@@ -92,3 +92,6 @@ Thumbs.db
 
 # Claude Code worktrees
 .claude/worktrees/
+
+# Local documents (not the product corpus; admins upload to S3)
+data/
