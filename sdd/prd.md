@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft v0.6 (refined from `initial-idea.md`; owner feedback and Bedrock model choices applied) |
+| **Status** | Draft v0.7 (refined from `initial-idea.md`; owner feedback, Bedrock models, credit policy, and hosting applied) |
 | **Owner** | Thao Dinh |
 | **Last updated** | 2026-10-01 |
 | **Lifecycle** | Build → Test → Deploy → Monitor ([The Agent Development Lifecycle](https://www.langchain.com/blog/the-agent-development-lifecycle)) |
@@ -42,7 +42,7 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 | **Chunk** | An embedded fragment of a Document, with metadata for citation and access control. |
 | **Citation** | Reference returned with an answer: document title, page/section, and chunk id. |
 | **Lesson Note** | A Markdown summary of what was learned in one or more threads, owned by one Learner. *Replaces "take keynote".* |
-| **Token credit** | The number of LLM tokens (input + output) a Learner may consume. Default **20,000** per user. |
+| **Token credit** | The number of LLM tokens (input + output) a Learner may consume. Default **2,000,000** per user; each Learner can raise or lower their own credit in settings, up to a system maximum. |
 
 ## 5. Goals and non-goals
 
@@ -50,7 +50,7 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 1. Learners get **grounded, cited answers** scoped to an enrolled subject.
 2. **Off-topic questions and prompt-injection attempts in user input are rejected** reliably.
 3. Learners can **create, update, edit, delete, and continue from Lesson Notes**.
-4. **Token usage is tracked** per user and per thread, and each user is limited by a **token credit** (default 20K).
+4. **Token usage is tracked** per user and per thread, and each user is limited by a self-adjustable **token credit** (default 2M).
 5. Every agent run is **traced and evaluated** in LangSmith (tool use, retrieval relevance, answer relevance), with human feedback used to calibrate LLM judges.
 6. All components require **authentication and authorization** via Keycloak; users can only see their own data.
 7. The agent is **deployed to AWS Bedrock AgentCore**.
@@ -71,7 +71,7 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 | D3 | A thread is bound to **one subject**; switching subject starts a new thread. | Keeps retrieval filters and evaluation simple. |
 | D4 | Subject access is **enforced in the RAG MCP server** using the user's forwarded access token (see §9.2), never by the agent's prompt alone. | The LLM must not be the access-control boundary. |
 | D5 | If the documents cannot support an answer, the agent says so rather than guessing. | Preserves groundedness. |
-| D6 | Each user has a **token credit, default 20K tokens**; when exhausted, new messages are blocked. | Owner decision; tiers are out of scope. |
+| D6 | Each user has a **token credit, default 2M tokens**, which the user can adjust themselves (up to a system maximum). When it is used up, new messages are blocked until the user raises it. | Owner decision. The credit works as a self-set budget; level-based tiers are out of scope. |
 | D7 | The only **untrusted input is the user's prompt**; injection defenses target it. | Documents are admin-uploaded; there are no web or third-party sources. |
 | D8 | Lesson Notes are **private to their owner**; stored as Markdown in S3 with metadata in PostgreSQL. | Data ownership requirement. |
 
@@ -84,7 +84,7 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 - Grounded answers with citations from the RAG MCP server.
 - Off-topic rejection and prompt-injection defenses on user input.
 - Lesson Notes: create from a thread, update from further chat, edit, delete, start a new thread from a note; note ↔ thread links.
-- Token usage (total and per thread) and per-user token credit enforcement.
+- Token usage (total and per thread), per-user token credit enforcement, and self-service credit adjustment.
 - Admin uploads documents to S3; S3 events keep the vector index in sync (create, replace, delete).
 - LangSmith tracing, evaluation suites, and human-feedback annotation (§10).
 - Agent deployed on Bedrock AgentCore.
@@ -98,7 +98,7 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 ## 8. User stories and acceptance criteria (MVP)
 
 **US-1 Register and sign in**
-- *Given* a new visitor, *when* they register with email + password, *then* a Keycloak account with the `learner` role is created, a 20K token credit is assigned, and they land on subject selection.
+- *Given* a new visitor, *when* they register with email + password, *then* a Keycloak account with the `learner` role is created, a 2M token credit is assigned, and they land on subject selection.
 - Unauthenticated calls to the API, agent, or MCP server return `401`.
 
 **US-2 Choose subjects**
@@ -125,7 +125,8 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 
 **US-8 Token usage and credit**
 - The learner sees tokens used (input/output) in total and per thread, and remaining credit.
-- *Given* remaining credit ≤ 0, *when* the learner sends a message, *then* the API rejects it (`402`/`429` with a clear message) without calling the agent. A turn already in progress may finish even if it overruns the credit.
+- *Given* remaining credit ≤ 0, *when* the learner sends a message, *then* the API rejects it (`402`/`429` with a clear message and a link to adjust the credit) without calling the agent. A turn already in progress may finish even if it overruns the credit.
+- *When* the learner changes their credit in settings to a value between their current usage and the system maximum, *then* the new limit applies to the next message. Values above the maximum or below current usage are rejected with a clear message. Every change is recorded (old value, new value, timestamp).
 - Usage figures match the token counts reported by the model endpoint for each completed turn.
 
 **US-9 Document sync via S3 events**
@@ -155,7 +156,7 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 | **Ingestion worker** | Consumes S3 `ObjectCreated` / `ObjectRemoved` events via SQS; extracts with Docling; chunks; embeds; upserts or deletes by `document_id` + `checksum`. |
 | **Smart Tutor agent** | Scope check, retrieval via MCP, cited answer, Lesson Note tool. Checkpointer and long-term memory in PostgreSQL. Reports token usage per turn. |
 | **API Server** | Auth, enrollments, threads, streaming (SSE), notes CRUD, usage and credit checks; forwards the user's token to the agent. |
-| **Web App** | Login/registration, subject selection, chat, notes editor, usage and credit view. |
+| **Web App** | Login/registration, subject selection, chat, notes editor, usage view, and credit settings. |
 
 ### 9.2 Identity propagation and access enforcement
 
@@ -164,7 +165,7 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 1. The Web App signs the user in with Keycloak (OIDC Authorization Code + PKCE) and calls the API with `Authorization: Bearer <access_token>`.
 2. The API validates the token (signature via Keycloak JWKS, `iss`, `exp`, `aud`), checks token credit, then invokes the agent and **forwards the same token**.
 3. The agent attaches the token to every MCP request (`Authorization` header on the streamable-HTTP transport). The token is passed in runtime context, **never placed in the prompt**, so the LLM cannot read or alter it.
-4. The MCP server validates the token itself, reads the user id (`sub`), looks up that user's enrolled subjects in PostgreSQL, and rejects the call (`403`) if the requested `subject` is not one of them. The `subject` filter is applied in SQL — the model cannot widen it.
+4. The MCP server (on AgentCore Runtime, §9.6) has the token validated by the runtime's `CUSTOM_JWT` authorizer against Keycloak's OIDC discovery URL; `Authorization` is on the runtime's request-header allowlist so the server receives it. The server reads the user id (`sub`), looks up that user's enrolled subjects in PostgreSQL, and rejects the call (`403`) if the requested `subject` is not one of them. The `subject` filter is applied in SQL — the model cannot widen it.
 
 Why enforce in the MCP server rather than in the agent: the agent's tool arguments are generated by the LLM, so a prompt injection could make it ask for `subject="other"`. The MCP server trusts only the verified token and the database, so even a fully compromised prompt cannot retrieve another subject's chunks.
 
@@ -175,7 +176,9 @@ Later hardening (not MVP): replace token forwarding with Keycloak **token exchan
 ### 9.3 Token credit
 
 - Usage is recorded per turn (`user_id`, `thread_id`, `input_tokens`, `output_tokens`, `model`, `timestamp`) from the `usage` block Bedrock returns on every Converse / Chat Completions response (no separate token-counting call is needed).
-- Credit check happens in the API **before** each turn; credit is lifetime (no reset) in the MVP — see Q2.
+- Credit check happens in the API **before** each turn. Credit is lifetime (no automatic reset); learners raise it themselves when needed.
+- Default credit is **2,000,000 tokens**. At roughly 6–7K tokens per turn (system prompt + ~5 chunks + recent history + answer), that is about 300 turns per learner.
+- The **system maximum** a learner may set is a config value (default 10,000,000 tokens) so a mistake or abuse cannot run up unbounded cost.
 - Embedding calls for search and ingestion are not charged to learners.
 
 ### 9.4 Model integration notes
@@ -198,12 +201,34 @@ Later hardening (not MVP): replace token forwarding with Keycloak **token exchan
 
 | Risk | Mitigation |
 |---|---|
-| **Tool calling.** The agent depends on calling MCP `search` and the Lesson Note tool. AWS documents *client-side tool calling* for Nemotron Nano 3 30B on the `bedrock-mantle` endpoint; tool use via Converse on `bedrock-runtime` is not listed. | M0 spike: verify streamed tool calls through the LangChain integration we choose. If unreliable, make retrieval a **fixed graph step** (always search before answering) rather than a model-chosen tool, and keep tools only for Lesson Notes. |
+| **Tool calling.** The agent depends on calling MCP `search` and the Lesson Note tool. AWS documents *client-side tool calling* for Nemotron Nano 3 30B on the `bedrock-mantle` endpoint; tool use via Converse on `bedrock-runtime` is not listed. | M0 spike: verify streamed tool calls through the LangChain integration we choose. **Fallback model:** `amazon.nova-2-lite-v1:0`. Its model card lists client-side tool calling on `bedrock-runtime` (works with `ChatBedrockConverse`), Nova models support **forcing a specific tool** (guarantees the `search` call), and it has US/EU/global cross-region profiles (1M context, 64K output; structured outputs not listed, so use a forced tool call for the scope decision). Last resort: make retrieval a **fixed graph step** and keep tools only for Lesson Notes. |
 | **Agent complexity.** Deep Agents adds a long system prompt and planning/filesystem tools; any mid-size model can lose focus on a narrow tutoring task. | Start with a minimal LangGraph agent (scope check → search → answer); add Deep Agents features only if evals stay green. The trajectory and scope evals (§10) decide. Keep the model ID behind a config switch. |
-| **Token cost vs. credit.** A 256K window and optional reasoning make it easy to send or generate far more tokens than a 20K credit allows. | Cap history and retrieved context per turn, keep reasoning off by default, and track tokens per turn in evals (§9.3, Q2). |
+| **Token cost per turn.** A 256K window and optional reasoning make it easy to send or generate far more tokens than a turn needs, burning learner credit and project budget. | Cap history and retrieved context per turn, keep reasoning off by default, and track tokens per turn in evals (§9.3). |
 | **Judge bias.** Grading with the agent's own model inflates scores. | Judges and synthetic data use `qwen.qwen3-32b-v1:0`, a different model family; calibrate it against human feedback (§10.2). |
 
-### 9.6 Stack
+### 9.6 Hosting options
+
+**Agent → AgentCore Runtime** (fixed by project goal).
+
+**RAG MCP server**
+
+| Option | Pros | Cons |
+|---|---|---|
+| **AgentCore Runtime, MCP protocol** *(recommended)* | Managed and serverless, with no cluster to run. Built-in `CUSTOM_JWT` authorizer validates Keycloak tokens via the OIDC discovery URL before requests reach our code, and the header allowlist forwards `Authorization` so the server can read `sub`. Same platform, deployment flow, and observability as the agent. Shows the full AgentCore story, which is a project goal. | Container must serve MCP at `0.0.0.0:8000/mcp`. Needs VPC networking to reach PostgreSQL (confirm setup in M0). Newer service, so fewer examples and less local-dev parity. Session-based pricing model to learn. |
+| AgentCore Gateway → Lambda targets | Turns Lambda functions into MCP tools with built-in inbound auth and tool discovery; scales to zero. | Extra hop and more moving parts. Passing the *user's* identity to the Lambda target needs extra configuration. Lambda cold starts plus PostgreSQL connections need RDS Proxy. Less control over MCP behavior. |
+| ECS Fargate | Plain container, same as local Docker; full control; easy VPC access and connection pooling to PostgreSQL. | We run the ALB, TLS, autoscaling, and JWT validation ourselves. At least one task always on, so it costs money while idle. |
+
+**API server (FastAPI)**
+
+| Option | Pros | Cons |
+|---|---|---|
+| **ECS Fargate + ALB** *(recommended)* | Long-lived SSE streams work naturally. Standard FastAPI with no adapters. Stable connection pool to PostgreSQL. Same container runs locally. | At least one task always on (small fixed monthly cost). We manage the ALB, scaling policy, and deployments. |
+| Lambda + Function URL / API Gateway | Scales to zero, very cheap at pilot scale, no servers. | SSE streaming from Python needs response streaming plus an adapter (e.g. Lambda Web Adapter); 15-minute max duration; cold starts on the chat path; PostgreSQL connections need RDS Proxy. |
+| AgentCore Runtime | One platform for everything. | Built for agent/MCP invocations, not a general REST API (notes CRUD, usage, settings). Poor fit. |
+
+**Decision (Q3):** Agent and RAG MCP server on **AgentCore Runtime**; API server on **ECS Fargate**. PostgreSQL on RDS in the same VPC.
+
+### 9.7 Stack
 
 | Concern | Choice |
 |---|---|
@@ -293,18 +318,18 @@ Trace every run; run answer-relevance and scope evaluators on a sample of produc
 | # | Question | Blocks | Default if unanswered |
 |---|---|---|---|
 | Q1 | Bedrock access details (Appendix A), especially a **region where both models are enabled** alongside AgentCore. | Build | — (required) |
-| Q2 | Is the 20K credit lifetime or does it reset (e.g. monthly)? Can an admin raise one user's credit manually? | Credit logic | Lifetime; admin can update via DB/script. |
-| Q3 | Where do the API and MCP servers run — AgentCore Gateway/Runtime or ECS/Lambda? | Deploy | Agent on AgentCore Runtime; API and MCP on ECS Fargate. |
+| Q2 | ~~Credit policy~~ **Resolved:** default 2M tokens, lifetime, self-adjustable by the learner up to a system maximum (§9.3). Confirm the 10M maximum. | Credit logic | 10M maximum. |
+| Q3 | ~~Hosting~~ **Resolved (recommended):** agent and MCP server on AgentCore Runtime, API on ECS Fargate (§9.6). | Deploy | — |
 | Q4 | Which subjects launch first? | Ingestion, evals | IELTS and AI Agents. |
 | Q5 | Retention period for threads and traces? | Privacy | 180 days. |
 | Q6 | Off-topic reply tone: strict or conversational? | UX copy | Short, friendly, suggests in-scope topics. |
-| Q7 | If the M0 spike shows Nemotron Nano 3 30B cannot call tools reliably through our LangChain integration, is a fixed "always search" step acceptable? | Agent design | Yes: fixed search step; tools only for Lesson Notes. |
+| Q7 | Agent model choice after the M0 spike. Candidates: `nvidia.nemotron-nano-3-30b` (current default), `nvidia.nemotron-super-3-120b` (stronger agentic model), and **fallback** `amazon.nova-2-lite-v1:0` (§9.5). | Agent design | Pick the cheapest candidate that passes all smoke-split evals; if none does, use a fixed "always search" step. |
 
 ## 14. Milestones
 
 | Milestone | Exit criteria |
 |---|---|
-| M0 Foundations | Repo, CI, Keycloak realm, PostgreSQL+pgvector, LangSmith project; all three Bedrock models reachable (Appendix A); **Nemotron Nano 3 30B tool-calling + streaming spike** done (§9.5) |
+| M0 Foundations | Repo, CI, Keycloak realm, PostgreSQL+pgvector, LangSmith project; all three Bedrock models reachable (Appendix A); **agent-model spike** done: Nemotron Nano 3 30B, Nemotron Super 3 120B, and Nova 2 Lite compared on tool calling, streaming, smoke-split evals, and first-token latency (§9.5, Q7); MCP server reachable on AgentCore Runtime with Keycloak JWT and VPC access to PostgreSQL |
 | M1 RAG MCP | S3-event ingestion + authenticated MCP search; retrieval-relevance eval passing |
 | M2 Agent | Grounded Q&A, scope guard, Lesson Note tool; all §10.1 evals passing on the smoke split |
 | M3 API + Web | Auth, chat streaming, notes, usage and credit; isolation tests passing |
