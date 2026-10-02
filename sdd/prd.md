@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft v1.4 (refined from `initial-idea.md`; learning loop; Docker Compose locally; all services incl. agent and MCP on EKS with Helm + CDK) |
+| **Status** | Draft v1.5 (refined from `initial-idea.md`; release roadmap R1/R2/R3; model abstraction and layered OOP architecture; all services on EKS) |
 | **Owner** | Thao Dinh |
 | **Last updated** | 2026-10-02 |
 | **Lifecycle** | Build → Test → Deploy → Monitor ([The Agent Development Lifecycle](https://www.langchain.com/blog/the-agent-development-lifecycle)) |
@@ -52,24 +52,29 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 
 ## 5. Goals and non-goals
 
-### Goals (MVP)
+### Goals: Release 1 (core tutor)
 1. Learners get **grounded, cited answers** within their enrolled subjects, **without choosing a subject** for each conversation.
 2. Questions the documents don't cover (off-topic or missing content) are **declined**, and **prompt-injection attempts in user input** have no effect.
 3. Learners can **create, edit, archive, and continue from Lesson Notes**, and a lifetime **learning record** tracks what they learned in each thread.
-4. Learners can **manage conversations and notes** (filter by date and subject), **take quizzes** generated from their notes, and **read daily/weekly reports** with recommendations for what to learn next.
+4. Learners can **manage conversations and notes** (filter by date and subject).
 5. **Token usage is tracked and shown** per thread and in total.
 6. Admins receive a weekly **content-gap report**.
-7. Every agent run is **traced and evaluated** in LangSmith (search step, subject detection, retrieval and answer relevance, quiz and recommendation quality), with human feedback used to calibrate LLM judges.
+7. Every agent run is **traced and evaluated** in LangSmith (search step, subject detection, retrieval and answer relevance), with human feedback used to calibrate LLM judges.
 8. All components require **authentication and authorization** via Keycloak; users can only see their own data.
-9. All services, including the agent and MCP server, are **deployed to Amazon EKS**.
+9. All services are **deployed to Amazon EKS**.
+10. Model access is **abstracted** and business logic is **encapsulated in classes**, so models can be swapped and features added without rewrites (§9.15).
 
-### Non-goals (MVP)
+### Goals: Release 2 (learning loop)
+11. Learners **take quizzes** generated from their notes, and **read daily/weekly reports** with recommendations for what to learn next.
+
+### Non-goals (Release 1)
+- Quizzes, daily/weekly reports, "what to learn next" recommendations, and the topic catalog (Release 2).
 - Token credits, quotas, or billing (usage is shown, not limited; cost is protected by rate limiting and budget alerts).
 - Free-text quiz answers graded by an LLM (multiple choice only); spaced-repetition scheduling.
 - Push or email notifications for reports (reports appear in the app).
 - Web search of any kind.
 - Admin web UI (admins work in S3 directly).
-- Deep Agents planning/filesystem features (a plain LangGraph flow is enough for the MVP).
+- Deep Agents planning/filesystem features (a plain LangGraph flow is enough for Release 1).
 - Defending against instructions embedded in documents (documents are admin-curated and trusted).
 - Document formats other than PDF; cross-subject threads; note sharing; mobile apps; non-English UI.
 
@@ -88,13 +93,18 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 | D9 | A **learning record** is written to long-term memory (a) when the learner asks for a note, and (b) automatically when the thread has been idle for `learning_record_idle_minutes` (default 10, admin-configurable). Records span all subjects so later reports can summarize across subjects. | Lifetime progress tracking even for learners who never create notes; foundation for daily/weekly reports and recommendations. |
 | D10 | Documents are **never deleted**. Archiving removes a document from search but keeps its chunks, so old citations still resolve; the S3 object moves to Glacier. | Owner decision; keeps history intact. |
 | D11 | Conversations, notes, quizzes, and reports all use **soft delete (archive)** and support **filtering by date and subject**. | One consistent management model across the app. |
-| D12 | Quizzes are **multiple choice only**, generated from **selected Lesson Notes** (active notes only) and **graded in code**. | Deterministic, cheap grading; testable answer keys. |
-| D13 | Reports are generated **automatically** (daily and weekly, in the learner's time zone, only when there was activity) and **on demand**, covering **all subjects**. | Learners get a summary without asking; one view across subjects. |
-| D14 | "What to learn next" picks topics **only from the topic catalog** of enrolled subjects, prioritizing weak quiz topics, then topics not yet covered. Requested from the Reports screen, not in chat. | Grounded, explainable recommendations; chat threads stay subject-bound (D3). |
+| D12 | *(Release 2)* Quizzes are **multiple choice only**, generated from **selected Lesson Notes** (active notes only) and **graded in code**. | Deterministic, cheap grading; testable answer keys. |
+| D13 | *(Release 2)* Reports are generated **automatically** (daily and weekly, in the learner's time zone, only when there was activity) and **on demand**, covering **all subjects**. | Learners get a summary without asking; one view across subjects. |
+| D14 | *(Release 2)* "What to learn next" picks topics **only from the topic catalog** of enrolled subjects, prioritizing weak quiz topics, then topics not yet covered. Requested from the Reports screen, not in chat. | Grounded, explainable recommendations; chat threads stay subject-bound (D3). |
+| D15 | LLM and embedding calls go through **provider interfaces** created by a config-driven factory; no business code references a model ID or vendor SDK directly. | Switch models (or providers) by configuration, not code changes. |
+| D16 | Business logic lives in **domain classes and application services** (OOP, layered); LangGraph nodes, API routes, and jobs are thin and call services. | Readability, testability, and safe changes as features grow. |
+| D17 | **Release 1** ships the core tutor; quizzes, reports, recommendations, and the topic catalog move to **Release 2**. Learning records stay in Release 1 so Release 2 has history to report on. | Smaller first release; no data gap when Release 2 lands. |
 
 ## 7. Scope
 
-### MVP (v1.0)
+Scope is split by release; the roadmap with milestones is in §14.
+
+### Release 1: core tutor
 - Registration, login, logout via **Keycloak's hosted pages**.
 - Enroll in / leave subjects.
 - Start a chat without choosing a subject; subject auto-detected (or picked when unsure); streamed responses.
@@ -104,26 +114,31 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 - Lifetime learning records, written on note creation and after 10 idle minutes (configurable).
 - Off-subject follow-up questions rejected, with a "New conversation" option.
 - Conversation management: list, filter by date and subject, open, view the linked note, archive and restore.
-- Note management: filter by date and subject; generate a multiple-choice quiz from selected notes; take it and see results.
-- Daily/weekly reports across subjects (automatic and on demand), filter and archive; "What should I learn next day/week?" recommendations.
-- Topic catalog per subject, derived from document headings at ingestion.
+- Note management: list, filter by date and subject, open the source conversation, archive and restore.
 - Token usage view (per thread and total); per-user rate limiting.
 - PDF ingestion from S3 events: add, replace (new version), archive, unarchive.
 - Weekly content-gap report for Admins.
 - LangSmith tracing, evaluation suites, and human-feedback annotation (§10).
 - All services (web, API, agent, MCP server, Keycloak, worker, scheduled jobs) on **Amazon EKS** (Helm); AWS resources managed with **AWS CDK**.
 - Local development with **Docker Compose** for dependency services.
+- Model provider abstraction and layered OOP code structure (§9.15).
 
-### Next (low priority)
-- Carry an answer's citations into the Lesson Note so each point links back to its source.
+### Release 2: learning loop
+- Topic catalog per subject, derived from document headings at ingestion (backfilled for documents ingested in Release 1).
+- Generate a multiple-choice quiz from selected notes; take it, see results, retake, archive.
+- Daily/weekly reports across subjects (automatic and on demand), filter and archive.
+- "What should I learn next day/week?" recommendations.
+- Carry an answer's citations into the Lesson Note (low priority).
 
-### Later
+### Release 3 and later (backlog)
 - Free-text quiz questions with LLM grading; spaced repetition; report notifications (email/push).
 - Optional admin-written subject metadata (`_subject.json`: display name, description, curated topic list) to refine the topic catalog.
 - Token credit tiers by user level (L1-Silver, L2-Golden).
 - Admin UI; more document formats; web search; note sharing; multilingual UI; mobile app.
 
-## 8. User stories and acceptance criteria (MVP)
+## 8. User stories and acceptance criteria
+
+US-1 to US-13b are **Release 1**; US-14 to US-16 are **Release 2**.
 
 **US-1 Register and sign in**
 - *Given* a new visitor, *when* they choose "Sign up", *then* they register on Keycloak's hosted page (with Keycloak email verification), get the `learner` role, and land on subject enrollment.
@@ -185,18 +200,21 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 - Opening a conversation shows its history and, if one exists, its **linked Lesson Note** with a link to open it.
 - They can **archive** and **restore** a conversation; archived conversations are hidden by default, viewable under "Archived", and read-only.
 
-**US-14 Manage notes and generate a quiz**
-- The learner sees their notes with subject, date, and a link to the source conversation; they can filter by **date range** and **subject**.
+**US-13b Manage notes** *(Release 1)*
+- The learner sees their notes with subject, date, and a link to the source conversation; they can filter by **date range** and **subject**, and combine both.
+- They can archive and restore notes (US-7).
+
+**US-14 Generate a quiz from notes** *(Release 2)*
 - *When* they select 1–10 active notes and click "Generate quiz", *then* the tutor creates a quiz of 5–10 multiple-choice questions (4 options, exactly one correct), each tagged with subject and topic, using only the content of the selected notes.
 - *When* they submit answers, *then* the quiz is graded in code; they see their score, the correct answers, a short explanation for each, and their score per topic.
 - They can list past quizzes (filter by date and subject), retake one, and archive it.
 
-**US-15 Daily and weekly reports**
+**US-15 Daily and weekly reports** *(Release 2)*
 - *Given* a day (or week, Monday to Sunday) in the learner's time zone with activity, *when* it ends, *then* a report is generated automatically covering **all subjects**: topics learned (from learning records), number of conversations, quiz results, weak topics (quiz topics scored below 60%), and recommendations for the next period.
 - No report is generated for a period without activity.
 - The learner can generate a report for the current day or week on demand ("Generate now"), list reports (filter by period type and date), view, and archive them.
 
-**US-16 What should I learn next?**
+**US-16 What should I learn next?** *(Release 2)*
 - *When* the learner clicks "What should I learn tomorrow?" or "…next week?", *then* the tutor returns 3–5 recommendations, each with: subject, topic, the reason (e.g. "quiz score 40%" or "not studied yet"), and where to read it (document title and page).
 - Recommendations come only from the topic catalog of enrolled subjects and active documents; weak topics come first, then topics not yet covered.
 - Each recommendation has a "Start learning" action that starts a new conversation bound to that subject with the topic as the first question.
@@ -221,7 +239,7 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 | **Ingestion worker** | Consumes S3 `ObjectCreated` and `ObjectTagging` events via SQS; extracts PDFs with Docling; chunks; embeds; activates or archives chunks by `document_id` + `version_id`; updates the topic catalog (§9.7). |
 | **Smart Tutor agent** | The paths in §9.2 (ask, summarize, idle record, quiz, report, recommend). Checkpointer (thread history) and long-term memory (learning records) in PostgreSQL. Reports token usage per call. |
 | **API Server** | Auth, enrollments, conversations, notes, quizzes, reports (list, filter, archive), streaming (SSE), quiz grading, usage view, rate limiting; forwards the user's token to the agent. |
-| **Scheduled jobs** (Kubernetes CronJobs) | Learning-record sweeper (every minute, §9.2); learner reports (hourly, generates reports for learners whose day/week just ended in their time zone, §9.8); content-gap report (weekly, §9.6). |
+| **Scheduled jobs** (Kubernetes CronJobs) | Learning-record sweeper (every minute, §9.2); content-gap report (weekly, §9.6); *Release 2:* learner reports (hourly, for learners whose day/week just ended in their time zone, §9.8). |
 | **Web App** | Keycloak login redirect, subject enrollment, chat, conversations, notes editor, quizzes, reports and recommendations, usage view. |
 
 ### 9.2 Agent flow
@@ -243,6 +261,8 @@ The graph state carries `subject` (null until bound). It is persisted by the che
 **Summarize path ("Summarize lesson" button):** read the thread → generate the Lesson Note and the learning record in one model call (the record returned via a `save_learning_record` tool call) → upsert the note (PostgreSQL) and the record (long-term memory).
 
 **Idle record path (background):** a sweeper runs every minute and selects threads where `last_message_at < now − learning_record_idle_minutes` and `last_message_at > record_written_at`. For each, it runs the record half of the summarize path (record only, no note) and sets `record_written_at`. The threshold is read from configuration on each sweep.
+
+**Release 2 paths** (quiz, report, recommend):
 
 **Quiz path ("Generate quiz" on selected notes):** load the selected active notes (ownership checked) → one model call returns the quiz via a `create_quiz` tool call (questions, 4 options, correct index, explanation, subject, topic) → code validates it (5–10 questions, exactly one correct option each, every topic present in the source notes; one retry on failure) → store the quiz without exposing the answer key to the client until submission. Grading is done by the API in code.
 
@@ -269,7 +289,7 @@ Network layer: the agent and MCP server are `ClusterIP` services with no ingress
 
 Keycloak setup: one realm with self-registration and email verification enabled; clients `smart-tutor-web` (public), `smart-tutor-api`, `rag-mcp`; an **audience mapper** so access tokens carry `aud: [smart-tutor-api, rag-mcp]`. Enrollments live in PostgreSQL, not in token claims, so changes apply immediately.
 
-Later hardening (not MVP): Keycloak **token exchange** (RFC 8693) so the MCP server receives a narrower, MCP-only token.
+Later hardening (Release 3+): Keycloak **token exchange** (RFC 8693) so the MCP server receives a narrower, MCP-only token.
 
 ### 9.4 Learner data
 
@@ -278,9 +298,9 @@ Later hardening (not MVP): Keycloak **token exchange** (RFC 8693) so the MCP ser
 | Lesson Note | PostgreSQL table `lesson_notes` | `thread_id` (unique) | `user_id`, `subject`, `markdown`, `status` (`active` / `archived`), `archived_at`, `source_note_id` (for "Discuss this note" threads), `updated_at`. No hard delete. |
 | Learning record | LangGraph long-term memory (PostgreSQL-backed store), namespace `("learning", user_id)` | `thread_id` | `subject`, `topics[]`, `key_points[]`, `note_id` (nullable), `trigger` (`note` / `idle`), `learned_at`, `updated_at`. |
 | Thread activity | PostgreSQL table `threads` | `thread_id` | `user_id`, `subject`, `title`, `status` (`active` / `archived`), `created_at`, `last_message_at`, `record_written_at` (drive the idle trigger). Indexed on `(user_id, subject, last_message_at)` for filtering. |
-| Quiz | PostgreSQL tables `quizzes`, `quiz_questions`, `quiz_attempts` | `quiz_id` | Source `note_ids[]`, subjects, questions (subject, topic, options, correct index, explanation), attempts with answers, score, per-topic scores, `status`. |
-| Report | PostgreSQL table `reports` | `report_id` | `user_id`, `period_type` (`daily` / `weekly`), `period_start`, `summary` (Markdown), `stats`, `recommendations[]`, `trigger` (`scheduled` / `on_demand`), `status`. Unique on `(user_id, period_type, period_start, trigger = scheduled)`. |
-| Learner profile | PostgreSQL table `learners` | `user_id` | `time_zone` (captured from the browser, editable), used to schedule reports. |
+| Quiz *(R2)* | PostgreSQL tables `quizzes`, `quiz_questions`, `quiz_attempts` | `quiz_id` | Source `note_ids[]`, subjects, questions (subject, topic, options, correct index, explanation), attempts with answers, score, per-topic scores, `status`. |
+| Report *(R2)* | PostgreSQL table `reports` | `report_id` | `user_id`, `period_type` (`daily` / `weekly`), `period_start`, `summary` (Markdown), `stats`, `recommendations[]`, `trigger` (`scheduled` / `on_demand`), `status`. Unique on `(user_id, period_type, period_start, trigger = scheduled)`. |
+| Learner profile | PostgreSQL table `learners` | `user_id` | `time_zone` (captured from the browser in Release 1, editable), used to schedule reports in Release 2. |
 | Setting | Configuration (AWS SSM Parameter Store) | `/smart-tutor/learning-record-idle-minutes` | Default 10; admins change it without a redeploy. |
 
 - The namespace is per learner, **not per subject**, so daily/weekly reports can summarize across all subjects with one query and group by `subject`.
@@ -303,7 +323,7 @@ S3 **versioning** is enabled on the documents bucket, and documents are never de
 - a rule filtered on tag `status=archived` transitions current objects to **S3 Glacier Flexible Retrieval** (e.g. after 30 days);
 - a rule on **noncurrent versions** transitions replaced versions the same way.
 
-Archived chunks keep their text, title, and page in PostgreSQL, so citations in old threads still display without reading the file from S3; the UI marks them "archived". Reading the original file back requires a Glacier restore (minutes to hours), which no MVP flow needs. Glacier classes have minimum storage durations (90 days for Flexible Retrieval), which is fine since documents are never deleted.
+Archived chunks keep their text, title, and page in PostgreSQL, so citations in old threads still display without reading the file from S3; the UI marks them "archived". Reading the original file back requires a Glacier restore (minutes to hours), which no planned flow needs. Glacier classes have minimum storage durations (90 days for Flexible Retrieval), which is fine since documents are never deleted.
 
 ### 9.6 Content-gap report
 
@@ -311,14 +331,14 @@ Archived chunks keep their text, title, and page in PostgreSQL, so citations in 
 - A weekly Kubernetes CronJob groups similar questions by embedding similarity, ranks groups by count, and writes `s3://…/reports/content-gaps/<subject>/<yyyy-ww>.md`.
 - Questions with very low scores are mostly off-topic; the report lists groups closest to the threshold first, since those are the most likely missing content.
 
-### 9.7 Topic catalog
+### 9.7 Topic catalog *(Release 2)*
 
 - At ingestion, the worker takes the section headings Docling extracts from each PDF (levels 1–2) and stores them as catalog entries: `subject`, `topic` (heading text), `document_id`, `version_id`, `page`, `status`, and an embedding of the heading.
 - Entries follow their document's status: archived documents' topics are excluded from recommendations.
 - No extra model call is needed. Documents with poor headings produce a thin catalog; the optional admin-written `_subject.json` (Later) can add a curated topic list.
 - "Covered" = a catalog topic whose embedding is close to a topic in the learner's learning records (threshold tuned on the eval set).
 
-### 9.8 Reports and scheduling
+### 9.8 Reports and scheduling *(Release 2)*
 
 - A scheduler runs **hourly** and finds learners whose local day (or week, ending Sunday) has just ended, using `learners.time_zone`.
 - For each with activity in that period (any message, note, or quiz attempt), it runs the report path (§9.2). Learners with no activity get no report.
@@ -403,7 +423,7 @@ At pilot scale the compute cost is similar (about $10/month on AgentCore vs $0�
 
 - CDK in Python keeps one language across the backend and infrastructure.
 - Cluster add-ons (AWS Load Balancer Controller, External Secrets Operator, metrics server) are installed with Helm by the same pipeline.
-- Environments: **local** and **prod** for the MVP; a `staging` namespace and CDK stage can be added later with the same charts and stacks.
+- Environments: **local** and **prod** for Releases 1–2; a `staging` namespace and CDK stage can be added later with the same charts and stacks.
 
 **Delivery (CI/CD).** On merge to `main`: run tests and the smoke evaluation split → build images and push to ECR → `cdk deploy` (AWS resources, when changed) → `helm upgrade` (all EKS workloads with the new image tags). Releases are gated on the full evaluation split (§10).
 
@@ -439,11 +459,41 @@ All environments run in **us-east-1 (N. Virginia)**, the only commercial region 
 
 **Open check (M0):** the Nova embeddings model card lists only `StartAsyncInvoke`, while the request schema documents synchronous `InvokeModel`. Query-time search needs the synchronous call; verify it before building M1.
 
+### 9.15 Code architecture and model abstraction
+
+**Layers.** One Python package shared by all deployables (API, agent, MCP server, worker, jobs). Dependencies point inward only.
+
+| Layer | Contains | May depend on |
+|---|---|---|
+| `domain` | Entities and value objects with their rules as methods, no I/O: `Subject`, `Learner`, `Thread` (e.g. `bind_subject()` refuses to rebind), `LessonNote` (`archive()`, `restore()`), `LearningRecord`, `Document`, `Chunk`, `Citation`, `TokenUsage`; *Release 2:* `Quiz` (`grade(answers)`), `Report`, `Recommendation`. | nothing |
+| `application` | Services, one per use case, orchestrating domain objects through ports: `SubjectDetector`, `AskService`, `NoteService`, `LearningRecordService`, `ConversationService`, `UsageService`, `ContentGapService`, `IngestionService`; *Release 2:* `QuizService`, `ReportService`, `RecommendationService`. | `domain`, `ports` |
+| `ports` | Abstract interfaces (Python ABCs): `ChatModel`, `EmbeddingModel`, `Retriever`, repositories (`ThreadRepository`, `NoteRepository`, …), `LearningMemory`, `Clock`. | `domain` |
+| `adapters` | Implementations of ports: Bedrock model adapters, PostgreSQL repositories, MCP search client, LangGraph store, S3/SQS clients. The only place vendor SDKs are imported. | `ports`, vendor SDKs |
+| `entrypoints` | FastAPI routes, LangGraph graph and nodes, MCP server tools, SQS worker, CronJobs. Each one parses input, calls a service, and formats output; no business rules. | `application` |
+
+**Model abstraction.**
+
+| Port | Methods | Release 1 adapter |
+|---|---|---|
+| `ChatModel` | `stream(messages, tools)`, `invoke(messages, tools)`, `structured(messages, schema)` → validated Pydantic object; every call returns normalized `TokenUsage` | `BedrockConverseChatModel` (Nova 2 Lite via `us.` profile; also used for the Qwen judge) |
+| `EmbeddingModel` | `embed_documents(texts)`, `embed_query(text)`, `model_id`, `dimension` | `NovaEmbeddingModel` |
+
+- **Vendor quirks stay inside adapters.** Nova's `GENERIC_INDEX` vs `TEXT_RETRIEVAL` maps onto `embed_documents` vs `embed_query`. `structured()` is a forced tool call on Nova (no native structured output) but can use native structured output on another provider. The inference profile ID, retries, and timeouts are adapter details.
+- **A `ModelFactory` builds models from configuration by role** (`agent`, `judge`, `embedding`): provider, model ID, and parameters. Business code asks for a role, never a model ID. Adapters may use LangChain internally (e.g. `ChatBedrockConverse`).
+- **Switching the chat or judge model** is a configuration change, released only after the full evaluation split passes as a LangSmith experiment comparing old and new models.
+- **Switching the embedding model** also needs a re-index: chunks record `embedding_model` and `embedding_dim`; a re-embed job writes new vectors alongside the old ones, search switches once complete, then the old vectors are dropped.
+
+**OOP guidelines.**
+- Dependencies are passed in through constructors (no globals or module-level clients), so services are unit-tested with fake adapters.
+- Domain objects protect their own invariants; services coordinate and hold no state between calls.
+- Pydantic models for API and tool payloads; domain classes stay free of framework types.
+- Each Release 2 module (quiz, report, recommendation) is added as new domain classes, services, and entrypoints, without changing Release 1 services.
+
 ## 10. Quality, safety, and evaluation
 
 ### 10.1 Evaluators
 
-| Evaluator | Type | What it checks | MVP target |
+| Evaluator | Type | What it checks | Target |
 |---|---|---|---|
 | **Search step ran** | Code | Every answered turn's trajectory contains the MCP `search` call, with `subjects` = the thread's subject (or the enrolled set on an unbound first turn). | 100% |
 | **Subject detection** | Code (labeled set) | Correct auto-bind / wrong auto-bind / asked when the question was clear. | ≥ 95% / ≤ 2% / ≤ 10% |
@@ -453,10 +503,10 @@ All environments run in **us-east-1 (N. Virginia)**, the only commercial region 
 | **Subject stays fixed** | Code | In multi-turn cases with an off-subject follow-up, `state.subject` is unchanged and no search runs outside it. | 100% |
 | **Learning record quality** | LLM-as-judge | The record's topics and key points match the thread content. | ≥ 0.8 |
 | **Injection resistance** | Code + LLM-as-judge | No system-prompt leakage, no scope change, no cross-subject or cross-user data. | 0 failures |
-| **Quiz validity** | Code | 5–10 questions, 4 options, exactly one correct, every question tagged with a subject and topic from the source notes. | 100% (after one retry) |
-| **Quiz quality** | LLM-as-judge | Each question is answerable from the source notes, has one clearly correct option, and is not trivial. | ≥ 0.85 |
-| **Recommendation grounding** | Code | Every recommended topic exists in the candidate list (catalog of enrolled subjects, active documents, or weak quiz topics). | 100% |
-| **Report faithfulness** | LLM-as-judge | The report summary states only what the period's records and quiz results contain. | ≥ 0.9 |
+| **Quiz validity** *(R2)* | Code | 5–10 questions, 4 options, exactly one correct, every question tagged with a subject and topic from the source notes. | 100% (after one retry) |
+| **Quiz quality** *(R2)* | LLM-as-judge | Each question is answerable from the source notes, has one clearly correct option, and is not trivial. | ≥ 0.85 |
+| **Recommendation grounding** *(R2)* | Code | Every recommended topic exists in the candidate list (catalog of enrolled subjects, active documents, or weak quiz topics). | 100% |
+| **Report faithfulness** *(R2)* | LLM-as-judge | The report summary states only what the period's records and quiz results contain. | ≥ 0.9 |
 
 *Recommended addition:* an LLM-as-judge **groundedness** check (answer vs. retrieved chunks), since an answer can be relevant yet unsupported.
 
@@ -478,7 +528,7 @@ Admins curate the dataset, but **review generated candidates rather than write e
 4. **Human review gate.** Generated items go to a LangSmith annotation queue; only accepted items enter the dataset.
 5. **Stable, versioned splits.** A **smoke** split (~30 items, every PR) and a **full** split (before release); never edit a version a release was gated on.
 6. **Grow from production.** 👎-rated, judge-flagged, and content-gap questions, plus quiz questions learners flag, become candidates for the next dataset version.
-7. **Learning-loop fixtures.** Seed synthetic learners with notes, learning records, and quiz attempts across both subjects (including weak topics and untouched catalog topics) to test quizzes, reports, and recommendations end to end.
+7. **Learning-loop fixtures** *(Release 2)*. Seed synthetic learners with notes, learning records, and quiz attempts across both subjects (including weak topics and untouched catalog topics) to test quizzes, reports, and recommendations end to end.
 
 Suggested starting size per subject: 40 answerable, 10 unanswerable, 30 off-topic (incl. 10 near-scope), 20 detection/ambiguous, 40 adversarial.
 
@@ -491,7 +541,7 @@ Trace every run; run answer-relevance, decline, and detection evaluators on a sa
 | Area | Target |
 |---|---|
 | Scale | 50 concurrent learners, ≤ 5 subjects, ≤ 2,000 pages per subject |
-| Latency | First streamed token p95 ≤ 3 s; quiz generation p95 ≤ 15 s; on-demand report or recommendations p95 ≤ 30 s; list/filter screens p95 ≤ 500 ms; ingestion ≤ 5 min per document |
+| Latency | First streamed token p95 ≤ 3 s; list/filter screens p95 ≤ 500 ms; ingestion ≤ 5 min per document; *Release 2:* quiz generation p95 ≤ 15 s, on-demand report or recommendations p95 ≤ 30 s |
 | Availability | Best-effort; no data loss on restart (checkpointer and memory in PostgreSQL) |
 | Security | Every service validates Keycloak JWTs; secrets in AWS Secrets Manager; TLS everywhere; tokens never logged or put in prompts |
 | Rate limiting | Per user, e.g. 20 messages/minute (config) |
@@ -503,8 +553,8 @@ Trace every run; run answer-relevance, decline, and detection evaluators on a sa
 
 - **Quality:** all §10.1 targets met on release and held for 4 weeks in sampled production traces.
 - **Judge alignment:** ≥ 80% agreement between each LLM judge and human annotations.
-- **Engagement (pilot):** ≥ 60% of registered learners start ≥ 3 threads; ≥ 1 Lesson Note per active learner per week; ≥ 40% of active learners take ≥ 1 quiz per week.
-- **Learning loop:** ≥ 30% of recommendations lead to a "Start learning" conversation within the recommended period; average score on retaken quizzes improves over the first attempt.
+- **Engagement (pilot, Release 1):** ≥ 60% of registered learners start ≥ 3 threads; ≥ 1 Lesson Note per active learner per week.
+- **Learning loop (Release 2):** ≥ 40% of active learners take ≥ 1 quiz per week; ≥ 30% of recommendations lead to a "Start learning" conversation within the recommended period; average score on retaken quizzes improves over the first attempt.
 - **Trust:** < 5% of answers rated 👎.
 - **Content:** each weekly content-gap report leads to at least one document addition or a decision not to cover the topic.
 
@@ -528,17 +578,54 @@ Trace every run; run answer-relevance, decline, and detection evaluators on a sa
 | Q14 | Quizzes | Multiple choice from selected notes, graded in code (D12). |
 | Q15 | Reports and recommendations | Daily/weekly across subjects, automatic and on demand; recommendations from the topic catalog and weak quiz topics (D13, D14). |
 | Q16 | Environments and IaC | Local: Docker Compose for dependencies. Prod: EKS with Helm; AWS resources with AWS CDK (Python) (§9.12). |
+| Q17 | Model abstraction | `ChatModel` / `EmbeddingModel` ports with Bedrock adapters, built by a config-driven `ModelFactory` (D15, §9.15). |
+| Q18 | Code structure | Layered OOP: domain classes, application services, ports, adapters, thin entrypoints (D16, §9.15). |
+| Q19 | Release scope | Release 1 = core tutor; quizzes, reports, recommendations, and topic catalog in Release 2 (D17, §14). |
 
-## 14. Milestones
+## 14. Roadmap: releases and milestones
+
+```
+Release 1: core tutor                                   Release 2: learning loop          Release 3+: backlog
+M0 Foundations → M1 Knowledge base → M2 Tutor agent →   M5 Topic catalog + quizzes →      themes below, prioritized
+M3 App (API + Web) → M4 Production launch (R1)          M6 Reports + recommendations →    after Release 2 feedback
+                                                        M7 Production launch (R2)
+```
+
+Durations are set after M0, once the spikes are done and team size is known. Milestones within a release are sequential; M3 can start alongside M2 once the API contracts are agreed.
+
+**Release gate (every release):** full evaluation split meets the §10.1 targets for that release's evaluators; data-isolation tests pass; production smoke test passes after deploy.
+
+### Release 1: core tutor
 
 | Milestone | Exit criteria |
 |---|---|
-| M0 Foundations | Repo, CI, **Docker Compose** dev stack (PostgreSQL+pgvector, Keycloak with realm import, LocalStack) running with one command; CDK app skeleton (VPC, RDS, ECR) and Helm umbrella chart skeleton; Keycloak realm (hosted login, self-registration), LangSmith project; all three Bedrock models reachable (Appendix A); synchronous Nova embeddings `InvokeModel` verified; Nova 2 Lite streamed text + tool call verified through `ChatBedrockConverse`; agent → MCP call with a forwarded Keycloak JWT working in the Compose stack |
-| M1 RAG MCP | S3-event ingestion (add, new version, archive, unarchive) + topic catalog + authenticated MCP search; retrieval-relevance eval passing |
-| M2 Agent | Subject detection and `state.subject`, search, relevance gate, answer/off-subject rejection, summarize path, idle-record sweeper; all §10.1 evals passing on the smoke split |
-| M3 API + Web | Auth, enrollment, chat streaming, conversation and note management (filters, archive), usage view, rate limiting; isolation tests passing |
-| M4 Learning loop | Quiz generation and grading, daily/weekly reports (scheduled + on demand), "what to learn next"; quiz, recommendation, and report evals passing on the smoke split |
-| M5 Deploy + Monitor | CDK stacks (EKS, RDS, S3/SQS, IAM/Pod Identity) and Helm releases (all services, NetworkPolicies) deployed to prod via CI/CD, online evaluation, annotation queue, content-gap report job, dashboards and alerts |
+| M0 Foundations | Repo, CI, **Docker Compose** dev stack (PostgreSQL+pgvector, Keycloak with realm import, LocalStack) running with one command; CDK app skeleton (VPC, RDS, ECR) and Helm umbrella chart skeleton; Keycloak realm (hosted login, self-registration), LangSmith project; all three Bedrock models reachable (Appendix A); synchronous Nova embeddings `InvokeModel` verified; Nova 2 Lite streamed text + tool call verified through `ChatBedrockConverse`; agent → MCP call with a forwarded Keycloak JWT working in the Compose stack; **package skeleton with the layers of §9.15, `ChatModel`/`EmbeddingModel` ports, Bedrock adapters, and `ModelFactory`** |
+| M1 Knowledge base | S3-event ingestion (add, new version, archive, unarchive) + authenticated MCP search; retrieval-relevance eval passing |
+| M2 Tutor agent | Subject detection and `state.subject`, search, relevance gate, answer/off-subject rejection, summarize path, idle-record sweeper, learning records; Release 1 evals passing on the smoke split |
+| M3 App (API + Web) | Auth, enrollment, chat streaming, conversation and note management (filters, archive), usage view, rate limiting; isolation tests passing |
+| M4 Production launch (R1) | CDK stacks (EKS, RDS, S3/SQS, IAM/Pod Identity) and Helm releases (all services, NetworkPolicies) deployed to prod via CI/CD; online evaluation, annotation queue, content-gap report job, dashboards and alerts; release gate passed; **pilot starts** |
+
+### Release 2: learning loop
+
+Starts after the Release 1 pilot has run long enough to produce real learning records (useful for tuning weak-topic and "covered" thresholds).
+
+| Milestone | Exit criteria |
+|---|---|
+| M5 Topic catalog + quizzes | Topic catalog built at ingestion and backfilled for existing documents; quiz generation from selected notes, code grading, retake, archive; quiz validity and quality evals passing |
+| M6 Reports + recommendations | Time-zone-aware report scheduler, report and recommend paths, on-demand generation, report list/filter/archive; recommendation grounding and report faithfulness evals passing |
+| M7 Production launch (R2) | Release 2 deployed; monitoring and alerts for the new paths; learning-loop metrics (§12) baselined; release gate passed |
+
+### Release 3 and later: backlog themes
+
+Prioritized after Release 2 feedback; not ordered.
+
+| Theme | Items |
+|---|---|
+| Content and citations | Citations carried into Lesson Notes (if not done in R2); `_subject.json` subject metadata; more document formats |
+| Learning | Free-text quiz answers with LLM grading; spaced repetition; report notifications (email/push) |
+| Platform | Staging environment; Keycloak token exchange for the MCP server; queue-based autoscaling for the worker (e.g. KEDA); admin UI |
+| Business | Token credit tiers by user level (L1-Silver, L2-Golden) |
+| Reach | Note sharing; multilingual UI; mobile app; web search |
 
 ---
 
