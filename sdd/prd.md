@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft v1.0 (refined from `initial-idea.md`; simplified scope, all open questions resolved) |
+| **Status** | Draft v1.1 (refined from `initial-idea.md`; simplified scope; note soft delete, learning-record triggers, subject in agent state) |
 | **Owner** | Thao Dinh |
 | **Last updated** | 2026-10-02 |
 | **Lifecycle** | Build → Test → Deploy → Monitor ([The Agent Development Lifecycle](https://www.langchain.com/blog/the-agent-development-lifecycle)) |
@@ -37,12 +37,12 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 |---|---|
 | **Subject** | The unit of scope and access control (e.g. `ielts`, `ai-agents`), represented by an S3 prefix `subjects/<subject>/`. Created by an Admin; never deleted. |
 | **Enrolled subjects** | The subjects a Learner has chosen ("favorites"). The tutor only detects, searches, and answers within enrolled subjects. |
-| **Thread** | One conversation. Bound to exactly **one** subject, set automatically from the first question (or chosen by the learner when detection is unsure). The subject cannot change mid-thread. |
+| **Thread** | One conversation. Bound to exactly **one** subject, set automatically from the first question (or chosen by the learner when detection is unsure) and stored in the **agent state**. The subject cannot change mid-thread; questions outside it are rejected. |
 | **Document** | A PDF uploaded by an Admin to a subject's S3 prefix. Identified by its S3 key; never deleted, only **archived**. Treated as trusted content. |
 | **Chunk** | An embedded fragment of a Document version, with metadata for citation, status (`active` / `archived`), and access control. |
 | **Citation** | Reference returned with an answer: document title and page. |
-| **Lesson Note** | A Markdown summary of one thread, owned by one Learner. **One note per thread.** |
-| **Learning record** | A lifetime entry in the learner's long-term memory describing what was learned in a thread (subject, topics, key points), linked to its Lesson Note. |
+| **Lesson Note** | A Markdown summary of one thread, owned by one Learner. **One note per thread.** Never hard-deleted; "delete" archives it. |
+| **Learning record** | A lifetime entry in the learner's long-term memory describing what was learned in a thread (subject, topics, key points). Written when the learner creates a note **or** automatically after the thread has been idle for a configurable time (default 10 minutes). |
 | **Content gap** | An in-subject question the documents could not answer; reported to Admins. |
 
 ## 5. Goals and non-goals
@@ -50,7 +50,7 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 ### Goals (MVP)
 1. Learners get **grounded, cited answers** within their enrolled subjects, **without choosing a subject** for each conversation.
 2. Questions the documents don't cover (off-topic or missing content) are **declined**, and **prompt-injection attempts in user input** have no effect.
-3. Learners can **create, edit, delete, and continue from Lesson Notes**, and each note adds to a lifetime **learning record**.
+3. Learners can **create, edit, archive, and continue from Lesson Notes**, and a lifetime **learning record** tracks what they learned in each thread.
 4. **Token usage is tracked and shown** per thread and in total.
 5. Admins receive a weekly **content-gap report**.
 6. Every agent run is **traced and evaluated** in LangSmith (search step, subject detection, retrieval relevance, answer relevance), with human feedback used to calibrate LLM judges.
@@ -72,13 +72,13 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 |---|---|---|
 | D1 | **Subject** is the single scope concept; access = enrolled subjects. | Draft mixed "favorite", "role", and "subject". |
 | D2 | The corpus is **whatever Admins upload** under `subjects/<subject>/` in S3. | Owner decision. |
-| D3 | A thread's subject is **auto-detected** from the first question among the learner's enrolled subjects; if detection is unsure, the learner picks one. The subject is then fixed for the thread. | No subject picker before chatting; retrieval and evaluation stay simple. |
+| D3 | A thread's subject is **auto-detected** from the first question among the learner's enrolled subjects; if detection is unsure, the learner picks one. The subject is then stored in the **agent state** and fixed for the thread. Later questions outside the subject are **rejected**, asking the learner to stay within the subject or start a new conversation. | No subject picker before chatting; retrieval and evaluation stay simple. |
 | D4 | Subject access is **enforced in the RAG MCP server** using the user's forwarded access token (§9.3), never by the agent's prompt. | The LLM must not be the access-control boundary. |
 | D5 | **Search always runs first** (a fixed graph step, not a model decision). Off-topic questions and in-subject questions the documents don't cover get the **same friendly decline**. | Fewer model calls, a predictable trajectory, and one rule instead of two. |
 | D6 | **No token credit.** Usage is recorded and displayed; cost is protected by per-user rate limits and Bedrock budget alerts. | Owner decision, for simplicity. A credit that users can raise or reset at will doesn't limit anything. |
 | D7 | The only **untrusted input is the user's prompt**; injection defenses target it. | Documents are admin-uploaded; there are no web or third-party sources. |
-| D8 | **One Lesson Note per thread**, stored in **PostgreSQL**, private to its owner. | Removes many-to-many links and S3/DB duplication; ownership checks are a single query. |
-| D9 | Each note create/update writes a **learning record** to long-term memory. | Lifetime progress tracking; foundation for later reports and recommendations. |
+| D8 | **One Lesson Note per thread**, stored in **PostgreSQL**, private to its owner. **Soft delete only**: "delete" archives the note; there is no hard delete. | Removes many-to-many links and S3/DB duplication; nothing a learner wrote is lost. |
+| D9 | A **learning record** is written to long-term memory (a) when the learner asks for a note, and (b) automatically when the thread has been idle for `learning_record_idle_minutes` (default 10, admin-configurable). Records span all subjects so later reports can summarize across subjects. | Lifetime progress tracking even for learners who never create notes; foundation for daily/weekly reports and recommendations. |
 | D10 | Documents are **never deleted**. Archiving removes a document from search but keeps its chunks, so old citations still resolve; the S3 object moves to Glacier. | Owner decision; keeps history intact. |
 
 ## 7. Scope
@@ -89,8 +89,9 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 - Start a chat without choosing a subject; subject auto-detected (or picked when unsure); streamed responses.
 - Grounded answers with citations (title + page) from the RAG MCP server.
 - Friendly decline for off-topic or uncovered questions; prompt-injection defenses on user input.
-- Lesson Notes (one per thread): create or overwrite via "Summarize lesson", edit, delete, "Discuss this note" (starts a new thread).
-- Lifetime learning record written on each note create/update.
+- Lesson Notes (one per thread): create or overwrite via "Summarize lesson", edit, archive (soft delete) and restore, "Discuss this note" (starts a new thread).
+- Lifetime learning records, written on note creation and after 10 idle minutes (configurable).
+- Off-subject follow-up questions rejected, with a "New conversation" option.
 - Token usage view (per thread and total); per-user rate limiting.
 - PDF ingestion from S3 events: add, replace (new version), archive, unarchive.
 - Weekly content-gap report for Admins.
@@ -123,8 +124,10 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 **US-4 Ask a grounded question**
 - *Given* a thread bound to subject *S*, *when* the learner asks a question, *then* the search step retrieves chunks **only from S**, and a streamed answer based on them lists ≥ 1 citation (document title, page).
 
-**US-5 Decline when not covered**
-- *When* the retrieved chunks don't support an answer (off-topic or missing content), *then* the tutor declines in one or two friendly sentences, without answering from its own knowledge, and suggests asking something within *S*.
+**US-5 Reject questions outside the thread's subject**
+- *Given* a thread bound to subject *S*, *when* a question is outside *S* or the documents of *S* don't support an answer, *then* the tutor declines in one or two friendly sentences, without answering from its own knowledge: "This conversation is about *S*. Please ask a question about *S*, or start a new conversation for other topics."
+- The decline shows a **"New conversation"** action; the new thread detects its subject from the question the learner asks there.
+- The thread's subject never changes as a result of a later question.
 - Each decline is logged as a content-gap candidate (§9.6).
 
 **US-6 Prompt-injection resistance**
@@ -132,12 +135,16 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 
 **US-7 Lesson Note**
 - *When* the learner clicks "Summarize lesson" in a thread, *then* the tutor writes a Markdown note for that thread (creating it, or overwriting the previous version) and shows it in the learner's notes list.
-- The learner can view, edit (Markdown editor), and delete a note; deleting a note does not delete the thread.
+- The learner can view and edit (Markdown editor) a note.
+- *When* the learner deletes a note, *then* it is **archived** (soft delete): hidden from the notes list, shown under "Archived", and restorable. Notes are never hard-deleted, and archiving does not affect the thread or its learning record.
 - *When* they choose "Discuss this note", *then* a new thread starts, bound to the note's subject, with the note as context and a link back to the source note.
 
 **US-8 Learning record**
-- *When* a note is created or overwritten, *then* a learning record (subject, topics, key points, thread id, note id, timestamp) is upserted in long-term memory for that learner.
-- *When* a note is deleted, *then* its learning record is kept (lifetime history) but marked as having no note.
+- **Trigger 1 (on request):** *when* the learner clicks "Summarize lesson", *then* the note and the thread's learning record (subject, topics, key points, thread id, note id, timestamp) are written together.
+- **Trigger 2 (idle):** *given* a thread with new messages since its last record, *when* no message has been sent for `learning_record_idle_minutes` (default 10), *then* the thread's learning record is written or updated, without creating a note.
+- *When* an admin changes `learning_record_idle_minutes`, *then* the new value applies from the next sweep, with no redeploy.
+- There is at most one learning record per thread; each trigger updates it in place.
+- Learning records are stored across all of a learner's subjects (subject is a field), so a single query can summarize a day or week across subjects.
 
 **US-9 Token usage**
 - The learner sees input/output tokens per thread and in total; figures match the `usage` reported by Bedrock for each completed turn.
@@ -176,6 +183,7 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 | **Smart Tutor agent** | The fixed flow in §9.2. Checkpointer (thread history) and long-term memory (learning records) in PostgreSQL. Reports token usage per turn. |
 | **API Server** | Auth, enrollments, threads, streaming (SSE), notes CRUD, usage view, rate limiting; forwards the user's token to the agent. |
 | **Report job** | Weekly scheduled task that builds the content-gap report (§9.6). |
+| **Learning-record sweeper** | Scheduled every minute; writes learning records for threads idle longer than the configured time (§9.2). |
 | **Web App** | Keycloak login redirect, subject enrollment, chat, notes editor, usage view. |
 
 ### 9.2 Agent flow
@@ -184,15 +192,19 @@ A plain **LangGraph** graph; no model-chosen tools for retrieval.
 
 **Ask path (every chat turn):**
 
-1. **Resolve subject.** If the thread is bound, use its subject. Otherwise, run step 2 across **all enrolled subjects**, score each subject by its best chunk similarity, and:
-   - bind the thread if the best subject's score ≥ `detect_threshold` **and** leads the runner-up by ≥ `detect_margin`;
+The graph state carries `subject` (null until bound). It is persisted by the checkpointer with the thread, written once, and never changed by later turns.
+
+1. **Resolve subject.** If `state.subject` is set, use it. Otherwise, run step 2 across **all enrolled subjects**, score each subject by its best chunk similarity, and:
+   - set `state.subject` if the best subject's score ≥ `detect_threshold` **and** leads the runner-up by ≥ `detect_margin`;
    - otherwise reply "Which subject is this about?" with the enrolled subjects as choices, and stop this turn.
    - Learners with one enrolled subject skip detection. Threshold and margin are tuned on the detection dataset (§10.3).
 2. **Search (fixed step).** Call the MCP `search` with the thread's subject and the question; get the top-k chunks (k = 5). The same search results serve both detection and answering, so the first turn costs no extra calls.
-3. **Relevance gate (code).** If the best score is below `answer_floor`, decline without calling the LLM and log a content-gap candidate.
-4. **Answer (Nova 2 Lite, streamed).** System prompt + capped recent history + chunks. The model either answers with citations or calls its only tool, `decline(reason)`, when the chunks don't support an answer; a decline is logged as a content-gap candidate.
+3. **Relevance gate (code).** If the best score in `state.subject` is below `answer_floor` (typical for a question about another subject), reject with the off-subject message (US-5) without calling the LLM, and log a content-gap candidate.
+4. **Answer (Nova 2 Lite, streamed).** System prompt (naming `state.subject`) + capped recent history + chunks. The model either answers with citations or calls its only tool, `decline(reason)`, when the question is outside the subject or the chunks don't support an answer; the decline is shown with the same off-subject message and logged.
 
-**Summarize path ("Summarize lesson" button):** read the thread → generate the Lesson Note and a learning record in one model call (the record returned via a `save_learning_record` tool call) → upsert the note (PostgreSQL) and the record (long-term memory).
+**Summarize path ("Summarize lesson" button):** read the thread → generate the Lesson Note and the learning record in one model call (the record returned via a `save_learning_record` tool call) → upsert the note (PostgreSQL) and the record (long-term memory).
+
+**Idle record path (background):** a sweeper runs every minute and selects threads where `last_message_at < now − learning_record_idle_minutes` and `last_message_at > record_written_at`. For each, it runs the record half of the summarize path (record only, no note) and sets `record_written_at`. The threshold is read from configuration on each sweep.
 
 Because the subject comes from code and the database, not from the model, attacks like "search subject X" have nothing to change.
 
@@ -211,10 +223,15 @@ Later hardening (not MVP): Keycloak **token exchange** (RFC 8693) so the MCP ser
 
 | Data | Store | Key | Notes |
 |---|---|---|---|
-| Lesson Note | PostgreSQL table `lesson_notes` | `thread_id` (unique) | `user_id`, `subject`, `markdown`, `source_note_id` (for "Discuss this note" threads), `updated_at`. |
-| Learning record | LangGraph long-term memory (PostgreSQL-backed store), namespace `("learning", user_id, subject)` | `thread_id` | `topics[]`, `key_points[]`, `note_id`, `learned_at`, `updated_at`. Upserted on every note create/overwrite; kept when the note is deleted. |
+| Lesson Note | PostgreSQL table `lesson_notes` | `thread_id` (unique) | `user_id`, `subject`, `markdown`, `status` (`active` / `archived`), `archived_at`, `source_note_id` (for "Discuss this note" threads), `updated_at`. No hard delete. |
+| Learning record | LangGraph long-term memory (PostgreSQL-backed store), namespace `("learning", user_id)` | `thread_id` | `subject`, `topics[]`, `key_points[]`, `note_id` (nullable), `trigger` (`note` / `idle`), `learned_at`, `updated_at`. |
+| Thread activity | PostgreSQL table `threads` | `thread_id` | `last_message_at`, `record_written_at` (drive the idle trigger). |
+| Setting | Configuration (AWS SSM Parameter Store) | `/smart-tutor/learning-record-idle-minutes` | Default 10; admins change it without a redeploy. |
 
-Records are written only on "Summarize lesson", never on every chat turn, so there is no per-turn memory cost. Daily/weekly reports and "what to learn next" read these records later.
+- The namespace is per learner, **not per subject**, so daily/weekly reports can summarize across all subjects with one query and group by `subject`.
+- Records are written only by the two triggers, never on every chat turn, so there is no per-turn memory cost.
+- Model tokens used to write records are recorded as background usage of the thread and appear in the learner's usage view.
+- Daily/weekly reports and "what to learn next" read these records later.
 
 ### 9.5 Documents: versions and archiving
 
@@ -272,7 +289,7 @@ Archived chunks keep their text, title, and page in PostgreSQL, so citations in 
 | Agent | **AgentCore Runtime** | Project goal. |
 | RAG MCP server | **AgentCore Runtime** (MCP protocol, served at `0.0.0.0:8000/mcp`) | Managed; built-in `CUSTOM_JWT` authorizer for Keycloak; forwards `Authorization`; same platform and observability as the agent. |
 | API server | **ECS Fargate + ALB** | Long-lived SSE streams, standard FastAPI, stable PostgreSQL connection pool. |
-| Ingestion worker, report job | ECS Fargate tasks (SQS consumer; scheduled task) | Same container tooling as the API. |
+| Ingestion worker, report job, learning-record sweeper | ECS Fargate tasks (SQS consumer; EventBridge Scheduler tasks) | Same container tooling as the API. |
 | Database | RDS PostgreSQL + pgvector, same VPC | |
 
 Alternatives considered: MCP via AgentCore Gateway → Lambda (extra hop, harder identity pass-through, RDS Proxy needed) or MCP on Fargate (we would run ALB, TLS, and JWT validation ourselves); API on Lambda (Python SSE needs an adapter, 15-minute limit, cold starts).
@@ -316,7 +333,9 @@ All environments run in **us-east-1 (N. Virginia)**, the only commercial region 
 | **Subject detection** | Code (labeled set) | Correct auto-bind / wrong auto-bind / asked when the question was clear. | ≥ 95% / ≤ 2% / ≤ 10% |
 | **Retrieval relevance** | LLM-as-judge | Relevance of retrieved chunks to the question (0–1 per chunk; averaged). | ≥ 0.8 |
 | **Answer relevance** | LLM-as-judge | Relevance of the final answer to the question. | ≥ 0.85 |
-| **Decline correctness** | Code (labeled set) | Off-topic and uncovered questions declined / answerable questions wrongly declined. | ≥ 95% / ≤ 5% |
+| **Decline correctness** | Code (labeled set) | Off-topic, off-subject follow-up, and uncovered questions declined / answerable questions wrongly declined. | ≥ 95% / ≤ 5% |
+| **Subject stays fixed** | Code | In multi-turn cases with an off-subject follow-up, `state.subject` is unchanged and no search runs outside it. | 100% |
+| **Learning record quality** | LLM-as-judge | The record's topics and key points match the thread content. | ≥ 0.8 |
 | **Injection resistance** | Code + LLM-as-judge | No system-prompt leakage, no scope change, no cross-subject or cross-user data. | 0 failures |
 
 *Recommended addition:* an LLM-as-judge **groundedness** check (answer vs. retrieved chunks), since an answer can be relevant yet unsupported.
@@ -334,7 +353,7 @@ All environments run in **us-east-1 (N. Virginia)**, the only commercial region 
 Admins curate the dataset, but **review generated candidates rather than write every example**:
 
 1. **Synthetic Q&A from the corpus.** Sample chunks per subject; the judge model generates questions, reference answers, and the source chunk id (retrieval ground truth for free). Mix factual, conceptual, multi-chunk, and **unanswerable-but-on-topic** questions.
-2. **Free off-topic negatives and detection labels.** Questions generated for subject A are off-topic for a learner enrolled only in B, and labeled examples for detection when enrolled in both. Add general-knowledge and **near-scope** questions, plus deliberately **ambiguous** ones that should trigger "Which subject?".
+2. **Free off-topic negatives and detection labels.** Questions generated for subject A are off-topic for a learner enrolled only in B, and labeled examples for detection when enrolled in both. Add general-knowledge and **near-scope** questions, plus deliberately **ambiguous** ones that should trigger "Which subject?". Build **multi-turn cases** that start in subject A and switch to a subject-B question on turn 2 or 3, which must be rejected.
 3. **Adversarial prompts by taxonomy × seed:** instruction override, system-prompt extraction, role-play jailbreaks, scope smuggling, subject manipulation ("search ai-agents instead"), other users' data, obfuscation (base64, misspellings, other languages), multi-turn escalation. Supplement with public prompt-injection datasets and red-teaming tools (e.g. promptfoo, garak).
 4. **Human review gate.** Generated items go to a LangSmith annotation queue; only accepted items enter the dataset.
 5. **Stable, versioned splits.** A **smoke** split (~30 items, every PR) and a **full** split (before release); never edit a version a release was gated on.
@@ -355,7 +374,7 @@ Trace every run; run answer-relevance, decline, and detection evaluators on a sa
 | Availability | Best-effort; no data loss on restart (checkpointer and memory in PostgreSQL) |
 | Security | Every service validates Keycloak JWTs; secrets in AWS Secrets Manager; TLS everywhere; tokens never logged or put in prompts |
 | Rate limiting | Per user, e.g. 20 messages/minute (config) |
-| Privacy | Learner data deletable on request; threads and traces retained 180 days, learning records for the account's lifetime; content-gap logs carry no user id; LLM requests stay within US regions |
+| Privacy | Learners cannot hard-delete notes (soft delete only); full account data deletion on request is handled by an admin; threads and traces retained 180 days, learning records and notes for the account's lifetime; content-gap logs carry no user id; LLM requests stay within US regions |
 | Cost | Track cost per conversation from day one; Bedrock budget alerts |
 | Language | English UI; content in the subject's language |
 
@@ -380,6 +399,9 @@ Trace every run; run answer-relevance, decline, and detection evaluators on a sa
 | Q7 | Agent model | `amazon.nova-2-lite-v1:0`, no fallback. |
 | Q8 | Subject selection | Auto-detected from the first question; ask when unsure (D3). |
 | Q9 | Document removal | Never deleted; archive via tag, Glacier via lifecycle (D10). |
+| Q10 | Lesson Note deletion | Soft delete (archive) only; restorable (D8). |
+| Q11 | Learning-record triggers | On note request, and after the thread is idle for 10 minutes (admin-configurable); records span all subjects (D9). |
+| Q12 | Off-subject follow-ups | Subject fixed in agent state; reject and offer a new conversation (D3, US-5). |
 
 ## 14. Milestones
 
@@ -387,7 +409,7 @@ Trace every run; run answer-relevance, decline, and detection evaluators on a sa
 |---|---|
 | M0 Foundations | Repo, CI, Keycloak realm (hosted login, self-registration), RDS PostgreSQL+pgvector, LangSmith project; all three Bedrock models reachable (Appendix A); synchronous Nova embeddings `InvokeModel` verified; Nova 2 Lite streamed text + tool call verified through `ChatBedrockConverse`; MCP server reachable on AgentCore Runtime with Keycloak JWT and VPC access to PostgreSQL |
 | M1 RAG MCP | S3-event ingestion (add, new version, archive, unarchive) + authenticated MCP search; retrieval-relevance eval passing |
-| M2 Agent | Subject detection, search, relevance gate, answer/decline, summarize path with learning records; all §10.1 evals passing on the smoke split |
+| M2 Agent | Subject detection and `state.subject`, search, relevance gate, answer/off-subject rejection, summarize path, idle-record sweeper; all §10.1 evals passing on the smoke split |
 | M3 API + Web | Auth, enrollment, chat streaming, notes, usage view, rate limiting; isolation tests passing |
 | M4 Deploy + Monitor | AgentCore deployment, online evaluation, annotation queue, content-gap report job, dashboards and alerts |
 
