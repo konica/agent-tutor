@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft v0.4 (refined from `initial-idea.md`; owner feedback and Bedrock model choice applied) |
+| **Status** | Draft v0.5 (refined from `initial-idea.md`; owner feedback, Bedrock models, and judge model applied) |
 | **Owner** | Thao Dinh |
 | **Last updated** | 2026-10-01 |
 | **Lifecycle** | Build → Test → Deploy → Monitor ([The Agent Development Lifecycle](https://www.langchain.com/blog/the-agent-development-lifecycle)) |
@@ -198,7 +198,7 @@ Later hardening (not MVP): replace token forwarding with Keycloak **token exchan
 |---|---|
 | **Tool calling.** The agent depends on calling MCP `search` and the Lesson Note tool. AWS documents *client-side tool calling* for Gemma 3 4B on the `bedrock-mantle` endpoint; support via Converse on `bedrock-runtime` is not stated. | M0 spike: verify streamed tool calls through the LangChain integration we choose. If unreliable, make retrieval a **fixed graph step** (always search before answering) rather than a model-chosen tool, and keep tools only for Lesson Notes. |
 | **Small-model reliability.** A 4B model may struggle with Deep Agents' long system prompt and planning tools, multi-step trajectories, and nuanced off-topic decisions. | Start with a minimal LangGraph agent (scope check → search → answer); add Deep Agents features only if evals stay green. The trajectory and scope evals (§10) decide. Keep a fallback to a larger Bedrock model (e.g. a bigger Gemma variant) behind a config switch. |
-| **Weak judge.** Using the 4B model as LLM-as-judge or to generate datasets would produce noisy scores. | Use a larger Bedrock model for judges and synthetic data (Q7); calibrate it against human feedback (§10.2). |
+| **Weak judge.** Using the 4B model as LLM-as-judge or to generate datasets would produce noisy scores. | Use `qwen.qwen3-32b-v1:0` for judges and synthetic data; calibrate it against human feedback (§10.2). |
 
 ### 9.6 Stack
 
@@ -207,9 +207,9 @@ Later hardening (not MVP): replace token forwarding with Keycloak **token exchan
 | Agent framework | LangChain (Deep Agents / LangGraph) |
 | Tracing and evaluation | LangSmith |
 | Document extraction | Docling |
-| LLM (agent) | `google.gemma-3-4b-it` on **Amazon Bedrock** (serverless) — 128K context, 8K max output, streaming; tool calling to be verified (§9.5, Q8) |
+| LLM (agent) | `google.gemma-3-4b-it` on **Amazon Bedrock** (serverless) — 128K context, 8K max output, streaming; tool calling to be verified (§9.5, Q7) |
 | Embeddings | `amazon.nova-2-multimodal-embeddings-v1:0` on **Amazon Bedrock**, **1024 dimensions** (§9.4) |
-| LLM (evaluation judges, synthetic data) | A larger Bedrock-hosted model (TBD, Q7) — not the 4B agent model |
+| LLM (evaluation judges, synthetic data) | `qwen.qwen3-32b-v1:0` on **Amazon Bedrock** — 32K context, hybrid thinking; a different model family from the agent, which avoids self-preference bias |
 | Vector store / app DB | PostgreSQL + pgvector |
 | Identity | Keycloak (OIDC; roles `learner`, `admin`) |
 | Storage / events | S3, S3 Event Notifications → SQS |
@@ -230,6 +230,8 @@ Later hardening (not MVP): replace token forwarding with Keycloak **token exchan
 | **Injection resistance** | Code + LLM-as-judge | No system-prompt leakage, no scope change, no cross-subject search. | 0 failures |
 
 *Recommended addition:* an LLM-as-judge **groundedness** check (answer vs. retrieved chunks), since an answer can be relevant to the question yet unsupported by the documents.
+
+**Judge model:** all LLM-as-judge evaluators use `qwen.qwen3-32b-v1:0` with temperature 0 and a fixed rubric prompt that returns a score plus a short reason. Enable thinking mode for nuanced criteria (injection, near-scope cases). The judge's 32K context must hold the question, the retrieved chunks, and the answer: with k = 5 chunks of ≤ 3,000 characters this is roughly 5K tokens, well within the limit. Judge token usage is billed to the project, never to learner credit.
 
 ### 10.2 Aligning LLM judges with human feedback
 
@@ -293,8 +295,7 @@ Trace every run; run answer-relevance and scope evaluators on a sample of produc
 | Q4 | Which subjects launch first? | Ingestion, evals | IELTS and AI Agents. |
 | Q5 | Retention period for threads and traces? | Privacy | 180 days. |
 | Q6 | Off-topic reply tone: strict or conversational? | UX copy | Short, friendly, suggests in-scope topics. |
-| Q7 | Which larger Bedrock model is used for LLM-as-judge and synthetic dataset generation? | Evaluation | A larger Gemma variant on Bedrock; revisit after judge–human agreement is measured. |
-| Q8 | If the M0 spike shows Gemma 3 4B cannot call tools reliably, is a fixed "always search" step acceptable, or do we switch the agent to a larger model? | Agent design | Fixed search step; keep the 4B model. |
+| Q7 | If the M0 spike shows Gemma 3 4B cannot call tools reliably, is a fixed "always search" step acceptable, or do we switch the agent to a larger model? | Agent design | Fixed search step; keep the 4B model. |
 
 ## 14. Milestones
 
@@ -313,7 +314,7 @@ Trace every run; run answer-relevance and scope evaluators on a sample of produc
 Both models are serverless on Bedrock, so there are no endpoints to host or scale. Model capabilities (context window, streaming, embedding dimensions, input limits) are documented by AWS and captured in §9.4. We need:
 
 1. **AWS region** for development and production. It must offer `google.gemma-3-4b-it`, `amazon.nova-2-multimodal-embeddings-v1:0`, and Bedrock AgentCore. Gemma 3 4B has no cross-region inference profile, so calls must go to that region directly.
-2. **Model access enabled** for both model IDs in that account and region (and for the larger judge model, Q7).
+2. **Model access enabled** for `google.gemma-3-4b-it`, `amazon.nova-2-multimodal-embeddings-v1:0`, and the judge model `qwen.qwen3-32b-v1:0` in that account and region (none of them supports cross-region inference).
 3. **Credentials:**
    - an IAM role for each workload (ingestion worker, MCP server, agent runtime) with `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream`, scoped to these model ARNs;
    - a Bedrock API key for local development, if preferred over IAM credentials.
