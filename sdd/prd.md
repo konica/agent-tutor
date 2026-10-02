@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft v0.7 (refined from `initial-idea.md`; owner feedback, Bedrock models, credit policy, and hosting applied) |
+| **Status** | Draft v0.8 (refined from `initial-idea.md`; owner decisions on models, credit policy, and hosting applied) |
 | **Owner** | Thao Dinh |
 | **Last updated** | 2026-10-01 |
 | **Lifecycle** | Build → Test → Deploy → Monitor ([The Agent Development Lifecycle](https://www.langchain.com/blog/the-agent-development-lifecycle)) |
@@ -190,20 +190,23 @@ Later hardening (not MVP): replace token forwarding with Keycloak **token exchan
 - Text input is limited to **8,192 characters** per synchronous call. Keep chunks well below this (e.g. ~1,500–3,000 characters), and set `truncationMode: NONE` so oversize chunks fail loudly instead of being cut.
 - Being multimodal, it can later embed page images (`DOCUMENT_IMAGE`) for diagrams and tables. That is out of scope for the MVP.
 
-**LLM — `nvidia.nemotron-nano-3-30b`**
-- Available through Bedrock's Converse API (`ChatBedrockConverse` in LangChain) and an OpenAI-compatible Chat Completions endpoint (`bedrock-runtime …/openai/v1` or `bedrock-mantle`).
-- Context window **256K tokens (262,144)**; max output **8K tokens**. Streaming and **structured outputs** are supported on `bedrock-runtime`. Use structured output for the scope-check decision (`in_scope: bool, reason`) so it can be checked in code.
-- The large context lets long threads keep full history without early summarization, but every input token counts against the learner's credit (§9.3). Cap the history and retrieved context sent per turn; don't fill the window just because it is available.
-- Built for reasoning. If reasoning output is enabled, those tokens add latency and count toward usage. Default to reasoning **off** for chat turns and measure the effect in evals before turning it on.
-- In-Region inference only (no cross-region profiles). The agent, AgentCore runtime, and all three models must share a region (Q1).
+**LLM — `amazon.nova-2-lite-v1:0`** (agent model; no fallback)
+- Called through the **Converse / ConverseStream API** on `bedrock-runtime` (`ChatBedrockConverse` in LangChain). Chat Completions and `bedrock-mantle` are **not** supported for this model.
+- **Must be called through a cross-region inference profile.** The model has no in-region availability; use `us.amazon.nova-2-lite-v1:0` (US), `eu.amazon.nova-2-lite-v1:0` (EU), or `global.amazon.nova-2-lite-v1:0`. Requests may be served in another region of the same geography. Prefer the geo profile over global unless data residency doesn't matter.
+- Context window **1M tokens**; max output **64K tokens**; streaming supported.
+- **Client-side tool calling** is supported on `bedrock-runtime`, and Nova models support **tool forcing** (`toolChoice` = a specific tool). Use it to guarantee a `search` call on in-scope turns.
+- **Structured outputs are not listed** for this model. Make the scope decision with a forced tool call (e.g. `classify_scope(in_scope: bool, reason: str)`), which gives a typed result that code can check.
+- **Prompt caching** is supported (system and messages, up to 4 checkpoints, 5-minute TTL, at most 20K tokens cached). Cache the fixed system prompt and tool definitions to cut cost and latency.
+- The large context does not mean we should fill it: every input token counts against the learner's credit (§9.3). Cap the history and retrieved context sent per turn.
 
 ### 9.5 Model risks and mitigations
 
 | Risk | Mitigation |
 |---|---|
-| **Tool calling.** The agent depends on calling MCP `search` and the Lesson Note tool. AWS documents *client-side tool calling* for Nemotron Nano 3 30B on the `bedrock-mantle` endpoint; tool use via Converse on `bedrock-runtime` is not listed. | M0 spike: verify streamed tool calls through the LangChain integration we choose. **Fallback model:** `amazon.nova-2-lite-v1:0`. Its model card lists client-side tool calling on `bedrock-runtime` (works with `ChatBedrockConverse`), Nova models support **forcing a specific tool** (guarantees the `search` call), and it has US/EU/global cross-region profiles (1M context, 64K output; structured outputs not listed, so use a forced tool call for the scope decision). Last resort: make retrieval a **fixed graph step** and keep tools only for Lesson Notes. |
-| **Agent complexity.** Deep Agents adds a long system prompt and planning/filesystem tools; any mid-size model can lose focus on a narrow tutoring task. | Start with a minimal LangGraph agent (scope check → search → answer); add Deep Agents features only if evals stay green. The trajectory and scope evals (§10) decide. Keep the model ID behind a config switch. |
-| **Token cost per turn.** A 256K window and optional reasoning make it easy to send or generate far more tokens than a turn needs, burning learner credit and project budget. | Cap history and retrieved context per turn, keep reasoning off by default, and track tokens per turn in evals (§9.3). |
+| **Tool calling.** The agent depends on calling MCP `search` and the Lesson Note tool. Nova 2 Lite documents client-side tool calling on `bedrock-runtime` and supports tool forcing, but streamed tool calls through LangChain + MCP adapters are still unproven in our stack. | M0 spike: verify streamed tool calls, tool forcing, and the scope-classification tool end to end. There is no fallback model by decision; if a gap appears, fix it in the graph (e.g. a forced `search` step) rather than by switching models. |
+| **Cross-region routing.** Nova 2 Lite runs only via inference profiles, so prompts may be processed in another region of the same geography. | Use the geo profile (`us.` or `eu.`) matching the deployment region; record this in the privacy notes. |
+| **Agent complexity.** Deep Agents adds a long system prompt and planning/filesystem tools; a lightweight model can lose focus on a narrow tutoring task. | Start with a minimal LangGraph agent (scope check → search → answer); add Deep Agents features only if evals stay green. The trajectory and scope evals (§10) decide. Keep the model ID in config. |
+| **Token cost per turn.** A 1M window makes it easy to send far more tokens than a turn needs, burning learner credit and project budget. | Cap history and retrieved context per turn, use prompt caching for the fixed prefix, and track tokens per turn in evals (§9.3). |
 | **Judge bias.** Grading with the agent's own model inflates scores. | Judges and synthetic data use `qwen.qwen3-32b-v1:0`, a different model family; calibrate it against human feedback (§10.2). |
 
 ### 9.6 Hosting options
@@ -226,7 +229,7 @@ Later hardening (not MVP): replace token forwarding with Keycloak **token exchan
 | Lambda + Function URL / API Gateway | Scales to zero, very cheap at pilot scale, no servers. | SSE streaming from Python needs response streaming plus an adapter (e.g. Lambda Web Adapter); 15-minute max duration; cold starts on the chat path; PostgreSQL connections need RDS Proxy. |
 | AgentCore Runtime | One platform for everything. | Built for agent/MCP invocations, not a general REST API (notes CRUD, usage, settings). Poor fit. |
 
-**Decision (Q3):** Agent and RAG MCP server on **AgentCore Runtime**; API server on **ECS Fargate**. PostgreSQL on RDS in the same VPC.
+**Decision (Q3, confirmed by owner):** Agent and RAG MCP server on **AgentCore Runtime**; API server on **ECS Fargate**. PostgreSQL on RDS in the same VPC.
 
 ### 9.7 Stack
 
@@ -235,7 +238,7 @@ Later hardening (not MVP): replace token forwarding with Keycloak **token exchan
 | Agent framework | LangChain (Deep Agents / LangGraph) |
 | Tracing and evaluation | LangSmith |
 | Document extraction | Docling |
-| LLM (agent) | `nvidia.nemotron-nano-3-30b` on **Amazon Bedrock** (serverless) — 256K (262,144-token) context, 8K max output, streaming, structured outputs; tool calling to be verified (§9.5, Q7) |
+| LLM (agent) | `amazon.nova-2-lite-v1:0` on **Amazon Bedrock** via a geo inference profile (e.g. `us.amazon.nova-2-lite-v1:0`) — 1M context, 64K max output, streaming, tool calling with tool forcing, prompt caching (§9.4) |
 | Embeddings | `amazon.nova-2-multimodal-embeddings-v1:0` on **Amazon Bedrock**, **1024 dimensions** (§9.4) |
 | LLM (evaluation judges, synthetic data) | `qwen.qwen3-32b-v1:0` on **Amazon Bedrock** — 32K context, hybrid thinking; a different model family from the agent, which avoids self-preference bias |
 | Vector store / app DB | PostgreSQL + pgvector |
@@ -318,18 +321,18 @@ Trace every run; run answer-relevance and scope evaluators on a sample of produc
 | # | Question | Blocks | Default if unanswered |
 |---|---|---|---|
 | Q1 | Bedrock access details (Appendix A), especially a **region where both models are enabled** alongside AgentCore. | Build | — (required) |
-| Q2 | ~~Credit policy~~ **Resolved:** default 2M tokens, lifetime, self-adjustable by the learner up to a system maximum (§9.3). Confirm the 10M maximum. | Credit logic | 10M maximum. |
-| Q3 | ~~Hosting~~ **Resolved (recommended):** agent and MCP server on AgentCore Runtime, API on ECS Fargate (§9.6). | Deploy | — |
+| Q2 | ~~Credit policy~~ **Resolved:** default 2M tokens, lifetime, self-adjustable by the learner up to a 10M system maximum (§9.3). | — | — |
+| Q3 | ~~Hosting~~ **Resolved:** agent and MCP server on AgentCore Runtime, API on ECS Fargate (§9.6). | — | — |
 | Q4 | Which subjects launch first? | Ingestion, evals | IELTS and AI Agents. |
 | Q5 | Retention period for threads and traces? | Privacy | 180 days. |
 | Q6 | Off-topic reply tone: strict or conversational? | UX copy | Short, friendly, suggests in-scope topics. |
-| Q7 | Agent model choice after the M0 spike. Candidates: `nvidia.nemotron-nano-3-30b` (current default), `nvidia.nemotron-super-3-120b` (stronger agentic model), and **fallback** `amazon.nova-2-lite-v1:0` (§9.5). | Agent design | Pick the cheapest candidate that passes all smoke-split evals; if none does, use a fixed "always search" step. |
+| Q7 | ~~Agent model~~ **Resolved:** `amazon.nova-2-lite-v1:0`, no fallback model (§9.4). | — | — |
 
 ## 14. Milestones
 
 | Milestone | Exit criteria |
 |---|---|
-| M0 Foundations | Repo, CI, Keycloak realm, PostgreSQL+pgvector, LangSmith project; all three Bedrock models reachable (Appendix A); **agent-model spike** done: Nemotron Nano 3 30B, Nemotron Super 3 120B, and Nova 2 Lite compared on tool calling, streaming, smoke-split evals, and first-token latency (§9.5, Q7); MCP server reachable on AgentCore Runtime with Keycloak JWT and VPC access to PostgreSQL |
+| M0 Foundations | Repo, CI, Keycloak realm, PostgreSQL+pgvector, LangSmith project; all three Bedrock models reachable (Appendix A); **Nova 2 Lite spike** done: streamed tool calls, tool forcing, and scope-classification tool verified through LangChain + MCP; first-token latency measured (§9.5); MCP server reachable on AgentCore Runtime with Keycloak JWT and VPC access to PostgreSQL |
 | M1 RAG MCP | S3-event ingestion + authenticated MCP search; retrieval-relevance eval passing |
 | M2 Agent | Grounded Q&A, scope guard, Lesson Note tool; all §10.1 evals passing on the smoke split |
 | M3 API + Web | Auth, chat streaming, notes, usage and credit; isolation tests passing |
@@ -341,13 +344,13 @@ Trace every run; run answer-relevance and scope evaluators on a sample of produc
 
 Both models are serverless on Bedrock, so there are no endpoints to host or scale. Model capabilities (context window, streaming, embedding dimensions, input limits) are documented by AWS and captured in §9.4. We need:
 
-1. **AWS region** for development and production. It must offer `nvidia.nemotron-nano-3-30b`, `amazon.nova-2-multimodal-embeddings-v1:0`, `qwen.qwen3-32b-v1:0`, and Bedrock AgentCore. None of these models has a cross-region inference profile, so calls must go to that region directly. Nemotron and Qwen are both offered in us-east-1, us-east-2, us-west-2, eu-west-1, eu-west-2, eu-south-1, and several APAC regions; Nemotron is not offered in eu-central-1 or eu-north-1.
-2. **Model access enabled** for `nvidia.nemotron-nano-3-30b`, `amazon.nova-2-multimodal-embeddings-v1:0`, and the judge model `qwen.qwen3-32b-v1:0` in that account and region (none of them supports cross-region inference).
+1. **AWS region** for development and production. It must offer Bedrock AgentCore, `amazon.nova-2-multimodal-embeddings-v1:0` and `qwen.qwen3-32b-v1:0` (Qwen is in-region only), and be a source region for a Nova 2 Lite geo inference profile (e.g. us-east-1, us-east-2, us-west-2 → `us.amazon.nova-2-lite-v1:0`; eu-west-1, eu-south-1 → `eu.amazon.nova-2-lite-v1:0`). **us-east-1, us-east-2, us-west-2, or eu-west-1** satisfy the LLM and judge; confirm Nova 2 embeddings and AgentCore there.
+2. **Model access enabled** for `amazon.nova-2-lite-v1:0` (and its inference profile), `amazon.nova-2-multimodal-embeddings-v1:0`, and the judge model `qwen.qwen3-32b-v1:0` in that account and region. IAM policies for the agent must allow invoking the **inference profile ARN and the underlying model ARNs in every destination region** of that profile.
 3. **Credentials:**
    - an IAM role for each workload (ingestion worker, MCP server, agent runtime) with `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream`, scoped to these model ARNs;
    - a Bedrock API key for local development, if preferred over IAM credentials.
 4. **Service quotas** for both models (requests and tokens per minute), to size ingestion batch rates and the pilot's 50 concurrent learners.
 5. **Network:** whether calls must go through a VPC interface endpoint (PrivateLink) for `bedrock-runtime`.
-6. **Endpoint preference** for the agent LLM: `bedrock-runtime` (Converse) or `bedrock-mantle` (OpenAI-compatible). The M0 tool-calling spike may decide this.
+6. **Data residency:** confirm that routing Nova 2 Lite requests across regions within the chosen geography (US or EU profile) is acceptable.
 7. **Budget alerts:** monthly Bedrock budget and who receives the alerts.
 8. **Guardrails (optional):** whether to attach a Bedrock Guardrail to agent calls as an extra layer against prompt injection and off-topic content.
