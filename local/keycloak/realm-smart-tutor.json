@@ -9,6 +9,8 @@
   "accessTokenLifespan": 900,
   "roles": {
     "realm": [
+      { "name": "offline_access", "description": "${role_offline-access}" },
+      { "name": "uma_authorization", "description": "${role_uma_authorization}" },
       { "name": "learner", "description": "Default role for self-registered users" },
       { "name": "admin", "description": "Uploads and archives documents; reads content-gap reports" },
       {
