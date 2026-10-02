@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft v0.5 (refined from `initial-idea.md`; owner feedback, Bedrock models, and judge model applied) |
+| **Status** | Draft v0.6 (refined from `initial-idea.md`; owner feedback and Bedrock model choices applied) |
 | **Owner** | Thao Dinh |
 | **Last updated** | 2026-10-01 |
 | **Lifecycle** | Build → Test → Deploy → Monitor ([The Agent Development Lifecycle](https://www.langchain.com/blog/the-agent-development-lifecycle)) |
@@ -174,7 +174,7 @@ Later hardening (not MVP): replace token forwarding with Keycloak **token exchan
 
 ### 9.3 Token credit
 
-- Usage is recorded per turn (`user_id`, `thread_id`, `input_tokens`, `output_tokens`, `model`, `timestamp`) from the `usage` block Bedrock returns on every Converse / Chat Completions response (Bedrock's separate CountTokens API is not available for Gemma 3 4B and is not needed).
+- Usage is recorded per turn (`user_id`, `thread_id`, `input_tokens`, `output_tokens`, `model`, `timestamp`) from the `usage` block Bedrock returns on every Converse / Chat Completions response (no separate token-counting call is needed).
 - Credit check happens in the API **before** each turn; credit is lifetime (no reset) in the MVP — see Q2.
 - Embedding calls for search and ingestion are not charged to learners.
 
@@ -187,18 +187,21 @@ Later hardening (not MVP): replace token forwarding with Keycloak **token exchan
 - Text input is limited to **8,192 characters** per synchronous call. Keep chunks well below this (e.g. ~1,500–3,000 characters), and set `truncationMode: NONE` so oversize chunks fail loudly instead of being cut.
 - Being multimodal, it can later embed page images (`DOCUMENT_IMAGE`) for diagrams and tables. That is out of scope for the MVP.
 
-**LLM — `google.gemma-3-4b-it`**
+**LLM — `nvidia.nemotron-nano-3-30b`**
 - Available through Bedrock's Converse API (`ChatBedrockConverse` in LangChain) and an OpenAI-compatible Chat Completions endpoint (`bedrock-runtime …/openai/v1` or `bedrock-mantle`).
-- Streaming is supported. Context window is 128K, max output is 8K tokens.
-- In-Region inference only (no cross-region profiles). The agent, AgentCore runtime, and model must share a region where both models are offered (Q1).
+- Context window **256K tokens (262,144)**; max output **8K tokens**. Streaming and **structured outputs** are supported on `bedrock-runtime`. Use structured output for the scope-check decision (`in_scope: bool, reason`) so it can be checked in code.
+- The large context lets long threads keep full history without early summarization, but every input token counts against the learner's credit (§9.3). Cap the history and retrieved context sent per turn; don't fill the window just because it is available.
+- Built for reasoning. If reasoning output is enabled, those tokens add latency and count toward usage. Default to reasoning **off** for chat turns and measure the effect in evals before turning it on.
+- In-Region inference only (no cross-region profiles). The agent, AgentCore runtime, and all three models must share a region (Q1).
 
 ### 9.5 Model risks and mitigations
 
 | Risk | Mitigation |
 |---|---|
-| **Tool calling.** The agent depends on calling MCP `search` and the Lesson Note tool. AWS documents *client-side tool calling* for Gemma 3 4B on the `bedrock-mantle` endpoint; support via Converse on `bedrock-runtime` is not stated. | M0 spike: verify streamed tool calls through the LangChain integration we choose. If unreliable, make retrieval a **fixed graph step** (always search before answering) rather than a model-chosen tool, and keep tools only for Lesson Notes. |
-| **Small-model reliability.** A 4B model may struggle with Deep Agents' long system prompt and planning tools, multi-step trajectories, and nuanced off-topic decisions. | Start with a minimal LangGraph agent (scope check → search → answer); add Deep Agents features only if evals stay green. The trajectory and scope evals (§10) decide. Keep a fallback to a larger Bedrock model (e.g. a bigger Gemma variant) behind a config switch. |
-| **Weak judge.** Using the 4B model as LLM-as-judge or to generate datasets would produce noisy scores. | Use `qwen.qwen3-32b-v1:0` for judges and synthetic data; calibrate it against human feedback (§10.2). |
+| **Tool calling.** The agent depends on calling MCP `search` and the Lesson Note tool. AWS documents *client-side tool calling* for Nemotron Nano 3 30B on the `bedrock-mantle` endpoint; tool use via Converse on `bedrock-runtime` is not listed. | M0 spike: verify streamed tool calls through the LangChain integration we choose. If unreliable, make retrieval a **fixed graph step** (always search before answering) rather than a model-chosen tool, and keep tools only for Lesson Notes. |
+| **Agent complexity.** Deep Agents adds a long system prompt and planning/filesystem tools; any mid-size model can lose focus on a narrow tutoring task. | Start with a minimal LangGraph agent (scope check → search → answer); add Deep Agents features only if evals stay green. The trajectory and scope evals (§10) decide. Keep the model ID behind a config switch. |
+| **Token cost vs. credit.** A 256K window and optional reasoning make it easy to send or generate far more tokens than a 20K credit allows. | Cap history and retrieved context per turn, keep reasoning off by default, and track tokens per turn in evals (§9.3, Q2). |
+| **Judge bias.** Grading with the agent's own model inflates scores. | Judges and synthetic data use `qwen.qwen3-32b-v1:0`, a different model family; calibrate it against human feedback (§10.2). |
 
 ### 9.6 Stack
 
@@ -207,7 +210,7 @@ Later hardening (not MVP): replace token forwarding with Keycloak **token exchan
 | Agent framework | LangChain (Deep Agents / LangGraph) |
 | Tracing and evaluation | LangSmith |
 | Document extraction | Docling |
-| LLM (agent) | `google.gemma-3-4b-it` on **Amazon Bedrock** (serverless) — 128K context, 8K max output, streaming; tool calling to be verified (§9.5, Q7) |
+| LLM (agent) | `nvidia.nemotron-nano-3-30b` on **Amazon Bedrock** (serverless) — 256K (262,144-token) context, 8K max output, streaming, structured outputs; tool calling to be verified (§9.5, Q7) |
 | Embeddings | `amazon.nova-2-multimodal-embeddings-v1:0` on **Amazon Bedrock**, **1024 dimensions** (§9.4) |
 | LLM (evaluation judges, synthetic data) | `qwen.qwen3-32b-v1:0` on **Amazon Bedrock** — 32K context, hybrid thinking; a different model family from the agent, which avoids self-preference bias |
 | Vector store / app DB | PostgreSQL + pgvector |
@@ -295,13 +298,13 @@ Trace every run; run answer-relevance and scope evaluators on a sample of produc
 | Q4 | Which subjects launch first? | Ingestion, evals | IELTS and AI Agents. |
 | Q5 | Retention period for threads and traces? | Privacy | 180 days. |
 | Q6 | Off-topic reply tone: strict or conversational? | UX copy | Short, friendly, suggests in-scope topics. |
-| Q7 | If the M0 spike shows Gemma 3 4B cannot call tools reliably, is a fixed "always search" step acceptable, or do we switch the agent to a larger model? | Agent design | Fixed search step; keep the 4B model. |
+| Q7 | If the M0 spike shows Nemotron Nano 3 30B cannot call tools reliably through our LangChain integration, is a fixed "always search" step acceptable? | Agent design | Yes: fixed search step; tools only for Lesson Notes. |
 
 ## 14. Milestones
 
 | Milestone | Exit criteria |
 |---|---|
-| M0 Foundations | Repo, CI, Keycloak realm, PostgreSQL+pgvector, LangSmith project; both Bedrock models reachable (Appendix A); **Gemma 3 4B tool-calling + streaming spike** done (§9.5) |
+| M0 Foundations | Repo, CI, Keycloak realm, PostgreSQL+pgvector, LangSmith project; all three Bedrock models reachable (Appendix A); **Nemotron Nano 3 30B tool-calling + streaming spike** done (§9.5) |
 | M1 RAG MCP | S3-event ingestion + authenticated MCP search; retrieval-relevance eval passing |
 | M2 Agent | Grounded Q&A, scope guard, Lesson Note tool; all §10.1 evals passing on the smoke split |
 | M3 API + Web | Auth, chat streaming, notes, usage and credit; isolation tests passing |
@@ -313,8 +316,8 @@ Trace every run; run answer-relevance and scope evaluators on a sample of produc
 
 Both models are serverless on Bedrock, so there are no endpoints to host or scale. Model capabilities (context window, streaming, embedding dimensions, input limits) are documented by AWS and captured in §9.4. We need:
 
-1. **AWS region** for development and production. It must offer `google.gemma-3-4b-it`, `amazon.nova-2-multimodal-embeddings-v1:0`, and Bedrock AgentCore. Gemma 3 4B has no cross-region inference profile, so calls must go to that region directly.
-2. **Model access enabled** for `google.gemma-3-4b-it`, `amazon.nova-2-multimodal-embeddings-v1:0`, and the judge model `qwen.qwen3-32b-v1:0` in that account and region (none of them supports cross-region inference).
+1. **AWS region** for development and production. It must offer `nvidia.nemotron-nano-3-30b`, `amazon.nova-2-multimodal-embeddings-v1:0`, `qwen.qwen3-32b-v1:0`, and Bedrock AgentCore. None of these models has a cross-region inference profile, so calls must go to that region directly. Nemotron and Qwen are both offered in us-east-1, us-east-2, us-west-2, eu-west-1, eu-west-2, eu-south-1, and several APAC regions; Nemotron is not offered in eu-central-1 or eu-north-1.
+2. **Model access enabled** for `nvidia.nemotron-nano-3-30b`, `amazon.nova-2-multimodal-embeddings-v1:0`, and the judge model `qwen.qwen3-32b-v1:0` in that account and region (none of them supports cross-region inference).
 3. **Credentials:**
    - an IAM role for each workload (ingestion worker, MCP server, agent runtime) with `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream`, scoped to these model ARNs;
    - a Bedrock API key for local development, if preferred over IAM credentials.
