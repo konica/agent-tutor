@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft v1.5 (refined from `initial-idea.md`; release roadmap R1/R2/R3; model abstraction and layered OOP architecture; all services on EKS) |
+| **Status** | Draft v1.6 (refined from `initial-idea.md`; release roadmap R1/R2/R3; model abstraction; modular layered OOP architecture; all services on EKS) |
 | **Owner** | Thao Dinh |
 | **Last updated** | 2026-10-02 |
 | **Lifecycle** | Build → Test → Deploy → Monitor ([The Agent Development Lifecycle](https://www.langchain.com/blog/the-agent-development-lifecycle)) |
@@ -463,13 +463,15 @@ All environments run in **us-east-1 (N. Virginia)**, the only commercial region 
 
 **Layers.** One Python package shared by all deployables (API, agent, MCP server, worker, jobs). Dependencies point inward only.
 
+The package is organized **by module first** (`knowledge`, `tutoring`, `learning`, `accounts`, `insights`; Release 2: `catalog`, `quizzes`, `recommendations`, `reports`), with the `domain`, `application`, `ports`, and `adapters` layers **inside each module**, a small `shared` kernel (model ports, `ModelFactory`, auth, common value objects), and entrypoints in `apps/`. Modules use each other only through their `application` layer. These rules are checked in CI with import-linter; details in `sdd/specs/2026-10-02-project-structure-design.md`.
+
 | Layer | Contains | May depend on |
 |---|---|---|
 | `domain` | Entities and value objects with their rules as methods, no I/O: `Subject`, `Learner`, `Thread` (e.g. `bind_subject()` refuses to rebind), `LessonNote` (`archive()`, `restore()`), `LearningRecord`, `Document`, `Chunk`, `Citation`, `TokenUsage`; *Release 2:* `Quiz` (`grade(answers)`), `Report`, `Recommendation`. | nothing |
 | `application` | Services, one per use case, orchestrating domain objects through ports: `SubjectDetector`, `AskService`, `NoteService`, `LearningRecordService`, `ConversationService`, `UsageService`, `ContentGapService`, `IngestionService`; *Release 2:* `QuizService`, `ReportService`, `RecommendationService`. | `domain`, `ports` |
 | `ports` | Abstract interfaces (Python ABCs): `ChatModel`, `EmbeddingModel`, `Retriever`, repositories (`ThreadRepository`, `NoteRepository`, …), `LearningMemory`, `Clock`. | `domain` |
 | `adapters` | Implementations of ports: Bedrock model adapters, PostgreSQL repositories, MCP search client, LangGraph store, S3/SQS clients. The only place vendor SDKs are imported. | `ports`, vendor SDKs |
-| `entrypoints` | FastAPI routes, LangGraph graph and nodes, MCP server tools, SQS worker, CronJobs. Each one parses input, calls a service, and formats output; no business rules. | `application` |
+| `entrypoints` (`apps/`) | FastAPI routes, LangGraph graph and nodes, MCP server tools, SQS worker, CronJobs. Each one parses input, calls a service, and formats output; no business rules. One composition root per deployable. | `application` (and `adapters`, for wiring) |
 
 **Model abstraction.**
 
@@ -579,7 +581,7 @@ Trace every run; run answer-relevance, decline, and detection evaluators on a sa
 | Q15 | Reports and recommendations | Daily/weekly across subjects, automatic and on demand; recommendations from the topic catalog and weak quiz topics (D13, D14). |
 | Q16 | Environments and IaC | Local: Docker Compose for dependencies. Prod: EKS with Helm; AWS resources with AWS CDK (Python) (§9.12). |
 | Q17 | Model abstraction | `ChatModel` / `EmbeddingModel` ports with Bedrock adapters, built by a config-driven `ModelFactory` (D15, §9.15). |
-| Q18 | Code structure | Layered OOP: domain classes, application services, ports, adapters, thin entrypoints (D16, §9.15). |
+| Q18 | Code structure | Layered OOP: domain classes, application services, ports, adapters, thin entrypoints (D16, §9.15); organized by module first, layers inside each module (project structure spec). |
 | Q19 | Release scope | Release 1 = core tutor; quizzes, reports, recommendations, and topic catalog in Release 2 (D17, §14). |
 
 ## 14. Roadmap: releases and milestones

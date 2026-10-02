@@ -1,0 +1,8 @@
+# CronJobs: learning-record sweeper (every minute), content-gap report (weekly), (R2) learner reports.
+image:
+  repository: smart-tutor-api
+  tag: ""  # defaults to global.imageTag
+schedules:
+  recordSweeper: "* * * * *"
+  contentGapReport: "0 6 * * 1"
+# Owns its NetworkPolicy and ExternalSecret (spec §8).

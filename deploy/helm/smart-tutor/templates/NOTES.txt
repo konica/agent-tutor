@@ -1,0 +1,1 @@
+Smart Tutor {{ .Chart.AppVersion }} deployed to namespace {{ .Release.Namespace }}.

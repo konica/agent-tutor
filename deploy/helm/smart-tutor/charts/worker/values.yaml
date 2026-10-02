@@ -1,0 +1,6 @@
+# Ingestion worker consuming SQS (image includes the ingest extra).
+image:
+  repository: smart-tutor-worker
+  tag: ""  # defaults to global.imageTag
+replicaCount: 1
+# Owns its NetworkPolicy and ExternalSecret (spec §8).

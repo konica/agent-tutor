@@ -94,4 +94,9 @@ Thumbs.db
 .claude/worktrees/
 
 # Local documents (not the product corpus; admins upload to S3)
-data/
+/data/
+
+# Web (Node) and CDK build output
+node_modules/
+cdk.out/
+*.tsbuildinfo

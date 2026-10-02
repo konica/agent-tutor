@@ -1,0 +1,213 @@
+[project]
+name = "smart-tutor"
+version = "0.1.0"
+description = "Smart Tutor: subject-scoped AI tutor (API, agent, RAG MCP server, ingestion worker, jobs)"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "boto3>=1.40",
+    "fastapi>=0.115",
+    "httpx>=0.28",
+    "langchain-aws>=0.2",
+    "langgraph>=0.6",
+    "langgraph-checkpoint-postgres>=2.0",
+    "langsmith>=0.4",
+    "mcp>=2.2",
+    "pgvector>=0.4",
+    "psycopg[binary,pool]>=3.2",
+    "pydantic>=2.11",
+    "pydantic-settings>=2.10",
+    "pyjwt[crypto]>=2.10",
+    "sqlalchemy>=2.0",
+    "uvicorn[standard]>=0.35",
+]
+
+[project.optional-dependencies]
+# Installed only in the worker image (pulls in PyTorch).
+ingest = ["docling>=2.40"]
+# Evaluation runs (backend/evals) and CI eval gates.
+eval = ["openevals>=0.1", "pyyaml>=6.0"]
+
+[dependency-groups]
+dev = [
+    "import-linter>=2.3",
+    "mypy>=1.17",
+    "pytest>=8.4",
+    "pytest-asyncio>=1.1",
+    "ruff>=0.12",
+]
+
+[build-system]
+requires = ["uv_build>=0.8,<0.9"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["smart_tutor", "fakes"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-m 'not integration' --import-mode=importlib"
+pythonpath = ["tests"]  # so tests can `import fakes`
+markers = ["integration: needs the Docker Compose stack (make up)"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src"]
+
+# ---------------------------------------------------------------------------
+# Import rules (sdd/specs/2026-10-02-project-structure-design.md §6). Run: lint-imports
+# Modules: knowledge tutoring learning accounts insights | R2: catalog quizzes recommendations reports
+# ---------------------------------------------------------------------------
+[tool.importlinter]
+root_package = "smart_tutor"
+include_external_packages = true
+
+# Rule 1: layers inside every module.
+[[tool.importlinter.contracts]]
+name = "Layers inside each module: adapters | application -> ports -> domain"
+type = "layers"
+layers = ["adapters | application", "ports", "domain"]
+containers = [
+    "smart_tutor.knowledge", "smart_tutor.tutoring", "smart_tutor.learning",
+    "smart_tutor.accounts", "smart_tutor.insights", "smart_tutor.catalog",
+    "smart_tutor.quizzes", "smart_tutor.recommendations", "smart_tutor.reports",
+]
+
+[[tool.importlinter.contracts]]
+name = "Layers inside shared: adapters -> ports -> domain"
+type = "layers"
+layers = ["adapters", "ports", "domain"]
+containers = ["smart_tutor.shared"]
+
+# Rule 2: a module's domain, ports, and adapters are private; others use its application layer only.
+[[tool.importlinter.contracts]]
+name = "knowledge internals are private"
+type = "forbidden"
+source_modules = ["smart_tutor.tutoring", "smart_tutor.learning", "smart_tutor.accounts", "smart_tutor.insights", "smart_tutor.catalog", "smart_tutor.quizzes", "smart_tutor.recommendations", "smart_tutor.reports"]
+forbidden_modules = ["smart_tutor.knowledge.domain", "smart_tutor.knowledge.ports", "smart_tutor.knowledge.adapters"]
+
+[[tool.importlinter.contracts]]
+name = "tutoring internals are private"
+type = "forbidden"
+source_modules = ["smart_tutor.knowledge", "smart_tutor.learning", "smart_tutor.accounts", "smart_tutor.insights", "smart_tutor.catalog", "smart_tutor.quizzes", "smart_tutor.recommendations", "smart_tutor.reports"]
+forbidden_modules = ["smart_tutor.tutoring.domain", "smart_tutor.tutoring.ports", "smart_tutor.tutoring.adapters"]
+
+[[tool.importlinter.contracts]]
+name = "learning internals are private"
+type = "forbidden"
+source_modules = ["smart_tutor.knowledge", "smart_tutor.tutoring", "smart_tutor.accounts", "smart_tutor.insights", "smart_tutor.catalog", "smart_tutor.quizzes", "smart_tutor.recommendations", "smart_tutor.reports"]
+forbidden_modules = ["smart_tutor.learning.domain", "smart_tutor.learning.ports", "smart_tutor.learning.adapters"]
+
+[[tool.importlinter.contracts]]
+name = "accounts internals are private"
+type = "forbidden"
+source_modules = ["smart_tutor.knowledge", "smart_tutor.tutoring", "smart_tutor.learning", "smart_tutor.insights", "smart_tutor.catalog", "smart_tutor.quizzes", "smart_tutor.recommendations", "smart_tutor.reports"]
+forbidden_modules = ["smart_tutor.accounts.domain", "smart_tutor.accounts.ports", "smart_tutor.accounts.adapters"]
+
+[[tool.importlinter.contracts]]
+name = "insights internals are private"
+type = "forbidden"
+source_modules = ["smart_tutor.knowledge", "smart_tutor.tutoring", "smart_tutor.learning", "smart_tutor.accounts", "smart_tutor.catalog", "smart_tutor.quizzes", "smart_tutor.recommendations", "smart_tutor.reports"]
+forbidden_modules = ["smart_tutor.insights.domain", "smart_tutor.insights.ports", "smart_tutor.insights.adapters"]
+
+[[tool.importlinter.contracts]]
+name = "catalog internals are private"
+type = "forbidden"
+source_modules = ["smart_tutor.knowledge", "smart_tutor.tutoring", "smart_tutor.learning", "smart_tutor.accounts", "smart_tutor.insights", "smart_tutor.quizzes", "smart_tutor.recommendations", "smart_tutor.reports"]
+forbidden_modules = ["smart_tutor.catalog.domain", "smart_tutor.catalog.ports", "smart_tutor.catalog.adapters"]
+
+[[tool.importlinter.contracts]]
+name = "quizzes internals are private"
+type = "forbidden"
+source_modules = ["smart_tutor.knowledge", "smart_tutor.tutoring", "smart_tutor.learning", "smart_tutor.accounts", "smart_tutor.insights", "smart_tutor.catalog", "smart_tutor.recommendations", "smart_tutor.reports"]
+forbidden_modules = ["smart_tutor.quizzes.domain", "smart_tutor.quizzes.ports", "smart_tutor.quizzes.adapters"]
+
+[[tool.importlinter.contracts]]
+name = "recommendations internals are private"
+type = "forbidden"
+source_modules = ["smart_tutor.knowledge", "smart_tutor.tutoring", "smart_tutor.learning", "smart_tutor.accounts", "smart_tutor.insights", "smart_tutor.catalog", "smart_tutor.quizzes", "smart_tutor.reports"]
+forbidden_modules = ["smart_tutor.recommendations.domain", "smart_tutor.recommendations.ports", "smart_tutor.recommendations.adapters"]
+
+[[tool.importlinter.contracts]]
+name = "reports internals are private"
+type = "forbidden"
+source_modules = ["smart_tutor.knowledge", "smart_tutor.tutoring", "smart_tutor.learning", "smart_tutor.accounts", "smart_tutor.insights", "smart_tutor.catalog", "smart_tutor.quizzes", "smart_tutor.recommendations"]
+forbidden_modules = ["smart_tutor.reports.domain", "smart_tutor.reports.ports", "smart_tutor.reports.adapters"]
+
+[[tool.importlinter.contracts]]
+name = "shared depends on no feature module and no app"
+type = "forbidden"
+source_modules = ["smart_tutor.shared"]
+forbidden_modules = [
+    "smart_tutor.knowledge", "smart_tutor.tutoring", "smart_tutor.learning",
+    "smart_tutor.accounts", "smart_tutor.insights", "smart_tutor.catalog",
+    "smart_tutor.quizzes", "smart_tutor.recommendations", "smart_tutor.reports",
+    "smart_tutor.apps",
+]
+
+# Rule 3: apps are leaves (composition roots); nothing imports them.
+[[tool.importlinter.contracts]]
+name = "Nothing imports apps"
+type = "forbidden"
+source_modules = [
+    "smart_tutor.knowledge", "smart_tutor.tutoring", "smart_tutor.learning",
+    "smart_tutor.accounts", "smart_tutor.insights", "smart_tutor.catalog",
+    "smart_tutor.quizzes", "smart_tutor.recommendations", "smart_tutor.reports",
+]
+forbidden_modules = ["smart_tutor.apps"]
+
+# Rule 4: vendor SDKs and infrastructure stay in adapters (and apps).
+[[tool.importlinter.contracts]]
+name = "Domain, application, and ports use no vendor SDK or shared adapter"
+type = "forbidden"
+source_modules = [
+    "smart_tutor.shared.domain", "smart_tutor.shared.ports",
+    "smart_tutor.knowledge.domain", "smart_tutor.knowledge.application", "smart_tutor.knowledge.ports",
+    "smart_tutor.tutoring.domain", "smart_tutor.tutoring.application", "smart_tutor.tutoring.ports",
+    "smart_tutor.learning.domain", "smart_tutor.learning.application", "smart_tutor.learning.ports",
+    "smart_tutor.accounts.domain", "smart_tutor.accounts.application", "smart_tutor.accounts.ports",
+    "smart_tutor.insights.domain", "smart_tutor.insights.application", "smart_tutor.insights.ports",
+    "smart_tutor.catalog.domain", "smart_tutor.catalog.application", "smart_tutor.catalog.ports",
+    "smart_tutor.quizzes.domain", "smart_tutor.quizzes.application", "smart_tutor.quizzes.ports",
+    "smart_tutor.recommendations.domain", "smart_tutor.recommendations.application", "smart_tutor.recommendations.ports",
+    "smart_tutor.reports.domain", "smart_tutor.reports.application", "smart_tutor.reports.ports",
+]
+forbidden_modules = [
+    "smart_tutor.shared.adapters",
+    "boto3", "botocore", "docling", "fastapi", "langchain_aws", "langgraph", "mcp", "psycopg", "sqlalchemy",
+]
+
+[[tool.importlinter.contracts]]
+name = "Docling only in knowledge.adapters (keeps the ingest extra in the worker image)"
+type = "forbidden"
+source_modules = [
+    "smart_tutor.shared", "smart_tutor.apps",
+    "smart_tutor.tutoring", "smart_tutor.learning", "smart_tutor.accounts", "smart_tutor.insights",
+    "smart_tutor.catalog", "smart_tutor.quizzes", "smart_tutor.recommendations", "smart_tutor.reports",
+]
+forbidden_modules = ["docling"]
+
+# Rule 5: the module dependency graph, top to bottom. Higher modules may use lower ones (application only);
+# "|" marks independent siblings. Lower never imports higher, so there are no cycles.
+# A new cross-module dependency means editing this order on purpose.
+[[tool.importlinter.contracts]]
+name = "Module dependency graph"
+type = "layers"
+containers = ["smart_tutor"]
+layers = [
+    "reports",
+    "recommendations",
+    "quizzes | catalog",
+    "learning",
+    "tutoring | knowledge",
+    "accounts | insights",
+]

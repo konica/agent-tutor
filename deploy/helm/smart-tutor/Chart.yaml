@@ -1,0 +1,28 @@
+apiVersion: v2
+name: smart-tutor
+description: Smart Tutor on EKS (umbrella chart; PRD §9.11)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+dependencies:
+  - name: api
+    version: 0.1.0
+    condition: api.enabled
+  - name: agent
+    version: 0.1.0
+    condition: agent.enabled
+  - name: mcp-server
+    version: 0.1.0
+    condition: mcp-server.enabled
+  - name: worker
+    version: 0.1.0
+    condition: worker.enabled
+  - name: web
+    version: 0.1.0
+    condition: web.enabled
+  - name: jobs
+    version: 0.1.0
+    condition: jobs.enabled
+  - name: keycloak
+    version: 0.1.0
+    condition: keycloak.enabled

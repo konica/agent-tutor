@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mcp-server
+description: "RAG MCP server, internal ClusterIP at :8000/mcp; ingress only from agent pods."
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

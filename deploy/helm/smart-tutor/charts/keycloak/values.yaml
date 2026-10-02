@@ -1,0 +1,4 @@
+# Keycloak; M4 adds the upstream chart as a dependency and points it at RDS.
+port: 8080
+replicaCount: 1
+# Owns its NetworkPolicy and ExternalSecret (spec §8).

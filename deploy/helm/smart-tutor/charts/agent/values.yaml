@@ -1,0 +1,7 @@
+# Smart Tutor agent, internal ClusterIP; ingress only from api pods (NetworkPolicy).
+image:
+  repository: smart-tutor-agent
+  tag: ""  # defaults to global.imageTag
+port: 8080
+replicaCount: 1
+# Owns its NetworkPolicy and ExternalSecret (spec §8).
