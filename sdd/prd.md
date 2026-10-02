@@ -42,7 +42,7 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 | **Chunk** | An embedded fragment of a Document, with metadata for citation and access control. |
 | **Citation** | Reference returned with an answer: document title, page/section, and chunk id. |
 | **Lesson Note** | A Markdown summary of what was learned in one or more threads, owned by one Learner. *Replaces "take keynote".* |
-| **Token credit** | The number of LLM tokens (input + output) a Learner may consume. Default **2,000,000** per user; each Learner can raise or lower their own credit in settings, up to a system maximum. |
+| **Token credit** | The number of LLM tokens (input + output) a Learner may consume. Default **2,000,000** per user; each Learner can change their own limit (up to a system maximum) and reset their own usage in settings. |
 
 ## 5. Goals and non-goals
 
@@ -71,7 +71,7 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 | D3 | A thread is bound to **one subject**; switching subject starts a new thread. | Keeps retrieval filters and evaluation simple. |
 | D4 | Subject access is **enforced in the RAG MCP server** using the user's forwarded access token (see §9.2), never by the agent's prompt alone. | The LLM must not be the access-control boundary. |
 | D5 | If the documents cannot support an answer, the agent says so rather than guessing. | Preserves groundedness. |
-| D6 | Each user has a **token credit, default 2M tokens**, which the user can adjust themselves (up to a system maximum). When it is used up, new messages are blocked until the user raises it. | Owner decision. The credit works as a self-set budget; level-based tiers are out of scope. |
+| D6 | Each user has a **token credit, default 2M tokens**. The user can **adjust the limit** (up to a system maximum) and **reset their usage** themselves. When the credit is used up, new messages are blocked until the user raises the limit or resets. | Owner decision, for simplicity. The credit is a personal budget, not a cost control; level-based tiers are out of scope. |
 | D7 | The only **untrusted input is the user's prompt**; injection defenses target it. | Documents are admin-uploaded; there are no web or third-party sources. |
 | D8 | Lesson Notes are **private to their owner**; stored as Markdown in S3 with metadata in PostgreSQL. | Data ownership requirement. |
 
@@ -84,7 +84,7 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 - Grounded answers with citations from the RAG MCP server.
 - Off-topic rejection and prompt-injection defenses on user input.
 - Lesson Notes: create from a thread, update from further chat, edit, delete, start a new thread from a note; note ↔ thread links.
-- Token usage (total and per thread), per-user token credit enforcement, and self-service credit adjustment.
+- Token usage (total and per thread), per-user token credit enforcement, and self-service credit adjustment and usage reset.
 - Admin uploads documents to S3; S3 events keep the vector index in sync (create, replace, delete).
 - LangSmith tracing, evaluation suites, and human-feedback annotation (§10).
 - Agent deployed on Bedrock AgentCore.
@@ -124,9 +124,11 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 - *When* they choose "Discuss this note", *then* a new thread for the note's subject starts with the note as context and is linked to it.
 
 **US-8 Token usage and credit**
-- The learner sees tokens used (input/output) in total and per thread, and remaining credit.
+- The learner sees tokens used (input/output) since the last reset, lifetime total, per thread, and remaining credit.
 - *Given* remaining credit ≤ 0, *when* the learner sends a message, *then* the API rejects it (`402`/`429` with a clear message and a link to adjust the credit) without calling the agent. A turn already in progress may finish even if it overruns the credit.
-- *When* the learner changes their credit in settings to a value between their current usage and the system maximum, *then* the new limit applies to the next message. Values above the maximum or below current usage are rejected with a clear message. Every change is recorded (old value, new value, timestamp).
+- *When* the learner sets their credit limit in settings to a value from 0 to the system maximum, *then* the new limit applies to the next message. Values above the maximum are rejected with a clear message.
+- *When* the learner clicks "Reset usage" and confirms, *then* their usage counter returns to 0 and they can send messages again; per-thread usage and lifetime totals are unchanged.
+- Every limit change and reset is recorded (user, action, old value, new value, timestamp).
 - Usage figures match the token counts reported by the model endpoint for each completed turn.
 
 **US-9 Document sync via S3 events**
@@ -176,9 +178,14 @@ Later hardening (not MVP): replace token forwarding with Keycloak **token exchan
 ### 9.3 Token credit
 
 - Usage is recorded per turn (`user_id`, `thread_id`, `input_tokens`, `output_tokens`, `model`, `timestamp`) from the `usage` block Bedrock returns on every Converse / Chat Completions response (no separate token-counting call is needed).
-- Credit check happens in the API **before** each turn. Credit is lifetime (no automatic reset); learners raise it themselves when needed.
-- Default credit is **2,000,000 tokens**. At roughly 6–7K tokens per turn (system prompt + ~5 chunks + recent history + answer), that is about 300 turns per learner.
-- The **system maximum** a learner may set is a config value (default 10,000,000 tokens) so a mistake or abuse cannot run up unbounded cost.
+- Credit check happens in the API **before** each turn: `used_since_reset < credit_limit`. There is no automatic reset.
+- **Self-service, for simplicity.** In settings, a learner can:
+  - **adjust their credit limit** to any value from 0 to the system maximum, and
+  - **reset their usage**, which sets `used_since_reset` to 0 and records `usage_reset_at`.
+- A reset does **not** delete per-turn usage records. Per-thread usage, lifetime totals, and project cost reporting stay intact; only the counter checked against the credit restarts.
+- Default credit is **2,000,000 tokens**. At roughly 6–7K tokens per turn (system prompt + ~5 chunks + recent history + answer), that is about 300 turns between resets.
+- The **system maximum** for the credit limit is a config value (default 10,000,000 tokens).
+- Because learners can reset at will, the credit is a **personal budget, not a cost control**. Project cost is protected by Bedrock budget alerts (Appendix A) and per-user rate limiting in the API (e.g. requests per minute).
 - Embedding calls for search and ingestion are not charged to learners.
 
 ### 9.4 Model integration notes
@@ -308,7 +315,7 @@ Suggested starting size per subject: 40 in-scope (incl. 10 unanswerable), 30 off
 
 ### 10.4 Online monitoring
 
-Trace every run; run answer-relevance and scope evaluators on a sample of production traces; alert on error rate, latency, credit-exhaustion spikes, and drops in evaluator scores.
+Trace every run; run answer-relevance and scope evaluators on a sample of production traces; alert on error rate, latency, unusual per-user token volume (resets make credit exhaustion an unreliable signal), and drops in evaluator scores.
 
 ## 11. Non-functional requirements (pilot scale)
 
@@ -334,7 +341,7 @@ Trace every run; run answer-relevance and scope evaluators on a sample of produc
 | # | Question | Blocks | Default if unanswered |
 |---|---|---|---|
 | Q1 | ~~Region~~ **Resolved: us-east-1** for dev and prod (§9.8). Remaining Appendix A items (access, IAM, quotas, network, budget) are setup tasks for M0. | — | — |
-| Q2 | ~~Credit policy~~ **Resolved:** default 2M tokens, lifetime, self-adjustable by the learner up to a 10M system maximum (§9.3). | — | — |
+| Q2 | ~~Credit policy~~ **Resolved:** default 2M tokens; the learner can adjust the limit (up to a 10M system maximum) and reset their usage (§9.3). | — | — |
 | Q3 | ~~Hosting~~ **Resolved:** agent and MCP server on AgentCore Runtime, API on ECS Fargate (§9.6). | — | — |
 | Q4 | ~~Launch subjects~~ **Resolved:** IELTS and AI Agents. | — | — |
 | Q5 | ~~Retention~~ **Resolved:** threads and traces kept 180 days. | — | — |
