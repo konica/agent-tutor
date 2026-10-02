@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft v1.5 (refined from `initial-idea.md`; release roadmap R1/R2/R3; model abstraction and layered OOP architecture; all services on EKS) |
+| **Status** | Draft v1.6 (refined from `initial-idea.md`; release roadmap R1/R2/R3; model abstraction and layered OOP architecture; all services on EKS; laptop-only web app, citations toggle; design brief in `sdd/design/brief.md`) |
 | **Owner** | Thao Dinh |
 | **Last updated** | 2026-10-02 |
 | **Lifecycle** | Build → Test → Deploy → Monitor ([The Agent Development Lifecycle](https://www.langchain.com/blog/the-agent-development-lifecycle)) |
@@ -76,7 +76,7 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 - Admin web UI (admins work in S3 directly).
 - Deep Agents planning/filesystem features (a plain LangGraph flow is enough for Release 1).
 - Defending against instructions embedded in documents (documents are admin-curated and trusted).
-- Document formats other than PDF; cross-subject threads; note sharing; mobile apps; non-English UI.
+- Document formats other than PDF; cross-subject threads; note sharing; mobile apps; phone and tablet layouts (the web app targets laptop screens); non-English UI.
 
 ## 6. Key product decisions
 
@@ -155,6 +155,7 @@ US-1 to US-13b are **Release 1**; US-14 to US-16 are **Release 2**.
 
 **US-4 Ask a grounded question**
 - *Given* a thread bound to subject *S*, *when* the learner asks a question, *then* the search step retrieves chunks **only from S**, and a streamed answer based on them lists ≥ 1 citation (document title, page).
+- Citations are shown by default; a "Show citations" switch in the conversation hides or shows them. The choice is remembered for the learner and changes only the display.
 
 **US-5 Reject questions outside the thread's subject**
 - *Given* a thread bound to subject *S*, *when* a question is outside *S* or the documents of *S* don't support an answer, *then* the tutor declines in one or two friendly sentences, without answering from its own knowledge: "This conversation is about *S*. Please ask a question about *S*, or start a new conversation for other topics."
@@ -179,7 +180,7 @@ US-1 to US-13b are **Release 1**; US-14 to US-16 are **Release 2**.
 - Learning records are stored across all of a learner's subjects (subject is a field), so a single query can summarize a day or week across subjects.
 
 **US-9 Token usage**
-- The learner sees input/output tokens per thread and in total; figures match the `usage` reported by Bedrock for each completed turn.
+- The learner sees input/output tokens per thread (in the conversation's status line, updated after each answer) and in total (Usage screen); figures match the `usage` reported by Bedrock for each completed turn.
 - *When* a learner exceeds the per-user rate limit, *then* the API returns `429` with a retry-after message.
 
 **US-10 Document sync via S3 events**
@@ -548,6 +549,7 @@ Trace every run; run answer-relevance, decline, and detection evaluators on a sa
 | Privacy | Learners cannot hard-delete notes (soft delete only); full account data deletion on request is handled by an admin; threads and traces retained 180 days, learning records and notes for the account's lifetime; content-gap logs carry no user id; LLM requests stay within US regions |
 | Cost | Track cost per conversation from day one; Bedrock budget alerts |
 | Language | English UI; content in the subject's language |
+| Devices | Laptop browsers (1280 px wide and up); phones and tablets not supported |
 
 ## 12. Success metrics
 
@@ -581,6 +583,7 @@ Trace every run; run answer-relevance, decline, and detection evaluators on a sa
 | Q17 | Model abstraction | `ChatModel` / `EmbeddingModel` ports with Bedrock adapters, built by a config-driven `ModelFactory` (D15, §9.15). |
 | Q18 | Code structure | Layered OOP: domain classes, application services, ports, adapters, thin entrypoints (D16, §9.15). |
 | Q19 | Release scope | Release 1 = core tutor; quizzes, reports, recommendations, and topic catalog in Release 2 (D17, §14). |
+| Q20 | Devices and chat display | Laptop only; citations shown by default with a show/hide switch; per-thread token usage in the chat status line (design brief v0.2). |
 
 ## 14. Roadmap: releases and milestones
 

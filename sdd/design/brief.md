@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Brief version** | v0.1 |
-| **Based on** | `sdd/prd.md` Draft v1.5 |
-| **Status** | Draft, round 1 |
+| **Brief version** | v0.2 |
+| **Based on** | `sdd/prd.md` Draft v1.6 |
+| **Status** | Draft, round 1 (open questions answered) |
 | **Owner** | Thao Dinh |
 | **Last updated** | 2026-10-02 |
 | **Designer** | Open Design |
@@ -15,7 +15,13 @@
 
 ## 0. What changed in this version
 
-First version. Design every Release 1 screen in §5. Release 2 screens (§6) are low-fidelity wireframes only.
+Owner answers to the three open questions (§10):
+
+- **Laptop only.** No phone or tablet layouts. Design for laptop screens; see §4 and §8. *Redo: all screens drop any phone variants.*
+- **Citations toggle.** Citations show by default; a **show/hide citations** switch in the chat header hides or shows them. See §5.4. *Redo: chat screens.*
+- **Token usage in the status line.** The conversation's token usage sits in a status line at the bottom of the chat. See §5.4. *Redo: chat screens.*
+
+If you haven't started v0.1, design straight from this version.
 
 ---
 
@@ -42,12 +48,13 @@ Tone: calm, focused study tool. Friendly, never chatty. Plain English.
 
 ## 4. Scope
 
-**In scope for this round:** the Release 1 learner web app (§5), desktop first, plus a responsive layout down to phone width (see open question Q1).
+**In scope for this round:** the Release 1 learner web app (§5) for **laptop screens only** (1280–1920 px wide). Phones and tablets are not supported.
 
 **Out of scope (do not design):**
 - Admin UI, document upload screens, the content-gap report.
 - Token credits, plans, or billing (usage is shown, not limited).
-- Web search, note sharing, notifications (email/push), languages other than English, native mobile apps.
+- Web search, note sharing, notifications (email/push), languages other than English.
+- Phone and tablet layouts, and native mobile apps.
 - Keycloak's login and registration pages beyond a **theme** (they are hosted by Keycloak; we only restyle them).
 
 ## 5. Release 1 screens (full fidelity)
@@ -76,6 +83,7 @@ The most important screen. Design every state:
 | **Subject detected** | After the first answer, a subject chip in the thread header (e.g. "IELTS") with a **"Change"** action. "Change" restarts the conversation under the chosen subject. |
 | **Detection unsure** | Tutor message "Which subject is this about?" with one button per enrolled subject. |
 | **Streaming answer** | Text appears progressively; a stop button. |
+| **Citations toggle** | A **"Show citations"** switch in the thread header, **on by default**. Off hides the citations under every answer in the view; the answers themselves are unchanged. The learner's choice is remembered across conversations. Show the thread both ways. |
 | **Answer with citations** | At least one citation per answer: document title and page (e.g. "Agentic Design Patterns, p. 42"). Citations from archived documents show an "archived" badge. Thumbs up / down on each answer, with an optional reason. |
 | **Decline (off-subject or not covered)** | One or two friendly sentences: "This conversation is about *IELTS*. Please ask a question about *IELTS*, or start a new conversation for other topics." plus a **"New conversation"** button. Must not look like an error. |
 | **Summarize lesson** | A **"Summarize lesson"** action in the thread header. While generating: progress state. After: confirmation with a link to the note. If a note already exists, the action reads "Update lesson note" and warns that it overwrites the previous version. |
@@ -83,7 +91,7 @@ The most important screen. Design every state:
 | **Rate limited** | Inline message: too many messages, try again in N seconds. Input disabled until then. |
 | **Error** | The answer failed: retry action. |
 
-Also show: the thread's token usage (small, unobtrusive, e.g. in a thread info panel) and, when the thread has a note, a link to it.
+**Status line.** A slim status line along the bottom of the conversation, below the input, shows the conversation's token usage (e.g. "Tokens: 12,480 in · 3,215 out"). It updates after each completed answer. When the thread has a note, show a link to it in the thread header.
 
 ### 5.5 Conversations — US-13
 - List: title (from first question), subject, last activity; newest first.
@@ -131,6 +139,7 @@ Use realistic sample data, not lorem ipsum:
 
 - **Brand:** none yet. Propose a direction (logo mark, palette, type) in round 1; one direction is enough.
 - **Accessibility:** WCAG 2.1 AA (contrast, keyboard navigation, visible focus, labelled controls). Streaming text must not be announced word by word to screen readers.
+- **Screen sizes:** laptop only; design at 1440 px wide and check 1280 px. No phone or tablet breakpoints.
 - **Themes:** light mode required; dark mode optional in round 1.
 - **Components:** build from a small, reusable set (list row, filter bar, tabs, chip, citation, banner, empty state, dialog) and show them on one components page.
 
@@ -144,9 +153,15 @@ Use realistic sample data, not lorem ipsum:
 
 | # | Question | Default if unanswered |
 |---|---|---|
-| Q1 | How far must the web app work on phones? | Responsive to phone width; desktop is the primary target. |
-| Q2 | Should the thread show which document chunks were used, beyond citations? | No; citations only. |
-| Q3 | Where does per-thread token usage live? | A thread info panel, not in the main chat column. |
+| Q4 | Should the citations toggle also apply to Lesson Notes when citations are carried into notes (Release 2)? | Yes, the same remembered setting. |
+
+**Answered**
+
+| # | Question | Answer (v0.2) |
+|---|---|---|
+| Q1 | How far must the web app work on phones? | Not supported; laptop only. |
+| Q2 | Should citations always show? | Shown by default, with a switch to hide or show them. |
+| Q3 | Where does per-thread token usage live? | In the status line of the chat conversation. |
 
 ## 11. How this brief is versioned
 
@@ -163,10 +178,11 @@ Use realistic sample data, not lorem ipsum:
 
 | Version | Date | PRD | Changes | Screens to redo |
 |---|---|---|---|---|
+| v0.2 | 2026-10-02 | v1.6 | Laptop only; citations toggle (on by default); token usage in the chat status line. | Chat (all states); all screens drop phone variants |
 | v0.1 | 2026-10-02 | v1.5 | First brief: Release 1 screens at full fidelity, Release 2 as wireframes. | All |
 
 ### Feedback log
 
 | Round | Brief version reviewed | Feedback | Decision | Applied in |
 |---|---|---|---|---|
-| — | — | — | — | — |
+| 0 (owner) | v0.1 | Answers to Q1–Q3. | Laptop only; citations toggle, on by default; usage in the chat status line. | v0.2 |
