@@ -10,4 +10,4 @@ class NotFoundError(DomainError):
 
 
 class AccessDeniedError(DomainError):
-    """The caller may not access this resource (e.g. a subject they are not enrolled in)."""
+    """The caller may not access this resource (e.g. a document they cannot read)."""

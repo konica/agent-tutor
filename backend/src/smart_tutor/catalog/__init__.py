@@ -1,1 +1,1 @@
-"""catalog: Topic catalog per subject, derived from Docling headings at ingestion."""
+"""catalog (Release 2): topic catalog per content, derived from Docling headings at ingestion."""

@@ -1,6 +1,6 @@
 apiVersion: v2
 name: jobs
-description: "CronJobs: learning-record sweeper (every minute), content-gap report (weekly), (R2) learner reports."
+description: "CronJobs: learning-record sweeper (every minute), Glacier tagger (daily), (R2) learner reports."
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

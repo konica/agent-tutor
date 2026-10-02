@@ -1,1 +1,1 @@
-"""accounts: Learners (time zone), subject enrollments, token usage, rate-limit policy."""
+"""accounts: learner profile, upload limits, token usage, rate-limit policy."""
