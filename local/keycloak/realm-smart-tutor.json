@@ -12,7 +12,7 @@
       { "name": "offline_access", "description": "${role_offline-access}" },
       { "name": "uma_authorization", "description": "${role_uma_authorization}" },
       { "name": "learner", "description": "Default role for self-registered users" },
-      { "name": "admin", "description": "Uploads and archives documents; reads content-gap reports" },
+      { "name": "admin", "description": "Operations: moderates the shared subject catalog, handles account deletion, reviews evaluations" },
       {
         "name": "default-roles-smart-tutor",
         "composite": true,

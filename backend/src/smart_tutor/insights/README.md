@@ -1,12 +1,12 @@
 # `insights` module (Release 1)
 
-**Owns** (§9.6, US-11): Content-gap capture and the weekly content-gap report.
+**Owns** (§9.6): Anonymized decline log and quality monitoring queries.
 
-**Key classes:** `ContentGap`; service `ContentGapService`.
+**Key classes:** `Decline`; service `DeclineLogService`.
 
 **May use (application layer only):** none. Everyone may use `shared`.
 
-**Rules:** Never stores a user id with a content gap.
+**Rules:** Never stores a user id with a decline.
 
 Layout: `domain/` → `ports/` ← `application/`, `adapters/`. Other modules import only `insights.application`.
 See `sdd/specs/2026-10-02-project-structure-design.md`.

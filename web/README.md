@@ -4,7 +4,7 @@ React + TypeScript (Vite). `npm install && npm run dev` → http://localhost:517
 
 | Path | What |
 |---|---|
-| `src/features/` | One folder per feature: `enrollment`, `chat`, `conversations`, `notes`, `usage`; (R2) `quizzes`, `reports` |
+| `src/features/` | One folder per feature: `library` (upload, documents), `subjects` (choose, rename), `chat`, `conversations`, `notes`, `usage`; (R2) `quizzes`, `reports` |
 | `src/api/` | Typed client generated from the API's OpenAPI schema |
 | `src/auth/` | Keycloak OIDC (Authorization Code + PKCE) |
 | `src/components/` | Shared UI |

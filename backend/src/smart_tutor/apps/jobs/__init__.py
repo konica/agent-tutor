@@ -1,1 +1,1 @@
-"""Kubernetes CronJobs: learning-record sweeper, content-gap report, (R2) learner reports."""
+"""Kubernetes CronJobs: learning-record sweeper, Glacier tagger, (R2) learner reports."""

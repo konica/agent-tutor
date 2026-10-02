@@ -2,9 +2,10 @@
 
 | | |
 |---|---|
-| **Status** | Approved 2026-10-02; scaffolded |
-| **Date** | 2026-10-02 |
-| **Based on** | `sdd/prd.md` v1.5 (§9.11–§9.15, §10, §14) |
+| **Status** | Approved 2026-10-02; scaffolded. Revised 2026-10-03 for PRD v2.0 |
+| **Date** | 2026-10-02 (rev. 2026-10-03) |
+| **Based on** | `sdd/prd.md` v2.0 (§9.4, §9.11–§9.16, §10, §14) |
+| **Revision 2026-10-03** | PRD v2.0 (learner uploads, shared subject catalog, SHA-256 dedupe, sharing-ready model): `knowledge` owns library, contents, subjects, and access (`can_read`); `accounts` loses enrollment; `insights` becomes the decline log; new Release 3 module `graph`; module order puts `knowledge` below `tutoring`. |
 | **Scope** | Folder structure for the whole repository, Python packaging, module boundaries, and the import rules CI enforces |
 
 ## 1. Goals
@@ -79,22 +80,23 @@ backend/src/smart_tutor/
 │   │   └── aws/               # S3, SQS, SSM clients
 │   └── config.py      # pydantic-settings; model roles; SSM-backed settings
 │
-├── knowledge/         # documents, chunks, ingestion, search
+├── knowledge/         # library: contents (SHA-256), documents, can_read, upload, ingestion, chunks, search, subject catalog
 ├── tutoring/          # threads, subject detection, ask
 ├── learning/          # Lesson Notes, learning records
-├── accounts/          # learners, enrollments, token usage, rate-limit policy
-├── insights/          # content gaps and the weekly report
+├── accounts/          # learner profile, upload limits, token usage, rate-limit policy
+├── insights/          # decline log, quality monitoring queries
 ├── catalog/           # (R2) topic catalog from Docling headings
 ├── quizzes/           # (R2)
 ├── recommendations/   # (R2)
 ├── reports/           # (R2)
+├── graph/             # (R3) knowledge graph: relationships, timeline, concept history
 │
 └── apps/              # entrypoints: parse input, call application services, format output; no business rules
     ├── api/           # main.py, deps.py (wiring), routes/ (one file per module), sse.py, rate_limit.py
     ├── agent/         # server.py, graph.py, state.py, nodes/ (resolve_subject, search, gate, answer, summarize)
     ├── mcp_server/    # server.py, tools.py (search, get_chunk) → knowledge.application
     ├── worker/        # SQS consumer → knowledge.application.IngestionService
-    └── jobs/          # record_sweeper.py, content_gap_report.py, (R2) learner_reports.py
+    └── jobs/          # record_sweeper.py, glacier_tagger.py, (R2) learner_reports.py
 ```
 
 Every module has the same shape:
@@ -112,14 +114,15 @@ Every module has the same shape:
 
 | Module | Owns (PRD) | Key classes | Depends on (application of) |
 |---|---|---|---|
-| `knowledge` | Documents, versions, archive, chunks, ingestion, search (§9.5, US-10) | `Document`, `Chunk`; `IngestionService`, `SearchService`; ports `PdfExtractor`, `DocumentStore`, `ChunkRepository` | `accounts` (enrolled subjects for the search filter) |
-| `tutoring` | Threads, subject binding and detection, relevance gate, ask path (§9.2, US-3–US-6, US-13) | `Thread`, `DetectionPolicy`, `RelevanceGate`; `SubjectDetector`, `AskService`, `ConversationService`; ports `Retriever`, `ThreadRepository` | `accounts`, `insights` (log declines) |
+| `knowledge` | Library and corpus (PRD §9.4–§9.5, US-2, US-2b, US-10, US-10b, US-11): contents deduplicated by SHA-256, documents (library entries, archive, visibility, grants), the single `can_read` rule, upload flow, ingestion, metadata and references, chunks, search, shared subject catalog with personal names | `Content`, `Document` (`can_be_read_by()`), `Subject`, `PersonalSubjectName`, `Chunk`; `UploadService`, `DeduplicationService`, `IngestionService`, `SubjectSuggester`, `SubjectCatalogService`, `DocumentService`, `SearchService`; ports `PdfExtractor`, `ObjectStore`, `ContentRepository`, `DocumentRepository`, `SubjectRepository`, `ChunkRepository` | `accounts` (upload limits, processing usage) |
+| `tutoring` | Threads, subject binding and detection, relevance gate, ask path (§9.2, US-3–US-6, US-13) | `Thread`, `DetectionPolicy`, `RelevanceGate`; `SubjectDetector`, `AskService`, `ConversationService`; ports `Retriever`, `ThreadRepository` | `knowledge` (the learner's subjects and their names), `accounts`, `insights` (log declines) |
 | `learning` | Lesson Notes, learning records, idle sweep (§9.4, US-7, US-8, US-13b) | `LessonNote`, `LearningRecord`; `NoteService`, `LearningRecordService`; ports `NoteRepository`, `LearningMemory` | `tutoring` (thread content) |
-| `accounts` | Learners, enrollments, time zone, token usage, rate-limit policy (US-2, US-9) | `Learner`, `Enrollment`; `EnrollmentService`, `UsageService` | — |
-| `insights` | Content-gap capture and weekly report (§9.6, US-11) | `ContentGap`; `ContentGapService` | — |
+| `accounts` | Learner profile and time zone, upload limits, token usage (chat, document processing, background), rate-limit policy (US-9) | `Learner`, `UploadLimits`; `UsageService`, `LearnerService` | — |
+| `insights` | Anonymized decline log and quality monitoring queries (§9.6) | `Decline`; `DeclineLogService` | — |
 | `catalog` (R2) | Topic catalog (§9.7) | `TopicEntry`; `CatalogService` | `knowledge` |
 | `quizzes` (R2) | Quiz generation and grading (US-14) | `Quiz` (`grade(answers)`); `QuizService` | `learning` |
 | `recommendations` (R2) | "What to learn next" (US-16) | `Recommendation`; `RecommendationService` | `catalog`, `quizzes`, `learning` |
+| `graph` (R3) | Knowledge graph (§9.16, US-18): citation links, relationship labels with evidence, timeline, concept history | `Relationship`, `Timeline`; `GraphService` | `knowledge` |
 | `reports` (R2) | Daily/weekly reports (§9.8, US-15) | `Report`; `ReportService` | `learning`, `quizzes`, `recommendations` |
 
 The agent never reads chunk tables: `tutoring`'s `Retriever` port is implemented by an MCP client adapter that calls `apps/mcp_server`, which calls `knowledge.application.SearchService`. This keeps the access boundary of PRD §9.3 in the code structure.
@@ -134,7 +137,7 @@ The dependency graph between modules must stay **acyclic**; if two modules need 
 | 2 | Module privacy (`forbidden`) | A module may import from another module only its `application` package; everyone may import `shared`. |
 | 3 | Apps are leaves (`forbidden`) | Nothing imports `smart_tutor.apps`. |
 | 4 | Vendor SDKs (`forbidden`, external packages) | `docling` only from `knowledge.adapters`; `boto3`/`botocore`, `langgraph`, `langchain_aws`, `mcp` only from `adapters` or `apps`. |
-| 5 | Module graph (`layers` over modules) | Explicit order, top to bottom: `reports` → `recommendations` → `quizzes` \| `catalog` → `learning` → `tutoring` \| `knowledge` → `accounts` \| `insights`. Lower never imports higher, so there are no cycles; a new cross-module dependency means editing this order on purpose. |
+| 5 | Module graph (`layers` over modules) | Explicit order, top to bottom: `reports` → `recommendations` → `quizzes` \| `catalog` → `learning` → `tutoring` → `graph` → `knowledge` → `accounts` \| `insights`. Lower never imports higher, so there are no cycles; a new cross-module dependency means editing this order on purpose. |
 
 ## 7. Tests and evaluations
 
@@ -175,7 +178,7 @@ deploy/helm/
 
 ```
 web/src/
-├── features/     # enrollment, chat, conversations, notes, usage; (R2) quizzes, reports
+├── features/     # library (upload, documents), subjects, chat, conversations, notes, usage; (R2) quizzes, reports
 ├── api/          # typed client generated from the API's OpenAPI schema
 ├── auth/         # Keycloak OIDC (Authorization Code + PKCE)
 └── components/   # shared UI
