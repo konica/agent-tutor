@@ -1,0 +1,5 @@
+# Production overrides (us-east-1). Image tags are set by the deploy pipeline (helm upgrade --set global.imageTag=...).
+api:
+  replicaCount: 2
+agent:
+  replicaCount: 2

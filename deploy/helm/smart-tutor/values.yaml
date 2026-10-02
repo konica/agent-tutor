@@ -1,0 +1,25 @@
+# Shared defaults for every environment. Overrides: values-prod.yaml.
+global:
+  imageRegistry: ""  # ECR registry, set per environment
+  imageTag: latest
+
+api:
+  enabled: true
+
+agent:
+  enabled: true
+
+mcp-server:
+  enabled: true
+
+worker:
+  enabled: true
+
+web:
+  enabled: true
+
+jobs:
+  enabled: true
+
+keycloak:
+  enabled: true

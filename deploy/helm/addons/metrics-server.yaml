@@ -1,0 +1,2 @@
+# Values for metrics-server (HPA metrics).
+args: []

@@ -1,0 +1,7 @@
+# RAG MCP server, internal ClusterIP at :8000/mcp; ingress only from agent pods.
+image:
+  repository: smart-tutor-mcp
+  tag: ""  # defaults to global.imageTag
+port: 8000
+replicaCount: 1
+# Owns its NetworkPolicy and ExternalSecret (spec §8).

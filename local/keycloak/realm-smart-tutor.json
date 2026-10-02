@@ -1,0 +1,94 @@
+{
+  "realm": "smart-tutor",
+  "enabled": true,
+  "registrationAllowed": true,
+  "registrationEmailAsUsername": true,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": true,
+  "sslRequired": "none",
+  "accessTokenLifespan": 900,
+  "roles": {
+    "realm": [
+      { "name": "learner", "description": "Default role for self-registered users" },
+      { "name": "admin", "description": "Uploads and archives documents; reads content-gap reports" },
+      {
+        "name": "default-roles-smart-tutor",
+        "composite": true,
+        "composites": { "realm": ["offline_access", "uma_authorization", "learner"] }
+      }
+    ]
+  },
+  "defaultRole": { "name": "default-roles-smart-tutor" },
+  "clients": [
+    {
+      "clientId": "smart-tutor-web",
+      "name": "Smart Tutor web app",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:5173"],
+      "attributes": { "pkce.code.challenge.method": "S256", "post.logout.redirect.uris": "http://localhost:5173/*" },
+      "protocolMappers": [
+        {
+          "name": "audience-smart-tutor-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": { "included.client.audience": "smart-tutor-api", "access.token.claim": "true", "id.token.claim": "false" }
+        },
+        {
+          "name": "audience-rag-mcp",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": { "included.client.audience": "rag-mcp", "access.token.claim": "true", "id.token.claim": "false" }
+        }
+      ]
+    },
+    {
+      "clientId": "smart-tutor-api",
+      "name": "Smart Tutor API (resource server)",
+      "publicClient": false,
+      "bearerOnly": true,
+      "standardFlowEnabled": false
+    },
+    {
+      "clientId": "rag-mcp",
+      "name": "RAG MCP server (resource server)",
+      "publicClient": false,
+      "bearerOnly": true,
+      "standardFlowEnabled": false
+    }
+  ],
+  "users": [
+    {
+      "username": "learner@example.com",
+      "email": "learner@example.com",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Local",
+      "lastName": "Learner",
+      "credentials": [{ "type": "password", "value": "learner", "temporary": false }],
+      "realmRoles": ["default-roles-smart-tutor"]
+    },
+    {
+      "username": "learner2@example.com",
+      "email": "learner2@example.com",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Second",
+      "lastName": "Learner",
+      "credentials": [{ "type": "password", "value": "learner2", "temporary": false }],
+      "realmRoles": ["default-roles-smart-tutor"]
+    },
+    {
+      "username": "admin@example.com",
+      "email": "admin@example.com",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Local",
+      "lastName": "Admin",
+      "credentials": [{ "type": "password", "value": "admin", "temporary": false }],
+      "realmRoles": ["default-roles-smart-tutor", "admin"]
+    }
+  ]
+}

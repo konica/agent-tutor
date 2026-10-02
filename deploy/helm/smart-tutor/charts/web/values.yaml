@@ -1,0 +1,7 @@
+# nginx serving the React build behind the ALB.
+image:
+  repository: smart-tutor-web
+  tag: ""  # defaults to global.imageTag
+port: 8080
+replicaCount: 1
+# Owns its NetworkPolicy and ExternalSecret (spec §8).

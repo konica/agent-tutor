@@ -1,0 +1,97 @@
+# Local development (PRD §9.12).
+#   docker compose up -d                 # dependencies only: pgvector, Keycloak, LocalStack
+#   docker compose --profile app up -d   # + app services from the same images as production
+# Bedrock and LangSmith have no emulator: app services call the real us-east-1 models with your AWS profile.
+
+name: smart-tutor
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: smart_tutor
+      POSTGRES_PASSWORD: smart_tutor
+      POSTGRES_DB: smart_tutor
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./local/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smart_tutor -d smart_tutor"]
+      interval: 5s
+      retries: 20
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: smart_tutor
+      KC_DB_PASSWORD: smart_tutor
+      KC_HEALTH_ENABLED: "true"
+    ports: ["8080:8080"]
+    volumes:
+      - ./local/keycloak:/opt/keycloak/data/import:ro
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  localstack:
+    image: localstack/localstack:4
+    environment:
+      SERVICES: s3,sqs,ssm,secretsmanager
+      AWS_DEFAULT_REGION: us-east-1
+    ports: ["4566:4566"]
+    volumes:
+      - ./local/localstack/init/ready.d:/etc/localstack/init/ready.d:ro
+
+  # --- app profile: same images as production -------------------------------------------
+  api:
+    profiles: [app]
+    build: {context: ./backend, target: api}
+    env_file: [{path: .env, required: false}]
+    environment:
+      SMART_TUTOR_DATABASE_URL: postgresql+psycopg://smart_tutor:smart_tutor@postgres:5432/smart_tutor
+      SMART_TUTOR_KEYCLOAK_ISSUER: http://localhost:8080/realms/smart-tutor
+    ports: ["8001:8080"]
+    depends_on: [postgres, keycloak, agent]
+
+  agent:
+    profiles: [app]
+    build: {context: ./backend, target: agent}
+    env_file: [{path: .env, required: false}]
+    environment:
+      SMART_TUTOR_DATABASE_URL: postgresql+psycopg://smart_tutor:smart_tutor@postgres:5432/smart_tutor
+      SMART_TUTOR_MCP_URL: http://mcp:8000/mcp
+    ports: ["8002:8080"]
+    depends_on: [postgres, mcp]
+
+  mcp:
+    profiles: [app]
+    build: {context: ./backend, target: mcp}
+    env_file: [{path: .env, required: false}]
+    environment:
+      SMART_TUTOR_DATABASE_URL: postgresql+psycopg://smart_tutor:smart_tutor@postgres:5432/smart_tutor
+    ports: ["8000:8000"]
+    depends_on: [postgres]
+
+  worker:
+    profiles: [app]
+    build: {context: ./backend, target: worker}
+    env_file: [{path: .env, required: false}]
+    environment:
+      SMART_TUTOR_DATABASE_URL: postgresql+psycopg://smart_tutor:smart_tutor@postgres:5432/smart_tutor
+      SMART_TUTOR_INGEST_QUEUE_URL: http://localstack:4566/000000000000/smart-tutor-ingest
+      AWS_ENDPOINT_URL_S3: http://localstack:4566
+      AWS_ENDPOINT_URL_SQS: http://localstack:4566
+    depends_on: [postgres, localstack]
+
+  web:
+    profiles: [app]
+    build: {context: ./web}
+    ports: ["5173:8080"]
+
+volumes:
+  pgdata:

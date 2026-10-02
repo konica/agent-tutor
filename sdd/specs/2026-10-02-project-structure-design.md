@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft for review |
+| **Status** | Approved 2026-10-02; scaffolded |
 | **Date** | 2026-10-02 |
 | **Based on** | `sdd/prd.md` v1.5 (§9.11–§9.15, §10, §14) |
 | **Scope** | Folder structure for the whole repository, Python packaging, module boundaries, and the import rules CI enforces |
@@ -18,7 +18,7 @@
 
 | # | Decision | Rationale |
 |---|---|---|
-| S1 | **One Python package** (`smart_tutor`) with one `pyproject.toml`; heavy dependencies sit behind **extras**: `[ingest]` (Docling), `[eval]` (evaluation deps), `[dev]`. Each Docker build target installs only the extras it needs. | Matches the PRD's "one package shared by all deployables" while keeping Docling/PyTorch out of the API, agent, and MCP images. A uv workspace with several packages was rejected as too heavy for the team size. |
+| S1 | **One Python package** (`smart_tutor`) with one `pyproject.toml`; heavy dependencies sit behind **extras**: `[ingest]` (Docling), `[eval]` (evaluation deps); development tools are a uv `dev` dependency group (never installed in images). Each Docker build target installs only the extras it needs. | Matches the PRD's "one package shared by all deployables" while keeping Docling/PyTorch out of the API, agent, and MCP images. A uv workspace with several packages was rejected as too heavy for the team size. |
 | S2 | **Modules first, layers inside each module** (modular monolith). Each module has `domain/`, `application/`, `ports/`, `adapters/`. | Long-term: a feature is one folder; R2/R3 add folders, not files spread across five layer folders; modules can be owned independently and split out later if ever needed. |
 | S3 | **Entrypoints live in `smart_tutor/apps/`**, one composition root per deployable, not inside modules. | A deployable spans modules (the API serves all of them; the agent graph uses `tutoring` and `learning`). Wiring stays in one place per deployable. |
 | S4 | Modules talk to each other **only through the other module's `application` layer** (and the `shared` kernel). | Prevents coupling through domain internals or tables; e.g. `reports` reads learning records via a `learning` service, never its tables. |
@@ -47,7 +47,7 @@ agent-tutor/
 │   └── design-briefs/       # versioned briefs for the designer
 │
 ├── backend/                 # the one Python package (S1)
-│   ├── pyproject.toml       # extras: [ingest], [eval], [dev]; import-linter contracts
+│   ├── pyproject.toml       # extras: [ingest], [eval]; dev group; import-linter contracts
 │   ├── uv.lock
 │   ├── Dockerfile           # multi-stage; targets: api, agent, mcp, worker (CronJobs reuse the api image)
 │   ├── src/smart_tutor/     # §4
@@ -134,7 +134,7 @@ The dependency graph between modules must stay **acyclic**; if two modules need 
 | 2 | Module privacy (`forbidden`) | A module may import from another module only its `application` package; everyone may import `shared`. |
 | 3 | Apps are leaves (`forbidden`) | Nothing imports `smart_tutor.apps`. |
 | 4 | Vendor SDKs (`forbidden`, external packages) | `docling` only from `knowledge.adapters`; `boto3`/`botocore`, `langgraph`, `langchain_aws`, `mcp` only from `adapters` or `apps`. |
-| 5 | Module graph | No cycles between modules. |
+| 5 | Module graph (`layers` over modules) | Explicit order, top to bottom: `reports` → `recommendations` → `quizzes` \| `catalog` → `learning` → `tutoring` \| `knowledge` → `accounts` \| `insights`. Lower never imports higher, so there are no cycles; a new cross-module dependency means editing this order on purpose. |
 
 ## 7. Tests and evaluations
 

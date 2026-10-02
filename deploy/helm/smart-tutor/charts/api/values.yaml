@@ -1,0 +1,7 @@
+# FastAPI server behind the ALB (SSE streaming).
+image:
+  repository: smart-tutor-api
+  tag: ""  # defaults to global.imageTag
+port: 8080
+replicaCount: 1
+# Owns its NetworkPolicy and ExternalSecret (spec §8).
