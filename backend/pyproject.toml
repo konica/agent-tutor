@@ -65,7 +65,8 @@ files = ["src"]
 
 # ---------------------------------------------------------------------------
 # Import rules (sdd/specs/2026-10-02-project-structure-design.md §6). Run: lint-imports
-# Modules: knowledge tutoring learning accounts insights | R2: catalog quizzes recommendations reports
+# Generated from one module list; keep MODULES and the dependency order in sync with the spec.
+# R1: knowledge tutoring learning accounts insights | R2: catalog quizzes recommendations reports | R3: graph
 # ---------------------------------------------------------------------------
 [tool.importlinter]
 root_package = "smart_tutor"
@@ -77,9 +78,16 @@ name = "Layers inside each module: adapters | application -> ports -> domain"
 type = "layers"
 layers = ["adapters | application", "ports", "domain"]
 containers = [
-    "smart_tutor.knowledge", "smart_tutor.tutoring", "smart_tutor.learning",
-    "smart_tutor.accounts", "smart_tutor.insights", "smart_tutor.catalog",
-    "smart_tutor.quizzes", "smart_tutor.recommendations", "smart_tutor.reports",
+    "smart_tutor.knowledge",
+    "smart_tutor.tutoring",
+    "smart_tutor.learning",
+    "smart_tutor.accounts",
+    "smart_tutor.insights",
+    "smart_tutor.catalog",
+    "smart_tutor.quizzes",
+    "smart_tutor.recommendations",
+    "smart_tutor.reports",
+    "smart_tutor.graph",
 ]
 
 [[tool.importlinter.contracts]]
@@ -92,65 +100,218 @@ containers = ["smart_tutor.shared"]
 [[tool.importlinter.contracts]]
 name = "knowledge internals are private"
 type = "forbidden"
-source_modules = ["smart_tutor.tutoring", "smart_tutor.learning", "smart_tutor.accounts", "smart_tutor.insights", "smart_tutor.catalog", "smart_tutor.quizzes", "smart_tutor.recommendations", "smart_tutor.reports"]
-forbidden_modules = ["smart_tutor.knowledge.domain", "smart_tutor.knowledge.ports", "smart_tutor.knowledge.adapters"]
+source_modules = [
+    "smart_tutor.tutoring",
+    "smart_tutor.learning",
+    "smart_tutor.accounts",
+    "smart_tutor.insights",
+    "smart_tutor.catalog",
+    "smart_tutor.quizzes",
+    "smart_tutor.recommendations",
+    "smart_tutor.reports",
+    "smart_tutor.graph",
+]
+forbidden_modules = [
+    "smart_tutor.knowledge.domain",
+    "smart_tutor.knowledge.ports",
+    "smart_tutor.knowledge.adapters",
+]
 
 [[tool.importlinter.contracts]]
 name = "tutoring internals are private"
 type = "forbidden"
-source_modules = ["smart_tutor.knowledge", "smart_tutor.learning", "smart_tutor.accounts", "smart_tutor.insights", "smart_tutor.catalog", "smart_tutor.quizzes", "smart_tutor.recommendations", "smart_tutor.reports"]
-forbidden_modules = ["smart_tutor.tutoring.domain", "smart_tutor.tutoring.ports", "smart_tutor.tutoring.adapters"]
+source_modules = [
+    "smart_tutor.knowledge",
+    "smart_tutor.learning",
+    "smart_tutor.accounts",
+    "smart_tutor.insights",
+    "smart_tutor.catalog",
+    "smart_tutor.quizzes",
+    "smart_tutor.recommendations",
+    "smart_tutor.reports",
+    "smart_tutor.graph",
+]
+forbidden_modules = [
+    "smart_tutor.tutoring.domain",
+    "smart_tutor.tutoring.ports",
+    "smart_tutor.tutoring.adapters",
+]
 
 [[tool.importlinter.contracts]]
 name = "learning internals are private"
 type = "forbidden"
-source_modules = ["smart_tutor.knowledge", "smart_tutor.tutoring", "smart_tutor.accounts", "smart_tutor.insights", "smart_tutor.catalog", "smart_tutor.quizzes", "smart_tutor.recommendations", "smart_tutor.reports"]
-forbidden_modules = ["smart_tutor.learning.domain", "smart_tutor.learning.ports", "smart_tutor.learning.adapters"]
+source_modules = [
+    "smart_tutor.knowledge",
+    "smart_tutor.tutoring",
+    "smart_tutor.accounts",
+    "smart_tutor.insights",
+    "smart_tutor.catalog",
+    "smart_tutor.quizzes",
+    "smart_tutor.recommendations",
+    "smart_tutor.reports",
+    "smart_tutor.graph",
+]
+forbidden_modules = [
+    "smart_tutor.learning.domain",
+    "smart_tutor.learning.ports",
+    "smart_tutor.learning.adapters",
+]
 
 [[tool.importlinter.contracts]]
 name = "accounts internals are private"
 type = "forbidden"
-source_modules = ["smart_tutor.knowledge", "smart_tutor.tutoring", "smart_tutor.learning", "smart_tutor.insights", "smart_tutor.catalog", "smart_tutor.quizzes", "smart_tutor.recommendations", "smart_tutor.reports"]
-forbidden_modules = ["smart_tutor.accounts.domain", "smart_tutor.accounts.ports", "smart_tutor.accounts.adapters"]
+source_modules = [
+    "smart_tutor.knowledge",
+    "smart_tutor.tutoring",
+    "smart_tutor.learning",
+    "smart_tutor.insights",
+    "smart_tutor.catalog",
+    "smart_tutor.quizzes",
+    "smart_tutor.recommendations",
+    "smart_tutor.reports",
+    "smart_tutor.graph",
+]
+forbidden_modules = [
+    "smart_tutor.accounts.domain",
+    "smart_tutor.accounts.ports",
+    "smart_tutor.accounts.adapters",
+]
 
 [[tool.importlinter.contracts]]
 name = "insights internals are private"
 type = "forbidden"
-source_modules = ["smart_tutor.knowledge", "smart_tutor.tutoring", "smart_tutor.learning", "smart_tutor.accounts", "smart_tutor.catalog", "smart_tutor.quizzes", "smart_tutor.recommendations", "smart_tutor.reports"]
-forbidden_modules = ["smart_tutor.insights.domain", "smart_tutor.insights.ports", "smart_tutor.insights.adapters"]
+source_modules = [
+    "smart_tutor.knowledge",
+    "smart_tutor.tutoring",
+    "smart_tutor.learning",
+    "smart_tutor.accounts",
+    "smart_tutor.catalog",
+    "smart_tutor.quizzes",
+    "smart_tutor.recommendations",
+    "smart_tutor.reports",
+    "smart_tutor.graph",
+]
+forbidden_modules = [
+    "smart_tutor.insights.domain",
+    "smart_tutor.insights.ports",
+    "smart_tutor.insights.adapters",
+]
 
 [[tool.importlinter.contracts]]
 name = "catalog internals are private"
 type = "forbidden"
-source_modules = ["smart_tutor.knowledge", "smart_tutor.tutoring", "smart_tutor.learning", "smart_tutor.accounts", "smart_tutor.insights", "smart_tutor.quizzes", "smart_tutor.recommendations", "smart_tutor.reports"]
-forbidden_modules = ["smart_tutor.catalog.domain", "smart_tutor.catalog.ports", "smart_tutor.catalog.adapters"]
+source_modules = [
+    "smart_tutor.knowledge",
+    "smart_tutor.tutoring",
+    "smart_tutor.learning",
+    "smart_tutor.accounts",
+    "smart_tutor.insights",
+    "smart_tutor.quizzes",
+    "smart_tutor.recommendations",
+    "smart_tutor.reports",
+    "smart_tutor.graph",
+]
+forbidden_modules = [
+    "smart_tutor.catalog.domain",
+    "smart_tutor.catalog.ports",
+    "smart_tutor.catalog.adapters",
+]
 
 [[tool.importlinter.contracts]]
 name = "quizzes internals are private"
 type = "forbidden"
-source_modules = ["smart_tutor.knowledge", "smart_tutor.tutoring", "smart_tutor.learning", "smart_tutor.accounts", "smart_tutor.insights", "smart_tutor.catalog", "smart_tutor.recommendations", "smart_tutor.reports"]
-forbidden_modules = ["smart_tutor.quizzes.domain", "smart_tutor.quizzes.ports", "smart_tutor.quizzes.adapters"]
+source_modules = [
+    "smart_tutor.knowledge",
+    "smart_tutor.tutoring",
+    "smart_tutor.learning",
+    "smart_tutor.accounts",
+    "smart_tutor.insights",
+    "smart_tutor.catalog",
+    "smart_tutor.recommendations",
+    "smart_tutor.reports",
+    "smart_tutor.graph",
+]
+forbidden_modules = [
+    "smart_tutor.quizzes.domain",
+    "smart_tutor.quizzes.ports",
+    "smart_tutor.quizzes.adapters",
+]
 
 [[tool.importlinter.contracts]]
 name = "recommendations internals are private"
 type = "forbidden"
-source_modules = ["smart_tutor.knowledge", "smart_tutor.tutoring", "smart_tutor.learning", "smart_tutor.accounts", "smart_tutor.insights", "smart_tutor.catalog", "smart_tutor.quizzes", "smart_tutor.reports"]
-forbidden_modules = ["smart_tutor.recommendations.domain", "smart_tutor.recommendations.ports", "smart_tutor.recommendations.adapters"]
+source_modules = [
+    "smart_tutor.knowledge",
+    "smart_tutor.tutoring",
+    "smart_tutor.learning",
+    "smart_tutor.accounts",
+    "smart_tutor.insights",
+    "smart_tutor.catalog",
+    "smart_tutor.quizzes",
+    "smart_tutor.reports",
+    "smart_tutor.graph",
+]
+forbidden_modules = [
+    "smart_tutor.recommendations.domain",
+    "smart_tutor.recommendations.ports",
+    "smart_tutor.recommendations.adapters",
+]
 
 [[tool.importlinter.contracts]]
 name = "reports internals are private"
 type = "forbidden"
-source_modules = ["smart_tutor.knowledge", "smart_tutor.tutoring", "smart_tutor.learning", "smart_tutor.accounts", "smart_tutor.insights", "smart_tutor.catalog", "smart_tutor.quizzes", "smart_tutor.recommendations"]
-forbidden_modules = ["smart_tutor.reports.domain", "smart_tutor.reports.ports", "smart_tutor.reports.adapters"]
+source_modules = [
+    "smart_tutor.knowledge",
+    "smart_tutor.tutoring",
+    "smart_tutor.learning",
+    "smart_tutor.accounts",
+    "smart_tutor.insights",
+    "smart_tutor.catalog",
+    "smart_tutor.quizzes",
+    "smart_tutor.recommendations",
+    "smart_tutor.graph",
+]
+forbidden_modules = [
+    "smart_tutor.reports.domain",
+    "smart_tutor.reports.ports",
+    "smart_tutor.reports.adapters",
+]
+
+[[tool.importlinter.contracts]]
+name = "graph internals are private"
+type = "forbidden"
+source_modules = [
+    "smart_tutor.knowledge",
+    "smart_tutor.tutoring",
+    "smart_tutor.learning",
+    "smart_tutor.accounts",
+    "smart_tutor.insights",
+    "smart_tutor.catalog",
+    "smart_tutor.quizzes",
+    "smart_tutor.recommendations",
+    "smart_tutor.reports",
+]
+forbidden_modules = [
+    "smart_tutor.graph.domain",
+    "smart_tutor.graph.ports",
+    "smart_tutor.graph.adapters",
+]
 
 [[tool.importlinter.contracts]]
 name = "shared depends on no feature module and no app"
 type = "forbidden"
 source_modules = ["smart_tutor.shared"]
 forbidden_modules = [
-    "smart_tutor.knowledge", "smart_tutor.tutoring", "smart_tutor.learning",
-    "smart_tutor.accounts", "smart_tutor.insights", "smart_tutor.catalog",
-    "smart_tutor.quizzes", "smart_tutor.recommendations", "smart_tutor.reports",
+    "smart_tutor.knowledge",
+    "smart_tutor.tutoring",
+    "smart_tutor.learning",
+    "smart_tutor.accounts",
+    "smart_tutor.insights",
+    "smart_tutor.catalog",
+    "smart_tutor.quizzes",
+    "smart_tutor.recommendations",
+    "smart_tutor.reports",
+    "smart_tutor.graph",
     "smart_tutor.apps",
 ]
 
@@ -159,9 +320,16 @@ forbidden_modules = [
 name = "Nothing imports apps"
 type = "forbidden"
 source_modules = [
-    "smart_tutor.knowledge", "smart_tutor.tutoring", "smart_tutor.learning",
-    "smart_tutor.accounts", "smart_tutor.insights", "smart_tutor.catalog",
-    "smart_tutor.quizzes", "smart_tutor.recommendations", "smart_tutor.reports",
+    "smart_tutor.knowledge",
+    "smart_tutor.tutoring",
+    "smart_tutor.learning",
+    "smart_tutor.accounts",
+    "smart_tutor.insights",
+    "smart_tutor.catalog",
+    "smart_tutor.quizzes",
+    "smart_tutor.recommendations",
+    "smart_tutor.reports",
+    "smart_tutor.graph",
 ]
 forbidden_modules = ["smart_tutor.apps"]
 
@@ -170,29 +338,67 @@ forbidden_modules = ["smart_tutor.apps"]
 name = "Domain, application, and ports use no vendor SDK or shared adapter"
 type = "forbidden"
 source_modules = [
-    "smart_tutor.shared.domain", "smart_tutor.shared.ports",
-    "smart_tutor.knowledge.domain", "smart_tutor.knowledge.application", "smart_tutor.knowledge.ports",
-    "smart_tutor.tutoring.domain", "smart_tutor.tutoring.application", "smart_tutor.tutoring.ports",
-    "smart_tutor.learning.domain", "smart_tutor.learning.application", "smart_tutor.learning.ports",
-    "smart_tutor.accounts.domain", "smart_tutor.accounts.application", "smart_tutor.accounts.ports",
-    "smart_tutor.insights.domain", "smart_tutor.insights.application", "smart_tutor.insights.ports",
-    "smart_tutor.catalog.domain", "smart_tutor.catalog.application", "smart_tutor.catalog.ports",
-    "smart_tutor.quizzes.domain", "smart_tutor.quizzes.application", "smart_tutor.quizzes.ports",
-    "smart_tutor.recommendations.domain", "smart_tutor.recommendations.application", "smart_tutor.recommendations.ports",
-    "smart_tutor.reports.domain", "smart_tutor.reports.application", "smart_tutor.reports.ports",
+    "smart_tutor.shared.domain",
+    "smart_tutor.shared.ports",
+    "smart_tutor.knowledge.domain",
+    "smart_tutor.knowledge.application",
+    "smart_tutor.knowledge.ports",
+    "smart_tutor.tutoring.domain",
+    "smart_tutor.tutoring.application",
+    "smart_tutor.tutoring.ports",
+    "smart_tutor.learning.domain",
+    "smart_tutor.learning.application",
+    "smart_tutor.learning.ports",
+    "smart_tutor.accounts.domain",
+    "smart_tutor.accounts.application",
+    "smart_tutor.accounts.ports",
+    "smart_tutor.insights.domain",
+    "smart_tutor.insights.application",
+    "smart_tutor.insights.ports",
+    "smart_tutor.catalog.domain",
+    "smart_tutor.catalog.application",
+    "smart_tutor.catalog.ports",
+    "smart_tutor.quizzes.domain",
+    "smart_tutor.quizzes.application",
+    "smart_tutor.quizzes.ports",
+    "smart_tutor.recommendations.domain",
+    "smart_tutor.recommendations.application",
+    "smart_tutor.recommendations.ports",
+    "smart_tutor.reports.domain",
+    "smart_tutor.reports.application",
+    "smart_tutor.reports.ports",
+    "smart_tutor.graph.domain",
+    "smart_tutor.graph.application",
+    "smart_tutor.graph.ports",
 ]
 forbidden_modules = [
     "smart_tutor.shared.adapters",
-    "boto3", "botocore", "docling", "fastapi", "langchain_aws", "langgraph", "mcp", "psycopg", "sqlalchemy",
+    "boto3",
+    "botocore",
+    "docling",
+    "fastapi",
+    "langchain_aws",
+    "langgraph",
+    "mcp",
+    "psycopg",
+    "sqlalchemy",
 ]
 
 [[tool.importlinter.contracts]]
 name = "Docling only in knowledge.adapters (keeps the ingest extra in the worker image)"
 type = "forbidden"
 source_modules = [
-    "smart_tutor.shared", "smart_tutor.apps",
-    "smart_tutor.tutoring", "smart_tutor.learning", "smart_tutor.accounts", "smart_tutor.insights",
-    "smart_tutor.catalog", "smart_tutor.quizzes", "smart_tutor.recommendations", "smart_tutor.reports",
+    "smart_tutor.shared",
+    "smart_tutor.apps",
+    "smart_tutor.tutoring",
+    "smart_tutor.learning",
+    "smart_tutor.accounts",
+    "smart_tutor.insights",
+    "smart_tutor.catalog",
+    "smart_tutor.quizzes",
+    "smart_tutor.recommendations",
+    "smart_tutor.reports",
+    "smart_tutor.graph",
 ]
 forbidden_modules = ["docling"]
 
@@ -208,6 +414,8 @@ layers = [
     "recommendations",
     "quizzes | catalog",
     "learning",
-    "tutoring | knowledge",
+    "tutoring",
+    "graph",
+    "knowledge",
     "accounts | insights",
 ]

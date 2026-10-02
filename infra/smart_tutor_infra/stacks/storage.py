@@ -1,4 +1,5 @@
-"""Documents bucket (versioning, lifecycle to Glacier Flexible Retrieval), S3 -> SQS + DLQ (M1)."""
+"""Documents bucket: uploads/ (presigned POST, expires after 1 day, events -> SQS + DLQ) and contents/<sha256>.pdf
+(versioning; tagged unreferenced contents -> Glacier Flexible Retrieval after 30 days), CORS for the web origin (M1)."""
 
 from typing import Any
 

@@ -9,12 +9,13 @@ One package, `src/smart_tutor/`, shared by every backend deployable. Modules fir
 ```
 smart_tutor/
 ├── shared/      # kernel: ids, TokenUsage, Citation, errors; ports ChatModel/EmbeddingModel/Clock; ModelFactory; auth, postgres, aws, bedrock adapters; config.py
-├── knowledge/   # documents, chunks, ingestion, search
+├── knowledge/   # library: contents (SHA-256 dedupe), documents, can_read, upload, ingestion, search, subject catalog
 ├── tutoring/    # threads, subject detection, relevance gate, ask path
 ├── learning/    # Lesson Notes, learning records
-├── accounts/    # learners, enrollments, token usage, rate-limit policy
-├── insights/    # content gaps
+├── accounts/    # learner profile, upload limits, token usage, rate-limit policy
+├── insights/    # anonymized decline log
 ├── catalog/ quizzes/ recommendations/ reports/   # Release 2 — empty until then
+├── graph/       # Release 3 knowledge graph — empty until then
 └── apps/        # api, agent, mcp_server, worker, jobs — one composition root per deployable
 ```
 
@@ -37,7 +38,7 @@ Contracts live in `pyproject.toml` under `[tool.importlinter]`; CI fails if any 
 3. Nothing imports `smart_tutor.apps`.
 4. `domain`, `application`, `ports` import no vendor SDK (`boto3`, `botocore`, `docling`, `fastapi`, `langchain_aws`, `langgraph`, `mcp`, `psycopg`, `sqlalchemy`) and not `shared.adapters`.
 5. Docling is imported only in `knowledge.adapters` (it pulls in PyTorch and is installed only in the worker image).
-6. Module dependency order, top to bottom: `reports` → `recommendations` → `quizzes | catalog` → `learning` → `tutoring | knowledge` → `accounts | insights`. A lower module never imports a higher one. If you need a new cross-module dependency, change this order deliberately and say why in the PR; flows that go the "wrong" way are orchestrated in `apps/` (e.g. "Discuss this note": `apps/api` reads the note from `learning`, then starts a thread in `tutoring`).
+6. Module dependency order, top to bottom: `reports` → `recommendations` → `quizzes | catalog` → `learning` → `tutoring` → `graph` → `knowledge` → `accounts | insights`. A lower module never imports a higher one. If you need a new cross-module dependency, change this order deliberately and say why in the PR; flows that go the "wrong" way are orchestrated in `apps/` (e.g. "Discuss this note": `apps/api` reads the note from `learning`, then starts a thread in `tutoring`).
 7. The agent never reads chunk tables: `tutoring` retrieves through its `Retriever` port (MCP client), which calls `apps/mcp_server` → `knowledge.application.SearchService`.
 
 Do not silence a contract with `ignore_imports` to make CI pass; fix the dependency direction.

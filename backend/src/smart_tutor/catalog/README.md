@@ -1,6 +1,6 @@
 # `catalog` module (Release 2)
 
-**Owns** (§9.7): Topic catalog per subject, derived from Docling headings at ingestion.
+**Owns** (§9.7): Topic catalog per content, derived from Docling headings at ingestion; a learner's catalog is the union over their active documents.
 
 **Key classes:** `TopicEntry`; service `CatalogService`.
 
