@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft v0.3 (refined from `initial-idea.md`, owner feedback applied) |
+| **Status** | Draft v0.4 (refined from `initial-idea.md`; owner feedback and Bedrock model choice applied) |
 | **Owner** | Thao Dinh |
 | **Last updated** | 2026-10-01 |
 | **Lifecycle** | Build → Test → Deploy → Monitor ([The Agent Development Lifecycle](https://www.langchain.com/blog/the-agent-development-lifecycle)) |
@@ -28,7 +28,7 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 | Persona | Job to be done |
 |---|---|
 | **Learner** (primary) | "Help me study *my* subject efficiently, keep me on track, and show me which source backs each answer." |
-| **Admin** (secondary) | "Let me upload the trusted documents for each subject, host the models, and build evaluation datasets." |
+| **Admin** (secondary) | "Let me upload the trusted documents for each subject, provision model access, and build evaluation datasets." |
 | **Developer / Operator** (internal) | "Let me trace, evaluate, and monitor the agent so I can ship changes with confidence." |
 
 ## 4. Glossary
@@ -146,7 +146,7 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
    Keycloak (OIDC) ◄── validate ──────────────── RAG MCP Server ──► PostgreSQL + pgvector
                                                                          ▲
  Admin ──► S3 subjects/<subject>/ ──► S3 event → SQS → Ingestion worker ──┘
-                                      (Docling → chunk → embed via SageMaker)
+                                      (Docling → chunk → embed via Bedrock Nova)
 ```
 
 | Component | Responsibilities |
@@ -174,19 +174,42 @@ Later hardening (not MVP): replace token forwarding with Keycloak **token exchan
 
 ### 9.3 Token credit
 
-- Usage is recorded per turn (`user_id`, `thread_id`, `input_tokens`, `output_tokens`, `model`, `timestamp`) from the model endpoint's reported usage.
+- Usage is recorded per turn (`user_id`, `thread_id`, `input_tokens`, `output_tokens`, `model`, `timestamp`) from the `usage` block Bedrock returns on every Converse / Chat Completions response (Bedrock's separate CountTokens API is not available for Gemma 3 4B and is not needed).
 - Credit check happens in the API **before** each turn; credit is lifetime (no reset) in the MVP — see Q2.
 - Embedding calls for search and ingestion are not charged to learners.
 
-### 9.4 Stack
+### 9.4 Model integration notes
+
+**Embeddings — `amazon.nova-2-multimodal-embeddings-v1:0`**
+- Call `InvokeModel` with `taskType: SINGLE_EMBEDDING`.
+- Use `embeddingPurpose: GENERIC_INDEX` when embedding document chunks and `TEXT_RETRIEVAL` when embedding the learner's query. Mixing these up silently degrades retrieval.
+- **Dimension 1024** (allowed: 256, 384, 1024, 3072; default 3072). pgvector's HNSW/IVFFlat indexes support `vector` columns only up to 2,000 dimensions, so 3072 would need `halfvec` or no index. 1024 keeps an HNSW cosine index simple. Changing the dimension later means re-embedding everything, so record `embedding_model` and `embedding_dim` on each chunk.
+- Text input is limited to **8,192 characters** per synchronous call. Keep chunks well below this (e.g. ~1,500–3,000 characters), and set `truncationMode: NONE` so oversize chunks fail loudly instead of being cut.
+- Being multimodal, it can later embed page images (`DOCUMENT_IMAGE`) for diagrams and tables. That is out of scope for the MVP.
+
+**LLM — `google.gemma-3-4b-it`**
+- Available through Bedrock's Converse API (`ChatBedrockConverse` in LangChain) and an OpenAI-compatible Chat Completions endpoint (`bedrock-runtime …/openai/v1` or `bedrock-mantle`).
+- Streaming is supported. Context window is 128K, max output is 8K tokens.
+- In-Region inference only (no cross-region profiles). The agent, AgentCore runtime, and model must share a region where both models are offered (Q1).
+
+### 9.5 Model risks and mitigations
+
+| Risk | Mitigation |
+|---|---|
+| **Tool calling.** The agent depends on calling MCP `search` and the Lesson Note tool. AWS documents *client-side tool calling* for Gemma 3 4B on the `bedrock-mantle` endpoint; support via Converse on `bedrock-runtime` is not stated. | M0 spike: verify streamed tool calls through the LangChain integration we choose. If unreliable, make retrieval a **fixed graph step** (always search before answering) rather than a model-chosen tool, and keep tools only for Lesson Notes. |
+| **Small-model reliability.** A 4B model may struggle with Deep Agents' long system prompt and planning tools, multi-step trajectories, and nuanced off-topic decisions. | Start with a minimal LangGraph agent (scope check → search → answer); add Deep Agents features only if evals stay green. The trajectory and scope evals (§10) decide. Keep a fallback to a larger Bedrock model (e.g. a bigger Gemma variant) behind a config switch. |
+| **Weak judge.** Using the 4B model as LLM-as-judge or to generate datasets would produce noisy scores. | Use a larger Bedrock model for judges and synthetic data (Q7); calibrate it against human feedback (§10.2). |
+
+### 9.6 Stack
 
 | Concern | Choice |
 |---|---|
 | Agent framework | LangChain (Deep Agents / LangGraph) |
 | Tracing and evaluation | LangSmith |
 | Document extraction | Docling |
-| LLM | `gpt-5.4-nano`, hosted by Admin on AWS SageMaker (details needed — Appendix A) |
-| Embeddings | `text-embedding-small`, hosted by Admin on AWS SageMaker (details needed — Appendix A) |
+| LLM (agent) | `google.gemma-3-4b-it` on **Amazon Bedrock** (serverless) — 128K context, 8K max output, streaming; tool calling to be verified (§9.5, Q8) |
+| Embeddings | `amazon.nova-2-multimodal-embeddings-v1:0` on **Amazon Bedrock**, **1024 dimensions** (§9.4) |
+| LLM (evaluation judges, synthetic data) | A larger Bedrock-hosted model (TBD, Q7) — not the 4B agent model |
 | Vector store / app DB | PostgreSQL + pgvector |
 | Identity | Keycloak (OIDC; roles `learner`, `admin`) |
 | Storage / events | S3, S3 Event Notifications → SQS |
@@ -264,18 +287,20 @@ Trace every run; run answer-relevance and scope evaluators on a sample of produc
 
 | # | Question | Blocks | Default if unanswered |
 |---|---|---|---|
-| Q1 | SageMaker endpoint details (Appendix A). | Build | — (required) |
+| Q1 | Bedrock access details (Appendix A), especially a **region where both models are enabled** alongside AgentCore. | Build | — (required) |
 | Q2 | Is the 20K credit lifetime or does it reset (e.g. monthly)? Can an admin raise one user's credit manually? | Credit logic | Lifetime; admin can update via DB/script. |
 | Q3 | Where do the API and MCP servers run — AgentCore Gateway/Runtime or ECS/Lambda? | Deploy | Agent on AgentCore Runtime; API and MCP on ECS Fargate. |
 | Q4 | Which subjects launch first? | Ingestion, evals | IELTS and AI Agents. |
 | Q5 | Retention period for threads and traces? | Privacy | 180 days. |
 | Q6 | Off-topic reply tone: strict or conversational? | UX copy | Short, friendly, suggests in-scope topics. |
+| Q7 | Which larger Bedrock model is used for LLM-as-judge and synthetic dataset generation? | Evaluation | A larger Gemma variant on Bedrock; revisit after judge–human agreement is measured. |
+| Q8 | If the M0 spike shows Gemma 3 4B cannot call tools reliably, is a fixed "always search" step acceptable, or do we switch the agent to a larger model? | Agent design | Fixed search step; keep the 4B model. |
 
 ## 14. Milestones
 
 | Milestone | Exit criteria |
 |---|---|
-| M0 Foundations | Repo, CI, Keycloak realm, PostgreSQL+pgvector, LangSmith project; SageMaker endpoints reachable (Appendix A) |
+| M0 Foundations | Repo, CI, Keycloak realm, PostgreSQL+pgvector, LangSmith project; both Bedrock models reachable (Appendix A); **Gemma 3 4B tool-calling + streaming spike** done (§9.5) |
 | M1 RAG MCP | S3-event ingestion + authenticated MCP search; retrieval-relevance eval passing |
 | M2 Agent | Grounded Q&A, scope guard, Lesson Note tool; all §10.1 evals passing on the smoke split |
 | M3 API + Web | Auth, chat streaming, notes, usage and credit; isolation tests passing |
@@ -283,26 +308,17 @@ Trace every run; run answer-relevance and scope evaluators on a sample of produc
 
 ---
 
-## Appendix A — Information needed from the Admin (SageMaker models)
+## Appendix A — Information needed from the Admin (Amazon Bedrock)
 
-### Both endpoints
-- AWS **region** and **endpoint name** (and ARN).
-- **Access method**: IAM role/policy to assume (`sagemaker:InvokeEndpoint`, `InvokeEndpointWithResponseStream`), and whether calls go through a VPC endpoint.
-- **Serving container** (e.g. vLLM, TGI, LMI/DJL) and **request/response schema** — ideally a sample request and response. Is it OpenAI-compatible (`/v1/chat/completions`, `/v1/embeddings`)?
-- **Rate / concurrency limits**, autoscaling settings, and whether it scales to zero (cold-start time).
-- **Model version** and how we are notified of upgrades (affects evaluation baselines).
-- Separate endpoints (or variants) for **dev/test vs. prod**, if any.
+Both models are serverless on Bedrock, so there are no endpoints to host or scale. Model capabilities (context window, streaming, embedding dimensions, input limits) are documented by AWS and captured in §9.4. We need:
 
-### LLM (`gpt-5.4-nano`)
-- **Streaming** supported? (needed for SSE to the web app)
-- **Tool / function calling** supported, and in which format? (required for MCP tools and the Lesson Note tool)
-- **Context window** and **max output tokens**.
-- Does the response include **token usage** (`prompt_tokens`, `completion_tokens`)? If not, which **tokenizer** should we use to count? (required for credits)
-- Supported parameters (temperature, top_p, stop, structured/JSON output).
-- Cost per hour or per token, for cost tracking.
-
-### Embeddings (`text-embedding-small`)
-- **Vector dimension** (sizes the pgvector column).
-- **Max input tokens** per text and **max batch size**.
-- Are vectors **normalized**? Recommended distance metric (cosine / inner product).
-- Any required **input prefixes** (e.g. `query:` / `passage:`).
+1. **AWS region** for development and production. It must offer `google.gemma-3-4b-it`, `amazon.nova-2-multimodal-embeddings-v1:0`, and Bedrock AgentCore. Gemma 3 4B has no cross-region inference profile, so calls must go to that region directly.
+2. **Model access enabled** for both model IDs in that account and region (and for the larger judge model, Q7).
+3. **Credentials:**
+   - an IAM role for each workload (ingestion worker, MCP server, agent runtime) with `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream`, scoped to these model ARNs;
+   - a Bedrock API key for local development, if preferred over IAM credentials.
+4. **Service quotas** for both models (requests and tokens per minute), to size ingestion batch rates and the pilot's 50 concurrent learners.
+5. **Network:** whether calls must go through a VPC interface endpoint (PrivateLink) for `bedrock-runtime`.
+6. **Endpoint preference** for the agent LLM: `bedrock-runtime` (Converse) or `bedrock-mantle` (OpenAI-compatible). The M0 tool-calling spike may decide this.
+7. **Budget alerts:** monthly Bedrock budget and who receives the alerts.
+8. **Guardrails (optional):** whether to attach a Bedrock Guardrail to agent calls as an extra layer against prompt injection and off-topic content.
