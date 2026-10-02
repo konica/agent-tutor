@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft v0.8 (refined from `initial-idea.md`; owner decisions on models, credit policy, and hosting applied) |
+| **Status** | Draft v0.9 (refined from `initial-idea.md`; all open questions resolved, region us-east-1) |
 | **Owner** | Thao Dinh |
 | **Last updated** | 2026-10-01 |
 | **Lifecycle** | Build → Test → Deploy → Monitor ([The Agent Development Lifecycle](https://www.langchain.com/blog/the-agent-development-lifecycle)) |
@@ -247,6 +247,19 @@ Later hardening (not MVP): replace token forwarding with Keycloak **token exchan
 | Agent hosting | AWS Bedrock AgentCore |
 | API / Web | FastAPI / React |
 
+### 9.8 Region: us-east-1
+
+All environments run in **us-east-1 (N. Virginia)**. It is the only commercial region where every component is available:
+
+| Component | Availability in us-east-1 |
+|---|---|
+| `amazon.nova-2-multimodal-embeddings-v1:0` | In-region. Only commercial region offering it; no cross-region profile. |
+| `amazon.nova-2-lite-v1:0` | Via `us.amazon.nova-2-lite-v1:0`; requests may be served in us-east-1, us-east-2, or us-west-2. |
+| `qwen.qwen3-32b-v1:0` (judge) | In-region. |
+| AgentCore Runtime | Available; VPC connectivity in AZs `use1-az1`, `use1-az2`, `use1-az4`. Place RDS and Fargate subnets in these AZ IDs. |
+
+**Open check (M0):** the Nova embeddings model card lists only `StartAsyncInvoke`, while the request schema documents synchronous `InvokeModel` (`SINGLE_EMBEDDING`). Query-time search needs a synchronous call with low latency, so verify `InvokeModel` works for text queries before building M1. Async remains suitable for bulk ingestion.
+
 ## 10. Quality, safety, and evaluation
 
 ### 10.1 Evaluators
@@ -305,7 +318,7 @@ Trace every run; run answer-relevance and scope evaluators on a sample of produc
 | Latency | First streamed token p95 ≤ 3 s; ingestion ≤ 5 min per document |
 | Availability | Best-effort; no data loss on restart (checkpointer in PostgreSQL) |
 | Security | Every service validates Keycloak JWTs; S3 per-user prefixes; secrets in AWS Secrets Manager; TLS everywhere; tokens never logged or put in prompts |
-| Privacy | Learner data deletable on request; traces must not contain credentials |
+| Privacy | Learner data deletable on request; threads and traces retained 180 days; traces must not contain credentials; LLM requests stay within US regions (us-east-1/us-east-2/us-west-2) |
 | Cost | Track cost per conversation from day one |
 | Language | English UI; content in the subject's language |
 
@@ -320,19 +333,19 @@ Trace every run; run answer-relevance and scope evaluators on a sample of produc
 
 | # | Question | Blocks | Default if unanswered |
 |---|---|---|---|
-| Q1 | Bedrock access details (Appendix A), especially a **region where both models are enabled** alongside AgentCore. | Build | — (required) |
+| Q1 | ~~Region~~ **Resolved: us-east-1** for dev and prod (§9.8). Remaining Appendix A items (access, IAM, quotas, network, budget) are setup tasks for M0. | — | — |
 | Q2 | ~~Credit policy~~ **Resolved:** default 2M tokens, lifetime, self-adjustable by the learner up to a 10M system maximum (§9.3). | — | — |
 | Q3 | ~~Hosting~~ **Resolved:** agent and MCP server on AgentCore Runtime, API on ECS Fargate (§9.6). | — | — |
-| Q4 | Which subjects launch first? | Ingestion, evals | IELTS and AI Agents. |
-| Q5 | Retention period for threads and traces? | Privacy | 180 days. |
-| Q6 | Off-topic reply tone: strict or conversational? | UX copy | Short, friendly, suggests in-scope topics. |
+| Q4 | ~~Launch subjects~~ **Resolved:** IELTS and AI Agents. | — | — |
+| Q5 | ~~Retention~~ **Resolved:** threads and traces kept 180 days. | — | — |
+| Q6 | ~~Off-topic tone~~ **Resolved:** short, friendly, suggests in-scope topics. | — | — |
 | Q7 | ~~Agent model~~ **Resolved:** `amazon.nova-2-lite-v1:0`, no fallback model (§9.4). | — | — |
 
 ## 14. Milestones
 
 | Milestone | Exit criteria |
 |---|---|
-| M0 Foundations | Repo, CI, Keycloak realm, PostgreSQL+pgvector, LangSmith project; all three Bedrock models reachable (Appendix A); **Nova 2 Lite spike** done: streamed tool calls, tool forcing, and scope-classification tool verified through LangChain + MCP; first-token latency measured (§9.5); MCP server reachable on AgentCore Runtime with Keycloak JWT and VPC access to PostgreSQL |
+| M0 Foundations | Repo, CI, Keycloak realm, PostgreSQL+pgvector, LangSmith project; all three Bedrock models reachable (Appendix A); **Nova 2 Lite spike** done: streamed tool calls, tool forcing, and scope-classification tool verified through LangChain + MCP; first-token latency measured (§9.5); MCP server reachable on AgentCore Runtime with Keycloak JWT and VPC access to PostgreSQL; synchronous Nova embeddings `InvokeModel` verified for query-time search (§9.8) |
 | M1 RAG MCP | S3-event ingestion + authenticated MCP search; retrieval-relevance eval passing |
 | M2 Agent | Grounded Q&A, scope guard, Lesson Note tool; all §10.1 evals passing on the smoke split |
 | M3 API + Web | Auth, chat streaming, notes, usage and credit; isolation tests passing |
@@ -344,13 +357,13 @@ Trace every run; run answer-relevance and scope evaluators on a sample of produc
 
 Both models are serverless on Bedrock, so there are no endpoints to host or scale. Model capabilities (context window, streaming, embedding dimensions, input limits) are documented by AWS and captured in §9.4. We need:
 
-1. **AWS region** for development and production. It must offer Bedrock AgentCore, `amazon.nova-2-multimodal-embeddings-v1:0` and `qwen.qwen3-32b-v1:0` (Qwen is in-region only), and be a source region for a Nova 2 Lite geo inference profile (e.g. us-east-1, us-east-2, us-west-2 → `us.amazon.nova-2-lite-v1:0`; eu-west-1, eu-south-1 → `eu.amazon.nova-2-lite-v1:0`). **us-east-1, us-east-2, us-west-2, or eu-west-1** satisfy the LLM and judge; confirm Nova 2 embeddings and AgentCore there.
+1. **AWS region: us-east-1** (decided, see §9.8).
 2. **Model access enabled** for `amazon.nova-2-lite-v1:0` (and its inference profile), `amazon.nova-2-multimodal-embeddings-v1:0`, and the judge model `qwen.qwen3-32b-v1:0` in that account and region. IAM policies for the agent must allow invoking the **inference profile ARN and the underlying model ARNs in every destination region** of that profile.
 3. **Credentials:**
    - an IAM role for each workload (ingestion worker, MCP server, agent runtime) with `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream`, scoped to these model ARNs;
    - a Bedrock API key for local development, if preferred over IAM credentials.
 4. **Service quotas** for both models (requests and tokens per minute), to size ingestion batch rates and the pilot's 50 concurrent learners.
 5. **Network:** whether calls must go through a VPC interface endpoint (PrivateLink) for `bedrock-runtime`.
-6. **Data residency:** confirm that routing Nova 2 Lite requests across regions within the chosen geography (US or EU profile) is acceptable.
+6. **Data residency:** Nova 2 Lite requests are routed within US regions via the `us.` profile (accepted).
 7. **Budget alerts:** monthly Bedrock budget and who receives the alerts.
 8. **Guardrails (optional):** whether to attach a Bedrock Guardrail to agent calls as an extra layer against prompt injection and off-topic content.
