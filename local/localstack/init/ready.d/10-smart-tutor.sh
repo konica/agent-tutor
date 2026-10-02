@@ -17,14 +17,20 @@ QUEUE_URL=$(awslocal sqs create-queue --queue-name "$QUEUE" \
   --query QueueUrl --output text)
 QUEUE_ARN=$(awslocal sqs get-queue-attributes --queue-url "$QUEUE_URL" --attribute-names QueueArn --query Attributes.QueueArn --output text)
 
-# Add, new version, archive (tag), unarchive (tag removed) -> SQS (PRD §9.5 table).
+# Learner uploads (presigned POST to uploads/<user_id>/<upload_id>.pdf) -> SQS -> worker (PRD §9.5).
+# The worker hashes the bytes and stores new contents at contents/<sha256>.pdf (no events there).
 awslocal s3api put-bucket-notification-configuration --bucket "$BUCKET" --notification-configuration "{
   \"QueueConfigurations\": [{
     \"QueueArn\": \"$QUEUE_ARN\",
-    \"Events\": [\"s3:ObjectCreated:*\", \"s3:ObjectTagging:*\"],
-    \"Filter\": {\"Key\": {\"FilterRules\": [{\"Name\": \"prefix\", \"Value\": \"subjects/\"}]}}
+    \"Events\": [\"s3:ObjectCreated:*\"],
+    \"Filter\": {\"Key\": {\"FilterRules\": [{\"Name\": \"prefix\", \"Value\": \"uploads/\"}]}}
   }]
 }"
+
+# Browser uploads from the local web app.
+awslocal s3api put-bucket-cors --bucket "$BUCKET" --cors-configuration '{
+  "CORSRules": [{"AllowedOrigins": ["http://localhost:5173"], "AllowedMethods": ["POST"], "AllowedHeaders": ["*"]}]
+}'
 
 awslocal ssm put-parameter --name /smart-tutor/learning-record-idle-minutes --type String --value 10 --overwrite
 

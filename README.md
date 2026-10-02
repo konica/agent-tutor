@@ -1,6 +1,6 @@
 # Smart Tutor
 
-A subject-scoped AI tutor: it detects the subject of a question among the learner's enrolled subjects, answers only from admin-uploaded documents with citations, and declines everything else. Product requirements: [`sdd/prd.md`](sdd/prd.md). Repository layout: [`sdd/specs/2026-10-02-project-structure-design.md`](sdd/specs/2026-10-02-project-structure-design.md).
+An AI tutor for your own documents: learners upload PDFs, the system suggests subjects from a shared catalog, and the tutor answers questions only from the learner's documents in one subject at a time, with citations. Identical files are processed once across all users. Later releases add quizzes and reports, then sharing and a knowledge graph of how documents relate over time. Product requirements: [`sdd/prd.md`](sdd/prd.md). Repository layout: [`sdd/specs/2026-10-02-project-structure-design.md`](sdd/specs/2026-10-02-project-structure-design.md).
 
 ## Layout
 
