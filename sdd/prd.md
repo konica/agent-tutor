@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft v1.2 (refined from `initial-idea.md`; adds conversation/note management, quizzes, daily/weekly reports, and recommendations) |
+| **Status** | Draft v1.3 (refined from `initial-idea.md`; adds learning loop, Docker Compose for local development, EKS + Helm + CDK for production) |
 | **Owner** | Thao Dinh |
 | **Last updated** | 2026-10-02 |
 | **Lifecycle** | Build → Test → Deploy → Monitor ([The Agent Development Lifecycle](https://www.langchain.com/blog/the-agent-development-lifecycle)) |
@@ -111,7 +111,8 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 - PDF ingestion from S3 events: add, replace (new version), archive, unarchive.
 - Weekly content-gap report for Admins.
 - LangSmith tracing, evaluation suites, and human-feedback annotation (§10).
-- Agent and MCP server deployed on Bedrock AgentCore; API on ECS Fargate.
+- Agent and MCP server deployed on Bedrock AgentCore; all other services on **Amazon EKS** (Helm); AWS resources managed with **AWS CDK**.
+- Local development with **Docker Compose** for dependency services.
 
 ### Next (low priority)
 - Carry an answer's citations into the Lesson Note so each point links back to its source.
@@ -205,7 +206,7 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 ### 9.1 Components
 
 ```
- Web App (React) ──► API Server (FastAPI, ECS Fargate) ──► Smart Tutor Agent (LangGraph, AgentCore Runtime)
+ Web App (React, EKS) ──► API Server (FastAPI, EKS) ──► Smart Tutor Agent (LangGraph, AgentCore Runtime)
        │                 │  (user JWT)                           │  (same user JWT)
        ▼                 ▼                                       ▼
    Keycloak (OIDC) ◄── validate ─────────────────────── RAG MCP Server (AgentCore Runtime) ──► PostgreSQL + pgvector
@@ -220,7 +221,7 @@ General-purpose chatbots drift off-topic, answer from unknown sources, and forge
 | **Ingestion worker** | Consumes S3 `ObjectCreated` and `ObjectTagging` events via SQS; extracts PDFs with Docling; chunks; embeds; activates or archives chunks by `document_id` + `version_id`; updates the topic catalog (§9.7). |
 | **Smart Tutor agent** | The paths in §9.2 (ask, summarize, idle record, quiz, report, recommend). Checkpointer (thread history) and long-term memory (learning records) in PostgreSQL. Reports token usage per call. |
 | **API Server** | Auth, enrollments, conversations, notes, quizzes, reports (list, filter, archive), streaming (SSE), quiz grading, usage view, rate limiting; forwards the user's token to the agent. |
-| **Scheduled jobs** | Learning-record sweeper (every minute, §9.2); learner reports (hourly, generates reports for learners whose day/week just ended in their time zone, §9.8); content-gap report (weekly, §9.6). |
+| **Scheduled jobs** (Kubernetes CronJobs) | Learning-record sweeper (every minute, §9.2); learner reports (hourly, generates reports for learners whose day/week just ended in their time zone, §9.8); content-gap report (weekly, §9.6). |
 | **Web App** | Keycloak login redirect, subject enrollment, chat, conversations, notes editor, quizzes, reports and recommendations, usage view. |
 
 ### 9.2 Agent flow
@@ -262,7 +263,7 @@ Because the subject comes from code and the database, not from the model, attack
 1. The Web App signs the user in with Keycloak (OIDC Authorization Code + PKCE, Keycloak hosted login/registration pages) and calls the API with `Authorization: Bearer <access_token>`.
 2. The API validates the token (signature via Keycloak JWKS, `iss`, `exp`, `aud`), applies the rate limit, then invokes the agent and **forwards the same token**.
 3. The agent attaches the token to every MCP request (`Authorization` header on the streamable-HTTP transport). The token is passed in runtime context, **never placed in the prompt**.
-4. The MCP server (on AgentCore Runtime) has the token validated by the runtime's `CUSTOM_JWT` authorizer against Keycloak's OIDC discovery URL; `Authorization` is on the runtime's request-header allowlist so the server receives it. The server reads `sub`, looks up the user's enrolled subjects in PostgreSQL, and searches only the intersection with the requested `subjects` (`403` if empty). The filter is applied in SQL.
+4. The MCP server (on AgentCore Runtime) has the token validated by the runtime's `CUSTOM_JWT` authorizer against Keycloak's OIDC discovery URL; `Authorization` is on the runtime's request-header allowlist so the server receives it. The server **also validates the JWT in its own code** (JWKS, `iss`, `aud`, `exp`): defense in depth in production, and the same behavior locally where there is no AgentCore authorizer. The server reads `sub`, looks up the user's enrolled subjects in PostgreSQL, and searches only the intersection with the requested `subjects` (`403` if empty). The filter is applied in SQL.
 
 Keycloak setup: one realm with self-registration and email verification enabled; clients `smart-tutor-web` (public), `smart-tutor-api`, `rag-mcp`; an **audience mapper** so access tokens carry `aud: [smart-tutor-api, rag-mcp]`. Enrollments live in PostgreSQL, not in token claims, so changes apply immediately.
 
@@ -305,7 +306,7 @@ Archived chunks keep their text, title, and page in PostgreSQL, so citations in 
 ### 9.6 Content-gap report
 
 - Every decline (relevance gate or `decline` tool) writes `subject`, question text, best retrieval score, and timestamp to a `content_gaps` table, **without user id**.
-- A weekly job (EventBridge Scheduler → small task) groups similar questions by embedding similarity, ranks groups by count, and writes `s3://…/reports/content-gaps/<subject>/<yyyy-ww>.md`.
+- A weekly Kubernetes CronJob groups similar questions by embedding similarity, ranks groups by count, and writes `s3://…/reports/content-gaps/<subject>/<yyyy-ww>.md`.
 - Questions with very low scores are mostly off-topic; the report lists groups closest to the threshold first, since those are the most likely missing content.
 
 ### 9.7 Topic catalog
@@ -349,21 +350,56 @@ Archived chunks keep their text, title, and page in PostgreSQL, so citations in 
 | **Bad quiz questions.** Ambiguous options, two correct answers, or facts not in the notes. | Code validation of structure; quiz-quality LLM judge (§10.1); questions limited to the selected notes; learners can flag a question, which feeds the dataset. |
 | **Recommendations that drift.** The model invents topics or suggests archived material. | Candidates built in code from the topic catalog and quiz results; the model only ranks and explains; unknown topics rejected. |
 | **Thin topic catalog.** PDFs with poor headings give few topics. | Monitor catalog size per subject; optional `_subject.json` later. |
+| **Local/prod drift.** AgentCore and Bedrock can't run locally; LocalStack differs from AWS in edge cases. | Same container images and contracts locally and in prod; MCP validates JWTs in code in both; CI runs integration tests against Compose; a prod smoke test after each deploy. |
+| **EKS operational load.** A cluster, add-ons, and upgrades for a pilot-sized app. | Managed node group, a small add-on set installed by the pipeline, Helm values per environment; revisit if ops cost outweighs the benefit. |
 | **Judge bias.** Grading with the agent's own model inflates scores. | Judges and synthetic data use `qwen.qwen3-32b-v1:0`, a different model family, calibrated against human feedback (§10.2). |
 
 ### 9.11 Hosting
 
 | Component | Hosting | Why |
 |---|---|---|
-| Agent | **AgentCore Runtime** | Project goal. |
+| Agent | **AgentCore Runtime** (HTTP protocol) | Project goal. |
 | RAG MCP server | **AgentCore Runtime** (MCP protocol, served at `0.0.0.0:8000/mcp`) | Managed; built-in `CUSTOM_JWT` authorizer for Keycloak; forwards `Authorization`; same platform and observability as the agent. |
-| API server | **ECS Fargate + ALB** | Long-lived SSE streams, standard FastAPI, stable PostgreSQL connection pool. |
-| Ingestion worker and scheduled jobs (record sweeper, learner reports, content-gap report) | ECS Fargate tasks (SQS consumer; EventBridge Scheduler tasks) | Same container tooling as the API. |
-| Database | RDS PostgreSQL + pgvector, same VPC | |
+| API server | **EKS** Deployment behind an ALB (AWS Load Balancer Controller) | Long-lived SSE streams, standard FastAPI, stable PostgreSQL connection pool. |
+| Web app | **EKS** Deployment (nginx serving the React build) behind the same ALB | One platform for all non-agent services. |
+| Keycloak | **EKS** Deployment (official Keycloak image via Helm), database on RDS | Self-hosted identity next to the services that use it. |
+| Ingestion worker | **EKS** Deployment consuming SQS | Long-running consumer; scale replicas with queue depth later (e.g. KEDA). |
+| Scheduled jobs (record sweeper, learner reports, content-gap report) | **EKS** CronJobs | Native Kubernetes scheduling; same images as the API. |
+| Database | RDS PostgreSQL + pgvector, same VPC (separate databases for the app and Keycloak) | Managed backups and failover. |
 
-Alternatives considered: MCP via AgentCore Gateway → Lambda (extra hop, harder identity pass-through, RDS Proxy needed) or MCP on Fargate (we would run ALB, TLS, and JWT validation ourselves); API on Lambda (Python SSE needs an adapter, 15-minute limit, cold starts).
+All EKS workloads are packaged as **Helm charts** (one umbrella chart, values per environment). Pods get AWS permissions through **EKS Pod Identity** (no static keys) and secrets through the **External Secrets Operator** syncing from AWS Secrets Manager.
 
-### 9.12 Stack
+Alternatives considered for the MCP server: AgentCore Gateway → Lambda (extra hop, harder identity pass-through) or EKS (we would run ingress and JWT validation ourselves, and lose the AgentCore story).
+
+### 9.12 Environments, infrastructure as code, and delivery
+
+**Local development (Docker Compose).** `docker compose up` starts the dependency services:
+
+| Service | Image / tool | Replaces in production |
+|---|---|---|
+| PostgreSQL + pgvector | `pgvector/pgvector` (app DB and Keycloak DB) | RDS |
+| Keycloak | Official Keycloak image, realm imported from a versioned JSON file (clients, roles, audience mapper, test users) | Keycloak on EKS |
+| LocalStack | S3 (with event notifications to SQS), SQS, SSM Parameter Store, Secrets Manager | AWS services |
+
+- App services (API, agent, MCP server, ingestion worker, web) run on the host with hot reload, or in Compose under an optional `app` profile using the same images as production.
+- The agent and MCP server run as plain containers locally, using the same contract AgentCore expects (agent HTTP endpoint; MCP at `:8000/mcp`). The MCP server validates JWTs in code (§9.3), so local auth behaves like production.
+- **Bedrock and LangSmith have no local emulator:** local runs call the real us-east-1 Bedrock models and a separate LangSmith project, using a developer AWS profile. Keep a small `.env.example`; no secrets in the repo.
+- Scheduled jobs are run on demand locally (`make sweep`, `make reports`).
+
+**Production (AWS, us-east-1).**
+
+| Layer | Tool | Manages |
+|---|---|---|
+| AWS resources | **AWS CDK (Python)**, which deploys through CloudFormation | VPC (subnets in `use1-az1/az2/az4`), EKS cluster and managed node group, RDS PostgreSQL, S3 buckets (versioning, lifecycle, event notifications), SQS + DLQ, ECR repositories, IAM roles and Pod Identity associations, Secrets Manager, SSM parameters, ACM certificate, **AgentCore runtimes** for the agent and MCP server (`aws_bedrockagentcore.Runtime`, JWT authorizer, VPC config), Bedrock budget alerts |
+| Kubernetes workloads | **Helm** | API, web, Keycloak, ingestion worker, CronJobs, ingress, External Secrets, autoscaling settings |
+
+- CDK in Python keeps one language across the backend and infrastructure; CDK has an L2 construct for AgentCore Runtime, so agent and MCP runtimes live in the same IaC as everything else.
+- Cluster add-ons (AWS Load Balancer Controller, External Secrets Operator, metrics server) are installed with Helm by the same pipeline.
+- Environments: **local** and **prod** for the MVP; a `staging` namespace and CDK stage can be added later with the same charts and stacks.
+
+**Delivery (CI/CD).** On merge to `main`: run tests and the smoke evaluation split → build images and push to ECR → `cdk deploy` (AWS resources and AgentCore runtimes, which pull the new agent/MCP image tags) → `helm upgrade` (EKS workloads). Releases are gated on the full evaluation split (§10).
+
+### 9.13 Stack
 
 | Concern | Choice |
 |---|---|
@@ -376,10 +412,13 @@ Alternatives considered: MCP via AgentCore Gateway → Lambda (extra hop, harder
 | Vector store / app DB / memory | PostgreSQL + pgvector (RDS) |
 | Identity | Keycloak (OIDC; roles `learner`, `admin`; hosted login/registration) |
 | Storage / events | S3 (versioning, lifecycle to Glacier), S3 Event Notifications → SQS |
-| Hosting | AgentCore Runtime (agent, MCP); ECS Fargate (API, worker, report job) |
+| Hosting | AgentCore Runtime (agent, MCP); Amazon EKS (API, web, Keycloak, worker, CronJobs) |
+| Infrastructure as code | AWS CDK (Python) → CloudFormation for AWS resources; Helm for Kubernetes workloads |
+| Local development | Docker Compose (PostgreSQL + pgvector, Keycloak, LocalStack) |
+| Secrets and AWS access in pods | External Secrets Operator (Secrets Manager); EKS Pod Identity |
 | API / Web | FastAPI / React |
 
-### 9.13 Region: us-east-1
+### 9.14 Region: us-east-1
 
 All environments run in **us-east-1 (N. Virginia)**, the only commercial region where every component is available:
 
@@ -388,7 +427,7 @@ All environments run in **us-east-1 (N. Virginia)**, the only commercial region 
 | `amazon.nova-2-multimodal-embeddings-v1:0` | In-region; the only commercial region offering it. |
 | `amazon.nova-2-lite-v1:0` | Via `us.amazon.nova-2-lite-v1:0` (served in us-east-1, us-east-2, or us-west-2). |
 | `qwen.qwen3-32b-v1:0` | In-region. |
-| AgentCore Runtime | Available; VPC connectivity in AZs `use1-az1`, `use1-az2`, `use1-az4`. Place RDS and Fargate subnets in these AZ IDs. |
+| AgentCore Runtime | Available; VPC connectivity in AZs `use1-az1`, `use1-az2`, `use1-az4`. Place RDS and EKS node subnets in these AZ IDs. |
 
 **Open check (M0):** the Nova embeddings model card lists only `StartAsyncInvoke`, while the request schema documents synchronous `InvokeModel`. Query-time search needs the synchronous call; verify it before building M1.
 
@@ -465,9 +504,9 @@ Trace every run; run answer-relevance, decline, and detection evaluators on a sa
 
 | # | Topic | Decision |
 |---|---|---|
-| Q1 | Region | us-east-1 for dev and prod (§9.13). |
+| Q1 | Region | us-east-1 for dev and prod (§9.14). |
 | Q2 | Token credit | Removed; usage shown, rate limits and budget alerts protect cost (D6). |
-| Q3 | Hosting | Agent and MCP on AgentCore Runtime; API on ECS Fargate (§9.11). |
+| Q3 | Hosting | Agent and MCP on AgentCore Runtime; all other services on EKS (§9.11). |
 | Q4 | Launch subjects | IELTS and AI Agents. |
 | Q5 | Retention | Threads and traces 180 days; learning records lifetime. |
 | Q6 | Decline tone | Short, friendly, suggests asking within the subject. |
@@ -480,27 +519,31 @@ Trace every run; run answer-relevance, decline, and detection evaluators on a sa
 | Q13 | Conversation and note management | List, filter by date and subject, archive/restore; conversation shows its linked note (D11). |
 | Q14 | Quizzes | Multiple choice from selected notes, graded in code (D12). |
 | Q15 | Reports and recommendations | Daily/weekly across subjects, automatic and on demand; recommendations from the topic catalog and weak quiz topics (D13, D14). |
+| Q16 | Environments and IaC | Local: Docker Compose for dependencies. Prod: EKS with Helm; AWS resources and AgentCore runtimes with AWS CDK (Python) (§9.12). |
 
 ## 14. Milestones
 
 | Milestone | Exit criteria |
 |---|---|
-| M0 Foundations | Repo, CI, Keycloak realm (hosted login, self-registration), RDS PostgreSQL+pgvector, LangSmith project; all three Bedrock models reachable (Appendix A); synchronous Nova embeddings `InvokeModel` verified; Nova 2 Lite streamed text + tool call verified through `ChatBedrockConverse`; MCP server reachable on AgentCore Runtime with Keycloak JWT and VPC access to PostgreSQL |
+| M0 Foundations | Repo, CI, **Docker Compose** dev stack (PostgreSQL+pgvector, Keycloak with realm import, LocalStack) running with one command; CDK app skeleton (VPC, RDS, ECR) and Helm umbrella chart skeleton; Keycloak realm (hosted login, self-registration), LangSmith project; all three Bedrock models reachable (Appendix A); synchronous Nova embeddings `InvokeModel` verified; Nova 2 Lite streamed text + tool call verified through `ChatBedrockConverse`; MCP server reachable on AgentCore Runtime with Keycloak JWT and VPC access to PostgreSQL |
 | M1 RAG MCP | S3-event ingestion (add, new version, archive, unarchive) + topic catalog + authenticated MCP search; retrieval-relevance eval passing |
 | M2 Agent | Subject detection and `state.subject`, search, relevance gate, answer/off-subject rejection, summarize path, idle-record sweeper; all §10.1 evals passing on the smoke split |
 | M3 API + Web | Auth, enrollment, chat streaming, conversation and note management (filters, archive), usage view, rate limiting; isolation tests passing |
 | M4 Learning loop | Quiz generation and grading, daily/weekly reports (scheduled + on demand), "what to learn next"; quiz, recommendation, and report evals passing on the smoke split |
-| M5 Deploy + Monitor | AgentCore deployment, online evaluation, annotation queue, content-gap report job, dashboards and alerts |
+| M5 Deploy + Monitor | CDK stacks (EKS, RDS, S3/SQS, IAM/Pod Identity, AgentCore runtimes) and Helm releases deployed to prod via CI/CD, online evaluation, annotation queue, content-gap report job, dashboards and alerts |
 
 ---
 
-## Appendix A — Setup checklist for the Admin (AWS)
+## Appendix A — AWS setup checklist
+
+**Manual, one-time (cannot or should not be in CDK):**
 
 1. **Region:** us-east-1.
-2. **Model access** for `amazon.nova-2-lite-v1:0` (and the `us.` inference profile), `amazon.nova-2-multimodal-embeddings-v1:0`, and `qwen.qwen3-32b-v1:0`. IAM policies for the agent must allow the **inference profile ARN and the underlying model ARNs in every destination region** of that profile.
-3. **IAM roles** per workload (ingestion worker, MCP server, agent runtime, report job) with `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream` scoped to these models; a Bedrock API key for local development if preferred.
-4. **Service quotas** for all three models (requests and tokens per minute), sized for ingestion and 50 concurrent learners.
-5. **Network:** whether `bedrock-runtime` calls must go through a VPC interface endpoint (PrivateLink).
-6. **S3:** versioning enabled on the documents bucket; event notifications for `ObjectCreated` and `ObjectTagging` to SQS; lifecycle rules moving `status=archived` objects and noncurrent versions to Glacier Flexible Retrieval.
-7. **Budget alerts:** monthly Bedrock budget and who receives the alerts.
-8. **Guardrails (optional):** a Bedrock Guardrail on agent calls as an extra layer against prompt injection.
+2. **Model access** enabled for `amazon.nova-2-lite-v1:0` (and the `us.` inference profile), `amazon.nova-2-multimodal-embeddings-v1:0`, and `qwen.qwen3-32b-v1:0`.
+3. **Service quotas** for all three models (requests and tokens per minute), sized for ingestion and 50 concurrent learners; EKS and EC2 quotas for the node group.
+4. **Domain and DNS:** the domain for the web app, API, and Keycloak, and where its DNS is hosted (for the ACM certificate).
+5. **CDK bootstrap** of the account and region (`cdk bootstrap`), and a CI deploy role trusted by GitHub Actions (OIDC).
+6. **Developer access** for local development: an AWS profile allowed to invoke the three models; a LangSmith API key.
+7. **Decisions:** whether `bedrock-runtime` calls must go through a VPC interface endpoint (PrivateLink); monthly Bedrock budget and who receives alerts; whether to add a Bedrock Guardrail (optional).
+
+**Created by CDK (for reference):** VPC, EKS cluster and node group, RDS, S3 (versioning, `ObjectCreated` and `ObjectTagging` notifications to SQS, lifecycle to Glacier Flexible Retrieval), SQS + DLQ, ECR, Secrets Manager entries, SSM parameters, ACM certificate, AgentCore runtimes, budget alerts, and IAM roles with Pod Identity associations. IAM policies for the agent allow `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream` on the **inference profile ARN and the underlying model ARNs in every destination region** of that profile.
