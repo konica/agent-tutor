@@ -1,4 +1,4 @@
-# `reports` module (Release 2)
+# `reports` module (Release 3)
 
 **Owns** (US-15, §9.8): Daily and weekly reports across subjects (scheduled and on demand).
 

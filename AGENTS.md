@@ -5,11 +5,11 @@ Nested files take precedence for their folder: see `backend/AGENTS.md` before ch
 
 ## Project overview
 
-Smart Tutor is an AI tutor for the learner's **own documents**. Learners upload PDFs into a private library; for each upload the system suggests 3 subjects from a **shared subject catalog** (learners can rename a subject for themselves; the `subject_id` never changes). The tutor detects which of the learner's subjects a question belongs to, answers **only** from their documents in that subject with citations (title + page), and declines everything else. Learners keep one Lesson Note per conversation, and a lifetime learning record is written per thread. Identical files (same SHA-256) are processed and embedded **once** in the whole system.
+Smart Tutor is an AI tutor for the learner's **own documents**. Learners upload PDFs into a private library; for each upload the system suggests 3 subjects from a **shared subject catalog** (learners can rename a subject for themselves; the `subject_id` never changes). The tutor detects which of the learner's subjects a question belongs to, answers **only** from their documents in the conversation's subjects (1–3; a conversation grows to at most 3) with citations (title + page). Documents have 1–3 subjects, and declines everything else. Learners keep one Lesson Note per conversation, and a lifetime learning record is written per thread. Identical files (same SHA-256) are processed and embedded **once** in the whole system.
 
 - Product requirements (source of truth for behavior): `sdd/prd.md` (v2.0)
 - Repository layout and architecture rules: `sdd/specs/2026-10-02-project-structure-design.md`
-- Release 1 = core tutor on uploaded documents (modules `knowledge`, `tutoring`, `learning`, `accounts`, `insights`). Release 2 = quizzes, reports, recommendations, topic catalog. Release 3 = sharing/publishing and the knowledge graph (`graph`). Do not build later-release features unless asked; the data model already has `visibility` and `document_grants` for sharing.
+- Release 1 = core tutor on uploaded documents (modules `knowledge`, `tutoring`, `learning`, `accounts`, `insights`). Release 2 = research map (`graph`: citation links, timeline, reading order). Release 3 = quizzes, reports, recommendations, topic catalog. Release 4 = sharing, publishing, imports by DOI/arXiv. Release 5 = deep knowledge graph. Do not build later-release features unless asked; the data model already has `visibility`, `document_grants`, `work_key`, references, and saved Docling output for them.
 
 Runtime pieces: Web app (React) → API (FastAPI) → Agent (LangGraph) → RAG MCP server → PostgreSQL + pgvector. Uploads go by presigned POST to `uploads/<user_id>/…`; the ingestion worker consumes S3 events from SQS, hashes the file, links duplicates to existing content, and otherwise runs Docling → metadata and subject suggestions → chunk → embed. Identity: Keycloak (OIDC); the user's JWT is forwarded API → agent → MCP. Models on Amazon Bedrock (us-east-1): agent `us.amazon.nova-2-lite-v1:0`, embeddings `amazon.nova-2-multimodal-embeddings-v1:0` (1024-dim), judge `qwen.qwen3-32b-v1:0`. Production: everything on EKS via Helm; AWS resources via CDK (Python).
 
@@ -71,7 +71,7 @@ CI (`.github/workflows/ci.yml`) runs the backend checks, the web build, and helm
 ## Testing instructions
 
 - Add or update tests for every behavior change. Unit tests use fakes from `backend/tests/fakes/` (e.g. `FakeChatModel`, `FakeEmbeddingModel`), never real Bedrock.
-- Domain rules (e.g. `Thread.bind_subject()` refuses to rebind, notes are archived not deleted) get unit tests in `backend/tests/unit/<module>/`.
+- Domain rules (e.g. `Thread.add_subject()` refuses a fourth subject and never removes one, `Document.set_subjects()` accepts 1–3, notes are archived not deleted) get unit tests in `backend/tests/unit/<module>/`.
 - Data isolation (PRD US-12) tests live in `backend/tests/isolation/`; any new endpoint or MCP tool that returns learner data needs one.
 - Agent quality is measured with LangSmith evals in `backend/evals/`; release targets are in `backend/evals/thresholds.yaml`. Don't loosen a threshold to make a run pass.
 

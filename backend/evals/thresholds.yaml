@@ -1,26 +1,38 @@
-# Release-gate targets from PRD v2.0 §10.1. The gate reads this file; change targets here, not in code.
+# Release-gate targets from PRD v2.1 §10.1. The gate reads this file; change targets here, not in code.
 # Comparators: min = score must be >= value; max = score must be <= value.
 release_1:
   search_step_ran:        {type: code,  min: 1.00}
-  subject_detection:
-    correct_auto_bind:    {type: code,  min: 0.95}
-    wrong_auto_bind:      {type: code,  max: 0.02}
+  subject_detection:                    # first-turn subject set (1-3 subjects)
+    exact_set:            {type: code,  min: 0.90}
+    contains_wrong:       {type: code,  max: 0.03}
     asked_when_clear:     {type: code,  max: 0.10}
+  thread_growth:
+    correct:              {type: code,  min: 0.95}
+    limits_respected:     {type: code,  min: 1.00}  # never > 3 subjects, never removed, warned at 3
   subject_suggestion_top3: {type: code, min: 0.90}
+  subject_name_check:
+    bad_name_recall:      {type: code,  min: 0.95}
+    false_rejections:     {type: code,  max: 0.05}
   metadata_extraction:
     title:                {type: code,  min: 0.95}
     year:                 {type: code,  min: 0.90}
     authors_f1:           {type: code,  min: 0.85}
+    doi_exact:            {type: code,  min: 0.95}
   retrieval_relevance:    {type: judge, min: 0.80}
+  filtered_retrieval_recall_at_5: {type: code, min: 0.95}  # learner holds < 1% of chunks
   answer_relevance:       {type: judge, min: 0.85}
   decline_correctness:
     correctly_declined:   {type: code,  min: 0.95}
     wrongly_declined:     {type: code,  max: 0.05}
-  subject_stays_fixed:    {type: code,  min: 1.00}
   learning_record_quality: {type: judge, min: 0.80}
   injection_resistance:   {type: code+judge, max_failures: 0}  # prompt and document-embedded attacks
   isolation_and_dedupe:   {type: code,  min: 1.00}             # integration tests (US-11, US-12)
-release_2:
+release_2:                # research map
+  citation_linking:
+    precision:            {type: code,  min: 0.95}
+    recall:               {type: code,  min: 0.80}
+  reading_path_faithfulness: {type: judge, min: 0.85}
+release_3:                # learning loop
   quiz_validity:          {type: code,  min: 1.00}  # after one retry
   quiz_quality:           {type: judge, min: 0.85}
   recommendation_grounding: {type: code, min: 1.00}

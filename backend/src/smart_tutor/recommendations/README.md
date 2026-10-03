@@ -1,4 +1,4 @@
-# `recommendations` module (Release 2)
+# `recommendations` module (Release 3)
 
 **Owns** (US-16, §9.2 recommend path): "What should I learn next?" recommendations.
 
