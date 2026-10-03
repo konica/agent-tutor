@@ -1,0 +1,11 @@
+.claude/
+.scratch/
+.env
+.env.*
+**/node_modules/
+**/.venv/
+**/dist/
+**/cdk.out/
+**/__pycache__/
+web/src/api/generated/
+research/
