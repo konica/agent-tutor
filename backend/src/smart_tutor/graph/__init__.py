@@ -1,1 +1,1 @@
-"""graph (Release 3): knowledge graph — citation links, relationships with evidence, timeline, concept history."""
+"""graph: research map (Release 2: work links, timeline, reading order) and deep knowledge graph (Release 5)."""

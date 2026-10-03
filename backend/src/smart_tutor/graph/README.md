@@ -1,12 +1,12 @@
-# `graph` module (Release 3)
+# `graph` module (Release 2, extended in Release 5)
 
-**Owns** (§9.16, US-18): Knowledge graph: citation links between contents, relationship labels with evidence, per-subject timeline, concept history.
+**Owns** (PRD §9.7, §9.16, US-19, US-20, US-18): the research map — works (contents grouped by `work_key`), citation links from saved references, per-subject timeline, reading order, reading paths; in Release 5 also model-labeled relationships with evidence and concept history.
 
-**Key classes:** `Relationship`, `Timeline`; service `GraphService`.
+**Key classes:** `Work`, `WorkLink`, `ReadingOrder`; service `ResearchMapService`.
 
 **May use (application layer only):** `knowledge`. Everyone may use `shared`.
 
-**Rules:** A learner's graph includes only contents they can read (`can_read`). Edges are computed once per content pair and shared, like embeddings.
+**Rules:** A learner's map includes only works they can read (`can_read`). Links are computed once per content and shared, like embeddings. Links, timeline, and reading order use no model calls.
 
 Layout: `domain/` → `ports/` ← `application/`, `adapters/`. Other modules import only `graph.application`.
 See `sdd/specs/2026-10-02-project-structure-design.md`.

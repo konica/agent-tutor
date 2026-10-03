@@ -1,4 +1,4 @@
-# `quizzes` module (Release 2)
+# `quizzes` module (Release 3)
 
 **Owns** (US-14): Multiple-choice quizzes generated from selected notes, graded in code.
 
