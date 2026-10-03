@@ -179,18 +179,18 @@ Rules:
 
 ## 9. Prerequisite: one `main`
 
-Before this loop starts, merge the open branches so `main` holds the current PRD, brief and process documents:
+Before this loop starts, `main` must hold the current PRD, brief and process documents:
 
-1. `docs/delivery-process-discussion` (delivery process, `CONTEXT.md`)
-2. `prd/v2.3-pdf-text-loader` (PRD v2.3, ADR 0005)
-3. `docs/design-brief-prd-v2` (brief v0.3). Its `sdd/design/brief.md` is identical to the copy on this spec's branch, so it merges cleanly.
+1. `docs/delivery-process-discussion` (delivery process, `CONTEXT.md`): merged.
+2. `prd/v2.3-pdf-text-loader` (PRD v2.3, ADR 0005): merged.
+3. Brief v0.3: brought to `main` by this spec's PR, as `sdd/design/brief.md`. The branch `docs/design-brief-prd-v2` holds the identical file and can be closed without merging.
 
-The prototype moved into the repo on this spec's branch (§12). The first implementation PR adds the tooling. Brief v0.3 answers PRD v2.1, so before round v0.3 is accepted, the PO checks whether PRD v2.2 and v2.3 change any user-facing behavior. If they do, the brief moves to v0.4 first.
+The prototype moved into the repo with this spec's PR (§12). The first implementation PR adds the tooling. Brief v0.3 answers PRD v2.1, so before round v0.3 is accepted, the PO checks whether PRD v2.2 and v2.3 change any user-facing behavior. If they do, the brief moves to v0.4 first.
 
 ## 10. Rollout
 
-1. Merge the branches in §9.
-2. PR 1: `sdd/design/` layout, scripts, Makefile targets, `AGENTS.md` "Design inputs", brief §11 contract and Appendix A update.
+1. Merge this spec's PR (§9).
+2. PR 1: scripts, Makefile targets, `AGENTS.md` "Design inputs", brief §11 contract and Appendix A update.
 3. PR 2: run `make design-accept ROUND=v0.3` (or v0.4) and tag it.
 4. Backfill `## Design` on story parents #8–#24.
 5. Create the Web foundation parent and slice; block every `area:web` slice on it.
