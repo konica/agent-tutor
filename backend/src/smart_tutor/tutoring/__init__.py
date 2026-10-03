@@ -1,1 +1,1 @@
-"""tutoring: Threads, subject detection and binding, relevance gate, the ask path, conversation management."""
+"""tutoring: threads (1-3 subjects), subject detection and growth, relevance gate, ask path, conversations."""

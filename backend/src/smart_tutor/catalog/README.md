@@ -1,4 +1,4 @@
-# `catalog` module (Release 2)
+# `catalog` module (Release 3)
 
 **Owns** (§9.7): Topic catalog per content, derived from Docling headings at ingestion; a learner's catalog is the union over their active documents.
 
