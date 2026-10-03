@@ -330,6 +330,7 @@ Use this realistic sample data, not lorem ipsum.
 |---|---|---|---|---|
 | 0 (owner) | v0.1 | Answers to Q1–Q3. | Laptop only; citations switch, on by default; usage in the chat status line. | v0.2 |
 | 1 (owner) | v0.2 | PRD v2.1 changed the product (own documents, shared subjects, multi-subject threads, new release order). | Rewrite the brief. | v0.3 |
+| 2 (owner) | v0.3 | Round 2 accepted as `design-v0.3`. Checked against PRD v2.2 (architecture only) and v2.3 (`pypdf`, no OCR). One user-facing gap: a scanned PDF without a text layer fails with "No text layer (scanned PDFs are not supported yet)", not "We couldn't read this PDF" (`library-failed`, `details-failed`). | Accept v0.3; code follows the PRD wording. Designer's Q7 and D1–D12 stay open for the PO; story tickets list them where they apply. | Next round |
 
 ---
 
