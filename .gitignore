@@ -100,3 +100,8 @@ Thumbs.db
 node_modules/
 cdk.out/
 *.tsbuildinfo
+
+# Open Design local state; git is the design history
+sdd/design/prototype/**/.file-versions/
+sdd/design/prototype/**/.od-*/
+.design-shots/
