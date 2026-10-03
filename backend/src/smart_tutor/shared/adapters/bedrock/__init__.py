@@ -1,1 +1,1 @@
-"""Bedrock adapters: BedrockConverseChatModel, NovaEmbeddingModel (M0)."""
+"""Bedrock adapters: BedrockConverseChatModel (Converse/ConverseStream), NovaEmbeddingModel (InvokeModel)."""

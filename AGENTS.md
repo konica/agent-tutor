@@ -12,7 +12,7 @@ Sources of truth — read the relevant one before changing behavior or structure
 |---|---|
 | Product behavior, user stories, data model, flows, evals, roadmap | `sdd/prd.md` (v2.3) |
 | Folder structure, module boundaries, import rules | `sdd/specs/2026-10-02-project-structure-design.md` |
-| Why an architecture choice was made | `sdd/adr/` (0001–0005) |
+| Why an architecture choice was made | `sdd/adr/` (0001–0006) |
 | Why the PRD changed in v2.1 | `sdd/reviews/2026-10-03-prd-v2.0-review.md` |
 
 **Release scope:** build **Release 1** (core tutor: modules `knowledge`, `subjects`, `tutoring`, `learning`, `accounts`, `insights`). Later releases already have empty modules and prepared data (R2 research map → `graph`; R3 `catalog`, `quizzes`, `recommendations`, `reports`; R4 sharing and imports; R5 deep graph); build them only when asked.
@@ -43,7 +43,7 @@ Code must keep these true; each has tests or evals guarding it.
 ## Local development
 
 - `docker compose up -d` starts pgvector, Keycloak (:8080), and LocalStack (:4566); `--profile app` adds the app containers. Copy `.env.example` to `.env`.
-- Bedrock and LangSmith have no emulator: local runs call real us-east-1 models with a developer AWS profile.
+- Bedrock and LangSmith have no emulator: local runs call real us-east-1 models with your AWS credentials. `make bedrock-check` (pytest marker `bedrock`, under a cent) verifies the configured models and adapters.
 - Keycloak users: `learner@example.com`/`learner`, `learner2@example.com`/`learner2`, `admin@example.com`/`admin` (console admin/admin). The realm imports only when it doesn't exist yet: run `docker compose down -v` after editing `local/keycloak/realm-smart-tutor.json`, and keep the built-in roles `offline_access` and `uma_authorization` defined in it.
 - Windows Git Bash: set `PYTHONUTF8=1` for `lint-imports` and `MSYS_NO_PATHCONV=1` for commands taking `/smart-tutor/...` paths (SSM names). `make` may be missing; every `Makefile` target is a one-line command you can run directly.
 

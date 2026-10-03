@@ -49,12 +49,14 @@ A new cross-module dependency means moving a module in the order on purpose and 
 
 - Core dependencies in `[project.dependencies]`; heavy single-service ones behind an extra: `ingest` (PDF loader and text splitter, worker only) or `eval`. Dev tools in the `dev` dependency group. Run `uv lock` and commit `uv.lock` after editing.
 - `mcp` is 2.x: the server class is `mcp.server.MCPServer`, and host/port go to `run()`.
+- Bedrock adapters use boto3 Converse/InvokeModel directly, not `langchain-aws` chat models (ADR 0006); `boto3-stubs[bedrock-runtime]` types the client for mypy.
 
 ## Tests
 
 - `tests/unit/<module>/` — domain and application with fakes from `tests/fakes/` (`from fakes import FakeChatModel`); the default `pytest` run. Async tests need no decorator.
 - `tests/integration/<module>/` — adapters against the Compose stack, marked `@pytest.mark.integration`.
 - `tests/isolation/` — cross-user access and dedupe guarantees (PRD US-11, US-12).
+- `tests/bedrock/` — real Bedrock calls through `ModelFactory`, marked `@pytest.mark.bedrock` (`make bedrock-check`). Run it after changing a model ID, an adapter, or boto3. Unit tests never trace to LangSmith (`tests/unit/conftest.py`).
 
 ## Images
 

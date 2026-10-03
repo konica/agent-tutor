@@ -11,3 +11,11 @@ class NotFoundError(DomainError):
 
 class AccessDeniedError(DomainError):
     """The caller may not access this resource (e.g. a document they cannot read)."""
+
+
+class ModelError(Exception):
+    """A model call failed after the client's retries (throttling, timeout, service error)."""
+
+
+class ModelOutputError(ModelError):
+    """The model answered, but its payload broke the expected contract (schema, dimension)."""
