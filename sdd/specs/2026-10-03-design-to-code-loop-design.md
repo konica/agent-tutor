@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft, for PO review |
+| **Status** | Approved by the PO, 2026-10-03 |
 | **Date** | 2026-10-03 |
 | **Owner** | Thao Dinh (PO) |
 | **Applies to** | `sdd/prd.md`, `sdd/design/`, GitHub issues, `web/` |
