@@ -2,12 +2,13 @@
 
 | | |
 |---|---|
-| **Status** | Draft v2.4 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Status** | Draft v2.5 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Changes from v2.4** | Every service (API, agent, MCP server) has Keycloak validate the learner's token by introspection instead of checking its signature locally, so signing out or a revoked session ends access on the next request rather than at token expiry; the token travels in LangGraph runtime context (§9.3; ADR 0007). `smart-tutor-api` and `rag-mcp` become confidential clients. |
 | **Changes from v2.3** | Architecture only: LangChain's `BaseChatModel` and `Embeddings` replace the hand-written `ChatModel` / `EmbeddingModel` ports; `ModelFactory` builds chat models with `init_chat_model` (§9.15; ADR 0006). No product behavior changes. |
 | **Changes from v2.2** | Release 1 extracts PDF text page by page with `pypdf` into LangChain `Document`s instead of Docling (D26, ADR 0005): no PyTorch in the worker, no OCR (PDFs without a text layer fail with a reason), saved page text replaces saved Docling output. Reference lists and section headings move to a structured-extraction step added in Release 2, backfilled from stored PDFs. M0 drops the Docling benchmark. |
 | **Changes from v2.1** | Architecture only: the subject catalog moves from `knowledge` into a new `subjects` module (§9.15; ADR 0004). No product behavior changes. |
 | **Owner** | Thao Dinh |
-| **Last updated** | 2026-10-03 |
+| **Last updated** | 2026-10-04 |
 | **Lifecycle** | Build → Test → Deploy → Monitor ([The Agent Development Lifecycle](https://www.langchain.com/blog/the-agent-development-lifecycle)) |
 | **Changes from v2.0** | Product owner, business analyst, and technical review applied. Documents take 1–3 subjects; threads start with the detected subjects and grow to at most 3 (warning at the maximum). No admin functions (no subject rename/merge/hide, no account-deletion process — recorded as a known gap). No limit on the number of documents. Re-summarizing an edited note asks first. Traces deleted after 180 days; threads kept. Explicit document and content state machines, shared retry, work identity (same paper, different files), saved Docling output. Release order: R2 research map, R3 learning loop, R4 sharing and imports, R5 deep knowledge graph. |
 
@@ -328,15 +329,15 @@ Because subjects and readable documents come from code and the database, attacks
 ### 9.3 Identity propagation and access enforcement
 
 1. The Web App signs in with Keycloak (Authorization Code + PKCE) and calls the API with `Authorization: Bearer <access_token>`.
-2. The API validates the token (JWKS, `iss`, `exp`, `aud`), applies rate limits, invokes the agent, and **forwards the same token**.
-3. The agent attaches the token to every MCP request (HTTP header, runtime context — **never in the prompt**).
-4. The MCP server validates the JWT in code, reads `sub`, and builds the search filter in SQL: chunks whose `content_id` belongs to a document that is `ready`, not archived, has **any** of the requested `subject_ids`, and is readable by `sub` (Releases 1–3: `owner_id = sub`; Release 4: also a grant or `visibility = public`). An empty readable set returns an empty result; the agent turns it into the US-10 message (no error is shown to the learner).
+2. The API has **Keycloak validate the token** (token introspection as the `smart-tutor-api` client: `active`, `iss`, `aud`), applies rate limits, invokes the agent, and **forwards the same token**. Signing out or revoking a session therefore ends access on the next request, on every service (ADR 0007).
+3. The agent validates the token the same way and attaches it to every MCP request (HTTP header, LangGraph runtime context — **never in the prompt, state, or traces**).
+4. The MCP server has Keycloak validate the token (introspection as the `rag-mcp` client), reads `sub`, and builds the search filter in SQL: chunks whose `content_id` belongs to a document that is `ready`, not archived, has **any** of the requested `subject_ids`, and is readable by `sub` (Releases 1–3: `owner_id = sub`; Release 4: also a grant or `visibility = public`). An empty readable set returns an empty result; the agent turns it into the US-10 message (no error is shown to the learner).
 
 **`can_read(user, document)`** is implemented once (domain rule + one SQL predicate) and used by the API, the MCP server, and citation resolution.
 
 **Filtered vector search:** a learner's documents are a small part of all chunks, so a post-filtered HNSW scan can return fewer than k results. Use pgvector **iterative index scans** (`hnsw.iterative_scan`, available in pgvector ≥ 0.8) and fall back to exact search over the learner's chunks when their readable set is small. Recall under a selective filter is tested in M1.
 
-Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow only API → agent and agent → MCP. Keycloak: realm with self-registration; clients `smart-tutor-web`, `smart-tutor-api`, `rag-mcp`; audience mapper adding `smart-tutor-api` and `rag-mcp`.
+Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow only API → agent and agent → MCP. Keycloak: realm with self-registration; clients `smart-tutor-web` (public), `smart-tutor-api` and `rag-mcp` (confidential, used only for introspection); audience mapper adding `smart-tutor-api` and `rag-mcp`. Keycloak is on the request path (several introspections per question), so its availability is chat availability.
 
 **Uploads:** the API issues a **presigned POST** for `uploads/<user_id>/<upload_id>.pdf` with `content-length-range` ≤ 50 MB and content type `application/pdf`; the key binds the upload to the user. The `uploads/` prefix expires after 1 day.
 
@@ -560,7 +561,7 @@ Trace every run; sample production traces for answer relevance, decline, detecti
 | Scale | 50 concurrent learners; no limit on documents per learner; ≤ 500 pages and ≤ 50 MB per document |
 | Latency | First streamed token p95 ≤ 3 s (from question sent); list/filter p95 ≤ 500 ms; suggestions shown p95 ≤ 30 s (from upload completion); duplicate of a ready content reaches *choose subjects* p95 ≤ 10 s; new content searchable p95 ≤ 5 min for ≤ 200 pages and ≤ 15 min for 201–500 pages (from upload completion to `ready` content, subjects chosen) |
 | Availability | Best-effort; no data loss on restart |
-| Security | Every service validates Keycloak JWTs; documents private by default; `can_read` in code and SQL; worker isolation; secrets in Secrets Manager; TLS; tokens never logged or put in prompts |
+| Security | Every service has Keycloak validate the token (introspection); documents private by default; `can_read` in code and SQL; worker isolation; secrets in Secrets Manager; TLS; tokens never logged or put in prompts |
 | Rate limits and caps (configurable) | Chat: 20 messages/minute and 500/day per learner. Uploads: 20/hour and 100/day per learner; duplicates and failed uploads count. Processing retries: 3 per content. |
 | Retention and privacy | Documents and notes kept (archive only); threads kept for the account's lifetime; **traces deleted after 180 days**; decline log scrubbed and deleted after 90 days; subject names are shared (D20); LLM requests stay in US regions. **Known gap:** no account-deletion process (§9.10). |
 | Cost | Embedding once per unique content; track cost per conversation and per processed content; Bedrock budget alerts |

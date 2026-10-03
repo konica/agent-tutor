@@ -1,1 +1,1 @@
-"""Keycloak JWT verification (JWKS, iss, aud, exp), used by the API and MCP server (M0)."""
+"""Keycloak token validation by introspection (active, iss, aud, sub) for the API, agent, and MCP server (ADR 0007)."""
