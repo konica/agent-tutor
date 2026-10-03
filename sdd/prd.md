@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Draft v2.2 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Status** | Draft v2.3 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Changes from v2.2** | Release 1 extracts PDF text page by page with `pypdf` into LangChain `Document`s instead of Docling (D26, ADR 0005): no PyTorch in the worker, no OCR (PDFs without a text layer fail with a reason), saved page text replaces saved Docling output. Reference lists and section headings move to a structured-extraction step added in Release 2, backfilled from stored PDFs. M0 drops the Docling benchmark. |
 | **Changes from v2.1** | Architecture only: the subject catalog moves from `knowledge` into a new `subjects` module (§9.15; ADR 0004). No product behavior changes. |
 | **Owner** | Thao Dinh |
 | **Last updated** | 2026-10-03 |
@@ -40,7 +41,7 @@ Learners and researchers work through many documents on a topic but lack the bac
 
 | Term | Definition |
 |---|---|
-| **Content** | One unique file, identified by the **SHA-256** of its bytes. Stored once (`contents/<sha256>.pdf`), extracted, chunked, and embedded **once in the whole system**, however many learners have it. Holds the extracted metadata and the saved Docling output. |
+| **Content** | One unique file, identified by the **SHA-256** of its bytes. Stored once (`contents/<sha256>.pdf`), extracted, chunked, and embedded **once in the whole system**, however many learners have it. Holds the extracted metadata and the saved page text. |
 | **Work** | The paper or book a content represents. Different files of the same work (preprint vs published version, v1 vs v2) are different contents with the same `work_key` (DOI, else normalized title + year). Used by the research map to show one node per work. |
 | **Document** | A learner's **library entry** for a content: owner, 1–3 subjects, state, archived flag, visibility. Two learners with the same file have two documents pointing to one content. Never deleted, only archived. |
 | **Library** | All documents a learner owns (Release 4: also documents shared with them or added from published or imported documents). |
@@ -72,7 +73,7 @@ Learners and researchers work through many documents on a topic but lack the bac
 8. Every agent run is **traced and evaluated** in LangSmith, with human feedback used to calibrate LLM judges.
 9. All components require **authentication and authorization** via Keycloak; learners can only read their own documents and data.
 10. All services are **deployed to Amazon EKS**; model access is **abstracted** and business logic **encapsulated in classes** (§9.15).
-11. The data model is **ready for later releases**: visibility and grants (sharing), work identity, references, and saved Docling output (research map, topic catalog, knowledge graph) — no reprocessing needed later.
+11. The data model is **ready for later releases**: visibility and grants (sharing), work identity, saved page text, and stored PDFs (research map, topic catalog, knowledge graph backfill from them; D26).
 
 ### Goals: later releases
 12. **R2 Research map:** learners see how their papers relate (citations, timeline) and in which order to read them, and can ask the tutor about a reading path.
@@ -85,7 +86,7 @@ Learners and researchers work through many documents on a topic but lack the bac
 - Hard delete of documents by learners (archive only).
 - **Admin product functions:** subject catalog moderation (rename, merge, hide) and account-deletion tooling. *Known gap:* there is no process to erase a user's data; required before launch if users are subject to GDPR or similar law (tracked in §9.10 and M4).
 - Token credits, quotas, or billing; a cap on the number of documents (cost is protected by per-file limits, rate limits, daily caps, and budget alerts).
-- Web search; document formats other than PDF; OCR quality guarantees for scanned PDFs.
+- Web search; document formats other than PDF; scanned PDFs without a text layer (no OCR in Release 1).
 - Restricting a thread to selected documents; more than 3 subjects per thread or per document; mobile apps; non-English UI.
 - Deep Agents planning/filesystem features (a plain LangGraph flow is enough).
 
@@ -114,10 +115,11 @@ Learners and researchers work through many documents on a topic but lack the bac
 | D19 | **Existing content is linked only after the server computes the hash from uploaded bytes.** The browser's hash only lets a learner skip uploading a file already in **their own** library (Release 4: or a published document). | Prevents gaining access to someone else's private file by knowing its hash. |
 | D20 | On upload the system **suggests 3 subjects** from the first 1–2 pages: matching shared subjects first, then the learner's subjects, then new names. The learner keeps **1–3** of them and/or types names (total 1–3). **Every new name joins the shared catalog immediately**, after normalization, reuse of a near-duplicate existing subject, and a personal-data/offensive-content check. | One-click organization; overlap between research subjects. |
 | D21 | Learners can **rename a subject for themselves** (personal name) or reset it to the shared name. The `subject_id`, documents, and threads are unchanged and other learners are unaffected. There is no admin rename, merge, or hide, so subject ids never change meaning. | Personal vocabulary without breaking shared ids. |
-| D22 | Ingestion extracts **title, authors, year, DOI (if present), work key, and the reference list**, and **saves Docling's structured output** next to the content. | The research map, topic catalog, and knowledge graph need no reprocessing (and no Glacier restore). |
+| D22 | Ingestion extracts **title, authors, year, DOI (if present), and the work key** from Release 1, and saves the **page text** next to the content. The **reference list and section headings** come from a structured-extraction step added in Release 2, backfilled from stored PDFs (D26). | Work identity from day one; later releases reprocess only the PDFs of referenced contents, which stay in S3 Standard. |
 | D23 | The admin content-gap report is removed; declines are logged anonymously for evals and monitoring. | No admin corpus to fill gaps in. |
 | D24 | **No limit on the number of documents** per learner. Per-file limits (PDF, ≤ 50 MB, ≤ 500 pages), upload rate limits, and daily caps apply. | Researchers accumulate papers; archive-only must not trap them. |
 | D25 | **Traces are deleted after 180 days; threads are kept** for the account's lifetime, so notes and learning records keep their links. | Long-term learning history with bounded trace storage. |
+| D26 | Release 1 extracts text **page by page with `pypdf`** into LangChain `Document`s (page number in metadata), chunked with LangChain's `RecursiveCharacterTextSplitter`: no layout model, no OCR. A PDF without extractable text fails with a reason. | Smaller, faster worker (no PyTorch); Release 1 needs only page text for chunks and citations. Structured extraction waits until a feature needs it (ADR 0005). |
 
 ## 7. Scope
 
@@ -125,7 +127,7 @@ Learners and researchers work through many documents on a topic but lack the bac
 - Registration, login, logout via **Keycloak's hosted pages**, with terms of use accepted at sign-up (upload warranty).
 - **Upload** PDFs with a client-side duplicate check and server-side SHA-256; per-document state.
 - **Subject suggestion** (3 choices, keep 1–3) and the **shared subject catalog**; personal subject names (rename, reset).
-- Ingestion once per unique content: fast first-pages step (metadata, suggestions), full Docling extraction (saved), references, work key, chunking, embedding.
+- Ingestion once per unique content: fast first-pages step (metadata, suggestions), page text extraction with `pypdf` (saved), work key, chunking, embedding.
 - **Document management:** list, filter by subject, date, and state; change subjects (1–3); edit display title; archive and restore; retry failed processing.
 - Chat without choosing subjects; detection; threads that grow to 3 subjects with a warning at the maximum; streamed, cited answers; friendly decline.
 - Prompt-injection defenses for user prompts and document text.
@@ -137,13 +139,14 @@ Learners and researchers work through many documents on a topic but lack the bac
 - All services on **Amazon EKS** (Helm); AWS resources with **AWS CDK**; local development with **Docker Compose**.
 
 ### Release 2: research map
+- Structured extraction of reference lists and section headings, backfilled from stored PDFs (D22, D26).
 - Citation links between the learner's works (references matched to works by DOI, then normalized title + year), one node per work.
 - Timeline per subject (by year), with each work's citations in and out.
 - Suggested **reading order** per subject (foundational works first: cited works before the works citing them, then by year).
 - Ask the tutor about a reading path ("How did idea X develop across these papers?") answered from the papers in order, with citations.
 
 ### Release 3: learning loop
-- Topic catalog per content from the saved Docling output.
+- Topic catalog per content from the section headings extracted in Release 2.
 - Quizzes from selected notes; daily/weekly reports; "what should I learn next?" following the reading order.
 - Carry an answer's citations into the Lesson Note (low priority).
 
@@ -168,7 +171,7 @@ Story IDs are stable. Release 1: US-1 to US-13b. Release 2: US-19, US-20. Releas
 
 **US-2 Upload a document**
 - *When* the learner selects a PDF, *then* the browser computes its SHA-256 and asks the API whether it is already in their library. If it is, nothing is uploaded and they see "Already in your library" with a link (or "Restore" if archived).
-- **Checked before upload:** file type (PDF) and size (≤ 50 MB). **Checked after upload:** page count (≤ 500) and whether the PDF can be parsed; failures put the document in *failed* with the reason.
+- **Checked before upload:** file type (PDF) and size (≤ 50 MB). **Checked after upload:** page count (≤ 500), whether the PDF can be parsed, and whether it has extractable text (scanned PDFs without a text layer are not supported yet); failures put the document in *failed* with the reason.
 - Each document shows its state: *processing → choose subjects → ready*, or *failed* with the reason and **Retry** (§9.5).
 - There is no limit on the number of documents; uploads are rate-limited (§11).
 
@@ -270,14 +273,14 @@ Story IDs are stable. Release 1: US-1 to US-13b. Release 2: US-19, US-20. Releas
    │                        ▼                           RAG MCP Server (EKS, internal) ──► PostgreSQL + pgvector
    ▼                  Keycloak (OIDC)                                                              ▲
  S3 uploads/<user>/ ──► S3 event → SQS → Ingestion worker (hash → dedupe → first pages: metadata, ┘
-                                          suggestions → Docling (saved JSON) → references, work key → chunk → embed)
-                         contents/<sha256>.pdf + contents/<sha256>.docling.json (unreferenced PDFs → Glacier)
+                                          suggestions → page text (pypdf, saved JSON) → work key → chunk → embed)
+                         contents/<sha256>.pdf + contents/<sha256>.pages.json (unreferenced PDFs → Glacier)
 ```
 
 | Component | Responsibilities |
 |---|---|
 | **API Server** | Auth, documents (duplicate check, presigned upload, list/filter, subjects, display title, archive, retry), subjects (catalog search, personal names), conversations, notes, usage, rate limits and daily caps, SSE streaming; forwards the user's token to the agent. |
-| **Ingestion worker** | Consumes S3 `ObjectCreated` events for `uploads/`; validates; computes SHA-256; links to existing content or stores a new content; runs the **fast first-pages step** (text of pages 1–2 → metadata and subject candidates) before full Docling extraction; saves Docling output; extracts references and the work key; chunks and embeds. Processes uploads **fairly per user** (first-pages steps before full extractions; round-robin across users). Parses untrusted files: non-root, read-only filesystem, egress limited by NetworkPolicy, per-file timeout. |
+| **Ingestion worker** | Consumes S3 `ObjectCreated` events for `uploads/`; validates; computes SHA-256; links to existing content or stores a new content; runs the **fast first-pages step** (text of pages 1–2 → metadata and subject candidates) before full text extraction; saves the page text; sets the work key; chunks and embeds. Processes uploads **fairly per user** (first-pages steps before full extractions; round-robin across users). Parses untrusted files: non-root, read-only filesystem, egress limited by NetworkPolicy, per-file timeout. |
 | **RAG MCP Server** | `search(query, subject_ids, k)` over streamable HTTP: validates the forwarded JWT, resolves the learner's **readable, ready, non-archived documents** in any of those subjects (`can_read`), searches their contents' chunks only, returns chunks with scores and citation metadata. `get_chunk(chunk_id)` resolves old citations (only through a document the caller can read). |
 | **Smart Tutor agent** | Ask, summarize, idle-record paths (§9.2); checkpointer and long-term memory in PostgreSQL; token usage per call. |
 | **Scheduled jobs** (Kubernetes CronJobs) | Learning-record sweeper (every minute); Glacier tagger (daily); trace and decline-log retention (daily); *R3:* learner reports (hourly). |
@@ -305,14 +308,14 @@ Thresholds (`detect_threshold`, `detect_margin`, `multi_margin`, `answer_floor`)
 **Idle record path:** a sweeper every minute selects threads with `last_learner_message_at < now − learning_record_idle_minutes` and `last_learner_message_at > record_written_at` and writes or updates the record only.
 
 **Document processing path (worker):**
-1. Validate type, size, page count, and parseability; compute SHA-256 of the uploaded bytes.
+1. Validate type, size, page count, parseability, and that the PDF has extractable text; compute SHA-256 of the uploaded bytes.
 2. **Insert-or-get the content by hash.** Existing content → delete the uploaded copy, link the learner's document to it; if the content is `ready`, compute this learner's suggestions (step 5) and stop; if `processing`, the document waits; if `failed`, re-queue it (counts as a retry).
 3. **New content:** move the file to `contents/<sha256>.pdf`.
 4. **First-pages step (fast, one model call, `describe_document` tool call)** on text extracted from pages 1–2: title, authors, year, DOI, a two-sentence summary, and 3 proposed subject names; an embedding of the summary is stored on the content.
 5. **Suggestions for this learner (code):** rank shared subjects by similarity between the summary embedding and subject name embeddings, boosting subjects the learner already has and matching their personal names; fill the remaining of 3 slots with the model's proposed names that don't match an existing subject.
-6. **Full extraction:** Docling → save `contents/<sha256>.docling.json` → references from the bibliography section and the **work key** (DOI, else normalized title + year) in code → chunk and embed (chunk writes idempotent per content). Runs while the learner chooses subjects.
+6. **Full extraction:** `pypdf` reads the text page by page into LangChain `Document`s → save `contents/<sha256>.pages.json` → **work key** (DOI, else normalized title + year) in code from the first-pages metadata → split each page with `RecursiveCharacterTextSplitter` into chunks that keep their page number → embed (chunk writes idempotent per content). Runs while the learner chooses subjects. A PDF with no extractable text fails with "No text layer (scanned PDFs are not supported yet)".
 
-**Release 2 path (research map):** at ingestion (from Release 2; backfilled from saved Docling output for older contents) references are matched to works by DOI, then normalized title + year; the map and reading order for a learner are computed in code from their works. Reading-path answers retrieve per work in reading order and cite each step.
+**Release 2 path (research map):** at ingestion (from Release 2, which adds structured extraction of reference lists; backfilled from stored PDFs for older contents) references are matched to works by DOI, then normalized title + year; the map and reading order for a learner are computed in code from their works. Reading-path answers retrieve per work in reading order and cite each step.
 
 **Release 3 paths** (none go through chat threads):
 - **Quiz:** load the selected active notes (ownership checked) → one `create_quiz` tool call (questions, 4 options, correct index, explanation, subject, topic) → code validation (5–10 questions, one correct option each, topics present in the notes; one retry) → store without exposing the answer key until submission; the API grades in code.
@@ -340,7 +343,7 @@ Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow onl
 
 | Data | Store | Key | Notes |
 |---|---|---|---|
-| Content | PostgreSQL `contents` | `content_id`; unique `sha256` | `s3_key`, `docling_key`, `bytes`, `pages`, `state` (`processing` / `ready` / `failed`), `failure_reason`, `attempts`, `title`, `authors[]`, `year`, `doi`, `work_key`, `references[]`, `summary`, `summary_embedding`, `proposed_subject_names[]`, `embedding_model`, `embedding_dim`, `processed_by_user_id` (who triggered first processing; for usage), `processed_at`. No owner. |
+| Content | PostgreSQL `contents` | `content_id`; unique `sha256` | `s3_key`, `text_key`, `bytes`, `pages`, `state` (`processing` / `ready` / `failed`), `failure_reason`, `attempts`, `title`, `authors[]`, `year`, `doi`, `work_key`, `references[]` (from Release 2), `summary`, `summary_embedding`, `proposed_subject_names[]`, `embedding_model`, `embedding_dim`, `processed_by_user_id` (who triggered first processing; for usage), `processed_at`. No owner. |
 | Chunk | PostgreSQL `chunks` (pgvector) | `chunk_id` | `content_id`, `page` (nullable), `text`, `embedding` (1024-dim, HNSW). |
 | Document | PostgreSQL `documents` | `document_id`; unique `(owner_id, content_id)` where `content_id` is set | `owner_id`, `content_id` (null until hashed), `upload_id`, `state` (`processing` / `awaiting_subjects` / `ready` / `failed`), `archived` (bool), `archived_at`, `visibility` (`private`; R4: `shared` / `public`), `title_override`, `added_via` (`upload` / `dedupe`; R4: `share` / `public` / `import`), `created_at`. |
 | Document subjects | PostgreSQL `document_subjects` | `(document_id, subject_id)` | 1–3 rows per ready document (enforced in the domain and by a check). |
@@ -367,7 +370,7 @@ Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow onl
 
 **Content states (shared, keyed by SHA-256):**
 - (none) → `processing`: first server-verified hash (insert-or-get on the unique hash; concurrent uploads share the row).
-- `processing` → `ready`: extraction, metadata, saved Docling output, and embeddings all succeed.
+- `processing` → `ready`: extraction, metadata, saved page text, and embeddings all succeed.
 - `processing` → `failed`: validation, parse, timeout, or model error; reason and attempt count recorded.
 - `failed` → `processing`: **Retry** by any linked learner, or a re-upload of the same file, up to 3 attempts in total; after that it stays `failed` ("This file could not be processed").
 - `ready` → `processing` (system only): embedding-model change; re-embedding works from chunk text in PostgreSQL (no file needed); search keeps serving old vectors until it finishes.
@@ -389,7 +392,7 @@ Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow onl
 | Choose / change subjects (1–3), edit display title | Updates `document_subjects` / `title_override` only. |
 | Archive / restore | Updates `documents.archived`. Content and chunks unaffected (other learners may use them). |
 
-**Glacier:** a daily job tags `contents/<sha256>.pdf` with `status=archived` when no non-archived document references the content, and removes the tag when one does again; an S3 lifecycle rule moves tagged PDFs to **Glacier Flexible Retrieval** after 30 days. Chunks and the saved Docling JSON stay in PostgreSQL and S3 Standard, so search, citations, re-embedding, the research map, and the topic catalog never need the PDF; only a full re-extraction (e.g. a new Docling version) would require a Glacier restore (hours). Versioning stays on to protect against accidental overwrites.
+**Glacier:** a daily job tags `contents/<sha256>.pdf` with `status=archived` when no non-archived document references the content, and removes the tag when one does again; an S3 lifecycle rule moves tagged PDFs to **Glacier Flexible Retrieval** after 30 days. Chunks and the saved page text stay in PostgreSQL and S3 Standard, so search, citations, and re-embedding never need the PDF. Structured extraction in Release 2 reads the PDFs of referenced contents, which are never in Glacier; a content linked again after its PDF moved to Glacier needs a restore (hours) before that step. Versioning stays on to protect against accidental overwrites.
 
 ### 9.6 Decline log
 
@@ -398,14 +401,14 @@ Every decline (relevance gate, growth check, or `decline` tool) writes `subject_
 ### 9.7 Research map *(Release 2)*
 
 - **Works:** contents grouped by `work_key`; a learner's map shows one node per work they hold (several files of a work collapse into one node).
-- **Citation links:** each content's references (from saved Docling output) are matched to works by DOI, then by normalized title + year; links are stored once in `work_links` and shared, like embeddings. A learner's map includes only links between works they can read.
+- **Citation links:** each content's references (from the Release 2 structured-extraction step) are matched to works by DOI, then by normalized title + year; links are stored once in `work_links` and shared, like embeddings. A learner's map includes only links between works they can read.
 - **Timeline and reading order:** works ordered by year; reading order = cited works before citing works (topological order of the citation links within the subject), ties broken by year; cycles (mutual citation) broken by year.
 - **Reading paths in chat:** retrieval per work in reading order; the answer walks the works chronologically with citations.
 - Cost: no model calls for links, timeline, or order; one model call per reading-path answer.
 
 ### 9.8 Topic catalog, reports, and scheduling *(Release 3)*
 
-- **Topic catalog:** section headings (levels 1–2) from the saved Docling output become catalog entries per content (topic, page, heading embedding, computed once). A learner's catalog is the union over their active documents; "covered" = close to a topic in their learning records. Backfilled for all existing contents from saved output before Release 3 reports launch.
+- **Topic catalog:** section headings (levels 1–2) from the Release 2 structured-extraction step become catalog entries per content (topic, page, heading embedding, computed once). A learner's catalog is the union over their active documents; "covered" = close to a topic in their learning records. Backfilled for all existing contents before Release 3 reports launch.
 - **Reports:** an hourly scheduler finds learners whose local day (or week, ending Sunday) just ended and, with activity (message, note, or quiz attempt), runs the report path; idempotent per `(user, period_type, period_start)`; "Generate now" creates an on-demand report. Report tokens count as background usage.
 
 ### 9.9 Model integration notes
@@ -416,7 +419,7 @@ Every decline (relevance gate, growth check, or `decline` tool) writes `subject_
 
 **Judge: `qwen.qwen3-32b-v1:0`** — LLM-as-judge and synthetic data, temperature 0.
 
-**Docling throughput:** full extraction of large PDFs on CPU takes minutes; the first-pages step keeps suggestions fast, and M0 benchmarks Docling on CPU nodes (with CPU-only PyTorch) to size worker replicas against the §11 targets.
+**Text extraction quality:** `pypdf` reads only the PDF's text layer, with no OCR or layout model. Multi-column pages, tables, and formulas may come out in a poor order, which can hurt retrieval, and scanned PDFs fail. The M1 retrieval and filtered-recall evals on the seed corpus measure the effect; a structured extractor can replace the adapter behind the `PdfExtractor` port without changing other code.
 
 ### 9.10 Risks and mitigations
 
@@ -439,7 +442,7 @@ Every decline (relevance gate, growth check, or `decline` tool) writes `subject_
 
 ### 9.11 Hosting
 
-Agent, MCP server, API, web, Keycloak, ingestion worker, and CronJobs run on **EKS** (Helm umbrella chart; Pod Identity; External Secrets); RDS PostgreSQL + pgvector. Bedrock AgentCore Runtime for the agent and MCP server was considered and rejected: a second platform next to EKS, an extra hop per turn, and its microVM isolation and scale-to-zero matter little for an agent that runs no code (cost at pilot scale is similar). The worker gets stricter isolation because it parses untrusted files, and uses CPU-only PyTorch.
+Agent, MCP server, API, web, Keycloak, ingestion worker, and CronJobs run on **EKS** (Helm umbrella chart; Pod Identity; External Secrets); RDS PostgreSQL + pgvector. Bedrock AgentCore Runtime for the agent and MCP server was considered and rejected: a second platform next to EKS, an extra hop per turn, and its microVM isolation and scale-to-zero matter little for an agent that runs no code (cost at pilot scale is similar). The worker gets stricter isolation because it parses untrusted files.
 
 ### 9.12 Environments, infrastructure as code, and delivery
 
@@ -455,7 +458,7 @@ Agent, MCP server, API, web, Keycloak, ingestion worker, and CronJobs run on **E
 |---|---|
 | Agent framework | LangChain + LangGraph |
 | Tracing and evaluation | LangSmith |
-| Document extraction | Docling (PDF); a fast PDF text extractor for the first-pages step |
+| Document extraction | `pypdf` page text as LangChain `Document`s (also for the first-pages step), chunked with `langchain-text-splitters`; structured extraction (reference lists, headings) chosen for Release 2 |
 | LLM (agent, document description) | `amazon.nova-2-lite-v1:0` via `us.amazon.nova-2-lite-v1:0` |
 | Embeddings | `amazon.nova-2-multimodal-embeddings-v1:0`, 1024 dimensions |
 | LLM (judges, synthetic data) | `qwen.qwen3-32b-v1:0` |
@@ -475,7 +478,7 @@ One Python package organized **by module first**, with `domain`, `application`, 
 
 | Module | Owns (v2.1) |
 |---|---|
-| `knowledge` | Contents (SHA-256 dedupe, state machine, retry), documents (library entries, 1–3 subjects, `can_read`, visibility, grants), upload flow, ingestion (first pages, Docling output, references, work key), chunks, search |
+| `knowledge` | Contents (SHA-256 dedupe, state machine, retry), documents (library entries, 1–3 subjects, `can_read`, visibility, grants), upload flow, ingestion (first pages, page text, work key), chunks, search |
 | `subjects` | **Shared subject catalog**: subjects with stable ids, personal names (rename, reset), suggestion ranking, name checks (ADR 0003, 0004) |
 | `tutoring` | Threads (1–3 subjects, growth), detection among the learner's subjects (asks `knowledge.application`; names from `subjects.application`), relevance gate, growth check, ask path, conversations |
 | `learning` | Lesson Notes (edit-aware overwrite), learning records |
@@ -489,7 +492,7 @@ One Python package organized **by module first**, with `domain`, `application`, 
 | `domain` | Entities and rules, no I/O: `Content` (state transitions, `retry()`), `Document` (state transitions, `archive()`, `restore()`, `set_subjects()` 1–3, `can_be_read_by(user)`), `Subject`, `PersonalSubjectName`, `Thread` (`add_subject()` refuses beyond 3, never removes), `LessonNote` (`needs_overwrite_confirmation()`), `LearningRecord`, `Chunk`, `Citation`, `TokenUsage` | nothing |
 | `application` | One service per use case: `UploadService`, `DeduplicationService`, `IngestionService`, `SubjectSuggester`, `SubjectCatalogService`, `DocumentService`, `SearchService`, `SubjectDetector`, `AskService`, `NoteService`, `LearningRecordService`, `ConversationService`, `UsageService`, `DeclineLogService` | `domain`, `ports` |
 | `ports` | ABCs: `ChatModel`, `EmbeddingModel`, `Retriever`, `PdfExtractor`, `FirstPagesReader`, `ObjectStore`, repositories, `LearningMemory`, `Clock` | `domain` |
-| `adapters` | Bedrock, PostgreSQL, MCP client, LangGraph store, S3/SQS, Docling | `ports`, vendor SDKs |
+| `adapters` | Bedrock, PostgreSQL, MCP client, LangGraph store, S3/SQS, PDF loader | `ports`, vendor SDKs |
 | `entrypoints` (`apps/`) | FastAPI routes, LangGraph graph, MCP tools, SQS worker, CronJobs | `application` (and `adapters`, for wiring) |
 
 **Model abstraction:** `ChatModel` (`stream`, `invoke`, `structured`, normalized `TokenUsage`) and `EmbeddingModel` (`embed_documents`, `embed_query`, `model_id`, `dimension`) ports; Bedrock adapters; a `ModelFactory` builds models by role (`agent`, `judge`, `embedding`). Switching chat models is a configuration change gated on the full evaluation split. Switching the embedding model re-embeds each **content** once from stored chunk text, recorded as `system` usage.
@@ -589,7 +592,7 @@ Measured over the pilot unless stated; minimum sample 100 events per metric.
 | Q24 | Document deletion | Archive only for learners (D10). |
 | Q25 | Subject renaming | Personal names per learner; `subject_id` never changes (D21). |
 | Q26 | Deduplication | SHA-256 per content across all users; embed once; auto-link after a server-side hash (D18, D19). |
-| Q27 | Future direction | Research map in Release 2; deep knowledge graph in Release 5; metadata, references, and Docling output captured from Release 1 (D17, D22). |
+| Q27 | Future direction | Research map in Release 2; deep knowledge graph in Release 5; metadata and work key captured from Release 1; reference lists and headings backfilled from stored PDFs in Release 2 (D17, D22, D26). |
 | Q28 | Content-gap report | Removed; anonymized decline log kept (D23). |
 | Q29 | Admin functions | None for now: no catalog rename/merge/hide, no account-deletion tooling (known gap) (§5, §9.10). |
 | Q30 | Subjects per document | 1–3 (D20). |
@@ -599,6 +602,7 @@ Measured over the pilot unless stated; minimum sample 100 events per metric.
 | Q34 | Retention | Traces deleted after 180 days; threads, notes, and learning records kept (D25). |
 | Q35 | Release order | R1 core tutor; R2 research map; R3 learning loop; R4 sharing and imports; R5 deep knowledge graph (D17). |
 | Q36 | Subject catalog module | Split out of `knowledge` into `subjects` (§9.15, ADR 0004). |
+| Q37 | PDF extraction in Release 1 | `pypdf` page text as LangChain `Document`s, no OCR; structured extraction (e.g. Docling) reconsidered for Release 2 (D26, ADR 0005). |
 
 ## 14. Roadmap: releases and milestones
 
@@ -617,8 +621,8 @@ M4 Production launch (R1)
 
 | Milestone | Exit criteria |
 |---|---|
-| M0 Foundations | Repo, CI, Compose stack, CDK and Helm skeletons, Keycloak realm, LangSmith project, package skeleton with ports and `ModelFactory` *(scaffold done)*; Bedrock models reachable (sync Nova embeddings verified; Nova 2 Lite streaming + tool call verified); forwarded JWT agent → MCP in Compose; **Docling CPU benchmark** and CPU-only PyTorch worker image. |
-| M1 Library and ingestion | Presigned upload, browser duplicate check, server SHA-256 dedupe with insert-or-get, content and document state machines with retry, first-pages step, Docling with saved output, references and work key, chunks and embeddings, subject suggestions and shared catalog (1–3 per document, name check), personal names, archive/restore, Glacier tagger (tag/untag test), MCP search with `can_read` and iterative scans; suggestion, name-check, metadata, retrieval, filtered-recall, and dedupe/isolation tests passing on the seed corpus. |
+| M0 Foundations | Repo, CI, Compose stack, CDK and Helm skeletons, Keycloak realm, LangSmith project, package skeleton with ports and `ModelFactory` *(scaffold done)*; Bedrock models reachable (sync Nova embeddings verified; Nova 2 Lite streaming + tool call verified); forwarded JWT agent → MCP in Compose; page-text extraction with `pypdf` checked on seed-corpus PDFs. |
+| M1 Library and ingestion | Presigned upload, browser duplicate check, server SHA-256 dedupe with insert-or-get, content and document state machines with retry, first-pages step, page text with saved output, work key, chunks and embeddings, subject suggestions and shared catalog (1–3 per document, name check), personal names, archive/restore, Glacier tagger (tag/untag test), MCP search with `can_read` and iterative scans; suggestion, name-check, metadata, retrieval, filtered-recall, and dedupe/isolation tests passing on the seed corpus. |
 | M2 Tutor agent | First-turn multi-subject detection, growth to 3 with notices and warning, search, relevance gate, answer with document-as-data prompting, decline log, summarize path with edit-aware overwrite, idle sweeper, learning records; Release 1 evals passing on the smoke split, including adversarial PDFs. |
 | M3 App (API + Web) | Auth and terms, library and upload UX, subject choice and rename, chat streaming with subject notices, conversation and note management, usage view, rate limits and daily caps; isolation tests passing. |
 | M4 Production launch (R1) | CDK stacks and Helm releases in prod via CI/CD; worker isolation; trace and decline retention jobs; online evaluation, annotation queue, dashboards and alerts; **data-erasure obligations reviewed** (known gap); release gate passed; **pilot starts**. |
@@ -627,14 +631,14 @@ M4 Production launch (R1)
 
 | Milestone | Exit criteria |
 |---|---|
-| M5 Research map | Work links from saved references (backfilled), timeline, reading order, reading-path answers; citation-linking and reading-path evals passing. |
+| M5 Research map | Structured extraction of reference lists and headings (backfilled from stored PDFs), work links from references, timeline, reading order, reading-path answers; citation-linking and reading-path evals passing. |
 | M6 Launch (R2) | Deployed; research-map metrics baselined; release gate. |
 
 ### Release 3 — learning loop
 
 | Milestone | Exit criteria |
 |---|---|
-| M7 Topic catalog + quizzes | Catalog from saved Docling output (backfilled), quizzes; quiz evals passing. |
+| M7 Topic catalog + quizzes | Catalog from extracted headings (backfilled), quizzes; quiz evals passing. |
 | M8 Reports + recommendations | Scheduler, reports, recommendations following reading order; grounding and faithfulness evals passing. |
 | M9 Launch (R3) | Deployed; release gate. |
 

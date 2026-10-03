@@ -14,7 +14,7 @@ The one Python package, `smart_tutor`, shared by every backend deployable.
 
 ```bash
 uv sync                      # core + dev group
-uv sync --extra ingest       # + Docling (worker)
+uv sync --extra ingest       # + PDF loader (worker)
 uv sync --extra eval         # + evaluation deps
 uv run pytest                # unit tests
 uv run pytest -m integration # needs `make up`
