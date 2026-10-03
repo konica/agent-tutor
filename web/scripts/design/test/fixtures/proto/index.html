@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Fixture</title></head>
+<body>
+  <header class="review-bar">Review bar</header>
+  <main id="root"></main>
+  <script>
+    window.ST = { STATES: [
+      { id: 'home-empty', group: 'Home', ref: '§6.3 · US-2', desc: 'Empty home.', view: function () {} },
+      { id: 'r2-map', group: 'R2', ref: '§7 · US-19', desc: 'Map.', release: 2 }
+    ] };
+    const show = () => { document.getElementById('root').textContent = 'State ' + location.hash.slice(2); };
+    window.addEventListener('hashchange', show);
+    show();
+  </script>
+</body>
+</html>
