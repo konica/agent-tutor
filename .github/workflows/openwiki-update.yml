@@ -48,7 +48,7 @@ jobs:
           OPENWIKI_TELEMETRY_DISABLED: "1"
           OPENWIKI_PROVIDER: bedrock
           BEDROCK_AWS_REGION: us-east-1
-          OPENWIKI_MODEL_ID: us.anthropic.claude-sonnet-5-5
+          OPENWIKI_MODEL_ID: us.anthropic.claude-sonnet-4-6
 
       - name: Remove transient OpenWiki run state
         if: ${{ !cancelled() }}
