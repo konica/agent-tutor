@@ -14,8 +14,8 @@ smart_tutor/
 ├── learning/    # Lesson Notes, learning records
 ├── accounts/    # learner profile, upload limits, token usage, rate-limit policy
 ├── insights/    # anonymized decline log
-├── catalog/ quizzes/ recommendations/ reports/   # Release 2 — empty until then
-├── graph/       # Release 3 knowledge graph — empty until then
+├── graph/       # Release 2 research map (Release 5 deep graph) — empty until then
+├── catalog/ quizzes/ recommendations/ reports/   # Release 3 — empty until then
 └── apps/        # api, agent, mcp_server, worker, jobs — one composition root per deployable
 ```
 

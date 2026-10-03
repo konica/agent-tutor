@@ -1,6 +1,6 @@
 # Smart Tutor
 
-An AI tutor for your own documents: learners upload PDFs, the system suggests subjects from a shared catalog, and the tutor answers questions only from the learner's documents in one subject at a time, with citations. Identical files are processed once across all users. Later releases add quizzes and reports, then sharing and a knowledge graph of how documents relate over time. Product requirements: [`sdd/prd.md`](sdd/prd.md). Repository layout: [`sdd/specs/2026-10-02-project-structure-design.md`](sdd/specs/2026-10-02-project-structure-design.md).
+An AI tutor for your own documents: learners upload PDFs, the system suggests subjects from a shared catalog, and the tutor answers questions only from the learner's documents in the conversation's subjects (up to 3), with citations. Identical files are processed once across all users. Release 2 adds a research map (citation links, timeline, reading order); later releases add quizzes and reports, sharing and imports, and a deep knowledge graph. Product requirements: [`sdd/prd.md`](sdd/prd.md). Repository layout: [`sdd/specs/2026-10-02-project-structure-design.md`](sdd/specs/2026-10-02-project-structure-design.md).
 
 ## Layout
 
