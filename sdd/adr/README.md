@@ -24,4 +24,4 @@ Product decisions are recorded in `sdd/prd.md` (§6, §13); ADRs cover architect
 | [0005](0005-pypdf-page-text-instead-of-docling.md) | Extract PDF page text with `pypdf` instead of Docling in Release 1 |
 | [0006](0006-langchain-model-interfaces.md) | LangChain model interfaces as the model ports; `init_chat_model` builds them |
 | [0007](0007-forward-learner-jwt-via-runtime-context.md) | Forward the learner JWT through LangGraph runtime context; Keycloak validates it on every hop (introspection) |
-| [0008](0008-chunk-page-text-with-a-langchain-transformer.md) | Chunk page text with `RecursiveCharacterTextSplitter` (512 characters, one page per chunk) behind a LangChain document transformer |
+| [0008](0008-chunk-page-text-with-a-langchain-transformer.md) | Chunk page text with `RecursiveCharacterTextSplitter` (1,000 characters, overlap 200, one page per chunk) behind a LangChain document transformer |
