@@ -1032,3 +1032,9 @@ Expected: all pass.
 git add .github/workflows/ci.yml AGENTS.md sdd/design/README.md sdd/design/brief.md
 git commit -m "Check states.json in CI and add design inputs for agents"
 ```
+
+## Changes made during execution
+
+- The root `.gitignore` rule `lib/` (Python template) hid `web/scripts/design/lib/`. Added `!web/scripts/design/lib/` in commit "Track the design tooling lib folder".
+- Screenshots kept a 48 px empty strip where the hidden review bar had been. The hide style in `lib/prototype.mjs` also sets the prototype's `--review-h` to `0px`.
+- The real run found that the prototype's chat states use the range `US-3–10`, so each maps to ten stories. The brief's new §11 item 6 asks the designer for specific stories per state from the next round.
