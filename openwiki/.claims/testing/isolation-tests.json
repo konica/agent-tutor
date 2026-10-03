@@ -1,0 +1,282 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:32a0a65cb4883e70db8685c823c441959e364df2a8c99cb005aab29c48ddaf34",
+  "claims": [
+    {
+      "id": "claim_b9790027fbb245f6a352d7f1a3a18657",
+      "statement": "The tests/isolation/ directory is the dedicated test suite for cross-user data isolation (US-12) and SHA-256 deduplication integrity (US-11), and runs against the live API and MCP server rather than using fakes or only testing adapters.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L55-L57",
+          "version": "repo-lines-v1:sha256:953b583c621e087d824b037474213d9fd3d62606b5104c0cfdbe8c8cc81e1eea:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDhjNmE3ZjU0MDU3ODEwMDZkZjE0NGE3OWIyMjRkMTIwM2M2MmZjNDVmYzBhZTBjZGI5M2FkNTNhZWMyMDIwZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDQyZDllYWUxMTZjN2MxOGFiN2ExY2QyZGJiNjM2MDdiZTYzMjY5OWM2MGRlNDkxNDU4ZDUzNTY3ZmFmMTZmOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDZjYmFiNjY0NGE5ZTE2ODg5NGQ1YjQzOTQ4OGUyODg3NmFmZTllMTA3MDkzMTVhMzk4NTllODMxMTdkNDVmNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWJkODZmMGNiNzZlMTc5NGVmNjAwMmRiYzdkZTE2NzAwZjkwYzBlOTg0NzFmYmY0ZTllMDRjMjU4YjQwM2Y5ZCJ9"
+        },
+        {
+          "resource": "repo://backend/tests/isolation/README.md",
+          "version": "repo-file-v1:sha256:997ab5e402f43f29bd3e0d9b0767043821a1d7ad73df57a15106bebade9e2ff7"
+        }
+      ]
+    },
+    {
+      "id": "claim_ccffed4bb1a145fbb8ccc14959676c74",
+      "statement": "AGENTS.md mandates that every endpoint and MCP tool that returns learner data must have a test in tests/isolation/.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L55-L57",
+          "version": "repo-lines-v1:sha256:953b583c621e087d824b037474213d9fd3d62606b5104c0cfdbe8c8cc81e1eea:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDhjNmE3ZjU0MDU3ODEwMDZkZjE0NGE3OWIyMjRkMTIwM2M2MmZjNDVmYzBhZTBjZGI5M2FkNTNhZWMyMDIwZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDQyZDllYWUxMTZjN2MxOGFiN2ExY2QyZGJiNjM2MDdiZTYzMjY5OWM2MGRlNDkxNDU4ZDUzNTY3ZmFmMTZmOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDZjYmFiNjY0NGE5ZTE2ODg5NGQ1YjQzOTQ4OGUyODg3NmFmZTllMTA3MDkzMTVhMzk4NTllODMxMTdkNDVmNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWJkODZmMGNiNzZlMTc5NGVmNjAwMmRiYzdkZTE2NzAwZjkwYzBlOTg0NzFmYmY0ZTllMDRjMjU4YjQwM2Y5ZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_df727e1bf9e04434a0358d6de93a44fe",
+      "statement": "The isolation_and_dedupe release-gate threshold is 1.00 (100%) in evals/thresholds.yaml, meaning a single test failure blocks release, and the entry is typed as code (deterministic assertions, not LLM-as-judge).",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/thresholds.yaml#L29-L29",
+          "version": "repo-lines-v1:sha256:71560dc2c7c164f2c96dbae205e404ec37cff2f3b035dd609088b4da801a3714:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzE1NjBkYzJjN2MxNjRmMmM5NmRiYWUyMDVlNDA0ZWMzN2NmZjJmM2IwMzVkZDYwOTA4OGI0ZGE4MDFhMzcxNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzE1NjBkYzJjN2MxNjRmMmM5NmRiYWUyMDVlNDA0ZWMzN2NmZjJmM2IwMzVkZDYwOTA4OGI0ZGE4MDFhMzcxNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWI5YjcxNWY4MzVlOThiYzk5OTFkNjgyYTA4MGRjODdmOTdmMjk4ZTI1NWVhZDkxMWRhMDYxNTkxZTJiMzkzNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDhiYzZkMDJkNjk2MjZiZjAwMmYyZWZjN2MzMGRhNWRiOTliZmNhYTg3MmY4ZTJmZGFlMWVlZmM3Mzg3NTFjYiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_c713bdd36dd54bea898c799dc79f07a4",
+      "statement": "Isolation tests correspond to PRD US-11 (duplicate uploads) and US-12 (data isolation), and the release gate for every release — not just Release 1 — requires isolation tests to pass.",
+      "evidence": [
+        {
+          "resource": "repo://backend/tests/isolation/README.md",
+          "version": "repo-file-v1:sha256:997ab5e402f43f29bd3e0d9b0767043821a1d7ad73df57a15106bebade9e2ff7"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L225-L231",
+          "version": "repo-lines-v1:sha256:590b9ce5cdfdfd4e8c22b5f2ec89a89f9ef8e978d42d147e85c89fb3f931242a:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZWU2YTZlYmE2Njk4YjkzZmI5MjM2YTk0ZTllYjMxYTJlYmZlZjhiMWJhMmY2OTJjZjMwZDk1OWIyMDFhNWUyYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmM0NjdkOTgyYTU0NGI5YTNiN2Q0MDdiNzNmYTlhZTQ3ZjIzZjQ2NWQ5MmE1OTRjZDgzYTFlZDVmZGEyMGJlMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTQwY2UwY2VmZTA1ZTg3YWQ3NzczZDgwMTM0NTMxOGU5YWRjMmRmZjIwMWY0NzMxNTQ2YzkwYmFiOWQyYmJkMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNWE1NGM0MDczMGVjNWU4ODllYTVhNDQyMDIwZjU3MDk4OTZkZmMzM2E5ZmU3ZTEwYjc5MjhhMzYyNGYxMmE5ZSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L614-L614",
+          "version": "repo-lines-v1:sha256:b2daece25602fb2b6fce202cdd5d0d5f0cc083388e958791226fef4c9358f5f4:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjJkYWVjZTI1NjAyZmIyYjZmY2UyMDJjZGQ1ZDBkNWYwY2MwODMzODhlOTU4NzkxMjI2ZmVmNGM5MzU4ZjVmNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjJkYWVjZTI1NjAyZmIyYjZmY2UyMDJjZGQ1ZDBkNWYwY2MwODMzODhlOTU4NzkxMjI2ZmVmNGM5MzU4ZjVmNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGUwNzc5MDg3YTY5YTI1MTQxOTAxNmRkNDliOWM2ZWMyN2RhOWNhYzM4OGQxZGM4ZGVhMzdmMTRlNTc3NWE4YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjRkYmJlM2MzMjI3Y2QzMzlkMmJlN2I1NjA3NmZkZTYxNDBkNDI5NmU5OGY0NjBmNjNlNWFlYWRmZjA4ZDM3OSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_f30e9a3a7d8943bbac6d98b4d0b8a59c",
+      "statement": "A duplicate upload links to existing content without creating new chunks: when any learner uploads a file whose server-computed SHA-256 matches an existing content, the uploaded copy is discarded, the learner's document is linked to the existing content row, and no extraction or embedding runs.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L113-L113",
+          "version": "repo-lines-v1:sha256:c5f91d880ea0a5f78781f0536c65c40e9bcce5b08b57d4208ebc98dcc6938ac0:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzVmOTFkODgwZWEwYTVmNzg3ODFmMDUzNmM2NWM0MGU5YmNjZTViMDhiNTdkNDIwOGViYzk4ZGNjNjkzOGFjMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzVmOTFkODgwZWEwYTVmNzg3ODFmMDUzNmM2NWM0MGU5YmNjZTViMDhiNTdkNDIwOGViYzk4ZGNjNjkzOGFjMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTI1YjNhMGJkYTY3M2M4OWIxMDdiMWYwODVhNjBmN2YxMDgwZjk3NWJlNjVlNDg5N2ZkM2M1NjczZTY3MGYwMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWM1MzA2ZWE4ZmRlNThlNTdkYWM0MjBlOTBjODYyYjJiZjYxNDlhY2JkMTc3ZmM1YTE3MzI3MmRjYzhlZTNhZCJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L225-L228",
+          "version": "repo-lines-v1:sha256:6a8c1337a918489ae1d669dc174381974c0db80ffc4aee96eb30b0213012d52a:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZWU2YTZlYmE2Njk4YjkzZmI5MjM2YTk0ZTllYjMxYTJlYmZlZjhiMWJhMmY2OTJjZjMwZDk1OWIyMDFhNWUyYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWZhNjNjNmRkYTA2YWUyNjc4YWE3MGZhNTFhZjc4ZWFiNjFiM2Y2NzZlMjQzMDc1NGUyMTJlMTE2NWQwYWE1NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTQwY2UwY2VmZTA1ZTg3YWQ3NzczZDgwMTM0NTMxOGU5YWRjMmRmZjIwMWY0NzMxNTQ2YzkwYmFiOWQyYmJkMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOGViNmU3M2M2NzEwNGQxZTIzMGM4MDlhMDY3MmU5ZmMyOWZmYWNkMjVkYWFmNGZkNmRiZWExYjhhNDZjMmE0NyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_68c3d875b69e410b8e6fe2e86b3e5aa8",
+      "statement": "A browser-supplied SHA-256 hash alone never causes the system to link a learner's document to existing content; linking only happens after the server recomputes the hash from the uploaded bytes, preventing access to another learner's private file by knowing its hash (PRD D19).",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L114-L114",
+          "version": "repo-lines-v1:sha256:f087e731b3fb42329b24b8adaca2b830b5ca6415936c4c19f2cc7b277f771b80:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjA4N2U3MzFiM2ZiNDIzMjliMjRiOGFkYWNhMmI4MzBiNWNhNjQxNTkzNmM0YzE5ZjJjYzdiMjc3Zjc3MWI4MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjA4N2U3MzFiM2ZiNDIzMjliMjRiOGFkYWNhMmI4MzBiNWNhNjQxNTkzNmM0YzE5ZjJjYzdiMjc3Zjc3MWI4MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmIyZDcwOWU4Zjg0ZTkzMTE4OTE3NTBmM2JjNTE1ZjIzYTZiYTBjNzk0NDhmNmM5N2Y4MmU3ODQyYzc5ODU0NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTMxZDU5MDc3NzIzN2UxZTczYzYyN2VlMzA5MjA2MzIzNWFlNmNjNjM3NmM3ZWI4NTkwOWQwMmRjZTE0MTc5ZiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L228-L228",
+          "version": "repo-lines-v1:sha256:5fa63c6dda06ae2678aa70fa51af78eab61b3f676e2430754e212e1165d0aa57:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNWZhNjNjNmRkYTA2YWUyNjc4YWE3MGZhNTFhZjc4ZWFiNjFiM2Y2NzZlMjQzMDc1NGUyMTJlMTE2NWQwYWE1NyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWZhNjNjNmRkYTA2YWUyNjc4YWE3MGZhNTFhZjc4ZWFiNjFiM2Y2NzZlMjQzMDc1NGUyMTJlMTE2NWQwYWE1NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWM2Y2YwMDZkYjI1NTRhODNjMWQ3MDE1YmQ3ZDcyY2Y0MDhjYjVkYTNmYWVmYTVlYjk3MzY3NzdiMDgyYTY3NCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOGViNmU3M2M2NzEwNGQxZTIzMGM4MDlhMDY3MmU5ZmMyOWZmYWNkMjVkYWFmNGZkNmRiZWExYjhhNDZjMmE0NyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_dcb56aa802b1414b9b59f6a79017b656",
+      "statement": "Concurrent identical uploads produce exactly one content row because the worker uses an insert-or-get on the contents table's unique sha256 index; both learners' documents are linked to that single row.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L308-L309",
+          "version": "repo-lines-v1:sha256:1f3bb5128af4fde1d82f79168ff00dbfe7d710929c7697f5fd6866928ea25389:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTNjOTZhOGJiNWY3MjQ5ODJjNDc2YzgwNWMwOTNmMWI5MDFhMGYwNGRkZjBlYTkxOTE3ZTkxOGJlMDY3NzAwNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmNlYjdmZGM5N2U3NjQyMGMyZDM1ODVlZDYzYzMwMmYxYmRiNzY3NzcwMzQ4OTIxZGFhYjAyOWRkNjAyZGYyNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2Y0YWIxYTRjYWQxY2NkMjg0MDJhMWJjYzkxZDE5MTJiNjIzNzAyN2ZlOTViNzljOWEzZDYwNjdhMGY5NmE3YSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmY5ZmI3MTE4N2NlOWYwY2JkYmE0ZDkyMzNjYTE2YmE1YzEwZDA4ZmZiZDIyMjZkYTA2NWRjNGNhMDAwMTU1MiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L369-L369",
+          "version": "repo-lines-v1:sha256:f2e4b8267a8caa1ae33925196745dcfe52f49d1540a83da312fce3ce93ea7def:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjJlNGI4MjY3YThjYWExYWUzMzkyNTE5Njc0NWRjZmU1MmY0OWQxNTQwYTgzZGEzMTJmY2UzY2U5M2VhN2RlZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjJlNGI4MjY3YThjYWExYWUzMzkyNTE5Njc0NWRjZmU1MmY0OWQxNTQwYTgzZGEzMTJmY2UzY2U5M2VhN2RlZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjI4NjdmMTNkZmIwMTE5MjM1YzQ1MjBlNzk0NjA3MWRhOWQ0ZWI5MmM1ODAzNzhlMDEzOTIwYjgyZWQ1NzhhMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzI4MGE5NzMzN2EwMmNhYzU2ZjVlMjliYjY1ZmY5MTNmMDQ1OWUxYzI0NjViYTE4OTM5YmE3ODdkYTllNzE5ZiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_7543d4fd997a4f9f9013fc008ac5bf34",
+      "statement": "US-12 requires that a learner can never read, list, retrieve, cite, or download another learner's documents, threads, notes, learning records, quizzes, reports, or usage, including when both learners hold documents in the same shared subject.",
+      "evidence": [
+        {
+          "resource": "repo://backend/tests/isolation/README.md",
+          "version": "repo-file-v1:sha256:997ab5e402f43f29bd3e0d9b0767043821a1d7ad73df57a15106bebade9e2ff7"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L230-L231",
+          "version": "repo-lines-v1:sha256:78920e6dd6927d3a5b1943aa5362063d5ae438b97d45be8c819398eea9ef4131:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODQxZGE3NTE5Mzg0OTA2ODY0NWE5NWZkY2RiMjU0OThmNjYwMmUyZjQzYzkxOWU1YWQ0NWQ0OTI2ZTkyMmExMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmM0NjdkOTgyYTU0NGI5YTNiN2Q0MDdiNzNmYTlhZTQ3ZjIzZjQ2NWQ5MmE1OTRjZDgzYTFlZDVmZGEyMGJlMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2M3YWQxN2E3NTNlNjk2YzYzNzNjNGE5OTAxYzJhZWY4ZTgyODM3ZTAzMDJlYWM3OGJkZTAyZmY2NGVkYmJiZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNWE1NGM0MDczMGVjNWU4ODllYTVhNDQyMDIwZjU3MDk4OTZkZmMzM2E5ZmU3ZTEwYjc5MjhhMzYyNGYxMmE5ZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_bd51ea9fb8dd47c8ba17aa32457cd546",
+      "statement": "At the M1 scaffold stage, the tests/isolation/ directory contains only the README; the test files themselves are empty stubs, implementing the isolation tests is an explicit M1 task.",
+      "evidence": [
+        {
+          "resource": "repo://backend/tests/isolation/README.md",
+          "version": "repo-file-v1:sha256:997ab5e402f43f29bd3e0d9b0767043821a1d7ad73df57a15106bebade9e2ff7"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L621-L621",
+          "version": "repo-lines-v1:sha256:d01e15c576691ca068c956993bf78a6014616a58f76981033d096af81888bd93:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDAxZTE1YzU3NjY5MWNhMDY4Yzk1Njk5M2JmNzhhNjAxNDYxNmE1OGY3Njk4MTAzM2QwOTZhZjgxODg4YmQ5MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDAxZTE1YzU3NjY5MWNhMDY4Yzk1Njk5M2JmNzhhNjAxNDYxNmE1OGY3Njk4MTAzM2QwOTZhZjgxODg4YmQ5MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmNkOGM2YWM0MWFjMTQwMzQ4MDU2MmQzZjUzYzcwYzdmMDkwNjVhOWE5YzRhNzcxOWM1ZTc1NjBhNzU4N2YxMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDQwMzA2NmQ4OWQwZWEzYTBhNWJjMjg2NzdhNjUwODI2MmFlMWM0NGI0N2U2MTU0N2EzOTcwMDU4ZDNhYWM1ZiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_cc840d1a03f2479188ad3db8f408f060",
+      "statement": "Isolation tests are a distinct tier from integration tests: they are not marked @pytest.mark.integration, their purpose is behavioral proof of a security property rather than adapter-level verification, and they exercise the full stack including authentication middleware, SQL predicates, and MCP JWT validation.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L55-L57",
+          "version": "repo-lines-v1:sha256:953b583c621e087d824b037474213d9fd3d62606b5104c0cfdbe8c8cc81e1eea:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDhjNmE3ZjU0MDU3ODEwMDZkZjE0NGE3OWIyMjRkMTIwM2M2MmZjNDVmYzBhZTBjZGI5M2FkNTNhZWMyMDIwZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDQyZDllYWUxMTZjN2MxOGFiN2ExY2QyZGJiNjM2MDdiZTYzMjY5OWM2MGRlNDkxNDU4ZDUzNTY3ZmFmMTZmOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDZjYmFiNjY0NGE5ZTE2ODg5NGQ1YjQzOTQ4OGUyODg3NmFmZTllMTA3MDkzMTVhMzk4NTllODMxMTdkNDVmNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWJkODZmMGNiNzZlMTc5NGVmNjAwMmRiYzdkZTE2NzAwZjkwYzBlOTg0NzFmYmY0ZTllMDRjMjU4YjQwM2Y5ZCJ9"
+        },
+        {
+          "resource": "repo://backend/tests/integration/README.md",
+          "version": "repo-file-v1:sha256:046150e407de93a4b78f0cb597c6cd8439da26c851745401acaadc7c94aa8c04"
+        },
+        {
+          "resource": "repo://backend/tests/isolation/README.md",
+          "version": "repo-file-v1:sha256:997ab5e402f43f29bd3e0d9b0767043821a1d7ad73df57a15106bebade9e2ff7"
+        }
+      ]
+    },
+    {
+      "id": "claim_f767e1e1b4474ce8801204b19ff9e18e",
+      "statement": "When Release 4 adds sharing grants and extends can_read, the isolation tests must be updated to cover the new sharing cases; the M10 milestone exit criterion explicitly requires this.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L645-L645",
+          "version": "repo-lines-v1:sha256:88517035eb161d8401c83be4493c48da0b83829a84df86d3a1a37306f0499806:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODg1MTcwMzVlYjE2MWQ4NDAxYzgzYmU0NDkzYzQ4ZGEwYjgzODI5YTg0ZGY4NmQzYTFhMzczMDZmMDQ5OTgwNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODg1MTcwMzVlYjE2MWQ4NDAxYzgzYmU0NDkzYzQ4ZGEwYjgzODI5YTg0ZGY4NmQzYTFhMzczMDZmMDQ5OTgwNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDYxMDA5NjQzM2Q2ZWMwYmZiNjA3NTlkNDM4ZDFiYjMwODYxM2M0MjM5NjVhNjk2MWQ1ZGNhNzU2MDIzODhjZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTYxMTYxZDI1YmMzOGM3MTM0MDFlZWE1YWY3MzYwYjI0MTBkZTJkNDM0ODA5OTQ5NTY0ZDFhNmE0ZGYxNWRmMSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_8de2380631d04d8696ebe9b2bec1b4e5",
+      "statement": "The isolation_and_dedupe evaluator in evals/thresholds.yaml has type: code and min: 1.00, making it a deterministic code-assertion release gate that blocks release if any isolation or deduplication test fails.",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/thresholds.yaml#L29-L29",
+          "version": "repo-lines-v1:sha256:71560dc2c7c164f2c96dbae205e404ec37cff2f3b035dd609088b4da801a3714:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzE1NjBkYzJjN2MxNjRmMmM5NmRiYWUyMDVlNDA0ZWMzN2NmZjJmM2IwMzVkZDYwOTA4OGI0ZGE4MDFhMzcxNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzE1NjBkYzJjN2MxNjRmMmM5NmRiYWUyMDVlNDA0ZWMzN2NmZjJmM2IwMzVkZDYwOTA4OGI0ZGE4MDFhMzcxNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWI5YjcxNWY4MzVlOThiYzk5OTFkNjgyYTA4MGRjODdmOTdmMjk4ZTI1NWVhZDkxMWRhMDYxNTkxZTJiMzkzNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDhiYzZkMDJkNjk2MjZiZjAwMmYyZWZjN2MzMGRhNWRiOTliZmNhYTg3MmY4ZTJmZGFlMWVlZmM3Mzg3NTFjYiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_38ccd863665d4929b2796b0d0ddbf840",
+      "statement": "Isolation tests run against the live API and MCP server and require the full Compose stack (make up); the stack is shared with integration tests run via make test-integration, but isolation tests are a distinct tier not marked @pytest.mark.integration.",
+      "evidence": [
+        {
+          "resource": "repo://Makefile#L26-L28",
+          "version": "repo-lines-v1:sha256:db4f0192aee4230ae9caed2bbb500bee693e0d4e0c8f493d57946ca385909763:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNGYwMGNlZjc4MDBjMmJjZTE3MmRmYjhmMTIzNTRmZDY0MWEzMDljNzQwZWU2OTI4ODUyNTFlMDgyMzIwYjc2ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTQ3NjRjYzdmZjIxNjMzYTk5OTkyOGMwYjhmNmFmMzA4ZTM4ZGE1ZDg4MmNlMGE2MTM4ZGRiZGM5MWZhY2U1ZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNWNhODc4YzU4MTM5NjFiODlkNTMyMzBkMzQ5YmE0MDA2ZDZmNzU4YzRjN2E3MDlmNDkwM2M3MWIzYWQ2MDU5MyJ9"
+        },
+        {
+          "resource": "repo://backend/AGENTS.md#L55-L58",
+          "version": "repo-lines-v1:sha256:1239282c30934e69bf7c857292a03290c30ad2751c71de8b292722c28dc3afac:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDhjNmE3ZjU0MDU3ODEwMDZkZjE0NGE3OWIyMjRkMTIwM2M2MmZjNDVmYzBhZTBjZGI5M2FkNTNhZWMyMDIwZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDZjYmFiNjY0NGE5ZTE2ODg5NGQ1YjQzOTQ4OGUyODg3NmFmZTllMTA3MDkzMTVhMzk4NTllODMxMTdkNDVmNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGZhZWJjMWMxN2YyYmNlY2Y3Yjc4ZTI3MmI3OTQwZDJkNTNiNTIzYmE3NzlhMDFiNzljY2ZiMGJlZjFjNWYxYiJ9"
+        },
+        {
+          "resource": "repo://backend/tests/isolation/README.md",
+          "version": "repo-file-v1:sha256:997ab5e402f43f29bd3e0d9b0767043821a1d7ad73df57a15106bebade9e2ff7"
+        }
+      ]
+    },
+    {
+      "id": "claim_a6e548cb1f5042ce828ba47c9a0465d4",
+      "statement": "The three deduplication invariants under test are: (1) a duplicate upload links to existing content without creating new chunks; (2) a browser-sent hash alone never links content to a new learner — linking requires a server-side recomputation of the hash from uploaded bytes; (3) concurrent identical uploads produce exactly one content row via an insert-or-get on the contents table's unique sha256 index.",
+      "evidence": [
+        {
+          "resource": "repo://backend/tests/isolation/README.md",
+          "version": "repo-file-v1:sha256:997ab5e402f43f29bd3e0d9b0767043821a1d7ad73df57a15106bebade9e2ff7"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L113-L114",
+          "version": "repo-lines-v1:sha256:8a22d4664d2da1d30e95ede992df58371b31e75aa61e19b9151c6dfe0db755ce:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzVmOTFkODgwZWEwYTVmNzg3ODFmMDUzNmM2NWM0MGU5YmNjZTViMDhiNTdkNDIwOGViYzk4ZGNjNjkzOGFjMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjA4N2U3MzFiM2ZiNDIzMjliMjRiOGFkYWNhMmI4MzBiNWNhNjQxNTkzNmM0YzE5ZjJjYzdiMjc3Zjc3MWI4MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTI1YjNhMGJkYTY3M2M4OWIxMDdiMWYwODVhNjBmN2YxMDgwZjk3NWJlNjVlNDg5N2ZkM2M1NjczZTY3MGYwMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTMxZDU5MDc3NzIzN2UxZTczYzYyN2VlMzA5MjA2MzIzNWFlNmNjNjM3NmM3ZWI4NTkwOWQwMmRjZTE0MTc5ZiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L225-L231",
+          "version": "repo-lines-v1:sha256:590b9ce5cdfdfd4e8c22b5f2ec89a89f9ef8e978d42d147e85c89fb3f931242a:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZWU2YTZlYmE2Njk4YjkzZmI5MjM2YTk0ZTllYjMxYTJlYmZlZjhiMWJhMmY2OTJjZjMwZDk1OWIyMDFhNWUyYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmM0NjdkOTgyYTU0NGI5YTNiN2Q0MDdiNzNmYTlhZTQ3ZjIzZjQ2NWQ5MmE1OTRjZDgzYTFlZDVmZGEyMGJlMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTQwY2UwY2VmZTA1ZTg3YWQ3NzczZDgwMTM0NTMxOGU5YWRjMmRmZjIwMWY0NzMxNTQ2YzkwYmFiOWQyYmJkMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNWE1NGM0MDczMGVjNWU4ODllYTVhNDQyMDIwZjU3MDk4OTZkZmMzM2E5ZmU3ZTEwYjc5MjhhMzYyNGYxMmE5ZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_6fe9b9770fcc4358802ed08fb63bf9f0",
+      "statement": "US-12 (data isolation) requires that a learner can never read, list, retrieve, cite, or download another learner's documents, threads, notes, learning records, quizzes, reports, or usage — including when two learners hold documents in the same shared subject. The MCP search tool must return only chunks of contents behind documents the caller can read (can_read).",
+      "evidence": [
+        {
+          "resource": "repo://backend/tests/isolation/README.md",
+          "version": "repo-file-v1:sha256:997ab5e402f43f29bd3e0d9b0767043821a1d7ad73df57a15106bebade9e2ff7"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L230-L231",
+          "version": "repo-lines-v1:sha256:78920e6dd6927d3a5b1943aa5362063d5ae438b97d45be8c819398eea9ef4131:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODQxZGE3NTE5Mzg0OTA2ODY0NWE5NWZkY2RiMjU0OThmNjYwMmUyZjQzYzkxOWU1YWQ0NWQ0OTI2ZTkyMmExMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmM0NjdkOTgyYTU0NGI5YTNiN2Q0MDdiNzNmYTlhZTQ3ZjIzZjQ2NWQ5MmE1OTRjZDgzYTFlZDVmZGEyMGJlMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2M3YWQxN2E3NTNlNjk2YzYzNzNjNGE5OTAxYzJhZWY4ZTgyODM3ZTAzMDJlYWM3OGJkZTAyZmY2NGVkYmJiZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNWE1NGM0MDczMGVjNWU4ODllYTVhNDQyMDIwZjU3MDk4OTZkZmMzM2E5ZmU3ZTEwYjc5MjhhMzYyNGYxMmE5ZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_c8871e0dafd24190882d69d8d502fbbf",
+      "statement": "Every endpoint and MCP tool that returns learner data must have a test in tests/isolation/; this is an explicit requirement from AGENTS.md and is enforced as a release gate at every milestone.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L55-L58",
+          "version": "repo-lines-v1:sha256:1239282c30934e69bf7c857292a03290c30ad2751c71de8b292722c28dc3afac:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDhjNmE3ZjU0MDU3ODEwMDZkZjE0NGE3OWIyMjRkMTIwM2M2MmZjNDVmYzBhZTBjZGI5M2FkNTNhZWMyMDIwZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDZjYmFiNjY0NGE5ZTE2ODg5NGQ1YjQzOTQ4OGUyODg3NmFmZTllMTA3MDkzMTVhMzk4NTllODMxMTdkNDVmNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGZhZWJjMWMxN2YyYmNlY2Y3Yjc4ZTI3MmI3OTQwZDJkNTNiNTIzYmE3NzlhMDFiNzljY2ZiMGJlZjFjNWYxYiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L614-L614",
+          "version": "repo-lines-v1:sha256:b2daece25602fb2b6fce202cdd5d0d5f0cc083388e958791226fef4c9358f5f4:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjJkYWVjZTI1NjAyZmIyYjZmY2UyMDJjZGQ1ZDBkNWYwY2MwODMzODhlOTU4NzkxMjI2ZmVmNGM5MzU4ZjVmNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjJkYWVjZTI1NjAyZmIyYjZmY2UyMDJjZGQ1ZDBkNWYwY2MwODMzODhlOTU4NzkxMjI2ZmVmNGM5MzU4ZjVmNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGUwNzc5MDg3YTY5YTI1MTQxOTAxNmRkNDliOWM2ZWMyN2RhOWNhYzM4OGQxZGM4ZGVhMzdmMTRlNTc3NWE4YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjRkYmJlM2MzMjI3Y2QzMzlkMmJlN2I1NjA3NmZkZTYxNDBkNDI5NmU5OGY0NjBmNjNlNWFlYWRmZjA4ZDM3OSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_1c73c41bc822433bbbcaa735a24db1fe",
+      "statement": "New isolation tests belong in tests/isolation/ following existing patterns; coverage must include all REST API routes for documents, threads, notes, learning records, quizzes, reports, and usage, plus the MCP search and get_chunk tools.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L55-L58",
+          "version": "repo-lines-v1:sha256:1239282c30934e69bf7c857292a03290c30ad2751c71de8b292722c28dc3afac:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDhjNmE3ZjU0MDU3ODEwMDZkZjE0NGE3OWIyMjRkMTIwM2M2MmZjNDVmYzBhZTBjZGI5M2FkNTNhZWMyMDIwZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDZjYmFiNjY0NGE5ZTE2ODg5NGQ1YjQzOTQ4OGUyODg3NmFmZTllMTA3MDkzMTVhMzk4NTllODMxMTdkNDVmNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGZhZWJjMWMxN2YyYmNlY2Y3Yjc4ZTI3MmI3OTQwZDJkNTNiNTIzYmE3NzlhMDFiNzljY2ZiMGJlZjFjNWYxYiJ9"
+        },
+        {
+          "resource": "repo://backend/tests/isolation/README.md",
+          "version": "repo-file-v1:sha256:997ab5e402f43f29bd3e0d9b0767043821a1d7ad73df57a15106bebade9e2ff7"
+        }
+      ]
+    },
+    {
+      "id": "claim_094c93a337464c1c952acec1e66fac97",
+      "statement": "The isolation test suite must be extended when Release 4 introduces sharing grants and broadens can_read; the M10 milestone exit criterion explicitly requires isolation tests to be updated for sharing cases.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L644-L645",
+          "version": "repo-lines-v1:sha256:6fbccdd690bc413f3f6966cb18e431633c2227f7270147e082c39da8e117f9bd:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTQxYjk0ODVhODFlNjkyMDhjYmY0NzEyYmFjYWVmNWIwODkwZmZmYzkxMzBmODFjOWY1NDhhOGM0NmUwZDIyMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODg1MTcwMzVlYjE2MWQ4NDAxYzgzYmU0NDkzYzQ4ZGEwYjgzODI5YTg0ZGY4NmQzYTFhMzczMDZmMDQ5OTgwNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjQ4YWY3NjQ4MmUwY2Q3ZWE1NTI1NTRhZThhMzFkZWZjODY5NWZiMzVkZmIwMjg4M2M3OGU4NDU4NGVlNTkzMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTYxMTYxZDI1YmMzOGM3MTM0MDFlZWE1YWY3MzYwYjI0MTBkZTJkNDM0ODA5OTQ5NTY0ZDFhNmE0ZGYxNWRmMSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_c812e345d0f24115947a880631389b6e",
+      "statement": "At the M1 scaffold stage the tests/isolation/ directory contains only the README; the test files are empty stubs identified as an M1 implementation task, with the README documenting the intended scope.",
+      "evidence": [
+        {
+          "resource": "repo://backend/tests/isolation/README.md",
+          "version": "repo-file-v1:sha256:997ab5e402f43f29bd3e0d9b0767043821a1d7ad73df57a15106bebade9e2ff7"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L621-L621",
+          "version": "repo-lines-v1:sha256:d01e15c576691ca068c956993bf78a6014616a58f76981033d096af81888bd93:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDAxZTE1YzU3NjY5MWNhMDY4Yzk1Njk5M2JmNzhhNjAxNDYxNmE1OGY3Njk4MTAzM2QwOTZhZjgxODg4YmQ5MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDAxZTE1YzU3NjY5MWNhMDY4Yzk1Njk5M2JmNzhhNjAxNDYxNmE1OGY3Njk4MTAzM2QwOTZhZjgxODg4YmQ5MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmNkOGM2YWM0MWFjMTQwMzQ4MDU2MmQzZjUzYzcwYzdmMDkwNjVhOWE5YzRhNzcxOWM1ZTc1NjBhNzU4N2YxMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDQwMzA2NmQ4OWQwZWEzYTBhNWJjMjg2NzdhNjUwODI2MmFlMWM0NGI0N2U2MTU0N2EzOTcwMDU4ZDNhYWM1ZiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_cdd59ceaf012457985491d273e1d02f1",
+      "statement": "The release gate applies to every release, not just Release 1: the PRD states that full evaluation split targets, isolation tests passing, and production smoke test passing are all required before any release ships.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L614-L614",
+          "version": "repo-lines-v1:sha256:b2daece25602fb2b6fce202cdd5d0d5f0cc083388e958791226fef4c9358f5f4:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjJkYWVjZTI1NjAyZmIyYjZmY2UyMDJjZGQ1ZDBkNWYwY2MwODMzODhlOTU4NzkxMjI2ZmVmNGM5MzU4ZjVmNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjJkYWVjZTI1NjAyZmIyYjZmY2UyMDJjZGQ1ZDBkNWYwY2MwODMzODhlOTU4NzkxMjI2ZmVmNGM5MzU4ZjVmNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGUwNzc5MDg3YTY5YTI1MTQxOTAxNmRkNDliOWM2ZWMyN2RhOWNhYzM4OGQxZGM4ZGVhMzdmMTRlNTc3NWE4YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjRkYmJlM2MzMjI3Y2QzMzlkMmJlN2I1NjA3NmZkZTYxNDBkNDI5NmU5OGY0NjBmNjNlNWFlYWRmZjA4ZDM3OSJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-03T03:19:50.688Z"
+  }
+}

@@ -1,0 +1,214 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:5dc194dc109f3ea29a3d2bb8b90e372ec9758defcfac4fa8f7b60fd411e26395",
+  "claims": [
+    {
+      "id": "claim_f6b532067fcc40d39b69410a99df6a0d",
+      "statement": "Content is keyed by the SHA-256 of its bytes, stored once at contents/<sha256>.pdf, and has no owner; Document is a per-learner library entry that points to a content, unique per (owner_id, content_id).",
+      "evidence": [
+        {
+          "resource": "repo://sdd/adr/0002-content-document-split-sha256-dedupe.md#L10-L13",
+          "version": "repo-lines-v1:sha256:86b0bf49f78954bb0370be65e6b49cdfab8aa33bd1d7e5e68aece5d82ea275e8:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMGNiNzFhYjA5NTUzNjM4NGRlYzQ2NjU0M2Q1NTljZTQwMzgwNzFlZjAwOTdmM2UwNmM2MjM1MDJhZTJjZjMyNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiY2RhM2QxOTU4OTQ5ZjNhNDg0OGVlYjJmZDExZTkzNjVkNTc3ZGE3NTQ3YTFkYTM4OGZjYTllYWU0OWM3OTk2MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWQ4YzdkMjFmNGYwY2UxNjY4NmVmZDMxMjkzODg1ZGMwNTE2NzY1YzA4ZjZiZjMxYTJkOTUyZDlkODM0ZGNlZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjJkODE3Y2M0NjhhMWQ5YjgwNmI1ZTZlNzJmYjViZWEwMTdiZDAxN2MzZjczN2Y3NjllMmVkZjc5Y2VjZDQ0MCJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L343-L345",
+          "version": "repo-lines-v1:sha256:82e5e17e8efd71e85c3fecd0e0a250548a0d3c68703b29b5c5bc21e9a20098af:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjExZmIxMzQ0NTQxNWI3MGUxYzFlYTllZTc4NDAyZTY2OTdiNTRlMzMwMDcwNjFiZDUzYzE0YWQyYTY5YTM4YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzdiODc5Mjk2YzZjYzk5MjA0YzEwMTNkZmFhY2E5YWZjMGI2NzBkZTQ5YWZmZmYwOTlhMTQxZGIzYTI5NDEwNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmU0OTEzZTQyNzYwNTM2MWFkZjQyOTk4NjQzMDBjM2EzYjAxYjNkN2ZlNGVjY2I5Y2FkMzIyMjEzNmFlMTIxNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDdjMGM5NmJiNzJiYzIzMTg3ODc4MDUyYmU4ZmRhNzAzZjkyNzZmODNhYmZiNTI2YmU5MjZjYjUzYjUyOTYyNSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_1409dde03edd4763ba42e5ba5194b810",
+      "statement": "Content transitions through states: processing (on first insert-or-get by SHA-256), ready (on successful extraction+embedding), failed (on validation/parse/timeout/model error), and ready→processing for system-initiated re-embedding on model change.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/adr/0002-content-document-split-sha256-dedupe.md#L18-L20",
+          "version": "repo-lines-v1:sha256:2990557f85c85ad2dabf473bd60e8621406518488d583e633e3d521b4f62dca1:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzNkMTBkZDljNjZjYmYwZTgwMjRhN2QxODNhNTRmOTQ0MDJkYzE4ZTlmZmU2MzkyNjAzZWMzMmU3YzIwYTc4NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjIyODc5M2QwNGM2M2EzZjYzM2UxYjFmZThjZDAwN2FhMWI1MWNhNTljYmQxZDU1ODhhZjA1ZGM1ZDljNDYxMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjIsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTUwODYxNTlhOGU2MzMyMDBhYjQyYWMxYmRlZTkxYWZiZTViYTI4YTcxMmIxYWQ3OGFjYmIxZTcyNzQ2YjMxNSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L368-L373",
+          "version": "repo-lines-v1:sha256:a16bbb2d0540cf62c285c3b648bad17e1835c02a7470ea114b422edb166247ec:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzVjZDFhNTkzMDk5NDg1MWNkOTE5YWRkNGQyZWVlYzNlMDE1MTFlNjU5OTcyYmM4YmQwNTM1OTQxMzNkN2E4MiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzExNTZkODdkZWQ3ODM5MmFlYjg2NTVhMDcwNGY5YTgyMzMwYWY3ZTMxMDM0NmM1MWRiNDBjYWQ3NDhiODM1NiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDhhMGQzZDc5YWIxZGRkNmI4YjFmYmZkNDA2OGU4NTIwZWUyYmMwNzVkZmJkOGUyOWYxZGUxYmJhNjdlZWNhMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTg4NjgxOWE5NjYyZTEzNDM5MTg1OTU1ZjZkMGY2NjY2NjczYjUwZDQzZmNlMTlmZDI2NWI4MzE4MDIzYWY3NiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_d8724e13f50b4b398d1869b69801a1d3",
+      "statement": "A failed content can be retried (failed→processing) by any linked learner or by a re-upload of the same file, up to a maximum of 3 attempts total; after 3 failures it stays failed permanently.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L357-L357",
+          "version": "repo-lines-v1:sha256:aa74953301c80c0846c9b8c1a7df682c7d31b8d96a2846e418dd4c5b63f5529c:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWE3NDk1MzMwMWM4MGMwODQ2YzliOGMxYTdkZjY4MmM3ZDMxYjhkOTZhMjg0NmU0MThkZDRjNWI2M2Y1NTI5YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYWE3NDk1MzMwMWM4MGMwODQ2YzliOGMxYTdkZjY4MmM3ZDMxYjhkOTZhMjg0NmU0MThkZDRjNWI2M2Y1NTI5YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTc2MTZhMDA3MDIzNDFlMTI4M2FkYjRkNjBlZjBhODRkYTkwMmY3ZmQ2ZjJjYThiZWExZTI5ZTc5OWUyYTE5MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDYzYjhlNjBjNjE2MTgxZjFiZmI1MjdkNGM3YzA1Yjc0MmNkZTFiZDVlOWYwZTMwNjlkZmE1NjI5MTQ1MTNmZCJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L372-L372",
+          "version": "repo-lines-v1:sha256:cecea79d27f2b48928dc42313220aa289cdea64a5fe74f2270801cd5680823ac:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2VjZWE3OWQyN2YyYjQ4OTI4ZGM0MjMxMzIyMGFhMjg5Y2RlYTY0YTVmZTc0ZjIyNzA4MDFjZDU2ODA4MjNhYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiY2VjZWE3OWQyN2YyYjQ4OTI4ZGM0MjMxMzIyMGFhMjg5Y2RlYTY0YTVmZTc0ZjIyNzA4MDFjZDU2ODA4MjNhYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmI0OGEwMmJkZWQxNDY1MjdlYzdjNTY2ZDM0NzQxNTQ5NWQ1MzhkYmVlN2I4OWFlNzM4ZmYzMGZiNjQyZTRlNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDA5ZjA1YWQ4N2E4MGRkNTU0OTZjYjc2YTFiNDFlODY5MTc2Y2NkYWI0NWEyYzU5Yjc5NDc0OWYxOTcwOTlmNSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_e1598607eb3d44b8904241634d70aea3",
+      "statement": "Document transitions through states: processing (upload start, content_id null), awaiting_subjects (content reaches ready), ready (1–3 subjects chosen); failed when its content fails or validation fails; the archived flag is orthogonal and can be set on any state.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L375-L381",
+          "version": "repo-lines-v1:sha256:79eb41dd1ec3df582c8729b7ebef40b74bd9f711b380d494031f34ca74b04b15:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzI4NTZmZDI4M2M2M2ExYjVmM2E2NjMwZGQ3MjRlOWY5ODdmOGZkZWRkMTdkN2RjNTM0N2M1ZDUzY2RjODg3MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTFkZmQxZjhhZGIzYzI5NmVlMDZjYmMzMGZlMGE5YWI3Yzg1MjEzZWJhMDEwNWNmNWU0ZjczMmVhOTE4OGNlZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDBjNmFmZjI1MmY3NTM2ZGMzNTZmM2Q4YmNlM2VjM2UwZTVmMjZiY2Q2NWExMTVmM2Q0NzNhMWIwOTYzYmZjZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODE0YjBhMWI3N2U2NjI2Njc0MWRiZWM4OGY4ZWVmODNhMDJhNGQwZDA3NTNlNjY3MGMyOWEyZmE4YWViYTExNiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_73e95542a8b04ee4882506178e64eca5",
+      "statement": "A document is searchable only when its state is ready, its archived flag is false, and its linked content state is ready.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/knowledge/README.md#L9-L9",
+          "version": "repo-lines-v1:sha256:d39d4b78695862c7b7e4784d459520e57b504ccb8b06ba15c730d08abb946eb4:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDM5ZDRiNzg2OTU4NjJjN2I3ZTQ3ODRkNDU5NTIwZTU3YjUwNGNjYjhiMDZiYTE1YzczMGQwOGFiYjk0NmViNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDM5ZDRiNzg2OTU4NjJjN2I3ZTQ3ODRkNDU5NTIwZTU3YjUwNGNjYjhiMDZiYTE1YzczMGQwOGFiYjk0NmViNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWJhOGFlMmZjOTUzMTJhYzEwYWFmMjJkMWI3YWE1ZTlhYzQwZDExYzdmNDg3Yzg3ZGIzNDk2OTE5NTdiYzYwNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmFiMWY5YmI2OWU1MjM5NTk5YjkwZmUzNzY1OWFiM2MxNWQwMjE2NDNiOTNlNTMyMDAxZWY0MDlkMjA3ZWMyNCJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L381-L381",
+          "version": "repo-lines-v1:sha256:11dfd1f8adb3c296ee06cbc30fe0a9ab7c85213eba0105cf5e4f732ea9188cef:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTFkZmQxZjhhZGIzYzI5NmVlMDZjYmMzMGZlMGE5YWI3Yzg1MjEzZWJhMDEwNWNmNWU0ZjczMmVhOTE4OGNlZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTFkZmQxZjhhZGIzYzI5NmVlMDZjYmMzMGZlMGE5YWI3Yzg1MjEzZWJhMDEwNWNmNWU0ZjczMmVhOTE4OGNlZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZGVkODIwOTc3YmU1ZDBlYTI2Nzk2NzVhNjdkMjRlZTg3YjlkYWQ3YzEyODcxM2M2MDAzNDFjODQ3OTNjYjkwMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODE0YjBhMWI3N2U2NjI2Njc0MWRiZWM4OGY4ZWVmODNhMDJhNGQwZDA3NTNlNjY3MGMyOWEyZmE4YWViYTExNiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_f1f44173759d43fc97870123a68e7add",
+      "statement": "Linking a document to an existing content requires the server to re-hash the uploaded bytes and find a SHA-256 match; a browser-supplied hash is accepted only to skip re-uploading a file already in the learner's own library and never proves access to another learner's content (PRD D19, ADR 0002).",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/knowledge/README.md#L9-L9",
+          "version": "repo-lines-v1:sha256:d39d4b78695862c7b7e4784d459520e57b504ccb8b06ba15c730d08abb946eb4:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDM5ZDRiNzg2OTU4NjJjN2I3ZTQ3ODRkNDU5NTIwZTU3YjUwNGNjYjhiMDZiYTE1YzczMGQwOGFiYjk0NmViNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDM5ZDRiNzg2OTU4NjJjN2I3ZTQ3ODRkNDU5NTIwZTU3YjUwNGNjYjhiMDZiYTE1YzczMGQwOGFiYjk0NmViNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWJhOGFlMmZjOTUzMTJhYzEwYWFmMjJkMWI3YWE1ZTlhYzQwZDExYzdmNDg3Yzg3ZGIzNDk2OTE5NTdiYzYwNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmFiMWY5YmI2OWU1MjM5NTk5YjkwZmUzNzY1OWFiM2MxNWQwMjE2NDNiOTNlNTMyMDAxZWY0MDlkMjA3ZWMyNCJ9"
+        },
+        {
+          "resource": "repo://sdd/adr/0002-content-document-split-sha256-dedupe.md#L14-L14",
+          "version": "repo-lines-v1:sha256:9e51a2da845b9ac774c6935bcb328d6ad2c8b4d297860a7128a4574e30b1eadb:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWU1MWEyZGE4NDViOWFjNzc0YzY5MzViY2IzMjhkNmFkMmM4YjRkMjk3ODYwYTcxMjhhNDU3NGUzMGIxZWFkYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWU1MWEyZGE4NDViOWFjNzc0YzY5MzViY2IzMjhkNmFkMmM4YjRkMjk3ODYwYTcxMjhhNDU3NGUzMGIxZWFkYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTBiMGJhOGRiNWQ1MGUzYTZkMWZmNWVlMTEyZmQ0MGEwMDUwODk5NWI3Y2IwN2EyMTI5NDE4NjFiZTg1ZDcxNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjIyODc5M2QwNGM2M2EzZjYzM2UxYjFmZThjZDAwN2FhMWI1MWNhNTljYmQxZDU1ODhhZjA1ZGM1ZDljNDYxMyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L114-L114",
+          "version": "repo-lines-v1:sha256:f087e731b3fb42329b24b8adaca2b830b5ca6415936c4c19f2cc7b277f771b80:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjA4N2U3MzFiM2ZiNDIzMjliMjRiOGFkYWNhMmI4MzBiNWNhNjQxNTkzNmM0YzE5ZjJjYzdiMjc3Zjc3MWI4MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjA4N2U3MzFiM2ZiNDIzMjliMjRiOGFkYWNhMmI4MzBiNWNhNjQxNTkzNmM0YzE5ZjJjYzdiMjc3Zjc3MWI4MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmIyZDcwOWU4Zjg0ZTkzMTE4OTE3NTBmM2JjNTE1ZjIzYTZiYTBjNzk0NDhmNmM5N2Y4MmU3ODQyYzc5ODU0NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTMxZDU5MDc3NzIzN2UxZTczYzYyN2VlMzA5MjA2MzIzNWFlNmNjNjM3NmM3ZWI4NTkwOWQwMmRjZTE0MTc5ZiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_c5f8f736af77492dbaf814aadf0fff09",
+      "statement": "When two learners upload the same file concurrently, a unique constraint on the sha256 column ensures only one content row is created (insert-or-get); both documents end up linked to it and only one extraction run proceeds.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L309-L309",
+          "version": "repo-lines-v1:sha256:bceb7fdc97e76420c2d3585ed63c302f1bdb767770348921daab029dd602df24:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmNlYjdmZGM5N2U3NjQyMGMyZDM1ODVlZDYzYzMwMmYxYmRiNzY3NzcwMzQ4OTIxZGFhYjAyOWRkNjAyZGYyNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmNlYjdmZGM5N2U3NjQyMGMyZDM1ODVlZDYzYzMwMmYxYmRiNzY3NzcwMzQ4OTIxZGFhYjAyOWRkNjAyZGYyNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzI2YWUxMGJlMmU5NWMxNzAyNzUyOWFlNTIxZGFmY2JhNGJhYTIzNTM3OWMxNzU2MjhmM2NhMTIxYmZkZWU1NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmY5ZmI3MTE4N2NlOWYwY2JkYmE0ZDkyMzNjYTE2YmE1YzEwZDA4ZmZiZDIyMjZkYTA2NWRjNGNhMDAwMTU1MiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L343-L343",
+          "version": "repo-lines-v1:sha256:f11fb13445415b70e1c1ea9ee78402e6697b54e33007061bd53c14ad2a69a38c:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjExZmIxMzQ0NTQxNWI3MGUxYzFlYTllZTc4NDAyZTY2OTdiNTRlMzMwMDcwNjFiZDUzYzE0YWQyYTY5YTM4YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjExZmIxMzQ0NTQxNWI3MGUxYzFlYTllZTc4NDAyZTY2OTdiNTRlMzMwMDcwNjFiZDUzYzE0YWQyYTY5YTM4YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmU0OTEzZTQyNzYwNTM2MWFkZjQyOTk4NjQzMDBjM2EzYjAxYjNkN2ZlNGVjY2I5Y2FkMzIyMjEzNmFlMTIxNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjFkMzM1ZDhlMTZjNjExN2YzMTNlNmQ4ODE3NWRkY2FhMWQ4NjdkOWY3MGIxODgyYmZlNTJhZGM4OTFjOWZlMCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_de6c6a9b144a467983cde62d639b85fa",
+      "statement": "The glacier_tagger CronJob (daily) tags content S3 keys with status=archived when no non-archived document references them, causing the S3 lifecycle rule to move those PDFs to Glacier Flexible Retrieval after 30 days; the tag is removed when a document referencing the content is restored.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/jobs/glacier_tagger.py#L1-L4",
+          "version": "repo-lines-v1:sha256:74c68c788cbe291adeb27a2865e6a15b926aabc9acc4d6a9df54e383b8e7b2ea:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2ZjMDA1ZDhiNTA3NDQ0MzdlMjEzODUzNDRmM2MyMWE3NzY1OWIzNTBlZGQ1NGM3YzcyYjIwMjc1NGZhMzAxNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDc1ZDQ1ODllOTFjYzhjYjk3NDg4OWRhYjAxZGUxNWRiMTU3NGNhMTBlZWM3MjkwYTEwOWJmNTg4Yzk0ZTAxYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNmUwZGQ4NzIyYjliMDQ3YmU4Mjg3MDRjMmI2YTljNjEwZWIwYTRkN2IzYWMwNjIyZTdjOTMzYTJiOTBjODM5NSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L392-L392",
+          "version": "repo-lines-v1:sha256:978ae25ead7a858fa67adc0f5d8e32d3cf13db6831b67e745a8429e02b7752bf:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc4YWUyNWVhZDdhODU4ZmE2N2FkYzBmNWQ4ZTMyZDNjZjEzZGI2ODMxYjY3ZTc0NWE4NDI5ZTAyYjc3NTJiZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc4YWUyNWVhZDdhODU4ZmE2N2FkYzBmNWQ4ZTMyZDNjZjEzZGI2ODMxYjY3ZTc0NWE4NDI5ZTAyYjc3NTJiZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWQ2ZTFiZjNlZDhhYmU3YTBmNWMxMmViZjRkOGJkY2FiOTUwYjVlYTFhNDQ3MTlmNDZkYmUwZDQyYTZhMjQ3MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGJmY2E0OWM2MGY3ZmMyNTcyNWUyNDE2Yjc5NmZiZWZlYTJhMThiNTBhOWE0NWU5ZWY0Y2Y2ZWQyZmY5MTE0MSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L448-L448",
+          "version": "repo-lines-v1:sha256:319f831b0c9eab19efc68928bb39ea94351fa5805cece9e38c1f09ef626f4b05:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzE5ZjgzMWIwYzllYWIxOWVmYzY4OTI4YmIzOWVhOTQzNTFmYTU4MDVjZWNlOWUzOGMxZjA5ZWY2MjZmNGIwNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzE5ZjgzMWIwYzllYWIxOWVmYzY4OTI4YmIzOWVhOTQzNTFmYTU4MDVjZWNlOWUzOGMxZjA5ZWY2MjZmNGIwNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGNiNzAzODg5MTI3NTg0ZWM4ODA3MWNmYTBhYTQ4NTQyM2ZlZDJhM2Q5ZWIxODUxNTJkZjA5NzcwZjZjMzdlYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiN2IyYzcyOTgxOTA5YjZiYTY2MWM4NjBiOTQ0OWZmYjFlMmY2M2E3YTE3MjcwNTgyZWNlMzdhZDI2ZDFhYWI4NCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_dcbaa651d0ee40f08f5da9c152293952",
+      "statement": "glacier_tagger.main() is a NotImplementedError stub at the M1 scaffold stage; the CronJob and S3 lifecycle rule are defined in the CDK stack but the Python logic is not yet implemented.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/jobs/glacier_tagger.py#L7-L8",
+          "version": "repo-lines-v1:sha256:0cf36ee4e21d9fff2ff9b222717a813920401ef201147bd5608b6112ec90eb30:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTc1ODUzZWM2YTFjNzVmN2ZiNzUzYjk4NDQ1Nzg0ODIyYWNlOGMwNmI4ZTUyNDYxYmFkOTgxYjQ2OTU3NjQyYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGYwYjgyMTQ4MmEwMjgyOTFmNmJiYWNlOTExNTZjNTdhODc0NGQyYzkyZGQ1NzY3M2I2ODc3MjA5NTUxZTk2NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDQ4NDE5ZmMzY2M5MWFjYjBhMWFiMDUxMjIwOTk5ZmQ5ZDgyN2NjMDVhMDQzODU3Nzk2ZjJlYmQwNjk3MDQ2ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTlmN2Y3YWExNjMwNTY3YzFiNWU2NjQ0ZTIxY2JlYzgzYTQzOTMzZGM1YjBkYTBkOTBjZDUzYmE0OGU5MTBkMiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_d6566fb1831146f7a222b65fb5f927e7",
+      "statement": "The saved Docling JSON (contents/<sha256>.docling.json) and PostgreSQL chunks stay in S3 Standard and PostgreSQL respectively, so search, re-embedding, the research map, and topic catalog never require a Glacier restore; only a re-extraction with a new Docling version would need the original PDF.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L373-L373",
+          "version": "repo-lines-v1:sha256:31156d87ded78392aeb8655a0704f9a82330af7e310346c51db40cad748b8356:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzExNTZkODdkZWQ3ODM5MmFlYjg2NTVhMDcwNGY5YTgyMzMwYWY3ZTMxMDM0NmM1MWRiNDBjYWQ3NDhiODM1NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzExNTZkODdkZWQ3ODM5MmFlYjg2NTVhMDcwNGY5YTgyMzMwYWY3ZTMxMDM0NmM1MWRiNDBjYWQ3NDhiODM1NiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzI4MGE5NzMzN2EwMmNhYzU2ZjVlMjliYjY1ZmY5MTNmMDQ1OWUxYzI0NjViYTE4OTM5YmE3ODdkYTllNzE5ZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTg4NjgxOWE5NjYyZTEzNDM5MTg1OTU1ZjZkMGY2NjY2NjczYjUwZDQzZmNlMTlmZDI2NWI4MzE4MDIzYWY3NiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L392-L392",
+          "version": "repo-lines-v1:sha256:978ae25ead7a858fa67adc0f5d8e32d3cf13db6831b67e745a8429e02b7752bf:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc4YWUyNWVhZDdhODU4ZmE2N2FkYzBmNWQ4ZTMyZDNjZjEzZGI2ODMxYjY3ZTc0NWE4NDI5ZTAyYjc3NTJiZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc4YWUyNWVhZDdhODU4ZmE2N2FkYzBmNWQ4ZTMyZDNjZjEzZGI2ODMxYjY3ZTc0NWE4NDI5ZTAyYjc3NTJiZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWQ2ZTFiZjNlZDhhYmU3YTBmNWMxMmViZjRkOGJkY2FiOTUwYjVlYTFhNDQ3MTlmNDZkYmUwZDQyYTZhMjQ3MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGJmY2E0OWM2MGY3ZmMyNTcyNWUyNDE2Yjc5NmZiZWZlYTJhMThiNTBhOWE0NWU5ZWY0Y2Y2ZWQyZmY5MTE0MSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_28e1efcace22435db947bdf2df0b6c3c",
+      "statement": "On an embedding-model change, content transitions ready→processing (system-initiated), the worker re-embeds using chunk text stored in PostgreSQL with no S3 access required, and search continues serving old vectors until the new embeddings are written; usage is recorded as source=system with null user_id.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L355-L355",
+          "version": "repo-lines-v1:sha256:1af08c5a8851943cbec36021b8649bd05c25a3d5e69aa25f2b7218ed9634ea5f:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWFmMDhjNWE4ODUxOTQzY2JlYzM2MDIxYjg2NDliZDA1YzI1YTNkNWU2OWFhMjVmMmI3MjE4ZWQ5NjM0ZWE1ZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWFmMDhjNWE4ODUxOTQzY2JlYzM2MDIxYjg2NDliZDA1YzI1YTNkNWU2OWFhMjVmMmI3MjE4ZWQ5NjM0ZWE1ZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzg1ZjNjNDY2ZDhjZjc0MWU1NGNiNjdmYTRhNWYwZDA2MmQxNDYxZGQ4NDdjN2UxZWI4ZjAyNmU0MDAxYzFhNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTkzMDJmOTJkYzA5YTBkMmJmYmUwMDcwYjU3ODQ3YjUxOTRmNWI4Y2E3Y2UwMThiMzExZGUyZWU1ZjAwN2YyMiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L373-L373",
+          "version": "repo-lines-v1:sha256:31156d87ded78392aeb8655a0704f9a82330af7e310346c51db40cad748b8356:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzExNTZkODdkZWQ3ODM5MmFlYjg2NTVhMDcwNGY5YTgyMzMwYWY3ZTMxMDM0NmM1MWRiNDBjYWQ3NDhiODM1NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzExNTZkODdkZWQ3ODM5MmFlYjg2NTVhMDcwNGY5YTgyMzMwYWY3ZTMxMDM0NmM1MWRiNDBjYWQ3NDhiODM1NiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzI4MGE5NzMzN2EwMmNhYzU2ZjVlMjliYjY1ZmY5MTNmMDQ1OWUxYzI0NjViYTE4OTM5YmE3ODdkYTllNzE5ZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTg4NjgxOWE5NjYyZTEzNDM5MTg1OTU1ZjZkMGY2NjY2NjczYjUwZDQzZmNlMTlmZDI2NWI4MzE4MDIzYWY3NiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L495-L495",
+          "version": "repo-lines-v1:sha256:ecf5e9c4a9b109f25a98cafdbdced6963d44748dfba26c0b12decf86f668325d:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZWNmNWU5YzRhOWIxMDlmMjVhOThjYWZkYmRjZWQ2OTYzZDQ0NzQ4ZGZiYTI2YzBiMTJkZWNmODZmNjY4MzI1ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZWNmNWU5YzRhOWIxMDlmMjVhOThjYWZkYmRjZWQ2OTYzZDQ0NzQ4ZGZiYTI2YzBiMTJkZWNmODZmNjY4MzI1ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWY1MmY3NmYyNmQzYjQ4ZjE1YWRjZmQ4ZjcxYzkyOWE1MWY0ZTJkMDNjMDdiMDRhNjJkYWE4OTdiOTc0ZTBmNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWJkYWNlMTY2ZGY5ODkzZGRhNGM3MjczYTllMWVhYWUwYTAwMjllNTNlNTFhZjA1ZDIxMzRlOGVlNTQ0ODNmNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_6fe86a0c45ae48848a33deec88f20bd5",
+      "statement": "The knowledge module domain layer owns the Content (state transitions, retry()) and Document (state transitions, archive(), restore(), set_subjects() 1–3, can_be_read_by()) entities with no I/O or framework types.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/knowledge/README.md#L3-L5",
+          "version": "repo-lines-v1:sha256:1c8f9fb000237ffee839934a85b80b5f2d8816f0b206a94f7755f6bcc7832273:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzgyOTU3NmQxZjRjNzM5ZmFkNGM3MTA3YjcyOTdlMWMzZDQ5MTUzYThlYzU3MjI0NjgzYTI4MWQxNWI3MmI0ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjU1MTVkOTJkNTZjMjIwNDFmOTQyMDhkYjQ5OWU4MmM2OGM1YTQ1ZDc1ZDliOGU4Yzk1NDc5M2YzYWMyNDM4MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjIsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2NlZjU1MTVlODA2ZTljN2Q1NWU1MGM4OTBhNTRmY2U0ODA5Yjc5Nzk4MzcyMWZmNzliNzhkY2E1MWFlMjFhYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWJhOGFlMmZjOTUzMTJhYzEwYWFmMjJkMWI3YWE1ZTlhYzQwZDExYzdmNDg3Yzg3ZGIzNDk2OTE5NTdiYzYwNCJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L489-L489",
+          "version": "repo-lines-v1:sha256:2bc05c530f06b09cad4bc9b79f5cbb64bda1bccf4611842fd2cb6bc6f1d77122:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMmJjMDVjNTMwZjA2YjA5Y2FkNGJjOWI3OWY1Y2JiNjRiZGExYmNjZjQ2MTE4NDJmZDJjYjZiYzZmMWQ3NzEyMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMmJjMDVjNTMwZjA2YjA5Y2FkNGJjOWI3OWY1Y2JiNjRiZGExYmNjZjQ2MTE4NDJmZDJjYjZiYzZmMWQ3NzEyMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmE2N2U5Yjc3YzQzN2UzNjgyZjlkODk2NjRmM2U0YWYyOTRhMWQ2MmQ1YzM3NWMzNWEyYzg2ODQxYTg0ODEwMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzAxZTNiNmFiZDRhMmY2MDM1YWQ0NDgxN2UyZTc4YTdiMWQ3YTY2MWU4YWZjNzAyYjQ3Yzc2ODExNTVjOWRhYyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_0c0d06a2a2be4882bed167255deab54b",
+      "statement": "The SHA-256 deduplication flowchart in the browser-to-document-linkage decision tree is a Mermaid flowchart TD diagram; labels must not contain semicolons or unquoted punctuation, and edge labels with parentheses must use the pipe-delimiter syntax without semicolons inside node labels.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/adr/0002-content-document-split-sha256-dedupe.md",
+          "version": "repo-file-v1:sha256:2a0c5ac25be3bf5d4ba4593700ef7908c5fa89843272b49ed1df98743d4fc6bd"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L383-L391",
+          "version": "repo-lines-v1:sha256:da251cad746856bac1abdad10454b207ea7207ae651cc1b4407b40b46b0f75c6:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjZkMTNmOGVlMzNhZWQzMTk5ZjUwMjI4ZDdkMmJlNGRlMjQzMjdjYTRmMDg5MWIzYmM0NzZiZjU5YWQxMDIzYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNThiNzRjMDQzNzE1YTNhNjg0MGVjNDkxOTJjOWI4MTkxNTU3YWYwZDlmM2JlMmZiZTRiMjQ3ZjE4ZmQ2ZjVkZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzJhYjNlNGJjMWFiZDU5ZGMzOTFhZDdhYmY1YTVhNjMxYzIyMjhiMjhiODNjYTRmZjcyMjc2YzIwNDUwM2E4MiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_234f30b4ca884e8486675bf41a018267",
+      "statement": "UploadService, DeduplicationService, IngestionService, and the glacier_tagger CronJob are all pending M1 implementation and exist only as scaffold stubs at the current stage.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/jobs/glacier_tagger.py",
+          "version": "repo-file-v1:sha256:fe8f8fdf66054b646f5d74071d4d4af6d06eb7112aacdbebd1a3e0b2a07da7d1"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/knowledge/README.md",
+          "version": "repo-file-v1:sha256:e37ec23ef5a6e64b5055c8e0d24bec2cea4580c9c05be3acd78c0afb47f8855c"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L283-L283",
+          "version": "repo-lines-v1:sha256:1c7fbc00dc64a8e60411f79dd96cd97992f06ecbc5c970c534678b9ceeaebcc3:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWM3ZmJjMDBkYzY0YThlNjA0MTFmNzlkZDk2Y2Q5Nzk5MmYwNmVjYmM1Yzk3MGM1MzQ2NzhiOWNlZWFlYmNjMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWM3ZmJjMDBkYzY0YThlNjA0MTFmNzlkZDk2Y2Q5Nzk5MmYwNmVjYmM1Yzk3MGM1MzQ2NzhiOWNlZWFlYmNjMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDY4YzU5ODZjODMwOTQwNzNkMjI4Y2U2NWZlMWFlMDI2NmE4Y2IxMWE3MmVjN2U3ODE3MTgwYjY4ODU5Y2NhYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjJlOTI0YmY0NGQ4ZTgyNzc2YTQyMjU1Njc5NDhkOGNmNThlNjhkMjIxOGZiNzhjNTQ5ZmM2NTRkNzhkYmQyMCJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-03T03:19:50.688Z"
+  }
+}

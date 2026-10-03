@@ -1,0 +1,234 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:65ab760b2c9c146102b19cb9a4d2f5be97fd2eb574b2a2bc0c652932c8012cd6",
+  "claims": [
+    {
+      "id": "claim_077646e1c9ed4fd49343c66a2788a695",
+      "statement": "The subjects module owns the shared subject catalog (stable subject_id UUIDs, canonical_name, name_embedding), personal subject names (user_subject_names), subject suggestion ranking, and subject-name checks (normalization, near-duplicate reuse, personal-data/offensive check). It has no dependency on any other business module.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/subjects/README.md#L1-L11",
+          "version": "repo-lines-v1:sha256:ba2eec89c9efc41c1d393e6d9cd107505c98123bccf82ec02b26abce12c7434f:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcxYTk0NGZjMzQ0OTUzNzM0YTk4MDRjYWNmOTJiYmVkM2Q0Njk4MTIxYjg3ZDI1ODU4M2ZiZjg5MmQ5OGQ1ZWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ0MWYxNzg2NGJhYzBlMTg1MTczNTdhYWFiMzAzNjg2Nzk4NjY0ZmQwNWM2ZDg1ODQzZmRlZTY1MDE2NGY3ODMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc0MDBmZjU0Mzc5NjQyZTBiMTBlNzU5NzgyNzRiNTQwYzBlMDhjMDFmMjRhMDUyMWY0MDM4YWJiODg4NmM4YjIifQ"
+        },
+        {
+          "resource": "repo://sdd/adr/0004-subjects-module.md#L1-L20",
+          "version": "repo-lines-v1:sha256:a45e8ec2db0a27fdf8cf6bc386bdfc93c7488e5dd5eac982357d0e5c0d6f200a:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIyMGVmMGViMWNiZDMwOWJkNGY0ZTM2ZTk5OGUzZDk0ZGQ2MDZjY2FjMDM5NDY3NThmMWViZWU2YjhmMDk2NzMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg2MWMzZGJiNDcxMDQ0NTNlNTEzYzc2NTA2YzU3YjUxYTM2NDkyZDcyY2E1YjQ1YzUzNmRmYmI3NDE2YTBlMmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://sdd/specs/2026-10-02-project-structure-design.md#L119-L132",
+          "version": "repo-lines-v1:sha256:edb35a635c4be47a859efaf5c9914be2272873c1777820eaf43e688983e9112e:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY0ZjgxYTY4M2RiN2YzZGJiNWVjMjYxYzdiZTc5OGNkNTU3YmU4ZDIxNzYzNjAyZjQ0ZjZkODRlNjYxNjI0ZGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlYjcwMjU3NTkzZGEwNmY2ODJhM2RkZGE1NGE5ZDI2MGQ0ZmM1MTRmNjQ1MjM3ZjVjYTc0YjA4ZjhkYTYxYTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjYyMzA5ZDVjMDdhZDY2NDM1Yjc1YjlmOTllNThlNDM5NzIyNWY3Y2I2YmNjNjhhZTJhNWYxODRiNDU5ZTQ0YjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdmMmUwMWY4ZjJmMjBjMGJiNmZiYjNkYTllZGE0ZDI0NmFkYmUyMDhkMjU2ODVhNTA5NDJkODA5OWM1Njg2ZTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_72b1d36e9c1d4685965f3dfc8fdacf0b",
+      "statement": "The subjects module was split out of knowledge in PRD v2.2 (ADR 0004) so that tutoring, learning, and the API can resolve subject names without depending on the library module. The module order is: tutoring → graph → knowledge → subjects → accounts | insights.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/adr/0004-subjects-module.md#L1-L20",
+          "version": "repo-lines-v1:sha256:a45e8ec2db0a27fdf8cf6bc386bdfc93c7488e5dd5eac982357d0e5c0d6f200a:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIyMGVmMGViMWNiZDMwOWJkNGY0ZTM2ZTk5OGUzZDk0ZGQ2MDZjY2FjMDM5NDY3NThmMWViZWU2YjhmMDk2NzMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg2MWMzZGJiNDcxMDQ0NTNlNTEzYzc2NTA2YzU3YjUxYTM2NDkyZDcyY2E1YjQ1YzUzNmRmYmI3NDE2YTBlMmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://sdd/specs/2026-10-02-project-structure-design.md#L139-L145",
+          "version": "repo-lines-v1:sha256:414ae8e236f30bef24ec14bd604f0e55661d966ba14f175753443f51840c1df3:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzI4ZWZjMGFiNGRlZTI2Y2Q3ZmE1YjU5OTlmODc1ZDcyZDk1YmY5OGMzNWQ4ZTVjYzE2NDcwZTk4ZmRmYWQzNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzY3NzM5YjI2YzU4YzY0NmMyMmYzMzY1ZmI2YTY3NTk5Mjc1ZGQ1YzZkODY0MjQ1ZWRhZDczMTQ2YTA4MzRmOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWMxYzY2MDRlM2JiMmZhYjQ2MWFjMjFjZGQ1YWJhYzNjYTYwOWYxM2RiZTUyYWYwNzQ2YzAyN2I4MzU2NDJkNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzUyMDM0Y2Y1NTcwZjc1ZmRlMzc5OGIwZTc4OGQ5ODIzMjY1NTI3NWM3ZTRhODgzMWFkMzA2YjAxMDllMmNjMyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_46a5d867cf7c4678ae3be275e81b2f07",
+      "statement": "A subject_id is a UUID that never changes and is never reused. The subjects table stores no creator_id or status field; there is no admin rename, merge, or hide operation (PRD D21, ADR 0003).",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/subjects/README.md#L9-L9",
+          "version": "repo-lines-v1:sha256:15f5a9f6fa8a47f90ec1aa4d7fa4852ba02ed8cd8ec80c0c01924d9d2bb91bbd:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTVmNWE5ZjZmYThhNDdmOTBlYzFhYTRkN2ZhNDg1MmJhMDJlZDhjZDhlYzgwYzBjMDE5MjRkOWQyYmI5MWJiZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTVmNWE5ZjZmYThhNDdmOTBlYzFhYTRkN2ZhNDg1MmJhMDJlZDhjZDhlYzgwYzBjMDE5MjRkOWQyYmI5MWJiZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzY1ZDdlZjNhZDFhMTZmMDRmOWY3YjUxMWNkNmViZjg2YjM4NWQyODNlNGQ3MWY3ZGI4ZmNmZGYxZDBiMThiYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjU0ZGQ0MWE0MDAwMDZiNTlhYTE3YjdmNWFlY2VlNTE0MjlkNzA1YTQzYTcyNDNhZGQxMGM3M2MyOWI5ZmQxZSJ9"
+        },
+        {
+          "resource": "repo://sdd/adr/0003-shared-subject-catalog.md#L11-L21",
+          "version": "repo-lines-v1:sha256:57ac810f9b8682b83b216350ed98f54f582b664ac7df5762d712d887e0ea67ca:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlYjcwMjU3NTkzZGEwNmY2ODJhM2RkZGE1NGE5ZDI2MGQ0ZmM1MTRmNjQ1MjM3ZjVjYTc0YjA4ZjhkYTYxYTYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBlZTZhNDA2M2NhYTE0NTQwNGUyMjcyYmM0NDljYWU2MjI3N2JlOGU2OTk3MWI1ZDljYzU2MDc0YTY3YWU0MDciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI5N2Q1NGJhNDM2MmU3ZmEyNDI0MTg1YjYwYTY5NzFlZTQzODIxMGRiOGJjNmZhOGViMDQ4OThjYjY3MjhkMjciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L116-L116",
+          "version": "repo-lines-v1:sha256:e4855ca33e7eff29195dad48f79c1dfe384d1ea7a62669af0b5e1da7dfb62f7d:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTQ4NTVjYTMzZTdlZmYyOTE5NWRhZDQ4Zjc5YzFkZmUzODRkMWVhN2E2MjY2OWFmMGI1ZTFkYTdkZmI2MmY3ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTQ4NTVjYTMzZTdlZmYyOTE5NWRhZDQ4Zjc5YzFkZmUzODRkMWVhN2E2MjY2OWFmMGI1ZTFkYTdkZmI2MmY3ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGI0OWIxOWFjZWIzMTNlZmI5MzAxZTM2NGM2ZDk2NDVlZjAxYWRmOTU2YzgzYmY0Y2MzN2U0Nzg4OTlhNzQ5ZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjcyY2M2YWM2MDEzMTQxYWVmYmE2ZmU4Y2JlMmY1NjcyY2JiZTkzMDM3MzJjYWJiZjhiNDY4MTFkOTA1NmNjMCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_e74e0e2752fb4b4a8bc56713443d5689",
+      "statement": "Every other table (document_subjects, threads, lesson_notes, learning records, decline log) stores only subject_ids. Subject names are resolved at read time using COALESCE(user_subject_names.display_name, subjects.canonical_name); no rename ever touches those tables.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/subjects/README.md#L9-L9",
+          "version": "repo-lines-v1:sha256:15f5a9f6fa8a47f90ec1aa4d7fa4852ba02ed8cd8ec80c0c01924d9d2bb91bbd:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTVmNWE5ZjZmYThhNDdmOTBlYzFhYTRkN2ZhNDg1MmJhMDJlZDhjZDhlYzgwYzBjMDE5MjRkOWQyYmI5MWJiZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTVmNWE5ZjZmYThhNDdmOTBlYzFhYTRkN2ZhNDg1MmJhMDJlZDhjZDhlYzgwYzBjMDE5MjRkOWQyYmI5MWJiZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzY1ZDdlZjNhZDFhMTZmMDRmOWY3YjUxMWNkNmViZjg2YjM4NWQyODNlNGQ3MWY3ZGI4ZmNmZGYxZDBiMThiYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjU0ZGQ0MWE0MDAwMDZiNTlhYTE3YjdmNWFlY2VlNTE0MjlkNzA1YTQzYTcyNDNhZGQxMGM3M2MyOWI5ZmQxZSJ9"
+        },
+        {
+          "resource": "repo://sdd/adr/0003-shared-subject-catalog.md#L14-L14",
+          "version": "repo-lines-v1:sha256:4166d085f128c4953871e4be309e8aa8e2d3d4401b5cdc420eb4eaad11816727:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDE2NmQwODVmMTI4YzQ5NTM4NzFlNGJlMzA5ZThhYThlMmQzZDQ0MDFiNWNkYzQyMGViNGVhYWQxMTgxNjcyNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDE2NmQwODVmMTI4YzQ5NTM4NzFlNGJlMzA5ZThhYThlMmQzZDQ0MDFiNWNkYzQyMGViNGVhYWQxMTgxNjcyNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjM2YjYxNGEzMTNmZjRjNDVmYmZhMDk2YzE2ZTJiMDhkN2I0MGVjYmI3NGMzMDcxZmRmY2U2NWRiNWI5NWNiNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTZmZDlmNzY4NzAyNDMxOGQzNTA5OGQwNjRhMWI2MjEyMmFjNTNhZThkYzQ1MzA5ZGIwYWJiNWY4MzgzZTk2OSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L362-L364",
+          "version": "repo-lines-v1:sha256:d6d753808bc34eb59e905fa452d60da0097bb6dc3c784c0e2e4673ce21ef68d9:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDQxM2M3MWFiOWY1Y2QwZmJmYzY2ZDIwYmZiZWJhNWRlYjE4MzQwNDExMmMwNTRiYThkOTM4NzllZDkyMmIzZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzg3MDNkMjNiYzhiMTc1ZDMwODNlMmE4ZWU5ZGRiOGNhNjZmMmNiNGU1NDRiOTZmNWE3MGM4NGUwMWZmOWQxMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmMxYWFkNzUxNDZmOGY0ZGU2ZjFlYWZjOTM3YTNjNjAzOWY5NzU2ZmI0ODNkZWU2NGY4NTg0MjQwNDczYjk3MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDhhMGQzZDc5YWIxZGRkNmI4YjFmYmZkNDA2OGU4NTIwZWUyYmMwNzVkZmJkOGUyOWYxZGUxYmJhNjdlZWNhMSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_802455b5c26f4006a2e1d0a6215a26df",
+      "statement": "The new-name pipeline for every typed subject name is: trim whitespace, enforce 60-character limit, normalize (case-fold, Unicode NFKC, collapse whitespace), check for near-duplicate (reuse existing subject and tell the learner which), check for personal data or offensive content (rejected with a rephrase request), then add to the shared catalog immediately.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L115-L115",
+          "version": "repo-lines-v1:sha256:f8f5fe7763dfdd0600c96df9da3bf8a93c014e0fc9c1f920f651ac9bb37ac586:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjhmNWZlNzc2M2RmZGQwNjAwYzk2ZGY5ZGEzYmY4YTkzYzAxNGUwZmM5YzFmOTIwZjY1MWFjOWJiMzdhYzU4NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjhmNWZlNzc2M2RmZGQwNjAwYzk2ZGY5ZGEzYmY4YTkzYzAxNGUwZmM5YzFmOTIwZjY1MWFjOWJiMzdhYzU4NiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODI1OGM2MjJiMWJlNWNmN2E4ZTRiY2E4MDlhZWViZTAwMjAxNzczNTE3YmNlZDJkYzA1YjhmMTZlOGNjNjRjMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODlhZTdmMjhlM2ZlMDg4NDA4MTJjNjNiNzMxNzBmNjRkMTEwMDllMWIyMzM5MjhmMWQ2MjM4MDI3MmYwZWRkMSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L177-L177",
+          "version": "repo-lines-v1:sha256:50a0083d0c5a991e86b80cbf8d081880398bd38acda9e8754a345e6d91041cb4:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTBhMDA4M2QwYzVhOTkxZTg2YjgwY2JmOGQwODE4ODAzOThiZDM4YWNkYTllODc1NGEzNDVlNmQ5MTA0MWNiNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTBhMDA4M2QwYzVhOTkxZTg2YjgwY2JmOGQwODE4ODAzOThiZDM4YWNkYTllODc1NGEzNDVlNmQ5MTA0MWNiNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjBhZmIxN2M5Njk1OTIxN2Y0ZDUxYzY5ZWZmOWEzODE5MDhjNmUwYTE0OGM0OGQ2NmRlM2IzYmI1MjIyMzNjYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmIwYmQ2NDQ0ZDlmNDE4Y2M3NGFkMzlkNWZkZTU2NmQ0ZWY1ZjU5MmU0ODU3ODZhZDMxZTU4YTAwNTI2ZTVhYyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_47b6b6505f254c9c94f8f94815c29c14",
+      "statement": "Personal subject names are stored in user_subject_names keyed by (user_id, subject_id) with a unique constraint on (user_id, normalized display_name). A personal rename never changes the subject_id, documents, threads, notes, or learning records, and other learners are not affected.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/adr/0003-shared-subject-catalog.md#L19-L19",
+          "version": "repo-lines-v1:sha256:f8eef90429048c938e51da44dc90e83dbd2c538c7dabf4de8aa08e9f821bdaf8:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjhlZWY5MDQyOTA0OGM5MzhlNTFkYTQ0ZGM5MGU4M2RiZDJjNTM4YzdkYWJmNGRlOGFhMDhlOWY4MjFiZGFmOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjhlZWY5MDQyOTA0OGM5MzhlNTFkYTQ0ZGM5MGU4M2RiZDJjNTM4YzdkYWJmNGRlOGFhMDhlOWY4MjFiZGFmOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmZjYzBiZGJkMWUyZDNmMzAxZDhhYTM4YTQxZmFiZjM4N2ZlMzY1NzE2OWQwNGJlYzcxY2VlMWRhMTdlOTU5YiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjIsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzEzNjMxZGJiZmUyZDE1Nzk3ZWY3YTc3NGVhYmI5NTQ5ZDlkYjU2YWU1ZGY4Mzk3ZTBlZjYxY2I2NDU2NTQ1YiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L223-L223",
+          "version": "repo-lines-v1:sha256:e9a28319887f4e13792f5a9a776867db7166ccc7ce0d200618bed40a1b770941:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTlhMjgzMTk4ODdmNGUxMzc5MmY1YTlhNzc2ODY3ZGI3MTY2Y2NjN2NlMGQyMDA2MThiZWQ0MGExYjc3MDk0MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTlhMjgzMTk4ODdmNGUxMzc5MmY1YTlhNzc2ODY3ZGI3MTY2Y2NjN2NlMGQyMDA2MThiZWQ0MGExYjc3MDk0MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTI4YTNjYmRhZTA1MTA2ZWMzYjBlYjE3ZjlkMmVlY2ZmMjczNzBjOTVkYmUxZmUxMWJlODVmYjhhNWM0OTY0ZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDhlN2NmNGJlMzEyZTc0NmRjZDk3MWNmMmQ3ZGIwYWIxY2JlNjA1YWM5MTZmODM4NWM1M2M4MGFlNDA0M2U4MyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L349-L349",
+          "version": "repo-lines-v1:sha256:6a664f0ebadb847e3347991e7c1d42137392d65e4dfdf8ee31bf7e204d561e11:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmE2NjRmMGViYWRiODQ3ZTMzNDc5OTFlN2MxZDQyMTM3MzkyZDY1ZTRkZmRmOGVlMzFiZjdlMjA0ZDU2MWUxMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNmE2NjRmMGViYWRiODQ3ZTMzNDc5OTFlN2MxZDQyMTM3MzkyZDY1ZTRkZmRmOGVlMzFiZjdlMjA0ZDU2MWUxMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDdjMGM5NmJiNzJiYzIzMTg3ODc4MDUyYmU4ZmRhNzAzZjkyNzZmODNhYmZiNTI2YmU5MjZjYjUzYjUyOTYyNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzhkNmQ3MzYwZTBmZDEzNDcwMTUyM2M5MDAzNzk2ODAzZGU3NTEwZTYxZTE3OTY1YWQ3MjIxYTBlNjk5ZDgwYiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_b1266f3ef6444f2ab3565d357848661b",
+      "statement": "'My subjects' is the set of distinct subject_ids over a learner's ready, non-archived documents. This is a derived query result, not a stored field; subject detection and search both operate within this set.",
+      "evidence": [
+        {
+          "resource": "repo://CONTEXT.md#L41-L41",
+          "version": "repo-lines-v1:sha256:cc334a7628f41c397d9be6f7f8df84997d2d292c5cd5da7765a890578a2cd543:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2MzMzRhNzYyOGY0MWMzOTdkOWJlNmY3ZjhkZjg0OTk3ZDJkMjkyYzVjZDVkYTc3NjVhODkwNTc4YTJjZDU0MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiY2MzMzRhNzYyOGY0MWMzOTdkOWJlNmY3ZjhkZjg0OTk3ZDJkMjkyYzVjZDVkYTc3NjVhODkwNTc4YTJjZDU0MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGU5N2JjYjg5MzQ4NjQ3M2U4NDk5YzdiNTBjNWM0MmYwMGYwM2MyNWI0MGVkNjljMzdkYzBhOWM2N2E0NTUwZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjg1NGZiNjY0NDVlZjdiMmE5YjYxMTY0NGI5OTRhOTJhZjYyM2M0MGYxY2RjNGVjNjk2YzIwZDI5ZWMwMmU0YiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L364-L364",
+          "version": "repo-lines-v1:sha256:c8703d23bc8b175d3083e2a8ee9ddb8ca66f2cb4e544b96f5a70c84e01ff9d13:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzg3MDNkMjNiYzhiMTc1ZDMwODNlMmE4ZWU5ZGRiOGNhNjZmMmNiNGU1NDRiOTZmNWE3MGM4NGUwMWZmOWQxMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzg3MDNkMjNiYzhiMTc1ZDMwODNlMmE4ZWU5ZGRiOGNhNjZmMmNiNGU1NDRiOTZmNWE3MGM4NGUwMWZmOWQxMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjBhMTZjYWZjMWJjYWE1ODM2MTVlYTk0NDg0MDA5ZDQ2ZWM2MWRjMzM0ZWM0YjkxZjhlNWFiZmEyMzI4ZDE0MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDhhMGQzZDc5YWIxZGRkNmI4YjFmYmZkNDA2OGU4NTIwZWUyYmMwNzVkZmJkOGUyOWYxZGUxYmJhNjdlZWNhMSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L49-L49",
+          "version": "repo-lines-v1:sha256:834f742f54186d88a2689f899aaf8f1492202d60d3094af5c480be422d2d855b:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODM0Zjc0MmY1NDE4NmQ4OGEyNjg5Zjg5OWFhZjhmMTQ5MjIwMmQ2MGQzMDk0YWY1YzQ4MGJlNDIyZDJkODU1YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODM0Zjc0MmY1NDE4NmQ4OGEyNjg5Zjg5OWFhZjhmMTQ5MjIwMmQ2MGQzMDk0YWY1YzQ4MGJlNDIyZDJkODU1YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTg2MWZmYjkzN2MwODM4MGJjZGMwM2IzYTc0YjhhOGIwZmZmMmUwOWYzY2IzYmY3MGZkZGFiNzM4MmJiZDY4OCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjAwZWU0MTA4MzM1ODRmYmRjNTVhZWFjY2I3NDgyYzE2MmNhMDM5OGVjYjhkYzNlNjgwYjgyZWJmNTg5M2NkZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_62111f294c394a7291cfc80ffbb8fee6",
+      "statement": "SubjectSuggester ranks 3 subject suggestions per upload by computing cosine similarity between the content's summary_embedding and each subject's name_embedding, boosting subjects the learner already has and those matching their personal names, then filling remaining slots with model-proposed names that do not match any existing subject.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/subjects/README.md#L5-L5",
+          "version": "repo-lines-v1:sha256:974321189ab6a50259b50c46314c1d910b55d219d3babad84809054f36c86e9b:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc0MzIxMTg5YWI2YTUwMjU5YjUwYzQ2MzE0YzFkOTEwYjU1ZDIxOWQzYmFiYWQ4NDgwOTA1NGYzNmM4NmU5YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc0MzIxMTg5YWI2YTUwMjU5YjUwYzQ2MzE0YzFkOTEwYjU1ZDIxOWQzYmFiYWQ4NDgwOTA1NGYzNmM4NmU5YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjNiZTg4MmYzYTRhMThkY2I0YzVhNjM0ODJlN2EzM2IxYWYzZTg2Nzg3ZGE5MjA3ZGQxNmFkYWFlNmIxODU1MCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzY1ZDdlZjNhZDFhMTZmMDRmOWY3YjUxMWNkNmViZjg2YjM4NWQyODNlNGQ3MWY3ZGI4ZmNmZGYxZDBiMThiYSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L312-L312",
+          "version": "repo-lines-v1:sha256:f8852c81759adcf25b1ce8550a733a8f8d8dcd87bc80b77c1f17cdfc20b30c4c:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjg4NTJjODE3NTlhZGNmMjViMWNlODU1MGE3MzNhOGY4ZDhkY2Q4N2JjODBiNzdjMWYxN2NkZmMyMGIzMGM0YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjg4NTJjODE3NTlhZGNmMjViMWNlODU1MGE3MzNhOGY4ZDhkY2Q4N2JjODBiNzdjMWYxN2NkZmMyMGIzMGM0YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODNjMjM4MjcyZDQwNGRkMjY0ZjM1OTlmMjJiM2UyMDJjOWI3OTg4OTZhODZjMmNlMTBlMzZhYmRhZTBkZmVlYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjk4NTkyM2UxZTljMTgxNjA2ZmE5NDdkMjQ5YTYwODM3Y2FlNWZlYThlODlhMTIwMmYyMGUyZGNhZmUzNzBmMCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_efa0a2c6039e45578235ef7f175ba8e5",
+      "statement": "SubjectNameChecker and SubjectSuggester are defined as stubs in the subjects module scaffold with full implementation planned for the M1 milestone.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/subjects/README.md#L5-L5",
+          "version": "repo-lines-v1:sha256:974321189ab6a50259b50c46314c1d910b55d219d3babad84809054f36c86e9b:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc0MzIxMTg5YWI2YTUwMjU5YjUwYzQ2MzE0YzFkOTEwYjU1ZDIxOWQzYmFiYWQ4NDgwOTA1NGYzNmM4NmU5YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc0MzIxMTg5YWI2YTUwMjU5YjUwYzQ2MzE0YzFkOTEwYjU1ZDIxOWQzYmFiYWQ4NDgwOTA1NGYzNmM4NmU5YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjNiZTg4MmYzYTRhMThkY2I0YzVhNjM0ODJlN2EzM2IxYWYzZTg2Nzg3ZGE5MjA3ZGQxNmFkYWFlNmIxODU1MCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzY1ZDdlZjNhZDFhMTZmMDRmOWY3YjUxMWNkNmViZjg2YjM4NWQyODNlNGQ3MWY3ZGI4ZmNmZGYxZDBiMThiYSJ9"
+        },
+        {
+          "resource": "repo://sdd/specs/2026-10-02-project-structure-design.md#L196-L200",
+          "version": "repo-lines-v1:sha256:c8ddcb89fb925ed5fa72e50a85af9f51f46cbcdb87395f418d004587647912cd:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDliMmMxYmYyMjQ1NTkyYjE5MzYyMGU4YTdkNDViNzk5MjJjMmZmOWJkMzhmZTUxZmEyNTE1MDVhNzA1MzYwYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzI2YzNiZjM0Y2RmZmEzMjA2YWY5MmQwMWEyNzdjODQ4ZTQxNWNiOTA5MGY1Yzc2NzI4ZWI2YTljOWVlMGM5MiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjQ4ZjZiY2ZjZGViYmZkOWUyNmM3MDVjNmJkODY0ODFlZDEyMzNlMDEyY2ExMDE3OTlmNzQ1NWRmNTlhYmE1YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGQzNzY3ZGRhOWNmMGU0MmJmODE5M2U3NmMwNTUzNTViMGIzNWEzMGRkNzRiN2RjMmUzOTc5M2QyNjg1NjczNiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_cff2a0397fb741febcabbb8513ad1a9f",
+      "statement": "The subjects module's internal layout is domain/ → ports/ ← application/, adapters/. Other modules import only subjects.application; this boundary is enforced by import-linter contract 2 in CI.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/subjects/README.md#L11-L11",
+          "version": "repo-lines-v1:sha256:441f17864bac0e18517357aaab303686798664fd05c6d85843fdee650164f783:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDQxZjE3ODY0YmFjMGUxODUxNzM1N2FhYWIzMDM2ODY3OTg2NjRmZDA1YzZkODU4NDNmZGVlNjUwMTY0Zjc4MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDQxZjE3ODY0YmFjMGUxODUxNzM1N2FhYWIzMDM2ODY3OTg2NjRmZDA1YzZkODU4NDNmZGVlNjUwMTY0Zjc4MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzJkMjE1ZjNkZmZjMDk2N2UzYjE4MDZjNGNkMjE5OWMwM2JlZTU1ZmVjMGI1YTljNTA2MjcxMzQ0MzY5YWEwZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzQwMGZmNTQzNzk2NDJlMGIxMGU3NTk3ODI3NGI1NDBjMGUwOGMwMWYyNGEwNTIxZjQwMzhhYmI4ODg2YzhiMiJ9"
+        },
+        {
+          "resource": "repo://sdd/specs/2026-10-02-project-structure-design.md#L139-L145",
+          "version": "repo-lines-v1:sha256:414ae8e236f30bef24ec14bd604f0e55661d966ba14f175753443f51840c1df3:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzI4ZWZjMGFiNGRlZTI2Y2Q3ZmE1YjU5OTlmODc1ZDcyZDk1YmY5OGMzNWQ4ZTVjYzE2NDcwZTk4ZmRmYWQzNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzY3NzM5YjI2YzU4YzY0NmMyMmYzMzY1ZmI2YTY3NTk5Mjc1ZGQ1YzZkODY0MjQ1ZWRhZDczMTQ2YTA4MzRmOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWMxYzY2MDRlM2JiMmZhYjQ2MWFjMjFjZGQ1YWJhYzNjYTYwOWYxM2RiZTUyYWYwNzQ2YzAyN2I4MzU2NDJkNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzUyMDM0Y2Y1NTcwZjc1ZmRlMzc5OGIwZTc4OGQ5ODIzMjY1NTI3NWM3ZTRhODgzMWFkMzA2YjAxMDllMmNjMyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_9b2fd0d4a4544d888074af1748c13168",
+      "statement": "Subject names in the shared catalog are visible to all users. The accepted residual risk of sensitive names entering the catalog is mitigated by the 60-char limit, normalization, near-duplicate reuse, and the LLM name check; admin catalog moderation tooling is a known backlog item.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/adr/0003-shared-subject-catalog.md#L19-L21",
+          "version": "repo-lines-v1:sha256:c39dfec0abd33bd6b699ddecc5b141c86ce30dc2186acdc2a200c9cdd401e41b:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjhlZWY5MDQyOTA0OGM5MzhlNTFkYTQ0ZGM5MGU4M2RiZDJjNTM4YzdkYWJmNGRlOGFhMDhlOWY4MjFiZGFmOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMGVlNmE0MDYzY2FhMTQ1NDA0ZTIyNzJiYzQ0OWNhZTYyMjc3YmU4ZTY5OTcxYjVkOWNjNTYwNzRhNjdhZTQwNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmZjYzBiZGJkMWUyZDNmMzAxZDhhYTM4YTQxZmFiZjM4N2ZlMzY1NzE2OWQwNGJlYzcxY2VlMWRhMTdlOTU5YiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L427-L427",
+          "version": "repo-lines-v1:sha256:1cc667e9ba9f6965476cae4a7686ab93912a4c59f8cf0758ad26864418b3a05c:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWNjNjY3ZTliYTlmNjk2NTQ3NmNhZTRhNzY4NmFiOTM5MTJhNGM1OWY4Y2YwNzU4YWQyNjg2NDQxOGIzYTA1YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWNjNjY3ZTliYTlmNjk2NTQ3NmNhZTRhNzY4NmFiOTM5MTJhNGM1OWY4Y2YwNzU4YWQyNjg2NDQxOGIzYTA1YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDhkMGQ5Zjc5OTk3N2FiMDNlM2ZiNDRiM2Q0ZjU4N2Y3MzVjYzVhYWI1ODM1NTdiYjhiZGZiOThlOTdlNDJhZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWM5MzZiMGY3ZmI2ZDJiODA2OTU1NzRjZGY3ZWRmMWEzOWJjMzZmMzRkYWM1NGY0NmQzNmY2ZTI5YmNiNzIzNyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_7000cd59558a4f1f900f5cdd67ec2af9",
+      "statement": "The new-name pipeline for subject catalog entries proceeds in six ordered steps: trim whitespace, enforce the 60-character limit, normalize (casefold, Unicode NFKC, collapse whitespace), near-duplicate reuse via embedding similarity (SubjectCatalogService returns existing subject if a close match is found), personal-data/offensive-content check via SubjectNameChecker (calls amazon.nova-2-lite-v1:0 check_subject_name tool; stub at M1), and immediate catalog insertion with no approval queue.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/subjects/README.md",
+          "version": "repo-file-v1:sha256:f28366aa82df793837b080b7d48e01ec6f2ce43e606a8d1bb41c45621143bb13"
+        },
+        {
+          "resource": "repo://sdd/adr/0003-shared-subject-catalog.md",
+          "version": "repo-file-v1:sha256:8e671e2e4061893375dec06e347d7db0edb3eda5e1a907b9f4b4958e85825e40"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L177-L178",
+          "version": "repo-lines-v1:sha256:e79f455322f52fedcac57791f23fb7f6efe51259d2be88b38cb1d6b7f3443a5d:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTBhMDA4M2QwYzVhOTkxZTg2YjgwY2JmOGQwODE4ODAzOThiZDM4YWNkYTllODc1NGEzNDVlNmQ5MTA0MWNiNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGQ3NTNlOTJmYjg1ZjEwOTNkNjM1N2JhNjI0ZWEyOTgwYzExYzViZTkyMWM3YmQ5ODYxM2JjMGYwNmZkNDMwMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjBhZmIxN2M5Njk1OTIxN2Y0ZDUxYzY5ZWZmOWEzODE5MDhjNmUwYTE0OGM0OGQ2NmRlM2IzYmI1MjIyMzNjYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjJhYWY4OTAyZTAzZWRlYmZmM2Q5NjA0OTZhNDNhOWE4YTUwNDUzOTdlOGEwNjEwNTU3NTk2ODYxOWM1MTRiYiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_2dd4e6dfc0564b4e85fcb718ba8bfca6",
+      "statement": "SubjectSuggester ranks subject suggestions using a preference order of: (1) shared catalog subjects matching by cosine similarity to the content summary_embedding, (2) boosted by whether those subjects are already in the learner's My Subjects set, (3) remaining slots filled with model-proposed names from describe_document that do not match any existing subject. This implements the PRD D20 ordering: matching shared subjects first, then the learner's subjects, then new names.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/subjects/README.md",
+          "version": "repo-file-v1:sha256:f28366aa82df793837b080b7d48e01ec6f2ce43e606a8d1bb41c45621143bb13"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L115-L116",
+          "version": "repo-lines-v1:sha256:aed6546dda9461ec5afe6617ce242b25db4b3329ca1ff2e81592e2007b55cad7:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjhmNWZlNzc2M2RmZGQwNjAwYzk2ZGY5ZGEzYmY4YTkzYzAxNGUwZmM5YzFmOTIwZjY1MWFjOWJiMzdhYzU4NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTQ4NTVjYTMzZTdlZmYyOTE5NWRhZDQ4Zjc5YzFkZmUzODRkMWVhN2E2MjY2OWFmMGI1ZTFkYTdkZmI2MmY3ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODI1OGM2MjJiMWJlNWNmN2E4ZTRiY2E4MDlhZWViZTAwMjAxNzczNTE3YmNlZDJkYzA1YjhmMTZlOGNjNjRjMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjcyY2M2YWM2MDEzMTQxYWVmYmE2ZmU4Y2JlMmY1NjcyY2JiZTkzMDM3MzJjYWJiZjhiNDY4MTFkOTA1NmNjMCJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L311-L313",
+          "version": "repo-lines-v1:sha256:b5b3757cfbe5ebc6f6c2fb7e746faa6552ec00ef10211dd08771540ae5ea8d47:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODBlZTI3NWRkMTc4MDA5M2VkZjc5NjRkMWFiZGZkMzVjMTIzMGMxZWFjZmIwYTAwYjYwMmUxMjNjZTExYzMyYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjk1N2M4NTM3ZTAwNTkwZTgwNzE3Y2E0YTM0MTlkYjU1YTk3YzJkMjEwYjAxNjE5ZDM3Y2ZiZTQwMmY3OWNiMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNmE1YzE3MTFlNTE5YTU5YjM1OWM5MjIxN2I4N2NjMWI4MGUxMjA5Zjg3NjcwMzBlNjFhMDViMzc1MDg3OWVjNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTcyNTk4MzY5YzQzM2ViYTI2YTAzNTZhYTM0ZTM1NWY4NjAwMGQ1OGM3YzYwYzBmODM4MTRiN2ZlOTcyNDU4NyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_aaa54c83b3c745d89f9ae55f21511c63",
+      "statement": "Concurrent near-duplicate creation is an accepted risk: because there is no merge operation, two learners who submit near-identical names simultaneously may each create a separate catalog entry. ADR 0003 records this as rare and accepted as a consequence of the stable-id, no-merge design.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/adr/0003-shared-subject-catalog.md",
+          "version": "repo-file-v1:sha256:8e671e2e4061893375dec06e347d7db0edb3eda5e1a907b9f4b4958e85825e40"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L428-L429",
+          "version": "repo-lines-v1:sha256:dcaa68e4c5fdd47eda3d897926213cccddad6eb9502b016ce50e744fc07a7277:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODJmZmJmZmZlMzNmMzdmNGYwMjFmMzdkZDdlYmFhMDk2NDFiZGNkMDY2MzM2N2JlNjE5Y2VhYjc2NjlhMzMwZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYWU0ZDlmNmUzZDk4MmJiNWQ0YTRiMzgzNGQwNjI2YjNhMmQyMGM1ZjNjYzA3YTgyOTEzMmQ1MmIzMDU3ZDhmNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzVkMTZiMDE5NTA5NjE5N2ZmMTcxMThlMDY3NzVlNmQ3OWY3YmEzMWJmMTcxMzBhOWZhYjUzZjQwN2RkZTUzNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOGZmZjJiMjM4YjY5MGIxZDIxZWE0N2Y5ZThjNzI2NTJhNDU4ZDVjZWIwYTA2ODAzMDcyODk1OTAzZGNlMTVjMCJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-03T03:19:50.688Z"
+  }
+}

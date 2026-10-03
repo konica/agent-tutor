@@ -1,0 +1,176 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:f596cdab4951004f4acdee0fb6ead12ec7c4b62e785af59cdb86a76fc4a73cb9",
+  "claims": [
+    {
+      "id": "claim_06d29a8cc4b64cfb85aaee56bb2a82cc",
+      "statement": "The `learning` module owns Lesson Notes (one per thread, soft-delete only) and lifetime learning records (note trigger and idle trigger); its public API for other modules is `learning.application`, which is the only package other modules may import from it.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/learning/README.md",
+          "version": "repo-file-v1:sha256:df2cdf14720ce9750aad8ec090c820bd3b76bee4108bb5e5905b46ad8a49e9bb"
+        },
+        {
+          "resource": "repo://sdd/specs/2026-10-02-project-structure-design.md#L117-L135",
+          "version": "repo-lines-v1:sha256:7ac4d861bfdf318c84fa28830502cac346acbc20a4623ee67e7e68fd31e593dc:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJkZWIxZTA0ZmM2ZWJlOGVkYTc5ZmMxNjUwMjI1NzMwNTM3NzZhYjkwMTY1MGNlMjMwMzczMTQ3NWFiOTZiMmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFhZjViMjU1MTVkZWM3MjQyNDAyYTI2NTc3MTNmYWEwMWMwZDYzY2UzMDdjZTI1YzJiMDhjYjViY2U0ODkzYmEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjgzYTQ0MmY2ZWY2ZTg0N2U5MmRjMmZlMzdjZTJiMjhmMTRkY2M1MWE1NzBiZjBjYTkzYWIwM2M3NjUzNTIyYTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjljMWM2NjA0ZTNiYjJmYWI0NjFhYzIxY2RkNWFiYWMzY2E2MDlmMTNkYmU1MmFmMDc0NmMwMjdiODM1NjQyZDQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_8dc63eb9d42b483593943706447bbf19",
+      "statement": "There is exactly one Lesson Note per thread: the `lesson_notes` table uses `thread_id` as a unique key, and notes are never hard-deleted — 'Delete' archives the note (sets `status = archived`), which is reversible via `restore()`.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L103-L104",
+          "version": "repo-lines-v1:sha256:3c3e07935075afcb53d5433b157655aee6f7f1771e38a386dca5d6367276b243:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFkYmM0ZTQ3ZDJlMjA5MjM4ZTM3NGM5YjQ0NGVjNTZkZGVlM2YwMGI2NmUzODE3OTFhMzJhMjYyYjhhZDQ1NCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTlhNWNiMmNlZTg0YjNjMDFkZDA4YWY1MmQyZTM2YWQ2NTFkZGJhMTU4OTdmNDhjZTg5OWQwNDQwNjI5M2QyMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWJkNTAxMDVjMjllZTFmOTU4YmZkYTgwOTllYTczZDdjZDZjY2E0NmU3NzRmNmZiYTAxMzdjZTE1MjYzZDE1NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTA2OTE3MzEwNDRlMjg4NDk4NWY4NjM3N2JiZTU1NjQ2NTIzOWI3ZTNmZjVmYjM1OTQzNTI3MmU1YTczNDRhNiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L351-L351",
+          "version": "repo-lines-v1:sha256:838c2757b67e8ce6d1098bb3f1d31baefac2f906c9d64b96bc466e752e551081:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODM4YzI3NTdiNjdlOGNlNmQxMDk4YmIzZjFkMzFiYWVmYWMyZjkwNmM5ZDY0Yjk2YmM0NjZlNzUyZTU1MTA4MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODM4YzI3NTdiNjdlOGNlNmQxMDk4YmIzZjFkMzFiYWVmYWMyZjkwNmM5ZDY0Yjk2YmM0NjZlNzUyZTU1MTA4MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmY2MTM2NzU1NzUxZWMxMzI2ZWMwZGJhMDM1YTE1NmJmYWQ5YmE2YWZmNjNjZTQ0YmY0YTY4NDVjZjg5NmQ1MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzg1ZjNjNDY2ZDhjZjc0MWU1NGNiNjdmYTRhNWYwZDA2MmQxNDYxZGQ4NDdjN2UxZWI4ZjAyNmU0MDAxYzFhNiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_e93809c4a8364aad96edfe7185ed6b9b",
+      "statement": "When 'Summarize lesson' is invoked on a Lesson Note that the learner has manually edited (`edited_since_generated = true`), the API asks for confirmation before overwriting (PRD D8). The confirmation check happens in `apps/api` before the agent is called.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L103-L103",
+          "version": "repo-lines-v1:sha256:01dbc4e47d2e209238e374c9b444ec56ddee3f00b66e381791a32a262b8ad454:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFkYmM0ZTQ3ZDJlMjA5MjM4ZTM3NGM5YjQ0NGVjNTZkZGVlM2YwMGI2NmUzODE3OTFhMzJhMjYyYjhhZDQ1NCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFkYmM0ZTQ3ZDJlMjA5MjM4ZTM3NGM5YjQ0NGVjNTZkZGVlM2YwMGI2NmUzODE3OTFhMzJhMjYyYjhhZDQ1NCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWJkNTAxMDVjMjllZTFmOTU4YmZkYTgwOTllYTczZDdjZDZjY2E0NmU3NzRmNmZiYTAxMzdjZTE1MjYzZDE1NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTFkZTBkNjExNTgzNDAwMTNkYTI3YzIwZjc3MWM2NTJlZDU4MmNhYTM5YTk2YTM5MDFlN2IxNGM2MTFkOWM0MiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L202-L204",
+          "version": "repo-lines-v1:sha256:ca7b6d0840ab4def2ffdac83b8bedd12967d7fb13fc0a947448c45021dfec5bd:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjQxNDY0OGY2NWU0ZGFmNmNhZDFlYzA5N2U0YzYyN2RmMWY4NTE0NTU1YjQzMTA3YzE4OGZjNjNlODg2ZjJjNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTI2MTY1Nzk2NTU4Mjc4MDkzMzhhYTE0OGM4NGY0OTRhMjNiNGE3Y2MwOWMyZWZmNDJhMWQyNDRiOTFlNzExNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDE4M2NkY2ZiYjc5OThmYjc0ZDM4M2RhNTc0ZmE4MDhmODM5NmRmNzZkMTdlMTEyNWFjMWQyMmU1MGRkZjRiNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjQ5NGJjNDcyNDg2ODhhYTZiOWFhYWUyZjJjYjdmZjY3NzI0ZDJlNmZmZTcwYzI4YzBlYWY1YzM4NWE0Nzk1ZiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_5c8d0790902a466c8f1ed442a4a3f7cd",
+      "statement": "A learning record is a lifetime entry per thread in the LangGraph store, namespace `('learning', user_id)`, key = `thread_id`, storing `subject_ids`, `topics`, `key_points`, `note_id`, `trigger`, `learned_at`, and `updated_at`. At most one record exists per thread; it is updated in place by either trigger.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L104-L104",
+          "version": "repo-lines-v1:sha256:99a5cb2cee84b3c01dd08af52d2e36ad651ddba15897f48ce899d04406293d21:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTlhNWNiMmNlZTg0YjNjMDFkZDA4YWY1MmQyZTM2YWQ2NTFkZGJhMTU4OTdmNDhjZTg5OWQwNDQwNjI5M2QyMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTlhNWNiMmNlZTg0YjNjMDFkZDA4YWY1MmQyZTM2YWQ2NTFkZGJhMTU4OTdmNDhjZTg5OWQwNDQwNjI5M2QyMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2E2MmQ5ZGZjZTk2ZjUyZWQ4MzhiZWEyN2ZiZmVjNGJlZDNjYmMxMmQyMTVmMDgyNmNhYTQ2ZDQwNzlhNTUxOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTA2OTE3MzEwNDRlMjg4NDk4NWY4NjM3N2JiZTU1NjQ2NTIzOWI3ZTNmZjVmYjM1OTQzNTI3MmU1YTczNDRhNiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L352-L352",
+          "version": "repo-lines-v1:sha256:174ef4cf382ea2625c75dc9dd933257b76710bc0a93be170582f131902488836:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTc0ZWY0Y2YzODJlYTI2MjVjNzVkYzlkZDkzMzI1N2I3NjcxMGJjMGE5M2JlMTcwNTgyZjEzMTkwMjQ4ODgzNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTc0ZWY0Y2YzODJlYTI2MjVjNzVkYzlkZDkzMzI1N2I3NjcxMGJjMGE5M2JlMTcwNTgyZjEzMTkwMjQ4ODgzNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2YzNzE4MGJkZmIwMTE0MDhmZjFmZmJhYjEyNTYxN2RmYzMxZjJlYWE2NTA1YTY5M2Q0ZDgxYWM4YjJkOGJiYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTRjZGFlNWEyOWM4MWE3NGI4ZDY4M2NiYjQ5ZDg1NzgyNTU0ZjM2ZTRiYWYyY2MyNGFiNmViODI1MTkyODYzYSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_375508c19f9e4125b1e1a1acc349303b",
+      "statement": "Learning records are written by exactly two triggers: (1) the note trigger — when the learner creates or overwrites a Lesson Note via 'Summarize lesson', the agent's `save_learning_record` tool call upserts the note and record together; (2) the idle trigger — the record sweeper CronJob writes or updates the record when a thread has been idle, without creating a note.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/learning/README.md#L9-L9",
+          "version": "repo-lines-v1:sha256:da99c148d8b344b1c92cc16bc26260d02d5c299e35bcc572c439f1110b49969f:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGE5OWMxNDhkOGIzNDRiMWM5MmNjMTZiYzI2MjYwZDAyZDVjMjk5ZTM1YmNjNTcyYzQzOWYxMTEwYjQ5OTY5ZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGE5OWMxNDhkOGIzNDRiMWM5MmNjMTZiYzI2MjYwZDAyZDVjMjk5ZTM1YmNjNTcyYzQzOWYxMTEwYjQ5OTY5ZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTEwMDM5M2U0Y2U0NjFlMTMzYmMzOGJiYjJiZWM3NTdkYWUxZTBlYWE4M2U5YTZiNTY5M2QzMTFkZjI2Y2ExNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTIxN2Y0NDdhNjlkNzcxZDYwMWE4M2VkMGExOGY5ZTczNzViY2Y4N2E4NzY4NmM1MmY5OTllOTdhZDM2NTlhOSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L104-L104",
+          "version": "repo-lines-v1:sha256:99a5cb2cee84b3c01dd08af52d2e36ad651ddba15897f48ce899d04406293d21:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTlhNWNiMmNlZTg0YjNjMDFkZDA4YWY1MmQyZTM2YWQ2NTFkZGJhMTU4OTdmNDhjZTg5OWQwNDQwNjI5M2QyMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTlhNWNiMmNlZTg0YjNjMDFkZDA4YWY1MmQyZTM2YWQ2NTFkZGJhMTU4OTdmNDhjZTg5OWQwNDQwNjI5M2QyMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2E2MmQ5ZGZjZTk2ZjUyZWQ4MzhiZWEyN2ZiZmVjNGJlZDNjYmMxMmQyMTVmMDgyNmNhYTQ2ZDQwNzlhNTUxOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTA2OTE3MzEwNDRlMjg4NDk4NWY4NjM3N2JiZTU1NjQ2NTIzOWI3ZTNmZjVmYjM1OTQzNTI3MmU1YTczNDRhNiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L207-L210",
+          "version": "repo-lines-v1:sha256:77649ff82f30ef2b7c48881675559f0fba9dc8adec6b79cbbf5190f460e907f9:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjE5YTY0YWY0ZTQ1NGJlOWY5ZDY1MmIwOTQ0YWQzNjE4YWJmYWEyNjc4NjU1Mjg1NGIwNTY3NTVjZTBlN2U3ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODllZGI3ZDM1NThkM2Q1NTdhYjVjYjU4ODI3NjllOGQwMjliMmU1YTNhMjM1MWE5NDQ1ZTIyZjE1YWQ2NWEzNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjVkM2YwNmMyN2Y3NjRiOTViNTkwYWM0ZDc2NjNiYWZjZWRhMjM1NzRmMTliMWMxZTg0YWUwMzI1ZjVhNTMxNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzY3ZGM3NTg5MWI1YzE3NWE2MWRhMGFkNWRmMDk5YThhNWUzNmNlODdmZTc4N2UxYzI2N2RlM2ExNzk3OTQ3ZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_66d9bff2afe04d629cafb9fde77c8b7e",
+      "statement": "Only learner messages reset the idle timer. The `threads` table tracks `last_learner_message_at` and `record_written_at`; the sweeper selects threads where `last_learner_message_at < now() − idle_minutes AND last_learner_message_at > record_written_at`.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L104-L104",
+          "version": "repo-lines-v1:sha256:99a5cb2cee84b3c01dd08af52d2e36ad651ddba15897f48ce899d04406293d21:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTlhNWNiMmNlZTg0YjNjMDFkZDA4YWY1MmQyZTM2YWQ2NTFkZGJhMTU4OTdmNDhjZTg5OWQwNDQwNjI5M2QyMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTlhNWNiMmNlZTg0YjNjMDFkZDA4YWY1MmQyZTM2YWQ2NTFkZGJhMTU4OTdmNDhjZTg5OWQwNDQwNjI5M2QyMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2E2MmQ5ZGZjZTk2ZjUyZWQ4MzhiZWEyN2ZiZmVjNGJlZDNjYmMxMmQyMTVmMDgyNmNhYTQ2ZDQwNzlhNTUxOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTA2OTE3MzEwNDRlMjg4NDk4NWY4NjM3N2JiZTU1NjQ2NTIzOWI3ZTNmZjVmYjM1OTQzNTI3MmU1YTczNDRhNiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L305-L305",
+          "version": "repo-lines-v1:sha256:328a143eb3e1440708ecdb77e216e88e43a7102b1897d70ed0f2a1cc7e376783:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzI4YTE0M2ViM2UxNDQwNzA4ZWNkYjc3ZTIxNmU4OGU0M2E3MTAyYjE4OTdkNzBlZDBmMmExY2M3ZTM3Njc4MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzI4YTE0M2ViM2UxNDQwNzA4ZWNkYjc3ZTIxNmU4OGU0M2E3MTAyYjE4OTdkNzBlZDBmMmExY2M3ZTM3Njc4MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTQyZDc4OGU4N2U3ZDY5MmZkODhhNDY5NTZhODM0NmU0N2E4Y2NmNzJiZTUxMDUxNjY2ZjVhOTk4ZDE0N2RlZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzI2YWUxMGJlMmU5NWMxNzAyNzUyOWFlNTIxZGFmY2JhNGJhYTIzNTM3OWMxNzU2MjhmM2NhMTIxYmZkZWU1NiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L350-L350",
+          "version": "repo-lines-v1:sha256:55f049159f075c0d49ffb6df0ff22937a89c2d17de61f6badb4661d37bb51f5e:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTVmMDQ5MTU5ZjA3NWMwZDQ5ZmZiNmRmMGZmMjI5MzdhODljMmQxN2RlNjFmNmJhZGI0NjYxZDM3YmI1MWY1ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTVmMDQ5MTU5ZjA3NWMwZDQ5ZmZiNmRmMGZmMjI5MzdhODljMmQxN2RlNjFmNmJhZGI0NjYxZDM3YmI1MWY1ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDg0MTMxZWRkNTcxNjUzYzNhYjYxMTlkMTBlNjRhNmQxYjEyZDI4NWRiMTE0ZjBlOWNjMjE5Y2RhN2RiOTQxNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZmJmOGEzNDM1M2JhZjNlNTA3ZmRiMTYzNGVhMjFlYWRlNjdiZGNlYmRlNzc5ZTljODU1ZWI3ZTQzODBiNjMxYSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_fa8774a9e47b466dbe76bada942a8150",
+      "statement": "The idle timeout is read from SSM Parameter Store at `/smart-tutor/learning-record-idle-minutes` (default 10 minutes). A changed value applies from the next sweeper run.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L357-L357",
+          "version": "repo-lines-v1:sha256:aa74953301c80c0846c9b8c1a7df682c7d31b8d96a2846e418dd4c5b63f5529c:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWE3NDk1MzMwMWM4MGMwODQ2YzliOGMxYTdkZjY4MmM3ZDMxYjhkOTZhMjg0NmU0MThkZDRjNWI2M2Y1NTI5YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYWE3NDk1MzMwMWM4MGMwODQ2YzliOGMxYTdkZjY4MmM3ZDMxYjhkOTZhMjg0NmU0MThkZDRjNWI2M2Y1NTI5YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTc2MTZhMDA3MDIzNDFlMTI4M2FkYjRkNjBlZjBhODRkYTkwMmY3ZmQ2ZjJjYThiZWExZTI5ZTc5OWUyYTE5MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDYzYjhlNjBjNjE2MTgxZjFiZmI1MjdkNGM3YzA1Yjc0MmNkZTFiZDVlOWYwZTMwNjlkZmE1NjI5MTQ1MTNmZCJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L55-L55",
+          "version": "repo-lines-v1:sha256:c52ae3bccaf69027e85fc8ab010dd37350a9f3568b47438e7484c4900ef358ad:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzUyYWUzYmNjYWY2OTAyN2U4NWZjOGFiMDEwZGQzNzM1MGE5ZjM1NjhiNDc0MzhlNzQ4NGM0OTAwZWYzNThhZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzUyYWUzYmNjYWY2OTAyN2U4NWZjOGFiMDEwZGQzNzM1MGE5ZjM1NjhiNDc0MzhlNzQ4NGM0OTAwZWYzNThhZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzA2MWFkZDY2MWMzYjc4YjU3MjU1Y2QyMTA3OGMxZTBiNDBhMjA2N2VkMWU4YTM1NjQ5YjVkNWJmY2M1YTNjYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWQ4ODIwYmU5M2VkNGE2M2M3YzkyMmJjNTVhY2FlYmYzNzlkMGUxOTAxYWFmOWI2NDNkZThhYjI3NWVmNWJhMiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_8ae5034dd05d4d3f88cf4905e68ccae9",
+      "statement": "`apps/jobs/record_sweeper.py` is a stub that raises `NotImplementedError('M2: learning-record sweeper')` and is scheduled for implementation at Milestone 2. `NoteService` and `LearningRecordService` in `learning.application` are likewise stubs at this stage.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/jobs/record_sweeper.py",
+          "version": "repo-file-v1:sha256:8050212c5fb211d9a32c19965f62c332f5bef4adedb94ae6b0f8751abcec016f"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L622-L622",
+          "version": "repo-lines-v1:sha256:1a2e179715529b6137a3abff02d7fc03a20c79f36262f5be75bc9e1c17bf4fd1:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWEyZTE3OTcxNTUyOWI2MTM3YTNhYmZmMDJkN2ZjMDNhMjBjNzlmMzYyNjJmNWJlNzViYzllMWMxN2JmNGZkMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWEyZTE3OTcxNTUyOWI2MTM3YTNhYmZmMDJkN2ZjMDNhMjBjNzlmMzYyNjJmNWJlNzViYzllMWMxN2JmNGZkMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTkwZGMxNTJjNjkwZmZkZGY2ZWM5ZjFiYTRjYTc3YTNjN2QwZmNkMGU2MTFlOGE2MmEyNjhiNzMwN2Q0ZjhjYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjhjMjkxNmM4NTI2NjE0YzBjYzM4ZTc3ODJiZDkzYzRlMzZlZDM4MGM0NDVhNTczNzljYjk0ODA0NTA4ZTIwOSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_b1fc458be93f4128a9499ec74bf94168",
+      "statement": "The 'Discuss this note' flow is orchestrated in `apps/api`: it reads the Lesson Note via `learning.application`, then starts a new thread via `tutoring.application`, passing the note as context and recording `source_note_id`. This keeps `tutoring` free of any import from `learning`, satisfying the acyclic module dependency rule.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L205-L205",
+          "version": "repo-lines-v1:sha256:a13b9465d31684d05683a066f22e29e99b0fbf50d2dcc8fbe572cb1d1e7812de:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTEzYjk0NjVkMzE2ODRkMDU2ODNhMDY2ZjIyZTI5ZTk5YjBmYmY1MGQyZGNjOGZiZTU3MmNiMWQxZTc4MTJkZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTEzYjk0NjVkMzE2ODRkMDU2ODNhMDY2ZjIyZTI5ZTk5YjBmYmY1MGQyZGNjOGZiZTU3MmNiMWQxZTc4MTJkZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiY2E3YjZkMDg0MGFiNGRlZjJmZmRhYzgzYjhiZWRkMTI5NjdkN2ZiMTNmYzBhOTQ3NDQ4YzQ1MDIxZGZlYzViZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjQ0ODdlOWRiYTZlZjI4ZWU2NmMwNTdlZjg3MmQyYzhlMzc5MWJiNzA2N2I1ZDhlY2FmZDc2OWJmMTJlOTUyZiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L351-L351",
+          "version": "repo-lines-v1:sha256:838c2757b67e8ce6d1098bb3f1d31baefac2f906c9d64b96bc466e752e551081:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODM4YzI3NTdiNjdlOGNlNmQxMDk4YmIzZjFkMzFiYWVmYWMyZjkwNmM5ZDY0Yjk2YmM0NjZlNzUyZTU1MTA4MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODM4YzI3NTdiNjdlOGNlNmQxMDk4YmIzZjFkMzFiYWVmYWMyZjkwNmM5ZDY0Yjk2YmM0NjZlNzUyZTU1MTA4MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmY2MTM2NzU1NzUxZWMxMzI2ZWMwZGJhMDM1YTE1NmJmYWQ5YmE2YWZmNjNjZTQ0YmY0YTY4NDVjZjg5NmQ1MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzg1ZjNjNDY2ZDhjZjc0MWU1NGNiNjdmYTRhNWYwZDA2MmQxNDYxZGQ4NDdjN2UxZWI4ZjAyNmU0MDAxYzFhNiJ9"
+        },
+        {
+          "resource": "repo://sdd/specs/2026-10-02-project-structure-design.md#L135-L135",
+          "version": "repo-lines-v1:sha256:1af5b25515dec7242402a2657713faa01c0d63ce307ce25c2b08cb5bce4893ba:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWFmNWIyNTUxNWRlYzcyNDI0MDJhMjY1NzcxM2ZhYTAxYzBkNjNjZTMwN2NlMjVjMmIwOGNiNWJjZTQ4OTNiYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWFmNWIyNTUxNWRlYzcyNDI0MDJhMjY1NzcxM2ZhYTAxYzBkNjNjZTMwN2NlMjVjMmIwOGNiNWJjZTQ4OTNiYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjgyZTdlODNhN2QwOTFjYjAyYjI4NzZjODFmNGI0OGE3YWY0OTU2MjI2YzY4NjJmMmZiY2U1ZTVmMDYyMWJiNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWMxYzY2MDRlM2JiMmZhYjQ2MWFjMjFjZGQ1YWJhYzNjYTYwOWYxM2RiZTUyYWYwNzQ2YzAyN2I4MzU2NDJkNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_0ad65881bf754827a9aa6d2336c93395",
+      "statement": "The record sweeper runs as a Kubernetes CronJob every minute and is deployed in the `jobs` sub-chart of the `smart-tutor` Helm umbrella chart, alongside the Glacier tagger and retention CronJobs.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/jobs/__init__.py",
+          "version": "repo-file-v1:sha256:3879f96e6596f8c1d9ccbabd266cafac4e6dafa6c760698657373def7b89003a"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L283-L283",
+          "version": "repo-lines-v1:sha256:1c7fbc00dc64a8e60411f79dd96cd97992f06ecbc5c970c534678b9ceeaebcc3:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWM3ZmJjMDBkYzY0YThlNjA0MTFmNzlkZDk2Y2Q5Nzk5MmYwNmVjYmM1Yzk3MGM1MzQ2NzhiOWNlZWFlYmNjMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWM3ZmJjMDBkYzY0YThlNjA0MTFmNzlkZDk2Y2Q5Nzk5MmYwNmVjYmM1Yzk3MGM1MzQ2NzhiOWNlZWFlYmNjMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDY4YzU5ODZjODMwOTQwNzNkMjI4Y2U2NWZlMWFlMDI2NmE4Y2IxMWE3MmVjN2U3ODE3MTgwYjY4ODU5Y2NhYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjJlOTI0YmY0NGQ4ZTgyNzc2YTQyMjU1Njc5NDhkOGNmNThlNjhkMjIxOGZiNzhjNTQ5ZmM2NTRkNzhkYmQyMCJ9"
+        },
+        {
+          "resource": "repo://sdd/specs/2026-10-02-project-structure-design.md#L178-L178",
+          "version": "repo-lines-v1:sha256:1ba2b45df948d7471c13845970ae3a65082b9c6bb0e61f8bd902b547bec6a92a:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWJhMmI0NWRmOTQ4ZDc0NzFjMTM4NDU5NzBhZTNhNjUwODJiOWM2YmIwZTYxZjhiZDkwMmI1NDdiZWM2YTkyYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWJhMmI0NWRmOTQ4ZDc0NzFjMTM4NDU5NzBhZTNhNjUwODJiOWM2YmIwZTYxZjhiZDkwMmI1NDdiZWM2YTkyYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTI5OTAwZTYwOTM0ZTQ4ZDZhMmIwMmRlNTI2NTJlZWYzZWEyNTEyMzlhOGY0YmM3Nzg0YTJmN2RlMzljOWUzMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjYzNWEyYjAyOTU1MmMyMDQxMjUyY2RlYTRmNGJlMTI2ZWJlMTUxZGZhYWUzMmYxYmFhNjE0ZTExZjNhM2MxNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_0f9c8a6b58fe47c4b712426c47650932",
+      "statement": "Learning records and Lesson Notes are kept for the account's lifetime (threads are never deleted). Traces are deleted after 180 days, but note and record links survive because they reference `thread_id`, not trace ids.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L120-L120",
+          "version": "repo-lines-v1:sha256:80f2d00776fd6170910281450f661ffadef996a075f7c7c7e10914834fb55cd1:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODBmMmQwMDc3NmZkNjE3MDkxMDI4MTQ1MGY2NjFmZmFkZWY5OTZhMDc1ZjdjN2M3ZTEwOTE0ODM0ZmI1NWNkMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODBmMmQwMDc3NmZkNjE3MDkxMDI4MTQ1MGY2NjFmZmFkZWY5OTZhMDc1ZjdjN2M3ZTEwOTE0ODM0ZmI1NWNkMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjcyY2M2YWM2MDEzMTQxYWVmYmE2ZmU4Y2JlMmY1NjcyY2JiZTkzMDM3MzJjYWJiZjhiNDY4MTFkOTA1NmNjMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmRjNDQ5MzQxYTJlYWM4MDk5NGM5NDZkYzE5NmExMjM3MWVmYmVkNGQ0ZTgzMzVmYTA4NzUwMDllNzdlNTk1MiJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-03T03:19:50.688Z"
+  }
+}

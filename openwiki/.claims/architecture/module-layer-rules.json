@@ -1,0 +1,216 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:d3e97ebd4f4401defbc898f79913ee7fdecea54143920e4eed671813a489aa01",
+  "claims": [
+    {
+      "id": "claim_ae0f42a8af694254b11af0af0c802f68",
+      "statement": "The Smart Tutor backend uses a modules-first layout inside one Python package (`smart_tutor`): each feature module contains `domain/`, `application/`, `ports/`, and `adapters/` sub-packages plus a `README.md`. The eleven feature modules are: knowledge, subjects, tutoring, learning, accounts, insights, graph, catalog, quizzes, recommendations, and reports.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L7-L24",
+          "version": "repo-lines-v1:sha256:1e5541913040eca686ba1eb9cc187a04a5e087db06cbb7dba6b1d6fc04147d34:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA5NzNmN2RmMTc1NDZiNTRlOTdiOTQ5NGE5NTVlZDIzYTVhNmM4MzJlYjc5MWFkMzg0ODliYTM3OGU4YzFkMTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYzZDFhNDg1ZTZmYWRkZTQ3MzcxZmFiZjkzNWZjODcwNTE3OGU5ZmZiZmU4OGY1ZWE2MmFjNTk0NzZiNjFhMGEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg0MjRmMGQ5NzdiMjQ5MjM1NGZlZWM5YzBiYTZmZjkzMDg5MzVlYTM0Y2VjMWJhMDRlN2NiNmU5YjIyZWM2MTYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImIzZDhiNjBlNGEyYWI4MzczNzBhOTkwYzg0MzIzYjYxNDYwZTQ1NzhmNTM3YTUzZmIxZDU2MDIzMzY5MmExNjgifQ"
+        },
+        {
+          "resource": "repo://sdd/adr/0001-modular-monolith.md#L12-L15",
+          "version": "repo-lines-v1:sha256:5060c0c96da0245cc45baa5f89f3399c99aa49859b0b004b3c2b0c1392706621:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTk0YTNkMjc4YjY4MjNhNDQ2ZDI4YjhjNzYxZDE4NzVkZmNjYzU0MWYxNmJkOGJlMWVkMzZiYjRlOTdkNDA1OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzVmNmRkM2I2MDY3YzZjZWIzYTE3MWU3MjQzZDI3YjYxMjkzYTVlYTNjMjJjZDE1ZjVlNmRmZmM2OTI3YTBiZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWJkM2JlNzZmNmI3ZjU4MjIzNTI4ZGQzZTQ2YjczNWRiMDU3MWVmMzA3ZTM3OGY0ODA4ZDg0OWE0OWU4ZGYxZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmZjYzBiZGJkMWUyZDNmMzAxZDhhYTM4YTQxZmFiZjM4N2ZlMzY1NzE2OWQwNGJlYzcxY2VlMWRhMTdlOTU5YiJ9"
+        },
+        {
+          "resource": "repo://sdd/specs/2026-10-02-project-structure-design.md#L106-L115",
+          "version": "repo-lines-v1:sha256:06434f1c795fee4d451e66a349b9a84c227224fb6dc4d69823fab9dd61b739cf:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE1OThhMWEyYjI1YTA4NGNlMmQ2OGU0YjY2NGJhZDMzZDY4MTY5MzcyMzRjNTIwMWRhMDBmYzE2ZDcyOTBhNDMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlYzU2OGVhZGRjYzQ4NDAyNmYxZTMyYWYyMmM3NWYzODUzNjJjZjJjNWMxZGQ5NjhjMDU5MmY1NzE5NTgzMzAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg2N2FjYmJhNjE3YzUyYjcxNTE1YTBmMDI2ODNkNWY3MzJkNmJiMzBiNGU1ZTJkZjM3ODM5YTA1NzEwZTBkODUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjYyMzA5ZDVjMDdhZDY2NDM1Yjc1YjlmOTllNThlNDM5NzIyNWY3Y2I2YmNjNjhhZTJhNWYxODRiNDU5ZTQ0YjIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_e6c95e6e2c0642f5beac878b0d997701",
+      "statement": "Within each module, `domain/` holds entities and business rules with no I/O; `application/` holds one service per use case and acts as the module's public API; `ports/` holds ABCs; and `adapters/` holds vendor SDK implementations and is the only place vendor SDKs may appear.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L24-L32",
+          "version": "repo-lines-v1:sha256:7010fc38265afb08c0874a94adec30b48a4feab9ac4f8edd5a05dd52345b521f:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjNkMWE0ODVlNmZhZGRlNDczNzFmYWJmOTM1ZmM4NzA1MTc4ZTlmZmJmZTg4ZjVlYTYyYWM1OTQ3NmI2MWEwYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDNjZGEyZmM4ZmRmZWQwMmZhZDc5ZGM4NDY1MjYyNzllZDkxMDQ1MWY1ZDk3OWM4YjFhMGE3MWQxNmE0Y2ZiOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmI0MDBiMjc0ZWM0YjQ1NmI0OTJiMWMzMGE1ZTllN2MwYjAxZmJkZmQ1MzY5NDBkZjI3NTQ0Y2I4YTliYjRiYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDZiMjFmNTRmZmU4YTRmNjY2NDM0ZmU4MzBjNDUxZDhlZTM1ZWU2MTAxOGE2MDJlMDlmNTczYmNkZDVhZTkyNiJ9"
+        },
+        {
+          "resource": "repo://sdd/specs/2026-10-02-project-structure-design.md#L106-L115",
+          "version": "repo-lines-v1:sha256:06434f1c795fee4d451e66a349b9a84c227224fb6dc4d69823fab9dd61b739cf:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE1OThhMWEyYjI1YTA4NGNlMmQ2OGU0YjY2NGJhZDMzZDY4MTY5MzcyMzRjNTIwMWRhMDBmYzE2ZDcyOTBhNDMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlYzU2OGVhZGRjYzQ4NDAyNmYxZTMyYWYyMmM3NWYzODUzNjJjZjJjNWMxZGQ5NjhjMDU5MmY1NzE5NTgzMzAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg2N2FjYmJhNjE3YzUyYjcxNTE1YTBmMDI2ODNkNWY3MzJkNmJiMzBiNGU1ZTJkZjM3ODM5YTA1NzEwZTBkODUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjYyMzA5ZDVjMDdhZDY2NDM1Yjc1YjlmOTllNThlNDM5NzIyNWY3Y2I2YmNjNjhhZTJhNWYxODRiNDU5ZTQ0YjIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_c0f8a6f43032438482e6963e8b62b768",
+      "statement": "`apps/` contains one composition root per deployable (api, agent, mcp_server, worker, jobs). Entrypoints parse input, call one application service, and format output; no business rules live in `apps/`. Nothing imports `apps/` — it is a leaf.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L21-L32",
+          "version": "repo-lines-v1:sha256:6b10f4f020aa4821f56af41b157551ca5371797357860b0ba886918e55078abf:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY1ZTVkYjBmNmUwNmMzMWI1NGQwYWYxNTNjOTE0ZDUxZDViMjYzYTkwZmEwYzRiODkwMWE4MDY4YTU0NDY5NjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQzY2RhMmZjOGZkZmVkMDJmYWQ3OWRjODQ2NTI2Mjc5ZWQ5MTA0NTFmNWQ5NzljOGIxYTBhNzFkMTZhNGNmYjkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYyMjYyOGRiYWQyZGE5YTJiMGUyNDZjYjU3Yzk0NjM1MTI0MWMwZThlMGVkYzdjMDQyYzVkODY1ZDk3Y2U4MTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ2YjIxZjU0ZmZlOGE0ZjY2NjQzNGZlODMwYzQ1MWQ4ZWUzNWVlNjEwMThhNjAyZTA5ZjU3M2JjZGQ1YWU5MjYifQ"
+        },
+        {
+          "resource": "repo://backend/pyproject.toml#L351-L368",
+          "version": "repo-lines-v1:sha256:8e2da3947f595cb2f576b396002c6dea5dc7394528537a9691b4d7f109f3c4ed:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU0NTQyM2NjYTc3OWZkY2M2NTg4OTFkNzFiYjk1NDczZjU0OTJmNGMwMGZlNDY0M2I3MjQzYWIyNGQ5ODA5ZDkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ0Y2JjOGZjNDRlN2U4ZWVkZTcyZThkMjMyMjU4NWQ1NzYzNzU1ZDkyMGY2OTc1ZTQ5MGFiNTBlNmI2YmUxZjciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNhY2FiYzQwNzM1M2E0NDVmOTgzYzBiZDQxMDVjZDI4NWM5MWZhZGE2YTVhYzZiMThlZmU1OTdmMGMzN2NiN2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjgyM2NhYWRlNjk1Y2RmMjk5N2NmMTQ3YTQ0NGI1MjBhZTUxMDVhODRjOGY5YjIxOWRjZWM1OTNkZmZkYjYzMmIifQ"
+        },
+        {
+          "resource": "repo://sdd/specs/2026-10-02-project-structure-design.md#L98-L103",
+          "version": "repo-lines-v1:sha256:4ec162bd0c83fd6d4cbd7b01854489e34148166653cb5d766d92acdf844e40cc:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjZjYWMyYWJhNzA4YWZiYmZjMWRiYWMyMzlmY2IzYmY5NDRlZTA1M2FmN2U3NzE4NmFiZTlkMGMzNGI2Yjk3OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmM0MzkyYzNmYzY2ZDY1YzFlMzhjZGZkNmFjNTY3ZGM0MDg3ODg3MGQ4YzhkY2UxNWY3OGM2MzNhZTFmODI1MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzc2ODMxNWJkMzVhOTgwYWE4NWE0NzUzMGFjZDhiMTY2ZTE1YjY3ODUwMTFlN2VlMTJhZDUyN2Q5ZjkxYzgxZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzAwNDY1NmUyMDkzYmY5OTBmYzY0MGRkOWJiZGQ4MWQ2ZjZkMzBlYjU5ZjkzNDY5YmU0MWRiYTJmZmMxOTcyZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_545fe7ea34204f09a87c7fdbc6edc6e9",
+      "statement": "Cross-module flows that go against the acyclic dependency order are orchestrated in `apps/` rather than through a reverse import. The canonical example is 'Discuss this note': `apps/api` reads the note from `learning.application.NoteService` then starts a thread via `tutoring.application.AskService`, keeping neither module importing the other.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L32-L33",
+          "version": "repo-lines-v1:sha256:7d1cd870559ed3bee2f0ea2f3aaadc52b6a00786399d664e49be89bb24187304:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDNjZGEyZmM4ZmRmZWQwMmZhZDc5ZGM4NDY1MjYyNzllZDkxMDQ1MWY1ZDk3OWM4YjFhMGE3MWQxNmE0Y2ZiOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzk5MGRhNTcxN2UwNDA1YTQ2YThhMzlkMjcwYjU0ZWQ5YzJiMzA4ZjczNTE4YWZmN2RiMTkxMzViOGY0MzM0MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWE2NmMwMWM4MDE0MzUzYjJiZmVmYTk5YjgzODAwYzdjMGZlMTQ2NjAwYzA2ODljYjc0MGNjOTQyMzI0M2U4ZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZmZmMTA5YzA1NGMzYjgxZjkxMzgxNTc0ODVhMzgxMTk2OWE3NDI5NjZmYTgyMzNiOTEwOWNmODZiNzc1ZDZiOCJ9"
+        },
+        {
+          "resource": "repo://sdd/adr/0001-modular-monolith.md#L19-L21",
+          "version": "repo-lines-v1:sha256:c7ac51faa977bcdbe588a9007e42ed7c7f823c708419e2170d1c6f5fdc027948:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjhmNTg4ZTVjZmVmNzYyZmYwMGMwMGZhNmQ5ZGI5NzY1MmM0Mjk5MWUxYjZmZTA3YmM2NDNiNzk0NmYyMjViNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmJiNGIwNzg3ODdjNGZlNTc0YWI0ZjQzMjNiYTBlNTY1YzYxYzJiODRjYWNiMjM4MWFmZjU3MjY1ZjAxMjhhMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmZjYzBiZGJkMWUyZDNmMzAxZDhhYTM4YTQxZmFiZjM4N2ZlMzY1NzE2OWQwNGJlYzcxY2VlMWRhMTdlOTU5YiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjIsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjRlM2I2NWQyMjRhY2ZmMGNhY2ExZmE1ODJlMjJjYWIyNjIyNTg3MGUzYTQzYjA5Y2ViM2NlZjNlNWIyYWY1OSJ9"
+        },
+        {
+          "resource": "repo://sdd/specs/2026-10-02-project-structure-design.md#L133-L135",
+          "version": "repo-lines-v1:sha256:7f2e01f8f2f20c0bb6fbb3da9eda4d246adbe208d25685a50942d8099c5686e5:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDRiMmY4MTY2ODQ3ZDZlNjBkY2UwZmMzNzJlN2VlYzZmYzU2NDg2M2JhNjkwYjdiMGQ0Y2YwYWVkYWZjNmRlYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWFmNWIyNTUxNWRlYzcyNDI0MDJhMjY1NzcxM2ZhYTAxYzBkNjNjZTMwN2NlMjVjMmIwOGNiNWJjZTQ4OTNiYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWRiYzM4YzRkMjkwOGMxNWMzNWFkMmFjNzY3MDhjOWI5MWFiMjM3ZjUzYzYxNDA5ZThlZWVkZDYxZTBlZWE2OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWMxYzY2MDRlM2JiMmZhYjQ2MWFjMjFjZGQ1YWJhYzNjYTYwOWYxM2RiZTUyYWYwNzQ2YzAyN2I4MzU2NDJkNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_f8f7fcce3ef94a5aa53074a7638845cb",
+      "statement": "The acyclic module dependency order (top imports bottom, never the reverse) is: reports → recommendations → quizzes | catalog → learning → tutoring → graph → knowledge → subjects → accounts | insights. `accounts` and `insights` are independent siblings, as are `quizzes` and `catalog`.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L43-L43",
+          "version": "repo-lines-v1:sha256:45bbe5c5511b9b83510be61b85552e8d57b6bdde4deb09c643215e3e2ddff9bc:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDViYmU1YzU1MTFiOWI4MzUxMGJlNjFiODU1NTJlOGQ1N2I2YmRkZTRkZWIwOWM2NDMyMTVlM2UyZGRmZjliYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDViYmU1YzU1MTFiOWI4MzUxMGJlNjFiODU1NTJlOGQ1N2I2YmRkZTRkZWIwOWM2NDMyMTVlM2UyZGRmZjliYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMGEwMzY3YTcwZTM2ODI0NDlhN2YwZjc3ZWE1ZjllY2QwYzkzYmMxNWY3MTdkOWE5OWQxNzk2OTRlODE3OTMxNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDAxMzM0MDNjNDZkNTcwZjdhNmRmOGNhM2M5MWY1ODA1OGExMTk1ZmIxZDM2NTU2YmJmN2YxZDIxZmIxZmFkMyJ9"
+        },
+        {
+          "resource": "repo://backend/pyproject.toml#L443-L460",
+          "version": "repo-lines-v1:sha256:91be039ffbe41240c7e7232608f3573f3539dafdcb14bf4ba3acd1646592580d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJmMzMyY2QwMjgyZDQ5YWU2ZTQ2ZDg5YmRlMjk4OTk5NmFkOTNiMmZmNmYyZmI0ZGJhMDAyYTFhNmY0MGNmOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZkM2I2YzViOTQ0MjJhN2MwNGYwMDkzMzgxYmY4ZDE3MDdlNmVjY2E2Zjc4NzMyMWE2Nzk0ZWEzZGYxNjQ1MmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjMxYzlkYzc1ZTMxN2ZjZGM2Zjg4MzhiMWYxN2QwNGFhODg2NjMzMGZhZWMxN2M1MWE3YTRhMzgzMGYxYmFmMTAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://sdd/adr/0004-subjects-module.md#L14-L15",
+          "version": "repo-lines-v1:sha256:2fe58cdb030bdba566457c64d89b05b7156ed6a7667ebbdfc7d2fd71aa1c1582:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTdmMzFiMjBmZmNjZTcxYTBlNTcxZmMzN2FhMDljYWViNzU3YTNjNmI4ZTA3ZmE2ZDZmOWMxNDRhNzFlZDFhNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmUzZmU0MzRhYzRkZWY3ZGE4YmVhZDMxMDFkZDkxODAyZjFjY2E5Y2U4NGM2Mzk5YWQ5Y2I3ZGUyYjRlNzhhZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWRjOGU3YTVlOWE4YzE5MjE2YjJlNzFkODA4ODM4NWYyZGVlNTU3M2FhMWNkZjNjMmYxNDMwZmU1OGUwYTQ1NCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmZjYzBiZGJkMWUyZDNmMzAxZDhhYTM4YTQxZmFiZjM4N2ZlMzY1NzE2OWQwNGJlYzcxY2VlMWRhMTdlOTU5YiJ9"
+        },
+        {
+          "resource": "repo://sdd/specs/2026-10-02-project-structure-design.md#L139-L145",
+          "version": "repo-lines-v1:sha256:414ae8e236f30bef24ec14bd604f0e55661d966ba14f175753443f51840c1df3:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzI4ZWZjMGFiNGRlZTI2Y2Q3ZmE1YjU5OTlmODc1ZDcyZDk1YmY5OGMzNWQ4ZTVjYzE2NDcwZTk4ZmRmYWQzNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzY3NzM5YjI2YzU4YzY0NmMyMmYzMzY1ZmI2YTY3NTk5Mjc1ZGQ1YzZkODY0MjQ1ZWRhZDczMTQ2YTA4MzRmOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWMxYzY2MDRlM2JiMmZhYjQ2MWFjMjFjZGQ1YWJhYzNjYTYwOWYxM2RiZTUyYWYwNzQ2YzAyN2I4MzU2NDJkNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzUyMDM0Y2Y1NTcwZjc1ZmRlMzc5OGIwZTc4OGQ5ODIzMjY1NTI3NWM3ZTRhODgzMWFkMzA2YjAxMDllMmNjMyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_2c75495631464e7388d89cdcd0ca0305",
+      "statement": "CI enforces 18 import-linter contracts via `PYTHONUTF8=1 uv run lint-imports`. The contracts fall into five categories: (1) layers inside each module, (2) module privacy — cross-module access only via `application`, (3) apps as leaves, (4) vendor SDK confinement — docling only in `knowledge.adapters`, boto3/langgraph/mcp only in `adapters` or `apps`, (5) the acyclic module dependency graph. A broken contract fails the build.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L37-L43",
+          "version": "repo-lines-v1:sha256:45a038c54c85422eeee9250d2927c9cb209821bc64bc4f5c5387087dea85607f:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjRkZTczYjBjMmNlZDZkMTkzYzYzYTE2MDJjMjEwOTQ2YjI1N2JlOGI3YmNmOWMzNmU4YWM1MzhiYWU4YjM4OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDViYmU1YzU1MTFiOWI4MzUxMGJlNjFiODU1NTJlOGQ1N2I2YmRkZTRkZWIwOWM2NDMyMTVlM2UyZGRmZjliYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmZmMTA5YzA1NGMzYjgxZjkxMzgxNTc0ODVhMzgxMTk2OWE3NDI5NjZmYTgyMzNiOTEwOWNmODZiNzc1ZDZiOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDAxMzM0MDNjNDZkNTcwZjdhNmRmOGNhM2M5MWY1ODA1OGExMTk1ZmIxZDM2NTU2YmJmN2YxZDIxZmIxZmFkMyJ9"
+        },
+        {
+          "resource": "repo://backend/pyproject.toml#L71-L460",
+          "version": "repo-lines-v1:sha256:4e391d1e1124f37c175a9bf665b144fffdc008bfda9579ce1b7267483fabf4b9:eyJzZWxlY3RlZExpbmVDb3VudCI6MzkwLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI5NDYxOWJjNTkwMWFjNDRmZWYyYWI4N2M1M2YwNTY4MTZiMTZkMTNlOTdlN2ZjMjY0NTU4NTFkYTQ2MTk5Njg3IiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiJmZDNiNmM1Yjk0NDIyYTdjMDRmMDA5MzM4MWJmOGQxNzA3ZTZlY2NhNmY3ODczMjFhNjc5NGVhM2RmMTY0NTJkIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiI0ODE2MjQ1ZjBmZWIyMGI2NjU0MGUxYWNiMGI2MWI2NjNlZTlhMzNiNzgxOGU0MWFhNTMxMzVhYzZlMzJlYTcxIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MCwiZm9sbG93aW5nQ29udGV4dEhhc2giOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1In0"
+        },
+        {
+          "resource": "repo://sdd/adr/0001-modular-monolith.md#L15-L15",
+          "version": "repo-lines-v1:sha256:c5f6dd3b6067c6ceb3a171e7243d27b61293a5ea3c22cd15f5e6dffc6927a0be:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzVmNmRkM2I2MDY3YzZjZWIzYTE3MWU3MjQzZDI3YjYxMjkzYTVlYTNjMjJjZDE1ZjVlNmRmZmM2OTI3YTBiZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzVmNmRkM2I2MDY3YzZjZWIzYTE3MWU3MjQzZDI3YjYxMjkzYTVlYTNjMjJjZDE1ZjVlNmRmZmM2OTI3YTBiZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjFhZTg4YTRlNTFmZDY3MDZhNTJjMWNkOGRiZTZjMTk3ZGU5MjVmY2EyZWU1NjM3ZTdkZTlkYTM2MzlmMDM2MCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmZjYzBiZGJkMWUyZDNmMzAxZDhhYTM4YTQxZmFiZjM4N2ZlMzY1NzE2OWQwNGJlYzcxY2VlMWRhMTdlOTU5YiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_a62db93fca7749c0b903cd9d4b3788db",
+      "statement": "`docling` is forbidden everywhere except `knowledge.adapters` because it pulls in PyTorch and is installed only in the `worker` image via the `[ingest]` optional dependency group. All other modules and `apps` are prohibited from importing it.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L42-L42",
+          "version": "repo-lines-v1:sha256:20b0e0f0d2353077687629da58b92dbd73cbd8950c1d40de8a1cf6430586af38:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjBiMGUwZjBkMjM1MzA3NzY4NzYyOWRhNThiOTJkYmQ3M2NiZDg5NTBjMWQ0MGRlOGExY2Y2NDMwNTg2YWYzOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjBiMGUwZjBkMjM1MzA3NzY4NzYyOWRhNThiOTJkYmQ3M2NiZDg5NTBjMWQ0MGRlOGExY2Y2NDMwNTg2YWYzOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMGI3ODIwOGJlMmQxYTBmMTUzN2M2NjljZGRkZTkyZGI0NmE3MjE1YzZjYzE4MjNmMjBmMWY5ODdmYWU2NWQxYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTEzZjZjMDRhMDRkNGEwZmFjMGE2NDVmYWUxNGQyNmVjMzFjMWQxM2ZjYmE5MGVjMDU0YTI5MzExYTFmMGRkNiJ9"
+        },
+        {
+          "resource": "repo://backend/pyproject.toml#L26-L28",
+          "version": "repo-lines-v1:sha256:f16bc6ce9a901b095a1235833f358d57614d75adf94c8c8d92a4d744456ec90c:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzYzYjg3NTAyNDI5N2VkOGY5ODA5YjI2MmQwOWNkZTlmYWQ1Y2E5NjVlN2M4NTQ5MmU1YzU5NmJiYzUzNWJiOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDJiOGE0OWYxNmM4MzBkNzQxYjIyYzM5MmRjODgyMTEzNzRmYjMwMzYxOTc3OTY4YWMzZmExYzMyMWIwNjZlNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTQ2YjE2ZjU5NTY1ZmM4OWZjN2MzZGUxMTEzOGU2N2EwYWFiMzM0ZGY2ZmFjMzU3NjIwMjAzMDZiYzg1YTE1MCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjgzYTFkYmU3MjBhMDI4OGVjNWVkNDcwNDBmYjkwMjk4MjUyOTU3YzQ1MTI1OTc4MWU3Yzk1ODUzZjEzMThkYSJ9"
+        },
+        {
+          "resource": "repo://backend/pyproject.toml#L424-L441",
+          "version": "repo-lines-v1:sha256:e1fb7bc0ced619b8904a1fb2280034edd1037b19c624ddb962287c6d5dc44d92:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE1MzA0NmQzNTEyMzA4OTEzNzE0NmVjZmJmMmZhZDE4YzFjMjhhNTgyNzIzMzQ5MzI0OTRkNWJhNzFlMGU2ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhiY2UwZTZlZGJlMzNlMGQ3NzQ3YjVkOGNkNDYzNDZkNjQ5Nzg2OGM0NWYzMGUwNzc3NmFiYTBiNWU0Mzg3MzciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA2ODlmZmQ3MzZiY2ZhNDI3ZmUyNjgxYzliMDkxMTMyMjIyY2RmYTllZTM0MGYzZTM1ODg1Y2I0ZjQyNzRmMzMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImEwZjA2ZTY4NTNlNWI1M2FlNTkyNTI5ZmIyMTQ3ZmFmNGUwOWMzNjI2YjVjMTA1MjA0MWQ4NjE1ZjRkYTBkMTAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_535248db40b046dbb5319ea10be7a079",
+      "statement": "The `shared` kernel is open to all modules but imports no feature module and no `apps`. It holds cross-module value objects (UserId, ThreadId, TokenUsage, Citation), model ports (ChatModel, EmbeddingModel, Clock), ModelFactory, authentication, and infrastructure clients.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L11-L12",
+          "version": "repo-lines-v1:sha256:ae7c74dc2a521110eddf9c482628bd96aa6c94ffe040bb10f0f8872bf30a83d0:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTZhMjlkMDZmYzFjNDc0MTBiM2VhMWY1NzA2ZmMxM2M0OTM5MWExMTFkOTk5YmMwNDFkM2U3ODQ0MDYyYWEwZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzZhMDJiNzI0ZTc4YTQ4YTA0NTIzOGVhZmE0YWFjNGJkOGU1YmEzMmVhZmUxYTlmZmNiNDg0ZDFiNjgyMGJkNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzk4NGQ2OWEzM2FjMGU5OWI0MzI5OTBhYjA0MDQ5YTIxZGMyNzk1Yjk1OGM4NjlkYTQxOTFkN2ZkMjljNDIwNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTE2NjRmYjE4MGY3YWQ1ZjhhMTJhYmI1MDE0ZGIxMzYyOGM2ZTMwMzZjNWNlMDhmMmVjNjkyMTgwNmU0YjU1OSJ9"
+        },
+        {
+          "resource": "repo://backend/pyproject.toml#L332-L349",
+          "version": "repo-lines-v1:sha256:c8999689bc241d60e6f46b35b06eacd923e3a5567a5051fcb97f1bb8a4865059:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE1MzA0NmQzNTEyMzA4OTEzNzE0NmVjZmJmMmZhZDE4YzFjMjhhNTgyNzIzMzQ5MzI0OTRkNWJhNzFlMGU2ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZkM2I2YzViOTQ0MjJhN2MwNGYwMDkzMzgxYmY4ZDE3MDdlNmVjY2E2Zjc4NzMyMWE2Nzk0ZWEzZGYxNjQ1MmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ5Y2ZjMTAwNjkxMDY3NDc5NDg0MTA3ZDk1ODJiZDNjNDZiYjJhNWQ1OWZmM2QyY2U1NDg0NzJmYjFkOTkwMDkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg2ZmY4ZDAzZGNmZWVlOGFiZDc0YjliYTJiYmY2OWMyZTA5NzQ2NWZhOWQ1MjRkMzMyYWQyZjI1YmRlYTJjMTQifQ"
+        },
+        {
+          "resource": "repo://sdd/specs/2026-10-02-project-structure-design.md#L76-L84",
+          "version": "repo-lines-v1:sha256:a889fee1d8422d993cbc9675d89e3f2b3f7ecf337118c2d72b1be9ab3eea293e:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjQ2YzU0ZGFjZDFkMmM4ZjQ2MDIzNjMxYjA0ODUzZjZiOTdkNDA1MTVhMGUyNDkwMjg5ZGQzODNiZWNmZTY4OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMGViZDVkM2VhMmFhNTlkY2IzZjFkNDNjMTNiZjM2M2U2OTcxZjk0MDE5MjcyMzdkODI0YjE1YTkwNDIzNzczOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2VkNjg5NDE2OWYwMDhhNDBlZDVmYjVkZTE0MDU0NWI0MWUxZWJkYWVjM2Y0MzFmN2Y4NzQ2M2QzYzRkNjc4ZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjA3NTM0ZjViYWUwMDdlNTM5NGI0Y2Y2ZWFiMzY0MTJmN2ZmYjYyYmRiM2I4YzMwZDM5ZWE4ODE1ZDgxNTYyYiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_5c4a83cee56646c590279c8982e873e5",
+      "statement": "The agent retrieval path never accesses chunk tables directly: `tutoring`'s `Retriever` port is implemented as an MCP-client adapter calling `apps/mcp_server`, which calls `knowledge.application.SearchService`. This keeps chunk-table access inside `knowledge`.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L44-L46",
+          "version": "repo-lines-v1:sha256:40133403c46d570f7a6df8ca3c91f58058a1195fb1d36556bbf7f1d21fb1fad3:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzMwZDFkMTkyZWVlYmNhN2QyZDIyN2U1ODkxYWFmZjBkNDNlM2ViYWVlMzNjMGUzMzg1ZGQ4N2I1NTIyOTFjYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWI4YTY3N2VmNGI1YTE2ZjdkOTgwMGRiODAxZDY3YTcwMzRkYzk2Mjg0NThiN2IzZWQwNGVjYjNmZjg5OTIxNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmRkNzQ1Nzc5MDkyMTJjOTE2YmI0ZTU4NDNlYjQ5YzcwMTFiNzg1MWMwNmQwN2FmOTRiYzUyNmQ0ZjMxOWFmYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmU2ZjY2ZWE3ZWEzNjE1Zjk2YzM0NDY2YmNlOTYwOTBiYjQzNDdjMjg2MWQwZjQ4MmY1MmNhMjM3NTkyMWJjMiJ9"
+        },
+        {
+          "resource": "repo://sdd/specs/2026-10-02-project-structure-design.md#L133-L133",
+          "version": "repo-lines-v1:sha256:d4b2f8166847d6e60dce0fc372e7eec6fc564863ba690b7b0d4cf0aedafc6deb:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDRiMmY4MTY2ODQ3ZDZlNjBkY2UwZmMzNzJlN2VlYzZmYzU2NDg2M2JhNjkwYjdiMGQ0Y2YwYWVkYWZjNmRlYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDRiMmY4MTY2ODQ3ZDZlNjBkY2UwZmMzNzJlN2VlYzZmYzU2NDg2M2JhNjkwYjdiMGQ0Y2YwYWVkYWZjNmRlYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWRiYzM4YzRkMjkwOGMxNWMzNWFkMmFjNzY3MDhjOWI5MWFiMjM3ZjUzYzYxNDA5ZThlZWVkZDYxZTBlZWE2OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjc0ZTNjMTNkM2I5ODM2OTI5MWNiMTMzNmIwYjZmYzc3ZmI0N2M5YjcxMjUxYWVlYTM5NDYzMWYzZGU4ZTRlMyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_91d224ca3cad4ff6aa97f7026746ecda",
+      "statement": "A new cross-module dependency that requires changing the module dependency order must be introduced intentionally with a PR explanation; the correct remediation for a broken import-linter contract is always to fix the dependency direction, never to suppress the linter.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L46-L47",
+          "version": "repo-lines-v1:sha256:ee0ff4e1d86c05d9527dd3f63181d8446b02e817093ecbc61871e676cef8c754:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWI4YTY3N2VmNGI1YTE2ZjdkOTgwMGRiODAxZDY3YTcwMzRkYzk2Mjg0NThiN2IzZWQwNGVjYjNmZjg5OTIxNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTEzZjZjMDRhMDRkNGEwZmFjMGE2NDVmYWUxNGQyNmVjMzFjMWQxM2ZjYmE5MGVjMDU0YTI5MzExYTFmMGRkNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjQxY2U4YTgxMWRjZGUyZDA2YTI2OWFhNGUzNjRhMmMwZTgxMzZlNmY5M2MzOTdmYzUwNGQzMjUyMDdjYWMyNiJ9"
+        },
+        {
+          "resource": "repo://sdd/adr/0001-modular-monolith.md#L19-L20",
+          "version": "repo-lines-v1:sha256:e22897d668b8535b6d99117c79c967fe41fc23a9bbd6b4566277d1103076c8d2:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjhmNTg4ZTVjZmVmNzYyZmYwMGMwMGZhNmQ5ZGI5NzY1MmM0Mjk5MWUxYjZmZTA3YmM2NDNiNzk0NmYyMjViNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGVjNzZhNTVlYjFlOGIzODEyMjFmOGRmNTZlZWM5ZTQ1Y2NiNzZkM2EyOWRlOWY0MmE0ZGVkYTI2MjFiYTc0NCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmZjYzBiZGJkMWUyZDNmMzAxZDhhYTM4YTQxZmFiZjM4N2ZlMzY1NzE2OWQwNGJlYzcxY2VlMWRhMTdlOTU5YiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDliYzVmZTNiOGUwOWU0MmZkNmRkMTZkZDhkNzU4NWE2MzA3NTQ2NWEwNTFjMzJjMjVkMjdmZmFiMTZhNWFlNiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_4895162b553945cf860d11d44e8b23fe",
+      "statement": "Rule 1 is implemented as two separate `layers` contracts: one with `containers` set to all eleven feature modules enforcing `adapters | application → ports → domain`, and one separate contract for `smart_tutor.shared` enforcing `adapters → ports → domain` (shared has no `application` sub-package).",
+      "evidence": [
+        {
+          "resource": "repo://backend/pyproject.toml#L76-L98",
+          "version": "repo-lines-v1:sha256:833f5bd476a87c23f4878212819b60ecb2c4ca7435bd609ba5e48a45e2556f82:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE1MzA0NmQzNTEyMzA4OTEzNzE0NmVjZmJmMmZhZDE4YzFjMjhhNTgyNzIzMzQ5MzI0OTRkNWJhNzFlMGU2ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc3ZGY4M2M1YTZkY2QxNjRlOWU2YWFhODRlMGIxYWYzYWI4ZjQ1YjZhYWNkYjU3MjhkMjI5NTBiMGIxYWIyMmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRlOTU5NzdkN2MxNjEwNTQwYmNmZGVmMmY4NWFlOGJlOTlhNGYxYzczYjhjNWVhNGIwZGJlYmYwNTU4NjNiNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjYyNjY3NjFkMzlhMTk2MzljMmU1NjliMWRiOWY5YjIwODhiNGE2MzFlZmYxNGRjMjM3YmRkOWJhN2RlNmQ5NWMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_0a742ab3fb7243a884c5d7a8eb44b5f0",
+      "statement": "Rule 2 is implemented as twelve `forbidden` contracts: one for each of the eleven feature modules (knowledge, subjects, tutoring, learning, accounts, insights, catalog, quizzes, recommendations, reports, graph) forbidding external access to their `domain`, `ports`, and `adapters`, plus one contract for `shared` forbidding it from importing any feature module or `apps`.",
+      "evidence": [
+        {
+          "resource": "repo://backend/pyproject.toml#L100-L349",
+          "version": "repo-lines-v1:sha256:8e34182e8c4d03a6c9eb58ceb3762d0a7b1ee712abceb5c0699da45a4f0e30d0:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUwLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI4MDFmZjI2YzVmNjQyOWMzZGQyMmFiNzA4ZGQ2MWU1NjNiMTM5ZTFmZTlmNzgxNWQ2NDcwOWZhODg2NTA3NDFhIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiJmZDNiNmM1Yjk0NDIyYTdjMDRmMDA5MzM4MWJmOGQxNzA3ZTZlY2NhNmY3ODczMjFhNjc5NGVhM2RmMTY0NTJkIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJiNjNmMzFiOGQwZTQ4MTcxNjM2NWM5NDc1ZjM1NGIyZTUzY2I2ZmFiMTUwMzc0ODczZTQwYmYyZmU5OTY4NTgyIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiI4NmZmOGQwM2RjZmVlZThhYmQ3NGI5YmEyYmJmNjljMmUwOTc0NjVmYTlkNTI0ZDMzMmFkMmYyNWJkZWEyYzE0In0"
+        }
+      ]
+    },
+    {
+      "id": "claim_168c49a371e1469ba317137b767cf9d6",
+      "statement": "When `lint-imports` detects a violation it prints the contract name and the exact import chain that broke it (e.g., `smart_tutor.learning.application.note_service -> smart_tutor.tutoring.domain.thread`), then reports how many contracts are broken. The correct fix is always to move the offending code (into `adapters/`, through a port, or orchestrate in `apps/`), never to relax the contract.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L37-L46",
+          "version": "repo-lines-v1:sha256:f98c15400746c2f1547257ff32817ae41ce5ad974da7159f42fd1e248d0e3f5a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI0ZGU3M2IwYzJjZWQ2ZDE5M2M2M2ExNjAyYzIxMDk0NmIyNTdiZThiN2JjZjljMzZlOGFjNTM4YmFlOGIzODkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjliOGE2NzdlZjRiNWExNmY3ZDk4MDBkYjgwMWQ2N2E3MDM0ZGM5NjI4NDU4YjdiM2VkMDRlY2IzZmY4OTkyMTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZmZjEwOWMwNTRjM2I4MWY5MTM4MTU3NDg1YTM4MTE5NjlhNzQyOTY2ZmE4MjMzYjkxMDljZjg2Yjc3NWQ2YjgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJlNmY2NmVhN2VhMzYxNWY5NmMzNDQ2NmJjZTk2MDkwYmI0MzQ3YzI4NjFkMGY0ODJmNTJjYTIzNzU5MjFiYzIifQ"
+        },
+        {
+          "resource": "repo://backend/pyproject.toml#L66-L68",
+          "version": "repo-lines-v1:sha256:a0d17e50ec5d7a2078966a30deb5cb4c803186267ef6cee841bcbd60d166eb8c:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjA0ZDFmY2I3NTI5MzA3YjkwYjU3MGEwZTRjNzA1YmZlMGNmYTUxYWE1MDA1NDIwODQ3NmQwYTMyNjQyMjI0OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTJhZjU5MzY3ZjNiNjE1MDYyNWU4NGNiMjlhNThhNDliOWRkNTM2NWQxYzI5NWI2ZmE4MTY3OWJjOWNjYTBhNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjBkMzJkYzFlNDlhODhiYmE4NmE4ZjgzMjAyNWYzN2IyMTg0ZjdkZmYwOGQ2NGJiNmE3ZDA3MTA0ODMzNWNkYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjRkN2ZhOTk0OTRmMGY5MWYxNGNkODQwM2NhNzJmOGI0MGU0OWM2NWQyODAyZjM0NmVmYjZmZGU2ZGMyYWRiMSJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-03T03:19:50.688Z"
+  }
+}

@@ -1,0 +1,180 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:4d9f74aa17dd80e586eb46d6112142f58a8448445e56a2ba3fccb6dbeefa1cee",
+  "claims": [
+    {
+      "id": "claim_56bde8ef033b40bcb1d7f864d22b96d3",
+      "statement": "Smart Tutor uses Keycloak 26.3 as its identity provider with a single OIDC realm named 'smart-tutor', configured in local/keycloak/realm-smart-tutor.json and auto-imported on first start via the --import-realm flag.",
+      "evidence": [
+        {
+          "resource": "repo://compose.yaml#L24-L38",
+          "version": "repo-lines-v1:sha256:9d30263d6cea29f244d9fdd48fac0faf2ac48c0877622309e15e2242a3afe32b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0ZTE5MzA1ZWY5YzJmODU1MjhkMjYxNmVkZWQxZjJhNGY3M2U2OGIyYmFjMTlhMDU0NWQ0ZjIzZDQ0Mjc3ZjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzYTJmMTI0M2ZhZmFlMGFiYjY5ZWE3YTBjMTgxYjZhOWJmMjhiZmMxYjA3NjY0MDUwZmZlMWY0YjEyMTE2MDQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIwMmZhNWQ5OGM5Y2VhN2FjOTdjNTNmMWZkODEwNjQ1OTE3YjljYTdiMzIyYWUzYmYyNmM3N2FlYzhmMmM5ZGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjIyZDg1YzZiYmM0NGZlMmRmZTEzMWVkZmQ4ZWEzMzBhNDBkMTc1YmQ0MzA2OGJhOGE2OGZkZWMzMTk4OGFhNTkifQ"
+        },
+        {
+          "resource": "repo://local/keycloak/realm-smart-tutor.json#L1-L8",
+          "version": "repo-lines-v1:sha256:41f196b2a91ac1136a415312518275be2fb6900d06bccfae0cc8a48056040179:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODNlYWU3ZTZhNGQzYzcxYmNjOTYzMjhjNTE5ZmJhMjk0MWVlNDg2OTY4YTZkNjMyMmZiMDhjZWI0NGUzZWZkNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODdmZjg2Njg4OGI3MjllZmViNGIxYTlkODJkZjgzMDEyZTU1Y2VmN2IzYTEzYzg5NjcxYWQyYWNhM2FmZjljYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWIzMjNmNzkzNmM4NTQ1N2I2YWYyZTQ1YzlhYjJlYjE4ZDg1NTI5NDg4NzMxNGVkZWQ2NDk1MjAyZTcyNjBlMiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_175941b1f6dd484183a91136c7e10cec",
+      "statement": "The smart-tutor realm has three clients: smart-tutor-web (public PKCE SPA client), smart-tutor-api (bearer-only resource server), and rag-mcp (bearer-only resource server). The two resource-server clients have standardFlowEnabled: false and never initiate flows.",
+      "evidence": [
+        {
+          "resource": "repo://local/keycloak/realm-smart-tutor.json#L24-L63",
+          "version": "repo-lines-v1:sha256:ec3fa9af48d74355c9cde0019f93cf29261aef7a46d0595948a7702e4905f26f:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA3YTk2YjhhZDQwYTk1ZDg3ZjE5MmMxMGUwNGEzN2QxMzk1NTIzM2I4ZThiZTA5MDAwODA5NmQxZGRmNTNhNmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNlYWE0OWFlYzQyZjJiN2E4YzlmZjdmMmI0M2IzMDM3Nzc4Y2JjZDI3OWQ2MjU1ZTJlNWM0NjcyYWEzZDA5MTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUxZDE4ZDI4ZWZkMzNlYzU3NmM4Mzg2NWYzMmFmMDBjMjgwODljYWMzNDM4ZTk0MTQ2YjkzNGE1ZTRhY2U3MzAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFiMDBjODQ2ZTE5ZGJjZTAwNzhiMjhhZjYyYWVmNmY2MDI0NWE3N2UzMDhiYTljMjNkNjg5NGMxNzNhMGQ4Y2EifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_140960c6e79a4bdbac292e72cd3d736a",
+      "statement": "The smart-tutor-web client carries two audience protocol mappers that add 'smart-tutor-api' and 'rag-mcp' to the aud claim of every access token (access token only; not the ID token), so one token issued at login is valid for both resource servers.",
+      "evidence": [
+        {
+          "resource": "repo://local/keycloak/realm-smart-tutor.json#L33-L47",
+          "version": "repo-lines-v1:sha256:017096cbf8248eca9430b5f2b4029a51160bc814c05f4bd8a16db0047821e59b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIzMzhmYmEyM2RmMThmYTdiZmUwNjNjYjE3NmU3MjAwNTUxZDUzMjkzZGZlOTVjYWJmMzJmNzM4YTE3Zjk5OTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM5YmEwYWVkYzRkZDFiYjI2MDkyMDFhYjY1ZGNkOGY5YTQ1ODg3MWFjODUxZGYwM2NmNjMwY2RhZWJmMmRiZGIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjliNTUyZGQ5NGJkOGI1YzVlYTU3NTk2Yjk4ZTk5M2U0OGNkYzZhYzc1MzEwMzg4NWI2ZjUxMGNiYjNkNjMyOTAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRmMmE2OTI3MjIyNTY2ZGFjYjQ1ODYxMTEzMWRmMjFmMzc2ZmY3ZWNiNTIxODdjZThjZDM0N2NhMjYwMGEzODkifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_8a987a0583054d52917ea2bbaaf9955f",
+      "statement": "The web app performs Authorization Code + PKCE (S256) against the smart-tutor realm; the resulting access token is sent to the API as a Bearer token, the API validates it and forwards the same token in runtime context to the agent, and the agent attaches it as an HTTP Authorization header on every MCP request — never in a prompt.",
+      "evidence": [
+        {
+          "resource": "repo://local/keycloak/realm-smart-tutor.json#L29-L34",
+          "version": "repo-lines-v1:sha256:7f4ecccd1ae8633459af1697f748e83c1128b7e50242f3cd52febe618ed40d1f:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTdjYTJiYjRkOWMwMmI5MmIxMTM0Zjk0ZGZiZDVkYzc4OWZkYzkzZGE5MzgzYmJkMDkwZGUyY2NlYTllMmFiNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzU2NDI3NWM0NDhhZDk0MGFhZjFmNGJjYWM0YWQzNzkxZjYwNjg4NDM3Y2Y2NjliYTljOWM2MmY4ZjI2OTFiOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDgzN2VkNThhZmQ1NTFmNWY0NWZmNDJhNWYwYzJhM2NmODU4NDZlNzhiYjY3ZTRhYzk4NjZhNjBmNjExOWE1YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDcwNGRkZWVkOThhZGRhMzEzYjk1MmZhZDNiNDc5OTAzMTRlNWY2YjU1MTAwNWI5ODNjMzlmYTJiMzg4NmZlNyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L326-L329",
+          "version": "repo-lines-v1:sha256:43aa2d01be48eafc6c849b10e413d2dbe56ac4a712c8b42d4738fe2260a4c43e:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODA4NzgwMGQxYmEyYTFmMmZjMTM1Nzg1MTRjOTdhMzYxYTRjMDhjMGQ2NTQ3MjkzYTAwZDI5MzRmNmFlMTAxNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjdjNGU2YWM1ZWQyYzJkYjY0OWEwODUzNTcwN2YzMDcwOTQzNjJiNzgyM2JkODdlNmFiMDU3ZDgzMmI5ZjJkZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzYwMjMzOWY0ZTVkODI0Y2Y3YzZkYjgzMzQ3MWI0MDY3NTdlZGYyMmU1NzNkZmEzNGViZDlkNmJmYzgxZjQwNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWQzN2FmMDQ4MDlkMTc5OGI4ZGNiNWIzNTk1ZjJkNmE3YzBkYjJkNDA1ZTA1ZDc4MjI2MGM4MDJjNTk2Y2ExNiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_2f7f954ad69c4971b663aa75c918bea0",
+      "statement": "JWT validation in the auth adapter checks: JWKS (fetched from the Keycloak issuer), iss (must equal keycloak_issuer from Settings), aud (smart-tutor-api for the API; rag-mcp for the MCP server), and exp. The verifier is currently a stub (M0 task).",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/adapters/auth/__init__.py#L1-L1",
+          "version": "repo-lines-v1:sha256:526272e6ed41cf58e31a6590a8ca92445619f0ff049b934efc72a6494db45fb1:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTI2MjcyZTZlZDQxY2Y1OGUzMWE2NTkwYThjYTkyNDQ1NjE5ZjBmZjA0OWI5MzRlZmM3MmE2NDk0ZGI0NWZiMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTI2MjcyZTZlZDQxY2Y1OGUzMWE2NTkwYThjYTkyNDQ1NjE5ZjBmZjA0OWI5MzRlZmM3MmE2NDk0ZGI0NWZiMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/config.py#L32-L33",
+          "version": "repo-lines-v1:sha256:9ce91b2d2efa79c7c6cc8f41f70133c1ac6a934abe25890ced841ef0e8231db0:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzkzM2U0NmFiZDE3ZDUwMmNjOGFhNGM5NzdlNDc4MjcxNWZmYzU5ZjY4ZjA3M2ZkOGRiM2UwNjI3NDNkZDVkZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNmFmYmQ4ZmY3YWQ3YmJiYzcwMjAwODJkMDlhNzYyMTQ0ZDIwZGVkNmQwYmRiNGYxZmFkYWQ4NmU0NDIxYWU0ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTdjNTA1NmFkZWQ5ODk5MTBiMTE3N2ViNGViNDY2ZWY3OTE4NTQxZGE4NDE1ZmUzNmU5M2I2MjNiZGYwZDM3NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzRjMjM0NzhhNzEwMTg0YWI2MzQzODJlYTRiZjYyOWJkMDkzMTllYWU2N2NmYmQzMWRhZjc2MTYwZTA0NzgwOSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L327-L327",
+          "version": "repo-lines-v1:sha256:24bc47d59bed2f287888c1c4aec3881bbd068da0d7264a2c55ecfcf869ca5859:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjRiYzQ3ZDU5YmVkMmYyODc4ODhjMWM0YWVjMzg4MWJiZDA2OGRhMGQ3MjY0YTJjNTVlY2ZjZjg2OWNhNTg1OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjRiYzQ3ZDU5YmVkMmYyODc4ODhjMWM0YWVjMzg4MWJiZDA2OGRhMGQ3MjY0YTJjNTVlY2ZjZjg2OWNhNTg1OSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmM2MzA0YzYzMDFhYjlkY2U1ZjI3ZWUyYzdkZWJmOWQ0MWM3Y2I0YmQ5NDQ1MzlhZThkMmZlY2UwZTJiNTMwNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDA0ZWUxMzVmZjA1ZWJjMGNjMmQ2NjlhMDg5ZjE3NjU2MzVmMTgxNGQwY2U3OGE0YzY4MDFjZDI1Mzc2NWNjZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_885b1bc5b42f407a93f67d058260077f",
+      "statement": "Settings supplies keycloak_issuer (default: http://localhost:8080/realms/smart-tutor) and keycloak_audience (default: smart-tutor-api) read from environment variables with prefix SMART_TUTOR_ and nested delimiter __.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/config.py#L26-L33",
+          "version": "repo-lines-v1:sha256:47206ce8fc383aa390c59a946f98318309f367587d54214abbbdc014693545a4:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTM4YWVlZjM2N2E4OTIwZjljMTlmYWNhYWU4YThmYjJhZWIzMDA0ZDQ0YmVlNmJmMjZmMWY1YjAxYTE2OTkwZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNmFmYmQ4ZmY3YWQ3YmJiYzcwMjAwODJkMDlhNzYyMTQ0ZDIwZGVkNmQwYmRiNGYxZmFkYWQ4NmU0NDIxYWU0ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGI5NzRkYTQwODYzMmE0YWE3ZTJhZTgwYjg2MDM5MWEzZGNkODIxMWM3OWVjYWQ3Y2E4ZTk1MTI4YjAwMTgzMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzRjMjM0NzhhNzEwMTg0YWI2MzQzODJlYTRiZjYyOWJkMDkzMTllYWU2N2NmYmQzMWRhZjc2MTYwZTA0NzgwOSJ9"
+        },
+        {
+          "resource": "repo://compose.yaml#L55-L58",
+          "version": "repo-lines-v1:sha256:55302fcf6d2172405e32e189aaa5b8d7d324c027cf0d51ddfda80b85ee3a6cce:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMmU2OGM5NjcwYWM0OGIzM2U0YzJlYmMxYzE1NTEyMjNmMDA3OTdmNWI3ODBmZWNjMjVjM2UwZjJjNzlhMmNjMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjVhYmZkYjFlZWI4MjcyNzA2MDMyNWZlYWZhMzA1ZjNlNTE3MTZlNjg5N2IwN2I3ZDQxYTdlYjM4NGI3MDIzYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTRlNzJmODI5MTk1NzYwZGFjNjRlNThmNzlhZjc0ODRmYWMyMDk2OGUzZWU0MzRiYWRhNWNhZDZjMjAzNTcyZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODVmYmIxMTU3MTE3ODUxNGEwMGM2ZjcwY2MzNTRmNWIwYzMzNzZlNmJjOGNmNDM3ZDYzMmQ0ZGZlZWQ2ZmRiOCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_d4c98351abe2485ea2292506873533d1",
+      "statement": "The realm defines two application roles: 'learner' (default for all self-registered users, assigned via the default-roles-smart-tutor composite role) and 'admin' (operations only: cost/budget alerts, evaluation annotation; no product admin functions in Releases 1–3).",
+      "evidence": [
+        {
+          "resource": "repo://local/keycloak/realm-smart-tutor.json#L10-L23",
+          "version": "repo-lines-v1:sha256:1c63bd6125a7599e611c8ff7d316583105b164036322afac068a830b01ac68bf:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI5YTlkMzI3ODI1NjRlMGI1ZWU3NmMzZjRjNWEzMjJmODQxZjg3YmY2Njc1MzRlYjM3YjI2NDljOGZlYmVmOTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA0YTFhYTliMzgzYWI4YTBmMjRjNzg5ZWU4ODBlZWJlOTdlMGI5MmIyNmM0OTc3OWIyZmZkMzg4ZDY4OGVjOGUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZlYmQzZDM1MDhlN2NjYjcxZDE1NDg3OTZhYTc4MmJiYTM2MTk3YTE4Y2FkYTI4M2MwZjgwYjk2YmNhZjNiYmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjllYzZjOTBiNTBjZDlmYTc5NjgzNDA3ODZkOTA3ZjRmZDI2MTJiMzIwYWVhNDEyN2I1ZWRmYjA2NjdmM2FjYTYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_a0e414e94d9646eda1bd50e37224624d",
+      "statement": "Self-registration is enabled on the smart-tutor realm (registrationAllowed: true); new users automatically receive the learner role through the default-roles-smart-tutor composite role without manual assignment.",
+      "evidence": [
+        {
+          "resource": "repo://local/keycloak/realm-smart-tutor.json#L3-L23",
+          "version": "repo-lines-v1:sha256:79869d1e128c429323644fcf1cd225f0dd6c8da3c032f12822f77e2822726764:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRkNjIwYjJkYWU2MWI4M2RiNDNiMzA3YWFmYmU4MDBiZGI0Y2NmNDdmZGMzZjVhNWQ4NWYwYTI5OTczZWFkNDUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA0YTFhYTliMzgzYWI4YTBmMjRjNzg5ZWU4ODBlZWJlOTdlMGI5MmIyNmM0OTc3OWIyZmZkMzg4ZDY4OGVjOGUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjoyLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkzMTYzMjk5ZmVkMDAyNzM1Y2M1ZjZlZjIyNDVjODEzODI0MmI3Njc3MjAxZmRiMTBkZjVlY2RmMTdkZmQ4MTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjllYzZjOTBiNTBjZDlmYTc5NjgzNDA3ODZkOTA3ZjRmZDI2MTJiMzIwYWVhNDEyN2I1ZWRmYjA2NjdmM2FjYTYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_202e232f1e7b4ee1acc4a6cc583eaf77",
+      "statement": "Three test users are pre-seeded in the realm for local development: learner@example.com/learner, learner2@example.com/learner2 (both learner role), and admin@example.com/admin (learner + admin roles). The Keycloak admin console is accessible at http://localhost:8080 with admin/admin.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L47-L47",
+          "version": "repo-lines-v1:sha256:7668993051a707734526cab1a9944758988931ae0f436dc4c99568eafbc0572d:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzY2ODk5MzA1MWE3MDc3MzQ1MjZjYWIxYTk5NDQ3NTg5ODg5MzFhZTBmNDM2ZGM0Yzk5NTY4ZWFmYmMwNTcyZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzY2ODk5MzA1MWE3MDc3MzQ1MjZjYWIxYTk5NDQ3NTg5ODg5MzFhZTBmNDM2ZGM0Yzk5NTY4ZWFmYmMwNTcyZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWUxZjEwNTgzMmFlNjJmMTJkMjQzNDBjYTgyMDhjN2YxODUwN2UxYTNkNjM4MjAzMzc2ZGMwMDk1MTY0NzZkNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGRmYTE1YTFlMWY3ZDI4OGRjNzRjNzAwNTUyMDdhZjM3NjZjN2FlNmEzNDU3NGU4ZjgyODg2OTNiMzEzMjNmOCJ9"
+        },
+        {
+          "resource": "repo://local/keycloak/realm-smart-tutor.json#L64-L95",
+          "version": "repo-lines-v1:sha256:6159e83b3e57062b0731fd69ab1866e5dd2ab1c8fbb487933c50a31ed46fb03a:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU2MzNiNzNkN2NmZDZiNGMzOWIyZjk3NjE0YjYxYjM0Zjg4NWVhMzBjNjBiZjEwNjAwMGNmNTkwMGIwNzUzMzAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI3MGU4MzNmM2QyY2ZiMmY2NjVhNThiNTU1ZDRjOTI1NTIwMzA2NDhiOTY3ZmI3NjY3YzI5ODU2MjQ5M2I5OWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ3ODYxMDBjZWRlMTZhOTY0MjM2MGY5YTAyOTJjMWMyYTgwMDlhYzFiOWZiZmFhZmY0ODkzOTc5ZmEyNzc5YzgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUyMmZhYTUzNWJkMmVhM2Q1MmU3NDFlZDQ1NDQzNWI3ZmU0OWU4MzU4NmU5NDNkOThkODJiYmZiMjRkMWY1YzUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_25d44fa6c38144488a38ba26de727528",
+      "statement": "The realm is only imported when it does not yet exist in the Keycloak database. After editing realm-smart-tutor.json, volumes must be destroyed with 'docker compose down -v' to force re-import.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L47-L47",
+          "version": "repo-lines-v1:sha256:7668993051a707734526cab1a9944758988931ae0f436dc4c99568eafbc0572d:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzY2ODk5MzA1MWE3MDc3MzQ1MjZjYWIxYTk5NDQ3NTg5ODg5MzFhZTBmNDM2ZGM0Yzk5NTY4ZWFmYmMwNTcyZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzY2ODk5MzA1MWE3MDc3MzQ1MjZjYWIxYTk5NDQ3NTg5ODg5MzFhZTBmNDM2ZGM0Yzk5NTY4ZWFmYmMwNTcyZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWUxZjEwNTgzMmFlNjJmMTJkMjQzNDBjYTgyMDhjN2YxODUwN2UxYTNkNjM4MjAzMzc2ZGMwMDk1MTY0NzZkNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGRmYTE1YTFlMWY3ZDI4OGRjNzRjNzAwNTUyMDdhZjM3NjZjN2FlNmEzNDU3NGU4ZjgyODg2OTNiMzEzMjNmOCJ9"
+        },
+        {
+          "resource": "repo://compose.yaml#L26-L37",
+          "version": "repo-lines-v1:sha256:aa6091d58aafa7dc65056cd1b0c0053b177df7d25925ebc86858dee3ea023ba7:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA4NjI2NjQ3OGE5MWUwNGY3MGU5ZmVmMmIwZDA2OTJiNjdiNDJmYjRhMDJjMGRlMDZhNDk4ODI3ODJjZjBiYWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI0NmQyNTZiNDRlZGMxZGQyYzI5NzY4NWQzZDVjZmQ3MWRlY2Y0N2MyOTgwMWI2ZDI5OTVjNzJlNGI5ZDhlMjkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImY3ZWZlMGI2MjllZGU1NDk5MzU5NWYyMTM1NTViNzVhYjc3ZGJmZTkyZjFhNDM0ZjU5NWQyNzAxOTUyODNkY2YiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjIzNjUyZWMxOWVkOTM2NDkwMzQ2Njk4MWI3ZTlkNmU3OWVlMmYzZDgwYzBlNmEzMWNiMzhhZTA5ZGIzYTg5M2EifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_9c1237d915834f0d998bd3b0bc1eeff0",
+      "statement": "Tokens travel only in HTTP headers and runtime context and must never appear in prompts, logs, or traces. This is a project-level invariant (AGENTS.md and PRD §9.3) that protects the access-control boundary from LLM exposure.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L40-L40",
+          "version": "repo-lines-v1:sha256:a25c3ee96ddc1dd0fae89cd3ff6b5eb296afaaa82e8caa2e9cf665612b9e656b:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTI1YzNlZTk2ZGRjMWRkMGZhZTg5Y2QzZmY2YjVlYjI5NmFmYWFhODJlOGNhYTJlOWNmNjY1NjEyYjllNjU2YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTI1YzNlZTk2ZGRjMWRkMGZhZTg5Y2QzZmY2YjVlYjI5NmFmYWFhODJlOGNhYTJlOWNmNjY1NjEyYjllNjU2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDkzMzQwM2QzYzczNGRlOWU4MzFhYTAxZDhlNmNkODU2ZWUzMmE3OWRjMjUyMTVmODcwNDAwZDI1MTVjNmUwZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODdjODRiZTZjOWJjNmIwZDdhYWNjZjdiNzFlNGYzMGRkNGQyZDFmNGNkMWY3YTU5ZTU1YTQ0YTk2NDM1NDU5YiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L328-L329",
+          "version": "repo-lines-v1:sha256:c47c6197cbf9ce85ec40917b1d53ee6536c21c5b3cda75ec6edc29ce47b5cc0f:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjU5ZTYyNzQ3NGYyMDllOTE4YzAyMDYxZDRlNWI0MTA3NmFlZTdiMTBlOTVjNzAzYmQzNTBhNmNlM2Q0NGY1MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjdjNGU2YWM1ZWQyYzJkYjY0OWEwODUzNTcwN2YzMDcwOTQzNjJiNzgyM2JkODdlNmFiMDU3ZDgzMmI5ZjJkZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTBkNjUwZDFhMThlMTE4ODAxOTE3Y2M5Y2JiNDc3YjhhMDRlZmRiNjE4MzZiMDg4YzE3YTRjY2NjZmE4Y2Y0NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWQzN2FmMDQ4MDlkMTc5OGI4ZGNiNWIzNTk1ZjJkNmE3YzBkYjJkNDA1ZTA1ZDc4MjI2MGM4MDJjNTk2Y2ExNiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_34bc1d2233d242cb987ce364c0aa647a",
+      "statement": "The MCP server validates the forwarded JWT against aud=rag-mcp, reads the sub claim, and uses it to build an SQL predicate restricting all chunk searches to documents owned by that subject (owner_id = sub in Releases 1–3), ensuring access is never decided by the prompt.",
+      "evidence": [
+        {
+          "resource": "repo://local/keycloak/realm-smart-tutor.json#L57-L63",
+          "version": "repo-lines-v1:sha256:2934f62393a1780709642fb2f4acb2ac1f1284de72f702c070d123c5065aaf2e:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDhmNDc0OWRkODNhNWMwNGI4Njc4YTcxMWQzNzNkM2Q0OTZiZmVkZGZlZDA5MWUzNDRiNzg3OGZiOTBlNDg2YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiM2VhYTQ5YWVjNDJmMmI3YThjOWZmN2YyYjQzYjMwMzc3NzhjYmNkMjc5ZDYyNTVlMmU1YzQ2NzJhYTNkMDkxNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjg4Y2RkOWJhZGI0ZTFjZDk4YzM5YjMyNDE2NmU4YzNhOTMyYmY3ZTI0YjAwYTlmMDY0MzJkZjFiOWZjODk0OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWIwMGM4NDZlMTlkYmNlMDA3OGIyOGFmNjJhZWY2ZjYwMjQ1YTc3ZTMwOGJhOWMyM2Q2ODk0YzE3M2EwZDhjYSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L329-L331",
+          "version": "repo-lines-v1:sha256:27712d2634f98b4455bc38d984cb2c6bca2ebfc80ad5d80802c47ba7011c4463:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjdjNGU2YWM1ZWQyYzJkYjY0OWEwODUzNTcwN2YzMDcwOTQzNjJiNzgyM2JkODdlNmFiMDU3ZDgzMmI5ZjJkZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGIzZjRkYzI4NDA5NjBkMWI2Yjg0ODk4N2Q3ZGEyNjlkN2U4ODBlZDViNGE2MDVjOWU0MWZlY2UwNjllMDgyMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTJjMmFkZDIxZWVmODNjZTFlOTNmYjc1NGMwODM2ODQ1NDFmY2QxOTBiZjRlYmJmNTE0MGI4MTFjNWZkYTQwYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjk1NmRlNjdjMDg2MjJhYjU4OWVhYzk2YWEwNjhmY2E0MzI5YTQzYmFhZmMxZTI2ZWY4NTZkYmIxNDU2ZWJiZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_bf56ff64ce7d4af183ec0229e9744276",
+      "statement": "Unauthenticated calls to the API, agent, or MCP server return HTTP 401.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/adapters/auth/__init__.py",
+          "version": "repo-file-v1:sha256:526272e6ed41cf58e31a6590a8ca92445619f0ff049b934efc72a6494db45fb1"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L167-L167",
+          "version": "repo-lines-v1:sha256:12ca4003eaf5dab8073a2ed79ff68487788137e6a62145599dbf0e0eea452302:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTJjYTQwMDNlYWY1ZGFiODA3M2EyZWQ3OWZmNjg0ODc3ODgxMzdlNmE2MjE0NTU5OWRiZjBlMGVlYTQ1MjMwMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTJjYTQwMDNlYWY1ZGFiODA3M2EyZWQ3OWZmNjg0ODc3ODgxMzdlNmE2MjE0NTU5OWRiZjBlMGVlYTQ1MjMwMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWJkM2YwYjM5YTczNjY1ZmRlZTU1YzdmYjI1MGRmYTYzNDU2YTQ0ZGMwMmY0NTkwYWQzNzVmMzI5NTE3NzZmYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTBjOTEwZTgyMjY5OWRlODEyOWNhN2Y0ZTQyZjdjZTA2NTIzZDg1OWMzMTYxNWFkZWNiODU3MzUwNjJkOThmZiJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-03T03:19:50.688Z"
+  }
+}

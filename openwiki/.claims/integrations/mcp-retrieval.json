@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:ee34eefe0136f0768e67bebba5a2aa226beb1191b8af39589917b158efdd6108",
+  "claims": [
+    {
+      "id": "claim_0f6d8306c6f14c2fa38cf4ef52e40b3e",
+      "statement": "The RAG MCP server uses MCPServer from mcp 2.x, listens at :8000/mcp on the streamable-http transport, and host/port are passed to mcp.run().",
+      "evidence": [
+        {
+          "resource": "repo://backend/pyproject.toml#L15-L15",
+          "version": "repo-lines-v1:sha256:660c2de6f85f36b11752aa4ffcc39d30e82fc5b20bd0b782e3ad6d042b0d3519:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjYwYzJkZTZmODVmMzZiMTE3NTJhYTRmZmNjMzlkMzBlODJmYzViMjBiZDBiNzgyZTNhZDZkMDQyYjBkMzUxOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjYwYzJkZTZmODVmMzZiMTE3NTJhYTRmZmNjMzlkMzBlODJmYzViMjBiZDBiNzgyZTNhZDZkMDQyYjBkMzUxOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTAzZTMzN2ZlYWU2ZDM1Y2M2OTNlZDdiYjVkNjVlYTA3MDQ5YzU2NThlYmI3MTNhNzU3NzU5MjM4MTc1OTZmMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiN2Y5ZjJmZjBhYTUxODI0ZTRlNDhkNjM1N2RkYWQzMDNlMWEyYjMxMTNlOThlMTlhMDg3ZTJhYjlkMWY3NDEzZCJ9"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/mcp_server/server.py",
+          "version": "repo-file-v1:sha256:77b5eafc76bb8d9cd3acdb8cadd36c5d97753aaa45b7bed5db48259b24008a85"
+        }
+      ]
+    },
+    {
+      "id": "claim_ba18e196653742dc917fc83555f09c26",
+      "statement": "apps/mcp_server/tools.py, which declares the search and get_chunk tools, is a planned M1 stub; server.py's docstring records this as an M1 task referencing knowledge.application.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/mcp_server/server.py#L1-L4",
+          "version": "repo-lines-v1:sha256:338ac7a5e14ee10775364bba595f26777967c2eabdfbf9ac546ca77bc36f45fa:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODVhYTAyMWNkZDgyODU3NDlmMWM1MTc0ODYyMjcyM2ZkNzU0ZjM0NjkzMjgxMDE5OTgxNTRkNDVlZDQ3MDlhZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDc1ZDQ1ODllOTFjYzhjYjk3NDg4OWRhYjAxZGUxNWRiMTU3NGNhMTBlZWM3MjkwYTEwOWJmNTg4Yzk0ZTAxYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODdhZmQ5MzdhMTBiMmM3MjIyZjY4NDIzYWI5OWUzMTRmZDk2ZDdkZTQzYmUzZjUwNDE3NWYxMTkzN2ZlOTkyNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_28581eea9af949a68d7ba1017451d689",
+      "statement": "The search tool accepts query, subject_ids, and k (default 5), validates the forwarded JWT before any database query, and returns ranked chunks with scores and citation metadata.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L281-L281",
+          "version": "repo-lines-v1:sha256:df0d2ef2105438f62cfcab0ba8d1e4330ac24a4ca868647e80df764b4eb402a0:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGYwZDJlZjIxMDU0MzhmNjJjZmNhYjBiYThkMWU0MzMwYWMyNGE0Y2E4Njg2NDdlODBkZjc2NGI0ZWI0MDJhMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGYwZDJlZjIxMDU0MzhmNjJjZmNhYjBiYThkMWU0MzMwYWMyNGE0Y2E4Njg2NDdlODBkZjc2NGI0ZWI0MDJhMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDY2NzE4NGRjMzQ3MDQzMjVjYzJmZDJjYThlNzA4MDdmMmMwMWI2NGRkY2Y3NTA2ODNjOWNmMTQ3YjI2NGQyNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWNhODE1NTY2MmQwNzBhZThhNjM3YTE2MzBmMmI5NDFhMWMyMWZjYzIyNzBlN2QwNmViMThkMTJmYjRlNDkxNSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L329-L329",
+          "version": "repo-lines-v1:sha256:b7c4e6ac5ed2c2db649a08535707f307094362b7823bd87e6ab057d832b9f2dd:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjdjNGU2YWM1ZWQyYzJkYjY0OWEwODUzNTcwN2YzMDcwOTQzNjJiNzgyM2JkODdlNmFiMDU3ZDgzMmI5ZjJkZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjdjNGU2YWM1ZWQyYzJkYjY0OWEwODUzNTcwN2YzMDcwOTQzNjJiNzgyM2JkODdlNmFiMDU3ZDgzMmI5ZjJkZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTJjMmFkZDIxZWVmODNjZTFlOTNmYjc1NGMwODM2ODQ1NDFmY2QxOTBiZjRlYmJmNTE0MGI4MTFjNWZkYTQwYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWQzN2FmMDQ4MDlkMTc5OGI4ZGNiNWIzNTk1ZjJkNmE3YzBkYjJkNDA1ZTA1ZDc4MjI2MGM4MDJjNTk2Y2ExNiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_54e8232183d94e779978c5382a6c94b9",
+      "statement": "The get_chunk tool resolves a single chunk by id and applies the same JWT validation and can_read check; it returns the chunk only when the caller's sub has a readable, ready, non-archived document whose content_id matches the chunk.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L281-L281",
+          "version": "repo-lines-v1:sha256:df0d2ef2105438f62cfcab0ba8d1e4330ac24a4ca868647e80df764b4eb402a0:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGYwZDJlZjIxMDU0MzhmNjJjZmNhYjBiYThkMWU0MzMwYWMyNGE0Y2E4Njg2NDdlODBkZjc2NGI0ZWI0MDJhMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGYwZDJlZjIxMDU0MzhmNjJjZmNhYjBiYThkMWU0MzMwYWMyNGE0Y2E4Njg2NDdlODBkZjc2NGI0ZWI0MDJhMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDY2NzE4NGRjMzQ3MDQzMjVjYzJmZDJjYThlNzA4MDdmMmMwMWI2NGRkY2Y3NTA2ODNjOWNmMTQ3YjI2NGQyNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWNhODE1NTY2MmQwNzBhZThhNjM3YTE2MzBmMmI5NDFhMWMyMWZjYzIyNzBlN2QwNmViMThkMTJmYjRlNDkxNSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_8621661e8ca3442db4f0785e944e3867",
+      "statement": "The search SQL filter scopes chunks to documents WHERE owner_id = sub AND state = 'ready' AND archived = false AND document_subjects.subject_id IN requested_subject_ids; an empty readable set returns an empty result rather than an error.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L329-L329",
+          "version": "repo-lines-v1:sha256:b7c4e6ac5ed2c2db649a08535707f307094362b7823bd87e6ab057d832b9f2dd:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjdjNGU2YWM1ZWQyYzJkYjY0OWEwODUzNTcwN2YzMDcwOTQzNjJiNzgyM2JkODdlNmFiMDU3ZDgzMmI5ZjJkZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjdjNGU2YWM1ZWQyYzJkYjY0OWEwODUzNTcwN2YzMDcwOTQzNjJiNzgyM2JkODdlNmFiMDU3ZDgzMmI5ZjJkZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTJjMmFkZDIxZWVmODNjZTFlOTNmYjc1NGMwODM2ODQ1NDFmY2QxOTBiZjRlYmJmNTE0MGI4MTFjNWZkYTQwYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWQzN2FmMDQ4MDlkMTc5OGI4ZGNiNWIzNTk1ZjJkNmE3YzBkYjJkNDA1ZTA1ZDc4MjI2MGM4MDJjNTk2Y2ExNiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_17ef69337ea04a51a5ccb0ed7afb12b2",
+      "statement": "The server uses pgvector >= 0.8 hnsw.iterative_scan for iterative HNSW search and falls back to exact search over the learner's filtered chunk subset when the readable set is small; recall under selective filters is an M1 evaluation target.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L333-L333",
+          "version": "repo-lines-v1:sha256:e5b8d16ad633ef8169ac4cda19ade9eff6257a9ce5ca8ee31fc9f9a3593eaf98:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTViOGQxNmFkNjMzZWY4MTY5YWM0Y2RhMTlhZGU5ZWZmNjI1N2E5Y2U1Y2E4ZWUzMWZjOWY5YTM1OTNlYWY5OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTViOGQxNmFkNjMzZWY4MTY5YWM0Y2RhMTlhZGU5ZWZmNjI1N2E5Y2U1Y2E4ZWUzMWZjOWY5YTM1OTNlYWY5OCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWQzN2FmMDQ4MDlkMTc5OGI4ZGNiNWIzNTk1ZjJkNmE3YzBkYjJkNDA1ZTA1ZDc4MjI2MGM4MDJjNTk2Y2ExNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDZiMjRjMjhkN2IwYWMzNzdlYjQ2MDAwNzMwNDM1ODYwZTViNzQyZDFjNGVkMzQxN2ZmMjExMTkxNzU4MDllMCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_19f3bf73ea2c43eab77495f77efad7be",
+      "statement": "tutoring.ports.Retriever is an ABC; the concrete implementation in tutoring.adapters is an MCP client adapter that attaches the forwarded JWT and calls the MCP server's search tool, so tutoring never reads chunk tables directly.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/tutoring/README.md#L9-L9",
+          "version": "repo-lines-v1:sha256:ca790ee9e43fbcf909c7d05f69d5c9ae81a219c7bba23ab69bf8849e123c8ed9:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2E3OTBlZTllNDNmYmNmOTA5YzdkMDVmNjlkNWM5YWU4MWEyMTljN2JiYTIzYWI2OWJmODg0OWUxMjNjOGVkOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiY2E3OTBlZTllNDNmYmNmOTA5YzdkMDVmNjlkNWM5YWU4MWEyMTljN2JiYTIzYWI2OWJmODg0OWUxMjNjOGVkOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTQyMDQxYjNiMDc5MTIyZjYwNmM2ZjY1NjNlMzBhMWYzN2FmZjc4NThkODA3ZGM2ZDk0YmRhZmY3YzMxMGNjNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjQ4MzFkNGZlMDc2NmRlOWEzMWVmMmIzMGUxMjVkNDkyM2EyYjhiNjdlMDIwZmNmZWYxYjc3MjE4ZWNhOTIwZiJ9"
+        },
+        {
+          "resource": "repo://sdd/specs/2026-10-02-project-structure-design.md#L133-L133",
+          "version": "repo-lines-v1:sha256:d4b2f8166847d6e60dce0fc372e7eec6fc564863ba690b7b0d4cf0aedafc6deb:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDRiMmY4MTY2ODQ3ZDZlNjBkY2UwZmMzNzJlN2VlYzZmYzU2NDg2M2JhNjkwYjdiMGQ0Y2YwYWVkYWZjNmRlYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDRiMmY4MTY2ODQ3ZDZlNjBkY2UwZmMzNzJlN2VlYzZmYzU2NDg2M2JhNjkwYjdiMGQ0Y2YwYWVkYWZjNmRlYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWRiYzM4YzRkMjkwOGMxNWMzNWFkMmFjNzY3MDhjOWI5MWFiMjM3ZjUzYzYxNDA5ZThlZWVkZDYxZTBlZWE2OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjc0ZTNjMTNkM2I5ODM2OTI5MWNiMTMzNmIwYjZmYzc3ZmI0N2M5YjcxMjUxYWVlYTM5NDYzMWYzZGU4ZTRlMyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_1db6e2fc0d604a07a1163313cdabc50b",
+      "statement": "The agent→MCP→knowledge chain is the enforced access boundary: chunk tables are read only by knowledge; import-linter contract 4 restricts the mcp SDK to adapters and apps packages, enforced in CI.",
+      "evidence": [
+        {
+          "resource": "repo://backend/pyproject.toml#L71-L92",
+          "version": "repo-lines-v1:sha256:e112983cea46eb50e935bb5f80f4025b988783400a20ae3666f5dda9e1a50867:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk0NjE5YmM1OTAxYWM0NGZlZjJhYjg3YzUzZjA1NjgxNmIxNmQxM2U5N2U3ZmMyNjQ1NTg1MWRhNDYxOTk2ODciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZkM2I2YzViOTQ0MjJhN2MwNGYwMDkzMzgxYmY4ZDE3MDdlNmVjY2E2Zjc4NzMyMWE2Nzk0ZWEzZGYxNjQ1MmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ4MTYyNDVmMGZlYjIwYjY2NTQwZTFhY2IwYjYxYjY2M2VlOWEzM2I3ODE4ZTQxYWE1MzEzNWFjNmUzMmVhNzEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNiMTk2OTVlZWRmNWFlZTVkOWEzMTk1MjYwZmZmMDQ4NDgzMjBlZGRhZmU3NmM3MDZiMjhiNzJhMzcyNGMxNWIifQ"
+        },
+        {
+          "resource": "repo://sdd/specs/2026-10-02-project-structure-design.md#L133-L133",
+          "version": "repo-lines-v1:sha256:d4b2f8166847d6e60dce0fc372e7eec6fc564863ba690b7b0d4cf0aedafc6deb:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDRiMmY4MTY2ODQ3ZDZlNjBkY2UwZmMzNzJlN2VlYzZmYzU2NDg2M2JhNjkwYjdiMGQ0Y2YwYWVkYWZjNmRlYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDRiMmY4MTY2ODQ3ZDZlNjBkY2UwZmMzNzJlN2VlYzZmYzU2NDg2M2JhNjkwYjdiMGQ0Y2YwYWVkYWZjNmRlYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWRiYzM4YzRkMjkwOGMxNWMzNWFkMmFjNzY3MDhjOWI5MWFiMjM3ZjUzYzYxNDA5ZThlZWVkZDYxZTBlZWE2OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjc0ZTNjMTNkM2I5ODM2OTI5MWNiMTMzNmIwYjZmYzc3ZmI0N2M5YjcxMjUxYWVlYTM5NDYzMWYzZGU4ZTRlMyJ9"
+        },
+        {
+          "resource": "repo://sdd/specs/2026-10-02-project-structure-design.md#L144-L144",
+          "version": "repo-lines-v1:sha256:491c43031c978d0c4746502f65dd89b0c294763d90b29dd8def879189f0608c2:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDkxYzQzMDMxYzk3OGQwYzQ3NDY1MDJmNjVkZDg5YjBjMjk0NzYzZDkwYjI5ZGQ4ZGVmODc5MTg5ZjA2MDhjMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDkxYzQzMDMxYzk3OGQwYzQ3NDY1MDJmNjVkZDg5YjBjMjk0NzYzZDkwYjI5ZGQ4ZGVmODc5MTg5ZjA2MDhjMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWExZWJkZGIyZDAzY2NiZjgxOGQ1MGZmN2Y1MzEwNjRkNjUzZjliZDBiODZkOTY4NDM1MDk4Nzc4ZWZjNzZhNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzgzOTg2MzJhNDEzY2UxNGQyYWI1YzBlNzJjZmY3Mjk1MTkxZTk0NzY0NTgyZDRkZWJhYmY2OTFhNDBlNjIxZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_c60123ae58a74657817b17af5380567e",
+      "statement": "The MCP server is a ClusterIP service; a NetworkPolicy allows only agent → MCP traffic; the Keycloak client is rag-mcp with an audience mapper adding rag-mcp to access tokens.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L335-L335",
+          "version": "repo-lines-v1:sha256:033376d3719803b23bba3caada5eb3360aa12d11da19e27f8677db78a293a9fc:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDMzMzc2ZDM3MTk4MDNiMjNiYmEzY2FhZGE1ZWIzMzYwYWExMmQxMWRhMTllMjdmODY3N2RiNzhhMjkzYTlmYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDMzMzc2ZDM3MTk4MDNiMjNiYmEzY2FhZGE1ZWIzMzYwYWExMmQxMWRhMTllMjdmODY3N2RiNzhhMjkzYTlmYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjk1NmRlNjdjMDg2MjJhYjU4OWVhYzk2YWEwNjhmY2E0MzI5YTQzYmFhZmMxZTI2ZWY4NTZkYmIxNDU2ZWJiZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTljOTcwYjkzYzdjNWY3ODVkYzIyMzViNDFiODM0ZWE3ODRiNjYyZTU4MjU0ZTY2MjY5YTE1OTNhYWFlYjE0ZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_15510978d8b84886a76441a8f156e468",
+      "statement": "can_read(user, document) is implemented once as a domain rule and SQL predicate used by the API, MCP server, and citation resolution; for Releases 1–3 it is owner_id = sub, extended in Release 4 to also accept grants and visibility = public.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L329-L329",
+          "version": "repo-lines-v1:sha256:b7c4e6ac5ed2c2db649a08535707f307094362b7823bd87e6ab057d832b9f2dd:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjdjNGU2YWM1ZWQyYzJkYjY0OWEwODUzNTcwN2YzMDcwOTQzNjJiNzgyM2JkODdlNmFiMDU3ZDgzMmI5ZjJkZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjdjNGU2YWM1ZWQyYzJkYjY0OWEwODUzNTcwN2YzMDcwOTQzNjJiNzgyM2JkODdlNmFiMDU3ZDgzMmI5ZjJkZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTJjMmFkZDIxZWVmODNjZTFlOTNmYjc1NGMwODM2ODQ1NDFmY2QxOTBiZjRlYmJmNTE0MGI4MTFjNWZkYTQwYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWQzN2FmMDQ4MDlkMTc5OGI4ZGNiNWIzNTk1ZjJkNmE3YzBkYjJkNDA1ZTA1ZDc4MjI2MGM4MDJjNTk2Y2ExNiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L331-L331",
+          "version": "repo-lines-v1:sha256:db3f4dc2840960d1b6b848987d7da269d7e880ed5b4a605c9e41fece069e0821:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGIzZjRkYzI4NDA5NjBkMWI2Yjg0ODk4N2Q3ZGEyNjlkN2U4ODBlZDViNGE2MDVjOWU0MWZlY2UwNjllMDgyMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGIzZjRkYzI4NDA5NjBkMWI2Yjg0ODk4N2Q3ZGEyNjlkN2U4ODBlZDViNGE2MDVjOWU0MWZlY2UwNjllMDgyMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDA0ZWUxMzVmZjA1ZWJjMGNjMmQ2NjlhMDg5ZjE3NjU2MzVmMTgxNGQwY2U3OGE0YzY4MDFjZDI1Mzc2NWNjZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjk1NmRlNjdjMDg2MjJhYjU4OWVhYzk2YWEwNjhmY2E0MzI5YTQzYmFhZmMxZTI2ZWY4NTZkYmIxNDU2ZWJiZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_5b3d5055d4f7420a9163f34d91a4bc21",
+      "statement": "The filtered_retrieval_recall_at_5 evaluation in thresholds.yaml requires a code-measured recall of >= 0.95 for a learner whose readable documents account for fewer than 1% of all chunks; this is the M1 release-gate target for recall under selective subject filters.",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/thresholds.yaml#L22-L22",
+          "version": "repo-lines-v1:sha256:aae6e4e4d1ef99ab1c4c75f809151bff1383c43cfbd525364c96b6b2368c1ad7:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWFlNmU0ZTRkMWVmOTlhYjFjNGM3NWY4MDkxNTFiZmYxMzgzYzQzY2ZiZDUyNTM2NGM5NmI2YjIzNjhjMWFkNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYWFlNmU0ZTRkMWVmOTlhYjFjNGM3NWY4MDkxNTFiZmYxMzgzYzQzY2ZiZDUyNTM2NGM5NmI2YjIzNjhjMWFkNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2RmYmJkZjlkYzkzYjExODcyMzc1NDhmODkxMmUzZTMzZWZkMjg2MzM5YjJlNjFhZTlhMTQ1NWM1MjcwNzJiNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjdlYzI3MTg0YzY0YzkyNTEwOTJlZTY1ZTIwZTY1Y2E3NDZkYTllNTgyNzIyNzdhNTM1YjdlOGQ4YWEyNmU5YiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L431-L431",
+          "version": "repo-lines-v1:sha256:975445f64a8a8bbeb951c1c1cb38aee09b916296e7f618a1be4450337de69334:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc1NDQ1ZjY0YThhOGJiZWI5NTFjMWMxY2IzOGFlZTA5YjkxNjI5NmU3ZjYxOGExYmU0NDUwMzM3ZGU2OTMzNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc1NDQ1ZjY0YThhOGJiZWI5NTFjMWMxY2IzOGFlZTA5YjkxNjI5NmU3ZjYxOGExYmU0NDUwMzM3ZGU2OTMzNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWM5MzZiMGY3ZmI2ZDJiODA2OTU1NzRjZGY3ZWRmMWEzOWJjMzZmMzRkYWM1NGY0NmQzNmY2ZTI5YmNiNzIzNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiM2M2MDJmNDA5NjZlOTkwZGViODQxNjVmMDU4NzAyYTlhYzVlY2JlYmQ3YTMzM2MwODFkNzk2YzNjZGVmNWUwYyJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-03T03:19:50.688Z"
+  }
+}

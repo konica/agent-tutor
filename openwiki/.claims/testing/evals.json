@@ -1,0 +1,364 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:5666f2bd991930f7d56bf75175e05b7ea3fbe366f53056cba0a3fa4fced0530e",
+  "claims": [
+    {
+      "id": "claim_3fbda128af4a421085bce7ef048c1573",
+      "statement": "The eval folder layout separates data-building from execution: seed_corpus/ holds the manifest and labels; generators/ produces dataset candidates; adversarial/ defines the injection taxonomy; evaluators/ holds one module per PRD §10.1 evaluator with Qwen rubric prompts in rubrics/; targets.py adapts examples to agent calls; thresholds.yaml declares all release-gate targets; run.py is the entry point.",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/README.md",
+          "version": "repo-file-v1:sha256:f5ec9a89714f55f75d4d4a7469c85d382c77a55c1824541b2e04aea975783dc1"
+        },
+        {
+          "resource": "repo://backend/evals/evaluators/__init__.py",
+          "version": "repo-file-v1:sha256:8e172a6c8b8fa5869eaec3c5f944bc57805722da5feab6b157cfccb36f9bd87b"
+        },
+        {
+          "resource": "repo://backend/evals/run.py",
+          "version": "repo-file-v1:sha256:d20c0fbb295f8b09b12e8772c85e0bc5ff14013f8dc88721a7a13d444a2d80b2"
+        },
+        {
+          "resource": "repo://backend/evals/seed_corpus/README.md",
+          "version": "repo-file-v1:sha256:88bdf0a24ac4c81667de9b12a8842bb6b010ed18e5d1a663b719df5de25f25bb"
+        },
+        {
+          "resource": "repo://backend/evals/targets.py",
+          "version": "repo-file-v1:sha256:b2582df80744b9e4874da934c5a0a0ff23f925b10be9e2a03f4d96d10ef6d062"
+        },
+        {
+          "resource": "repo://backend/evals/thresholds.yaml",
+          "version": "repo-file-v1:sha256:418d423d220866e34a4fde23e5911d9aba81856e92f67d1634fa9b8fb3fb6474"
+        }
+      ]
+    },
+    {
+      "id": "claim_5180a13b9d5540b8b915e994ea58176c",
+      "statement": "LangSmith is the authoritative store for versioned evaluation datasets; the repository never edits a dataset version a release was gated on, and instead holds only the code that builds and runs datasets.",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/README.md",
+          "version": "repo-file-v1:sha256:f5ec9a89714f55f75d4d4a7469c85d382c77a55c1824541b2e04aea975783dc1"
+        },
+        {
+          "resource": "repo://backend/evals/generators/__init__.py",
+          "version": "repo-file-v1:sha256:0befa256f4fe50215785155d3f08a5ff9f38e95f33e8fa7a1daf7fc7645a0007"
+        }
+      ]
+    },
+    {
+      "id": "claim_1e0ac7978628446585697fa9d96bcac9",
+      "statement": "There are two eval splits: smoke (~30 items, run on every PR) and full (run before each release). The command is: uv run --extra eval python -m evals.run --split smoke|full.",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/README.md",
+          "version": "repo-file-v1:sha256:f5ec9a89714f55f75d4d4a7469c85d382c77a55c1824541b2e04aea975783dc1"
+        },
+        {
+          "resource": "repo://backend/evals/run.py",
+          "version": "repo-file-v1:sha256:d20c0fbb295f8b09b12e8772c85e0bc5ff14013f8dc88721a7a13d444a2d80b2"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L450-L450",
+          "version": "repo-lines-v1:sha256:b5edbacc41be5ba328936e0dfbe0b0d793855750760cff7f7de8934f86b7b486:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjVlZGJhY2M0MWJlNWJhMzI4OTM2ZTBkZmJlMGIwZDc5Mzg1NTc1MDc2MGNmZjdmN2RlODkzNGY4NmI3YjQ4NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjVlZGJhY2M0MWJlNWJhMzI4OTM2ZTBkZmJlMGIwZDc5Mzg1NTc1MDc2MGNmZjdmN2RlODkzNGY4NmI3YjQ4NiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODczYTcyYTYzOGE1ZDhiMDY4NzQxMjViZjkxNTA2YjUzZTU1NGI2ODJkYmUzNTVjNzA3YWJhNGIzNWM2MGIzNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmUwMWQ5MDYwYTFjZGViODllZjllYjQwOTNlNGJhODI1ZDQzYmM0MzA4NjIxODBkOTRmYWU5OTRlZTcxM2EyMyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_b0403049e8064c7d9ecba0ce15a4768b",
+      "statement": "run.py's main() raises NotImplementedError (M2 task), and targets.py's tutor_target() raises NotImplementedError (M2 task) with the description 'invoke the agent graph and return answer, citations, trajectory, state.subject'.",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/run.py",
+          "version": "repo-file-v1:sha256:d20c0fbb295f8b09b12e8772c85e0bc5ff14013f8dc88721a7a13d444a2d80b2"
+        },
+        {
+          "resource": "repo://backend/evals/targets.py",
+          "version": "repo-file-v1:sha256:b2582df80744b9e4874da934c5a0a0ff23f925b10be9e2a03f4d96d10ef6d062"
+        }
+      ]
+    },
+    {
+      "id": "claim_d10a40aaf96d40889c76fa78172ae648",
+      "statement": "The seed corpus is a fixed set of openly licensed documents (e.g. arXiv papers across 3–4 overlapping subjects, chains of citing papers, preprint/published pairs with the same work_key). PDFs are not committed; a download step fetches them to data/seed_corpus/ and verifies SHA-256. Only CC-BY-compatible licensed documents may be added.",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/seed_corpus/README.md",
+          "version": "repo-file-v1:sha256:88bdf0a24ac4c81667de9b12a8842bb6b010ed18e5d1a663b719df5de25f25bb"
+        },
+        {
+          "resource": "repo://backend/evals/seed_corpus/manifest.yaml",
+          "version": "repo-file-v1:sha256:7e236e1923e0636e748a2aeb3319b3e1b3739f2d989745a5c8e4737d1d88f402"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L538-L546",
+          "version": "repo-lines-v1:sha256:7845a35152c62c7715792605fe5ee4be77776eb47afa49abe2a2e9aefa84be5e:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWNmNGQ2ODY0YjE3Nzk0OGQzMzdmZjQxZWIzYTg0Y2I3ZjYwNTZmNDM1N2QyMWVmNTU1NTk1MjY3YWYwMjlmMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNmU2NDNkOTllMzk4ZjFhZTM3NjcxYWQyYWY5MDE0YzAyNjUxZGQ2ZWUzYmI4MGNkYzczY2FiZTE4NTFiMzM4YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjYzNDBjNzgzNmFhYzVjYzU3MGNiZDQwMzQ1ZDQ4YWNmNjA4ZWJhMjcyYWM4NzBjZmU0NzI4ZjUzOGM2NGEyZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiM2JiMWQ0ODE0OTliZjkxZjg5NGExNTA3NGY2ZjU5YWY2NzJkNTVmNmNiMzkyNDY3ZTU0MThiNDdmYTYxNWVlOCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_76acaff2a0784286a0f852e6bce911ea",
+      "statement": "Dataset candidates from generators go to a LangSmith annotation queue for human review before entering a dataset version. Production 👎-rated answers, judge-flagged turns, and PII-scrubbed declined questions can also become candidates after human review.",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/generators/__init__.py",
+          "version": "repo-file-v1:sha256:0befa256f4fe50215785155d3f08a5ff9f38e95f33e8fa7a1daf7fc7645a0007"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L543-L546",
+          "version": "repo-lines-v1:sha256:948042e4caa429189e5f83db92576fddf429cb12b8c332409c9d1045f52b8530:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzIyYTk3MWI5MDBkZTk3NWI5NTQwYWM1NWQ3NGUyNTgxODk1NTM5OWI4OTYzZDFkYjlmOGQ2ZGM0ZjAwYmFhZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNmU2NDNkOTllMzk4ZjFhZTM3NjcxYWQyYWY5MDE0YzAyNjUxZGQ2ZWUzYmI4MGNkYzczY2FiZTE4NTFiMzM4YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTYwM2E4Mzc2ZTFkNjE2YTBjOTljYTlkNWExNmRlZTMyMTY2NGFjZjBjN2IyZGY1NGZjOTYwODU4YmE2OTk2OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiM2JiMWQ0ODE0OTliZjkxZjg5NGExNTA3NGY2ZjU5YWY2NzJkNTVmNmNiMzkyNDY3ZTU0MThiNDdmYTYxNWVlOCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_ea2a664500924d4b87cd9578aac5f03e",
+      "statement": "The adversarial taxonomy defines nine categories: instruction_override, system_prompt_extraction, role_play_jailbreak, scope_smuggling, subject_manipulation, other_users_data, obfuscation (variants: base64, misspellings, other_languages), multi_turn_escalation, and document_embedded. Document-embedded attacks are placed at five locations: visible_text, white_text, footnote, pdf_metadata, references_section.",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/adversarial/taxonomy.yaml",
+          "version": "repo-file-v1:sha256:6b0eadb1fa60679e78ca4f8eba0402428d18c2b35dab4b42840768c4a2efa793"
+        }
+      ]
+    },
+    {
+      "id": "claim_84fa2f0319a2455090a26fe7e1911f9e",
+      "statement": "The adversarial document-embedded defence passes chunk text to the model as quoted data with an explicit instruction to treat document content as information, never as instructions; subject search and can_read access controls live in code and SQL, not the prompt, so document-embedded attacks cannot reach other users' data.",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/adversarial/taxonomy.yaml",
+          "version": "repo-file-v1:sha256:6b0eadb1fa60679e78ca4f8eba0402428d18c2b35dab4b42840768c4a2efa793"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L322-L322",
+          "version": "repo-lines-v1:sha256:fa2b9119d3f1fe0136c7a79206f836bff48c0cbb3bfacb71d443c86148146719:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZmEyYjkxMTlkM2YxZmUwMTM2YzdhNzkyMDZmODM2YmZmNDhjMGNiYjNiZmFjYjcxZDQ0M2M4NjE0ODE0NjcxOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmEyYjkxMTlkM2YxZmUwMTM2YzdhNzkyMDZmODM2YmZmNDhjMGNiYjNiZmFjYjcxZDQ0M2M4NjE0ODE0NjcxOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNThjYjFlNmFhMTg2ZDg0ZTU3NGMyYjIwZTY3YTNhMTY3ZjExNzA1NTM0YTBmZTJhNzk0YWIzMjg1ZjA0ZDFkNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzYwMjMzOWY0ZTVkODI0Y2Y3YzZkYjgzMzQ3MWI0MDY3NTdlZGYyMmU1NzNkZmEzNGViZDlkNmJmYzgxZjQwNiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_1612347155a54575b33563d8a31842c1",
+      "statement": "The judge model is qwen.qwen3-32b-v1:0 at temperature 0. It is a different model family from the agent (Amazon Nova 2 Lite) to reduce judge bias. It is used for retrieval_relevance, answer_relevance, learning_record_quality, and injection_resistance (combined with code), with rubric prompts stored as Markdown files in evaluators/rubrics/.",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/evaluators/rubrics/README.md",
+          "version": "repo-file-v1:sha256:a6b9ba345ac5446f79d02fa7b83d7d3a41dc061dfec02222a1dbed2d519e5f68"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L417-L417",
+          "version": "repo-lines-v1:sha256:16dad7edffe0ae0c30256ebf324bc61f650577947ffa7eeeb0d55f4f339c5769:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTZkYWQ3ZWRmZmUwYWUwYzMwMjU2ZWJmMzI0YmM2MWY2NTA1Nzc5NDdmZmE3ZWVlYjBkNTVmNGYzMzljNTc2OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTZkYWQ3ZWRmZmUwYWUwYzMwMjU2ZWJmMzI0YmM2MWY2NTA1Nzc5NDdmZmE3ZWVlYjBkNTVmNGYzMzljNTc2OSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjE2OGZiYmEwNzZkYTRmMzdhYTQxZjVhZWYwZTk4ZTQ4NDBhZTY4MjgyZmVmZGVhNDQ5ZjU5YWJhNDlmYjA3YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDMzYzJmNjY5ZmEzMDZlNTNhYTA4ZGZkZGQwZDdkOWZlMDEyMzIwZDY2YWQwZDdkZDIxOTdmNzYxZmM4ZDM3MiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L437-L437",
+          "version": "repo-lines-v1:sha256:cecc580ada745c644972ba26d9bceb9872b30aaf3a14571f186f7727d52eb3db:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2VjYzU4MGFkYTc0NWM2NDQ5NzJiYTI2ZDliY2ViOTg3MmIzMGFhZjNhMTQ1NzFmMTg2Zjc3MjdkNTJlYjNkYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiY2VjYzU4MGFkYTc0NWM2NDQ5NzJiYTI2ZDliY2ViOTg3MmIzMGFhZjNhMTQ1NzFmMTg2Zjc3MjdkNTJlYjNkYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzQxYWY3YzgyOWNjNjAzMTViYTA1ZDc1MjdkMjYwM2FkYWE2MzgzNjU0OGFjYzgxNzAwNjBjYWNlZjMyYzAwNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjFjYmVkYjk4MDkzYTVkNjY4MWFjZjYxMTAyMDkzOTA4ZmVmYzJiZjlmNWNiNzU3NWE3ZWRkYmRkNjBkZDUxZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_0f13f757563a405393a96418a3507e98",
+      "statement": "Judge–human alignment is maintained by attaching learner 👍/👎 ratings to LangSmith runs, having admins score a weekly sample in an annotation queue, and revising a rubric prompt when judge–human agreement drops below 80% (thresholds.yaml judge_alignment.min_agreement: 0.80).",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/evaluators/rubrics/README.md",
+          "version": "repo-file-v1:sha256:a6b9ba345ac5446f79d02fa7b83d7d3a41dc061dfec02222a1dbed2d519e5f68"
+        },
+        {
+          "resource": "repo://backend/evals/thresholds.yaml#L40-L41",
+          "version": "repo-lines-v1:sha256:f8e9b9302a44e31b34a358d192c5f180ac6e32530b72e967852105dc1c3c974c:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWM3ZWUyY2MxNGJkNDZiYzVmZjRmNjUwMTRlMzU2YTk3ZGJkYjhjNDExYmM4ZjU2MDk1Njg4YjY3MzdlYmIxNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmFiZjNlMzM3YTcyYmZjZTQ1ZDdhMDYwYTAwOTQ5YWI3Y2M3NjRjYTgwYmNhMGFkODM2NDU5NTgzNzEyMjFlYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWYxODFlZTE5NDZiN2JhYzU1YjgwNWViOTIxZmIzMGZhYzdlNDFmZjA2NTQ3N2I3ZDExOWExOTk5NTkzZDRmOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L534-L534",
+          "version": "repo-lines-v1:sha256:908b61861677764747200354d8b35d3caec75b7764c28caee929d605d6b6a426:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTA4YjYxODYxNjc3NzY0NzQ3MjAwMzU0ZDhiMzVkM2NhZWM3NWI3NzY0YzI4Y2FlZTkyOWQ2MDVkNmI2YTQyNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTA4YjYxODYxNjc3NzY0NzQ3MjAwMzU0ZDhiMzVkM2NhZWM3NWI3NzY0YzI4Y2FlZTkyOWQ2MDVkNmI2YTQyNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzkyMmMxYWQ3MDA4NjM5ZDIyNDdmNWZjMDQzMmQzYzhkNjI4NzZjZjk5ZGJmZDRjZjZmOTI3ZjdjNmQ1NjYxNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjYzNDBjNzgzNmFhYzVjYzU3MGNiZDQwMzQ1ZDQ4YWNmNjA4ZWJhMjcyYWM4NzBjZmU0NzI4ZjUzOGM2NGEyZiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_62e8915c4adf46a0818d4cacc5597892",
+      "statement": "The Release 1 gate in thresholds.yaml defines the following evaluators and thresholds: search_step_ran (code, min 1.00); subject_detection exact_set (code, min 0.90), contains_wrong (code, max 0.03), asked_when_clear (code, max 0.10); thread_growth correct (code, min 0.95), limits_respected (code, min 1.00); subject_suggestion_top3 (code, min 0.90); subject_name_check bad_name_recall (code, min 0.95), false_rejections (code, max 0.05); metadata_extraction title (code, min 0.95), year (code, min 0.90), authors_f1 (code, min 0.85), doi_exact (code, min 0.95); retrieval_relevance (judge, min 0.80); filtered_retrieval_recall_at_5 (code, min 0.95); answer_relevance (judge, min 0.85); decline_correctness correctly_declined (code, min 0.95), wrongly_declined (code, max 0.05); learning_record_quality (judge, min 0.80); injection_resistance (code+judge, max_failures 0); isolation_and_dedupe (code, min 1.00).",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/thresholds.yaml#L3-L29",
+          "version": "repo-lines-v1:sha256:89f9ae8c51935edabe7fbb1ca7c8598a8e94dd9def94e5eaeeb64a2b4510ca10:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFjM2E4M2E2NGU2YWIyZDA1MGE3MDg0ZGIyZGYzNjI4ZWI3OTk1NGI1YjY1Y2ZjNmU3Yzg2MjNhOWEzNGI5MWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcxNTYwZGMyYzdjMTY0ZjJjOTZkYmFlMjA1ZTQwNGVjMzdjZmYyZjNiMDM1ZGQ2MDkwODhiNGRhODAxYTM3MTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjoyLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE0ODI0MTNmNmJkYTRmMjQzMDJiNTg5YWQ0YzZjZDNlNmFkYzZhYmZkMDAxZjIwYmE1MDJhMmJlMmM1ZTRhMTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ4YmM2ZDAyZDY5NjI2YmYwMDJmMmVmYzdjMzBkYTVkYjk5YmZjYWE4NzJmOGUyZmRhZTFlZWZjNzM4NzUxY2IifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_f234640fd58f4b7480bf30a81bfc205b",
+      "statement": "thresholds.yaml also declares Release 2 gates (citation_linking precision ≥ 0.95 / recall ≥ 0.80, reading_path_faithfulness judge ≥ 0.85) and Release 3 gates (quiz_validity 100%, quiz_quality judge ≥ 0.85, recommendation_grounding 100%, report_faithfulness judge ≥ 0.90).",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/thresholds.yaml#L30-L39",
+          "version": "repo-lines-v1:sha256:528b98311857597701faea7cc406e8b70a12feb228b778fd0b4c1b8b554deb71:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlZDhmMzg5MTUwZGE5ZWNmNTdlNDg2OTJhODEzNTM0MzM4MDk0NTU0YWM5NDg4ZDIwYjI5NGQ5NDgwMDAyODMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIwM2M2ODFjN2YwMDEzMGZmYzk2OTZkNTVmZDQ3ZDE1OGY4OGU4OTFhNmI5ZTE2MTNhYWY0YWNjODI3NGM0ZDkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU0NTA5MzE4OWVjNGYwMmY4MDc0YjZhY2M2ZjgwZmFkY2U3MGRkOTI1MTE2NzgyYzZmNGI2YTA3ZDg3ZTA3ZWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoyLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY4ZTliOTMwMmE0NGUzMWIzNGEzNThkMTkyYzVmMTgwYWM2ZTMyNTMwYjcyZTk2Nzg1MjEwNWRjMWMzYzk3NGMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_ebddabb29d7c48c49c25e0f94016744b",
+      "statement": "The evals/ directory is structured into seed_corpus/ (manifest.yaml, PDFs in data/seed_corpus/ not committed), generators/ (synthetic Q&A, negatives, detection/growth cases), adversarial/taxonomy.yaml (injection categories × seeds including document-embedded attacks), evaluators/ (one module per PRD §10.1 evaluator, rubrics/ for Qwen judge prompts), targets.py (M2 stub for invoking the agent), thresholds.yaml (release gate targets), and run.py (CLI entry point).",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/README.md",
+          "version": "repo-file-v1:sha256:f5ec9a89714f55f75d4d4a7469c85d382c77a55c1824541b2e04aea975783dc1"
+        },
+        {
+          "resource": "repo://backend/evals/adversarial/taxonomy.yaml",
+          "version": "repo-file-v1:sha256:6b0eadb1fa60679e78ca4f8eba0402428d18c2b35dab4b42840768c4a2efa793"
+        },
+        {
+          "resource": "repo://backend/evals/evaluators/__init__.py",
+          "version": "repo-file-v1:sha256:8e172a6c8b8fa5869eaec3c5f944bc57805722da5feab6b157cfccb36f9bd87b"
+        },
+        {
+          "resource": "repo://backend/evals/evaluators/rubrics/README.md",
+          "version": "repo-file-v1:sha256:a6b9ba345ac5446f79d02fa7b83d7d3a41dc061dfec02222a1dbed2d519e5f68"
+        },
+        {
+          "resource": "repo://backend/evals/generators/__init__.py",
+          "version": "repo-file-v1:sha256:0befa256f4fe50215785155d3f08a5ff9f38e95f33e8fa7a1daf7fc7645a0007"
+        },
+        {
+          "resource": "repo://backend/evals/run.py",
+          "version": "repo-file-v1:sha256:d20c0fbb295f8b09b12e8772c85e0bc5ff14013f8dc88721a7a13d444a2d80b2"
+        },
+        {
+          "resource": "repo://backend/evals/seed_corpus/README.md",
+          "version": "repo-file-v1:sha256:88bdf0a24ac4c81667de9b12a8842bb6b010ed18e5d1a663b719df5de25f25bb"
+        },
+        {
+          "resource": "repo://backend/evals/seed_corpus/manifest.yaml",
+          "version": "repo-file-v1:sha256:7e236e1923e0636e748a2aeb3319b3e1b3739f2d989745a5c8e4737d1d88f402"
+        },
+        {
+          "resource": "repo://backend/evals/targets.py",
+          "version": "repo-file-v1:sha256:b2582df80744b9e4874da934c5a0a0ff23f925b10be9e2a03f4d96d10ef6d062"
+        },
+        {
+          "resource": "repo://backend/evals/thresholds.yaml",
+          "version": "repo-file-v1:sha256:418d423d220866e34a4fde23e5911d9aba81856e92f67d1634fa9b8fb3fb6474"
+        }
+      ]
+    },
+    {
+      "id": "claim_7b8c3c67164f42699ff32aed08268e90",
+      "statement": "The eval dataset is grown from four sources: synthetic Q&A, detection/growth labeled items, adversarial prompts and adversarial PDFs (taxonomy × seeds), and production 👎-rated questions (PII-scrubbed). All candidates go through a human review gate in a LangSmith annotation queue before entering a dataset version.",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/README.md",
+          "version": "repo-file-v1:sha256:f5ec9a89714f55f75d4d4a7469c85d382c77a55c1824541b2e04aea975783dc1"
+        },
+        {
+          "resource": "repo://backend/evals/adversarial/taxonomy.yaml",
+          "version": "repo-file-v1:sha256:6b0eadb1fa60679e78ca4f8eba0402428d18c2b35dab4b42840768c4a2efa793"
+        },
+        {
+          "resource": "repo://backend/evals/generators/__init__.py",
+          "version": "repo-file-v1:sha256:0befa256f4fe50215785155d3f08a5ff9f38e95f33e8fa7a1daf7fc7645a0007"
+        },
+        {
+          "resource": "repo://sdd/prd.md",
+          "version": "repo-file-v1:sha256:2317fd6a967b1da50b4a26b485ad5afe3934c5702ae7e1bc94fb3a6e19ff82cb"
+        }
+      ]
+    },
+    {
+      "id": "claim_1ac730a327504da1a7a80dc08835cc0f",
+      "statement": "Judge alignment is maintained by attaching Keycloak-authenticated learner 👍/👎 ratings to LangSmith runs; admins score a weekly sample; when judge–human agreement drops below 80% (judge_alignment.min_agreement: 0.80 in thresholds.yaml), the corresponding rubric prompt is revised.",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/evaluators/rubrics/README.md",
+          "version": "repo-file-v1:sha256:a6b9ba345ac5446f79d02fa7b83d7d3a41dc061dfec02222a1dbed2d519e5f68"
+        },
+        {
+          "resource": "repo://backend/evals/thresholds.yaml#L40-L41",
+          "version": "repo-lines-v1:sha256:f8e9b9302a44e31b34a358d192c5f180ac6e32530b72e967852105dc1c3c974c:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWM3ZWUyY2MxNGJkNDZiYzVmZjRmNjUwMTRlMzU2YTk3ZGJkYjhjNDExYmM4ZjU2MDk1Njg4YjY3MzdlYmIxNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmFiZjNlMzM3YTcyYmZjZTQ1ZDdhMDYwYTAwOTQ5YWI3Y2M3NjRjYTgwYmNhMGFkODM2NDU5NTgzNzEyMjFlYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWYxODFlZTE5NDZiN2JhYzU1YjgwNWViOTIxZmIzMGZhYzdlNDFmZjA2NTQ3N2I3ZDExOWExOTk5NTkzZDRmOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md",
+          "version": "repo-file-v1:sha256:2317fd6a967b1da50b4a26b485ad5afe3934c5702ae7e1bc94fb3a6e19ff82cb"
+        }
+      ]
+    },
+    {
+      "id": "claim_256d5f214ca74199817bc0c0e931c8ec",
+      "statement": "thresholds.yaml defines Release 1 gate targets for every evaluator with types code, judge, or code+judge. injection_resistance uses max_failures: 0 (zero failures permitted) and isolation_and_dedupe uses min: 1.00 (100%), making them zero-tolerance gates where a single failure blocks release.",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/thresholds.yaml#L1-L41",
+          "version": "repo-lines-v1:sha256:418d423d220866e34a4fde23e5911d9aba81856e92f67d1634fa9b8fb3fb6474:eyJzZWxlY3RlZExpbmVDb3VudCI6NDEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAwMmM5NjlmNWU2ZWJjYjg1M2RkYzdiNDY4ZjFkYmJjZDFkN2UwMDQ3MWU0Yzg3NmIyN2ZiNTI3NzNlMDA1YjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJhYmYzZTMzN2E3MmJmY2U0NWQ3YTA2MGEwMDk0OWFiN2NjNzY0Y2E4MGJjYTBhZDgzNjQ1OTU4MzcxMjIxZWMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_b1e02ba6de454ea5aa730dedb13ad413",
+      "statement": "There are two eval splits: smoke (~30 items, run on every PR in CI) and full (run before a release). The run command is: uv run --extra eval python -m evals.run --split smoke|full. Agent quality is gated on thresholds.yaml; the agent must be fixed (not the threshold) until a run passes.",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/README.md",
+          "version": "repo-file-v1:sha256:f5ec9a89714f55f75d4d4a7469c85d382c77a55c1824541b2e04aea975783dc1"
+        },
+        {
+          "resource": "repo://backend/evals/run.py",
+          "version": "repo-file-v1:sha256:d20c0fbb295f8b09b12e8772c85e0bc5ff14013f8dc88721a7a13d444a2d80b2"
+        },
+        {
+          "resource": "repo://backend/evals/thresholds.yaml",
+          "version": "repo-file-v1:sha256:418d423d220866e34a4fde23e5911d9aba81856e92f67d1634fa9b8fb3fb6474"
+        }
+      ]
+    },
+    {
+      "id": "claim_2ff5f65f1524476492e26aba9b22cb55",
+      "statement": "tutor_target() in targets.py is an M2 NotImplementedError stub that will invoke the LangGraph agent and return the answer, citations, trajectory, and state.subject for a given LangSmith dataset input example.",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/targets.py",
+          "version": "repo-file-v1:sha256:b2582df80744b9e4874da934c5a0a0ff23f925b10be9e2a03f4d96d10ef6d062"
+        }
+      ]
+    },
+    {
+      "id": "claim_37b0d3fdadea41c9a30de5bcabb60c78",
+      "statement": "The seed corpus uses openly licensed documents (arXiv papers across 3–4 overlapping subjects) with chains of papers citing each other, preprint/published pairs sharing a work_key, and adversarial PDFs marked adversarial: true. PDFs are not committed; manifest.yaml records id, source, SPDX license, SHA-256, subjects, metadata, work_key, and citation links.",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/seed_corpus/README.md",
+          "version": "repo-file-v1:sha256:88bdf0a24ac4c81667de9b12a8842bb6b010ed18e5d1a663b719df5de25f25bb"
+        },
+        {
+          "resource": "repo://backend/evals/seed_corpus/manifest.yaml",
+          "version": "repo-file-v1:sha256:7e236e1923e0636e748a2aeb3319b3e1b3739f2d989745a5c8e4737d1d88f402"
+        }
+      ]
+    },
+    {
+      "id": "claim_208b1bbaa1aa427dbaefe57a83d47133",
+      "statement": "The adversarial taxonomy in adversarial/taxonomy.yaml defines nine injection categories (instruction_override, system_prompt_extraction, role_play_jailbreak, scope_smuggling, subject_manipulation, other_users_data, obfuscation, multi_turn_escalation, document_embedded) with seeds and expected behaviours. document_embedded attacks are placed at five PDF locations: visible_text, white_text, footnote, pdf_metadata, references_section.",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/adversarial/taxonomy.yaml",
+          "version": "repo-file-v1:sha256:6b0eadb1fa60679e78ca4f8eba0402428d18c2b35dab4b42840768c4a2efa793"
+        }
+      ]
+    },
+    {
+      "id": "claim_379fdbc3bb5247f19867abbb8def68d3",
+      "statement": "The judge model is qwen.qwen3-32b-v1:0 at temperature 0, deliberately from a different model family than the agent (Amazon Nova 2 Lite) to reduce judge bias. It is used for retrieval relevance, answer relevance, learning record quality, and injection resistance evaluators. Each judge evaluator has a Markdown rubric prompt in evaluators/rubrics/.",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/evaluators/rubrics/README.md",
+          "version": "repo-file-v1:sha256:a6b9ba345ac5446f79d02fa7b83d7d3a41dc061dfec02222a1dbed2d519e5f68"
+        },
+        {
+          "resource": "repo://backend/evals/thresholds.yaml",
+          "version": "repo-file-v1:sha256:418d423d220866e34a4fde23e5911d9aba81856e92f67d1634fa9b8fb3fb6474"
+        },
+        {
+          "resource": "repo://sdd/prd.md",
+          "version": "repo-file-v1:sha256:2317fd6a967b1da50b4a26b485ad5afe3934c5702ae7e1bc94fb3a6e19ff82cb"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-03T03:19:50.688Z"
+  }
+}

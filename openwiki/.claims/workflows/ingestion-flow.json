@@ -1,0 +1,284 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:586244f03c7530aaf624d8e3976327b03b03c18d552cbcbed931e826e38da15f",
+  "claims": [
+    {
+      "id": "claim_39f62d13d03f4678805e9d8cbf0a8d12",
+      "statement": "The ingestion worker is triggered by S3 ObjectCreated events delivered via SQS: learners upload via a presigned POST to uploads/<user_id>/<upload_id>.pdf, the S3 event is delivered to SQS, and the worker consumes the SQS message to begin processing.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/worker/main.py#L1-L1",
+          "version": "repo-lines-v1:sha256:76e5774c06ec88938022bbb3ffd9be9c83415ad1b7c26bbd2994ec7fddaeb24d:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzZlNTc3NGMwNmVjODg5MzgwMjJiYmIzZmZkOWJlOWM4MzQxNWFkMWI3YzI2YmJkMjk5NGVjN2ZkZGFlYjI0ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzZlNTc3NGMwNmVjODg5MzgwMjJiYmIzZmZkOWJlOWM4MzQxNWFkMWI3YzI2YmJkMjk5NGVjN2ZkZGFlYjI0ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNmUwZGQ4NzIyYjliMDQ3YmU4Mjg3MDRjMmI2YTljNjEwZWIwYTRkN2IzYWMwNjIyZTdjOTMzYTJiOTBjODM5NSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L272-L274",
+          "version": "repo-lines-v1:sha256:5c32d9f153145276c36ad4e00d81741328af2cb2cd56df1216057df48ae43860:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTYwODhiMTgwZGQ2NDQ4YzVjNWM0M2I0NGY5NDkzODNlYjg3ZjU0NTZkNjA3YTJmZTVjZDIwZTMzMGRkNmM0MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWNlNWRkNGQ3M2E5NWY0YTVmNGM3Y2VhYjlmNzk4MzlhN2EyOWVlY2JmYWEzYWRjMmJiYzI1Yjk4NTJiZTQzNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzI5OTA4YWM1MzIwODAzNWRmMjNlMjZkODQzYWM2ZGZkN2MzNTQ3NjkzNGQyYjIwOGRlYTUzNmM4ZjRjNWJiNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjY5MDVjZWYyMWZkYmU0MjAwY2QwZjA0MWQ1OWMxNTBiOTRmMDRkNjhiOGY5ZDY1YTVkNWE0OTlmYzhjZjM4ZSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L337-L337",
+          "version": "repo-lines-v1:sha256:96fcd568c5a0f0a097f0b816b5fe7fa056fa9943109435fea4db2ec9cd05655c:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTZmY2Q1NjhjNWEwZjBhMDk3ZjBiODE2YjVmZTdmYTA1NmZhOTk0MzEwOTQzNWZlYTRkYjJlYzljZDA1NjU1YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTZmY2Q1NjhjNWEwZjBhMDk3ZjBiODE2YjVmZTdmYTA1NmZhOTk0MzEwOTQzNWZlYTRkYjJlYzljZDA1NjU1YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDZiMjRjMjhkN2IwYWMzNzdlYjQ2MDAwNzMwNDM1ODYwZTViNzQyZDFjNGVkMzQxN2ZmMjExMTkxNzU4MDllMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWI3ZWU4NGVmNmY5NGQ5YTI0OGUyOTM3ODcyZmEzNmQzNTY5YWYyZGQzZDk5NmU5MjEzNzE5OWRlYjI0NzA5MSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_882e720cc2894818bce5c07aa9a5e9d3",
+      "statement": "The ingestion pipeline has six steps: (1) validate type/size/pages/parseability and compute SHA-256, (2) insert-or-get content by hash with four branching outcomes (existing ready → skip extraction and show suggestions; existing processing → document waits; existing failed → re-queue; new hash → proceed), (3) move file to contents/<sha256>.pdf, (4) first-pages step using a describe_document tool call to extract title/authors/year/DOI/summary/subject names and store a summary embedding, (5) subject suggestion ranking by embedding similarity, (6) full Docling extraction saving contents/<sha256>.docling.json and extracting references, work_key, chunks, and embeddings.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/knowledge/README.md#L1-L12",
+          "version": "repo-lines-v1:sha256:e37ec23ef5a6e64b5055c8e0d24bec2cea4580c9c05be3acd78c0afb47f8855c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM3NTc3OTkzNWJiNjc5YTMxODMwZDgwMjdkZTY5Y2Y0YWM2NGFiMzJmNDkyM2JkNGQyNzQ1YTNkZTI5MjYyYjkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc0MDBmZjU0Mzc5NjQyZTBiMTBlNzU5NzgyNzRiNTQwYzBlMDhjMDFmMjRhMDUyMWY0MDM4YWJiODg4NmM4YjIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L308-L313",
+          "version": "repo-lines-v1:sha256:ec478f89f00101b3ad2a688770663fb8ce9456180f0d1c8b41b3f1c975818455:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTNjOTZhOGJiNWY3MjQ5ODJjNDc2YzgwNWMwOTNmMWI5MDFhMGYwNGRkZjBlYTkxOTE3ZTkxOGJlMDY3NzAwNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjk1N2M4NTM3ZTAwNTkwZTgwNzE3Y2E0YTM0MTlkYjU1YTk3YzJkMjEwYjAxNjE5ZDM3Y2ZiZTQwMmY3OWNiMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2Y0YWIxYTRjYWQxY2NkMjg0MDJhMWJjYzkxZDE5MTJiNjIzNzAyN2ZlOTViNzljOWEzZDYwNjdhMGY5NmE3YSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTcyNTk4MzY5YzQzM2ViYTI2YTAzNTZhYTM0ZTM1NWY4NjAwMGQ1OGM3YzYwYzBmODM4MTRiN2ZlOTcyNDU4NyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_a5a6f1eea6664f149d1c5524ef900e3e",
+      "statement": "Deduplication is enforced server-side via SHA-256 of uploaded bytes only; a browser-sent hash can only skip re-uploading a file already in the same learner's own library but never links a document to another learner's content (PRD D19).",
+      "evidence": [
+        {
+          "resource": "repo://sdd/adr/0002-content-document-split-sha256-dedupe.md#L13-L14",
+          "version": "repo-lines-v1:sha256:60ef6260bd7626be5953e3db46476b9d91ce3b798c681ddf0c4ac4fc36bbde97:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2RhM2QxOTU4OTQ5ZjNhNDg0OGVlYjJmZDExZTkzNjVkNTc3ZGE3NTQ3YTFkYTM4OGZjYTllYWU0OWM3OTk2MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWU1MWEyZGE4NDViOWFjNzc0YzY5MzViY2IzMjhkNmFkMmM4YjRkMjk3ODYwYTcxMjhhNDU3NGUzMGIxZWFkYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWM2Yjc1N2I0YWVhMWFhMmRmMjI4MjM5ZGQ1NjQ4ZTYzNzM3YTIyM2JhOTZjZWJlZDgyNGM4OGJiNzRhZWZmMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjIyODc5M2QwNGM2M2EzZjYzM2UxYjFmZThjZDAwN2FhMWI1MWNhNTljYmQxZDU1ODhhZjA1ZGM1ZDljNDYxMyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L114-L114",
+          "version": "repo-lines-v1:sha256:f087e731b3fb42329b24b8adaca2b830b5ca6415936c4c19f2cc7b277f771b80:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjA4N2U3MzFiM2ZiNDIzMjliMjRiOGFkYWNhMmI4MzBiNWNhNjQxNTkzNmM0YzE5ZjJjYzdiMjc3Zjc3MWI4MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjA4N2U3MzFiM2ZiNDIzMjliMjRiOGFkYWNhMmI4MzBiNWNhNjQxNTkzNmM0YzE5ZjJjYzdiMjc3Zjc3MWI4MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmIyZDcwOWU4Zjg0ZTkzMTE4OTE3NTBmM2JjNTE1ZjIzYTZiYTBjNzk0NDhmNmM5N2Y4MmU3ODQyYzc5ODU0NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTMxZDU5MDc3NzIzN2UxZTczYzYyN2VlMzA5MjA2MzIzNWFlNmNjNjM3NmM3ZWI4NTkwOWQwMmRjZTE0MTc5ZiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_e4b5657ffe2a425f8262ff4019d1782e",
+      "statement": "The worker applies fair scheduling: first-pages steps for all users are processed before any full Docling extractions, and full extractions are interleaved round-robin across users to prevent one learner from starving others.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L280-L280",
+          "version": "repo-lines-v1:sha256:faac20403ea7e886107fb272fbd0e127e6635d7339edb206a0a4566a64cfbe03:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZmFhYzIwNDAzZWE3ZTg4NjEwN2ZiMjcyZmJkMGUxMjdlNjYzNWQ3MzM5ZWRiMjA2YTBhNDU2NmE2NGNmYmUwMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmFhYzIwNDAzZWE3ZTg4NjEwN2ZiMjcyZmJkMGUxMjdlNjYzNWQ3MzM5ZWRiMjA2YTBhNDU2NmE2NGNmYmUwMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2YyOWFkOTczZGJjODY1YzZiMjNlZjNjY2M2NDIxMzk4MzliOTkzYmViNDg2OTFkOTA2ODdkMjZmN2RiMTZmNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjZiMDVmYjQ0YzM5MDhjNjZiMmY3YzhjZjAxZmM2ZjMyNWI3N2M2MTdlZGVmMjJhZDdiOThhMjExZTU1OWFiMCJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L433-L433",
+          "version": "repo-lines-v1:sha256:57912b18c8ee523495cb2f8dc5f8bc7d18e73898a8d594679e8fb811945db9a7:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTc5MTJiMThjOGVlNTIzNDk1Y2IyZjhkYzVmOGJjN2QxOGU3Mzg5OGE4ZDU5NDY3OWU4ZmI4MTE5NDVkYjlhNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTc5MTJiMThjOGVlNTIzNDk1Y2IyZjhkYzVmOGJjN2QxOGU3Mzg5OGE4ZDU5NDY3OWU4ZmI4MTE5NDVkYjlhNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGZmZjJiMjM4YjY5MGIxZDIxZWE0N2Y5ZThjNzI2NTJhNDU4ZDVjZWIwYTA2ODAzMDcyODk1OTAzZGNlMTVjMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzQxYWY3YzgyOWNjNjAzMTViYTA1ZDc1MjdkMjYwM2FkYWE2MzgzNjU0OGFjYzgxNzAwNjBjYWNlZjMyYzAwNiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_2c3dba2970be4c92af12541b7b546adb",
+      "statement": "The worker runs with security isolation: non-root UID 10001, a read-only root filesystem, NetworkPolicy egress restricted to AWS endpoints and PostgreSQL, per-file timeout, and resource limits on the Kubernetes pod.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L434-L434",
+          "version": "repo-lines-v1:sha256:bc0cf232448cc3e5c1e9dba664511c014b46e4606d1076a8ddd2a68a60b589e4:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmMwY2YyMzI0NDhjYzNlNWMxZTlkYmE2NjQ1MTFjMDE0YjQ2ZTQ2MDZkMTA3NmE4ZGRkMmE2OGE2MGI1ODllNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmMwY2YyMzI0NDhjYzNlNWMxZTlkYmE2NjQ1MTFjMDE0YjQ2ZTQ2MDZkMTA3NmE4ZGRkMmE2OGE2MGI1ODllNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWVjOTMxNWFjY2ZhOTk1OTg2ZjhhOTM1ZDU5MDI4MDlhMzczYmU5ZDJiN2EwYjYxNjdkZjJjMDcxZWI4ZTRlMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGE0MDM3MjljZmIzYzg1YTU0N2M5YjRkODFhZjFlZmRlMmEwN2NiZDJkYTEzN2RjZTcxNzFmZTlmZGVjOTNkMyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L442-L442",
+          "version": "repo-lines-v1:sha256:df6354c453adde9bcdf1cd5f4280e479dbc48be04babf64069d130ddf5341ec0:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGY2MzU0YzQ1M2FkZGU5YmNkZjFjZDVmNDI4MGU0NzlkYmM0OGJlMDRiYWJmNjQwNjlkMTMwZGRmNTM0MWVjMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGY2MzU0YzQ1M2FkZGU5YmNkZjFjZDVmNDI4MGU0NzlkYmM0OGJlMDRiYWJmNjQwNjlkMTMwZGRmNTM0MWVjMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTRiNzhiZTk0OTI1OTAyN2NhNWYwYWQyOTU0OTAxNjQxNGFhMjZiMTJmNThmZGZkYmFjMThiZGU4ODRjYjBiZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzU1NTg4OGI4N2ViZTIzMGIyZTRlOTQzNTY2NTEwMDI4OWMwNGI1NzFkZjc5OGUwMjJiZjFkNzdkZGJhMjU5NCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_eb71622b3ca340d7a28d6095cab5c5a3",
+      "statement": "Docling (which pulls in PyTorch) is confined exclusively to knowledge.adapters and the worker image: it is listed only under the [ingest] optional dependency in backend/pyproject.toml, and an import-linter contract enforced in CI forbids importing docling from any module other than smart_tutor.knowledge.adapters.",
+      "evidence": [
+        {
+          "resource": "repo://backend/pyproject.toml#L27-L27",
+          "version": "repo-lines-v1:sha256:e1fa03267d62413f2dd717f464a0812f412b8b80e0510885b3c143779e67e5e2:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTFmYTAzMjY3ZDYyNDEzZjJkZDcxN2Y0NjRhMDgxMmY0MTJiOGI4MGUwNTEwODg1YjNjMTQzNzc5ZTY3ZTVlMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTFmYTAzMjY3ZDYyNDEzZjJkZDcxN2Y0NjRhMDgxMmY0MTJiOGI4MGUwNTEwODg1YjNjMTQzNzc5ZTY3ZTVlMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWJjZjZiOWI1YThiMmQ4MWJkOTA1MjlkYzFmYzYxZWVlMmVjOWY0M2NmOWVkNGQ5NGRjNWFlMDkyYTRkODg4OCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiM2I1ZjAxYTE3ZmQ0NDAxOGQzNjQ3ODlhMzM4Mjc5ZTJjNzZiMWRjN2YyOGNkYjVjMWJiYzE5YzljZTcwZTZmYSJ9"
+        },
+        {
+          "resource": "repo://backend/pyproject.toml#L424-L441",
+          "version": "repo-lines-v1:sha256:e1fb7bc0ced619b8904a1fb2280034edd1037b19c624ddb962287c6d5dc44d92:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE1MzA0NmQzNTEyMzA4OTEzNzE0NmVjZmJmMmZhZDE4YzFjMjhhNTgyNzIzMzQ5MzI0OTRkNWJhNzFlMGU2ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhiY2UwZTZlZGJlMzNlMGQ3NzQ3YjVkOGNkNDYzNDZkNjQ5Nzg2OGM0NWYzMGUwNzc3NmFiYTBiNWU0Mzg3MzciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA2ODlmZmQ3MzZiY2ZhNDI3ZmUyNjgxYzliMDkxMTMyMjIyY2RmYTllZTM0MGYzZTM1ODg1Y2I0ZjQyNzRmMzMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImEwZjA2ZTY4NTNlNWI1M2FlNTkyNTI5ZmIyMTQ3ZmFmNGUwOWMzNjI2YjVjMTA1MjA0MWQ4NjE1ZjRkYTBkMTAifQ"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/knowledge/README.md#L9-L9",
+          "version": "repo-lines-v1:sha256:d39d4b78695862c7b7e4784d459520e57b504ccb8b06ba15c730d08abb946eb4:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDM5ZDRiNzg2OTU4NjJjN2I3ZTQ3ODRkNDU5NTIwZTU3YjUwNGNjYjhiMDZiYTE1YzczMGQwOGFiYjk0NmViNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDM5ZDRiNzg2OTU4NjJjN2I3ZTQ3ODRkNDU5NTIwZTU3YjUwNGNjYjhiMDZiYTE1YzczMGQwOGFiYjk0NmViNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWJhOGFlMmZjOTUzMTJhYzEwYWFmMjJkMWI3YWE1ZTlhYzQwZDExYzdmNDg3Yzg3ZGIzNDk2OTE5NTdiYzYwNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmFiMWY5YmI2OWU1MjM5NTk5YjkwZmUzNzY1OWFiM2MxNWQwMjE2NDNiOTNlNTMyMDAxZWY0MDlkMjA3ZWMyNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_fb7055947ea948fd84630f827db48df8",
+      "statement": "Full Docling extraction (step 6) runs concurrently while the learner chooses subjects, so the learner is not blocked waiting for heavy PDF processing before interacting with subject suggestions.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L313-L313",
+          "version": "repo-lines-v1:sha256:f957c8537e00590e80717ca4a3419db55a97c2d210b01619d37cfbe402f79cb0:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjk1N2M4NTM3ZTAwNTkwZTgwNzE3Y2E0YTM0MTlkYjU1YTk3YzJkMjEwYjAxNjE5ZDM3Y2ZiZTQwMmY3OWNiMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjk1N2M4NTM3ZTAwNTkwZTgwNzE3Y2E0YTM0MTlkYjU1YTk3YzJkMjEwYjAxNjE5ZDM3Y2ZiZTQwMmY3OWNiMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmY5ZmI3MTE4N2NlOWYwY2JkYmE0ZDkyMzNjYTE2YmE1YzEwZDA4ZmZiZDIyMjZkYTA2NWRjNGNhMDAwMTU1MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTcyNTk4MzY5YzQzM2ViYTI2YTAzNTZhYTM0ZTM1NWY4NjAwMGQ1OGM3YzYwYzBmODM4MTRiN2ZlOTcyNDU4NyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_1167439fb2eb4a3f92ed3c7508f216bd",
+      "statement": "apps/worker/main.py and apps/jobs/glacier_tagger.py are both NotImplementedError stubs targeting the M1 milestone; neither contains production logic.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/jobs/glacier_tagger.py#L1-L8",
+          "version": "repo-lines-v1:sha256:a459b24cc97870e9f14953fed17dc90db73bc4c2ee3328d4512294dc9c15655b:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2ZjMDA1ZDhiNTA3NDQ0MzdlMjEzODUzNDRmM2MyMWE3NzY1OWIzNTBlZGQ1NGM3YzcyYjIwMjc1NGZhMzAxNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGYwYjgyMTQ4MmEwMjgyOTFmNmJiYWNlOTExNTZjNTdhODc0NGQyYzkyZGQ1NzY3M2I2ODc3MjA5NTUxZTk2NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTlmN2Y3YWExNjMwNTY3YzFiNWU2NjQ0ZTIxY2JlYzgzYTQzOTMzZGM1YjBkYTBkOTBjZDUzYmE0OGU5MTBkMiJ9"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/worker/main.py#L1-L6",
+          "version": "repo-lines-v1:sha256:b9e7afeba95e17fd88c863a3ed82fa65ef1801424f7e6f9ae5029576eab3681c:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzZlNTc3NGMwNmVjODg5MzgwMjJiYmIzZmZkOWJlOWM4MzQxNWFkMWI3YzI2YmJkMjk5NGVjN2ZkZGFlYjI0ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTA0N2M5MTI5M2RjNmIxODIzMGUwYzk1ZGQ1OWIxMjdjNjc5ZDEwNmZkMzNiZGFiODljNDNiYjVhNTE1NjY2NCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_bbcd29fdb1634d78a36a7ef037dead2a",
+      "statement": "The first-pages step calls amazon.nova-2-lite-v1:0 with the describe_document tool on text from pages 1–2, returning title, authors, year, DOI, a two-sentence summary, and 3 proposed subject names; the summary is immediately embedded with amazon.nova-2-multimodal-embeddings-v1:0 (1024 dimensions) and stored as contents.summary_embedding.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L311-L311",
+          "version": "repo-lines-v1:sha256:80ee275dd1780093edf7964d1abdfd35c1230c1eacfb0a00b602e123ce11c32a:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODBlZTI3NWRkMTc4MDA5M2VkZjc5NjRkMWFiZGZkMzVjMTIzMGMxZWFjZmIwYTAwYjYwMmUxMjNjZTExYzMyYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODBlZTI3NWRkMTc4MDA5M2VkZjc5NjRkMWFiZGZkMzVjMTIzMGMxZWFjZmIwYTAwYjYwMmUxMjNjZTExYzMyYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNmE1YzE3MTFlNTE5YTU5YjM1OWM5MjIxN2I4N2NjMWI4MGUxMjA5Zjg3NjcwMzBlNjFhMDViMzc1MDg3OWVjNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTZjM2FkZTIzOWYxN2I3NTA4NmEwZWIyYWM4MTZjZGNkNTJmZmIwZTY1YmEwOTY5NWU0OWE0NjNkZWMxZGRhYiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L413-L413",
+          "version": "repo-lines-v1:sha256:2916df1b5a0aeec183003b0aaac85f93fd43c7e52e598150f6ba83121d88a415:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjkxNmRmMWI1YTBhZWVjMTgzMDAzYjBhYWFjODVmOTNmZDQzYzdlNTJlNTk4MTUwZjZiYTgzMTIxZDg4YTQxNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjkxNmRmMWI1YTBhZWVjMTgzMDAzYjBhYWFjODVmOTNmZDQzYzdlNTJlNTk4MTUwZjZiYTgzMTIxZDg4YTQxNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjljMGMxNmI2NTU0YzVhNmQwYzE2M2QwYmQxYmM0ODMzMDY3MTlkMWNiODcxNjhjNGIxOWMzY2JiODk0NWRhZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjE2OGZiYmEwNzZkYTRmMzdhYTQxZjVhZWYwZTk4ZTQ4NDBhZTY4MjgyZmVmZGVhNDQ5ZjU5YWJhNDlmYjA3YyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L415-L415",
+          "version": "repo-lines-v1:sha256:b30ea07ee22b86e2c2c2dce6cac4231a332b785a880311ec7746995a2765f769:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjMwZWEwN2VlMjJiODZlMmMyYzJkY2U2Y2FjNDIzMWEzMzJiNzg1YTg4MDMxMWVjNzc0Njk5NWEyNzY1Zjc2OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjMwZWEwN2VlMjJiODZlMmMyYzJkY2U2Y2FjNDIzMWEzMzJiNzg1YTg4MDMxMWVjNzc0Njk5NWEyNzY1Zjc2OSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTk5OGE3M2Q1ZGE2NTMxOWNkM2M4ZDRmMzMxNzhiYzNhNDBhMDlkZGY3ZDgyMDFkMzc5ZGE0Yjk1MDY5MjBhYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMGIxMmMxOTg3ZjE1OTY0MzFmMTBlZWMyYmUyNzI4MGFkMjE0MGI0NzFhYzVmZGU2NTc2NGIzN2Q1MGE3Yzc1NCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_46a44117a26949dba5952cccb4e5618a",
+      "statement": "Subject suggestions are computed by SubjectSuggester (subjects.application): shared catalog subjects are ranked by cosine similarity between the content's summary_embedding and each subject's name_embedding, boosting subjects the learner already holds and matching personal names, then filling remaining slots with proposed names that do not match an existing subject.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L312-L312",
+          "version": "repo-lines-v1:sha256:f8852c81759adcf25b1ce8550a733a8f8d8dcd87bc80b77c1f17cdfc20b30c4c:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjg4NTJjODE3NTlhZGNmMjViMWNlODU1MGE3MzNhOGY4ZDhkY2Q4N2JjODBiNzdjMWYxN2NkZmMyMGIzMGM0YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjg4NTJjODE3NTlhZGNmMjViMWNlODU1MGE3MzNhOGY4ZDhkY2Q4N2JjODBiNzdjMWYxN2NkZmMyMGIzMGM0YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODNjMjM4MjcyZDQwNGRkMjY0ZjM1OTlmMjJiM2UyMDJjOWI3OTg4OTZhODZjMmNlMTBlMzZhYmRhZTBkZmVlYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjk4NTkyM2UxZTljMTgxNjA2ZmE5NDdkMjQ5YTYwODM3Y2FlNWZlYThlODlhMTIwMmYyMGUyZGNhZmUzNzBmMCJ9"
+        },
+        {
+          "resource": "repo://sdd/specs/2026-10-02-project-structure-design.md#L122-L122",
+          "version": "repo-lines-v1:sha256:9bce89757f50ca426a187ea64e56b16b9a34eed8cf809f3d1db25474b5d8a3a0:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWJjZTg5NzU3ZjUwY2E0MjZhMTg3ZWE2NGU1NmIxNmI5YTM0ZWVkOGNmODA5ZjNkMWRiMjU0NzRiNWQ4YTNhMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWJjZTg5NzU3ZjUwY2E0MjZhMTg3ZWE2NGU1NmIxNmI5YTM0ZWVkOGNmODA5ZjNkMWRiMjU0NzRiNWQ4YTNhMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmI3YjE4Yzg1M2E0ZWRlNjI3NDE4YWNjNzFhY2I1YTA2Y2I2ZDA2YWVhZGVhMmRhODFiYWMwNjBiN2U1ZGRmNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjJlZWJiNGIxNTk3ZmQ5Njk3YzQzZGE4Yzg0MTMzMmI4MGY4YzQ1Nzg4OWZmMjdhNGU5Zjk0MmI1ZjMzNzQ3ZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_c4f7ea5824fa4a4a8c8065cf5bb59d5a",
+      "statement": "Docling's structured output is saved to contents/<sha256>.docling.json in S3 Standard (not Glacier), so the research map, topic catalog, re-embedding, and citations all read it without requiring a Glacier restore; only a full re-extraction from the PDF would need the archived PDF.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/adr/0002-content-document-split-sha256-dedupe.md#L12-L12",
+          "version": "repo-lines-v1:sha256:d1919fbde2775ae019a2e9970293841926df6451b1e9c6bf92609395def8c5ff:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDE5MTlmYmRlMjc3NWFlMDE5YTJlOTk3MDI5Mzg0MTkyNmRmNjQ1MWIxZTljNmJmOTI2MDkzOTVkZWY4YzVmZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDE5MTlmYmRlMjc3NWFlMDE5YTJlOTk3MDI5Mzg0MTkyNmRmNjQ1MWIxZTljNmJmOTI2MDkzOTVkZWY4YzVmZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWJkM2JlNzZmNmI3ZjU4MjIzNTI4ZGQzZTQ2YjczNWRiMDU3MWVmMzA3ZTM3OGY0ODA4ZDg0OWE0OWU4ZGYxZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjk0NDk2YmRlNTVjZmExZWIwODQxMmQ0OGIyNjEyNTYwYmE4MWY4NjA3OGZkY2VhMTQzNWQ5ZTMzYTVmNzhhNiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L392-L392",
+          "version": "repo-lines-v1:sha256:978ae25ead7a858fa67adc0f5d8e32d3cf13db6831b67e745a8429e02b7752bf:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc4YWUyNWVhZDdhODU4ZmE2N2FkYzBmNWQ4ZTMyZDNjZjEzZGI2ODMxYjY3ZTc0NWE4NDI5ZTAyYjc3NTJiZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc4YWUyNWVhZDdhODU4ZmE2N2FkYzBmNWQ4ZTMyZDNjZjEzZGI2ODMxYjY3ZTc0NWE4NDI5ZTAyYjc3NTJiZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWQ2ZTFiZjNlZDhhYmU3YTBmNWMxMmViZjRkOGJkY2FiOTUwYjVlYTFhNDQ3MTlmNDZkYmUwZDQyYTZhMjQ3MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGJmY2E0OWM2MGY3ZmMyNTcyNWUyNDE2Yjc5NmZiZWZlYTJhMThiNTBhOWE0NWU5ZWY0Y2Y2ZWQyZmY5MTE0MSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_a3961f01792c403986bba54d0372bce2",
+      "statement": "The glacier_tagger.py CronJob tags contents/<sha256>.pdf with status=archived when no non-archived document references the content, and removes the tag when one does again; an S3 lifecycle rule moves tagged PDFs to Glacier Flexible Retrieval after 30 days.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/jobs/glacier_tagger.py#L1-L4",
+          "version": "repo-lines-v1:sha256:74c68c788cbe291adeb27a2865e6a15b926aabc9acc4d6a9df54e383b8e7b2ea:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2ZjMDA1ZDhiNTA3NDQ0MzdlMjEzODUzNDRmM2MyMWE3NzY1OWIzNTBlZGQ1NGM3YzcyYjIwMjc1NGZhMzAxNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDc1ZDQ1ODllOTFjYzhjYjk3NDg4OWRhYjAxZGUxNWRiMTU3NGNhMTBlZWM3MjkwYTEwOWJmNTg4Yzk0ZTAxYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNmUwZGQ4NzIyYjliMDQ3YmU4Mjg3MDRjMmI2YTljNjEwZWIwYTRkN2IzYWMwNjIyZTdjOTMzYTJiOTBjODM5NSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L392-L392",
+          "version": "repo-lines-v1:sha256:978ae25ead7a858fa67adc0f5d8e32d3cf13db6831b67e745a8429e02b7752bf:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc4YWUyNWVhZDdhODU4ZmE2N2FkYzBmNWQ4ZTMyZDNjZjEzZGI2ODMxYjY3ZTc0NWE4NDI5ZTAyYjc3NTJiZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc4YWUyNWVhZDdhODU4ZmE2N2FkYzBmNWQ4ZTMyZDNjZjEzZGI2ODMxYjY3ZTc0NWE4NDI5ZTAyYjc3NTJiZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWQ2ZTFiZjNlZDhhYmU3YTBmNWMxMmViZjRkOGJkY2FiOTUwYjVlYTFhNDQ3MTlmNDZkYmUwZDQyYTZhMjQ3MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGJmY2E0OWM2MGY3ZmMyNTcyNWUyNDE2Yjc5NmZiZWZlYTJhMThiNTBhOWE0NWU5ZWY0Y2Y2ZWQyZmY5MTE0MSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L448-L448",
+          "version": "repo-lines-v1:sha256:319f831b0c9eab19efc68928bb39ea94351fa5805cece9e38c1f09ef626f4b05:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzE5ZjgzMWIwYzllYWIxOWVmYzY4OTI4YmIzOWVhOTQzNTFmYTU4MDVjZWNlOWUzOGMxZjA5ZWY2MjZmNGIwNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzE5ZjgzMWIwYzllYWIxOWVmYzY4OTI4YmIzOWVhOTQzNTFmYTU4MDVjZWNlOWUzOGMxZjA5ZWY2MjZmNGIwNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGNiNzAzODg5MTI3NTg0ZWM4ODA3MWNmYTBhYTQ4NTQyM2ZlZDJhM2Q5ZWIxODUxNTJkZjA5NzcwZjZjMzdlYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiN2IyYzcyOTgxOTA5YjZiYTY2MWM4NjBiOTQ0OWZmYjFlMmY2M2E3YTE3MjcwNTgyZWNlMzdhZDI2ZDFhYWI4NCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_0db736a37ff747199464f3e3c365c0b9",
+      "statement": "A content's work_key is computed in code as the DOI if present, otherwise normalized title + year; this key groups different files of the same intellectual work (e.g. preprint and published versions) into a single research-map node in Release 2.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L313-L313",
+          "version": "repo-lines-v1:sha256:f957c8537e00590e80717ca4a3419db55a97c2d210b01619d37cfbe402f79cb0:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjk1N2M4NTM3ZTAwNTkwZTgwNzE3Y2E0YTM0MTlkYjU1YTk3YzJkMjEwYjAxNjE5ZDM3Y2ZiZTQwMmY3OWNiMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjk1N2M4NTM3ZTAwNTkwZTgwNzE3Y2E0YTM0MTlkYjU1YTk3YzJkMjEwYjAxNjE5ZDM3Y2ZiZTQwMmY3OWNiMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmY5ZmI3MTE4N2NlOWYwY2JkYmE0ZDkyMzNjYTE2YmE1YzEwZDA4ZmZiZDIyMjZkYTA2NWRjNGNhMDAwMTU1MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTcyNTk4MzY5YzQzM2ViYTI2YTAzNTZhYTM0ZTM1NWY4NjAwMGQ1OGM3YzYwYzBmODM4MTRiN2ZlOTcyNDU4NyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L44-L44",
+          "version": "repo-lines-v1:sha256:0696479f83e0240fef2c4113f3225675cb29466cb4a4ee0a9c10d2894a5e04a4:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDY5NjQ3OWY4M2UwMjQwZmVmMmM0MTEzZjMyMjU2NzVjYjI5NDY2Y2I0YTRlZTBhOWMxMGQyODk0YTVlMDRhNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDY5NjQ3OWY4M2UwMjQwZmVmMmM0MTEzZjMyMjU2NzVjYjI5NDY2Y2I0YTRlZTBhOWMxMGQyODk0YTVlMDRhNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzQ1ZTA3M2UxMjdhN2U1NDg4Y2JlODFjZDI2YzdhNDE4ZWZjMDdkODNhN2ZhY2RiNzI0NzEyODQ5MWM1NTE2MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzI2MmViOWM4NWZhODg3NTEzYjk5NjczYjEyMTBiNWQyY2EzYmIwMzFjNzQ3MzVhZjk5OGI2NWUwMWI4MzhhYSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_886a47a459b74c079ff9ac1298ce888f",
+      "statement": "A document is searchable only when its state is ready, not archived, and its linked content is also ready; changing subjects or archiving a document never affects the shared chunks or content.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/adr/0002-content-document-split-sha256-dedupe.md#L18-L22",
+          "version": "repo-lines-v1:sha256:e6f4e67e5a5aae39b085dd7c7c5599ea2e64184dd4d152697b405e685f494195:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzY1OWY1NDkwNGEyY2FlNzg4NmM3OGE0N2MwNTdiZjNjYTM5MjY4YTc0ZDU2ZjBkOTgzN2EwMjA0Zjg3OTdmOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjIyODc5M2QwNGM2M2EzZjYzM2UxYjFmZThjZDAwN2FhMWI1MWNhNTljYmQxZDU1ODhhZjA1ZGM1ZDljNDYxMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L381-L381",
+          "version": "repo-lines-v1:sha256:11dfd1f8adb3c296ee06cbc30fe0a9ab7c85213eba0105cf5e4f732ea9188cef:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTFkZmQxZjhhZGIzYzI5NmVlMDZjYmMzMGZlMGE5YWI3Yzg1MjEzZWJhMDEwNWNmNWU0ZjczMmVhOTE4OGNlZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTFkZmQxZjhhZGIzYzI5NmVlMDZjYmMzMGZlMGE5YWI3Yzg1MjEzZWJhMDEwNWNmNWU0ZjczMmVhOTE4OGNlZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZGVkODIwOTc3YmU1ZDBlYTI2Nzk2NzVhNjdkMjRlZTg3YjlkYWQ3YzEyODcxM2M2MDAzNDFjODQ3OTNjYjkwMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODE0YjBhMWI3N2U2NjI2Njc0MWRiZWM4OGY4ZWVmODNhMDJhNGQwZDA3NTNlNjY3MGMyOWEyZmE4YWViYTExNiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_4c58ed38a8f143fd89ca6982dbd140ab",
+      "statement": "Before uploading, the browser computes the SHA-256 of the selected file and calls the API to check whether that hash already appears in the learner's own library; if a match is found the upload is skipped and the learner sees 'Already in your library' (or 'Restore' if archived). This check covers only the learner's own documents; it cannot expose another learner's files (PRD D19).",
+      "evidence": [
+        {
+          "resource": "repo://sdd/adr/0002-content-document-split-sha256-dedupe.md#L14-L14",
+          "version": "repo-lines-v1:sha256:9e51a2da845b9ac774c6935bcb328d6ad2c8b4d297860a7128a4574e30b1eadb:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWU1MWEyZGE4NDViOWFjNzc0YzY5MzViY2IzMjhkNmFkMmM4YjRkMjk3ODYwYTcxMjhhNDU3NGUzMGIxZWFkYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWU1MWEyZGE4NDViOWFjNzc0YzY5MzViY2IzMjhkNmFkMmM4YjRkMjk3ODYwYTcxMjhhNDU3NGUzMGIxZWFkYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTBiMGJhOGRiNWQ1MGUzYTZkMWZmNWVlMTEyZmQ0MGEwMDUwODk5NWI3Y2IwN2EyMTI5NDE4NjFiZTg1ZDcxNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjIyODc5M2QwNGM2M2EzZjYzM2UxYjFmZThjZDAwN2FhMWI1MWNhNTljYmQxZDU1ODhhZjA1ZGM1ZDljNDYxMyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L170-L173",
+          "version": "repo-lines-v1:sha256:3e7153f48148dd70c8c553e3e12c1e1fa811fedbfe0dc3f26d43dddaf1617400:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTgzYTdkZTFiY2VkYTlmMTk5MGYwYmUyOTk5ZmZmYjE0NDhjYjBmZWViMDAwMWY5ODFjYzAxN2FlMDljZWQzZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMGE5ZmYwM2VlMDAzYjdkOWM0N2I3OGM2NTllZDBhM2Q1MWMyYmNjZWI2NzU1YmZhMzJkNWQ0MTAxYzAyMzkzNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDJkNWYwNTcwYjI4YzE0OTAxZWQwNmJjZWNjZDY3NjkyNDZjODJhNDhlNzA4MWMzNGJhZDI5ZTdlNWQ2MmExMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjBhZmIxN2M5Njk1OTIxN2Y0ZDUxYzY5ZWZmOWEzODE5MDhjNmUwYTE0OGM0OGQ2NmRlM2IzYmI1MjIyMzNjYiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_e6ba72caf7e949588cecdba04083f3e9",
+      "statement": "Upload rate limits are sourced from SSM Parameter Store and enforced by the accounts module (UsageService). The defaults are 20 uploads per hour and 100 uploads per day per learner; both successful and failed or duplicate uploads count toward these limits. Exceeding a limit returns HTTP 429 with a retry-after message.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/accounts/README.md#L1-L12",
+          "version": "repo-lines-v1:sha256:1984e5316c29f41eb35411a5ed4e3130d2e73cf89b5dd1df893dcc3061700dc2:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3Nzg4NmNiMmE1ZWRiNzgzNDMzOTVkZjFkNzFkNWY5OGFkNGUwZTAxZjJiOTgzMWUxZTFjN2FiNTUyYTYxY2EiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc0MDBmZjU0Mzc5NjQyZTBiMTBlNzU5NzgyNzRiNTQwYzBlMDhjMDFmMjRhMDUyMWY0MDM4YWJiODg4NmM4YjIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L557-L560",
+          "version": "repo-lines-v1:sha256:0996ceb143c223a8732fa1f825f75aaea686891036a0b70bf628aa6e48a9a515:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOGEzODY3MzEyZDUxYWM2MmI3NTBiYWQ3Zjk5YzMwY2Y2YmIyZDFkMzQ0MGEyMjcxYTdjZTAyYzY0YmMwNzMwZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMmQ2MjBkNjdlNWRhY2IwY2VlMjY2MjRiNTY1ZjY4YTIyZWQ5NGIwYmE0ZWYwNjU0NGIyOGY1OGMwMzA2OTg1NCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjkxMzVmNjE5NzIyYjFlYjFhNGE5MTgzMjI3NjI3YzFjNGY2YTk0ODk3YmFkYmEyNjM2ZWJjY2MyYWQxY2I4YSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjc2ODI4OGYyYWM4YjNiNjZiNGYzOTNkNGUwY2QyZDE5M2M1MzU2NjA1NmYwMTM0NDc4ZTU4YTg1ZGUwOTVhMSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_a2eecfa349ea45cf87213c690521fb05",
+      "statement": "Per-file constraints enforced during ingestion: PDF format only, ≤ 50 MB (checked client-side before upload), ≤ 500 pages and parseability (checked server-side after upload). Failures set the document to `failed` with the reason; the learner sees a Retry button for up to 3 attempts per content.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L170-L173",
+          "version": "repo-lines-v1:sha256:3e7153f48148dd70c8c553e3e12c1e1fa811fedbfe0dc3f26d43dddaf1617400:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTgzYTdkZTFiY2VkYTlmMTk5MGYwYmUyOTk5ZmZmYjE0NDhjYjBmZWViMDAwMWY5ODFjYzAxN2FlMDljZWQzZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMGE5ZmYwM2VlMDAzYjdkOWM0N2I3OGM2NTllZDBhM2Q1MWMyYmNjZWI2NzU1YmZhMzJkNWQ0MTAxYzAyMzkzNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDJkNWYwNTcwYjI4YzE0OTAxZWQwNmJjZWNjZDY3NjkyNDZjODJhNDhlNzA4MWMzNGJhZDI5ZTdlNWQ2MmExMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjBhZmIxN2M5Njk1OTIxN2Y0ZDUxYzY5ZWZmOWEzODE5MDhjNmUwYTE0OGM0OGQ2NmRlM2IzYmI1MjIyMzNjYiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L557-L557",
+          "version": "repo-lines-v1:sha256:8a3867312d51ac62b750bad7f99c30cf6bb2d1d3440a2271a7ce02c64bc0730d:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOGEzODY3MzEyZDUxYWM2MmI3NTBiYWQ3Zjk5YzMwY2Y2YmIyZDFkMzQ0MGEyMjcxYTdjZTAyYzY0YmMwNzMwZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGEzODY3MzEyZDUxYWM2MmI3NTBiYWQ3Zjk5YzMwY2Y2YmIyZDFkMzQ0MGEyMjcxYTdjZTAyYzY0YmMwNzMwZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjkxMzVmNjE5NzIyYjFlYjFhNGE5MTgzMjI3NjI3YzFjNGY2YTk0ODk3YmFkYmEyNjM2ZWJjY2MyYWQxY2I4YSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDhhZjcyMjI5ZTVkYzRlNmFmNDllOGU3MTljMzJiOTZlZTFjOWIzZDRkMzExOWI1OGZmMjQ0MDQ4NjE1MTIwMCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_8b288d9b51424899903d3ceb1968c65f",
+      "statement": "The document state machine has four states per learner: `processing` (from upload start), `awaiting_subjects` (when the linked content becomes ready), `ready` (after 1–3 subjects are chosen), and `failed` (if content fails or validation fails). The `archived` flag is orthogonal to state and excludes documents from search.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/knowledge/README.md#L1-L12",
+          "version": "repo-lines-v1:sha256:e37ec23ef5a6e64b5055c8e0d24bec2cea4580c9c05be3acd78c0afb47f8855c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM3NTc3OTkzNWJiNjc5YTMxODMwZDgwMjdkZTY5Y2Y0YWM2NGFiMzJmNDkyM2JkNGQyNzQ1YTNkZTI5MjYyYjkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc0MDBmZjU0Mzc5NjQyZTBiMTBlNzU5NzgyNzRiNTQwYzBlMDhjMDFmMjRhMDUyMWY0MDM4YWJiODg4NmM4YjIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L375-L381",
+          "version": "repo-lines-v1:sha256:79eb41dd1ec3df582c8729b7ebef40b74bd9f711b380d494031f34ca74b04b15:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzI4NTZmZDI4M2M2M2ExYjVmM2E2NjMwZGQ3MjRlOWY5ODdmOGZkZWRkMTdkN2RjNTM0N2M1ZDUzY2RjODg3MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTFkZmQxZjhhZGIzYzI5NmVlMDZjYmMzMGZlMGE5YWI3Yzg1MjEzZWJhMDEwNWNmNWU0ZjczMmVhOTE4OGNlZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDBjNmFmZjI1MmY3NTM2ZGMzNTZmM2Q4YmNlM2VjM2UwZTVmMjZiY2Q2NWExMTVmM2Q0NzNhMWIwOTYzYmZjZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODE0YjBhMWI3N2U2NjI2Njc0MWRiZWM4OGY4ZWVmODNhMDJhNGQwZDA3NTNlNjY3MGMyOWEyZmE4YWViYTExNiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_ce626f2216a94bcbb5be62e2755b182c",
+      "statement": "Performance targets from PRD §11: subject suggestions shown p95 ≤ 30 s from upload completion (new content); duplicate of a ready content reaches choose-subjects p95 ≤ 10 s; new content searchable p95 ≤ 5 min for ≤ 200 pages and ≤ 15 min for 201–500 pages.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L557-L557",
+          "version": "repo-lines-v1:sha256:8a3867312d51ac62b750bad7f99c30cf6bb2d1d3440a2271a7ce02c64bc0730d:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOGEzODY3MzEyZDUxYWM2MmI3NTBiYWQ3Zjk5YzMwY2Y2YmIyZDFkMzQ0MGEyMjcxYTdjZTAyYzY0YmMwNzMwZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGEzODY3MzEyZDUxYWM2MmI3NTBiYWQ3Zjk5YzMwY2Y2YmIyZDFkMzQ0MGEyMjcxYTdjZTAyYzY0YmMwNzMwZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjkxMzVmNjE5NzIyYjFlYjFhNGE5MTgzMjI3NjI3YzFjNGY2YTk0ODk3YmFkYmEyNjM2ZWJjY2MyYWQxY2I4YSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDhhZjcyMjI5ZTVkYzRlNmFmNDllOGU3MTljMzJiOTZlZTFjOWIzZDRkMzExOWI1OGZmMjQ0MDQ4NjE1MTIwMCJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-03T03:19:50.688Z"
+  }
+}

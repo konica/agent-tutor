@@ -1,0 +1,232 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:73135be2a7353656f10769e69ceb9d03efc2797e10dbb58f47596cccd5cc8349",
+  "claims": [
+    {
+      "id": "claim_bde3713145fb43db873135197865b823",
+      "statement": "The Smart Tutor ask-path is a five-step LangGraph graph: (1) resolve subjects on the first turn, (2) MCP search returning top-5 chunks, (3) relevance gate comparing best score to answer_floor, (4) growth check searching other subjects, and (5) Nova 2 Lite streamed answer; steps 1, 3, and 4 are pure code with no LLM call.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/agent/nodes/__init__.py#L1-L1",
+          "version": "repo-lines-v1:sha256:5f48cc5d4c26440af1c1c996ce559f07817b08dfcd64f89aa72f997b26427bd8:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNWY0OGNjNWQ0YzI2NDQwYWYxYzFjOTk2Y2U1NTlmMDc4MTdiMDhkZmNkNjRmODlhYTcyZjk5N2IyNjQyN2JkOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWY0OGNjNWQ0YzI2NDQwYWYxYzFjOTk2Y2U1NTlmMDc4MTdiMDhkZmNkNjRmODlhYTcyZjk5N2IyNjQyN2JkOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L288-L299",
+          "version": "repo-lines-v1:sha256:3b18270e5c6d17f53865cc57e37f4f0b0b2642c9ac2ac28ff5aea99c420d68c1:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg5YTJiMzZlMGI0YjdhNjYwZmMwZjk1ZTQ4MmMwMmQxZmFlMGRjNjM2M2Q4ZGJjYzA4MzJkZDJhZGI1ZDYwMmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE3Y2MzOWEwMTY4NjAxMjEzMzkzYTI1OWQ3MTZmMTcyMGM3ODk1NDQyNzg3MWQ5Mjk4NDYwNGViNzgyMzcxOWIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjczNmFhYTMyZmMxNGI0ZWI2ZmVmNmY2NTNkZGI2NjdlZjMwMjk5YjFiOGEwYjcyNzMzNjUzZWU0ZTdmMDlkYTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzNzRlZmE1MGIyMDVhNTI3NDVjMzI4NTUzNmQ0YWU5OWEyNGI2MmY4NjA4OTAzYTQ4YmExMzQwN2VkY2JhYjMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_555d3dcd620543df8840fa306188302b",
+      "statement": "The five LangGraph graph nodes (resolve_subject, search, gate, answer, summarize) are stub implementations in M2; they live in apps/agent/nodes/__init__.py and call tutoring application services.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/agent/nodes/__init__.py#L1-L1",
+          "version": "repo-lines-v1:sha256:5f48cc5d4c26440af1c1c996ce559f07817b08dfcd64f89aa72f997b26427bd8:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNWY0OGNjNWQ0YzI2NDQwYWYxYzFjOTk2Y2U1NTlmMDc4MTdiMDhkZmNkNjRmODlhYTcyZjk5N2IyNjQyN2JkOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWY0OGNjNWQ0YzI2NDQwYWYxYzFjOTk2Y2U1NTlmMDc4MTdiMDhkZmNkNjRmODlhYTcyZjk5N2IyNjQyN2JkOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/agent/server.py#L1-L1",
+          "version": "repo-lines-v1:sha256:2821f0ffe427420cd0fcd7ffb8897fe8ff7abe2fa4508fa1a9f994aec6f67dff:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjgyMWYwZmZlNDI3NDIwY2QwZmNkN2ZmYjg4OTdmZThmZjdhYmUyZmE0NTA4ZmExYTlmOTk0YWVjNmY2N2RmZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjgyMWYwZmZlNDI3NDIwY2QwZmNkN2ZmYjg4OTdmZThmZjdhYmUyZmE0NTA4ZmExYTlmOTk0YWVjNmY2N2RmZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzI3MDMwNDRkNjY2Zjg3YjI0MTY0OTJiZmM4MGVjNWEyYzkwYTRkNTg3NGE1YTYxMjM2NzBmZmM5MmNiOTBkZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_10f53abcc16443bca62a90259c4313a7",
+      "statement": "Subject detection binds the best subject when its score >= detect_threshold AND it leads the runner-up by >= detect_margin; additional subjects within multi_margin of the best are also bound (up to 3 total); if the conditions are not met the agent asks the learner to pick subjects instead.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/tutoring/README.md#L1-L1",
+          "version": "repo-lines-v1:sha256:4d64c6f91bdf4aceccf06886f0da5fda2779a43c8fa3243769e8865e5ed1989d:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNGQ2NGM2ZjkxYmRmNGFjZWNjZjA2ODg2ZjBkYTVmZGEyNzc5YTQzYzhmYTMyNDM3NjllODg2NWU1ZWQxOTg5ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNGQ2NGM2ZjkxYmRmNGFjZWNjZjA2ODg2ZjBkYTVmZGEyNzc5YTQzYzhmYTMyNDM3NjllODg2NWU1ZWQxOTg5ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDhiYWQwZGM2OWU4OWNkOTFhNjI2ZWUwZjQ1NmVhYzg3NzNiZGZmMTYyMTI2MzM5MDE0OGJmMmFjYWRhYTI4MCJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L292-L292",
+          "version": "repo-lines-v1:sha256:2e48556780b05046959d3fd7e60a14e8996a987b51d3e3c92a49181f0a923f02:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMmU0ODU1Njc4MGIwNTA0Njk1OWQzZmQ3ZTYwYTE0ZTg5OTZhOTg3YjUxZDNlM2M5MmE0OTE4MWYwYTkyM2YwMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMmU0ODU1Njc4MGIwNTA0Njk1OWQzZmQ3ZTYwYTE0ZTg5OTZhOTg3YjUxZDNlM2M5MmE0OTE4MWYwYTkyM2YwMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGJhNGZkZDQ5NzM2NDAzZDQzZWM5YmU1NWUyZDA1NGEyNTk3MDhkMTVlNmFjZjkzNDU3NzM2YjIwMGM3MzAwNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWJhOWVhOTEzZTFkZGNmNWU1MWUwNDgxZTQxZjliNWFiYTU3MTc1N2VkYjg4OWQyY2VkYzUyMzQzM2U2M2QxMyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_b581b7c3ad3d4f418d649b8929d27098",
+      "statement": "Single-subject learners skip detection: the thread is bound to their one subject immediately on the first turn.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L292-L292",
+          "version": "repo-lines-v1:sha256:2e48556780b05046959d3fd7e60a14e8996a987b51d3e3c92a49181f0a923f02:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMmU0ODU1Njc4MGIwNTA0Njk1OWQzZmQ3ZTYwYTE0ZTg5OTZhOTg3YjUxZDNlM2M5MmE0OTE4MWYwYTkyM2YwMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMmU0ODU1Njc4MGIwNTA0Njk1OWQzZmQ3ZTYwYTE0ZTg5OTZhOTg3YjUxZDNlM2M5MmE0OTE4MWYwYTkyM2YwMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGJhNGZkZDQ5NzM2NDAzZDQzZWM5YmU1NWUyZDA1NGEyNTk3MDhkMTVlNmFjZjkzNDU3NzM2YjIwMGM3MzAwNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWJhOWVhOTEzZTFkZGNmNWU1MWUwNDgxZTQxZjliNWFiYTU3MTc1N2VkYjg4OWQyY2VkYzUyMzQzM2U2M2QxMyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_98ca2de1a4a04286b06613ed846cca14",
+      "statement": "Detection thresholds (detect_threshold, detect_margin, multi_margin, answer_floor) are configuration values stored in SSM Parameter Store under /smart-tutor/* and are tuned on the labeled detection dataset as part of the M2 milestone.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L301-L301",
+          "version": "repo-lines-v1:sha256:4fb080f5f272ff834c4ee22919719a247da0ae9572e916f02c5bae27b8cf3057:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNGZiMDgwZjVmMjcyZmY4MzRjNGVlMjI5MTk3MTlhMjQ3ZGEwYWU5NTcyZTkxNmYwMmM1YmFlMjdiOGNmMzA1NyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNGZiMDgwZjVmMjcyZmY4MzRjNGVlMjI5MTk3MTlhMjQ3ZGEwYWU5NTcyZTkxNmYwMmM1YmFlMjdiOGNmMzA1NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMGNiODZjNDk5NmQ1N2E0NTIxNDU2OGMyOGRlOTE2ZDI3ZTgzODU5OThlMTJjNmNjNmNmNTVlZDFhMjQ4NjY2ZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTQyZDc4OGU4N2U3ZDY5MmZkODhhNDY5NTZhODM0NmU0N2E4Y2NmNzJiZTUxMDUxNjY2ZjVhOTk4ZDE0N2RlZCJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L357-L357",
+          "version": "repo-lines-v1:sha256:aa74953301c80c0846c9b8c1a7df682c7d31b8d96a2846e418dd4c5b63f5529c:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWE3NDk1MzMwMWM4MGMwODQ2YzliOGMxYTdkZjY4MmM3ZDMxYjhkOTZhMjg0NmU0MThkZDRjNWI2M2Y1NTI5YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYWE3NDk1MzMwMWM4MGMwODQ2YzliOGMxYTdkZjY4MmM3ZDMxYjhkOTZhMjg0NmU0MThkZDRjNWI2M2Y1NTI5YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTc2MTZhMDA3MDIzNDFlMTI4M2FkYjRkNjBlZjBhODRkYTkwMmY3ZmQ2ZjJjYThiZWExZTI5ZTc5OWUyYTE5MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDYzYjhlNjBjNjE2MTgxZjFiZmI1MjdkNGM3YzA1Yjc0MmNkZTFiZDVlOWYwZTMwNjlkZmE1NjI5MTQ1MTNmZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_84ee8866a6e44701a72e66fed6416747",
+      "statement": "The growth check (step 4) searches the learner's other subjects; if a match >= detect_threshold is found and the thread has fewer than 3 subjects, the subject is added and the learner is notified; if the thread is already at 3, the agent declines and recommends a new conversation carrying the question over; if no match is found, the question is declined without an LLM call.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L295-L298",
+          "version": "repo-lines-v1:sha256:104d66fa2b7440997e14c48ed16c22d30a80cf1cab8125981afb9bffa7220548:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTE5OTNiMGE1MzA1NzA2ZmYzZjdlZDM5NGViMTYxYzFiODFjZDM4YjJmMWMwNDEwOTZjYmJmM2IwYjEwODYyOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjQ3YTFmZTM0NzBlZjBhOTcxNDEyYmM1MWNjMDYzYmU2Yjk5NDYyYzVlNjk3MzIzMmU4ODNkMzAzYzhhNGRhMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWUzMGU0MDE5YjU2NTQ3NzMxM2VlZDI3NjM3MzRmZjdkMjA0ZGQ3MDgwZjc1YjBmNjZkNmQxOGEyZDMyNzA3NCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjBjY2IxZjBiMDQ4ZTFjMWJkYjE5NDIwZjEwZWUzOGJkYjU5MWIxZTA1YmZhODQyMTI1YjMyNjZhNDQwMDhiNSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_1b9d36a07e834b24accf77e2b2fe344c",
+      "statement": "Thread subjects are append-only: Thread.add_subject() in tutoring.domain refuses any attempt to add a fourth subject and never removes subjects; the maximum is 3 subjects per thread; a warning is shown when the thread reaches the maximum.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/tutoring/README.md#L1-L1",
+          "version": "repo-lines-v1:sha256:4d64c6f91bdf4aceccf06886f0da5fda2779a43c8fa3243769e8865e5ed1989d:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNGQ2NGM2ZjkxYmRmNGFjZWNjZjA2ODg2ZjBkYTVmZGEyNzc5YTQzYzhmYTMyNDM3NjllODg2NWU1ZWQxOTg5ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNGQ2NGM2ZjkxYmRmNGFjZWNjZjA2ODg2ZjBkYTVmZGEyNzc5YTQzYzhmYTMyNDM3NjllODg2NWU1ZWQxOTg5ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDhiYWQwZGM2OWU4OWNkOTFhNjI2ZWUwZjQ1NmVhYzg3NzNiZGZmMTYyMTI2MzM5MDE0OGJmMmFjYWRhYTI4MCJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L288-L288",
+          "version": "repo-lines-v1:sha256:89a2b36e0b4b7a660fc0f95e482c02d1fae0dc6363d8dbcc0832dd2adb5d602f:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODlhMmIzNmUwYjRiN2E2NjBmYzBmOTVlNDgyYzAyZDFmYWUwZGM2MzYzZDhkYmNjMDgzMmRkMmFkYjVkNjAyZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODlhMmIzNmUwYjRiN2E2NjBmYzBmOTVlNDgyYzAyZDFmYWUwZGM2MzYzZDhkYmNjMDgzMmRkMmFkYjVkNjAyZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzM2YWFhMzJmYzE0YjRlYjZmZWY2ZjY1M2RkYjY2N2VmMzAyOTliMWI4YTBiNzI3MzM2NTNlZTRlN2YwOWRhOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGJhNGZkZDQ5NzM2NDAzZDQzZWM5YmU1NWUyZDA1NGEyNTk3MDhkMTVlNmFjZjkzNDU3NzM2YjIwMGM3MzAwNCJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L296-L298",
+          "version": "repo-lines-v1:sha256:d09765c8bfeaf239fb78a4ea3a294c9e8954cc76989dd44089c97597e8656ee6:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzk5ZDhjMTliODljZWM4YmUzNDJkZWYzOGRiNWZmY2M4ZDIzZGVkMGZiYzc0NjljMDUyN2RlNzVkY2MxZGUxOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjQ3YTFmZTM0NzBlZjBhOTcxNDEyYmM1MWNjMDYzYmU2Yjk5NDYyYzVlNjk3MzIzMmU4ODNkMzAzYzhhNGRhMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWJhOWVhOTEzZTFkZGNmNWU1MWUwNDgxZTQxZjliNWFiYTU3MTc1N2VkYjg4OWQyY2VkYzUyMzQzM2U2M2QxMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjBjY2IxZjBiMDQ4ZTFjMWJkYjE5NDIwZjEwZWUzOGJkYjU5MWIxZTA1YmZhODQyMTI1YjMyNjZhNDQwMDhiNSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_053993496c2d4b6b93297fb4d9c8d872",
+      "statement": "Answer generation uses Amazon Nova 2 Lite (amazon.nova-2-lite-v1:0 via the us.amazon.nova-2-lite-v1:0 inference profile) with ConverseStream; chunk text is passed as quoted data with an instruction never to follow instructions found in documents; the model may call a decline(reason) tool if the documents do not support an answer.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L299-L299",
+          "version": "repo-lines-v1:sha256:17cc39a0168601213393a259d716f1720c78954427871d92984604eb7823719b:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTdjYzM5YTAxNjg2MDEyMTMzOTNhMjU5ZDcxNmYxNzIwYzc4OTU0NDI3ODcxZDkyOTg0NjA0ZWI3ODIzNzE5YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTdjYzM5YTAxNjg2MDEyMTMzOTNhMjU5ZDcxNmYxNzIwYzc4OTU0NDI3ODcxZDkyOTg0NjA0ZWI3ODIzNzE5YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDA5NzY1YzhiZmVhZjIzOWZiNzhhNGVhM2EyOTRjOWU4OTU0Y2M3Njk4OWRkNDQwODljOTc1OTdlODY1NmVlNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTM3NGVmYTUwYjIwNWE1Mjc0NWMzMjg1NTM2ZDRhZTk5YTI0YjYyZjg2MDg5MDNhNDhiYTEzNDA3ZWRjYmFiMyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L415-L415",
+          "version": "repo-lines-v1:sha256:b30ea07ee22b86e2c2c2dce6cac4231a332b785a880311ec7746995a2765f769:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjMwZWEwN2VlMjJiODZlMmMyYzJkY2U2Y2FjNDIzMWEzMzJiNzg1YTg4MDMxMWVjNzc0Njk5NWEyNzY1Zjc2OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjMwZWEwN2VlMjJiODZlMmMyYzJkY2U2Y2FjNDIzMWEzMzJiNzg1YTg4MDMxMWVjNzc0Njk5NWEyNzY1Zjc2OSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTk5OGE3M2Q1ZGE2NTMxOWNkM2M4ZDRmMzMxNzhiYzNhNDBhMDlkZGY3ZDgyMDFkMzc5ZGE0Yjk1MDY5MjBhYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMGIxMmMxOTg3ZjE1OTY0MzFmMTBlZWMyYmUyNzI4MGFkMjE0MGI0NzFhYzVmZGU2NTc2NGIzN2Q1MGE3Yzc1NCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_5eb89bcf8ddd4ee5b4723de263876537",
+      "statement": "Every decline — whether from the growth check (step 4) or from the model's decline tool (step 5) — writes an anonymous record to the declines table via insights.application.DeclineLogService: subject_ids, PII-scrubbed question text, best retrieval score, reason, and timestamp, with no user_id stored; entries are deleted after 90 days.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/insights/README.md#L1-L1",
+          "version": "repo-lines-v1:sha256:b810d59dd3d72ef1a4d18326694609375a68603faaa311d8f9608abdd0faab98:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjgxMGQ1OWRkM2Q3MmVmMWE0ZDE4MzI2Njk0NjA5Mzc1YTY4NjAzZmFhYTMxMWQ4Zjk2MDhhYmRkMGZhYWI5OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjgxMGQ1OWRkM2Q3MmVmMWE0ZDE4MzI2Njk0NjA5Mzc1YTY4NjAzZmFhYTMxMWQ4Zjk2MDhhYmRkMGZhYWI5OCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjQ5ZmFkZDY5MTQxYjNiOTQ0YmRiYjI5NDE3MTBlZDE2ZDg3ZDM5OGM1NjJkNDQzYzYzZTdlYjAyNWY4YjkwZCJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L353-L353",
+          "version": "repo-lines-v1:sha256:6046c1b0c1d47336378727a97cbd55e7c6192e0c1b1f14bebc02efa1bb80e850:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjA0NmMxYjBjMWQ0NzMzNjM3ODcyN2E5N2NiZDU1ZTdjNjE5MmUwYzFiMWYxNGJlYmMwMmVmYTFiYjgwZTg1MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjA0NmMxYjBjMWQ0NzMzNjM3ODcyN2E5N2NiZDU1ZTdjNjE5MmUwYzFiMWYxNGJlYmMwMmVmYTFiYjgwZTg1MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzhkNmQ3MzYwZTBmZDEzNDcwMTUyM2M5MDAzNzk2ODAzZGU3NTEwZTYxZTE3OTY1YWQ3MjIxYTBlNjk5ZDgwYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTc2MTZhMDA3MDIzNDFlMTI4M2FkYjRkNjBlZjBhODRkYTkwMmY3ZmQ2ZjJjYThiZWExZTI5ZTc5OWUyYTE5MSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L396-L396",
+          "version": "repo-lines-v1:sha256:dda440f4e8170f6d33d69059876733079eeba68777628c5a1f44d23981035c8b:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGRhNDQwZjRlODE3MGY2ZDMzZDY5MDU5ODc2NzMzMDc5ZWViYTY4Nzc3NjI4YzVhMWY0NGQyMzk4MTAzNWM4YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGRhNDQwZjRlODE3MGY2ZDMzZDY5MDU5ODc2NzMzMDc5ZWViYTY4Nzc3NjI4YzVhMWY0NGQyMzk4MTAzNWM4YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGJmY2E0OWM2MGY3ZmMyNTcyNWUyNDE2Yjc5NmZiZWZlYTJhMThiNTBhOWE0NWU5ZWY0Y2Y2ZWQyZmY5MTE0MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTNlNzQ5ZWZlNTNmNTUwM2E3NDliMzcxODQzODA3N2YxMWMzYjAzZDVhZDM4OWU3NTA0ZWUzOTU0YzhhMGFjYiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_40a4c642138b4adf8c3b72af25648110",
+      "statement": "The RAG MCP server validates the forwarded JWT in code, reads the user sub, and applies a can_read SQL predicate to restrict chunk search to the caller's own ready, non-archived documents in the requested subjects; the agent passes the JWT in an HTTP header, never in the prompt.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/mcp_server/server.py#L1-L3",
+          "version": "repo-lines-v1:sha256:5a388ab1dabe334163a13567bec5dab3494cdf0e25b6dc865825aa830527c57e:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODVhYTAyMWNkZDgyODU3NDlmMWM1MTc0ODYyMjcyM2ZkNzU0ZjM0NjkzMjgxMDE5OTgxNTRkNDVlZDQ3MDlhZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzk5OTg5OTQ2NmRkYjY2YmJhZDEwMDAxN2Q5NzU3NzkxNWE1MzZiMjg4ZGRjNGM4ZjEzY2IyNTlmYzRjMmZjMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjhmOTVjYTA2MzJjMTIxZjQxMWEyNjFjZDM3MzJhZDVlZTQxYzI3ZjM3NTU4NzgwYTJhYTAyNzVmZmYyY2U3ZiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L326-L329",
+          "version": "repo-lines-v1:sha256:43aa2d01be48eafc6c849b10e413d2dbe56ac4a712c8b42d4738fe2260a4c43e:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODA4NzgwMGQxYmEyYTFmMmZjMTM1Nzg1MTRjOTdhMzYxYTRjMDhjMGQ2NTQ3MjkzYTAwZDI5MzRmNmFlMTAxNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjdjNGU2YWM1ZWQyYzJkYjY0OWEwODUzNTcwN2YzMDcwOTQzNjJiNzgyM2JkODdlNmFiMDU3ZDgzMmI5ZjJkZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzYwMjMzOWY0ZTVkODI0Y2Y3YzZkYjgzMzQ3MWI0MDY3NTdlZGYyMmU1NzNkZmEzNGViZDlkNmJmYzgxZjQwNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWQzN2FmMDQ4MDlkMTc5OGI4ZGNiNWIzNTk1ZjJkNmE3YzBkYjJkNDA1ZTA1ZDc4MjI2MGM4MDJjNTk2Y2ExNiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_9116603ebb504d65ac9225525f69528a",
+      "statement": "The MCP search tool returns top-5 chunks (k=5) via streamable HTTP at :8000/mcp; an empty readable set returns an empty result that the agent converts to the 'no active documents' message rather than an error.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/mcp_server/server.py#L7-L13",
+          "version": "repo-lines-v1:sha256:461888a9c9c36d5bc27a54189b3c704e0a9ae0ea7aef675401c367293f507923:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjhmOTVjYTA2MzJjMTIxZjQxMWEyNjFjZDM3MzJhZDVlZTQxYzI3ZjM3NTU4NzgwYTJhYTAyNzVmZmYyY2U3ZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTA0N2M5MTI5M2RjNmIxODIzMGUwYzk1ZGQ1OWIxMjdjNjc5ZDEwNmZkMzNiZGFiODljNDNiYjVhNTE1NjY2NCJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L281-L281",
+          "version": "repo-lines-v1:sha256:df0d2ef2105438f62cfcab0ba8d1e4330ac24a4ca868647e80df764b4eb402a0:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGYwZDJlZjIxMDU0MzhmNjJjZmNhYjBiYThkMWU0MzMwYWMyNGE0Y2E4Njg2NDdlODBkZjc2NGI0ZWI0MDJhMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGYwZDJlZjIxMDU0MzhmNjJjZmNhYjBiYThkMWU0MzMwYWMyNGE0Y2E4Njg2NDdlODBkZjc2NGI0ZWI0MDJhMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDY2NzE4NGRjMzQ3MDQzMjVjYzJmZDJjYThlNzA4MDdmMmMwMWI2NGRkY2Y3NTA2ODNjOWNmMTQ3YjI2NGQyNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWNhODE1NTY2MmQwNzBhZThhNjM3YTE2MzBmMmI5NDFhMWMyMWZjYzIyNzBlN2QwNmViMThkMTJmYjRlNDkxNSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L293-L293",
+          "version": "repo-lines-v1:sha256:69e3b5c8def242b110a29a685b67bebc4d23c122315c54e1cfb8961948daa511:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjllM2I1YzhkZWYyNDJiMTEwYTI5YTY4NWI2N2JlYmM0ZDIzYzEyMjMxNWM1NGUxY2ZiODk2MTk0OGRhYTUxMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjllM2I1YzhkZWYyNDJiMTEwYTI5YTY4NWI2N2JlYmM0ZDIzYzEyMjMxNWM1NGUxY2ZiODk2MTk0OGRhYTUxMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjkxOGEwYzZkNjIyN2Q1NGRmMmIyMGNjOWZmYjU5ZjAzNmYwNjdlYWVlZWRlOTgwMzUyYzYxMjBhMDU1NjMzZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiN2JlMzBmZTNkZmNjOTcxNjgwZmYwMDczODkwYmZkZWVlYWYwZGM2MDJmM2Q3ZWUzZTgxZWI5MTMzMjg0YWE3OSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_da054704c11344e7b3f45c3d331a04e9",
+      "statement": "The summarize path reads the thread, optionally asks the learner to confirm if the note was edited since last generated, makes one model call that returns the Lesson Note and calls the save_learning_record tool, then upserts both the LessonNote (one per thread) and the LearningRecord (in the LangGraph store under namespace (learning, user_id), keyed by thread_id).",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L303-L303",
+          "version": "repo-lines-v1:sha256:1853e058d100de00e314abed044d96f0bf9eae8b8a340866febfb2336e3c393a:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTg1M2UwNThkMTAwZGUwMGUzMTRhYmVkMDQ0ZDk2ZjBiZjllYWU4YjhhMzQwODY2ZmViZmIyMzM2ZTNjMzkzYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTg1M2UwNThkMTAwZGUwMGUzMTRhYmVkMDQ0ZDk2ZjBiZjllYWU4YjhhMzQwODY2ZmViZmIyMzM2ZTNjMzkzYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTM3NGVmYTUwYjIwNWE1Mjc0NWMzMjg1NTM2ZDRhZTk5YTI0YjYyZjg2MDg5MDNhNDhiYTEzNDA3ZWRjYmFiMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTIwYzQ5OWQ0MDA2YzA1MGQyYTFiMWQ4MTBkNjNkMjA2ODdhMzFlNWE2ZTYzNDY2Y2YwODE0ODMxNWExNTAyMyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L351-L352",
+          "version": "repo-lines-v1:sha256:b44fe9875f245db9a265d8562b860ab45880f4ac42743b4bfcca943f0c577804:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODM4YzI3NTdiNjdlOGNlNmQxMDk4YmIzZjFkMzFiYWVmYWMyZjkwNmM5ZDY0Yjk2YmM0NjZlNzUyZTU1MTA4MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTc0ZWY0Y2YzODJlYTI2MjVjNzVkYzlkZDkzMzI1N2I3NjcxMGJjMGE5M2JlMTcwNTgyZjEzMTkwMjQ4ODgzNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmY2MTM2NzU1NzUxZWMxMzI2ZWMwZGJhMDM1YTE1NmJmYWQ5YmE2YWZmNjNjZTQ0YmY0YTY4NDVjZjg5NmQ1MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTRjZGFlNWEyOWM4MWE3NGI4ZDY4M2NiYjQ5ZDg1NzgyNTU0ZjM2ZTRiYWYyY2MyNGFiNmViODI1MTkyODYzYSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_52cfae1c8adc421a914e6fa01d57bcae",
+      "statement": "The idle-record sweeper is a Kubernetes CronJob that runs every minute; it selects threads where last_learner_message_at < now − learning_record_idle_minutes AND last_learner_message_at > record_written_at, then writes or updates the learning record only (no Lesson Note); only learner messages reset the idle timer; the default is 10 minutes, stored in SSM.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L305-L305",
+          "version": "repo-lines-v1:sha256:328a143eb3e1440708ecdb77e216e88e43a7102b1897d70ed0f2a1cc7e376783:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzI4YTE0M2ViM2UxNDQwNzA4ZWNkYjc3ZTIxNmU4OGU0M2E3MTAyYjE4OTdkNzBlZDBmMmExY2M3ZTM3Njc4MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzI4YTE0M2ViM2UxNDQwNzA4ZWNkYjc3ZTIxNmU4OGU0M2E3MTAyYjE4OTdkNzBlZDBmMmExY2M3ZTM3Njc4MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTQyZDc4OGU4N2U3ZDY5MmZkODhhNDY5NTZhODM0NmU0N2E4Y2NmNzJiZTUxMDUxNjY2ZjVhOTk4ZDE0N2RlZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzI2YWUxMGJlMmU5NWMxNzAyNzUyOWFlNTIxZGFmY2JhNGJhYTIzNTM3OWMxNzU2MjhmM2NhMTIxYmZkZWU1NiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L357-L357",
+          "version": "repo-lines-v1:sha256:aa74953301c80c0846c9b8c1a7df682c7d31b8d96a2846e418dd4c5b63f5529c:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWE3NDk1MzMwMWM4MGMwODQ2YzliOGMxYTdkZjY4MmM3ZDMxYjhkOTZhMjg0NmU0MThkZDRjNWI2M2Y1NTI5YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYWE3NDk1MzMwMWM4MGMwODQ2YzliOGMxYTdkZjY4MmM3ZDMxYjhkOTZhMjg0NmU0MThkZDRjNWI2M2Y1NTI5YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTc2MTZhMDA3MDIzNDFlMTI4M2FkYjRkNjBlZjBhODRkYTkwMmY3ZmQ2ZjJjYThiZWExZTI5ZTc5OWUyYTE5MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDYzYjhlNjBjNjE2MTgxZjFiZmI1MjdkNGM3YzA1Yjc0MmNkZTFiZDVlOWYwZTMwNjlkZmE1NjI5MTQ1MTNmZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_eda601b5420d4c29b16dd1c6f622f84e",
+      "statement": "The tutoring module owns the Thread domain object, DetectionPolicy, RelevanceGate, and GrowthPolicy domain classes, and the SubjectDetector, AskService, and ConversationService application services; it retrieves chunks only through the Retriever port, implemented by an MCP client adapter, never by reading chunk tables directly.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/tutoring/README.md#L1-L10",
+          "version": "repo-lines-v1:sha256:faad5434df13beba721701dedc6c74d4ca2a59094bc5f6cad5457d762b7f468e:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRkNjRjNmY5MWJkZjRhY2VjY2YwNjg4NmYwZGE1ZmRhMjc3OWE0M2M4ZmEzMjQzNzY5ZTg4NjVlNWVkMTk4OWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlYjcwMjU3NTkzZGEwNmY2ODJhM2RkZGE1NGE5ZDI2MGQ0ZmM1MTRmNjQ1MjM3ZjVjYTc0YjA4ZjhkYTYxYTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoyLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZkOWQzZTMzZDdiZTg1MTNiM2RlMTMwOWMzNDY2ZTNiMWNiNjJiMjM1YTA0NGMzMWFhOWFmMTJlYzE5ZjEzNjUifQ"
+        },
+        {
+          "resource": "repo://sdd/specs/2026-10-02-project-structure-design.md#L133-L133",
+          "version": "repo-lines-v1:sha256:d4b2f8166847d6e60dce0fc372e7eec6fc564863ba690b7b0d4cf0aedafc6deb:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDRiMmY4MTY2ODQ3ZDZlNjBkY2UwZmMzNzJlN2VlYzZmYzU2NDg2M2JhNjkwYjdiMGQ0Y2YwYWVkYWZjNmRlYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDRiMmY4MTY2ODQ3ZDZlNjBkY2UwZmMzNzJlN2VlYzZmYzU2NDg2M2JhNjkwYjdiMGQ0Y2YwYWVkYWZjNmRlYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWRiYzM4YzRkMjkwOGMxNWMzNWFkMmFjNzY3MDhjOWI5MWFiMjM3ZjUzYzYxNDA5ZThlZWVkZDYxZTBlZWE2OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjc0ZTNjMTNkM2I5ODM2OTI5MWNiMTMzNmIwYjZmYzc3ZmI0N2M5YjcxMjUxYWVlYTM5NDYzMWYzZGU4ZTRlMyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_9177ee0da9a84e32a4429b6c135be24f",
+      "statement": "Chunk text passed to the model is always wrapped as quoted data with an explicit instruction that document content must never be treated as instructions (PRD D7); because subjects and the readable document set are determined by code and SQL — not by the prompt — document-embedded prompt-injection attacks have no effect on scope or access. LangSmith traces every agent run; traces are deleted after 180 days.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L102-L103",
+          "version": "repo-lines-v1:sha256:2f627102b37a3a159f5536cb70f3b10f2422a69ad5fbd89e978eb06b35b131bd:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMGIyNmJlMjFlOGM4MGJhNjQ3N2E0M2RmOWI4ZWIwN2FjODkwOTI5ZDhmNGE5MGE5NWRiYTEwZTlmMTE1Y2E1ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFkYmM0ZTQ3ZDJlMjA5MjM4ZTM3NGM5YjQ0NGVjNTZkZGVlM2YwMGI2NmUzODE3OTFhMzJhMjYyYjhhZDQ1NCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmI1NWFhZmU1N2NhNDNhYTE2YWVhNGExMWVkYjUyMzQ5NjdlMjQzZjQzYzIxNTVjMzVjZDU4ZmRiNGM5YjAzZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTFkZTBkNjExNTgzNDAwMTNkYTI3YzIwZjc3MWM2NTJlZDU4MmNhYTM5YTk2YTM5MDFlN2IxNGM2MTFkOWM0MiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L299-L299",
+          "version": "repo-lines-v1:sha256:17cc39a0168601213393a259d716f1720c78954427871d92984604eb7823719b:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTdjYzM5YTAxNjg2MDEyMTMzOTNhMjU5ZDcxNmYxNzIwYzc4OTU0NDI3ODcxZDkyOTg0NjA0ZWI3ODIzNzE5YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTdjYzM5YTAxNjg2MDEyMTMzOTNhMjU5ZDcxNmYxNzIwYzc4OTU0NDI3ODcxZDkyOTg0NjA0ZWI3ODIzNzE5YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDA5NzY1YzhiZmVhZjIzOWZiNzhhNGVhM2EyOTRjOWU4OTU0Y2M3Njk4OWRkNDQwODljOTc1OTdlODY1NmVlNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTM3NGVmYTUwYjIwNWE1Mjc0NWMzMjg1NTM2ZDRhZTk5YTI0YjYyZjg2MDg5MDNhNDhiYTEzNDA3ZWRjYmFiMyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L424-L424",
+          "version": "repo-lines-v1:sha256:a41b9485a81e69208cbf4712bacaef5b0890fffc9130f81c9f548a8c46e0d222:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTQxYjk0ODVhODFlNjkyMDhjYmY0NzEyYmFjYWVmNWIwODkwZmZmYzkxMzBmODFjOWY1NDhhOGM0NmUwZDIyMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTQxYjk0ODVhODFlNjkyMDhjYmY0NzEyYmFjYWVmNWIwODkwZmZmYzkxMzBmODFjOWY1NDhhOGM0NmUwZDIyMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTFkZmIwN2U2NWM2MDA4YjQxOWEwOTc1MDJmOGM0ZjAyZWU1NGI4MmEzNTVjOWQ0NzQwNTNhNDhjMDhiMjVlZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzVkMTZiMDE5NTA5NjE5N2ZmMTcxMThlMDY3NzVlNmQ3OWY3YmEzMWJmMTcxMzBhOWZhYjUzZjQwN2RkZTUzNCJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L561-L561",
+          "version": "repo-lines-v1:sha256:1e24a0fe51c2c36ec840e4b08fd06b1afb421657ae8d9a31316f3c9da8994929:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWUyNGEwZmU1MWMyYzM2ZWM4NDBlNGIwOGZkMDZiMWFmYjQyMTY1N2FlOGQ5YTMxMzE2ZjNjOWRhODk5NDkyOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWUyNGEwZmU1MWMyYzM2ZWM4NDBlNGIwOGZkMDZiMWFmYjQyMTY1N2FlOGQ5YTMxMzE2ZjNjOWRhODk5NDkyOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDhhZjcyMjI5ZTVkYzRlNmFmNDllOGU3MTljMzJiOTZlZTFjOWIzZDRkMzExOWI1OGZmMjQ0MDQ4NjE1MTIwMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTJjMDExZWU1MmM4N2FkYzZmMmRkNjJiM2M2OTNhZGY3MDUyY2MwMGFlY2Y4ODcyYWUwZGRhNzI0YjRlZTBhYyJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-03T03:19:50.688Z"
+  }
+}
