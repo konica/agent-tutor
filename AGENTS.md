@@ -80,8 +80,44 @@ Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-
 
 Single-context: `CONTEXT.md` at the root, ADRs in `sdd/adr/`. See `docs/agents/domain.md`.
 
+### Workflow: which skill does what
+
+mattpocock skills decide **what** to build and run the tracker; superpowers skills build **one ticket**. Use one skill per stage.
+
+| Stage | Skill | Output |
+|---|---|---|
+| Open decisions | `wayfinder` (with `grilling`, `domain-modeling`) | Decision tickets on the map; ADRs; `CONTEXT.md` terms |
+| Slice a story | `to-tickets` | Sub-issues of the story parent, with blocking edges |
+| Intake | `triage` | Category and state labels; agent brief |
+| Design one slice (only when it needs design) | superpowers `brainstorming` | Design doc in `sdd/specs/YYYY-MM-DD-<topic>-design.md` |
+| Plan one slice | superpowers `writing-plans` | Plan in `sdd/plans/YYYY-MM-DD-<feature>.md` |
+| Build | superpowers `subagent-driven-development` (or `executing-plans`), `test-driven-development` | Commits, each task reviewed |
+| Finish | superpowers `requesting-code-review`, `finishing-a-development-branch` | PR that closes the issue |
+
+- Build with superpowers, not mattpocock `implement`/`tdd`.
+- `grilling` is for project-level decision tickets; `brainstorming` is for designing one slice.
+- Save superpowers specs and plans under `sdd/`, not `docs/superpowers/`. The PRD stays the product spec; a design doc narrows it for one slice and cites its PRD section.
+- Decided in `sdd/reviews/2026-10-03-delivery-process-discussion.md`.
+
 ## Commits, PRs, and docs
 
 - Work on a branch and open a PR into `main`. Commit subjects in the imperative mood; the body says why.
 - **Stacked PRs:** when a PR's base is another PR's branch, merge the base first **and delete its branch**, so GitHub retargets the stacked PR to `main`. Otherwise the stacked PR merges into the stale branch and never reaches `main`.
 - A change to product behavior updates `sdd/prd.md` in the same PR and bumps its version in the status line. A new architecture decision gets an ADR in `sdd/adr/`; a structure change updates the spec.
+
+<!-- OPENWIKI:START -->
+
+## OpenWiki
+
+This repository has a generated `openwiki/` evidence index. It is optional just-in-time context, not required startup reading.
+
+- Do not enumerate, preload, or search wikis at task start. Use retrieval when the user asks for it, when unfamiliar architecture or dependency behavior materially affects the task, or when source inspection leaves an important uncertainty. Stop once the question is grounded.
+- When those conditions apply and OpenWiki retrieval tools are available, use `openwiki_search` for just-in-time context and `openwiki_read` for the relevant complete sections. If search returns `workspace_required`, ask which listed workspace to use and retry with its ID.
+- Use `openwiki_list_workspaces` or `openwiki_list_wikis` when workspace membership itself needs to be discovered.
+- If the retrieval tools are unavailable, read `openwiki/quickstart.md` and follow its links to the relevant pages.
+- Treat source code and tests as authoritative. A brief's unknowns and review items are verification gaps, not automatic requirements.
+- Prefer the narrowest quiet validation that proves the changed behavior. Preserve complete failure output.
+
+The scheduled OpenWiki GitHub Actions workflow refreshes the repository wiki. Do not hand-edit generated OpenWiki pages unless explicitly asked; prefer updating source code/docs and letting OpenWiki regenerate.
+
+<!-- OPENWIKI:END -->

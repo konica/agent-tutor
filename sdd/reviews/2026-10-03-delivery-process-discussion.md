@@ -1,6 +1,6 @@
 # Delivery process discussion: tickets, knowledge base, SDD framework
 
-Date: 2026-10-03. Participants: Product Owner (PO), Project Manager (PM), facilitated by Claude. Status: **proposal, awaiting team decision.**
+Date: 2026-10-03. Participants: Product Owner (PO), Project Manager (PM), facilitated by Claude. Status: **decisions 1–4 approved, 5 open** (see [Decisions](#decisions)).
 
 Three questions:
 
@@ -198,13 +198,16 @@ Recorded so the team does not reuse them:
 - Release scope belongs in Milestones (`M0`–`M14`, PRD §14) rather than `r1`–`r5` labels, to avoid two sources for the same fact.
 - OpenSpec is a delta-spec workflow and BMAD is a multi-persona planning method; neither is about flow diagrams or state machines.
 
-## Decisions needed from the team
+## Decisions
 
-1. Approve the label taxonomy (§1.3) and the Milestone/parent/sub-issue hierarchy (§1.2).
-2. Approve running `/setup-matt-pocock-skills` with: tracker GitHub, default triage label strings, ADRs in `sdd/adr/`, `CONTEXT.md` location (repo root or `sdd/`).
-3. Approve creating the "Release 1 ready to build" wayfinder map and the walking skeleton order (§1.5).
-4. Approve the OpenWiki pilot at end of M1 (§2.3).
-5. Approve "in-house SDD for Release 1, OpenSpec criteria at M4" (§3.2).
+Recorded 2026-10-03 by the product owner.
+
+1. **Approved:** label taxonomy (§1.3) and the Milestone → story parent → slice hierarchy (§1.2). Added `area:subjects` for the module introduced in PRD v2.2. Applied: labels, milestones M0–M4, story parents US-1 … US-13b.
+2. **Approved:** `/setup-matt-pocock-skills` with GitHub tracker and default triage labels. `CONTEXT.md` lives at the **repo root** (the skills' default, found by agents without extra config); ADRs stay in `sdd/adr/`. Config in `docs/agents/`.
+3. **Approved:** the "Wayfinder: Release 1 ready to build" map with decision tickets from the M0 exit criteria.
+4. **Approved, changed:** run OpenWiki **now** instead of piloting at the end of M1 (§2.3). Weekly workflow `.github/workflows/openwiki-update.yml` on Bedrock; it skips until the repo variable `OPENWIKI_AWS_ROLE_ARN` points at an OIDC role.
+5. **Open:** in-house SDD for Release 1 with OpenSpec criteria at M4 (§3.2).
+6. **Approved:** skill split. mattpocock skills decide what to build and run the tracker; superpowers skills (`brainstorming`, `writing-plans`, `subagent-driven-development`, `test-driven-development`, review, finishing) build one ticket, saving specs and plans under `sdd/`. Recorded in `AGENTS.md` → "Workflow: which skill does what".
 
 ## Sources
 
