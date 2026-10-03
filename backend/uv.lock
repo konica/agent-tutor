@@ -121,11 +121,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/57/5b/e212cbe3fc5a49d684410a195060d7152416e00d9aa24ed4d5fa4a22f94a/boto3_stubs-1.43.108-py3-none-any.whl", hash = "sha256:40f02e30f6e455ccb658dcdeb5756ce23bde767f425ab6d7f57a9ffad75a848c", size = 72039, upload-time = "2026-10-02T21:05:51.118Z" },
 ]
 
-[package.optional-dependencies]
-bedrock-runtime = [
-    { name = "mypy-boto3-bedrock-runtime" },
-]
-
 [[package]]
 name = "botocore"
 version = "1.43.107"
@@ -932,15 +927,6 @@ wheels = [
 ]
 
 [[package]]
-name = "mypy-boto3-bedrock-runtime"
-version = "1.43.62"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/26/78/542f5804cf0f9e3c1ccbf30917eaa3b4b6002b91965de02d065d7441fc93/mypy_boto3_bedrock_runtime-1.43.62.tar.gz", hash = "sha256:beb70b08ef72cdfd5036bcd3270f2fbac0a2ce5e40f70dfc1d87c4f139d4d7ff", size = 31492, upload-time = "2026-07-31T19:54:15.291Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d9/b2/e3bff20acd290b909f1c28856d6d8d7984f7f7d5bda299d5957f64e97bb3/mypy_boto3_bedrock_runtime-1.43.62-py3-none-any.whl", hash = "sha256:603d9df54da5029fc0d0e3c09b6db33733af53182bee030c0c7af99e88ed3b39", size = 37865, upload-time = "2026-07-31T19:54:13.959Z" },
-]
-
-[[package]]
 name = "mypy-extensions"
 version = "1.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1578,6 +1564,7 @@ dependencies = [
     { name = "boto3" },
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "langchain" },
     { name = "langchain-aws" },
     { name = "langgraph" },
     { name = "langgraph-checkpoint-postgres" },
@@ -1604,7 +1591,7 @@ ingest = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "boto3-stubs", extra = ["bedrock-runtime"] },
+    { name = "boto3-stubs" },
     { name = "import-linter" },
     { name = "mypy" },
     { name = "pytest" },
@@ -1617,7 +1604,8 @@ requires-dist = [
     { name = "boto3", specifier = ">=1.40" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.28" },
-    { name = "langchain-aws", specifier = ">=0.2" },
+    { name = "langchain", specifier = ">=1.0" },
+    { name = "langchain-aws", specifier = ">=1.8,<2" },
     { name = "langchain-text-splitters", marker = "extra == 'ingest'", specifier = ">=1.1" },
     { name = "langgraph", specifier = ">=0.6" },
     { name = "langgraph-checkpoint-postgres", specifier = ">=2.0" },
@@ -1638,7 +1626,7 @@ provides-extras = ["ingest", "eval"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "boto3-stubs", extras = ["bedrock-runtime"], specifier = ">=1.40" },
+    { name = "boto3-stubs", specifier = ">=1.40" },
     { name = "import-linter", specifier = ">=2.3" },
     { name = "mypy", specifier = ">=1.17" },
     { name = "pytest", specifier = ">=8.4" },

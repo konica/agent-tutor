@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Draft v2.3 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Status** | Draft v2.4 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Changes from v2.3** | Architecture only: LangChain's `BaseChatModel` and `Embeddings` replace the hand-written `ChatModel` / `EmbeddingModel` ports; `ModelFactory` builds chat models with `init_chat_model` (§9.15; ADR 0006). No product behavior changes. |
 | **Changes from v2.2** | Release 1 extracts PDF text page by page with `pypdf` into LangChain `Document`s instead of Docling (D26, ADR 0005): no PyTorch in the worker, no OCR (PDFs without a text layer fail with a reason), saved page text replaces saved Docling output. Reference lists and section headings move to a structured-extraction step added in Release 2, backfilled from stored PDFs. M0 drops the Docling benchmark. |
 | **Changes from v2.1** | Architecture only: the subject catalog moves from `knowledge` into a new `subjects` module (§9.15; ADR 0004). No product behavior changes. |
 | **Owner** | Thao Dinh |
@@ -437,7 +438,7 @@ Every decline (relevance gate, growth check, or `decline` tool) writes `subject_
 | **Malicious PDFs against the parser.** | Worker isolation: non-root, read-only root filesystem, NetworkPolicy egress only to AWS endpoints and PostgreSQL, resource limits, per-file timeout. |
 | **Wrong subjects detected.** | Thresholds and margins tuned on labeled data; "ask when unsure"; detection and growth evals. |
 | **Poor metadata (scanned or unusual PDFs).** Missing year or title weakens the research map. | Fields optional; display title editable; works without a year listed separately; extraction accuracy measured. |
-| **Tool calling in streamed answers; cross-region routing; token cost; long streams on Kubernetes; EKS operations; judge bias.** | Streamed text + tool calls verified in M0 through the boto3 Converse adapter (ADR 0006; `make bedrock-check`); the `us.` inference profile keeps requests in US regions; capped history and chunks, prompt caching, budget alerts; `preStop` hooks, grace periods, and PodDisruptionBudgets for streaming pods; managed node group with a small add-on set; judges use a different model family (Qwen) calibrated against human feedback. |
+| **Tool calling in streamed answers; cross-region routing; token cost; long streams on Kubernetes; EKS operations; judge bias.** | Streamed text + tool calls verified in M0 through `ChatBedrockConverse` (ADR 0006; `make bedrock-check`); the `us.` inference profile keeps requests in US regions; capped history and chunks, prompt caching, budget alerts; `preStop` hooks, grace periods, and PodDisruptionBudgets for streaming pods; managed node group with a small add-on set; judges use a different model family (Qwen) calibrated against human feedback. |
 | **Copyright of published or imported documents** *(R4)*. | Terms of use with upload warranty from R1; publishing terms, takedown per document visibility, imports limited to open-access sources. |
 
 ### 9.11 Hosting
@@ -491,11 +492,11 @@ One Python package organized **by module first**, with `domain`, `application`, 
 |---|---|---|
 | `domain` | Entities and rules, no I/O: `Content` (state transitions, `retry()`), `Document` (state transitions, `archive()`, `restore()`, `set_subjects()` 1–3, `can_be_read_by(user)`), `Subject`, `PersonalSubjectName`, `Thread` (`add_subject()` refuses beyond 3, never removes), `LessonNote` (`needs_overwrite_confirmation()`), `LearningRecord`, `Chunk`, `Citation`, `TokenUsage` | nothing |
 | `application` | One service per use case: `UploadService`, `DeduplicationService`, `IngestionService`, `SubjectSuggester`, `SubjectCatalogService`, `DocumentService`, `SearchService`, `SubjectDetector`, `AskService`, `NoteService`, `LearningRecordService`, `ConversationService`, `UsageService`, `DeclineLogService` | `domain`, `ports` |
-| `ports` | ABCs: `ChatModel`, `EmbeddingModel`, `Retriever`, `PdfExtractor`, `FirstPagesReader`, `ObjectStore`, repositories, `LearningMemory`, `Clock` | `domain` |
+| `ports` | ABCs: `Retriever`, `PdfExtractor`, `FirstPagesReader`, `ObjectStore`, repositories, `LearningMemory`, `Clock` | `domain` |
 | `adapters` | Bedrock, PostgreSQL, MCP client, LangGraph store, S3/SQS, PDF loader | `ports`, vendor SDKs |
 | `entrypoints` (`apps/`) | FastAPI routes, LangGraph graph, MCP tools, SQS worker, CronJobs | `application` (and `adapters`, for wiring) |
 
-**Model abstraction:** `ChatModel` (`stream`, `invoke`, `structured`, normalized `TokenUsage`, cached prompt tokens counted as input) and `EmbeddingModel` (`embed_documents`, `embed_query` returning vectors with `TokenUsage`, `model_id`, `dimension`) ports; Bedrock adapters; a `ModelFactory` builds models by role (`agent`, `judge`, `embedding`). Switching chat models is a configuration change gated on the full evaluation split. Switching the embedding model re-embeds each **content** once from stored chunk text, recorded as `system` usage.
+**Model abstraction:** LangChain's `BaseChatModel` and `Embeddings` are the model interfaces (ADR 0006); a `ModelFactory` builds them by role (`agent`, `judge`, `embedding`) with `init_chat_model` (`bedrock_converse`) and `NovaEmbeddings` (a `BedrockEmbeddings` subclass for the Nova request shape); `TokenUsage.from_usage_metadata` normalizes usage. Switching chat models is a configuration change gated on the full evaluation split. Switching the embedding model re-embeds each **content** once from stored chunk text, recorded as `system` usage.
 
 **OOP guidelines:** constructor injection; domain objects protect invariants; Pydantic at API and tool boundaries; later-release modules are added without changing Release 1 services.
 
@@ -621,7 +622,7 @@ M4 Production launch (R1)
 
 | Milestone | Exit criteria |
 |---|---|
-| M0 Foundations | Repo, CI, Compose stack, CDK and Helm skeletons, Keycloak realm, LangSmith project, package skeleton with ports and `ModelFactory` *(scaffold done)*; Bedrock models reachable *(done: adapters and `make bedrock-check`, ADR 0006)*; forwarded JWT agent → MCP in Compose; page-text extraction with `pypdf` checked on seed-corpus PDFs. |
+| M0 Foundations | Repo, CI, Compose stack, CDK and Helm skeletons, Keycloak realm, LangSmith project, package skeleton with ports and `ModelFactory` *(scaffold done)*; Bedrock models reachable *(done: `ModelFactory` on LangChain and `make bedrock-check`, ADR 0006)*; forwarded JWT agent → MCP in Compose; page-text extraction with `pypdf` checked on seed-corpus PDFs. |
 | M1 Library and ingestion | Presigned upload, browser duplicate check, server SHA-256 dedupe with insert-or-get, content and document state machines with retry, first-pages step, page text with saved output, work key, chunks and embeddings, subject suggestions and shared catalog (1–3 per document, name check), personal names, archive/restore, Glacier tagger (tag/untag test), MCP search with `can_read` and iterative scans; suggestion, name-check, metadata, retrieval, filtered-recall, and dedupe/isolation tests passing on the seed corpus. |
 | M2 Tutor agent | First-turn multi-subject detection, growth to 3 with notices and warning, search, relevance gate, answer with document-as-data prompting, decline log, summarize path with edit-aware overwrite, idle sweeper, learning records; Release 1 evals passing on the smoke split, including adversarial PDFs. |
 | M3 App (API + Web) | Auth and terms, library and upload UX, subject choice and rename, chat streaming with subject notices, conversation and note management, usage view, rate limits and daily caps; isolation tests passing. |

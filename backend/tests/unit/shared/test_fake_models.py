@@ -1,35 +1,35 @@
-"""The fakes must honor the port contracts, so services tested with them behave like with real adapters."""
+"""The fakes stand in for Bedrock models in service tests: scripted replies, tool calls, structured output."""
 
+from langchain_core.messages import AIMessage
 from pydantic import BaseModel
 
-from fakes import FakeChatModel, FakeEmbeddingModel
+from fakes import fake_chat_model, fake_embeddings
 from smart_tutor.shared.domain.token_usage import TokenUsage
-from smart_tutor.shared.ports.chat_model import ChatResult, Message
 
 
 class Note(BaseModel):
     title: str
 
 
-async def test_stream_ends_with_usage() -> None:
-    model = FakeChatModel(replies=[ChatResult(text="hello there", usage=TokenUsage(10, 2))])
+async def test_scripted_reply_carries_usage() -> None:
+    usage = {"input_tokens": 10, "output_tokens": 2, "total_tokens": 12}
+    model = fake_chat_model(AIMessage("hello there", usage_metadata=usage))
 
-    chunks = [c async for c in model.stream([Message(role="user", content="hi")])]
+    reply = await model.ainvoke("hi")
 
-    assert "".join(c.text for c in chunks if c.text) == "hellothere"
-    assert chunks[-1].usage == TokenUsage(10, 2)
-
-
-async def test_structured_returns_validated_schema() -> None:
-    model = FakeChatModel(structured_values=[Note(title="Tenses")])
-
-    result = await model.structured([Message(role="user", content="summarize")], Note)
-
-    assert result.value == Note(title="Tenses")
+    assert reply.content == "hello there"
+    assert TokenUsage.from_usage_metadata(reply.usage_metadata) == TokenUsage(10, 2)
 
 
-async def test_embeddings_match_declared_dimension(embedding_model: FakeEmbeddingModel) -> None:
-    [vector] = (await embedding_model.embed_documents(["chunk"])).vectors
+async def test_structured_output_parses_a_scripted_tool_call() -> None:
+    call = {"name": "Note", "args": {"title": "Tenses"}, "id": "t1"}
+    model = fake_chat_model(AIMessage("", tool_calls=[call]))
 
-    assert len(vector) == embedding_model.dimension
-    assert (await embedding_model.embed_query("chunk")).vectors == [vector]
+    assert await model.with_structured_output(Note).ainvoke("summarize") == Note(title="Tenses")
+
+
+def test_fake_embeddings_are_deterministic() -> None:
+    embeddings = fake_embeddings(dimension=4)
+
+    assert embeddings.embed_query("chunk") == embeddings.embed_documents(["chunk"])[0]
+    assert len(embeddings.embed_query("chunk")) == 4

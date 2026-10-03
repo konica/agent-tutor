@@ -3,26 +3,32 @@
 Secrets come from Secrets Manager (via External Secrets) in prod.
 """
 
+from typing import Any
+
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class ModelConfig(BaseModel):
-    provider: str = "bedrock"
+    # Chat: an `init_chat_model` provider. Embedding: "bedrock" (NovaEmbeddings).
+    provider: str = "bedrock_converse"
     model_id: str
-    # Chat: temperature, max_tokens, top_p. Embedding: dimension, max_concurrency.
-    params: dict[str, float | int | str] = {}
-    # Chat only: cache the system prompt (Bedrock prompt caching; cached tokens still count as input).
-    prompt_cache: bool = False
+    # Keyword arguments for the LangChain model class (e.g. temperature, max_tokens, dimensions).
+    params: dict[str, Any] = {}
 
 
 class ModelsConfig(BaseModel):
     """Models by role (PRD §9.13). Switching a model is a configuration change gated on the full eval split."""
 
-    agent: ModelConfig = ModelConfig(model_id="us.amazon.nova-2-lite-v1:0", prompt_cache=True)
-    judge: ModelConfig = ModelConfig(model_id="qwen.qwen3-32b-v1:0", params={"temperature": 0})
+    agent: ModelConfig = ModelConfig(model_id="us.amazon.nova-2-lite-v1:0")
+    # langchain-aws doesn't list Qwen3 as supporting a forced tool choice, but Bedrock accepts it (ADR 0006),
+    # and with_structured_output needs it.
+    judge: ModelConfig = ModelConfig(
+        model_id="qwen.qwen3-32b-v1:0",
+        params={"temperature": 0, "supports_tool_choice_values": ["auto", "any", "tool"]},
+    )
     embedding: ModelConfig = ModelConfig(
-        model_id="amazon.nova-2-multimodal-embeddings-v1:0", params={"dimension": 1024}
+        provider="bedrock", model_id="amazon.nova-2-multimodal-embeddings-v1:0", params={"dimensions": 1024}
     )
 
 

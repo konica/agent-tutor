@@ -16,7 +16,7 @@ The wiki is a **generated view**. It never overrides these authored files; when 
 
 1. Architecture: deployables (API, agent, MCP server, ingestion worker, CronJobs, web) and how a request flows between them.
 2. Backend modules (`knowledge`, `subjects`, `tutoring`, `learning`, `accounts`, `insights`) and their `domain` / `application` / `ports` / `adapters` layers: what exists today, what is a stub.
-3. Ports and adapters: model abstraction (`ChatModel`, `EmbeddingModel`, `ModelFactory`), storage, MCP.
+3. Ports and adapters: model abstraction (`ModelFactory` building LangChain `BaseChatModel` / `Embeddings`, ADR 0006), storage, MCP.
 4. Access and identity: `can_read`, JWT forwarding, isolation tests.
 5. Local development, checks, CI, and deployment (Compose, Makefile, CDK stacks, Helm chart).
 6. Tests and evals: fakes, isolation suite, LangSmith evals and thresholds.

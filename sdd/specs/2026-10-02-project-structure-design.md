@@ -74,9 +74,9 @@ agent-tutor/
 backend/src/smart_tutor/
 ├── shared/
 │   ├── domain/        # ids.py (UserId, ThreadId, SubjectId, DocumentId, ContentId), token_usage.py, citation.py, errors.py
-│   ├── ports/         # chat_model.py (ChatModel), embedding_model.py (EmbeddingModel), clock.py
+│   ├── ports/         # clock.py (models use LangChain's BaseChatModel / Embeddings, ADR 0006)
 │   ├── adapters/
-│   │   ├── bedrock/           # BedrockConverseChatModel, NovaEmbeddingModel
+│   │   ├── bedrock/           # NovaEmbeddings (BedrockEmbeddings subclass); chat via init_chat_model
 │   │   ├── model_factory.py   # builds models by role: agent | judge | embedding
 │   │   ├── auth/              # Keycloak JWT verifier (API and MCP server)
 │   │   ├── postgres/          # engine, session, unit of work
@@ -151,7 +151,7 @@ backend/tests/
 ├── unit/<module>/          # domain + application with fakes; no I/O
 ├── integration/<module>/   # adapters against the Compose stack; pytest marker `integration`
 ├── isolation/              # US-12: cross-user and cross-subject access tests against API and MCP
-├── fakes/                  # FakeChatModel, FakeEmbeddingModel, in-memory repositories
+├── fakes/                  # FakeChatModel (LangChain fake + bind_tools), fake_embeddings, in-memory repos
 └── conftest.py
 
 backend/evals/              # datasets live in LangSmith (versioned there); the repo holds what builds and runs them
@@ -195,7 +195,7 @@ web/src/
 **Included:**
 - All folders above, with `__init__.py` files and a `README.md` per module stating its responsibility, public services, and dependencies.
 - `backend/pyproject.toml` with extras and the import-linter contracts of §6; `make lint` runs them.
-- `shared/ports` stubs: `ChatModel`, `EmbeddingModel` (signatures from PRD §9.15), `Clock`.
+- `shared/ports` stubs: `Clock`. Model interfaces are LangChain's `BaseChatModel` and `Embeddings` (ADR 0006).
 - Root `Makefile`, `compose.yaml` (pgvector, Keycloak, LocalStack), `.env.example`.
 - Minimal placeholders for `backend/Dockerfile`, `infra/` (CDK app that synthesizes empty stacks), `deploy/helm/smart-tutor/Chart.yaml`, and `web/` (Vite React TypeScript skeleton).
 - `data/` untracked and ignored (S8).

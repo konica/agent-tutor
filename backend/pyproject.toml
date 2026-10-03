@@ -8,7 +8,8 @@ dependencies = [
     "boto3>=1.40",
     "fastapi>=0.115",
     "httpx>=0.28",
-    "langchain-aws>=0.2",
+    "langchain>=1.0",
+    "langchain-aws>=1.8,<2",
     "langgraph>=0.6",
     "langgraph-checkpoint-postgres>=2.0",
     "langsmith>=0.4",
@@ -30,7 +31,7 @@ eval = ["openevals>=0.1", "pyyaml>=6.0"]
 
 [dependency-groups]
 dev = [
-    "boto3-stubs[bedrock-runtime]>=1.40",
+    "boto3-stubs>=1.40",
     "import-linter>=2.3",
     "mypy>=1.17",
     "pytest>=8.4",
@@ -417,6 +418,7 @@ forbidden_modules = [
     "boto3",
     "botocore",
     "fastapi",
+    "langchain",  # init_chat_model lives here; services see only langchain_core interfaces (ADR 0006)
     "langchain_text_splitters",
     "langchain_aws",
     "langgraph",

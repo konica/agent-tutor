@@ -8,7 +8,7 @@ One package, `src/smart_tutor/`, shared by every backend deployable. **Modules f
 
 ```
 smart_tutor/
-├── shared/      # kernel: ids, TokenUsage, Citation, errors; ports ChatModel/EmbeddingModel/Clock; ModelFactory;
+├── shared/      # kernel: ids, TokenUsage, Citation, errors; port Clock; ModelFactory (LangChain models by role);
 │                #   bedrock, auth (JWT), postgres, aws adapters; config.py
 ├── knowledge/   # library: contents (SHA-256 dedupe, states, retry), documents, can_read, upload, ingestion, search
 ├── subjects/    # shared subject catalog, personal names, suggestion ranking, name checks
@@ -49,11 +49,11 @@ A new cross-module dependency means moving a module in the order on purpose and 
 
 - Core dependencies in `[project.dependencies]`; heavy single-service ones behind an extra: `ingest` (PDF loader and text splitter, worker only) or `eval`. Dev tools in the `dev` dependency group. Run `uv lock` and commit `uv.lock` after editing.
 - `mcp` is 2.x: the server class is `mcp.server.MCPServer`, and host/port go to `run()`.
-- Bedrock adapters use boto3 Converse/InvokeModel directly, not `langchain-aws` chat models (ADR 0006); `boto3-stubs[bedrock-runtime]` types the client for mypy.
+- Models are LangChain's: services take a `BaseChatModel` or `Embeddings` from `ModelFactory` (`init_chat_model`; ADR 0006). Don't hand-write model wrappers or call `bedrock-runtime` with boto3.
 
 ## Tests
 
-- `tests/unit/<module>/` — domain and application with fakes from `tests/fakes/` (`from fakes import FakeChatModel`); the default `pytest` run. Async tests need no decorator.
+- `tests/unit/<module>/` — domain and application with fakes from `tests/fakes/` (`from fakes import fake_chat_model, fake_embeddings`); the default `pytest` run. Async tests need no decorator.
 - `tests/integration/<module>/` — adapters against the Compose stack, marked `@pytest.mark.integration`.
 - `tests/isolation/` — cross-user access and dedupe guarantees (PRD US-11, US-12).
 - `tests/bedrock/` — real Bedrock calls through `ModelFactory`, marked `@pytest.mark.bedrock` (`make bedrock-check`). Run it after changing a model ID, an adapter, or boto3. Unit tests never trace to LangSmith (`tests/unit/conftest.py`).
