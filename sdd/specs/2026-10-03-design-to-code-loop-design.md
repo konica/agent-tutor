@@ -46,8 +46,8 @@ sdd/
     brief.md                 # design brief, versioned v0.x (brief §13)
     rounds.md                # log of accepted rounds (§4.1)
     states.json              # state index of the working copy (§4.2), generated
-    prototype/               # the Open Design project; Open Design edits it in place
-    history/                 # exported Open Design conversations (designer questions, owner answers)
+    prototype/               # the whole Open Design project, edited in place by Open Design
+      history/               # exported Open Design conversations (designer questions, owner answers)
 web/
   scripts/design/            # states, shots, diff (§5)
 .design-shots/               # rendered screenshots, git-ignored
@@ -55,7 +55,7 @@ web/
 
 - One folder, edited in place; git history and tags replace copied round folders. Any accepted round can be read with `git show design-v0.3:sdd/design/prototype/…` or rendered with `make design-shots ROUND=v0.3`.
 - Screenshots are not committed. The prototype is committed, so any state can be rendered on demand.
-- Open Design's own files (`.file-versions/`, `.od-*/`) are git-ignored; git is the version history.
+- Open Design's own files (`.file-versions/`, `.od-frames/`, `.od-skills/`) are committed with the prototype, so the folder is the complete project. Git tags, not `.file-versions/`, mark accepted rounds.
 - The designer may keep an older round inside the prototype for comparison (round v0.3 keeps `prototype/v0.2/`). That is the designer's choice; tickets still use tags.
 
 ### 4.1 `rounds.md`
@@ -213,9 +213,9 @@ Project `5632ee5d-5009-4b7b-86a1-827855c84d52` ("Smart Tutor Design Round 1") mo
 
 | From (`%APPDATA%\Open Design\…\projects\5632ee5d…\`) | To |
 |---|---|
-| `index.html`, `styles.css`, `v03.css`, `js/`, `v0.2/`, `*.artifact.json` | `sdd/design/prototype/` |
-| Design conversation (8 messages, in Open Design's `app.sqlite`) | `sdd/design/history/2026-10-03-open-design-rounds-1-2.md` (pasted briefs replaced by a pointer) |
-| `.file-versions/`, `.od-frames/`, `.od-skills/` | Not moved: Open Design's own history and device frames; git replaces the first, the app rebuilds the others. |
+| `index.html`, `styles.css`, `v03.css`, `js/`, `v0.2/`, `*.artifact.json` | `sdd/design/prototype/`, byte for byte |
+| Design conversation (8 messages, in Open Design's `app.sqlite`) | `sdd/design/prototype/history/2026-10-03-open-design-rounds-1-2.md` (pasted briefs replaced by a pointer) |
+| `.file-versions/`, `.od-frames/`, `.od-skills/` | `sdd/design/prototype/` (Open Design's version snapshots, device frames, and its empty skills folder, kept with a `.gitkeep`) |
 
 Brief v0.3 came along from `docs/design-brief-prd-v2` to `sdd/design/brief.md`.
 
