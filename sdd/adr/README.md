@@ -13,4 +13,11 @@ One file per decision: `NNNN-short-title.md` (e.g. `0001-modular-monolith.md`). 
 ## Consequences
 ```
 
-Decisions made before this folder existed are recorded in `sdd/prd.md` (§6, §13) and `sdd/specs/`.
+Product decisions are recorded in `sdd/prd.md` (§6, §13); ADRs cover architecture.
+
+| ADR | Decision |
+|---|---|
+| [0001](0001-modular-monolith.md) | Modular monolith with enforced import contracts |
+| [0002](0002-content-document-split-sha256-dedupe.md) | Separate contents from documents; deduplicate by SHA-256 |
+| [0003](0003-shared-subject-catalog.md) | Shared subject catalog with stable ids and personal names |
+| [0004](0004-subjects-module.md) | Split the subject catalog out of `knowledge` into `subjects` |

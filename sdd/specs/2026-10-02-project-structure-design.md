@@ -2,11 +2,12 @@
 
 | | |
 |---|---|
-| **Status** | Approved 2026-10-02; scaffolded. Revised 2026-10-03 for PRD v2.0 |
+| **Status** | Approved 2026-10-02; scaffolded. Revised 2026-10-03 for PRD v2.0, v2.1, and v2.2 |
 | **Date** | 2026-10-02 (rev. 2026-10-03) |
-| **Based on** | `sdd/prd.md` v2.0 (§9.4, §9.11–§9.16, §10, §14) |
+| **Based on** | `sdd/prd.md` v2.2 (§9.4, §9.11–§9.16, §10, §14); ADRs 0001–0004 |
 | **Revision 2026-10-03** | PRD v2.0 (learner uploads, shared subject catalog, SHA-256 dedupe, sharing-ready model): `knowledge` owns library, contents, subjects, and access (`can_read`); `accounts` loses enrollment; `insights` becomes the decline log; new Release 3 module `graph`; module order puts `knowledge` below `tutoring`. |
 | **Revision 2026-10-03 (PRD v2.1)** | Release order changed: `graph` is Release 2 (research map) and Release 5 (deep graph); `catalog`, `quizzes`, `recommendations`, `reports` are Release 3. Documents have 1–3 subjects (`document_subjects`); threads hold 1–3 `subject_ids`. No admin functions. |
+| **Revision 2026-10-03 (PRD v2.2)** | New Release 1 module `subjects` split out of `knowledge` (ADR 0004); module order `… tutoring → graph → knowledge → subjects → accounts \| insights`; retention CronJob; `evals/seed_corpus/` manifest; ADRs recorded in `sdd/adr/`. |
 | **Scope** | Folder structure for the whole repository, Python packaging, module boundaries, and the import rules CI enforces |
 
 ## 1. Goals
@@ -27,16 +28,16 @@
 | S5 | A small **`shared` kernel** holds cross-module value objects, the model ports, `ModelFactory`, auth, and infrastructure clients. | One home for the model abstraction (PRD D15) and identity (PRD §9.3). Kept small on purpose. |
 | S6 | `backend/` and `infra/` are **separate Python projects**. | The CDK app (`aws-cdk-lib`) has unrelated dependencies that must not enter application images. |
 | S7 | **Local development uses Docker Compose only**; Helm has `values.yaml` and `values-prod.yaml`. | PRD §9.12: Compose locally, EKS + Helm in production. |
-| S8 | The two PDFs under `data/` are **not tracked**; `data/` is ignored. | They are not the product corpus (Admins upload documents to S3). |
+| S8 | The two PDFs under `data/` are **not tracked**; `data/` is ignored. | They are not the product corpus (learners upload their own documents); the eval seed corpus is downloaded to `data/seed_corpus/` from a manifest (§7). |
 
-**PRD follow-up:** §9.15 describes the five layers at the top of the package. With S2/S3 the same layers sit inside each module and entrypoints move to `apps/`. Update PRD §9.15 wording in v1.6.
+Architecture decisions after this spec are recorded as ADRs in `sdd/adr/` (0001 modular monolith, 0002 content/document split and SHA-256 dedupe, 0003 shared subject catalog, 0004 `subjects` module).
 
 ## 3. Repository top level
 
 ```
 agent-tutor/
 ├── README.md
-├── Makefile                 # one entry point: make up, make test, make lint, make sweep, make reports
+├── Makefile                 # one entry point: make up, make test, make lint, make sweep, make glacier-tag, make retention
 ├── compose.yaml             # local dependencies (default) + `app` profile (same images as prod)
 ├── .env.example
 ├── .gitignore  .editorconfig  .pre-commit-config.yaml
@@ -45,7 +46,8 @@ agent-tutor/
 ├── sdd/                     # product and design docs
 │   ├── prd.md
 │   ├── specs/               # design specs (this document)
-│   ├── adr/                 # architecture decision records
+│   ├── adr/                 # architecture decision records (0001–0004)
+│   ├── reviews/             # review records (e.g. PRD v2.0 review → v2.1)
 │   └── design-briefs/       # versioned briefs for the designer
 │
 ├── backend/                 # the one Python package (S1)
@@ -71,7 +73,7 @@ agent-tutor/
 ```
 backend/src/smart_tutor/
 ├── shared/
-│   ├── domain/        # ids.py (UserId, ThreadId, SubjectId), token_usage.py, citation.py, errors.py
+│   ├── domain/        # ids.py (UserId, ThreadId, SubjectId, DocumentId, ContentId), token_usage.py, citation.py, errors.py
 │   ├── ports/         # chat_model.py (ChatModel), embedding_model.py (EmbeddingModel), clock.py
 │   ├── adapters/
 │   │   ├── bedrock/           # BedrockConverseChatModel, NovaEmbeddingModel
@@ -81,11 +83,12 @@ backend/src/smart_tutor/
 │   │   └── aws/               # S3, SQS, SSM clients
 │   └── config.py      # pydantic-settings; model roles; SSM-backed settings
 │
-├── knowledge/         # library: contents (SHA-256), documents, can_read, upload, ingestion, chunks, search, subject catalog
-├── tutoring/          # threads, subject detection, ask
+├── knowledge/         # library: contents (SHA-256, states, retry), documents (1–3 subjects, states), can_read, upload, ingestion, chunks, search
+├── subjects/          # shared subject catalog, personal names, suggestion ranking, name checks
+├── tutoring/          # threads (1–3 subjects, growth), subject detection, ask
 ├── learning/          # Lesson Notes, learning records
-├── accounts/          # learner profile, upload limits, token usage, rate-limit policy
-├── insights/          # decline log, quality monitoring queries
+├── accounts/          # learner profile and terms, rate limits and daily caps, token usage
+├── insights/          # decline log (scrubbed, 90-day retention), quality monitoring queries
 ├── graph/             # (R2) research map: work links, timeline, reading order; (R5) deep graph
 ├── catalog/           # (R3) topic catalog from saved Docling output
 ├── quizzes/           # (R3)
@@ -97,7 +100,7 @@ backend/src/smart_tutor/
     ├── agent/         # server.py, graph.py, state.py, nodes/ (resolve_subject, search, gate, answer, summarize)
     ├── mcp_server/    # server.py, tools.py (search, get_chunk) → knowledge.application
     ├── worker/        # SQS consumer → knowledge.application.IngestionService
-    └── jobs/          # record_sweeper.py, glacier_tagger.py, (R3) learner_reports.py
+    └── jobs/          # record_sweeper.py, glacier_tagger.py, retention.py, (R3) learner_reports.py
 ```
 
 Every module has the same shape:
@@ -115,11 +118,12 @@ Every module has the same shape:
 
 | Module | Owns (PRD) | Key classes | Depends on (application of) |
 |---|---|---|---|
-| `knowledge` | Library and corpus (PRD §9.4–§9.5, US-2, US-2b, US-10, US-10b, US-11): contents deduplicated by SHA-256, documents (library entries, archive, visibility, grants), the single `can_read` rule, upload flow, ingestion, metadata and references, chunks, search, shared subject catalog with personal names | `Content`, `Document` (`can_be_read_by()`), `Subject`, `PersonalSubjectName`, `Chunk`; `UploadService`, `DeduplicationService`, `IngestionService`, `SubjectSuggester`, `SubjectCatalogService`, `DocumentService`, `SearchService`; ports `PdfExtractor`, `ObjectStore`, `ContentRepository`, `DocumentRepository`, `SubjectRepository`, `ChunkRepository` | `accounts` (upload limits, processing usage) |
-| `tutoring` | Threads (1–3 subjects, growth with notices), subject detection, relevance gate, growth check, ask path (§9.2, US-3–US-6, US-3b, US-13) | `Thread` (`add_subject()`), `DetectionPolicy`, `RelevanceGate`, `GrowthPolicy`; `SubjectDetector`, `AskService`, `ConversationService`; ports `Retriever`, `ThreadRepository` | `knowledge` (the learner's subjects and their names), `accounts`, `insights` (log declines) |
+| `knowledge` | Library (PRD §9.2 document processing, §9.3–§9.5, US-2, US-2b, US-10, US-11): contents deduplicated by SHA-256 (states, shared retry), documents (library entries, 1–3 subjects, states, archive flag, visibility, grants), the single `can_read` rule, upload flow, ingestion (first pages, saved Docling output, references, work key), chunks, search | `Content`, `Document` (`set_subjects()`, `can_be_read_by()`), `Chunk`; `UploadService`, `DeduplicationService`, `IngestionService`, `DocumentService`, `SearchService`; ports `PdfExtractor`, `FirstPagesReader`, `ObjectStore`, `ContentRepository`, `DocumentRepository`, `ChunkRepository` | `subjects` (suggestions, get-or-create), `accounts` (rate limits, processing usage) |
+| `subjects` | Shared subject catalog (PRD D1, D20, D21, US-2b, US-10b; ADR 0003, 0004): stable `subject_id`s, canonical names, personal names (rename, reset), suggestion ranking, name checks | `Subject`, `SubjectName`, `PersonalSubjectName`; `SubjectCatalogService`, `SubjectSuggester`, `SubjectNameChecker`; ports `SubjectRepository`, `PersonalNameRepository` | — |
+| `tutoring` | Threads (1–3 subjects, growth with notices), subject detection, relevance gate, growth check, ask path (§9.2, US-3–US-6, US-3b, US-13) | `Thread` (`add_subject()`), `DetectionPolicy`, `RelevanceGate`, `GrowthPolicy`; `SubjectDetector`, `AskService`, `ConversationService`; ports `Retriever`, `ThreadRepository` | `knowledge` (the learner's subjects), `subjects` (names), `accounts`, `insights` (log declines) |
 | `learning` | Lesson Notes, learning records, idle sweep (§9.4, US-7, US-8, US-13b) | `LessonNote`, `LearningRecord`; `NoteService`, `LearningRecordService`; ports `NoteRepository`, `LearningMemory` | `tutoring` (thread content) |
-| `accounts` | Learner profile and time zone, upload limits, token usage (chat, document processing, background), rate-limit policy (US-9) | `Learner`, `UploadLimits`; `UsageService`, `LearnerService` | — |
-| `insights` | Anonymized decline log and quality monitoring queries (§9.6) | `Decline`; `DeclineLogService` | — |
+| `accounts` | Learner profile, time zone, and terms; rate limits and daily caps; token usage (chat, document processing, background, system) (US-1, US-9) | `Learner`, `RateLimits`; `UsageService`, `LearnerService` | — |
+| `insights` | Anonymized decline log (scrubbed, 90-day retention) and quality monitoring queries (§9.6) | `Decline`; `DeclineLogService` | — |
 | `catalog` (R3) | Topic catalog (§9.7) | `TopicEntry`; `CatalogService` | `knowledge` |
 | `quizzes` (R3) | Quiz generation and grading (US-14) | `Quiz` (`grade(answers)`); `QuizService` | `learning` |
 | `recommendations` (R3) | "What to learn next" (US-16), following the reading order | `Recommendation`; `RecommendationService` | `catalog`, `quizzes`, `learning`, `graph` |
@@ -138,7 +142,7 @@ The dependency graph between modules must stay **acyclic**; if two modules need 
 | 2 | Module privacy (`forbidden`) | A module may import from another module only its `application` package; everyone may import `shared`. |
 | 3 | Apps are leaves (`forbidden`) | Nothing imports `smart_tutor.apps`. |
 | 4 | Vendor SDKs (`forbidden`, external packages) | `docling` only from `knowledge.adapters`; `boto3`/`botocore`, `langgraph`, `langchain_aws`, `mcp` only from `adapters` or `apps`. |
-| 5 | Module graph (`layers` over modules) | Explicit order, top to bottom: `reports` → `recommendations` → `quizzes` \| `catalog` → `learning` → `tutoring` → `graph` → `knowledge` → `accounts` \| `insights`. Lower never imports higher, so there are no cycles; a new cross-module dependency means editing this order on purpose. |
+| 5 | Module graph (`layers` over modules) | Explicit order, top to bottom: `reports` → `recommendations` → `quizzes` \| `catalog` → `learning` → `tutoring` → `graph` → `knowledge` → `subjects` → `accounts` \| `insights`. Lower never imports higher, so there are no cycles; a new cross-module dependency means editing this order on purpose. |
 
 ## 7. Tests and evaluations
 
@@ -151,8 +155,9 @@ backend/tests/
 └── conftest.py
 
 backend/evals/              # datasets live in LangSmith (versioned there); the repo holds what builds and runs them
-├── generators/             # synthetic Q&A, off-topic and near-scope negatives, detection/ambiguous, multi-turn switches
-├── adversarial/            # taxonomy.yaml + seed prompts (PRD §10.3)
+├── seed_corpus/            # manifest.yaml: openly licensed eval documents with labels (PDFs downloaded to data/seed_corpus/)
+├── generators/             # synthetic Q&A, negatives, detection and thread-growth cases, synthetic learners
+├── adversarial/            # taxonomy.yaml + seed prompts, incl. document-embedded attacks (PRD §10.3)
 ├── evaluators/             # one file per PRD §10.1 evaluator; rubrics/ for Qwen judge prompts
 ├── targets.py              # how an evaluation run invokes the agent
 ├── thresholds.yaml         # PRD §10.1 targets, read by the release gate
@@ -170,7 +175,7 @@ infra/
 
 deploy/helm/
 ├── smart-tutor/                # umbrella chart: Chart.yaml, values.yaml, values-prod.yaml
-│   └── charts/                 # api, agent, mcp-server, worker, web, jobs (CronJobs), keycloak (wraps upstream chart)
+│   └── charts/                 # api, agent, mcp-server, worker, web, jobs (sweeper, Glacier tagger, retention), keycloak
 │                               # each sub-chart owns its NetworkPolicy and ExternalSecret
 └── addons/                     # values for AWS Load Balancer Controller, External Secrets Operator, metrics-server
 ```

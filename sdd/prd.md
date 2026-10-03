@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Draft v2.1 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Status** | Draft v2.2 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Changes from v2.1** | Architecture only: the subject catalog moves from `knowledge` into a new `subjects` module (§9.15; ADR 0004). No product behavior changes. |
 | **Owner** | Thao Dinh |
 | **Last updated** | 2026-10-03 |
 | **Lifecycle** | Build → Test → Deploy → Monitor ([The Agent Development Lifecycle](https://www.langchain.com/blog/the-agent-development-lifecycle)) |
@@ -474,8 +475,9 @@ One Python package organized **by module first**, with `domain`, `application`, 
 
 | Module | Owns (v2.1) |
 |---|---|
-| `knowledge` | Contents (SHA-256 dedupe, state machine, retry), documents (library entries, 1–3 subjects, `can_read`, visibility, grants), upload flow, ingestion (first pages, Docling output, references, work key), chunks, search, **shared subject catalog** (subjects, personal names, suggestions, name checks) |
-| `tutoring` | Threads (1–3 subjects, growth), detection among the learner's subjects (asks `knowledge.application`), relevance gate, growth check, ask path, conversations |
+| `knowledge` | Contents (SHA-256 dedupe, state machine, retry), documents (library entries, 1–3 subjects, `can_read`, visibility, grants), upload flow, ingestion (first pages, Docling output, references, work key), chunks, search |
+| `subjects` | **Shared subject catalog**: subjects with stable ids, personal names (rename, reset), suggestion ranking, name checks (ADR 0003, 0004) |
+| `tutoring` | Threads (1–3 subjects, growth), detection among the learner's subjects (asks `knowledge.application`; names from `subjects.application`), relevance gate, growth check, ask path, conversations |
 | `learning` | Lesson Notes (edit-aware overwrite), learning records |
 | `accounts` | Learner profile and terms, rate limits and daily caps, token usage |
 | `insights` | Decline log (scrubbed, 90-day retention) and quality monitoring queries |
@@ -596,6 +598,7 @@ Measured over the pilot unless stated; minimum sample 100 events per metric.
 | Q33 | Document count | No limit; per-file limits, rate limits, and daily caps apply (D24). |
 | Q34 | Retention | Traces deleted after 180 days; threads, notes, and learning records kept (D25). |
 | Q35 | Release order | R1 core tutor; R2 research map; R3 learning loop; R4 sharing and imports; R5 deep knowledge graph (D17). |
+| Q36 | Subject catalog module | Split out of `knowledge` into `subjects` (§9.15, ADR 0004). |
 
 ## 14. Roadmap: releases and milestones
 

@@ -1,61 +1,61 @@
 # AGENTS.md — backend
 
-Applies to everything under `backend/`. Repo-wide context (product, commands, security, PR rules) is in the root `AGENTS.md`.
+Applies inside `backend/`. Product rules, checks, and PR rules are in the root `AGENTS.md`.
 
 ## Package layout
 
-One package, `src/smart_tutor/`, shared by every backend deployable. Modules first, layers inside each module:
+One package, `src/smart_tutor/`, shared by every backend deployable. **Modules first, layers inside each module** (ADR 0001):
 
 ```
 smart_tutor/
-├── shared/      # kernel: ids, TokenUsage, Citation, errors; ports ChatModel/EmbeddingModel/Clock; ModelFactory; auth, postgres, aws, bedrock adapters; config.py
-├── knowledge/   # library: contents (SHA-256 dedupe), documents, can_read, upload, ingestion, search, subject catalog
-├── tutoring/    # threads, subject detection, relevance gate, ask path
+├── shared/      # kernel: ids, TokenUsage, Citation, errors; ports ChatModel/EmbeddingModel/Clock; ModelFactory;
+│                #   bedrock, auth (JWT), postgres, aws adapters; config.py
+├── knowledge/   # library: contents (SHA-256 dedupe, states, retry), documents, can_read, upload, ingestion, search
+├── subjects/    # shared subject catalog, personal names, suggestion ranking, name checks
+├── tutoring/    # threads (1–3 subjects, growth), detection, relevance gate, ask path
 ├── learning/    # Lesson Notes, learning records
-├── accounts/    # learner profile, upload limits, token usage, rate-limit policy
-├── insights/    # anonymized decline log
-├── graph/       # Release 2 research map (Release 5 deep graph) — empty until then
-├── catalog/ quizzes/ recommendations/ reports/   # Release 3 — empty until then
+├── accounts/    # learner profile and terms, rate limits and daily caps, token usage
+├── insights/    # decline log
+├── graph/       # Release 2 research map (Release 5 deep graph)
+├── catalog/ quizzes/ recommendations/ reports/   # Release 3
 └── apps/        # api, agent, mcp_server, worker, jobs — one composition root per deployable
 ```
 
-Each module has `domain/` (entities and rules, no I/O), `application/` (one service per use case — the module's public API), `ports/` (ABCs), `adapters/` (implementations; the only place vendor SDKs appear) and a `README.md` stating what it owns.
+Each module has `domain/` (entities and rules, no I/O), `application/` (one service per use case — the module's public API), `ports/` (ABCs), `adapters/` (implementations; the only place vendor SDKs appear). **Each module's `README.md` states what it owns, its key classes, what it may use, and its rules — read it before editing the module.**
 
-## Where does my change go?
+## Where a change goes
 
-- A business rule → a method on a domain class in the owning module (e.g. `tutoring/domain/thread.py`).
-- A use case → a service in that module's `application/`, receiving ports through its constructor.
-- Talking to Bedrock, Postgres, S3, SQS, MCP, LangGraph store → a port in `ports/` plus an implementation in `adapters/`.
-- An HTTP route, graph node, MCP tool, SQS handler or CronJob → `apps/<app>/`; it parses input, calls one service, formats output. No business rules in `apps/`.
-- Model calls → ask `ModelFactory` for a role (`agent`, `judge`, `embedding`). Never hard-code a model ID or import `boto3`/`langchain_aws` outside adapters.
+- A business rule → a method on the owning domain class (e.g. `Thread.add_subject()`, `Document.set_subjects()`, `Content.retry()`).
+- A use case → a service in the owning module's `application/`, receiving ports through its constructor.
+- Talking to Bedrock, PostgreSQL, S3, SQS, MCP, Docling, or the LangGraph store → a port in `ports/` and its implementation in `adapters/`.
+- An HTTP route, graph node, MCP tool, SQS handler, or CronJob → `apps/<app>/`: parse input, call one service, format output.
+- A flow that crosses modules against the dependency order → orchestrate it in `apps/` (e.g. "Discuss this note": `apps/api` reads the note from `learning`, then starts a thread in `tutoring`).
+- A model call → ask `ModelFactory` for a role (`agent`, `judge`, `embedding`).
 
-## Architecture rules (enforced by `PYTHONUTF8=1 uv run lint-imports`)
+## Architecture rules
 
-Contracts live in `pyproject.toml` under `[tool.importlinter]`; CI fails if any is broken.
+Enforced by `PYTHONUTF8=1 uv run lint-imports` (18 contracts in `pyproject.toml` under `[tool.importlinter]`, generated from one module list):
 
-1. Inside each module: `adapters | application` → `ports` → `domain`. Adapters and application never import each other.
-2. Another module is used only through its `application` package. Its `domain`, `ports`, `adapters` are private. Everyone may import `shared`; `shared` imports no feature module.
-3. Nothing imports `smart_tutor.apps`.
-4. `domain`, `application`, `ports` import no vendor SDK (`boto3`, `botocore`, `docling`, `fastapi`, `langchain_aws`, `langgraph`, `mcp`, `psycopg`, `sqlalchemy`) and not `shared.adapters`.
-5. Docling is imported only in `knowledge.adapters` (it pulls in PyTorch and is installed only in the worker image).
-6. Module dependency order, top to bottom: `reports` → `recommendations` → `quizzes | catalog` → `learning` → `tutoring` → `graph` → `knowledge` → `accounts | insights`. A lower module never imports a higher one. If you need a new cross-module dependency, change this order deliberately and say why in the PR; flows that go the "wrong" way are orchestrated in `apps/` (e.g. "Discuss this note": `apps/api` reads the note from `learning`, then starts a thread in `tutoring`).
-7. The agent never reads chunk tables: `tutoring` retrieves through its `Retriever` port (MCP client), which calls `apps/mcp_server` → `knowledge.application.SearchService`.
+1. Inside a module: `adapters | application` → `ports` → `domain`.
+2. Another module is used only through its `application` package; `shared` is open to all and imports no module.
+3. `apps` is a leaf: nothing imports it.
+4. `domain`, `application`, and `ports` stay free of vendor SDKs and `shared.adapters`; Docling lives only in `knowledge.adapters` (it pulls in PyTorch and ships only in the worker image).
+5. Module order, top to bottom: `reports` → `recommendations` → `quizzes | catalog` → `learning` → `tutoring` → `graph` → `knowledge` → `subjects` → `accounts | insights`. A module imports only modules below it.
+6. The agent retrieves through `tutoring`'s `Retriever` port (MCP client) → `apps/mcp_server` → `knowledge.application.SearchService`; chunk tables are read only by `knowledge`.
 
-Do not silence a contract with `ignore_imports` to make CI pass; fix the dependency direction.
+A new cross-module dependency means moving a module in the order on purpose and explaining why in the PR; fix the dependency direction to make a broken contract pass.
 
 ## Dependencies
 
-- Core dependencies go in `[project.dependencies]`. Heavy, single-service dependencies go behind an extra: `ingest` (Docling, worker only) or `eval` (evaluation runs). Dev tools go in the `dev` dependency group.
-- After editing `pyproject.toml`, run `uv lock` and commit `uv.lock`.
-- `mcp` is 2.x: the server class is `mcp.server.MCPServer` (FastMCP was renamed); host and port are passed to `run()`.
+- Core dependencies in `[project.dependencies]`; heavy single-service ones behind an extra: `ingest` (Docling, worker only) or `eval`. Dev tools in the `dev` dependency group. Run `uv lock` and commit `uv.lock` after editing.
+- `mcp` is 2.x: the server class is `mcp.server.MCPServer`, and host/port go to `run()`.
 
 ## Tests
 
-- `tests/unit/<module>/` — domain and application with fakes (`tests/fakes/`), no I/O; this is the default `pytest` run.
-- `tests/integration/<module>/` — adapters against the Compose stack; mark with `@pytest.mark.integration`.
-- `tests/isolation/` — cross-user and cross-subject access tests (PRD US-12).
-- Async tests need no decorator (`asyncio_mode = "auto"`). Import fakes as `from fakes import FakeChatModel`.
+- `tests/unit/<module>/` — domain and application with fakes from `tests/fakes/` (`from fakes import FakeChatModel`); the default `pytest` run. Async tests need no decorator.
+- `tests/integration/<module>/` — adapters against the Compose stack, marked `@pytest.mark.integration`.
+- `tests/isolation/` — cross-user access and dedupe guarantees (PRD US-11, US-12).
 
 ## Images
 
-`Dockerfile` targets: `api`, `agent`, `mcp`, `worker` (CronJobs reuse `api`). Containers run as uid 10001. Only `worker` installs the `ingest` extra; keep it that way.
+`Dockerfile` targets `api`, `agent`, `mcp`, `worker` (CronJobs reuse `api`), running as uid 10001. Only `worker` installs the `ingest` extra.
