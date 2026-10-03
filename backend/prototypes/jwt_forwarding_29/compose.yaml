@@ -1,0 +1,31 @@
+# PROTOTYPE (#29) — throwaway. Run from the repo root (joins the normal Compose stack's network):
+#   docker compose -f compose.yaml -f backend/prototypes/jwt_forwarding_29/compose.yaml up -d --build proto-api proto-agent proto-mcp
+#   cd backend && uv run python prototypes/jwt_forwarding_29/run.py
+
+x-proto: &proto
+  build: {context: ./backend, target: deps}
+  working_dir: /proto
+  volumes: ["./backend/prototypes/jwt_forwarding_29:/proto:ro"]
+  environment:
+    # Issuer = what the browser sees; JWKS = what a container can reach.
+    PROTO_ISSUER: http://localhost:8080/realms/smart-tutor
+    PROTO_JWKS_URL: http://keycloak:8080/realms/smart-tutor/protocol/openid-connect/certs
+    PROTO_MCP_URL: http://proto-mcp:8000/mcp
+    PROTO_AGENT_URL: http://proto-agent:8080
+    LANGSMITH_TRACING: "false"
+    PYTHONUNBUFFERED: "1"
+  depends_on: [keycloak]
+
+services:
+  proto-mcp:
+    <<: *proto
+    command: ["/app/.venv/bin/python", "mcp_server.py"]
+    ports: ["9000:8000"]
+  proto-agent:
+    <<: *proto
+    command: ["/app/.venv/bin/uvicorn", "agent:app", "--host", "0.0.0.0", "--port", "8080"]
+    ports: ["9002:8080"]
+  proto-api:
+    <<: *proto
+    command: ["/app/.venv/bin/uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8080"]
+    ports: ["9001:8080"]
