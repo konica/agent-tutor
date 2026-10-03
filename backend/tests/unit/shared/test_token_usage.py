@@ -13,3 +13,10 @@ def test_usage_adds_up() -> None:
 def test_negative_counts_are_rejected() -> None:
     with pytest.raises(ValueError):
         TokenUsage(input_tokens=-1)
+
+
+def test_usage_from_langchain_metadata() -> None:
+    metadata = {"input_tokens": 2054, "output_tokens": 20, "total_tokens": 2074, "input_token_details": {}}
+
+    assert TokenUsage.from_usage_metadata(metadata) == TokenUsage(input_tokens=2054, output_tokens=20)
+    assert TokenUsage.from_usage_metadata(None) == TokenUsage()

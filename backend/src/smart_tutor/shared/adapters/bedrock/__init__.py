@@ -1,1 +1,1 @@
-"""Bedrock adapters: BedrockConverseChatModel (Converse/ConverseStream), NovaEmbeddingModel (InvokeModel)."""
+"""Bedrock adapters. Chat models come from `init_chat_model` (ChatBedrockConverse); NovaEmbeddings fixes requests."""

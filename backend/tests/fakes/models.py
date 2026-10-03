@@ -1,65 +1,35 @@
-"""Deterministic fakes for the ChatModel and EmbeddingModel ports."""
+"""Fakes for the LangChain model interfaces, so services are tested without Bedrock."""
 
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import Callable, Sequence
+from typing import Any
 
-from pydantic import BaseModel
-
-from smart_tutor.shared.domain.token_usage import TokenUsage
-from smart_tutor.shared.ports.chat_model import (
-    ChatChunk,
-    ChatModel,
-    ChatResult,
-    Message,
-    StructuredResult,
-    ToolSpec,
-)
-from smart_tutor.shared.ports.embedding_model import EmbeddingModel, Embeddings
+from langchain_core.embeddings import DeterministicFakeEmbedding
+from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
+from langchain_core.messages import AIMessage
+from langchain_core.runnables import Runnable
+from langchain_core.tools import BaseTool
 
 
-class FakeChatModel(ChatModel):
-    """Returns scripted replies in order and records every call."""
+class FakeChatModel(GenericFakeChatModel):
+    """Replies with scripted `AIMessage`s in order (text, tool calls, usage); accepts tools.
 
-    def __init__(self, replies: Sequence[ChatResult] = (), structured_values: Sequence[BaseModel] = ()) -> None:
-        self._replies = list(replies)
-        self._structured = list(structured_values)
-        self.calls: list[list[Message]] = []
+    `with_structured_output` works on a scripted reply that calls the schema's tool.
+    """
 
-    async def stream(self, messages: Sequence[Message], tools: Sequence[ToolSpec] = ()) -> AsyncIterator[ChatChunk]:
-        result = await self.invoke(messages, tools)
-        for word in result.text.split(" "):
-            yield ChatChunk(text=word)
-        for call in result.tool_calls:
-            yield ChatChunk(tool_call=call)
-        yield ChatChunk(usage=result.usage)
-
-    async def invoke(self, messages: Sequence[Message], tools: Sequence[ToolSpec] = ()) -> ChatResult:
-        self.calls.append(list(messages))
-        return self._replies.pop(0)
-
-    async def structured[T: BaseModel](self, messages: Sequence[Message], schema: type[T]) -> StructuredResult[T]:
-        self.calls.append(list(messages))
-        return StructuredResult(value=schema.model_validate(self._structured.pop(0).model_dump()), usage=TokenUsage())
+    def bind_tools(
+        self,
+        tools: Sequence[dict[str, Any] | type | Callable[..., Any] | BaseTool],
+        *,
+        tool_choice: str | None = None,
+        **kwargs: Any,
+    ) -> Runnable[Any, AIMessage]:
+        return self
 
 
-class FakeEmbeddingModel(EmbeddingModel):
-    """Embeds text as a tiny deterministic vector (character statistics), enough for ranking tests."""
+def fake_chat_model(*replies: AIMessage) -> FakeChatModel:
+    return FakeChatModel(messages=iter(replies))
 
-    def __init__(self, dimension: int = 4) -> None:
-        self._dimension = dimension
 
-    @property
-    def model_id(self) -> str:
-        return "fake-embedding"
-
-    @property
-    def dimension(self) -> int:
-        return self._dimension
-
-    async def embed_documents(self, texts: Sequence[str]) -> Embeddings:
-        return Embeddings(vectors=[self._embed(t) for t in texts], usage=TokenUsage(input_tokens=len(texts)))
-
-    async def embed_query(self, text: str) -> Embeddings:
-        return Embeddings(vectors=[self._embed(text)], usage=TokenUsage(input_tokens=1))
-
-    def _embed(self, text: str) -> list[float]:
-        return [float(sum(ord(c) for c in text[i :: self._dimension])) for i in range(self._dimension)]
+def fake_embeddings(dimension: int = 8) -> DeterministicFakeEmbedding:
+    """Same text, same vector; different texts get unrelated vectors."""
+    return DeterministicFakeEmbedding(size=dimension)
