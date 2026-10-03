@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:1f90e62e796379c9c7429e83ad4ddf356c07494d0e1b99bd37b23d3485c9df22",
+  "claims": [
+    {
+      "id": "claim_a5964acc22e3434683be89b0c1dc003a",
+      "statement": "All five later-release modules (graph, catalog, quizzes, recommendations, reports) are entirely empty stubs: every sub-package contains only a docstring __init__.py with no domain classes, services, ports, or adapters implemented. Per AGENTS.md they should be built only when asked, and none should be edited until the corresponding release is started.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/catalog/__init__.py",
+          "version": "repo-file-v1:sha256:cd5d31d8d89fd526e04a41285a59353c639071efce67b05106a7aed22cc2f5ec"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/graph/__init__.py",
+          "version": "repo-file-v1:sha256:fe2be0fdb13d23eddd6db1401eb54ad25bcd3295097095083c018841a55b7a50"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/quizzes/__init__.py",
+          "version": "repo-file-v1:sha256:7a6bdce030855102d72327f9498c91b290504bd47b37988bd75f3000c243dce3"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/recommendations/__init__.py",
+          "version": "repo-file-v1:sha256:46810ed9ce8d19abda1a8d0b4a4a781a660c7869e918d026ef1724fb09fe77de"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/reports/__init__.py",
+          "version": "repo-file-v1:sha256:4f34d4d4d80a4af2721206668029addfe03fd44c2f9c2abc69cd1a165910ed23"
+        }
+      ]
+    },
+    {
+      "id": "claim_1fa12d8c1d374f679a916792fad248d6",
+      "statement": "The five later-release modules occupy the top five positions in the acyclic module dependency order enforced by import-linter: reports → recommendations → quizzes | catalog → learning → tutoring → graph → knowledge → subjects → accounts | insights. A module may only import the application layer of modules below it.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L42-L45",
+          "version": "repo-lines-v1:sha256:5d7fee87a2e0782961927863661f39f312fb1224629bba5f0be39df49bf06261:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjBiMGUwZjBkMjM1MzA3NzY4NzYyOWRhNThiOTJkYmQ3M2NiZDg5NTBjMWQ0MGRlOGExY2Y2NDMwNTg2YWYzOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMGI3ODIwOGJlMmQxYTBmMTUzN2M2NjljZGRkZTkyZGI0NmE3MjE1YzZjYzE4MjNmMjBmMWY5ODdmYWU2NWQxYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOThhMmI0MjgzNzY2NGJlYjBiNDFmZmU5ZTM0Mjg0MzFmMjQyNzA2MGU3MTdjYzViMjVmZTk2NDFmMDQzZjNiNSJ9"
+        },
+        {
+          "resource": "repo://backend/pyproject.toml#L446-L460",
+          "version": "repo-lines-v1:sha256:84cf81c23c71c974c19f30e2cfae0f810714dd9d02c7ae90b85d75feea89914b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE1MzA0NmQzNTEyMzA4OTEzNzE0NmVjZmJmMmZhZDE4YzFjMjhhNTgyNzIzMzQ5MzI0OTRkNWJhNzFlMGU2ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZkM2I2YzViOTQ0MjJhN2MwNGYwMDkzMzgxYmY4ZDE3MDdlNmVjY2E2Zjc4NzMyMWE2Nzk0ZWEzZGYxNjQ1MmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZhMTgzYmRhZjkwNjQ3Y2E1NTU1NDQyNzQxZTkwMjIwZjQzMmQ3ZWVlNmRlNDE1ZjU2ZTA2OTY2OTdlYjQ5MDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_f607e653e1314069adedec1de58294a5",
+      "statement": "The graph module (Release 2, extended in Release 5) owns the research map: works grouped by work_key, citation links from saved Docling references (computed once per content and shared), a per-subject timeline, reading order (cited works before citing, then by year), and reading-path answers. Release 5 adds model-labeled relationships and concept history. Key classes: Work, WorkLink, ReadingOrder; service ResearchMapService. May use knowledge.application.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/graph/README.md",
+          "version": "repo-file-v1:sha256:69a19758194ab55df58c5d0d4f127553e4f6ae04c5c3e9b94d819b2ecf5cd974"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L139-L143",
+          "version": "repo-lines-v1:sha256:a44a8db523cb7c563271fa50ec69b3e82df05635671c955f8be508ecac2357fc:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzFlNDRhNmIxNTk0MzM3ZmJlYmQ1NWIwMjNmMjE1MTlmODcxZjJhYzA2NDMwZjEzODcyZTQwNzU2ZjYwZmU0OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTRkYzhmZDllZWIwZjRmNGEyNWI5ODNjNDFlZWZkMmQ1NDQxMmFmZmMxZWNjNDg5NzY3YWU3MDg1Y2Q5Yjk3YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWUwZDUyYWQ3ZDE5YzYzNDA5ZWVhMjI2YzI0MTlkNTBhYTQzNzM0NGFjYWEzZDljZDgxZjA1NWM2MzJlYmVlYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTMxYjYxZWJkODZjMDlmODhlNTI3YWFmMmEzYTI5MjIyOWRlMWIyZWI2YWM3ODkwY2IzOThkNDdkZGU5NGVlOSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_ac4a306b80b54fbd932b250943c82cc9",
+      "statement": "The graph module's citation links and reading order are computed in code with no model calls; a learner's map includes only works they can read (can_read). Links are stored in the work_links table, keyed by (citing_work_key, cited_work_key), shared across all learners.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/graph/README.md",
+          "version": "repo-file-v1:sha256:69a19758194ab55df58c5d0d4f127553e4f6ae04c5c3e9b94d819b2ecf5cd974"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L358-L358",
+          "version": "repo-lines-v1:sha256:7d4a0e4b3611595afbb481f93e3faa8a460104e7254e2061b67894031eaa32bd:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2Q0YTBlNGIzNjExNTk1YWZiYjQ4MWY5M2UzZmFhOGE0NjAxMDRlNzI1NGUyMDYxYjY3ODk0MDMxZWFhMzJiZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2Q0YTBlNGIzNjExNTk1YWZiYjQ4MWY5M2UzZmFhOGE0NjAxMDRlNzI1NGUyMDYxYjY3ODk0MDMxZWFhMzJiZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWMzYjM4ODBkNTc0MTY1YTM5NmY4N2RiMTVmM2Y1MTQ0M2ZmYjRmNWQwYzUyMzAzM2NmMmY0MTQ5ZmIzYjQyOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmMxYWFkNzUxNDZmOGY0ZGU2ZjFlYWZjOTM3YTNjNjAzOWY5NzU2ZmI0ODNkZWU2NGY4NTg0MjQwNDczYjk3MyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_4e5adcc2f2a1468681830e24544eb961",
+      "statement": "The catalog module (Release 3) owns the topic catalog per content, derived from Docling headings at ingestion; a learner's catalog is the union over their active (non-archived, ready) documents. Topics of archived documents are never offered for recommendations. Key classes: TopicEntry; service CatalogService. May use knowledge.application.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/catalog/README.md",
+          "version": "repo-file-v1:sha256:67d6ed058812fc9dab39f67af5908e56de27af6b50d82b52fd22b6263c26c468"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L146-L147",
+          "version": "repo-lines-v1:sha256:607f47a2ae55a0375da06b75825f995cde753f7e8150bdbff69f695e021d99bc:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2YxMThiZTM0NDA2OTQzZGNhNjQ0ZDZmOGNiMGRlMWQ1OWRhOTI4MmRiODFhMzYxYjAzOGQzOTlmMDExZTdkMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTFlNjJhNmVjYWRhNmQ4YzFiMzk0YzZlODU0YTEzZDJlODRkMDgyNzU3Nzc2Y2Q0YTJmMjRjZjVjM2I5ZjdiZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTk1YmU5NWU1YzU1MWVmNjNiMWY4NTI3NTY4NDljMjIzZTM3ZWJmZGQxMjhiMzZmYTgyZGRhZmU4YzlmNWQ5ZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzIyZDYzYzkyZjM3OTEzMmMzZjAxNWE1Y2ZhYmVjYjVjMjcxNTZmNWNjNDFlOGFhODE0OTk5Y2FmMWRlMDhlZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_0f59d5414f664bcea98d5b00e228d834",
+      "statement": "The quizzes module (Release 3) owns multiple-choice quiz generation from selected Lesson Notes and code-based grading. The answer key is never exposed to the client before submission. Key classes: Quiz with grade(answers); service QuizService. May use learning.application.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/quizzes/README.md",
+          "version": "repo-file-v1:sha256:a0bfcb1217bfa3fd70fe328b578d6c1febb3efbdc2ab6d1e7db77c7c527f1d5b"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L247-L249",
+          "version": "repo-lines-v1:sha256:2dc42c59d2a48cfcd2418bbaf86d1fcc7f1245c3d1edbf5cd16c94b071893fc4:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDZjYmE3NTg4NmU4YmM1NjgwZjhhZjUyZTM5MWRlYzE4ZTQ1MDFiNzNkZGVlZGZjZDlhNzVkMDg1Mjk0ODgzMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmQ4MTE3MDZiZTUwMDU0ZjY3Yzc5OGE5ZWViNjhkMTdlODdiZGEwMzY0MGIzY2NiZDc3NTVkNmJiMTNmY2I4NCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTk4ZDYzZjk5Y2Q0YmMyODcxMTgwYTBlNjJmMzkzYTE3YjE2N2I0ZjZkNWUwNmJkYmViYWU4ZWI4MzUyNjYxOSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_ff19a7ec3c5d42a49907eba06f091104",
+      "statement": "The recommendations module (Release 3) owns 'What should I learn next?' recommendations. Candidates come from code only — weak quiz topics first, then reading-order entries and topic-catalog entries not yet covered; the model only ranks; topics outside candidates are rejected. Key classes: Recommendation; service RecommendationService. May use catalog, quizzes, learning, and graph application layers.",
+      "evidence": [
+        {
+          "resource": "repo://backend/pyproject.toml#L446-L460",
+          "version": "repo-lines-v1:sha256:84cf81c23c71c974c19f30e2cfae0f810714dd9d02c7ae90b85d75feea89914b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE1MzA0NmQzNTEyMzA4OTEzNzE0NmVjZmJmMmZhZDE4YzFjMjhhNTgyNzIzMzQ5MzI0OTRkNWJhNzFlMGU2ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZkM2I2YzViOTQ0MjJhN2MwNGYwMDkzMzgxYmY4ZDE3MDdlNmVjY2E2Zjc4NzMyMWE2Nzk0ZWEzZGYxNjQ1MmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZhMTgzYmRhZjkwNjQ3Y2E1NTU1NDQyNzQxZTkwMjIwZjQzMmQ3ZWVlNmRlNDE1ZjU2ZTA2OTY2OTdlYjQ5MDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/recommendations/README.md",
+          "version": "repo-file-v1:sha256:e493cd2e1f0f71d9787e7ae5dc6e8d74560d2bf5a642d057c2778346f1a63e1f"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L253-L255",
+          "version": "repo-lines-v1:sha256:708713f825b6daf7c9766ec59634d27a60ba36e0e1b90c5db8848abb85c48f96:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNThjNDIwZmNlYmE2YTJhNzYwYmU1YzE4OTYzNjBhMTBiYmJhZjk3MWJiY2Q0NGZkZmRhNTNlYjM4ZjM0OTcyOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTk4ZDYzZjk5Y2Q0YmMyODcxMTgwYTBlNjJmMzkzYTE3YjE2N2I0ZjZkNWUwNmJkYmViYWU4ZWI4MzUyNjYxOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiY2NiNDQzN2QyZDA0ZTg5MGM5NzdlMWM2Y2QyZWQ2OThmYzU5MzU0MWJjY2NmN2Q4NjZmNjk2Y2ViZThkZjQ5NyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L319-L321",
+          "version": "repo-lines-v1:sha256:58cb1e6aa186d84e574c2b20e67a3a167f11705534a0fe2a794ab3285f04d1d5:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTU3YjM5NzBmODAyNDJiOGVlZTc5ZmY5MjQzM2VjMDIxYTE4NTc4NDcwNzFhYTUwYmExNjM0M2FiZjJjNGNjYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTFjZDE5ZmE2ZGYwMmMwNGNkMzYwZGMzYTYwNzRmMWNkNTIxZDNlYWNkMzNmNTkxODYwMzk3ODBmYzIyYTkxYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTg1ZTc2ZDgzY2E5YjM3N2ZhYmNmMzM2OWZmMTI4MmMwODZjN2MyZTRkNDg3NzBjOWJjNTg2ZTdhMThiODljMCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_386d8826189347e699a4b3f6407190a1",
+      "statement": "The reports module (Release 3) owns daily and weekly learner reports across all subjects, scheduled and on demand. Reports are idempotent per (user_id, period_type, period_start); no report is generated for a period without activity. Scheduled reports are driven by an hourly CronJob. Key classes: Report; service ReportService. May use learning, quizzes, and recommendations application layers.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L31-L31",
+          "version": "repo-lines-v1:sha256:6c3ed7b83726fc668341a0d2f71070ae4c66f753ec441eebf30c4589e27b53e3:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmMzZWQ3YjgzNzI2ZmM2NjgzNDFhMGQyZjcxMDcwYWU0YzY2Zjc1M2VjNDQxZWViZjMwYzQ1ODllMjdiNTNlMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNmMzZWQ3YjgzNzI2ZmM2NjgzNDFhMGQyZjcxMDcwYWU0YzY2Zjc1M2VjNDQxZWViZjMwYzQ1ODllMjdiNTNlMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmRlODNkYjFkZjA0ZGI5MGEwOTdiZGNlZjRkMDVkMmIxMDY0NDdkOTcyNGYwNzlkNjNhMjc0MTRkZjY2ZjE4NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWE4MmQ4OTRmMTI5OWJlZDM1MmNkNzI1OWRjM2EwNTBmZThiMzI1YmMzYjQ0ODhlY2E3ZDk1ZGIwOWFhYzU1OCJ9"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/reports/README.md",
+          "version": "repo-file-v1:sha256:875d407ee7a9b4dd0eb503a270264bdac985590d5591a302bff285cd719c0d0a"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L250-L252",
+          "version": "repo-lines-v1:sha256:a98d63f99cd4bc2871180a0e62f393a17b167b4f6d5e06bdbebae8eb83526619:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTFhMDIwMGQxOTVkZTExZTg0M2VjNTBjM2JjZWQxNjlhOTBkMDAxZDg1ZTBlMzc5OWIyODU1Mjc5NTg5OWY4MiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmRjNDJjNTlkMmE0OGNmY2QyNDE4YmJhZjg2ZDFmY2M3ZjEyNDVjM2QxZWRiZjVjZDE2Yzk0YjA3MTg5M2ZjNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzA4NzEzZjgyNWI2ZGFmN2M5NzY2ZWM1OTYzNGQyN2E2MGJhMzZlMGUxYjkwYzVkYjg4NDhhYmI4NWM0OGY5NiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L359-L360",
+          "version": "repo-lines-v1:sha256:c9bb7c595aa3423b6b1293d5f243f7aa6658d93f2c3de07ce4734c77211fbd1b:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjdiZTE5MmQwZGZkOTJjZmE1ZWZmYzE0ODRmZGFkYjg1M2IyMTkxNGQxZjlmZWIxZTJmNzc4OWQ2NzUyZDFmNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiM2IyMTg2NTdhM2I3NjI3ODJhNjEzMzViMmRlZTlmYjMzNjcwYTFlNzcyZjYyMjljZGY1MGVjYzFjMDMwNWZiMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTkzMDJmOTJkYzA5YTBkMmJmYmUwMDcwYjU3ODQ3YjUxOTRmNWI4Y2E3Y2UwMThiMzExZGUyZWU1ZjAwN2YyMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjBhMTZjYWZjMWJjYWE1ODM2MTVlYTk0NDg0MDA5ZDQ2ZWM2MWRjMzM0ZWM0YjkxZjhlNWFiZmEyMzI4ZDE0MSJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-03T03:19:50.688Z"
+  }
+}

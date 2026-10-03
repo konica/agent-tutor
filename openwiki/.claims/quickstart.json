@@ -1,0 +1,176 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:82760c82b0ecf3a31facf71f6704685d38c89435ee7aeab5b54a77e41eba57ed",
+  "claims": [
+    {
+      "id": "claim_1f93bb9c609d490d809efd1179a73e1b",
+      "statement": "Smart Tutor answers questions only from the learner's own uploaded PDFs, with citations, using subjects drawn from a shared catalog; identical files are deduplicated by SHA-256 across all users and processed (extracted, chunked, embedded) exactly once.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L7-L8",
+          "version": "repo-lines-v1:sha256:a03c0b95dc22df04e91ed09a283e162df9d87c6bbff8cfa6ba9ce49e3d6e08ae:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2EzNDcxZTk1Y2RhYjgwMDJhMjVjMjVlMDhiZWEyMzE3MTRmZTRiYTBlZTdlMDU0ZTRmMjk3NDlmZTVlNmE3ZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNThkNWY4MzE4N2Y4YmQ1MjM1YzM4YjQzMTEzNDRmNzllNDllYzUyZWUzM2M4ZjI1MmY2YjA1NDE4YTZiYmE1NyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDE5NjFmMzJkNTEwNzQ0ODE4N2JjMmExZDhlYzQwYzA3YWQ5MmZmYzQ5ODI4MDk0NzhhOWY3ZWNhYmYxMDVjMyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L1-L6",
+          "version": "repo-lines-v1:sha256:a8f333551002e4137839ac5af895d5985441e72a8e4b8d99916ed6842b5f3066:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMGI4NjZhZjVlYjU3MzljOGNhZjEyZDEyNzI1ZGY1NGQwYjZkNzA5ZDEyMTE5MWMyOTEwODkyNGU0ODc0OGZlNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDY5YjA3NDVjM2Q1NTQ4YzYwYjQ0NzY2N2M5MmJhY2U0M2U5NDRmMDA0MzAyZTgzNDJiODRmYzJhMjc4YWVlMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiM2Q1MmY2OWMyMzdmZTJlNThhMGNiMjU5ZDZmZjQ4ZWU2YzllZGFjMTQ5OTM4MDkyYmYwYTFhZmUyMGY3NTMxYyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L16-L18",
+          "version": "repo-lines-v1:sha256:a50f75503bde7cebf4132350cce162945499fd406f4c8d2d7b698bd5589eb9dd:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMGEzZTJkYzk3NmU1ZTIwYTA1NTY0ZmQ2MjdhYTViOWRhZDFkNzA4ZTNjNmQ3OTliYTkwYzNkZWJjYTdiODQ2NCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDQwNTYyNDdjNDZkMWQxMDE4NDMwNzdhOTFhODczMjliN2Y1YmIxZmM2ZmQyZDcxOGI2ZjFjNDljMDIzZmVlYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiY2FiNmYyNmIwYWNjNjlmYzM1MGFjNjUwY2QwNjBjNjA5ZTI2NGM3NjAxODhlZmU0ZTQ4NDE1YWRlZTU5NDg4NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjA3MmYzOTAyYmVlZjJmMmI4ZjA3NWRiODlhMjk5YTNmMzU2OTg4MzRkNDY5NTRhNTU2NDgzNDJiNDcxOWM2MCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_49caf353c7a34be690a37758fb0941bd",
+      "statement": "Release 1 builds six active modules: knowledge, subjects, tutoring, learning, accounts, and insights. The graph module is a stub reserved for R2 (research map). The catalog, quizzes, recommendations, and reports modules are stubs reserved for R3.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L18-L18",
+          "version": "repo-lines-v1:sha256:a9a12d58f352c11f70b97425357b1ddef6058be56255fd2ccbcc24fd2b67554c:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTlhMTJkNThmMzUyYzExZjcwYjk3NDI1MzU3YjFkZGVmNjA1OGJlNTYyNTVmZDJjY2JjYzI0ZmQyYjY3NTU0YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTlhMTJkNThmMzUyYzExZjcwYjk3NDI1MzU3YjFkZGVmNjA1OGJlNTYyNTVmZDJjY2JjYzI0ZmQyYjY3NTU0YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWIyNDI5NzAwNDQyZTU0OGMxNjVhZjFkZTllMzQ1NmUxZjY4NTQ3NzZiZjM4OGFhNmFlYzlhMjIwYmZjOWJhZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiY2FjOWUwMTFjYjY3ZDljMzIzNjUzMTJjOWU0OTRmYzRlYzUwNmIxYWJhZjg5ZGRiNzZhYTE1OTFhMGVlZGNmYiJ9"
+        },
+        {
+          "resource": "repo://backend/AGENTS.md#L18-L21",
+          "version": "repo-lines-v1:sha256:9269b636b5c652579ac8c22dc376e79dc6d75fdf064c4e3ac4e3b17003f6edef:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNGQwNGNjYTM5MWM3YWI3ZDM4NWM0N2I4YmQwOTQyMWY0Mzg2N2MyMjZhMzZjOTRmNTkzZDg1Mzg2M2E2MmI2YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjVlNWRiMGY2ZTA2YzMxYjU0ZDBhZjE1M2M5MTRkNTFkNWIyNjNhOTBmYTBjNGI4OTAxYTgwNjhhNTQ0Njk2MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDc5YjQ5ODAzMWU5MTZmOTI5MzlkOTQ0YWI3MzdlNThkYTljZDZkMjViY2QwMTQ1YjkyMWRjNmQ3OGQxZTA5YiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODQ0MjIzYzk0NjQ3Zjc0ZjJmZTQxOGNmNzQ5MTdmNTZkZTA2NmI5ODQyY2Y4Yjc3OTQ3ZDE5ZTFjZGMwMTM0YyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_57c50429ce65430aa19671809da8dd0d",
+      "statement": "The repository is organized into backend/ (smart_tutor Python package, tests, evals), web/ (React+TypeScript+Vite), infra/ (AWS CDK), deploy/helm/ (Helm umbrella chart), local/ (Compose-only files), and sdd/ (PRD, specs, ADRs).",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L22-L30",
+          "version": "repo-lines-v1:sha256:b0848767db38c59f5a40ba39566c7790c1272234d06ea5a35670cda9c7050614:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOGFhZWFiNjRlYzIxMGJmNzU1ZjZiNDYwNWQ1ODMwZWRlOTMxYWMyMWU3ZDBjYTJkNDViZjc3NDdiZTFjMTYwZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiY2FjOWUwMTFjYjY3ZDljMzIzNjUzMTJjOWU0OTRmYzRlYzUwNmIxYWJhZjg5ZGRiNzZhYTE1OTFhMGVlZGNmYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzY0OWU5ZDU1YjcyN2IxZTNiMGVjNjc5YjAyOWNiNDkxODM5MGJlMjliZWE2ZjFiYmVkMWVkOWMzZTg5YzBlZiJ9"
+        },
+        {
+          "resource": "repo://README.md#L8-L16",
+          "version": "repo-lines-v1:sha256:810215654f833e75906a1b001cca9beaf2526f43e0acddde9208f97c911d8834:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTQxYjk0ODVhODFlNjkyMDhjYmY0NzEyYmFjYWVmNWIwODkwZmZmYzkxMzBmODFjOWY1NDhhOGM0NmUwZDIyMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTc0ZjJhYTI3ZWM3OWFlYmMyOGE0ZmZiYTdiMDg1ODc4NzNmNmI4ZjUxYTNhYTYyMzU2MzQyYjMyZmU0Y2YwZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTI0MjkxYjEzZDc0NWEwZDQ1ZTE5MDU1MDMxZjdkYjY4YjY0NGYwNWViMmQyYjRiZWJlNmI0ZjI3N2ZiM2E2YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiY2YxMWI1YjU4MTdlY2YyOGYwZmM4YWQ1ZWQyMzEyZTc0N2VhMGUwMzc5MTQ5MmI2ZWEwYzEwOTUxMDY5MThhYyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_d07ea9f2cc7f424cb362747930b6fd8d",
+      "statement": "The backend uses a modular-monolith layout where modules come first and each module contains domain/, application/, ports/, and adapters/ layers. The apps/ directory holds one composition root per deployable (api, agent, mcp_server, worker, jobs) and is a leaf that nothing imports.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L37-L46",
+          "version": "repo-lines-v1:sha256:f98c15400746c2f1547257ff32817ae41ce5ad974da7159f42fd1e248d0e3f5a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI0ZGU3M2IwYzJjZWQ2ZDE5M2M2M2ExNjAyYzIxMDk0NmIyNTdiZThiN2JjZjljMzZlOGFjNTM4YmFlOGIzODkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjliOGE2NzdlZjRiNWExNmY3ZDk4MDBkYjgwMWQ2N2E3MDM0ZGM5NjI4NDU4YjdiM2VkMDRlY2IzZmY4OTkyMTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZmZjEwOWMwNTRjM2I4MWY5MTM4MTU3NDg1YTM4MTE5NjlhNzQyOTY2ZmE4MjMzYjkxMDljZjg2Yjc3NWQ2YjgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJlNmY2NmVhN2VhMzYxNWY5NmMzNDQ2NmJjZTk2MDkwYmI0MzQ3YzI4NjFkMGY0ODJmNTJjYTIzNzU5MjFiYzIifQ"
+        },
+        {
+          "resource": "repo://backend/AGENTS.md#L7-L24",
+          "version": "repo-lines-v1:sha256:1e5541913040eca686ba1eb9cc187a04a5e087db06cbb7dba6b1d6fc04147d34:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA5NzNmN2RmMTc1NDZiNTRlOTdiOTQ5NGE5NTVlZDIzYTVhNmM4MzJlYjc5MWFkMzg0ODliYTM3OGU4YzFkMTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYzZDFhNDg1ZTZmYWRkZTQ3MzcxZmFiZjkzNWZjODcwNTE3OGU5ZmZiZmU4OGY1ZWE2MmFjNTk0NzZiNjFhMGEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg0MjRmMGQ5NzdiMjQ5MjM1NGZlZWM5YzBiYTZmZjkzMDg5MzVlYTM0Y2VjMWJhMDRlN2NiNmU5YjIyZWM2MTYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImIzZDhiNjBlNGEyYWI4MzczNzBhOTkwYzg0MzIzYjYxNDYwZTQ1NzhmNTM3YTUzZmIxZDU2MDIzMzY5MmExNjgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_bb140ab5e531474cb2f56f51fa82a96c",
+      "statement": "The enforced acyclic module dependency order (top imports only from below) is: reports → recommendations → quizzes|catalog → learning → tutoring → graph → knowledge → subjects → accounts|insights. shared is open to all modules and imports none; apps is a leaf.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L43-L46",
+          "version": "repo-lines-v1:sha256:766950b9a7a0f31e96ca9b90d4148adf577daa44a6d8f13fdbd619ef6ab9accf:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDViYmU1YzU1MTFiOWI4MzUxMGJlNjFiODU1NTJlOGQ1N2I2YmRkZTRkZWIwOWM2NDMyMTVlM2UyZGRmZjliYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWI4YTY3N2VmNGI1YTE2ZjdkOTgwMGRiODAxZDY3YTcwMzRkYzk2Mjg0NThiN2IzZWQwNGVjYjNmZjg5OTIxNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMGEwMzY3YTcwZTM2ODI0NDlhN2YwZjc3ZWE1ZjllY2QwYzkzYmMxNWY3MTdkOWE5OWQxNzk2OTRlODE3OTMxNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmU2ZjY2ZWE3ZWEzNjE1Zjk2YzM0NDY2YmNlOTYwOTBiYjQzNDdjMjg2MWQwZjQ4MmY1MmNhMjM3NTkyMWJjMiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_e878a4ec8d4e428c8c3f1f283e0c903e",
+      "statement": "Product invariants that all code must preserve: (1) can_read(user, document) is the sole access rule enforced in code and SQL, never by the prompt; (2) server-side SHA-256 deduplication — browser hash only skips re-upload within the learner's own library; (3) subject_ids stored everywhere, names resolved at read time, 1–3 subjects per document and thread, threads only ever add subjects; (4) user prompt and uploaded document text are untrusted — chunks passed as quoted data; (5) documents and Lesson Notes are archived never deleted, traces expire 180 days, decline log 90 days, threads kept; (6) decline log stores no user id, tokens travel in headers and runtime context only.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L35-L41",
+          "version": "repo-lines-v1:sha256:5900c5512b8353992ce2bbc272e7c78ce39c6c408ca6056083c99ca862c60740:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjVjNmI2ZDY1YjkxZjRmYzNhMzYwOGM2ZDg3ODFkNmNjMDI1YjlkODA5YTAyNGVlZTY2MDA5Mzk0YzJjYzhjMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzkwNDFjNjY3ZWQ2NDBlZDM1M2RmY2FhM2VjZjc1ZmI0MWE5NGVhMjcyYzdlYjJjMjMwY2Y2Y2Y4OWUwZGIzZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTFkMGRhN2QzNzIyNWFjNWVhY2RjNDI5NzhkNzcwY2E3MWQzNjMxNmUyNWMwZWJhZjI4YzM5MDlmMjRiMGFiOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDZmNjNlNzQwMWFlMTU1NDU0MzQ0YmMzOTg4YzliYzEwMDk1ZWVkOGYzZWUzMTQ0YzE0NDdkM2NkMzgxNDJhYiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_1acc0c7b8b3e4874ab85e8e2c30697b5",
+      "statement": "The authoritative sources of truth are: sdd/prd.md (product behavior, data model, flows, roadmap), sdd/specs/2026-10-02-project-structure-design.md (folder structure, module boundaries, import rules), sdd/adr/ (architecture decisions), CONTEXT.md (domain vocabulary), AGENTS.md and backend/AGENTS.md (agent coding rules).",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L79-L82",
+          "version": "repo-lines-v1:sha256:54505ddc74d0111aeda215909d389e861b19eba22719722035617f83555718b2:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjA1ZTAyM2FjNzZjMTI4ZTBlNGIxMDFmNWI5M2IxZDFlZjk4ZWExNjhkYmFkODU5NGIxZWQ0MDA4ZmQ3OWY1MiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWQ0YjU4MWMwZWJmODI4NDY0ZjI1YTlhZjM1ZmRjY2IzMmVlYjFiMDNmZWQ4ZjdmYmM3MDBhMDNmODNlYjUxOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWVjNmI5ODFlM2I4MmZlZGU1MjNlMjgzODAwOWM0NDAxMjU0MjYyMmUxOWZjZmJmZDlmZTk3ZTY3YWE2NmFlMSJ9"
+        },
+        {
+          "resource": "repo://AGENTS.md#L9-L16",
+          "version": "repo-lines-v1:sha256:b9f3bebc981f1d5ac9e16920555ce9ce9c7bc5a2979af8a988c93cabf574dcae:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzkwZTdjOGQ2ZWE0NTg2MzE2OWM4Y2M1ODE0N2NmNTU4YTFiNTkwOTA4YmVjOTI3MDdkNmY0MWM1NDkzNDJjMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmEzOWU2YmEyMzFhNzQ4Y2UyZjIxNGFkYjY0NDNmYjA0N2Y4YjkxZjY3MjE2OTgyOWEwMmJhNTY5ZmViMzIwMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGVlMzQ0YjZhODAyOTZmOWYzOGZmY2UyYWE0MjE1YmIyMzgzZmNhZTA2OGNjZTM2ZTQ3ZmJjN2M3ZGYyZjc5ZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTBiZjIwYzRlMTFiNWQ5NjlkZjgwNDIzMjA5ZmZlZTZmZjAwNGI5NWJjMmU3ODIxNWUxNDY4NWRmZmQ1NTYyNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_9752be77ca5d4997960f4ea8766b35b1",
+      "statement": "Local development requires Docker Compose (pgvector, Keycloak on :8080, LocalStack on :4566), uv, Node 22+, and an AWS profile with Bedrock access. Bedrock and LangSmith have no local emulator; local runs call real us-east-1 models.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L45-L48",
+          "version": "repo-lines-v1:sha256:eebe8f617fec9e8ab7ae9460aae4c0c29c447dd3a9c37e5a38cc972aefc29285:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWIyOThhN2FiM2Y2ZWQ4NGNhYjEwNzRmZGEwMmRkOWVkZjk4ZTVkMTM3ODljYWM5ZGRjZDRlZjQ5ZjI2ODQzOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzM5OTliN2E4ZmNhNTQ3NDNjZjdmNjYwMGI3ODEwODEzZTIzOGNhNDg3OGM0YjU3MmI2MjE1ZWM3MzkyM2U3ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDZmNjNlNzQwMWFlMTU1NDU0MzQ0YmMzOTg4YzliYzEwMDk1ZWVkOGYzZWUzMTQ0YzE0NDdkM2NkMzgxNDJhYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWVkZTJlMWM4MzU3YTE3ZDJhNzcyOTg1NTAyMzRmMWExNGE1MmMxMDkyMTI1Njg3NGUxYzg1Y2UzOTk1YTFjMyJ9"
+        },
+        {
+          "resource": "repo://README.md#L18-L27",
+          "version": "repo-lines-v1:sha256:39027b68409124468706b6e06893d048652e81c424cd7f63668b12c9b3d03776:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg4NDdkNjUyZmJkMDg0NWQ4ZTBjNWRhMjljOTY3NGVjNmI0MTY0MDg4ZmUzMzJhN2M0MDRlMDY1ZGIzOWViNDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlYjcwMjU3NTkzZGEwNmY2ODJhM2RkZGE1NGE5ZDI2MGQ0ZmM1MTRmNjQ1MjM3ZjVjYTc0YjA4ZjhkYTYxYTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ2ZjYzZTc0MDFhZTE1NTQ1NDM0NGJjMzk4OGM5YmMxMDA5NWVlZDhmM2VlMzE0NGMxNDQ3ZDNjZDM4MTQyYWIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjIwMjk0ODE5NzcyNWJlYjFkYmQxMzVmNGIwNDlkMjYyMGNkNmY4MTVhNTc0NWE2YTkzNzdlYmEyMjBiZGM5NTAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_e2b6afdd7e6448b2b58f7d78d59c3f5c",
+      "statement": "The agent graph is a plain LangGraph flow. The ask path runs: resolve subjects (first turn, detection or learner pick) → search via MCP (fixed step, top-5 chunks) → relevance gate (code) → growth check (code, adds a subject if score meets threshold and thread has < 3 subjects) → answer (streamed, with citations) or decline.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L288-L299",
+          "version": "repo-lines-v1:sha256:3b18270e5c6d17f53865cc57e37f4f0b0b2642c9ac2ac28ff5aea99c420d68c1:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg5YTJiMzZlMGI0YjdhNjYwZmMwZjk1ZTQ4MmMwMmQxZmFlMGRjNjM2M2Q4ZGJjYzA4MzJkZDJhZGI1ZDYwMmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE3Y2MzOWEwMTY4NjAxMjEzMzkzYTI1OWQ3MTZmMTcyMGM3ODk1NDQyNzg3MWQ5Mjk4NDYwNGViNzgyMzcxOWIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjczNmFhYTMyZmMxNGI0ZWI2ZmVmNmY2NTNkZGI2NjdlZjMwMjk5YjFiOGEwYjcyNzMzNjUzZWU0ZTdmMDlkYTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzNzRlZmE1MGIyMDVhNTI3NDVjMzI4NTUzNmQ0YWU5OWEyNGI2MmY4NjA4OTAzYTQ4YmExMzQwN2VkY2JhYjMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_13275f77544643069b0dcd4bbe96ac45",
+      "statement": "The RAG MCP server enforces access on every search: it validates the forwarded JWT, resolves only the caller's readable, ready, non-archived documents in the requested subjects, and searches only those contents' chunks — never another learner's chunks.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L35-L36",
+          "version": "repo-lines-v1:sha256:fe5dd950b00d1a41455f0d570b61830481e65da62375d0bad3e65a00c58f6e80:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjVjNmI2ZDY1YjkxZjRmYzNhMzYwOGM2ZDg3ODFkNmNjMDI1YjlkODA5YTAyNGVlZTY2MDA5Mzk0YzJjYzhjMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiM2MwMjU0NGQ5OTY5NGM3OGNlZTc3OWMzMTZhNDgwOWM3OWRhZmY1NjA5YTU2ZGExOTU0ZWJiMWNlZDRkN2IxYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTFkMGRhN2QzNzIyNWFjNWVhY2RjNDI5NzhkNzcwY2E3MWQzNjMxNmUyNWMwZWJhZjI4YzM5MDlmMjRiMGFiOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDkzMzQwM2QzYzczNGRlOWU4MzFhYTAxZDhlNmNkODU2ZWUzMmE3OWRjMjUyMTVmODcwNDAwZDI1MTVjNmUwZSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L281-L281",
+          "version": "repo-lines-v1:sha256:df0d2ef2105438f62cfcab0ba8d1e4330ac24a4ca868647e80df764b4eb402a0:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGYwZDJlZjIxMDU0MzhmNjJjZmNhYjBiYThkMWU0MzMwYWMyNGE0Y2E4Njg2NDdlODBkZjc2NGI0ZWI0MDJhMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGYwZDJlZjIxMDU0MzhmNjJjZmNhYjBiYThkMWU0MzMwYWMyNGE0Y2E4Njg2NDdlODBkZjc2NGI0ZWI0MDJhMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDY2NzE4NGRjMzQ3MDQzMjVjYzJmZDJjYThlNzA4MDdmMmMwMWI2NGRkY2Y3NTA2ODNjOWNmMTQ3YjI2NGQyNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWNhODE1NTY2MmQwNzBhZThhNjM3YTE2MzBmMmI5NDFhMWMyMWZjYzIyNzBlN2QwNmViMThkMTJmYjRlNDkxNSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_488b521d31c74dd6b5b5d0f6892a2b74",
+      "statement": "The quickstart page explicitly documents how agents should use openwiki_search for just-in-time context, openwiki_read for complete section context, openwiki_list_workspaces/openwiki_list_wikis for workspace discovery, and instructs agents to read openwiki/quickstart.md and follow its links as a fallback when retrieval tools are unavailable.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L113-L118",
+          "version": "repo-lines-v1:sha256:e886e7897ca1b3975c44fe5316ce5714ae509939d49b2d533d6b40d786d637ca:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMmNiM2Q0YTQ2NjliZGM3YTQwZDk4MDc3MzVkZjYwOGJmZTMxZDM4NjA2N2M5OTliNzUwYWFjNjMyYzFiNmQzMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTNjYzRhNzEwYmYzMWEyN2Q3MTk2MDRmYTdkYTEyZWJhNGY5MTY4ZTZjYzRkOWY4NmQ4YjJjOTE5NTYzYzRjZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjljZmFmYWEwYWRjYTI5NTQwZWMzZDIzOTkzYWQ1ZDYzYjhiMTA2MGFlNzk4NTk1OGM5MGY1OWY1NDgxZDE2NSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_cd83a1a6826d47419c9198765aa3c407",
+      "statement": "OpenWiki pages are a generated view synthesized from source files (sdd/prd.md, sdd/specs/, sdd/adr/, CONTEXT.md, AGENTS.md, backend/AGENTS.md); when wiki content and source files disagree, the source files are authoritative, and agents must not hand-edit generated OpenWiki pages.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L108-L122",
+          "version": "repo-lines-v1:sha256:5a99db190588a58887dedd862087182bcc044b1c2e4fa49bd3cc06e8d28e4a33:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVmMTgwZjljMTI2OTAzYmNjMzMxYWE5NTQ1NmU0OTQ0NGE3ZDRkMDExZThhMmE4M2Y1ZGM4NzAyMzkxODEyZDAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE3YjdlNzM0Yzk5ZjBmYzE0ZTJkMDZmZjVmOTQ2MTYwYjI3YjhlODc1NTVmYjZmNjdjMTI4N2YyMzQyODcyYjciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImExYjc0NWYwZGRmZGE3NjRhZTIwYzBiYzE0MmI0MDRiMTc2NDUwZjI0YzVlN2Q0NTM0MzA0M2U2MzE3MTFhYzMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_2a1319b8ff564677906bf43a7ad36bbe",
+      "statement": "The task-routing table maps Bedrock/model changes to integrations/bedrock-models.md, Keycloak/auth changes to integrations/keycloak-auth.md, MCP retrieval work to integrations/mcp-retrieval.md, S3/SQS storage work to integrations/storage-s3-sqs.md, and later-release stub understanding to modules/later-releases.md.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L1-L60",
+          "version": "repo-lines-v1:sha256:b2750744023552e35fa74f96c9317887aca2f7916484a753e994b41cf65ed682:eyJzZWxlY3RlZExpbmVDb3VudCI6NjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVjYjE1NzBhNDBhMzNmOTcwOTkxMmM1NWI0MDE0MDVjNWJjMGQxYWY4N2Y5OGU3MTg4Zjk5NDllNjRiMTgwNmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlYjcwMjU3NTkzZGEwNmY2ODJhM2RkZGE1NGE5ZDI2MGQ0ZmM1MTRmNjQ1MjM3ZjVjYTc0YjA4ZjhkYTYxYTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcxNWU1N2Y3N2RjODE5NGFiOGJiMGJlMDdjN2E1YWZhN2ExODVkN2U0YjNlNzdiNzdkMTQ4NGYyZmZjNTIyOGEifQ"
+        },
+        {
+          "resource": "repo://backend/AGENTS.md#L1-L58",
+          "version": "repo-lines-v1:sha256:5718f12f0d522419bbba269e63cf997083a247d8935cf11d92e64e8f44e70b52:eyJzZWxlY3RlZExpbmVDb3VudCI6NTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQyZjgzZmUwY2FjYTIyM2FhMzhmZDMxOGVhYTJiNDZkODEzMGI4ZjliOGQyNzRiYjFhYzg0MTIzMjg3NWExMzMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlYjcwMjU3NTkzZGEwNmY2ODJhM2RkZGE1NGE5ZDI2MGQ0ZmM1MTRmNjQ1MjM3ZjVjYTc0YjA4ZjhkYTYxYTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRmYWViYzFjMTdmMmJjZWNmN2I3OGUyNzJiNzk0MGQyZDUzYjUyM2JhNzc5YTAxYjc5Y2NmYjBiZWYxYzVmMWIifQ"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-03T03:19:50.688Z"
+  }
+}

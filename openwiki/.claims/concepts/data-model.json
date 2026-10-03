@@ -1,0 +1,302 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:8472cb4d89e57013e70bb6957c4770625c2962244db5cbc3855f889df1f0af19",
+  "claims": [
+    {
+      "id": "claim_2bd24c09f1324a89b9dfcbd52a1417cf",
+      "statement": "The Content/Document split (ADR 0002) ensures a file is extracted, chunked, and embedded exactly once per unique SHA-256 across all users; the `contents` table has no owner, while `documents` is the per-learner library entry with `owner_id`, subjects, and visibility.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/adr/0002-content-document-split-sha256-dedupe.md",
+          "version": "repo-file-v1:sha256:2a0c5ac25be3bf5d4ba4593700ef7908c5fa89843272b49ed1df98743d4fc6bd"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L343-L345",
+          "version": "repo-lines-v1:sha256:82e5e17e8efd71e85c3fecd0e0a250548a0d3c68703b29b5c5bc21e9a20098af:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjExZmIxMzQ0NTQxNWI3MGUxYzFlYTllZTc4NDAyZTY2OTdiNTRlMzMwMDcwNjFiZDUzYzE0YWQyYTY5YTM4YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzdiODc5Mjk2YzZjYzk5MjA0YzEwMTNkZmFhY2E5YWZjMGI2NzBkZTQ5YWZmZmYwOTlhMTQxZGIzYTI5NDEwNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmU0OTEzZTQyNzYwNTM2MWFkZjQyOTk4NjQzMDBjM2EzYjAxYjNkN2ZlNGVjY2I5Y2FkMzIyMjEzNmFlMTIxNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDdjMGM5NmJiNzJiYzIzMTg3ODc4MDUyYmU4ZmRhNzAzZjkyNzZmODNhYmZiNTI2YmU5MjZjYjUzYjUyOTYyNSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_b20932327e7f4307a1c65970ba54fb8c",
+      "statement": "The `contents` table stores `state` (`processing`/`ready`/`failed`), extracted metadata (title, authors, year, doi, work_key, references[]), summary and its embedding, proposed_subject_names[], the embedding model/dimension, processed_by_user_id (for usage attribution), and s3_key/docling_key pointing to the PDF and saved Docling JSON in S3.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L343-L343",
+          "version": "repo-lines-v1:sha256:f11fb13445415b70e1c1ea9ee78402e6697b54e33007061bd53c14ad2a69a38c:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjExZmIxMzQ0NTQxNWI3MGUxYzFlYTllZTc4NDAyZTY2OTdiNTRlMzMwMDcwNjFiZDUzYzE0YWQyYTY5YTM4YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjExZmIxMzQ0NTQxNWI3MGUxYzFlYTllZTc4NDAyZTY2OTdiNTRlMzMwMDcwNjFiZDUzYzE0YWQyYTY5YTM4YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmU0OTEzZTQyNzYwNTM2MWFkZjQyOTk4NjQzMDBjM2EzYjAxYjNkN2ZlNGVjY2I5Y2FkMzIyMjEzNmFlMTIxNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjFkMzM1ZDhlMTZjNjExN2YzMTNlNmQ4ODE3NWRkY2FhMWQ4NjdkOWY3MGIxODgyYmZlNTJhZGM4OTFjOWZlMCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_ea66d0f3b8d74c6c8e6e2eb944d59f1e",
+      "statement": "The `chunks` table stores content_id, page (nullable), text (preserved to allow re-embedding without Glacier restore), and a 1024-dimensional HNSW vector embedding; chunks belong to the content, not to any learner.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L344-L344",
+          "version": "repo-lines-v1:sha256:4473cdec8e978116e9bc39e944f2b02c488d98dc37ddb66b13d36d9926b55084:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDQ3M2NkZWM4ZTk3ODExNmU5YmMzOWU5NDRmMmIwMmM0ODhkOThkYzM3ZGRiNjZiMTNkMzZkOTkyNmI1NTA4NCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDQ3M2NkZWM4ZTk3ODExNmU5YmMzOWU5NDRmMmIwMmM0ODhkOThkYzM3ZGRiNjZiMTNkMzZkOTkyNmI1NTA4NCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNThiZDBjZmI1Y2RkNDY2MDg0ZGE3ODhmZGI3YTEyMGEyN2IxZTg4OTljNDc2NTdhYTJhYjRmMGVmODk5ZGJjMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiM2JkYjhmZGJiZmQyZmM1ZjAwOWMzYWIxYzRkZDZhMGMyZjc4MmY0MTY4M2U2Y2ZiNzA5OWIwMWQ4MzI1OGVhZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_355bcca6b5ef4b57a66c68fe512555bd",
+      "statement": "The `documents` table has unique constraint `(owner_id, content_id)` (where content_id is non-null), carries `state` (`processing`/`awaiting_subjects`/`ready`/`failed`), an `archived` boolean flag (soft-delete only), `visibility` (`private` in R1-3; `shared`/`public` in R4), `title_override`, and `added_via`.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L345-L345",
+          "version": "repo-lines-v1:sha256:77b879296c6cc99204c1013dfaaca9afc0b670de49affff099a141db3a294106:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzdiODc5Mjk2YzZjYzk5MjA0YzEwMTNkZmFhY2E5YWZjMGI2NzBkZTQ5YWZmZmYwOTlhMTQxZGIzYTI5NDEwNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzdiODc5Mjk2YzZjYzk5MjA0YzEwMTNkZmFhY2E5YWZjMGI2NzBkZTQ5YWZmZmYwOTlhMTQxZGIzYTI5NDEwNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWViNjNhOGI5OWY5N2NjYTg1ZDI4NGFkOWRhMjc3MWY1ZDFhNTliNjcwNWM4NjQ2NTU2ODU4NDdjMmY3NTRhNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDdjMGM5NmJiNzJiYzIzMTg3ODc4MDUyYmU4ZmRhNzAzZjkyNzZmODNhYmZiNTI2YmU5MjZjYjUzYjUyOTYyNSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_1c7d859371d84375b4afd6e99914b24c",
+      "statement": "The `document_subjects` join table enforces 1–3 subjects per document at the domain level (`Document.set_subjects()`) and by a database check; changing subjects updates only this table with no re-embedding.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L346-L346",
+          "version": "repo-lines-v1:sha256:6aea5cfe5ea0c5057aad23637f672c82435a5a1acd7600b254dc6d6b0f1f04e1:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmFlYTVjZmU1ZWEwYzUwNTdhYWQyMzYzN2Y2NzJjODI0MzVhNWExYWNkNzYwMGIyNTRkYzZkNmIwZjFmMDRlMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNmFlYTVjZmU1ZWEwYzUwNTdhYWQyMzYzN2Y2NzJjODI0MzVhNWExYWNkNzYwMGIyNTRkYzZkNmIwZjFmMDRlMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODJlNWUxN2U4ZWZkNzFlODVjM2ZlY2QwZTBhMjUwNTQ4YTBkM2M2ODcwM2IyOWI1YzViYzIxZTlhMjAwOThhZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDg0MTMxZWRkNTcxNjUzYzNhYjYxMTlkMTBlNjRhNmQxYjEyZDI4NWRiMTE0ZjBlOWNjMjE5Y2RhN2RiOTQxNyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L389-L389",
+          "version": "repo-lines-v1:sha256:3982af3f9af6ead5fa938fddbde9e0deb3c824d9b7a1b4be8cff46937380ec7b:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzk4MmFmM2Y5YWY2ZWFkNWZhOTM4ZmRkYmRlOWUwZGViM2M4MjRkOWI3YTFiNGJlOGNmZjQ2OTM3MzgwZWM3YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzk4MmFmM2Y5YWY2ZWFkNWZhOTM4ZmRkYmRlOWUwZGViM2M4MjRkOWI3YTFiNGJlOGNmZjQ2OTM3MzgwZWM3YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTBmNGM1NDg0N2JmNWZhNmY1YzdlMmVhMDhkZGIwM2M1NTg4ZDIzM2IxMzc5NGEwYjQ4MThmMmEzMDRiMmRlNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzFiYzBhNWQ3NzFiYTU4OGIzODQ1NmNlYzdiYzRkNzE5N2RjZGM3YmEyNGUyZGNhYWUzNGFjZGE2OTJkOTdkNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_f20ff8358ae24905852794ab3f5aed7e",
+      "statement": "The `document_grants` table (R4 placeholder) is created in Release 1 but unused until Release 4, when `can_read(user, document)` is extended to include grantees and public-visibility documents.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/adr/0002-content-document-split-sha256-dedupe.md",
+          "version": "repo-file-v1:sha256:2a0c5ac25be3bf5d4ba4593700ef7908c5fa89843272b49ed1df98743d4fc6bd"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L347-L347",
+          "version": "repo-lines-v1:sha256:7366cf319959f1383ae82d98e5683cda6eabd77e20715eaeadb26b543aa04a2c:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzM2NmNmMzE5OTU5ZjEzODNhZTgyZDk4ZTU2ODNjZGE2ZWFiZDc3ZTIwNzE1ZWFlYWRiMjZiNTQzYWEwNGEyYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzM2NmNmMzE5OTU5ZjEzODNhZTgyZDk4ZTU2ODNjZGE2ZWFiZDc3ZTIwNzE1ZWFlYWRiMjZiNTQzYWEwNGEyYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjFkMzM1ZDhlMTZjNjExN2YzMTNlNmQ4ODE3NWRkY2FhMWQ4NjdkOWY3MGIxODgyYmZlNTJhZGM4OTFjOWZlMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmY2MTM2NzU1NzUxZWMxMzI2ZWMwZGJhMDM1YTE1NmJmYWQ5YmE2YWZmNjNjZTQ0YmY0YTY4NDVjZjg5NmQ1MyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_b4fd56d085a8419b9a128656d1c989d3",
+      "statement": "The `subjects` table uses a stable UUID `subject_id` and unique `normalized_name`; it records canonical_name and name_embedding but no creator and no status column, because there are no admin moderation actions (rename, merge, hide).",
+      "evidence": [
+        {
+          "resource": "repo://sdd/adr/0003-shared-subject-catalog.md",
+          "version": "repo-file-v1:sha256:8e671e2e4061893375dec06e347d7db0edb3eda5e1a907b9f4b4958e85825e40"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L348-L348",
+          "version": "repo-lines-v1:sha256:1bf304e68a629133aed2ccb3aaa3ea1e37e867a28c66139dd2a59ea9413358a2:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWJmMzA0ZTY4YTYyOTEzM2FlZDJjY2IzYWFhM2VhMWUzN2U4NjdhMjhjNjYxMzlkZDJhNTllYTk0MTMzNThhMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWJmMzA0ZTY4YTYyOTEzM2FlZDJjY2IzYWFhM2VhMWUzN2U4NjdhMjhjNjYxMzlkZDJhNTllYTk0MTMzNThhMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2JkYjhmZGJiZmQyZmM1ZjAwOWMzYWIxYzRkZDZhMGMyZjc4MmY0MTY4M2U2Y2ZiNzA5OWIwMWQ4MzI1OGVhZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiN2YzNzE4MGJkZmIwMTE0MDhmZjFmZmJhYjEyNTYxN2RmYzMxZjJlYWE2NTA1YTY5M2Q0ZDgxYWM4YjJkOGJiYyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_e29669db49c647a9a44b2da57c5da332",
+      "statement": "The `user_subject_names` table (keyed by `(user_id, subject_id)`) stores a learner's personal display_name for a subject; a row is present only when the learner has renamed it, and 'Reset name' deletes the row without touching any other table.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/adr/0003-shared-subject-catalog.md",
+          "version": "repo-file-v1:sha256:8e671e2e4061893375dec06e347d7db0edb3eda5e1a907b9f4b4958e85825e40"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L349-L349",
+          "version": "repo-lines-v1:sha256:6a664f0ebadb847e3347991e7c1d42137392d65e4dfdf8ee31bf7e204d561e11:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmE2NjRmMGViYWRiODQ3ZTMzNDc5OTFlN2MxZDQyMTM3MzkyZDY1ZTRkZmRmOGVlMzFiZjdlMjA0ZDU2MWUxMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNmE2NjRmMGViYWRiODQ3ZTMzNDc5OTFlN2MxZDQyMTM3MzkyZDY1ZTRkZmRmOGVlMzFiZjdlMjA0ZDU2MWUxMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDdjMGM5NmJiNzJiYzIzMTg3ODc4MDUyYmU4ZmRhNzAzZjkyNzZmODNhYmZiNTI2YmU5MjZjYjUzYjUyOTYyNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzhkNmQ3MzYwZTBmZDEzNDcwMTUyM2M5MDAzNzk2ODAzZGU3NTEwZTYxZTE3OTY1YWQ3MjIxYTBlNjk5ZDgwYiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_bab07a6da97f445a95f56c195d64f629",
+      "statement": "Subject name is resolved at read time as `coalesce(user_subject_names.display_name, subjects.canonical_name)`; every other table stores only `subject_id`s, so a rename updates no other row.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/adr/0003-shared-subject-catalog.md",
+          "version": "repo-file-v1:sha256:8e671e2e4061893375dec06e347d7db0edb3eda5e1a907b9f4b4958e85825e40"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L362-L362",
+          "version": "repo-lines-v1:sha256:d413c71ab9f5cd0fbfc66d20bfbeba5deb183404112c054ba8d93879ed922b3e:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDQxM2M3MWFiOWY1Y2QwZmJmYzY2ZDIwYmZiZWJhNWRlYjE4MzQwNDExMmMwNTRiYThkOTM4NzllZDkyMmIzZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDQxM2M3MWFiOWY1Y2QwZmJmYzY2ZDIwYmZiZWJhNWRlYjE4MzQwNDExMmMwNTRiYThkOTM4NzllZDkyMmIzZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmMxYWFkNzUxNDZmOGY0ZGU2ZjFlYWZjOTM3YTNjNjAzOWY5NzU2ZmI0ODNkZWU2NGY4NTg0MjQwNDczYjk3MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzIxNGZhOTgwOGQ1MmJkNDE3OWVlNzQ4NTY5ZmI1ZmUyNzY2ZGNlNTg2MjE2N2JiMDhjNzk1ZDRjYjRmMDhlNSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_4d07ae56ea13422b8570cf1235ade60d",
+      "statement": "Display title is computed at read time as `coalesce(documents.title_override, contents.title, <original file name>)` per learner; citations use it at read time so an edit is immediately reflected without re-embedding.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L363-L363",
+          "version": "repo-lines-v1:sha256:9759e514bce4ae8e5c39504facc5b871373651d7c98437f64bc058a43e379ee6:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc1OWU1MTRiY2U0YWU4ZTVjMzk1MDRmYWNjNWI4NzEzNzM2NTFkN2M5ODQzN2Y2NGJjMDU4YTQzZTM3OWVlNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc1OWU1MTRiY2U0YWU4ZTVjMzk1MDRmYWNjNWI4NzEzNzM2NTFkN2M5ODQzN2Y2NGJjMDU4YTQzZTM3OWVlNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmMwOWNjY2RjYzcxMTc0NjQ0Yjc0MjkyNjQ2NzY3ZWMyYTA4ZjI2M2JhZGUzZjAyNWJjNGExYzE1N2I3NmY3ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTM0ZGQ0NGQxYzY4YzkwM2E2OTJlNTg4ZDJiMGU1MjJhMGM3NWEyZjQxMjY4MzgwZDhiZTlkNWIyMDlmNjJmYiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_4717835fc03c4aaf9f8ec17e732828b9",
+      "statement": "A learner's active subjects ('My subjects') are the distinct `subject_id` values over their `ready`, non-archived documents; subject detection, search scope, and thread growth checks operate over this derived set.",
+      "evidence": [
+        {
+          "resource": "repo://CONTEXT.md#L41-L42",
+          "version": "repo-lines-v1:sha256:ca8631e1e5a88a627da43810cd32a79945d7d682a31a4e7fc763f5cc8e77d31b:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2MzMzRhNzYyOGY0MWMzOTdkOWJlNmY3ZjhkZjg0OTk3ZDJkMjkyYzVjZDVkYTc3NjVhODkwNTc4YTJjZDU0MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGU5N2JjYjg5MzQ4NjQ3M2U4NDk5YzdiNTBjNWM0MmYwMGYwM2MyNWI0MGVkNjljMzdkYzBhOWM2N2E0NTUwZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDA0ZmFiNmNhNjcwOWQ4ODE4ZmZmNDQ1MmFhM2IzNTdjOTgxNWQxY2IzNjBkNjUwMjFiMTgzMmY4MGNkMGZjMyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L364-L364",
+          "version": "repo-lines-v1:sha256:c8703d23bc8b175d3083e2a8ee9ddb8ca66f2cb4e544b96f5a70c84e01ff9d13:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzg3MDNkMjNiYzhiMTc1ZDMwODNlMmE4ZWU5ZGRiOGNhNjZmMmNiNGU1NDRiOTZmNWE3MGM4NGUwMWZmOWQxMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzg3MDNkMjNiYzhiMTc1ZDMwODNlMmE4ZWU5ZGRiOGNhNjZmMmNiNGU1NDRiOTZmNWE3MGM4NGUwMWZmOWQxMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjBhMTZjYWZjMWJjYWE1ODM2MTVlYTk0NDg0MDA5ZDQ2ZWM2MWRjMzM0ZWM0YjkxZjhlNWFiZmEyMzI4ZDE0MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDhhMGQzZDc5YWIxZGRkNmI4YjFmYmZkNDA2OGU4NTIwZWUyYmMwNzVkZmJkOGUyOWYxZGUxYmJhNjdlZWNhMSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_668137ba3b30452cbbf1199676b161cd",
+      "statement": "The `threads` table carries `subject_ids[]` as an append-only array (subjects are never removed), `last_learner_message_at` (used by the idle sweeper), and `record_written_at` (prevents duplicate sweeper writes); threads are kept indefinitely per PRD D25.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L120-L120",
+          "version": "repo-lines-v1:sha256:80f2d00776fd6170910281450f661ffadef996a075f7c7c7e10914834fb55cd1:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODBmMmQwMDc3NmZkNjE3MDkxMDI4MTQ1MGY2NjFmZmFkZWY5OTZhMDc1ZjdjN2M3ZTEwOTE0ODM0ZmI1NWNkMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODBmMmQwMDc3NmZkNjE3MDkxMDI4MTQ1MGY2NjFmZmFkZWY5OTZhMDc1ZjdjN2M3ZTEwOTE0ODM0ZmI1NWNkMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjcyY2M2YWM2MDEzMTQxYWVmYmE2ZmU4Y2JlMmY1NjcyY2JiZTkzMDM3MzJjYWJiZjhiNDY4MTFkOTA1NmNjMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmRjNDQ5MzQxYTJlYWM4MDk5NGM5NDZkYzE5NmExMjM3MWVmYmVkNGQ0ZTgzMzVmYTA4NzUwMDllNzdlNTk1MiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L350-L350",
+          "version": "repo-lines-v1:sha256:55f049159f075c0d49ffb6df0ff22937a89c2d17de61f6badb4661d37bb51f5e:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTVmMDQ5MTU5ZjA3NWMwZDQ5ZmZiNmRmMGZmMjI5MzdhODljMmQxN2RlNjFmNmJhZGI0NjYxZDM3YmI1MWY1ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTVmMDQ5MTU5ZjA3NWMwZDQ5ZmZiNmRmMGZmMjI5MzdhODljMmQxN2RlNjFmNmJhZGI0NjYxZDM3YmI1MWY1ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDg0MTMxZWRkNTcxNjUzYzNhYjYxMTlkMTBlNjRhNmQxYjEyZDI4NWRiMTE0ZjBlOWNjMjE5Y2RhN2RiOTQxNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZmJmOGEzNDM1M2JhZjNlNTA3ZmRiMTYzNGVhMjFlYWRlNjdiZGNlYmRlNzc5ZTljODU1ZWI3ZTQzODBiNjMxYSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_a58a73fe3ab543e8a7b388258d8d461c",
+      "statement": "The `lesson_notes` table is unique per `thread_id`; it has an `edited_since_generated` boolean that triggers a confirmation prompt before the next 'Summarize lesson' overwrites the note, and a `source_note_id` for 'Discuss this note' threads.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L103-L103",
+          "version": "repo-lines-v1:sha256:01dbc4e47d2e209238e374c9b444ec56ddee3f00b66e381791a32a262b8ad454:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFkYmM0ZTQ3ZDJlMjA5MjM4ZTM3NGM5YjQ0NGVjNTZkZGVlM2YwMGI2NmUzODE3OTFhMzJhMjYyYjhhZDQ1NCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFkYmM0ZTQ3ZDJlMjA5MjM4ZTM3NGM5YjQ0NGVjNTZkZGVlM2YwMGI2NmUzODE3OTFhMzJhMjYyYjhhZDQ1NCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWJkNTAxMDVjMjllZTFmOTU4YmZkYTgwOTllYTczZDdjZDZjY2E0NmU3NzRmNmZiYTAxMzdjZTE1MjYzZDE1NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTFkZTBkNjExNTgzNDAwMTNkYTI3YzIwZjc3MWM2NTJlZDU4MmNhYTM5YTk2YTM5MDFlN2IxNGM2MTFkOWM0MiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L351-L351",
+          "version": "repo-lines-v1:sha256:838c2757b67e8ce6d1098bb3f1d31baefac2f906c9d64b96bc466e752e551081:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODM4YzI3NTdiNjdlOGNlNmQxMDk4YmIzZjFkMzFiYWVmYWMyZjkwNmM5ZDY0Yjk2YmM0NjZlNzUyZTU1MTA4MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODM4YzI3NTdiNjdlOGNlNmQxMDk4YmIzZjFkMzFiYWVmYWMyZjkwNmM5ZDY0Yjk2YmM0NjZlNzUyZTU1MTA4MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmY2MTM2NzU1NzUxZWMxMzI2ZWMwZGJhMDM1YTE1NmJmYWQ5YmE2YWZmNjNjZTQ0YmY0YTY4NDVjZjg5NmQ1MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzg1ZjNjNDY2ZDhjZjc0MWU1NGNiNjdmYTRhNWYwZDA2MmQxNDYxZGQ4NDdjN2UxZWI4ZjAyNmU0MDAxYzFhNiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_ff88b2753fbf4fc5b06c5752bb3402a3",
+      "statement": "Learning records are stored in the LangGraph store under namespace `(\"learning\", user_id)` keyed by `thread_id`; at most one record exists per thread and both the note trigger and the idle sweeper upsert the same record.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L104-L104",
+          "version": "repo-lines-v1:sha256:99a5cb2cee84b3c01dd08af52d2e36ad651ddba15897f48ce899d04406293d21:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTlhNWNiMmNlZTg0YjNjMDFkZDA4YWY1MmQyZTM2YWQ2NTFkZGJhMTU4OTdmNDhjZTg5OWQwNDQwNjI5M2QyMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTlhNWNiMmNlZTg0YjNjMDFkZDA4YWY1MmQyZTM2YWQ2NTFkZGJhMTU4OTdmNDhjZTg5OWQwNDQwNjI5M2QyMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2E2MmQ5ZGZjZTk2ZjUyZWQ4MzhiZWEyN2ZiZmVjNGJlZDNjYmMxMmQyMTVmMDgyNmNhYTQ2ZDQwNzlhNTUxOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTA2OTE3MzEwNDRlMjg4NDk4NWY4NjM3N2JiZTU1NjQ2NTIzOWI3ZTNmZjVmYjM1OTQzNTI3MmU1YTczNDRhNiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L352-L352",
+          "version": "repo-lines-v1:sha256:174ef4cf382ea2625c75dc9dd933257b76710bc0a93be170582f131902488836:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTc0ZWY0Y2YzODJlYTI2MjVjNzVkYzlkZDkzMzI1N2I3NjcxMGJjMGE5M2JlMTcwNTgyZjEzMTkwMjQ4ODgzNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTc0ZWY0Y2YzODJlYTI2MjVjNzVkYzlkZDkzMzI1N2I3NjcxMGJjMGE5M2JlMTcwNTgyZjEzMTkwMjQ4ODgzNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2YzNzE4MGJkZmIwMTE0MDhmZjFmZmJhYjEyNTYxN2RmYzMxZjJlYWE2NTA1YTY5M2Q0ZDgxYWM4YjJkOGJiYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTRjZGFlNWEyOWM4MWE3NGI4ZDY4M2NiYjQ5ZDg1NzgyNTU0ZjM2ZTRiYWYyY2MyNGFiNmViODI1MTkyODYzYSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_1b8d541a3d9e4dcfbc87695aa6c7ebff",
+      "statement": "The `declines` table has no `user_id` by design; it stores scrubbed question text, `subject_ids[]`, best retrieval score, and reason, and rows are deleted after 90 days by the daily retention CronJob.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/jobs/retention.py",
+          "version": "repo-file-v1:sha256:cc7f9504d92aede915db66647763ff88fc5f6b11f46c7fb5133982e7ee2ee247"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L353-L353",
+          "version": "repo-lines-v1:sha256:6046c1b0c1d47336378727a97cbd55e7c6192e0c1b1f14bebc02efa1bb80e850:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjA0NmMxYjBjMWQ0NzMzNjM3ODcyN2E5N2NiZDU1ZTdjNjE5MmUwYzFiMWYxNGJlYmMwMmVmYTFiYjgwZTg1MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjA0NmMxYjBjMWQ0NzMzNjM3ODcyN2E5N2NiZDU1ZTdjNjE5MmUwYzFiMWYxNGJlYmMwMmVmYTFiYjgwZTg1MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzhkNmQ3MzYwZTBmZDEzNDcwMTUyM2M5MDAzNzk2ODAzZGU3NTEwZTYxZTE3OTY1YWQ3MjIxYTBlNjk5ZDgwYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTc2MTZhMDA3MDIzNDFlMTI4M2FkYjRkNjBlZjBhODRkYTkwMmY3ZmQ2ZjJjYThiZWExZTI5ZTc5OWUyYTE5MSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L396-L396",
+          "version": "repo-lines-v1:sha256:dda440f4e8170f6d33d69059876733079eeba68777628c5a1f44d23981035c8b:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGRhNDQwZjRlODE3MGY2ZDMzZDY5MDU5ODc2NzMzMDc5ZWViYTY4Nzc3NjI4YzVhMWY0NGQyMzk4MTAzNWM4YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGRhNDQwZjRlODE3MGY2ZDMzZDY5MDU5ODc2NzMzMDc5ZWViYTY4Nzc3NjI4YzVhMWY0NGQyMzk4MTAzNWM4YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGJmY2E0OWM2MGY3ZmMyNTcyNWUyNDE2Yjc5NmZiZWZlYTJhMThiNTBhOWE0NWU5ZWY0Y2Y2ZWQyZmY5MTE0MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTNlNzQ5ZWZlNTNmNTUwM2E3NDliMzcxODQzODA3N2YxMWMzYjAzZDVhZDM4OWU3NTA0ZWUzOTU0YzhhMGFjYiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_0bf54bb2189449d1b84acaa2a31ff48a",
+      "statement": "The `token_usage` table has a nullable `user_id` (null for system re-embedding work after a model change) and records `source` (`chat`/`document_processing`/`background`/`system`) and a `ref_id` pointing to the thread or content.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/domain/token_usage.py",
+          "version": "repo-file-v1:sha256:e7c0d9bdf19501ebf7c278b12ca5dcd315f4d2b607ae748a9cc4dba9a9a92e4f"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L355-L355",
+          "version": "repo-lines-v1:sha256:1af08c5a8851943cbec36021b8649bd05c25a3d5e69aa25f2b7218ed9634ea5f:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWFmMDhjNWE4ODUxOTQzY2JlYzM2MDIxYjg2NDliZDA1YzI1YTNkNWU2OWFhMjVmMmI3MjE4ZWQ5NjM0ZWE1ZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWFmMDhjNWE4ODUxOTQzY2JlYzM2MDIxYjg2NDliZDA1YzI1YTNkNWU2OWFhMjVmMmI3MjE4ZWQ5NjM0ZWE1ZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzg1ZjNjNDY2ZDhjZjc0MWU1NGNiNjdmYTRhNWYwZDA2MmQxNDYxZGQ4NDdjN2UxZWI4ZjAyNmU0MDAxYzFhNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTkzMDJmOTJkYzA5YTBkMmJmYmUwMDcwYjU3ODQ3YjUxOTRmNWI4Y2E3Y2UwMThiMzExZGUyZWU1ZjAwN2YyMiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_bb6b124ea44c463abf703018174137e6",
+      "statement": "SSM parameters under `/smart-tutor/` control `learning-record-idle-minutes` (default 10), file limits, rate limits and daily caps, subject-detection thresholds, and the maximum retry attempts (3); the application loads `learning_record_idle_minutes_param` at runtime and a changed value takes effect from the next sweeper sweep.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/config.py#L37-L37",
+          "version": "repo-lines-v1:sha256:650a4bb1f38ad3c97826cd587fa352379d0eb13e7f0c2d6a4bcbc97a576a8c0d:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjUwYTRiYjFmMzhhZDNjOTc4MjZjZDU4N2ZhMzUyMzc5ZDBlYjEzZTdmMGMyZDZhNGJjYmM5N2E1NzZhOGMwZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjUwYTRiYjFmMzhhZDNjOTc4MjZjZDU4N2ZhMzUyMzc5ZDBlYjEzZTdmMGMyZDZhNGJjYmM5N2E1NzZhOGMwZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzRjMjM0NzhhNzEwMTg0YWI2MzQzODJlYTRiZjYyOWJkMDkzMTllYWU2N2NmYmQzMWRhZjc2MTYwZTA0NzgwOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjIsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjljYWIzNGY0MGRhMDc2ZmM4YTQ1Y2U1ZDFjMTYxOWM4ZjMwYThmNzllMTY0ZTU0NmFhZGVmMmY1MjgwNTY3ZCJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L357-L357",
+          "version": "repo-lines-v1:sha256:aa74953301c80c0846c9b8c1a7df682c7d31b8d96a2846e418dd4c5b63f5529c:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWE3NDk1MzMwMWM4MGMwODQ2YzliOGMxYTdkZjY4MmM3ZDMxYjhkOTZhMjg0NmU0MThkZDRjNWI2M2Y1NTI5YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYWE3NDk1MzMwMWM4MGMwODQ2YzliOGMxYTdkZjY4MmM3ZDMxYjhkOTZhMjg0NmU0MThkZDRjNWI2M2Y1NTI5YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTc2MTZhMDA3MDIzNDFlMTI4M2FkYjRkNjBlZjBhODRkYTkwMmY3ZmQ2ZjJjYThiZWExZTI5ZTc5OWUyYTE5MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDYzYjhlNjBjNjE2MTgxZjFiZmI1MjdkNGM3YzA1Yjc0MmNkZTFiZDVlOWYwZTMwNjlkZmE1NjI5MTQ1MTNmZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_04bb9df7647346049a17df55b1243057",
+      "statement": "The `work_links` table (R2) stores citation links as `(citing_work_key, cited_work_key)`, computed once per content from saved Docling references and shared across all learners; a learner's research map includes only links between works they can read.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L358-L358",
+          "version": "repo-lines-v1:sha256:7d4a0e4b3611595afbb481f93e3faa8a460104e7254e2061b67894031eaa32bd:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2Q0YTBlNGIzNjExNTk1YWZiYjQ4MWY5M2UzZmFhOGE0NjAxMDRlNzI1NGUyMDYxYjY3ODk0MDMxZWFhMzJiZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2Q0YTBlNGIzNjExNTk1YWZiYjQ4MWY5M2UzZmFhOGE0NjAxMDRlNzI1NGUyMDYxYjY3ODk0MDMxZWFhMzJiZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWMzYjM4ODBkNTc0MTY1YTM5NmY4N2RiMTVmM2Y1MTQ0M2ZmYjRmNWQwYzUyMzAzM2NmMmY0MTQ5ZmIzYjQyOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmMxYWFkNzUxNDZmOGY0ZGU2ZjFlYWZjOTM3YTNjNjAzOWY5NzU2ZmI0ODNkZWU2NGY4NTg0MjQwNDczYjk3MyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L401-L404",
+          "version": "repo-lines-v1:sha256:522f60ae30efe5a9bae0769ae3812c376f71857529b307496146d6fec9e2cbea:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmNiMzhkZWQzYmFjZDM2MTU4ODBmZjM1NWMyNWMwNzI2NDNhZDI2NTZkNjQ0ZmRhZjMwNmVmZTk0YjUwNDk2MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODcxNDdjYjU3NThiYzgzMjZmMzIzNDUxMzAwODljNDMwOTZmY2IxMmQ1YzZkZTBmOTQ3NWZhNzdkNDYxZmE4YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODVkN2M1YmI4N2RmMmYwNDM5ZjE5NTM0ZjY2OTBmOGI2Yzc1MzNkZTU1YzYzYWJhOGRjMDdkOWY5MjRiNTAwZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDI3Yjk5ZGI1OWU0ZDgyMzg5YTgyOTc3YTZlYThhODhkZjBlYjU1NTRlNDI2MzEzMmQwNTk1MmE5NWUyNjgwNyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_70a025f1e75041a4b729e5a36d8a0d34",
+      "statement": "The `reports` table (R3) has a unique constraint on `(user_id, period_type, period_start)` making scheduled report generation idempotent; on-demand reports use `trigger = on_demand` with no period uniqueness constraint.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L360-L360",
+          "version": "repo-lines-v1:sha256:3b218657a3b762782a61335b2dee9fb33670a1e772f6229cdf50ecc1c0305fb1:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2IyMTg2NTdhM2I3NjI3ODJhNjEzMzViMmRlZTlmYjMzNjcwYTFlNzcyZjYyMjljZGY1MGVjYzFjMDMwNWZiMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiM2IyMTg2NTdhM2I3NjI3ODJhNjEzMzViMmRlZTlmYjMzNjcwYTFlNzcyZjYyMjljZGY1MGVjYzFjMDMwNWZiMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzYwZWU1ZWFlMDVhMThhNTBlNjU4OTIwMDM5YWMxOTBiZTY1OTAxYTdjN2MwYjBjNDk4YzEyMjdlYzAwY2JjNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjBhMTZjYWZjMWJjYWE1ODM2MTVlYTk0NDg0MDA5ZDQ2ZWM2MWRjMzM0ZWM0YjkxZjhlNWFiZmEyMzI4ZDE0MSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L409-L409",
+          "version": "repo-lines-v1:sha256:c3361c3495a2040e39c5f26cc29f4a9ddaca39e2719149558432629d64291bee:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzMzNjFjMzQ5NWEyMDQwZTM5YzVmMjZjYzI5ZjRhOWRkYWNhMzllMjcxOTE0OTU1ODQzMjYyOWQ2NDI5MWJlZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzMzNjFjMzQ5NWEyMDQwZTM5YzVmMjZjYzI5ZjRhOWRkYWNhMzllMjcxOTE0OTU1ODQzMjYyOWQ2NDI5MWJlZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzFlOGZiZGMwMzdmMjZjMTkyZGNlNjBiZTg2NzcyYzFjZDY5MjMwNTM1NGJmZDhmM2I2MTZlMjUzYTE5NmQ5NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjljMGMxNmI2NTU0YzVhNmQwYzE2M2QwYmQxYmM0ODMzMDY3MTlkMWNiODcxNjhjNGIxOWMzY2JiODk0NWRhZiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_0aa3a9a2f9654727901607734da388c9",
+      "statement": "LangSmith traces are deleted after 180 days and `declines` rows after 90 days by a daily retention CronJob; threads, notes, and learning records are kept indefinitely per PRD D25.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/jobs/retention.py#L1-L4",
+          "version": "repo-lines-v1:sha256:87f0510336386c1669e147dca4f377cd81b45e711012d2387b173de884a2afd8:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzIzMjNkNDhkNDFiZjQ4MTU2NDhkNzgzNWQyYjQ0ZjEzZDQyOTUwNjgwYjMzNmNmMzZlMDk0Y2QyNTU3YzE3ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDc1ZDQ1ODllOTFjYzhjYjk3NDg4OWRhYjAxZGUxNWRiMTU3NGNhMTBlZWM3MjkwYTEwOWJmNTg4Yzk0ZTAxYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNmUwZGQ4NzIyYjliMDQ3YmU4Mjg3MDRjMmI2YTljNjEwZWIwYTRkN2IzYWMwNjIyZTdjOTMzYTJiOTBjODM5NSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L120-L120",
+          "version": "repo-lines-v1:sha256:80f2d00776fd6170910281450f661ffadef996a075f7c7c7e10914834fb55cd1:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODBmMmQwMDc3NmZkNjE3MDkxMDI4MTQ1MGY2NjFmZmFkZWY5OTZhMDc1ZjdjN2M3ZTEwOTE0ODM0ZmI1NWNkMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODBmMmQwMDc3NmZkNjE3MDkxMDI4MTQ1MGY2NjFmZmFkZWY5OTZhMDc1ZjdjN2M3ZTEwOTE0ODM0ZmI1NWNkMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjcyY2M2YWM2MDEzMTQxYWVmYmE2ZmU4Y2JlMmY1NjcyY2JiZTkzMDM3MzJjYWJiZjhiNDY4MTFkOTA1NmNjMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmRjNDQ5MzQxYTJlYWM4MDk5NGM5NDZkYzE5NmExMjM3MWVmYmVkNGQ0ZTgzMzVmYTA4NzUwMDllNzdlNTk1MiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_7b59f64945254fdea2a98ddc2af9e37c",
+      "statement": "Content PDFs transition to S3 Glacier Flexible Retrieval after 30 days when no non-archived document references the content; chunks and Docling JSON remain in PostgreSQL and S3 Standard so search, citations, re-embedding, and the research map never require a Glacier restore.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L392-L392",
+          "version": "repo-lines-v1:sha256:978ae25ead7a858fa67adc0f5d8e32d3cf13db6831b67e745a8429e02b7752bf:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc4YWUyNWVhZDdhODU4ZmE2N2FkYzBmNWQ4ZTMyZDNjZjEzZGI2ODMxYjY3ZTc0NWE4NDI5ZTAyYjc3NTJiZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc4YWUyNWVhZDdhODU4ZmE2N2FkYzBmNWQ4ZTMyZDNjZjEzZGI2ODMxYjY3ZTc0NWE4NDI5ZTAyYjc3NTJiZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWQ2ZTFiZjNlZDhhYmU3YTBmNWMxMmViZjRkOGJkY2FiOTUwYjVlYTFhNDQ3MTlmNDZkYmUwZDQyYTZhMjQ3MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGJmY2E0OWM2MGY3ZmMyNTcyNWUyNDE2Yjc5NmZiZWZlYTJhMThiNTBhOWE0NWU5ZWY0Y2Y2ZWQyZmY5MTE0MSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_79cf76e44f494eb0ae5d837da1f4b994",
+      "statement": "S3 uses a content-addressed `contents/<sha256>.pdf` prefix for processed PDFs and `contents/<sha256>.docling.json` for saved Docling output (both in S3 Standard at rest); the `uploads/<user_id>/<upload_id>.pdf` prefix is a temporary staging area that expires after 1 day and whose `ObjectCreated` events drive the SQS ingestion queue.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L337-L337",
+          "version": "repo-lines-v1:sha256:96fcd568c5a0f0a097f0b816b5fe7fa056fa9943109435fea4db2ec9cd05655c:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTZmY2Q1NjhjNWEwZjBhMDk3ZjBiODE2YjVmZTdmYTA1NmZhOTk0MzEwOTQzNWZlYTRkYjJlYzljZDA1NjU1YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTZmY2Q1NjhjNWEwZjBhMDk3ZjBiODE2YjVmZTdmYTA1NmZhOTk0MzEwOTQzNWZlYTRkYjJlYzljZDA1NjU1YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDZiMjRjMjhkN2IwYWMzNzdlYjQ2MDAwNzMwNDM1ODYwZTViNzQyZDFjNGVkMzQxN2ZmMjExMTkxNzU4MDllMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWI3ZWU4NGVmNmY5NGQ5YTI0OGUyOTM3ODcyZmEzNmQzNTY5YWYyZGQzZDk5NmU5MjEzNzE5OWRlYjI0NzA5MSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L448-L448",
+          "version": "repo-lines-v1:sha256:319f831b0c9eab19efc68928bb39ea94351fa5805cece9e38c1f09ef626f4b05:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzE5ZjgzMWIwYzllYWIxOWVmYzY4OTI4YmIzOWVhOTQzNTFmYTU4MDVjZWNlOWUzOGMxZjA5ZWY2MjZmNGIwNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzE5ZjgzMWIwYzllYWIxOWVmYzY4OTI4YmIzOWVhOTQzNTFmYTU4MDVjZWNlOWUzOGMxZjA5ZWY2MjZmNGIwNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGNiNzAzODg5MTI3NTg0ZWM4ODA3MWNmYTBhYTQ4NTQyM2ZlZDJhM2Q5ZWIxODUxNTJkZjA5NzcwZjZjMzdlYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiN2IyYzcyOTgxOTA5YjZiYTY2MWM4NjBiOTQ0OWZmYjFlMmY2M2E3YTE3MjcwNTgyZWNlMzdhZDI2ZDFhYWI4NCJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-03T03:19:50.688Z"
+  }
+}

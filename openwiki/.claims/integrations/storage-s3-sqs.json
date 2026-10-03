@@ -1,0 +1,180 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:24e914e1f9b58bbc03758c094af0f785c321e0bedd87e4d71a67b0edb0060def",
+  "claims": [
+    {
+      "id": "claim_1ab1a8bd364a43e68666aef7887b2eca",
+      "statement": "Smart Tutor uses a single S3 bucket named `smart-tutor-documents` with two key prefixes: `uploads/<user_id>/<upload_id>.pdf` for raw learner uploads (presigned POST, 1-day lifecycle expiry) and `contents/<sha256>.pdf` for deduplicated permanent content files; `contents/<sha256>.docling.json` stores the saved Docling extraction output alongside each content.",
+      "evidence": [
+        {
+          "resource": "repo://infra/smart_tutor_infra/stacks/storage.py#L1-L3",
+          "version": "repo-lines-v1:sha256:f958561cdfbfca7a5c26b849951aa1b55b880df09e462c141006e90ffc230177:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWJjMzJkOGZkZDZmYmY4NzFkMTBjODY1NTQwZmQ0OWQwODRlNjJmMDU1N2NmMWVhNjM2ZDRhMjNkNTA1MGRhOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTExNTdhMjA1OTYyZjg1MjNjMWI1ODI2NTViYTE5M2M1ZjJhMGM5OTJhMGE1ZjFkN2ZmYzlhNjJlZWU3ZDcyMyJ9"
+        },
+        {
+          "resource": "repo://local/localstack/init/ready.d/10-smart-tutor.sh#L6-L11",
+          "version": "repo-lines-v1:sha256:4338f4b9b1fba1b13f99484981281e2c4984a618b46fe1e837e48e70779c3242:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDJmMGNkNGRlMjI3YmM5Y2U3YjI3MjRhMTllNzZmZDI3YWRlYmE5ZTkzMWY3N2UxZGMxYzVjODE4YzM4OWY4NCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMmUwYjBlMzY2OTRjNmM4NTM4MTgxYzU0NzJlOTUyNTMyYzI5OGJhMGMzMzcyN2ZmNThlZjQ0OTQ0OWRkYjA3ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDE3MGVkMmI0ZGFlNTRiNWEwZmNhNjIzYjU5ZTg5MzMxYTE4YmRjYmEyYjQzOTRiNDMxN2ZiMzRkOTMwY2FmMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiM2JkMmU4NzU0YzM0ODNjNmQ4NDkwYTM1YzIzOTc4MDJkZTZjZjM2MzVkZWIwMDAyNDJhNmFhOTI5N2U3NWIzMCJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L337-L392",
+          "version": "repo-lines-v1:sha256:5d2468cb65d0ab9c3814b7a74828f61426975ecc242eacc293b08bb2ad0e6674:eyJzZWxlY3RlZExpbmVDb3VudCI6NTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk2ZmNkNTY4YzVhMGYwYTA5N2YwYjgxNmI1ZmU3ZmEwNTZmYTk5NDMxMDk0MzVmZWE0ZGIyZWM5Y2QwNTY1NWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk3OGFlMjVlYWQ3YTg1OGZhNjdhZGMwZjVkOGUzMmQzY2YxM2RiNjgzMWI2N2U3NDVhODQyOWUwMmI3NzUyYmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ2YjI0YzI4ZDdiMGFjMzc3ZWI0NjAwMDczMDQzNTg2MGU1Yjc0MmQxYzRlZDM0MTdmZjIxMTE5MTc1ODA5ZTAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRiZmNhNDljNjBmN2ZjMjU3MjVlMjQxNmI3OTZmYmVmZWEyYTE4YjUwYTlhNDVlOWVmNGNmNmVkMmZmOTExNDEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_ecee3f41ca6f42e582e94b688eb8533b",
+      "statement": "The API issues a presigned POST for `uploads/<user_id>/<upload_id>.pdf` with a `content-length-range` condition capping uploads at 50 MB and a `Content-Type` condition requiring `application/pdf`; the policy expires after 1 day and the key binds the upload to the authenticated user.",
+      "evidence": [
+        {
+          "resource": "repo://infra/smart_tutor_infra/stacks/storage.py#L1-L3",
+          "version": "repo-lines-v1:sha256:f958561cdfbfca7a5c26b849951aa1b55b880df09e462c141006e90ffc230177:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWJjMzJkOGZkZDZmYmY4NzFkMTBjODY1NTQwZmQ0OWQwODRlNjJmMDU1N2NmMWVhNjM2ZDRhMjNkNTA1MGRhOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTExNTdhMjA1OTYyZjg1MjNjMWI1ODI2NTViYTE5M2M1ZjJhMGM5OTJhMGE1ZjFkN2ZmYzlhNjJlZWU3ZDcyMyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L337-L337",
+          "version": "repo-lines-v1:sha256:96fcd568c5a0f0a097f0b816b5fe7fa056fa9943109435fea4db2ec9cd05655c:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTZmY2Q1NjhjNWEwZjBhMDk3ZjBiODE2YjVmZTdmYTA1NmZhOTk0MzEwOTQzNWZlYTRkYjJlYzljZDA1NjU1YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTZmY2Q1NjhjNWEwZjBhMDk3ZjBiODE2YjVmZTdmYTA1NmZhOTk0MzEwOTQzNWZlYTRkYjJlYzljZDA1NjU1YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDZiMjRjMjhkN2IwYWMzNzdlYjQ2MDAwNzMwNDM1ODYwZTViNzQyZDFjNGVkMzQxN2ZmMjExMTkxNzU4MDllMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWI3ZWU4NGVmNmY5NGQ5YTI0OGUyOTM3ODcyZmEzNmQzNTY5YWYyZGQzZDk5NmU5MjEzNzE5OWRlYjI0NzA5MSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_012e30ed5593452fbff9daa3608be7c1",
+      "statement": "An S3 bucket notification sends `s3:ObjectCreated:*` events scoped to the `uploads/` prefix to the `smart-tutor-ingest` SQS queue; objects written under `contents/` do not trigger notifications. A dead-letter queue `smart-tutor-ingest-dlq` receives messages after repeated processing failures.",
+      "evidence": [
+        {
+          "resource": "repo://local/localstack/init/ready.d/10-smart-tutor.sh#L13-L28",
+          "version": "repo-lines-v1:sha256:a49215e434a5b25db8f0e37fbced90285e2071e0ce87ea0ad0876495f2cacd8b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg0NzJiNzMyMjMyMTlmY2NmMGNkYWE5MWQyZjc2ZGFlZThmNTI5MmJlMzI1MjY5MGY5YWMwMjU3NDk1OTM2MmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk4YzBkZDcyMTkzMjY0NTNlOGUxZjI3OWY3YjZiYWQzZTRiZTc0YzIwOTlmMTcwOTYwOTY4ZTM2NDVhNzhmMDkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMxZTczNGViZWM4YjM1YzZhNzM5MzA1MjU3MmQ0M2VhODA2N2M2M2E1NzFiMDRiM2VjM2IxNThjYWYxYTFlN2YiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImIzYWRjNzIyNGY2MGE5NTI3ZGViYWZlNzJmNDQ0MmJjYTM1MzMzMTZjYzc0MmNiMzFiMzllMWIxNDQwNjQ2YmYifQ"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L446-L446",
+          "version": "repo-lines-v1:sha256:753f4fe127b178c033237efe4c8ba47d20e7cf5332b4372d4faa20e9895a9149:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzUzZjRmZTEyN2IxNzhjMDMzMjM3ZWZlNGM4YmE0N2QyMGU3Y2Y1MzMyYjQzNzJkNGZhYTIwZTk4OTVhOTE0OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzUzZjRmZTEyN2IxNzhjMDMzMjM3ZWZlNGM4YmE0N2QyMGU3Y2Y1MzMyYjQzNzJkNGZhYTIwZTk4OTVhOTE0OSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzU1NTg4OGI4N2ViZTIzMGIyZTRlOTQzNTY2NTEwMDI4OWMwNGI1NzFkZjc5OGUwMjJiZjFkNzdkZGJhMjU5NCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODczYTcyYTYzOGE1ZDhiMDY4NzQxMjViZjkxNTA2YjUzZTU1NGI2ODJkYmUzNTVjNzA3YWJhNGIzNWM2MGIzNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_4d38ec0403cb4a729419b7e277d5c2ad",
+      "statement": "The ingestion worker (`apps/worker/main.py`) polls `smart-tutor-ingest`, downloads each uploaded PDF from S3, and runs the processing pipeline (validation, SHA-256, deduplication or content creation, Docling extraction, chunking, and embedding); the pipeline is an M1 task and currently raises `NotImplementedError`.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/worker/main.py",
+          "version": "repo-file-v1:sha256:7ba03cdea573c4b900378a20ccd962d35f8d0430fcef8aec475ec6afad3c990b"
+        }
+      ]
+    },
+    {
+      "id": "claim_c70fbf4be9fa46909538c7d2e4b5efcc",
+      "statement": "`Settings` exposes `documents_bucket` (default `smart-tutor-documents`) and `ingest_queue_url` (default `http://localhost:4566/000000000000/smart-tutor-ingest`) as the two storage configuration keys, loaded from environment variables prefixed `SMART_TUTOR_`.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/config.py#L34-L35",
+          "version": "repo-lines-v1:sha256:07faf1b2d9a23f5950359b2bc19e81d06f1288600a132d0697b146a0646655ab:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNWYzZjE2MzBkZDc5NDg3ODY5NGVkODhiZDRiNGFjMjUxOTFhYzllZjNiZDJmZDI3ZDkyMjIyMTE0MzkzYTRjNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjZkMmE1NWNkZWVkOTE4ZGNkNDA4YjZiYWUxOTExN2QxNjU0ZjhkZTQzOWY2NTJlY2QxMTE2MmQxZDFhMjJhMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTU2ZjAxMTQ4ODVmZDkxYTM4ZTk4M2UyM2IxMjFkOWMzMDIzNzI0ZWFlZTU0NDNjMDllYzhiNzBhYmUwNzI3ZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjI0MWQ4NTIwZWU4MGJiN2NiMzM0ZDdhNzk0OGUyNjJmNmQ3YjNlM2IyN2ZmM2VjNTEzZjNiMDcwNTg5MTc3NCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_b07511d9911f47b381ba7170cd6699c9",
+      "statement": "The `glacier_tagger` CronJob (`apps/jobs/glacier_tagger.py`) runs daily, tags `contents/<sha256>.pdf` objects with `status=archived` when no non-archived document references the content, and removes the tag when a document becomes active again; an S3 lifecycle rule then moves tagged objects to Glacier Flexible Retrieval after 30 days. The CronJob is an M1 task.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/jobs/glacier_tagger.py",
+          "version": "repo-file-v1:sha256:fe8f8fdf66054b646f5d74071d4d4af6d06eb7112aacdbebd1a3e0b2a07da7d1"
+        },
+        {
+          "resource": "repo://infra/smart_tutor_infra/stacks/storage.py#L1-L3",
+          "version": "repo-lines-v1:sha256:f958561cdfbfca7a5c26b849951aa1b55b880df09e462c141006e90ffc230177:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWJjMzJkOGZkZDZmYmY4NzFkMTBjODY1NTQwZmQ0OWQwODRlNjJmMDU1N2NmMWVhNjM2ZDRhMjNkNTA1MGRhOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTExNTdhMjA1OTYyZjg1MjNjMWI1ODI2NTViYTE5M2M1ZjJhMGM5OTJhMGE1ZjFkN2ZmYzlhNjJlZWU3ZDcyMyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L392-L392",
+          "version": "repo-lines-v1:sha256:978ae25ead7a858fa67adc0f5d8e32d3cf13db6831b67e745a8429e02b7752bf:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc4YWUyNWVhZDdhODU4ZmE2N2FkYzBmNWQ4ZTMyZDNjZjEzZGI2ODMxYjY3ZTc0NWE4NDI5ZTAyYjc3NTJiZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc4YWUyNWVhZDdhODU4ZmE2N2FkYzBmNWQ4ZTMyZDNjZjEzZGI2ODMxYjY3ZTc0NWE4NDI5ZTAyYjc3NTJiZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWQ2ZTFiZjNlZDhhYmU3YTBmNWMxMmViZjRkOGJkY2FiOTUwYjVlYTFhNDQ3MTlmNDZkYmUwZDQyYTZhMjQ3MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGJmY2E0OWM2MGY3ZmMyNTcyNWUyNDE2Yjc5NmZiZWZlYTJhMThiNTBhOWE0NWU5ZWY0Y2Y2ZWQyZmY5MTE0MSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_b85d3d000fef436798c2ecdba3fba43f",
+      "statement": "Docling JSON, PostgreSQL chunks, and summary embeddings are never moved to Glacier, so the research map, topic catalog, knowledge graph, and chunk-text re-embedding work without a Glacier restore; only a full re-extraction (e.g. a Docling version upgrade) requires retrieving the archived PDF.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L392-L392",
+          "version": "repo-lines-v1:sha256:978ae25ead7a858fa67adc0f5d8e32d3cf13db6831b67e745a8429e02b7752bf:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc4YWUyNWVhZDdhODU4ZmE2N2FkYzBmNWQ4ZTMyZDNjZjEzZGI2ODMxYjY3ZTc0NWE4NDI5ZTAyYjc3NTJiZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc4YWUyNWVhZDdhODU4ZmE2N2FkYzBmNWQ4ZTMyZDNjZjEzZGI2ODMxYjY3ZTc0NWE4NDI5ZTAyYjc3NTJiZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWQ2ZTFiZjNlZDhhYmU3YTBmNWMxMmViZjRkOGJkY2FiOTUwYjVlYTFhNDQ3MTlmNDZkYmUwZDQyYTZhMjQ3MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGJmY2E0OWM2MGY3ZmMyNTcyNWUyNDE2Yjc5NmZiZWZlYTJhMThiNTBhOWE0NWU5ZWY0Y2Y2ZWQyZmY5MTE0MSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_9116de283d894fa8a3e414819d0d8227",
+      "statement": "`StorageStack` in `infra/smart_tutor_infra/stacks/storage.py` is an empty CDK stub whose module docstring describes the intended resources (presigned POST, versioning, `uploads/` S3→SQS notifications, 1-day uploads lifecycle, 30-day Glacier transition for tagged content PDFs, CORS); it currently contains only `super().__init__()` and is a milestone 1 task.",
+      "evidence": [
+        {
+          "resource": "repo://infra/smart_tutor_infra/stacks/storage.py",
+          "version": "repo-file-v1:sha256:3722beb1c1ce486928b7c0eab152bcf6fa85569c889546cde464f6b453122d33"
+        }
+      ]
+    },
+    {
+      "id": "claim_7d71ce15777442fdaf56272b5069f44b",
+      "statement": "In local development, a LocalStack service (image `localstack/localstack:4`) emulates S3, SQS, SSM, and Secrets Manager on port 4566; the init script `local/localstack/init/ready.d/10-smart-tutor.sh` creates the bucket (with versioning), the `smart-tutor-ingest` and `smart-tutor-ingest-dlq` SQS queues, the S3→SQS bucket notification for the `uploads/` prefix, CORS for `http://localhost:5173`, and the `/smart-tutor/learning-record-idle-minutes` SSM parameter.",
+      "evidence": [
+        {
+          "resource": "repo://compose.yaml#L41-L48",
+          "version": "repo-lines-v1:sha256:99eb037d321bdb714c48ae8fbc418a7ab2fa034a426a96a8717e2bfc1e978c57:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTNkM2ZlNDYxYTg5NDQxZDJjNTAyMTZhNWE0YmMxY2IxNTZiYTNlZjA5NGRjMzM4Zjg3MzU5YTIwODgwOGRlNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDc5NWYzM2ZmNmIyOTU2NTk2MGQzZjNhYjI2MTdmOTBhMjFlZDRmNjg4YTA5OTc3MGJmMzgyODQxNjA0ODVmOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjM2NTJlYzE5ZWQ5MzY0OTAzNDY2OTgxYjdlOWQ2ZTc5ZWUyZjNkODBjMGU2YTMxY2IzOGFlMDlkYjNhODkzYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzBhOGI2NDBiNzMzZDA5ZDc4NzFjYzJhMDk1MGVlZjFmMDBkNjJmMTNlZjQ0NmJhMWEzMGM5MzBhNDA5OGExZCJ9"
+        },
+        {
+          "resource": "repo://local/localstack/init/ready.d/10-smart-tutor.sh",
+          "version": "repo-file-v1:sha256:529cc8bf9bd14a672b488335a86b00218a360ee5ccc9903c895e5a8eb1726609"
+        }
+      ]
+    },
+    {
+      "id": "claim_449cc57de7754285acc73c91167036be",
+      "statement": "The `worker` Compose service connects to LocalStack by setting `AWS_ENDPOINT_URL_S3` and `AWS_ENDPOINT_URL_SQS` to `http://localstack:4566` and `SMART_TUTOR_INGEST_QUEUE_URL` to `http://localstack:4566/000000000000/smart-tutor-ingest`, requiring no code changes between local and production environments.",
+      "evidence": [
+        {
+          "resource": "repo://compose.yaml#L80-L89",
+          "version": "repo-lines-v1:sha256:44620e935fff2b9074a3f2f4ec2847779f8b6f3e2316ed13f69cdba501a0f046:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA2MGFiYmM1NTUwMGJmZmYzNDZhOTA2MWI4YWZlMTMxM2VhMTAyZGJlNzhlZDUwYzZjZjY4YTM2MjQ4OTAwYTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYzMGVlMWVkYWUzY2Y2Y2FjOWQxOGY2NzJiNmM3YzE2YmI3ZTliYmY4Mzg3MTY2OGNlODEwNzczNTZhNWE2ODkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFlMjY1MzZhYWFhZmE2OTc0MzdlNDg4NzAxZWZlZDE0YmNiYTg0ZjczMzNkY2JkYzIwNTUzZDdlOGZlN2VhNzYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM5MWY1YzM1OTE3ZjFmZWIyYWVkMzk2NjhhZGM1MmJjN2ZlZmE1NTdiMjdmNzI0Yjc2YmNlMDU0YTdiZjgxZWYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_4cdb050c72124add8895d3069b27640b",
+      "statement": "shared/adapters/aws/__init__.py is a stub module with a docstring listing planned S3, SQS, and SSM clients; no implementation exists at M0. Import-linter contract S4 restricts boto3/botocore calls to adapters or apps packages only.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/adapters/aws/__init__.py",
+          "version": "repo-file-v1:sha256:64770e92fac0c08623491ac2e431234f233bd7d753b92b71c163cc403cb8d743"
+        },
+        {
+          "resource": "repo://sdd/specs/2026-10-02-project-structure-design.md#L144-L144",
+          "version": "repo-lines-v1:sha256:491c43031c978d0c4746502f65dd89b0c294763d90b29dd8def879189f0608c2:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDkxYzQzMDMxYzk3OGQwYzQ3NDY1MDJmNjVkZDg5YjBjMjk0NzYzZDkwYjI5ZGQ4ZGVmODc5MTg5ZjA2MDhjMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDkxYzQzMDMxYzk3OGQwYzQ3NDY1MDJmNjVkZDg5YjBjMjk0NzYzZDkwYjI5ZGQ4ZGVmODc5MTg5ZjA2MDhjMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWExZWJkZGIyZDAzY2NiZjgxOGQ1MGZmN2Y1MzEwNjRkNjUzZjliZDBiODZkOTY4NDM1MDk4Nzc4ZWZjNzZhNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzgzOTg2MzJhNDEzY2UxNGQyYWI1YzBlNzJjZmY3Mjk1MTkxZTk0NzY0NTgyZDRkZWJhYmY2OTFhNDBlNjIxZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_bc1e829001ae40799b87073e8c5be90a",
+      "statement": "The ingestion worker runs under strict security isolation because it parses untrusted PDFs: non-root user ID, read-only root filesystem, NetworkPolicy egress restricted to AWS endpoints and PostgreSQL only, resource limits, and a per-file timeout (PRD §9.10).",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L434-L434",
+          "version": "repo-lines-v1:sha256:bc0cf232448cc3e5c1e9dba664511c014b46e4606d1076a8ddd2a68a60b589e4:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmMwY2YyMzI0NDhjYzNlNWMxZTlkYmE2NjQ1MTFjMDE0YjQ2ZTQ2MDZkMTA3NmE4ZGRkMmE2OGE2MGI1ODllNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmMwY2YyMzI0NDhjYzNlNWMxZTlkYmE2NjQ1MTFjMDE0YjQ2ZTQ2MDZkMTA3NmE4ZGRkMmE2OGE2MGI1ODllNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWVjOTMxNWFjY2ZhOTk1OTg2ZjhhOTM1ZDU5MDI4MDlhMzczYmU5ZDJiN2EwYjYxNjdkZjJjMDcxZWI4ZTRlMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGE0MDM3MjljZmIzYzg1YTU0N2M5YjRkODFhZjFlZmRlMmEwN2NiZDJkYTEzN2RjZTcxNzFmZTlmZGVjOTNkMyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L442-L442",
+          "version": "repo-lines-v1:sha256:df6354c453adde9bcdf1cd5f4280e479dbc48be04babf64069d130ddf5341ec0:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGY2MzU0YzQ1M2FkZGU5YmNkZjFjZDVmNDI4MGU0NzlkYmM0OGJlMDRiYWJmNjQwNjlkMTMwZGRmNTM0MWVjMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGY2MzU0YzQ1M2FkZGU5YmNkZjFjZDVmNDI4MGU0NzlkYmM0OGJlMDRiYWJmNjQwNjlkMTMwZGRmNTM0MWVjMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTRiNzhiZTk0OTI1OTAyN2NhNWYwYWQyOTU0OTAxNjQxNGFhMjZiMTJmNThmZGZkYmFjMThiZGU4ODRjYjBiZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzU1NTg4OGI4N2ViZTIzMGIyZTRlOTQzNTY2NTEwMDI4OWMwNGI1NzFkZjc5OGUwMjJiZjFkNzdkZGJhMjU5NCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_c5073e3984454e26b13210f3c4a4f233",
+      "statement": "LocalStack starts only four emulated AWS services — s3, sqs, ssm, and secretsmanager — on port 4566. Bedrock is not emulated; all Bedrock calls from the worker and agent target real AWS endpoints using the developer's AWS profile.",
+      "evidence": [
+        {
+          "resource": "repo://compose.yaml#L1-L4",
+          "version": "repo-lines-v1:sha256:409400137d221e73ef3a8e756cd866e1891c4a11a1884f473b3d5dc557af5a89:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmRjOTNkYjgyN2NhZDIxOGQ2OTgwNjg3YzUyNmJhOTE5MTEyOWNiNGUyNmMzNmFlMzg5NDIyNmU1NDEwYTY4OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ZmZWJhMjQ1OTkwYTczZjA3ODJmYTcwMmZkMTA4MWFiNTUzZGI1MTE5YTIwZTNkYWMwZDcxODcyYmU5MGFhOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDY1NzcxODc2MzViZGQ5MTE0MTAyOGFhMjhjMTQyMjdlZDJlYThhYTMzNmRiM2VmZDFhMjE5ZTIxZTMxMGFjYSJ9"
+        },
+        {
+          "resource": "repo://compose.yaml#L44-L44",
+          "version": "repo-lines-v1:sha256:9c2e3862e395bcb59909fe37ea5e645425d59b66748bebba6338dba13937cca4:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWMyZTM4NjJlMzk1YmNiNTk5MDlmZTM3ZWE1ZTY0NTQyNWQ1OWI2Njc0OGJlYmJhNjMzOGRiYTEzOTM3Y2NhNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWMyZTM4NjJlMzk1YmNiNTk5MDlmZTM3ZWE1ZTY0NTQyNWQ1OWI2Njc0OGJlYmJhNjMzOGRiYTEzOTM3Y2NhNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjgzNzRjNGY1YmYwZjhjNTM5YWQwMWVmZThiYjBkOTE0ODU1NGE3NWRkYjIwYWRmZmRiYTgyOWIyZTYxZTdmZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTU5NzViOWQ2ZmRlZmEwMDI1YjkzN2Y5NzA1NjAxMTY0MjNiMjA4NGQ4NWZjMzFlMzU0NTlhNGZmZjU2MGVmZCJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-03T03:19:50.688Z"
+  }
+}

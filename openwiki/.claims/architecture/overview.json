@@ -1,0 +1,362 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:c53f49371b4157c603c3b80e786162a1cca0c0748b3a0f5c30bfc9bcdc0e9db9",
+  "claims": [
+    {
+      "id": "claim_2befa52b0d8247409cad1a055aa4fd26",
+      "statement": "The system comprises six deployable components: API server (FastAPI, port 8080, public), agent server (FastAPI/LangGraph, port 8080, ClusterIP), RAG MCP server (streamable-HTTP, port 8000, ClusterIP), ingestion worker (SQS consumer, no port), three CronJobs (record_sweeper, glacier_tagger, retention), and web app (React/Vite/nginx, port 8080, public).",
+      "evidence": [
+        {
+          "resource": "repo://backend/Dockerfile",
+          "version": "repo-file-v1:sha256:49c74343ecea8be688f97c030e931131ffc8579f201c1904c555ed4075b6be7c"
+        },
+        {
+          "resource": "repo://compose.yaml",
+          "version": "repo-file-v1:sha256:58019660e42ffbc19ccd84153ed82533186aa9185a78516402ce3d8569ed1982"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L266-L284",
+          "version": "repo-lines-v1:sha256:04279dd84efab220809d40bcf4f65e0953d2678385f802f501636808e360b8f0:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlYzU2OGVhZGRjYzQ4NDAyNmYxZTMyYWYyMmM3NWYzODUzNjJjZjJjNWMxZGQ5NjhjMDU5MmY1NzE5NTgzMzAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5YzQ4MzlkOTQwYjAwNDI2MDY0MzAwYTczMzdhMDJhZjgxMmMyODgwMDA3ZWVjZjFkNTc3OWFlOTMxYzUwMDQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIzMmY2MDA0Y2EzZjg0YTE1MzA2NTU1NDNlY2Q3MTY3NjdjOTYyZGUyNDE1NGZiMmNjYTg0ODNjMzNjM2RhNGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjczNmFhYTMyZmMxNGI0ZWI2ZmVmNmY2NTNkZGI2NjdlZjMwMjk5YjFiOGEwYjcyNzMzNjUzZWU0ZTdmMDlkYTgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_6a522a95d21344909e122458aed39608",
+      "statement": "The backend multi-stage Dockerfile defines four named build targets — api, agent, mcp, and worker — all extending a shared python:3.12-slim runtime stage. CronJobs reuse the api image.",
+      "evidence": [
+        {
+          "resource": "repo://backend/Dockerfile#L1-L47",
+          "version": "repo-lines-v1:sha256:49c74343ecea8be688f97c030e931131ffc8579f201c1904c555ed4075b6be7c:eyJzZWxlY3RlZExpbmVDb3VudCI6NDcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI1ZDQ0MmE5ZTZjNjY0ZWI1MzFkOGVkMWZlZDczY2YzNGUwMGIwNGJhMWIxZGEwODYxNGFjYjFhNDRmMmE1OWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcyOTM5ZjZiYjJiNjNmZDgxNTAzNjg1ODRhYWFhZjVjZTQ3MGYyOTA0ZjI0OWUzMjk4OTU1OTE3YjQ5ODNiY2UiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_3b1a7b3c23834bd2af16d33d9d44c240",
+      "statement": "The worker target is the only image that installs the [ingest] extra (Docling + CPU-only PyTorch) via the deps-ingest stage; the api, agent, and mcp targets use the deps stage without that extra.",
+      "evidence": [
+        {
+          "resource": "repo://backend/Dockerfile#L18-L47",
+          "version": "repo-lines-v1:sha256:07d9d1e90ac6d29e16c299395eb267040eb3e2f784b0bc6c0363537cdf9c4fb0:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY4ZTUyZWJhMDkzMDA2MGU1NWRmN2NhYTk0OTE5MTMyMjM3ZDMyZjAzODRiMTk0MzM4OGEzNWNiYTBkZjdhMmUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcyOTM5ZjZiYjJiNjNmZDgxNTAzNjg1ODRhYWFhZjVjZTQ3MGYyOTA0ZjI0OWUzMjk4OTU1OTE3YjQ5ODNiY2UiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZmZTFmNjAzODUyOTQ1N2NkZDI0M2Q1NmIxYzM5MzViYTVmYTZlOTJmNzgyNThjMjU2OTNlYjYyNTUxMDE1NGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_452d8962eb994c2f81df13d79c2077cd",
+      "statement": "The API server entrypoint is `uvicorn smart_tutor.apps.api.main:app --host 0.0.0.0 --port 8080`; at the scaffold stage it only exposes GET /healthz, with routes added under routes/ and wiring in deps.py at M3.",
+      "evidence": [
+        {
+          "resource": "repo://backend/Dockerfile#L30-L33",
+          "version": "repo-lines-v1:sha256:cf68b19f7ebcecf4d20a826c8e5f11e157f4f05bbd885efa8b328417f0794649:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjhiNzRmYmI3NWQxODliMjUyZTkzOWVlNDM1ZWQwMzg2ZDc5OGE0ODZjYjM0YTJjOGI5MjI4Y2MyMzdhNDVhYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYWYyOGYwMmM5MTAwZjIyZTIzYzA3ZmQzZDZiN2QyMGEzZjk2YzY3ZmQ4ZGNiM2Y2MGJmNzI1NGVkODA4YjljZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDdjNzIxOThhZTRmYzhhOGE4MTU5MDk3MmZiZThhMWRjZDkyZTQ4M2U5ZDYyNzA5MzYxOGYyNDg0YjM1OWJkZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmQ4ZmJhMjRiY2JhZDBmODljNDEwN2E1NzY5MTZiMjFlYTc0YmQ0ZGM0NWEyYWM5MDFhZmMyMjRmZjE1MGY3ZiJ9"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/api/main.py",
+          "version": "repo-file-v1:sha256:3de6d69db30a2ce9dacd884a45995ef218b39055a25527a7adf1547a6eab0aae"
+        }
+      ]
+    },
+    {
+      "id": "claim_9fbd8cf536444980a5803f0ab4ad5078",
+      "statement": "The agent server is an internal ClusterIP FastAPI app on port 8080, described as wrapping the LangGraph graph from graph.py at M2; at the scaffold stage it serves only GET /healthz.",
+      "evidence": [
+        {
+          "resource": "repo://backend/Dockerfile#L35-L38",
+          "version": "repo-lines-v1:sha256:df018fe7f66eec5da153e695593a36e1ee92f6d118c9cb538b9749349872028f:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDI4Y2NhNTM3ZDQxYzk5OTA2MzI5NmNmNWE5MDU5ZDUyYTczOTZjYzcwMzYzNDZhNzNhYWZmYTZhY2FmNjdmNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWEyZjZhZDE3ZmZlNjQxYTUyZjlmOTM2YzM2MDY0YzQ0MWIyZjRiNzFjYzk2ZTlkZWRlYzY2NWMzODJmZjM2NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjZiMjU2ZDYyODJiMmQ1Mzg5YWQzZWZmNzYxZjZhZTdjZDI5ZWE4NmMzN2YzZmUzYWU4NzBhNjIyODYwNDcwNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGIzN2Y4OGIwYjUyNjAxZTE5MDcwYWRhOWU3NjExZGI0MTU0ZjczNDFiZTIxZGQ0NDliNTk3Nzc1YzNkMGRmZiJ9"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/agent/server.py",
+          "version": "repo-file-v1:sha256:b8a44524ac48a28d1d8a5dcd2cb291d626dac9157539272787f1950de76edf85"
+        }
+      ]
+    },
+    {
+      "id": "claim_1125772747fb482597692ae2a6f282bd",
+      "statement": "The RAG MCP server listens on streamable-HTTP at port 8000 via `mcp.run(transport='streamable-http', host='0.0.0.0', port=8000)` and is exposed only as a ClusterIP service; it exposes search and get_chunk tools backed by knowledge.application, with JWT validation in code per PRD §9.3.",
+      "evidence": [
+        {
+          "resource": "repo://backend/Dockerfile#L40-L43",
+          "version": "repo-lines-v1:sha256:d02d73caa0fb61755818dd798fe18ecfc9cb8fc73dcef7dec144471b0a2f9862:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjQ3NGE5ZWUzNGI2OTc4ZGJmZmU5MGIzNWI4M2UyMDMwNTZjZWU5MTM5ZWVhYjVkMmE4YjU3MDBjNGNiMjcxNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTIxZjg1Y2I0OTRiYTkwNDA5M2ViZWIzZGUyYzVjYmEyNDYzM2M5MzM1ZWJmNzdiNTZjNmUwMGJhZmEzZDFhOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2RmNTdjNjNmMzFjOTdlMjc2MTA4ODI5YjdiZGFiYTYwZmU4MDczNTJjMzA2ZDU4ZTliMzI0OWNlMmM1ZDc0NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGIwYmQwZmJhOGI0NjAzN2U3OGEwNTcyM2ExYjAzYjBiNGU5MzhhYTYyMjIwOGZiZjAzZTQyNjgzNWNiNTg3ZSJ9"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/mcp_server/server.py",
+          "version": "repo-file-v1:sha256:77b5eafc76bb8d9cd3acdb8cadd36c5d97753aaa45b7bed5db48259b24008a85"
+        }
+      ]
+    },
+    {
+      "id": "claim_7bfafad212df47c395e581ed0040da30",
+      "statement": "The ingestion worker consumes S3 ObjectCreated events from SQS and calls knowledge.application.IngestionService; its main() raises NotImplementedError('M1: ingestion worker') at the scaffold stage.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/worker/main.py",
+          "version": "repo-file-v1:sha256:7ba03cdea573c4b900378a20ccd962d35f8d0430fcef8aec475ec6afad3c990b"
+        }
+      ]
+    },
+    {
+      "id": "claim_2001d755ce754df49ed5d4bc00ee27f5",
+      "statement": "The glacier_tagger CronJob runs daily; it tags content files in S3 with status=archived when no non-archived document references them (triggering Glacier transition after 30 days via S3 lifecycle), and removes the tag when a document becomes active again. Its main() raises NotImplementedError('M1: Glacier tagger').",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/jobs/glacier_tagger.py",
+          "version": "repo-file-v1:sha256:fe8f8fdf66054b646f5d74071d4d4af6d06eb7112aacdbebd1a3e0b2a07da7d1"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L392-L392",
+          "version": "repo-lines-v1:sha256:978ae25ead7a858fa67adc0f5d8e32d3cf13db6831b67e745a8429e02b7752bf:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc4YWUyNWVhZDdhODU4ZmE2N2FkYzBmNWQ4ZTMyZDNjZjEzZGI2ODMxYjY3ZTc0NWE4NDI5ZTAyYjc3NTJiZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc4YWUyNWVhZDdhODU4ZmE2N2FkYzBmNWQ4ZTMyZDNjZjEzZGI2ODMxYjY3ZTc0NWE4NDI5ZTAyYjc3NTJiZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWQ2ZTFiZjNlZDhhYmU3YTBmNWMxMmViZjRkOGJkY2FiOTUwYjVlYTFhNDQ3MTlmNDZkYmUwZDQyYTZhMjQ3MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGJmY2E0OWM2MGY3ZmMyNTcyNWUyNDE2Yjc5NmZiZWZlYTJhMThiNTBhOWE0NWU5ZWY0Y2Y2ZWQyZmY5MTE0MSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_c6d611afe63747fba744bc03ac626fa2",
+      "statement": "The record_sweeper CronJob runs every minute; it writes learning records for threads whose last_learner_message_at is older than learning_record_idle_minutes and newer than record_written_at, via learning.application. Its main() raises NotImplementedError('M2: learning-record sweeper').",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/jobs/record_sweeper.py",
+          "version": "repo-file-v1:sha256:8050212c5fb211d9a32c19965f62c332f5bef4adedb94ae6b0f8751abcec016f"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L305-L305",
+          "version": "repo-lines-v1:sha256:328a143eb3e1440708ecdb77e216e88e43a7102b1897d70ed0f2a1cc7e376783:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzI4YTE0M2ViM2UxNDQwNzA4ZWNkYjc3ZTIxNmU4OGU0M2E3MTAyYjE4OTdkNzBlZDBmMmExY2M3ZTM3Njc4MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzI4YTE0M2ViM2UxNDQwNzA4ZWNkYjc3ZTIxNmU4OGU0M2E3MTAyYjE4OTdkNzBlZDBmMmExY2M3ZTM3Njc4MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTQyZDc4OGU4N2U3ZDY5MmZkODhhNDY5NTZhODM0NmU0N2E4Y2NmNzJiZTUxMDUxNjY2ZjVhOTk4ZDE0N2RlZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzI2YWUxMGJlMmU5NWMxNzAyNzUyOWFlNTIxZGFmY2JhNGJhYTIzNTM3OWMxNzU2MjhmM2NhMTIxYmZkZWU1NiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_4b9474850ccd4027ab81a5ad5a205803",
+      "statement": "The retention CronJob runs daily; it deletes LangSmith traces older than 180 days and decline-log entries older than 90 days; threads, notes, and learning records are kept per PRD D25. Its main() raises NotImplementedError('M4: retention job').",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/jobs/retention.py",
+          "version": "repo-file-v1:sha256:cc7f9504d92aede915db66647763ff88fc5f6b11f46c7fb5133982e7ee2ee247"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L561-L561",
+          "version": "repo-lines-v1:sha256:1e24a0fe51c2c36ec840e4b08fd06b1afb421657ae8d9a31316f3c9da8994929:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWUyNGEwZmU1MWMyYzM2ZWM4NDBlNGIwOGZkMDZiMWFmYjQyMTY1N2FlOGQ5YTMxMzE2ZjNjOWRhODk5NDkyOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWUyNGEwZmU1MWMyYzM2ZWM4NDBlNGIwOGZkMDZiMWFmYjQyMTY1N2FlOGQ5YTMxMzE2ZjNjOWRhODk5NDkyOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDhhZjcyMjI5ZTVkYzRlNmFmNDllOGU3MTljMzJiOTZlZTFjOWIzZDRkMzExOWI1OGZmMjQ0MDQ4NjE1MTIwMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTJjMDExZWU1MmM4N2FkYzZmMmRkNjJiM2M2OTNhZGY3MDUyY2MwMGFlY2Y4ODcyYWUwZGRhNzI0YjRlZTBhYyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_b5d9f10b5aff46958cb232071a405381",
+      "statement": "The web app is built with React 19 + TypeScript + Vite, served by nginxinc/nginx-unprivileged:1.29-alpine on port 8080 with its own Dockerfile independent of the backend multi-stage image.",
+      "evidence": [
+        {
+          "resource": "repo://web/Dockerfile",
+          "version": "repo-file-v1:sha256:b2e89c0cb75f789bf3855d21e0873c2e490497d67631791eaa8378cae766acd7"
+        },
+        {
+          "resource": "repo://web/package.json",
+          "version": "repo-file-v1:sha256:bfffbd4b4b3ab8b90c5709ed52fa6fc5cd1f76d96b43eff3872a9cc4397321ac"
+        }
+      ]
+    },
+    {
+      "id": "claim_b643a2e3a3a24121a64a27a528f9b004",
+      "statement": "Network topology: web calls API (public); API calls agent; agent calls MCP server; MCP server queries PostgreSQL+pgvector. Agent and MCP server are ClusterIP only. S3 ObjectCreated events flow via SQS to the ingestion worker which writes to PostgreSQL. Keycloak provides identity for all services.",
+      "evidence": [
+        {
+          "resource": "repo://compose.yaml#L51-L89",
+          "version": "repo-lines-v1:sha256:e53248051bf5dbdfabb37c739a9ffdf7a574bc5c119091f0b1e9b21656f84efe:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc4OWIyMjI0ODY5OGNmY2JmNGM0MDNkMDgwYzQ1YmVjMTk1YjliOTVhYzE0YmQ3MzIwY2M4MTBiYmY1ODExNDMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYzMGVlMWVkYWUzY2Y2Y2FjOWQxOGY2NzJiNmM3YzE2YmI3ZTliYmY4Mzg3MTY2OGNlODEwNzczNTZhNWE2ODkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY1MzVjMjAwMTZhZTRiYjc5ZTUzMjk4ZjgzNWM4MjViNDg3YzU3YzYxMjhhMmYwYWNmZTFiMWEzYzhlNjBjYjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM5MWY1YzM1OTE3ZjFmZWIyYWVkMzk2NjhhZGM1MmJjN2ZlZmE1NTdiMjdmNzI0Yjc2YmNlMDU0YTdiZjgxZWYifQ"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L266-L275",
+          "version": "repo-lines-v1:sha256:f4fed069eacb01056787bdf938888b97165cffdf6fce06b6e98fa3c9e027d3a0:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlYzU2OGVhZGRjYzQ4NDAyNmYxZTMyYWYyMmM3NWYzODUzNjJjZjJjNWMxZGQ5NjhjMDU5MmY1NzE5NTgzMzAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlYzU2OGVhZGRjYzQ4NDAyNmYxZTMyYWYyMmM3NWYzODUzNjJjZjJjNWMxZGQ5NjhjMDU5MmY1NzE5NTgzMzAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIzMmY2MDA0Y2EzZjg0YTE1MzA2NTU1NDNlY2Q3MTY3NjdjOTYyZGUyNDE1NGZiMmNjYTg0ODNjMzNjM2RhNGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBkMzhlZWNmZDcxZjc4YjhlMjlmYTgyNDU3Y2ViMGExMGYyZjNkYTA1MjJlNDQzYjEzNDVjYjM1N2YyYzI2ZDUifQ"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L335-L335",
+          "version": "repo-lines-v1:sha256:033376d3719803b23bba3caada5eb3360aa12d11da19e27f8677db78a293a9fc:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDMzMzc2ZDM3MTk4MDNiMjNiYmEzY2FhZGE1ZWIzMzYwYWExMmQxMWRhMTllMjdmODY3N2RiNzhhMjkzYTlmYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDMzMzc2ZDM3MTk4MDNiMjNiYmEzY2FhZGE1ZWIzMzYwYWExMmQxMWRhMTllMjdmODY3N2RiNzhhMjkzYTlmYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjk1NmRlNjdjMDg2MjJhYjU4OWVhYzk2YWEwNjhmY2E0MzI5YTQzYmFhZmMxZTI2ZWY4NTZkYmIxNDU2ZWJiZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTljOTcwYjkzYzdjNWY3ODVkYzIyMzViNDFiODM0ZWE3ODRiNjYyZTU4MjU0ZTY2MjY5YTE1OTNhYWFlYjE0ZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_e70d167e6ddd46439a7ea6fb16171ceb",
+      "statement": "Identity propagation: the web app obtains a Keycloak JWT (Authorization Code + PKCE); the API validates it (JWKS, iss, exp, aud) and forwards the same token to the agent; the agent attaches it to every MCP request as an HTTP header, never in the prompt; the MCP server validates the JWT and enforces can_read(sub, document) in SQL.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L324-L335",
+          "version": "repo-lines-v1:sha256:f9aa29982154af0d582fea32024038d166eff56a52315728b359fc3b9109304f:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY0YmQxMmYzOWY0NDYxMDVmYjdmYjQ4Y2EwYTEzYWEwYjgzMDZmYTVkNTI3OGUxYzJjNjM0ODY2Njc0YmQyYzgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAzMzM3NmQzNzE5ODAzYjIzYmJhM2NhYWRhNWViMzM2MGFhMTJkMTFkYTE5ZTI3Zjg2NzdkYjc4YTI5M2E5ZmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg2M2FkYjQ5ZTc2MzkxZmFiZDJkMjZmNGEyMTg3Njk3YzZkYzBlMmMyMWYyMTczZjVjZmRmMGE4ODBhMDg5OGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk5Yzk3MGI5M2M3YzVmNzg1ZGMyMjM1YjQxYjgzNGVhNzg0YjY2MmU1ODI1NGU2NjI2OWExNTkzYWFhZWIxNGUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_7ce0c20610c541f89247775191e98495",
+      "statement": "The API issues presigned POST URLs for uploads/<user_id>/<upload_id>.pdf with content-length-range ≤ 50 MB and content type application/pdf; the uploads/ prefix expires after 1 day.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L337-L337",
+          "version": "repo-lines-v1:sha256:96fcd568c5a0f0a097f0b816b5fe7fa056fa9943109435fea4db2ec9cd05655c:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTZmY2Q1NjhjNWEwZjBhMDk3ZjBiODE2YjVmZTdmYTA1NmZhOTk0MzEwOTQzNWZlYTRkYjJlYzljZDA1NjU1YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTZmY2Q1NjhjNWEwZjBhMDk3ZjBiODE2YjVmZTdmYTA1NmZhOTk0MzEwOTQzNWZlYTRkYjJlYzljZDA1NjU1YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDZiMjRjMjhkN2IwYWMzNzdlYjQ2MDAwNzMwNDM1ODYwZTViNzQyZDFjNGVkMzQxN2ZmMjExMTkxNzU4MDllMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWI3ZWU4NGVmNmY5NGQ5YTI0OGUyOTM3ODcyZmEzNmQzNTY5YWYyZGQzZDk5NmU5MjEzNzE5OWRlYjI0NzA5MSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_202978763fa74e5086ffd4a79ac16c87",
+      "statement": "The LangGraph agent graph carries subject_ids (empty until the first answerable turn, at most 3, append-only) in persisted thread state. The ask path always runs search as a fixed step before any LLM call.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L288-L300",
+          "version": "repo-lines-v1:sha256:31351b495e464b0a56a193866e5bf31a99773496825a2c9b5e7f6e37fc573d78:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg5YTJiMzZlMGI0YjdhNjYwZmMwZjk1ZTQ4MmMwMmQxZmFlMGRjNjM2M2Q4ZGJjYzA4MzJkZDJhZGI1ZDYwMmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlYjcwMjU3NTkzZGEwNmY2ODJhM2RkZGE1NGE5ZDI2MGQ0ZmM1MTRmNjQ1MjM3ZjVjYTc0YjA4ZjhkYTYxYTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjczNmFhYTMyZmMxNGI0ZWI2ZmVmNmY2NTNkZGI2NjdlZjMwMjk5YjFiOGEwYjcyNzMzNjUzZWU0ZTdmMDlkYTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRjOTBiNjk4NTgwZjQ5NzZkNmI2ODg2MTRmNTkxZDBiMmQxZWNmMzdhNDA3NmQwNDQyZTRjN2E2MDJhZWRhNjUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_35787f9610f642e08a1098a23c923ffc",
+      "statement": "compose.yaml provides a default mode (postgres, keycloak, localstack) and an app profile adding all five app services built from the same Docker targets as production. Bedrock and LangSmith are real services called from the developer's AWS profile; there is no local emulator for them.",
+      "evidence": [
+        {
+          "resource": "repo://compose.yaml#L1-L96",
+          "version": "repo-lines-v1:sha256:2a8a0f92df9548e14ec5a71eff44c40609b84e73a5bbfdc74385426ef2577b44:eyJzZWxlY3RlZExpbmVDb3VudCI6OTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZkYzkzZGI4MjdjYWQyMThkNjk4MDY4N2M1MjZiYTkxOTExMjljYjRlMjZjMzZhZTM4OTQyMjZlNTQxMGE2ODgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMwZTM4YTY4YjQ5N2I4ODk3ODRlZGRlMGZmMTNiYTA3MmJhYzM5Yjc2MzBkMTZjNTY3MjA4NWVhMzMxZjUxYmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUyOTU2YjdlMDc1NjNkNjExYmQyNGM4MjRjNThiMDNhYWMyMjk3N2NhMWEyMjljZWQ4MjBlNDFlZmQ4YTE1MjAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_1e29c1e45bf240e6a607deaf116411b6",
+      "statement": "Worker isolation for parsing untrusted PDFs: non-root user, read-only root filesystem, NetworkPolicy restricting egress to AWS endpoints and PostgreSQL, resource limits, and a per-file timeout (PRD §9.1, §9.10).",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L280-L280",
+          "version": "repo-lines-v1:sha256:faac20403ea7e886107fb272fbd0e127e6635d7339edb206a0a4566a64cfbe03:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZmFhYzIwNDAzZWE3ZTg4NjEwN2ZiMjcyZmJkMGUxMjdlNjYzNWQ3MzM5ZWRiMjA2YTBhNDU2NmE2NGNmYmUwMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmFhYzIwNDAzZWE3ZTg4NjEwN2ZiMjcyZmJkMGUxMjdlNjYzNWQ3MzM5ZWRiMjA2YTBhNDU2NmE2NGNmYmUwMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2YyOWFkOTczZGJjODY1YzZiMjNlZjNjY2M2NDIxMzk4MzliOTkzYmViNDg2OTFkOTA2ODdkMjZmN2RiMTZmNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjZiMDVmYjQ0YzM5MDhjNjZiMmY3YzhjZjAxZmM2ZjMyNWI3N2M2MTdlZGVmMjJhZDdiOThhMjExZTU1OWFiMCJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L434-L434",
+          "version": "repo-lines-v1:sha256:bc0cf232448cc3e5c1e9dba664511c014b46e4606d1076a8ddd2a68a60b589e4:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmMwY2YyMzI0NDhjYzNlNWMxZTlkYmE2NjQ1MTFjMDE0YjQ2ZTQ2MDZkMTA3NmE4ZGRkMmE2OGE2MGI1ODllNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmMwY2YyMzI0NDhjYzNlNWMxZTlkYmE2NjQ1MTFjMDE0YjQ2ZTQ2MDZkMTA3NmE4ZGRkMmE2OGE2MGI1ODllNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWVjOTMxNWFjY2ZhOTk1OTg2ZjhhOTM1ZDU5MDI4MDlhMzczYmU5ZDJiN2EwYjYxNjdkZjJjMDcxZWI4ZTRlMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGE0MDM3MjljZmIzYzg1YTU0N2M5YjRkODFhZjFlZmRlMmEwN2NiZDJkYTEzN2RjZTcxNzFmZTlmZGVjOTNkMyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_e181e40fbc684597aea02b45ba6935eb",
+      "statement": "The compose.yaml default profile starts three dependency services: PostgreSQL (pgvector/pgvector:pg17) on host port 5432, Keycloak (quay.io/keycloak/keycloak:26.3) on host port 8080, and LocalStack (localstack/localstack:4) on host port 4566 emulating s3, sqs, ssm, and secretsmanager.",
+      "evidence": [
+        {
+          "resource": "repo://compose.yaml#L8-L49",
+          "version": "repo-lines-v1:sha256:caa3acfcd53466c1dd21a722107789926b0de9465aa1abd0ad3187e28d803262:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZjZmVlYWJkODk2ZDhlYzU0OGQzOWI0NzUyNGEzOGFhZDU5MWM3ZGZlMWRhYzQzNGJkYzBhZDIzNzAyZDlmZDgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlYjcwMjU3NTkzZGEwNmY2ODJhM2RkZGE1NGE5ZDI2MGQ0ZmM1MTRmNjQ1MjM3ZjVjYTc0YjA4ZjhkYTYxYTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ2NTc3MTg3NjM1YmRkOTExNDEwMjhhYTI4YzE0MjI3ZWQyZWE4YWEzMzZkYjNlZmQxYTIxOWUyMWUzMTBhY2EiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRlMzc1OTZmOTJlMGI4NTNjNDBkNzQ5MGFmNzQ4MTczMTNmMzQyMDZhNGRkNTlmNzYzNmQ1ZDlhYTE4ODQ4MGEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_4f7bfa5643524d059abfade732ca7a03",
+      "statement": "The compose.yaml app profile adds five services with the following host-port mappings: api → 8001 (container 8080), agent → 8002 (container 8080), mcp → 8000 (container 8000), worker → no port, web → 5173 (container 8080).",
+      "evidence": [
+        {
+          "resource": "repo://compose.yaml#L51-L95",
+          "version": "repo-lines-v1:sha256:55208b7d6bdb2d3c756ead7cbcffa625ddfb2a5bf01e79c19e240dc8d9977fdc:eyJzZWxlY3RlZExpbmVDb3VudCI6NDUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc4OWIyMjI0ODY5OGNmY2JmNGM0MDNkMDgwYzQ1YmVjMTk1YjliOTVhYzE0YmQ3MzIwY2M4MTBiYmY1ODExNDMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlYjcwMjU3NTkzZGEwNmY2ODJhM2RkZGE1NGE5ZDI2MGQ0ZmM1MTRmNjQ1MjM3ZjVjYTc0YjA4ZjhkYTYxYTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY1MzVjMjAwMTZhZTRiYjc5ZTUzMjk4ZjgzNWM4MjViNDg3YzU3YzYxMjhhMmYwYWNmZTFiMWEzYzhlNjBjYjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoyLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZkZTAzYjQ3MDdmYWI3YWIzYWQ2NzExZTNlYzVkYjRjZGRkMGI1Y2IwOGI5NWFlZThjMmRlN2EyNDJlZGMzYjgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_f0c0364077ce478dae05f8a1e0ba6589",
+      "statement": "Bedrock and LangSmith have no local emulator; app services always call real us-east-1 endpoints using the developer's AWS profile even when running locally with Docker Compose.",
+      "evidence": [
+        {
+          "resource": "repo://compose.yaml#L1-L4",
+          "version": "repo-lines-v1:sha256:409400137d221e73ef3a8e756cd866e1891c4a11a1884f473b3d5dc557af5a89:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmRjOTNkYjgyN2NhZDIxOGQ2OTgwNjg3YzUyNmJhOTE5MTEyOWNiNGUyNmMzNmFlMzg5NDIyNmU1NDEwYTY4OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ZmZWJhMjQ1OTkwYTczZjA3ODJmYTcwMmZkMTA4MWFiNTUzZGI1MTE5YTIwZTNkYWMwZDcxODcyYmU5MGFhOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDY1NzcxODc2MzViZGQ5MTE0MTAyOGFhMjhjMTQyMjdlZDJlYThhYTMzNmRiM2VmZDFhMjE5ZTIxZTMxMGFjYSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_5578084abe76454eaf904593f62213a4",
+      "statement": "The backend multi-stage Dockerfile defines four build targets — api, agent, mcp, worker — all running as uid 10001. The api, agent, and mcp targets use the deps stage (no extras); the worker target uses deps-ingest which installs the [ingest] extra (Docling and CPU-only PyTorch). CronJobs reuse the api image.",
+      "evidence": [
+        {
+          "resource": "repo://backend/Dockerfile#L1-L47",
+          "version": "repo-lines-v1:sha256:49c74343ecea8be688f97c030e931131ffc8579f201c1904c555ed4075b6be7c:eyJzZWxlY3RlZExpbmVDb3VudCI6NDcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI1ZDQ0MmE5ZTZjNjY0ZWI1MzFkOGVkMWZlZDczY2YzNGUwMGIwNGJhMWIxZGEwODYxNGFjYjFhNDRmMmE1OWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcyOTM5ZjZiYjJiNjNmZDgxNTAzNjg1ODRhYWFhZjVjZTQ3MGYyOTA0ZjI0OWUzMjk4OTU1OTE3YjQ5ODNiY2UiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_32382f18051a489f8b6aef5f33cec753",
+      "statement": "All backend deployables (API, agent, MCP server, worker, CronJobs) share a single Python package smart_tutor. The apps/ sub-package is the composition root: each deployable has exactly one entry under apps/ that wires together domain modules without containing business rules.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L1-L22",
+          "version": "repo-lines-v1:sha256:69529b43aa9f624fc10a13eb8e47b1e6c08bbc17c7d8ef22b5b1669980c17d9d:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQyZjgzZmUwY2FjYTIyM2FhMzhmZDMxOGVhYTJiNDZkODEzMGI4ZjliOGQyNzRiYjFhYzg0MTIzMjg3NWExMzMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlYzU2OGVhZGRjYzQ4NDAyNmYxZTMyYWYyMmM3NWYzODUzNjJjZjJjNWMxZGQ5NjhjMDU5MmY1NzE5NTgzMzAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImFhMWM2NDc2ZDIyMjQxMzhlMmI2NjE0MGVkNTA4ZWZjZjI3OThhMjQ2NDA0M2M3MmM1N2ZhYmJlMzU4ZjA2ZmEifQ"
+        },
+        {
+          "resource": "repo://sdd/specs/2026-10-02-project-structure-design.md#L22-L33",
+          "version": "repo-lines-v1:sha256:60ddd8c2393750c5b58b987a52884a29db7161dcd676e194fa7cf2d00e417d61:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIyNDFjZGNhOTZmYjAyNjFmNDM1NDdmZDA2MTkzZmNmZDE2ZjE3ODc0YWZhNTFjY2YzODUxMDdmMjZiYzg5YTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBkZTFhZTk1NDkwMGUxYzIwZTVkODc0NTM2NjU3Nzg4ZjE2MmJlOGYyMTU4MzljM2U0ODQ5MWY2NGY0MTc4MDYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzZmEyNmQ3NGYzYWU5M2I0YjU3ZDFjZjRiMzljOWI4Mjg5YzliOTAwY2IwMmIwZmJmNGQ1MzBhZmVjMzY3OGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhlNGVmMzg0MjgwZWNkMTAxOTU0MWJkOTgwOTJjMDQ0YTgwMDNiZTg3ODkxNGNlMmUzNGMyMTdjMWFlMDJiM2YifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_170a458ef77d46289b538f98d0f1f9ec",
+      "statement": "The API server entrypoint is smart_tutor.apps.api.main:app (FastAPI, port 8080); at scaffold stage it serves only GET /healthz. Full route wiring in routes/ and deps.py is deferred to M3.",
+      "evidence": [
+        {
+          "resource": "repo://backend/Dockerfile#L30-L33",
+          "version": "repo-lines-v1:sha256:cf68b19f7ebcecf4d20a826c8e5f11e157f4f05bbd885efa8b328417f0794649:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjhiNzRmYmI3NWQxODliMjUyZTkzOWVlNDM1ZWQwMzg2ZDc5OGE0ODZjYjM0YTJjOGI5MjI4Y2MyMzdhNDVhYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYWYyOGYwMmM5MTAwZjIyZTIzYzA3ZmQzZDZiN2QyMGEzZjk2YzY3ZmQ4ZGNiM2Y2MGJmNzI1NGVkODA4YjljZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDdjNzIxOThhZTRmYzhhOGE4MTU5MDk3MmZiZThhMWRjZDkyZTQ4M2U5ZDYyNzA5MzYxOGYyNDg0YjM1OWJkZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmQ4ZmJhMjRiY2JhZDBmODljNDEwN2E1NzY5MTZiMjFlYTc0YmQ0ZGM0NWEyYWM5MDFhZmMyMjRmZjE1MGY3ZiJ9"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/api/main.py",
+          "version": "repo-file-v1:sha256:3de6d69db30a2ce9dacd884a45995ef218b39055a25527a7adf1547a6eab0aae"
+        }
+      ]
+    },
+    {
+      "id": "claim_08512f1fee844a57bd986949289d1520",
+      "statement": "The agent server entrypoint is smart_tutor.apps.agent.server:app (FastAPI, port 8080, ClusterIP only); at scaffold stage it serves only GET /healthz. The LangGraph graph in graph.py and all path logic are wired in M2.",
+      "evidence": [
+        {
+          "resource": "repo://backend/Dockerfile#L35-L38",
+          "version": "repo-lines-v1:sha256:df018fe7f66eec5da153e695593a36e1ee92f6d118c9cb538b9749349872028f:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDI4Y2NhNTM3ZDQxYzk5OTA2MzI5NmNmNWE5MDU5ZDUyYTczOTZjYzcwMzYzNDZhNzNhYWZmYTZhY2FmNjdmNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWEyZjZhZDE3ZmZlNjQxYTUyZjlmOTM2YzM2MDY0YzQ0MWIyZjRiNzFjYzk2ZTlkZWRlYzY2NWMzODJmZjM2NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjZiMjU2ZDYyODJiMmQ1Mzg5YWQzZWZmNzYxZjZhZTdjZDI5ZWE4NmMzN2YzZmUzYWU4NzBhNjIyODYwNDcwNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGIzN2Y4OGIwYjUyNjAxZTE5MDcwYWRhOWU3NjExZGI0MTU0ZjczNDFiZTIxZGQ0NDliNTk3Nzc1YzNkMGRmZiJ9"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/agent/server.py",
+          "version": "repo-file-v1:sha256:b8a44524ac48a28d1d8a5dcd2cb291d626dac9157539272787f1950de76edf85"
+        }
+      ]
+    },
+    {
+      "id": "claim_66d11cf453f2458b945fa06d7035f453",
+      "statement": "The RAG MCP server uses mcp.server.MCPServer('rag-mcp') and runs as a streamable-HTTP server on port 8000 via mcp.run(transport='streamable-http', host='0.0.0.0', port=8000). Tool bodies calling knowledge.application and JWT validation are implemented in M1.",
+      "evidence": [
+        {
+          "resource": "repo://backend/Dockerfile#L40-L43",
+          "version": "repo-lines-v1:sha256:d02d73caa0fb61755818dd798fe18ecfc9cb8fc73dcef7dec144471b0a2f9862:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjQ3NGE5ZWUzNGI2OTc4ZGJmZmU5MGIzNWI4M2UyMDMwNTZjZWU5MTM5ZWVhYjVkMmE4YjU3MDBjNGNiMjcxNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTIxZjg1Y2I0OTRiYTkwNDA5M2ViZWIzZGUyYzVjYmEyNDYzM2M5MzM1ZWJmNzdiNTZjNmUwMGJhZmEzZDFhOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2RmNTdjNjNmMzFjOTdlMjc2MTA4ODI5YjdiZGFiYTYwZmU4MDczNTJjMzA2ZDU4ZTliMzI0OWNlMmM1ZDc0NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGIwYmQwZmJhOGI0NjAzN2U3OGEwNTcyM2ExYjAzYjBiNGU5MzhhYTYyMjIwOGZiZjAzZTQyNjgzNWNiNTg3ZSJ9"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/mcp_server/server.py",
+          "version": "repo-file-v1:sha256:77b5eafc76bb8d9cd3acdb8cadd36c5d97753aaa45b7bed5db48259b24008a85"
+        }
+      ]
+    },
+    {
+      "id": "claim_6e14cafac3d446499a712c89c8bf7633",
+      "statement": "The ingestion worker (smart_tutor.apps.worker) is a long-running SQS consumer with no HTTP port. Its main() currently raises NotImplementedError('M1: ingestion worker'), pending milestone M1.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/worker/main.py",
+          "version": "repo-file-v1:sha256:7ba03cdea573c4b900378a20ccd962d35f8d0430fcef8aec475ec6afad3c990b"
+        }
+      ]
+    },
+    {
+      "id": "claim_9d33924df01e4254bc68cfeb5de86b4b",
+      "statement": "All three CronJob main() functions raise NotImplementedError: record_sweeper raises 'M2: learning-record sweeper', glacier_tagger raises 'M1: Glacier tagger', and retention raises 'M4: retention job'.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/jobs/glacier_tagger.py",
+          "version": "repo-file-v1:sha256:fe8f8fdf66054b646f5d74071d4d4af6d06eb7112aacdbebd1a3e0b2a07da7d1"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/jobs/record_sweeper.py",
+          "version": "repo-file-v1:sha256:8050212c5fb211d9a32c19965f62c332f5bef4adedb94ae6b0f8751abcec016f"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/jobs/retention.py",
+          "version": "repo-file-v1:sha256:cc7f9504d92aede915db66647763ff88fc5f6b11f46c7fb5133982e7ee2ee247"
+        }
+      ]
+    },
+    {
+      "id": "claim_093dcaf89c6f4ce9878efaa3b412b734",
+      "statement": "The web app Dockerfile uses a two-stage build: node:22-alpine to build the Vite React app, then nginxinc/nginx-unprivileged:1.29-alpine to serve the dist on port 8080.",
+      "evidence": [
+        {
+          "resource": "repo://web/Dockerfile",
+          "version": "repo-file-v1:sha256:b2e89c0cb75f789bf3855d21e0873c2e490497d67631791eaa8378cae766acd7"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-03T03:19:50.688Z"
+  }
+}

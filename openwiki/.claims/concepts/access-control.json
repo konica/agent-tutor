@@ -1,0 +1,170 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:1c86076ffcabbed824aa0957b2c0f8f885ad0da4a0cd2d2e8370d1df2e2be584",
+  "claims": [
+    {
+      "id": "claim_818ff709203e455fa4299f4cd0cef940",
+      "statement": "can_read(user, document) is the single access predicate implemented once as a domain method (Document.can_be_read_by) and as a SQL predicate, reused by the API, MCP server, and citation resolution. Releases 1–3: owner_id == sub; Release 4 extends to document_grants rows and visibility=public.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/knowledge/README.md#L1-L5",
+          "version": "repo-lines-v1:sha256:23d169b7376616cf2b16e10a1c1a348f5dd0b079a9075989efd2bcd73165912e:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzc1Nzc5OTM1YmI2NzlhMzE4MzBkODAyN2RlNjljZjRhYzY0YWIzMmY0OTIzYmQ0ZDI3NDVhM2RlMjkyNjJiOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjU1MTVkOTJkNTZjMjIwNDFmOTQyMDhkYjQ5OWU4MmM2OGM1YTQ1ZDc1ZDliOGU4Yzk1NDc5M2YzYWMyNDM4MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWJhOGFlMmZjOTUzMTJhYzEwYWFmMjJkMWI3YWE1ZTlhYzQwZDExYzdmNDg3Yzg3ZGIzNDk2OTE5NTdiYzYwNCJ9"
+        },
+        {
+          "resource": "repo://sdd/adr/0002-content-document-split-sha256-dedupe.md#L16-L18",
+          "version": "repo-lines-v1:sha256:2fcc0bdbd1e2d3f301d8aa38a41fabf387fe3657169d04bec71cee1da17e959b:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjk0NDk2YmRlNTVjZmExZWIwODQxMmQ0OGIyNjEyNTYwYmE4MWY4NjA3OGZkY2VhMTQzNWQ5ZTMzYTVmNzhhNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiM2Q1OTRjYWE1ZTMxMjNmYWIxMjEyODc4NWRmZTFhMjc4MGJkNDdjZGEwN2VjNjIxZjJkZGNiZjk3YTM0MzEzMiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L329-L331",
+          "version": "repo-lines-v1:sha256:27712d2634f98b4455bc38d984cb2c6bca2ebfc80ad5d80802c47ba7011c4463:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjdjNGU2YWM1ZWQyYzJkYjY0OWEwODUzNTcwN2YzMDcwOTQzNjJiNzgyM2JkODdlNmFiMDU3ZDgzMmI5ZjJkZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGIzZjRkYzI4NDA5NjBkMWI2Yjg0ODk4N2Q3ZGEyNjlkN2U4ODBlZDViNGE2MDVjOWU0MWZlY2UwNjllMDgyMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTJjMmFkZDIxZWVmODNjZTFlOTNmYjc1NGMwODM2ODQ1NDFmY2QxOTBiZjRlYmJmNTE0MGI4MTFjNWZkYTQwYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjk1NmRlNjdjMDg2MjJhYjU4OWVhYzk2YWEwNjhmY2E0MzI5YTQzYmFhZmMxZTI2ZWY4NTZkYmIxNDU2ZWJiZCJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L99-L99",
+          "version": "repo-lines-v1:sha256:a95204842c103aa6c3bd93c5c42ba74ea8e1fa48968549ce27f618ef7f63e6de:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTk1MjA0ODQyYzEwM2FhNmMzYmQ5M2M1YzQyYmE3NGVhOGUxZmE0ODk2ODU0OWNlMjdmNjE4ZWY3ZjYzZTZkZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTk1MjA0ODQyYzEwM2FhNmMzYmQ5M2M1YzQyYmE3NGVhOGUxZmE0ODk2ODU0OWNlMjdmNjE4ZWY3ZjYzZTZkZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzk1YjNmMDgyOGUzNDkxMWRlYzJiMGE3ZTBhZDQyYmY3ZTc2NDc0NTNiOWI4ZmE1YmQyZmMwOTU0MWZiNmVkMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZWJkNTAxMDVjMjllZTFmOTU4YmZkYTgwOTllYTczZDdjZDZjY2E0NmU3NzRmNmZiYTAxMzdjZTE1MjYzZDE1NiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_cf8359b08c5d40c4aeb61792cd6e4f03",
+      "statement": "The JWT forwarding chain is: Browser completes Authorization Code + PKCE with Keycloak and receives a token with aud including smart-tutor-api and rag-mcp; API validates (JWKS, iss, aud=smart-tutor-api, exp) and forwards the same token to the agent; agent attaches it to every MCP request via HTTP header and runtime context, never in the prompt; MCP server validates again (JWKS, aud includes rag-mcp, exp) and reads sub.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/adapters/auth/__init__.py#L1-L1",
+          "version": "repo-lines-v1:sha256:526272e6ed41cf58e31a6590a8ca92445619f0ff049b934efc72a6494db45fb1:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTI2MjcyZTZlZDQxY2Y1OGUzMWE2NTkwYThjYTkyNDQ1NjE5ZjBmZjA0OWI5MzRlZmM3MmE2NDk0ZGI0NWZiMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTI2MjcyZTZlZDQxY2Y1OGUzMWE2NTkwYThjYTkyNDQ1NjE5ZjBmZjA0OWI5MzRlZmM3MmE2NDk0ZGI0NWZiMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L326-L335",
+          "version": "repo-lines-v1:sha256:48c3c106cebcf4073abb4d1911309f84988250dab6759a62b8001ef04104ebb7:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgwODc4MDBkMWJhMmExZjJmYzEzNTc4NTE0Yzk3YTM2MWE0YzA4YzBkNjU0NzI5M2EwMGQyOTM0ZjZhZTEwMTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAzMzM3NmQzNzE5ODAzYjIzYmJhM2NhYWRhNWViMzM2MGFhMTJkMTFkYTE5ZTI3Zjg2NzdkYjc4YTI5M2E5ZmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM2MDIzMzlmNGU1ZDgyNGNmN2M2ZGI4MzM0NzFiNDA2NzU3ZWRmMjJlNTczZGZhMzRlYmQ5ZDZiZmM4MWY0MDYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk5Yzk3MGI5M2M3YzVmNzg1ZGMyMjM1YjQxYjgzNGVhNzg0YjY2MmU1ODI1NGU2NjI2OWExNTkzYWFhZWIxNGUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_f0246204f2824a50bcc5ea42739ded97",
+      "statement": "The MCP server builds its SQL search filter as: content_id IN (documents WHERE owner_id=sub AND state='ready' AND archived=FALSE AND subject_id = ANY(subject_ids)). An empty readable set returns an empty result and the agent surfaces the US-10 message, not an error.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/mcp_server/server.py#L1-L4",
+          "version": "repo-lines-v1:sha256:338ac7a5e14ee10775364bba595f26777967c2eabdfbf9ac546ca77bc36f45fa:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODVhYTAyMWNkZDgyODU3NDlmMWM1MTc0ODYyMjcyM2ZkNzU0ZjM0NjkzMjgxMDE5OTgxNTRkNDVlZDQ3MDlhZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDc1ZDQ1ODllOTFjYzhjYjk3NDg4OWRhYjAxZGUxNWRiMTU3NGNhMTBlZWM3MjkwYTEwOWJmNTg4Yzk0ZTAxYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODdhZmQ5MzdhMTBiMmM3MjIyZjY4NDIzYWI5OWUzMTRmZDk2ZDdkZTQzYmUzZjUwNDE3NWYxMTkzN2ZlOTkyNCJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L329-L330",
+          "version": "repo-lines-v1:sha256:8271a690fa4683635d0e81562c76ec9bbccd0f7252a36f8a13aa49ff7e625a13:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjdjNGU2YWM1ZWQyYzJkYjY0OWEwODUzNTcwN2YzMDcwOTQzNjJiNzgyM2JkODdlNmFiMDU3ZDgzMmI5ZjJkZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTJjMmFkZDIxZWVmODNjZTFlOTNmYjc1NGMwODM2ODQ1NDFmY2QxOTBiZjRlYmJmNTE0MGI4MTFjNWZkYTQwYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzEwMGNiNzZkYzY1ZjE0YzJmMGJmYzM1MDVjMzIwMzkyMzljYWU5NWQ0YTZjOTQ5NDYzOWJhZTFkYjUwMjg1ZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_abbf24ec146048af87c8c0aa3e6a5f19",
+      "statement": "Filtered vector search uses pgvector iterative HNSW scan (hnsw.iterative_scan, pgvector >= 0.8) as the primary path, with an exact-search fallback over the learner's own chunks when the readable set is small. Recall@5 target under selective filters is >= 0.95, tested in M1.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L333-L334",
+          "version": "repo-lines-v1:sha256:49ddf2d22534235f90c66d93ffcd4efde951aafe00c6dba623337a0ff609484a:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTViOGQxNmFkNjMzZWY4MTY5YWM0Y2RhMTlhZGU5ZWZmNjI1N2E5Y2U1Y2E4ZWUzMWZjOWY5YTM1OTNlYWY5OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWQzN2FmMDQ4MDlkMTc5OGI4ZGNiNWIzNTk1ZjJkNmE3YzBkYjJkNDA1ZTA1ZDc4MjI2MGM4MDJjNTk2Y2ExNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjhjMmY1YWZkNjY2NWU1YjQyY2Y4ZTgwMGJhZDAwNTA4YTVmNGJlNTI1OGNiZjQ0MzcxZmIwY2IwNGUzMDhhNyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L431-L431",
+          "version": "repo-lines-v1:sha256:975445f64a8a8bbeb951c1c1cb38aee09b916296e7f618a1be4450337de69334:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc1NDQ1ZjY0YThhOGJiZWI5NTFjMWMxY2IzOGFlZTA5YjkxNjI5NmU3ZjYxOGExYmU0NDUwMzM3ZGU2OTMzNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTc1NDQ1ZjY0YThhOGJiZWI5NTFjMWMxY2IzOGFlZTA5YjkxNjI5NmU3ZjYxOGExYmU0NDUwMzM3ZGU2OTMzNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWM5MzZiMGY3ZmI2ZDJiODA2OTU1NzRjZGY3ZWRmMWEzOWJjMzZmMzRkYWM1NGY0NmQzNmY2ZTI5YmNiNzIzNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiM2M2MDJmNDA5NjZlOTkwZGViODQxNjVmMDU4NzAyYTlhYzVlY2JlYmQ3YTMzM2MwODFkNzk2YzNjZGVmNWUwYyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_66c86f6db2624fa09772a872fbc5428d",
+      "statement": "The S3 key structure uploads/<user_id>/<upload_id>.pdf binds every presigned POST upload to its owner. A browser-supplied hash may skip a redundant upload only for a file already in the learner's own library; the server always independently computes SHA-256 from uploaded bytes before deduplication linking, preventing hash-based access to another learner's file.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/adr/0002-content-document-split-sha256-dedupe.md#L13-L14",
+          "version": "repo-lines-v1:sha256:60ef6260bd7626be5953e3db46476b9d91ce3b798c681ddf0c4ac4fc36bbde97:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2RhM2QxOTU4OTQ5ZjNhNDg0OGVlYjJmZDExZTkzNjVkNTc3ZGE3NTQ3YTFkYTM4OGZjYTllYWU0OWM3OTk2MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWU1MWEyZGE4NDViOWFjNzc0YzY5MzViY2IzMjhkNmFkMmM4YjRkMjk3ODYwYTcxMjhhNDU3NGUzMGIxZWFkYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWM2Yjc1N2I0YWVhMWFhMmRmMjI4MjM5ZGQ1NjQ4ZTYzNzM3YTIyM2JhOTZjZWJlZDgyNGM4OGJiNzRhZWZmMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjIyODc5M2QwNGM2M2EzZjYzM2UxYjFmZThjZDAwN2FhMWI1MWNhNTljYmQxZDU1ODhhZjA1ZGM1ZDljNDYxMyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L113-L114",
+          "version": "repo-lines-v1:sha256:8a22d4664d2da1d30e95ede992df58371b31e75aa61e19b9151c6dfe0db755ce:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzVmOTFkODgwZWEwYTVmNzg3ODFmMDUzNmM2NWM0MGU5YmNjZTViMDhiNTdkNDIwOGViYzk4ZGNjNjkzOGFjMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjA4N2U3MzFiM2ZiNDIzMjliMjRiOGFkYWNhMmI4MzBiNWNhNjQxNTkzNmM0YzE5ZjJjYzdiMjc3Zjc3MWI4MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTI1YjNhMGJkYTY3M2M4OWIxMDdiMWYwODVhNjBmN2YxMDgwZjk3NWJlNjVlNDg5N2ZkM2M1NjczZTY3MGYwMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTMxZDU5MDc3NzIzN2UxZTczYzYyN2VlMzA5MjA2MzIzNWFlNmNjNjM3NmM3ZWI4NTkwOWQwMmRjZTE0MTc5ZiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L337-L337",
+          "version": "repo-lines-v1:sha256:96fcd568c5a0f0a097f0b816b5fe7fa056fa9943109435fea4db2ec9cd05655c:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTZmY2Q1NjhjNWEwZjBhMDk3ZjBiODE2YjVmZTdmYTA1NmZhOTk0MzEwOTQzNWZlYTRkYjJlYzljZDA1NjU1YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTZmY2Q1NjhjNWEwZjBhMDk3ZjBiODE2YjVmZTdmYTA1NmZhOTk0MzEwOTQzNWZlYTRkYjJlYzljZDA1NjU1YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDZiMjRjMjhkN2IwYWMzNzdlYjQ2MDAwNzMwNDM1ODYwZTViNzQyZDFjNGVkMzQxN2ZmMjExMTkxNzU4MDllMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWI3ZWU4NGVmNmY5NGQ5YTI0OGUyOTM3ODcyZmEzNmQzNTY5YWYyZGQzZDk5NmU5MjEzNzE5OWRlYjI0NzA5MSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_693f01904c6441c59135547d74d9136c",
+      "statement": "Agent and MCP server are ClusterIP Kubernetes services; NetworkPolicies allow only API→agent and agent→MCP connections, preventing any external or intra-cluster caller from reaching them directly.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/agent/server.py#L1-L1",
+          "version": "repo-lines-v1:sha256:2821f0ffe427420cd0fcd7ffb8897fe8ff7abe2fa4508fa1a9f994aec6f67dff:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjgyMWYwZmZlNDI3NDIwY2QwZmNkN2ZmYjg4OTdmZThmZjdhYmUyZmE0NTA4ZmExYTlmOTk0YWVjNmY2N2RmZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjgyMWYwZmZlNDI3NDIwY2QwZmNkN2ZmYjg4OTdmZThmZjdhYmUyZmE0NTA4ZmExYTlmOTk0YWVjNmY2N2RmZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzI3MDMwNDRkNjY2Zjg3YjI0MTY0OTJiZmM4MGVjNWEyYzkwYTRkNTg3NGE1YTYxMjM2NzBmZmM5MmNiOTBkZSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L335-L335",
+          "version": "repo-lines-v1:sha256:033376d3719803b23bba3caada5eb3360aa12d11da19e27f8677db78a293a9fc:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDMzMzc2ZDM3MTk4MDNiMjNiYmEzY2FhZGE1ZWIzMzYwYWExMmQxMWRhMTllMjdmODY3N2RiNzhhMjkzYTlmYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDMzMzc2ZDM3MTk4MDNiMjNiYmEzY2FhZGE1ZWIzMzYwYWExMmQxMWRhMTllMjdmODY3N2RiNzhhMjkzYTlmYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjk1NmRlNjdjMDg2MjJhYjU4OWVhYzk2YWEwNjhmY2E0MzI5YTQzYmFhZmMxZTI2ZWY4NTZkYmIxNDU2ZWJiZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTljOTcwYjkzYzdjNWY3ODVkYzIyMzViNDFiODM0ZWE3ODRiNjYyZTU4MjU0ZTY2MjY5YTE1OTNhYWFlYjE0ZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_e3c499505aad4034b40ec6926d5b1866",
+      "statement": "The isolation test suite (backend/tests/isolation/) runs against the live API and MCP server and verifies: no cross-user read/list/retrieve/cite/download; MCP search returns only chunks of readable contents; deduplication never grants cross-user access; two learners in the same shared subject cannot see each other's documents.",
+      "evidence": [
+        {
+          "resource": "repo://backend/tests/isolation/README.md#L1-L5",
+          "version": "repo-lines-v1:sha256:997ab5e402f43f29bd3e0d9b0767043821a1d7ad73df57a15106bebade9e2ff7:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjNmMjJmYzYwMThiZmFiNjg0NTQxMDg0YjljNTE5YzYwZTA5NDI2ZTg3MzBmOTljODIyNmQ1ODM1NGZjZWU4MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2QzNWJiMmMwMTAzZWM3YmYwNzFlODBjYTQ5YTA5NTJjZDQ2NWJhOWU1OGEzMGVhMWIxMTA1ZjRmMGE1MjhhYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L231-L231",
+          "version": "repo-lines-v1:sha256:fc467d982a544b9a3b7d407b73fa9ae47f23f465d92a594cd83a1ed5fda20be0:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZmM0NjdkOTgyYTU0NGI5YTNiN2Q0MDdiNzNmYTlhZTQ3ZjIzZjQ2NWQ5MmE1OTRjZDgzYTFlZDVmZGEyMGJlMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmM0NjdkOTgyYTU0NGI5YTNiN2Q0MDdiNzNmYTlhZTQ3ZjIzZjQ2NWQ5MmE1OTRjZDgzYTFlZDVmZGEyMGJlMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzBiZDA5OGJmMjY5NGUzNTA4OTgxOTgyMjdmMTc2YTFjZmFhOGZlODMyOWZkMmI1Y2Q1MDRkY2NiYTU1MDFmOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNWE1NGM0MDczMGVjNWU4ODllYTVhNDQyMDIwZjU3MDk4OTZkZmMzM2E5ZmU3ZTEwYjc5MjhhMzYyNGYxMmE5ZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_c4a5b91d487542b1bf63e9cad32bcb6a",
+      "statement": "The Keycloak realm smart-tutor defines three clients: smart-tutor-web (browser PKCE), smart-tutor-api, and rag-mcp. An audience mapper adds both smart-tutor-api and rag-mcp to every access token so a single token is valid at both the API and MCP server without a token exchange.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/config.py#L32-L33",
+          "version": "repo-lines-v1:sha256:9ce91b2d2efa79c7c6cc8f41f70133c1ac6a934abe25890ced841ef0e8231db0:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzkzM2U0NmFiZDE3ZDUwMmNjOGFhNGM5NzdlNDc4MjcxNWZmYzU5ZjY4ZjA3M2ZkOGRiM2UwNjI3NDNkZDVkZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNmFmYmQ4ZmY3YWQ3YmJiYzcwMjAwODJkMDlhNzYyMTQ0ZDIwZGVkNmQwYmRiNGYxZmFkYWQ4NmU0NDIxYWU0ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTdjNTA1NmFkZWQ5ODk5MTBiMTE3N2ViNGViNDY2ZWY3OTE4NTQxZGE4NDE1ZmUzNmU5M2I2MjNiZGYwZDM3NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzRjMjM0NzhhNzEwMTg0YWI2MzQzODJlYTRiZjYyOWJkMDkzMTllYWU2N2NmYmQzMWRhZjc2MTYwZTA0NzgwOSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L335-L335",
+          "version": "repo-lines-v1:sha256:033376d3719803b23bba3caada5eb3360aa12d11da19e27f8677db78a293a9fc:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDMzMzc2ZDM3MTk4MDNiMjNiYmEzY2FhZGE1ZWIzMzYwYWExMmQxMWRhMTllMjdmODY3N2RiNzhhMjkzYTlmYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDMzMzc2ZDM3MTk4MDNiMjNiYmEzY2FhZGE1ZWIzMzYwYWExMmQxMWRhMTllMjdmODY3N2RiNzhhMjkzYTlmYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjk1NmRlNjdjMDg2MjJhYjU4OWVhYzk2YWEwNjhmY2E0MzI5YTQzYmFhZmMxZTI2ZWY4NTZkYmIxNDU2ZWJiZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTljOTcwYjkzYzdjNWY3ODVkYzIyMzViNDFiODM0ZWE3ODRiNjYyZTU4MjU0ZTY2MjY5YTE1OTNhYWFlYjE0ZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_a10e2ef0cf524940acb2641d895b0d09",
+      "statement": "The injection-resistance evaluator (evals/evaluators/, rubric in evals/evaluators/rubrics/) is a code+judge evaluator with a max_failures: 0 release-gate threshold that tests prompt-injection and document-embedded attacks, including the other_users_data adversarial category. It is one of two automated guards alongside the isolation test suite that enforce the isolation guarantee continuously.",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/adversarial/taxonomy.yaml#L19-L22",
+          "version": "repo-lines-v1:sha256:4e4b76fb79ec21f9f547e238975eccab4f341441eaf047a25c8d265b4bbfd605:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTlhZTQ0NWYxZmQ4NGUyY2Q2NzdkNjgyYmQ5MzU3M2I2OWU1NzBhZTI5MDIwMDA5MjgyN2UxZTAxZDQyNzUxMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTZjYjJjMjc5OGExYzgyZTNiYjcxMGFlNmU1MTlkMzZmZjE2ZTE1MjQxYjk2MmFiMTRiYWFjM2EzZjBiZmM2OSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTExZjUzODViNzBiZTc3NTc0ZWNhNzEwYjlhOTNjNWNiMWYyMmRkNWQyM2I5MTdhZWM1ZDAyY2RkMzJkNDU5NyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODYyMDg3ZTgyYjEwZDZkMjQ3OGQ2YzJmN2ZmYWJkMGJiMmMzMGJiOGEyZmYzNzJlZTIyNzY1Yjk0NzUzZTBmMyJ9"
+        },
+        {
+          "resource": "repo://backend/evals/evaluators/rubrics/README.md#L1-L3",
+          "version": "repo-lines-v1:sha256:a6b9ba345ac5446f79d02fa7b83d7d3a41dc061dfec02222a1dbed2d519e5f68:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTc4ZTgwNTEyZjNjMGJkOTNkYzI5NmZlZDg0ZGYzMDhiZWNhZjIyMmIzZjUxMmZhZjQ0ZWYxM2I5OWViODM2ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTU3Y2NjNDA5YWNhZWQzNjc5MWUxZjljMTZlNDI2MWQ4NjQzMmE5YTdhNjgxNDAyZDI5YjhkMWE0NjA0MGE5ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        },
+        {
+          "resource": "repo://backend/evals/thresholds.yaml#L28-L29",
+          "version": "repo-lines-v1:sha256:267f1a54a69811746ba9432ad9744b8f9374551f13bc5ff1e362cc14d1d62a5d:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMGVjZGVlYzM5MDM1M2ZhZTZmMjExNDY0MjhmMTA4YjU4Zjk3ZjA1NzVjZDFkYmY2MzFiNDhlNGFmNzM2YWU5YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzE1NjBkYzJjN2MxNjRmMmM5NmRiYWUyMDVlNDA0ZWMzN2NmZjJmM2IwMzVkZDYwOTA4OGI0ZGE4MDFhMzcxNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGI4NjEwNzExMWFlNGQ3NjhmOGEwZjBkYjhkODMzNDYxOGI0YWZlODY2NzI5YzBhM2MzMThlZjAzNDViMmUyMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDhiYzZkMDJkNjk2MjZiZjAwMmYyZWZjN2MzMGRhNWRiOTliZmNhYTg3MmY4ZTJmZGFlMWVlZmM3Mzg3NTFjYiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_02f31e65a91c48bf96b387a697c938c5",
+      "statement": "The LLM is not the access boundary: the MCP search tool (SearchService in knowledge.application) applies the can_read SQL predicate before returning any chunk to the agent, so the agent only ever receives chunks the calling learner is entitled to read. Access never depends on the prompt.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/apps/mcp_server/server.py#L1-L4",
+          "version": "repo-lines-v1:sha256:338ac7a5e14ee10775364bba595f26777967c2eabdfbf9ac546ca77bc36f45fa:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODVhYTAyMWNkZDgyODU3NDlmMWM1MTc0ODYyMjcyM2ZkNzU0ZjM0NjkzMjgxMDE5OTgxNTRkNDVlZDQ3MDlhZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDc1ZDQ1ODllOTFjYzhjYjk3NDg4OWRhYjAxZGUxNWRiMTU3NGNhMTBlZWM3MjkwYTEwOWJmNTg4Yzk0ZTAxYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODdhZmQ5MzdhMTBiMmM3MjIyZjY4NDIzYWI5OWUzMTRmZDk2ZDdkZTQzYmUzZjUwNDE3NWYxMTkzN2ZlOTkyNCJ9"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/knowledge/README.md#L1-L9",
+          "version": "repo-lines-v1:sha256:6abe1f78941d4489884e4dd8d709fb091741fa0de436ea4c8556bc70a451b000:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzc1Nzc5OTM1YmI2NzlhMzE4MzBkODAyN2RlNjljZjRhYzY0YWIzMmY0OTIzYmQ0ZDI3NDVhM2RlMjkyNjJiOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDM5ZDRiNzg2OTU4NjJjN2I3ZTQ3ODRkNDU5NTIwZTU3YjUwNGNjYjhiMDZiYTE1YzczMGQwOGFiYjk0NmViNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmFiMWY5YmI2OWU1MjM5NTk5YjkwZmUzNzY1OWFiM2MxNWQwMjE2NDNiOTNlNTMyMDAxZWY0MDlkMjA3ZWMyNCJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L99-L99",
+          "version": "repo-lines-v1:sha256:a95204842c103aa6c3bd93c5c42ba74ea8e1fa48968549ce27f618ef7f63e6de:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTk1MjA0ODQyYzEwM2FhNmMzYmQ5M2M1YzQyYmE3NGVhOGUxZmE0ODk2ODU0OWNlMjdmNjE4ZWY3ZjYzZTZkZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTk1MjA0ODQyYzEwM2FhNmMzYmQ5M2M1YzQyYmE3NGVhOGUxZmE0ODk2ODU0OWNlMjdmNjE4ZWY3ZjYzZTZkZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzk1YjNmMDgyOGUzNDkxMWRlYzJiMGE3ZTBhZDQyYmY3ZTc2NDc0NTNiOWI4ZmE1YmQyZmMwOTU0MWZiNmVkMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZWJkNTAxMDVjMjllZTFmOTU4YmZkYTgwOTllYTczZDdjZDZjY2E0NmU3NzRmNmZiYTAxMzdjZTE1MjYzZDE1NiJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-03T03:19:50.688Z"
+  }
+}

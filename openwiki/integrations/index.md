@@ -1,0 +1,6 @@
+# Files
+
+- [AWS Bedrock Model Integration](bedrock-models.md) - Documents the model roles (agent, judge, embedding), the ChatModel and EmbeddingModel port contracts, the ModelFactory that wires configuration to adapters, and the operational rules for switching models. All Bedrock adapter methods are stubbed at M0.
+- [Keycloak Authentication and Identity](keycloak-auth.md) - Documents the Keycloak OIDC configuration for Smart Tutor — realm structure, clients, role model, JWT validation in the API and MCP server, test users, and the token-privacy invariant.
+- [RAG MCP Server and Retrieval](mcp-retrieval.md) - Documents the MCP server's two tools (search and get_chunk), the access-enforced SQL filter that scopes retrieval to a learner's own readable documents, iterative HNSW search with exact-search fallback, and the Retriever port through which the tutoring agent accesses chunks without touching chunk tables directly.
+- [S3 Storage and SQS Ingestion Queue](storage-s3-sqs.md) - Documents the single S3 bucket used for learner uploads and content-addressed PDF storage, the S3→SQS event notification that triggers the ingestion worker, the Glacier lifecycle for unreferenced content files, and the LocalStack emulation used in local development.

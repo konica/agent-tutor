@@ -1,0 +1,338 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:b106730406f2d8343278f84ea8dc7d55c38a640c138ef778edd30057764cb022",
+  "claims": [
+    {
+      "id": "claim_c2129ef6b68848caae10a087d0acc5f6",
+      "statement": "The infra/ directory is a standalone Python project (smart-tutor-infra) with its own pyproject.toml and uv.lock, keeping aws-cdk-lib and constructs dependencies separate from application images.",
+      "evidence": [
+        {
+          "resource": "repo://infra/pyproject.toml",
+          "version": "repo-file-v1:sha256:2fe66546a53bffa058f4d04e010358798c41bea6be45c01d75b6c6be5110df02"
+        },
+        {
+          "resource": "repo://infra/uv.lock",
+          "version": "repo-file-v1:sha256:f37c597a13469314867ae274ebff404434af50e38aeac77b7f34ae3478327cc4"
+        }
+      ]
+    },
+    {
+      "id": "claim_3e272e80c5b1479a9c3ddb3f5f136559",
+      "statement": "The CDK entry point is infra/app.py, which calls build_app(app) from smart_tutor_infra.app_stacks and then app.synth().",
+      "evidence": [
+        {
+          "resource": "repo://infra/app.py",
+          "version": "repo-file-v1:sha256:19d1d1453f6aad9203045a44f45625f44bb57c4ac8a6c295a7134c6187b047d6"
+        }
+      ]
+    },
+    {
+      "id": "claim_71d5d85c8dfb4da3bff925ff553fef0b",
+      "statement": "build_app() in app_stacks.py assembles seven stacks (NetworkStack, DataStack, StorageStack, ClusterStack, RegistryStack, ConfigStack, BudgetsStack) named SmartTutor-{env_name}-{Purpose}; all non-network stacks declare an explicit add_dependency on NetworkStack.",
+      "evidence": [
+        {
+          "resource": "repo://infra/smart_tutor_infra/app_stacks.py",
+          "version": "repo-file-v1:sha256:2ef62f033a9df97b155e3e19ff62cea10ba456bf07e546af077b8b510b1e7b25"
+        }
+      ]
+    },
+    {
+      "id": "claim_6a4983920b6546ef9c1cbbdbcf500e06",
+      "statement": "The CDK region defaults to us-east-1, sourced from the cdk.json context key smart-tutor:region and read in build_app() via app.node.try_get_context; us-east-1 is required because it is the only commercial AWS region offering amazon.nova-2-multimodal-embeddings-v1:0 (PRD §9.14).",
+      "evidence": [
+        {
+          "resource": "repo://infra/cdk.json",
+          "version": "repo-file-v1:sha256:8d20dd3b3baefea5536f0f8510b79e2c182a369266cde2845fc4aacb6bee2188"
+        },
+        {
+          "resource": "repo://infra/smart_tutor_infra/app_stacks.py",
+          "version": "repo-file-v1:sha256:2ef62f033a9df97b155e3e19ff62cea10ba456bf07e546af077b8b510b1e7b25"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L469-L470",
+          "version": "repo-lines-v1:sha256:0bb5c732e931f44e8449f4d416647b3295326b969f0266465fe27f08890e339c:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjA0YWEwMzczMzEzM2E0NzZjMWNkMWE4MjVlNThhNDRhNTI4YTgwZjVkMjQ1ZWY0OTI1NjljYmM3NTVmYjRhZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDRiMGMzMWI3NDRiYTg5ODc2NTY2NDA4NTJkZjIxYjBmZjg0M2E0MTBhZmQ2OGY5MGVmNGJkZDNlOTkyODBjYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmY0MDcxZWYwZmU3YmE2NWU0ZTg2NTkwZDlkZmQwOTg5MjdmYjJkYzVkZWFlMTI1YWE3Mzc4NjNkN2MyMjc5NiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_0693c12172c1404b967a0a15f35c6458",
+      "statement": "All seven CDK stacks are empty skeletons at the scaffold stage (M0/M4 tasks); their docstrings describe the intended resources but no CDK constructs are instantiated yet.",
+      "evidence": [
+        {
+          "resource": "repo://infra/app.py#L1-L1",
+          "version": "repo-lines-v1:sha256:1f341a742684d7c97c2a60402e91f4e64d0c4ab951be0e68d5bf4a89e38c3517:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWYzNDFhNzQyNjg0ZDdjOTdjMmE2MDQwMmU5MWY0ZTY0ZDBjNGFiOTUxYmUwZTY4ZDViZjRhODllMzhjMzUxNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWYzNDFhNzQyNjg0ZDdjOTdjMmE2MDQwMmU5MWY0ZTY0ZDBjNGFiOTUxYmUwZTY4ZDViZjRhODllMzhjMzUxNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTk0OGE0NGRkMWU3YjM5NGE5Nzg5ZDZiYzE1ZGNmZWMxODQxMWRhMDNiZDBkMTBmZjU2NDY1ZTFiOGE3OTgxMCJ9"
+        },
+        {
+          "resource": "repo://infra/smart_tutor_infra/stacks/budgets.py",
+          "version": "repo-file-v1:sha256:2636741157e6ab7bf84ad5d9878a3a1486e3e4c14e1cafacca3022444fc2058c"
+        },
+        {
+          "resource": "repo://infra/smart_tutor_infra/stacks/cluster.py",
+          "version": "repo-file-v1:sha256:d4e26d2880752b797c16ef33ae433b6d74d0a05f506ef7950c2b0bba62b4ea54"
+        },
+        {
+          "resource": "repo://infra/smart_tutor_infra/stacks/config.py",
+          "version": "repo-file-v1:sha256:00fdb9507e2012676ddfcff23bf96b8624d5eacd4568d50a1468b7ae9289bf45"
+        },
+        {
+          "resource": "repo://infra/smart_tutor_infra/stacks/data.py",
+          "version": "repo-file-v1:sha256:eb40461d8497f97d2b0e4fb413776a692be2de8b33ac9287525b9881459317b3"
+        },
+        {
+          "resource": "repo://infra/smart_tutor_infra/stacks/network.py",
+          "version": "repo-file-v1:sha256:7121a58359f39138073fd54aca14c12b8ad2f1a16cfee44b1830fbc65d06870b"
+        },
+        {
+          "resource": "repo://infra/smart_tutor_infra/stacks/registry.py",
+          "version": "repo-file-v1:sha256:51d8d60329c97533e5781dccebbcca33917138c6d7df70d3ac7bebda82d7976e"
+        },
+        {
+          "resource": "repo://infra/smart_tutor_infra/stacks/storage.py",
+          "version": "repo-file-v1:sha256:3722beb1c1ce486928b7c0eab152bcf6fa85569c889546cde464f6b453122d33"
+        }
+      ]
+    },
+    {
+      "id": "claim_9dc118d86f33460dab9291b84f01263b",
+      "statement": "NetworkStack provisions a VPC with private subnets across 3 AZs (M0).",
+      "evidence": [
+        {
+          "resource": "repo://infra/smart_tutor_infra/stacks/network.py#L1-L1",
+          "version": "repo-lines-v1:sha256:c7cb36253623ea7c7e89c0cd423414750d608eaf814e4ab0591b40e584093a41:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzdjYjM2MjUzNjIzZWE3YzdlODljMGNkNDIzNDE0NzUwZDYwOGVhZjgxNGU0YWIwNTkxYjQwZTU4NDA5M2E0MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzdjYjM2MjUzNjIzZWE3YzdlODljMGNkNDIzNDE0NzUwZDYwOGVhZjgxNGU0YWIwNTkxYjQwZTU4NDA5M2E0MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjkxN2RkYmI5NjA1ODY1MmI3NTg5ZDQ0NjljNzQ4YzVhYWVhYTYxNzRhY2E0NWJlODRjYTQ3YWJjYzQ1Nzk3NCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_9ef743bf51014e3d8a5abb673881c374",
+      "statement": "DataStack provisions RDS PostgreSQL with pgvector; it hosts two separate databases — one for the application and one for Keycloak (M0).",
+      "evidence": [
+        {
+          "resource": "repo://infra/smart_tutor_infra/stacks/data.py#L1-L1",
+          "version": "repo-lines-v1:sha256:675c67a6cd98b9777386816669afe6778f8602562ab0113e240a4d7d32e1d46c:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjc1YzY3YTZjZDk4Yjk3NzczODY4MTY2NjlhZmU2Nzc4Zjg2MDI1NjJhYjAxMTNlMjQwYTRkN2QzMmUxZDQ2YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjc1YzY3YTZjZDk4Yjk3NzczODY4MTY2NjlhZmU2Nzc4Zjg2MDI1NjJhYjAxMTNlMjQwYTRkN2QzMmUxZDQ2YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjkxN2RkYmI5NjA1ODY1MmI3NTg5ZDQ0NjljNzQ4YzVhYWVhYTYxNzRhY2E0NWJlODRjYTQ3YWJjYzQ1Nzk3NCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_753ce663384f4483ac8453db43e7c408",
+      "statement": "StorageStack provisions the S3 documents bucket with two prefix conventions: uploads/ (presigned POST, events to SQS+DLQ, CORS for web origin, 1-day expiry lifecycle) and contents/<sha256>.pdf (versioned, Glacier Flexible Retrieval after 30 days for tagged unreferenced objects). Milestone M1.",
+      "evidence": [
+        {
+          "resource": "repo://infra/smart_tutor_infra/stacks/storage.py#L1-L3",
+          "version": "repo-lines-v1:sha256:f958561cdfbfca7a5c26b849951aa1b55b880df09e462c141006e90ffc230177:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWJjMzJkOGZkZDZmYmY4NzFkMTBjODY1NTQwZmQ0OWQwODRlNjJmMDU1N2NmMWVhNjM2ZDRhMjNkNTA1MGRhOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTExNTdhMjA1OTYyZjg1MjNjMWI1ODI2NTViYTE5M2M1ZjJhMGM5OTJhMGE1ZjFkN2ZmYzlhNjJlZWU3ZDcyMyJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L448-L448",
+          "version": "repo-lines-v1:sha256:319f831b0c9eab19efc68928bb39ea94351fa5805cece9e38c1f09ef626f4b05:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzE5ZjgzMWIwYzllYWIxOWVmYzY4OTI4YmIzOWVhOTQzNTFmYTU4MDVjZWNlOWUzOGMxZjA5ZWY2MjZmNGIwNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzE5ZjgzMWIwYzllYWIxOWVmYzY4OTI4YmIzOWVhOTQzNTFmYTU4MDVjZWNlOWUzOGMxZjA5ZWY2MjZmNGIwNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGNiNzAzODg5MTI3NTg0ZWM4ODA3MWNmYTBhYTQ4NTQyM2ZlZDJhM2Q5ZWIxODUxNTJkZjA5NzcwZjZjMzdlYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiN2IyYzcyOTgxOTA5YjZiYTY2MWM4NjBiOTQ0OWZmYjFlMmY2M2E3YTE3MjcwNTgyZWNlMzdhZDI2ZDFhYWI4NCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_23c443efbaf5413c85986aec0d34495d",
+      "statement": "ClusterStack provisions the EKS cluster, managed node group, and EKS Pod Identity associations (M4).",
+      "evidence": [
+        {
+          "resource": "repo://infra/smart_tutor_infra/stacks/cluster.py#L1-L1",
+          "version": "repo-lines-v1:sha256:5db14ac481c5b5f0f7592fa80ad8228b814f9b23e678d5878b69160e8b40ca68:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNWRiMTRhYzQ4MWM1YjVmMGY3NTkyZmE4MGFkODIyOGI4MTRmOWIyM2U2NzhkNTg3OGI2OTE2MGU4YjQwY2E2OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWRiMTRhYzQ4MWM1YjVmMGY3NTkyZmE4MGFkODIyOGI4MTRmOWIyM2U2NzhkNTg3OGI2OTE2MGU4YjQwY2E2OCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjkxN2RkYmI5NjA1ODY1MmI3NTg5ZDQ0NjljNzQ4YzVhYWVhYTYxNzRhY2E0NWJlODRjYTQ3YWJjYzQ1Nzk3NCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_6abb684ce3df4a3097076544bfbe67aa",
+      "statement": "RegistryStack provisions ECR repositories for the application images: api, agent, mcp, worker, and web (M0).",
+      "evidence": [
+        {
+          "resource": "repo://infra/smart_tutor_infra/stacks/registry.py#L1-L1",
+          "version": "repo-lines-v1:sha256:0e14d40061e4e4801f6014cfef7e03eee92c3e2ac3a50fbf46c366afca992c0c:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMGUxNGQ0MDA2MWU0ZTQ4MDFmNjAxNGNmZWY3ZTAzZWVlOTJjM2UyYWMzYTUwZmJmNDZjMzY2YWZjYTk5MmMwYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMGUxNGQ0MDA2MWU0ZTQ4MDFmNjAxNGNmZWY3ZTAzZWVlOTJjM2UyYWMzYTUwZmJmNDZjMzY2YWZjYTk5MmMwYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjkxN2RkYmI5NjA1ODY1MmI3NTg5ZDQ0NjljNzQ4YzVhYWVhYTYxNzRhY2E0NWJlODRjYTQ3YWJjYzQ1Nzk3NCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_73d89d12f869489aa1a107df0dafc710",
+      "statement": "ConfigStack provisions SSM parameters (including the learning-record idle-minutes threshold) and Secrets Manager entries; External Secrets in each sub-chart pull these into Kubernetes secrets at runtime (M0).",
+      "evidence": [
+        {
+          "resource": "repo://infra/smart_tutor_infra/stacks/config.py#L1-L1",
+          "version": "repo-lines-v1:sha256:6724e1116b9be2f46c6d4a0841f1c8cf476fab700bd2c61ecdd8d6f2a9e28f2c:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjcyNGUxMTE2YjliZTJmNDZjNmQ0YTA4NDFmMWM4Y2Y0NzZmYWI3MDBiZDJjNjFlY2RkOGQ2ZjJhOWUyOGYyYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjcyNGUxMTE2YjliZTJmNDZjNmQ0YTA4NDFmMWM4Y2Y0NzZmYWI3MDBiZDJjNjFlY2RkOGQ2ZjJhOWUyOGYyYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjkxN2RkYmI5NjA1ODY1MmI3NTg5ZDQ0NjljNzQ4YzVhYWVhYTYxNzRhY2E0NWJlODRjYTQ3YWJjYzQ1Nzk3NCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_d1ac81d35cb948fc9bf36c37be556c2f",
+      "statement": "BudgetsStack provisions AWS Budgets alerts for Bedrock model spend (M4).",
+      "evidence": [
+        {
+          "resource": "repo://infra/smart_tutor_infra/stacks/budgets.py#L1-L1",
+          "version": "repo-lines-v1:sha256:df5dc7572799ce15bcfbae376f8fadbb27fd7bb0f0c0f797b0b18dab44120473:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGY1ZGM3NTcyNzk5Y2UxNWJjZmJhZTM3NmY4ZmFkYmIyN2ZkN2JiMGYwYzBmNzk3YjBiMThkYWI0NDEyMDQ3MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGY1ZGM3NTcyNzk5Y2UxNWJjZmJhZTM3NmY4ZmFkYmIyN2ZkN2JiMGYwYzBmNzk3YjBiMThkYWI0NDEyMDQ3MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjkxN2RkYmI5NjA1ODY1MmI3NTg5ZDQ0NjljNzQ4YzVhYWVhYTYxNzRhY2E0NWJlODRjYTQ3YWJjYzQ1Nzk3NCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_1a8718a4a3164f6380cafd1750540bc5",
+      "statement": "The Helm umbrella chart smart-tutor (deploy/helm/smart-tutor/) has seven sub-chart dependencies — api, agent, mcp-server, worker, web, jobs, keycloak — each gated by a condition field in Chart.yaml.",
+      "evidence": [
+        {
+          "resource": "repo://deploy/helm/smart-tutor/Chart.yaml",
+          "version": "repo-file-v1:sha256:e57c23dbd06e3c5f70bccea87c82084b07809d3b2d68af150a9f7de9ade053b8"
+        }
+      ]
+    },
+    {
+      "id": "claim_e6ebdec14a1040b5953704c98b064509",
+      "statement": "Each sub-chart owns its own NetworkPolicy and ExternalSecret manifests. Default replica counts and image coordinates are declared per sub-chart in its values.yaml.",
+      "evidence": [
+        {
+          "resource": "repo://deploy/helm/smart-tutor/charts/agent/values.yaml",
+          "version": "repo-file-v1:sha256:1beea809bdeaba988e719840f180f3c67a1ad008a38896eba8ec05d11da2743f"
+        },
+        {
+          "resource": "repo://deploy/helm/smart-tutor/charts/api/values.yaml",
+          "version": "repo-file-v1:sha256:5b4dc53f0eaaf0bf460702d53ff5011e29fd079c72ac054a52065a8996220663"
+        },
+        {
+          "resource": "repo://deploy/helm/smart-tutor/charts/jobs/values.yaml",
+          "version": "repo-file-v1:sha256:f5761f42366dfddc3cdb1c1b393443c3f98871714a7950a925941d490915397d"
+        },
+        {
+          "resource": "repo://deploy/helm/smart-tutor/charts/keycloak/values.yaml",
+          "version": "repo-file-v1:sha256:7308b332dde964aa1dde73d426c7e091cdcdefdddcc622616c82b776bafc8f60"
+        },
+        {
+          "resource": "repo://deploy/helm/smart-tutor/charts/mcp-server/values.yaml",
+          "version": "repo-file-v1:sha256:f98a199bbe7ad1838d6d84d5e0eff6bb2c802d3e65833e6b970dde416cd9e4d4"
+        },
+        {
+          "resource": "repo://deploy/helm/smart-tutor/charts/web/values.yaml",
+          "version": "repo-file-v1:sha256:40a08c71e917e4681f6a21d9fca067d583be307f43e12258f6345474ea80b4a4"
+        },
+        {
+          "resource": "repo://deploy/helm/smart-tutor/charts/worker/values.yaml",
+          "version": "repo-file-v1:sha256:dd42c1202d1860faa603199a45109104686085e5b08d71675ce955c43ec6dcea"
+        }
+      ]
+    },
+    {
+      "id": "claim_d90e60a30a8a4cf69a63a1dcafd3777d",
+      "statement": "The agent sub-chart exposes an internal ClusterIP on port 8080 and accepts ingress only from api pods via NetworkPolicy; the mcp-server sub-chart exposes an internal ClusterIP on port 8000 (/mcp) and accepts ingress only from agent pods.",
+      "evidence": [
+        {
+          "resource": "repo://deploy/helm/smart-tutor/charts/agent/values.yaml",
+          "version": "repo-file-v1:sha256:1beea809bdeaba988e719840f180f3c67a1ad008a38896eba8ec05d11da2743f"
+        },
+        {
+          "resource": "repo://deploy/helm/smart-tutor/charts/mcp-server/values.yaml",
+          "version": "repo-file-v1:sha256:f98a199bbe7ad1838d6d84d5e0eff6bb2c802d3e65833e6b970dde416cd9e4d4"
+        }
+      ]
+    },
+    {
+      "id": "claim_ff442840bdf64cbf9f7ba3e09f5cdc64",
+      "statement": "The jobs sub-chart defines three CronJobs: recordSweeper (every minute, writes idle learning records), glacierTagger (daily at 03:00, tags unreferenced content objects for Glacier), and retention (daily at 03:30, purges expired traces and decline-log entries). All three use the smart-tutor-api image.",
+      "evidence": [
+        {
+          "resource": "repo://deploy/helm/smart-tutor/charts/jobs/Chart.yaml",
+          "version": "repo-file-v1:sha256:b93b0e0eed928ac933182110883b344c555a2fc1eb5a82f63cd46fae4f590e4b"
+        },
+        {
+          "resource": "repo://deploy/helm/smart-tutor/charts/jobs/values.yaml",
+          "version": "repo-file-v1:sha256:f5761f42366dfddc3cdb1c1b393443c3f98871714a7950a925941d490915397d"
+        }
+      ]
+    },
+    {
+      "id": "claim_8a56b34a57e34625a20a8e3a3ba38f57",
+      "statement": "values.yaml sets shared defaults for all environments including global.imageRegistry (empty, injected per environment) and global.imageTag (defaults to latest), plus enabled:true for every sub-chart.",
+      "evidence": [
+        {
+          "resource": "repo://deploy/helm/smart-tutor/values.yaml",
+          "version": "repo-file-v1:sha256:79bd2e6cc8b528f2338f3dfb58343065a8d36272e717c9b2c6062f46d9cff4a9"
+        }
+      ]
+    },
+    {
+      "id": "claim_158e609444224779aa20d44efb4f4964",
+      "statement": "values-prod.yaml overrides replicaCount to 2 for the api and agent sub-charts; all other settings inherit from values.yaml. Image tags are injected at deploy time via helm upgrade --set global.imageTag=..., not stored in the file.",
+      "evidence": [
+        {
+          "resource": "repo://deploy/helm/smart-tutor/values-prod.yaml",
+          "version": "repo-file-v1:sha256:50f90df7a2f034932c2d80fe26b0ed10fa4aa629fc4134ceada82bb6c5b7f567"
+        }
+      ]
+    },
+    {
+      "id": "claim_4977638e36724e36bd8196a3e41d85ad",
+      "statement": "The delivery pipeline (PRD §9.12) runs: merge to main → CI (tests + smoke eval split) → push images to ECR → cdk deploy → helm upgrade. Full evaluation split gates each release.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L450-L450",
+          "version": "repo-lines-v1:sha256:b5edbacc41be5ba328936e0dfbe0b0d793855750760cff7f7de8934f86b7b486:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjVlZGJhY2M0MWJlNWJhMzI4OTM2ZTBkZmJlMGIwZDc5Mzg1NTc1MDc2MGNmZjdmN2RlODkzNGY4NmI3YjQ4NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjVlZGJhY2M0MWJlNWJhMzI4OTM2ZTBkZmJlMGIwZDc5Mzg1NTc1MDc2MGNmZjdmN2RlODkzNGY4NmI3YjQ4NiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODczYTcyYTYzOGE1ZDhiMDY4NzQxMjViZjkxNTA2YjUzZTU1NGI2ODJkYmUzNTVjNzA3YWJhNGIzNWM2MGIzNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmUwMWQ5MDYwYTFjZGViODllZjllYjQwOTNlNGJhODI1ZDQzYmM0MzA4NjIxODBkOTRmYWU5OTRlZTcxM2EyMyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_c012897405a5431580830e20057c44c7",
+      "statement": "The synthesis smoke test (infra/tests/test_synth.py) asserts that build_app() produces exactly 7 stacks and that all of them target us-east-1.",
+      "evidence": [
+        {
+          "resource": "repo://infra/tests/test_synth.py",
+          "version": "repo-file-v1:sha256:f4a9ac2f3d5c68f67e289b4427033d6a0605a400cdee77946d97ad1a94e063fc"
+        }
+      ]
+    },
+    {
+      "id": "claim_511fab328b6f4afda605297c00fa8bb1",
+      "statement": "The CI workflow (.github/workflows/ci.yml) defines three jobs — backend (ruff lint, mypy, import-linter contracts, pytest), web (npm ci + npm run build), and helm (helm lint deploy/helm/smart-tutor) — triggered on all pull requests and pushes to main. ECR push, cdk deploy, and helm upgrade steps are pending M4.",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/ci.yml",
+          "version": "repo-file-v1:sha256:1e3f32814a4a591558b1ab8dd7e3275c8b4aeae42164326a0b2c4286cef8fb20"
+        }
+      ]
+    },
+    {
+      "id": "claim_a7a2877ee269456894fb8f147ba5d294",
+      "statement": "deploy/helm/addons/ holds values files for three cluster-level addons: the AWS Load Balancer Controller (clusterName: smart-tutor-prod), the External Secrets Operator (installCRDs: true, syncs Secrets Manager secrets via Pod Identity), and metrics-server (HPA metrics). These are installed separately from the application chart.",
+      "evidence": [
+        {
+          "resource": "repo://deploy/helm/addons/aws-load-balancer-controller.yaml",
+          "version": "repo-file-v1:sha256:a2b0b5280874a3b6114d38f89572a35eb1645647e4fe1eb0abdd7d006e596a0b"
+        },
+        {
+          "resource": "repo://deploy/helm/addons/external-secrets.yaml",
+          "version": "repo-file-v1:sha256:18a35c7f4a1de875a3535755c41731111b0a14523538592e56cd4ef328ebbfdd"
+        },
+        {
+          "resource": "repo://deploy/helm/addons/metrics-server.yaml",
+          "version": "repo-file-v1:sha256:6439752b636dc2bca384fa695651e5255c6f24e405e91949f0eabb5ebbf4c1fb"
+        }
+      ]
+    },
+    {
+      "id": "claim_02c547a8bb0e4493b666d75c9f99237f",
+      "statement": "The release gate requires three checks before a release is promoted: (1) all release_1 targets in backend/evals/thresholds.yaml are met (including injection_resistance: max_failures 0, isolation_and_dedupe: min 1.00, answer_relevance: min 0.85); (2) isolation tests pass; (3) a production smoke test passes.",
+      "evidence": [
+        {
+          "resource": "repo://backend/evals/thresholds.yaml",
+          "version": "repo-file-v1:sha256:418d423d220866e34a4fde23e5911d9aba81856e92f67d1634fa9b8fb3fb6474"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L450-L450",
+          "version": "repo-lines-v1:sha256:b5edbacc41be5ba328936e0dfbe0b0d793855750760cff7f7de8934f86b7b486:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjVlZGJhY2M0MWJlNWJhMzI4OTM2ZTBkZmJlMGIwZDc5Mzg1NTc1MDc2MGNmZjdmN2RlODkzNGY4NmI3YjQ4NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjVlZGJhY2M0MWJlNWJhMzI4OTM2ZTBkZmJlMGIwZDc5Mzg1NTc1MDc2MGNmZjdmN2RlODkzNGY4NmI3YjQ4NiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODczYTcyYTYzOGE1ZDhiMDY4NzQxMjViZjkxNTA2YjUzZTU1NGI2ODJkYmUzNTVjNzA3YWJhNGIzNWM2MGIzNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmUwMWQ5MDYwYTFjZGViODllZjllYjQwOTNlNGJhODI1ZDQzYmM0MzA4NjIxODBkOTRmYWU5OTRlZTcxM2EyMyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_640eca80857040ed9feca343961b02fb",
+      "statement": "Work is tracked using GitHub Milestones M0–M4 for Release 1, with a parent issue per user story (US-1 … US-13b) and vertical-slice sub-issues sized to one agent session. CDK/Helm work uses the area:infra label; issues touching learner data require the isolation label and a test in backend/tests/isolation/.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/reviews/2026-10-03-delivery-process-discussion.md#L44-L67",
+          "version": "repo-lines-v1:sha256:0a29e542b5fd46b77a364a3dc4d1bc29b1c1fa2babbec609d955c339393eae01:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE5YTM3NTM3OGNlMmFhZTBmZjMwMjg2OWI3ZmUxMjI2ZmU5NGIxNDNjNjVkMGYyNzg0N2FiMDE1MzE0YzY5YTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk4NzJiODEwNDVlY2FlNTkzMzIwMmNlNzRlYTAyZjE3ZTM5MDU5MzczNTM0YWU0NjE0MjcyYjA2N2IyZTVlMzAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJjZDMyZGM1NDczY2E2YjJiMjhiN2FlZDExNDIyZDM0ZTdmYzZhNTZjZGQwZjgzMjU5NTJmNDlkNDYwYTkwNTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg1ZDkzNWRmODMzNDNjMDllZDRkY2M0MDY1NWIxNzA2MjlmYjdhZTczNjc1ZTA3NzljYjFhNzBlZmNhMjc1MGIifQ"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-03T03:19:50.688Z"
+  }
+}

@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:e96b2ac2faff002ddd7245b742ed402a04afa5afc97fcf3c569c628855f68a89",
+  "claims": [
+    {
+      "id": "claim_459c5b8953784bf0ab0df0f5933beaff",
+      "statement": "The Docker Compose file defines two operating modes: the default (no profile) starts pgvector on port 5432, Keycloak on port 8080, and LocalStack on port 4566; adding `--profile app` additionally starts the api (:8001), agent (:8002), mcp (:8000), worker (no host port), and web (:5173) containers built from backend/Dockerfile targets.",
+      "evidence": [
+        {
+          "resource": "repo://compose.yaml#L1-L96",
+          "version": "repo-lines-v1:sha256:2a8a0f92df9548e14ec5a71eff44c40609b84e73a5bbfdc74385426ef2577b44:eyJzZWxlY3RlZExpbmVDb3VudCI6OTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZkYzkzZGI4MjdjYWQyMThkNjk4MDY4N2M1MjZiYTkxOTExMjljYjRlMjZjMzZhZTM4OTQyMjZlNTQxMGE2ODgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMwZTM4YTY4YjQ5N2I4ODk3ODRlZGRlMGZmMTNiYTA3MmJhYzM5Yjc2MzBkMTZjNTY3MjA4NWVhMzMxZjUxYmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUyOTU2YjdlMDc1NjNkNjExYmQyNGM4MjRjNThiMDNhYWMyMjk3N2NhMWEyMjljZWQ4MjBlNDFlZmQ4YTE1MjAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_6834976009d941a0bebb7ccc420b67e1",
+      "statement": "LocalStack is initialised at startup by `local/localstack/init/ready.d/10-smart-tutor.sh`, which creates the S3 bucket `smart-tutor-documents` (with versioning and CORS for localhost:5173), the SQS queue `smart-tutor-ingest` with a DLQ, an S3→SQS notification on `uploads/` prefix, and an SSM parameter `/smart-tutor/learning-record-idle-minutes`.",
+      "evidence": [
+        {
+          "resource": "repo://local/localstack/init/ready.d/10-smart-tutor.sh",
+          "version": "repo-file-v1:sha256:529cc8bf9bd14a672b488335a86b00218a360ee5ccc9903c895e5a8eb1726609"
+        }
+      ]
+    },
+    {
+      "id": "claim_f0ad7fd51c084d289a9805e12693c41a",
+      "statement": "The Postgres container runs `local/postgres/init/01-init.sql` on first start, which enables the `vector` extension in the app database and creates a separate `keycloak` database.",
+      "evidence": [
+        {
+          "resource": "repo://local/postgres/init/01-init.sql",
+          "version": "repo-file-v1:sha256:e70329100a0dfd9c7a89a86eb5eaa80e660ec5c320d21ff8e9a584b93ef4f87d"
+        }
+      ]
+    },
+    {
+      "id": "claim_42b1e0fcb7ab42daa9acd73f76346ef1",
+      "statement": "The Keycloak realm `smart-tutor` is imported from `local/keycloak/realm-smart-tutor.json` only when the volume does not yet exist; re-importing after edits requires `docker compose down -v`. Three test users are pre-configured: learner@example.com/learner, learner2@example.com/learner2, and admin@example.com/admin (with the `admin` realm role).",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L47-L47",
+          "version": "repo-lines-v1:sha256:7668993051a707734526cab1a9944758988931ae0f436dc4c99568eafbc0572d:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzY2ODk5MzA1MWE3MDc3MzQ1MjZjYWIxYTk5NDQ3NTg5ODg5MzFhZTBmNDM2ZGM0Yzk5NTY4ZWFmYmMwNTcyZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzY2ODk5MzA1MWE3MDc3MzQ1MjZjYWIxYTk5NDQ3NTg5ODg5MzFhZTBmNDM2ZGM0Yzk5NTY4ZWFmYmMwNTcyZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWUxZjEwNTgzMmFlNjJmMTJkMjQzNDBjYTgyMDhjN2YxODUwN2UxYTNkNjM4MjAzMzc2ZGMwMDk1MTY0NzZkNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGRmYTE1YTFlMWY3ZDI4OGRjNzRjNzAwNTUyMDdhZjM3NjZjN2FlNmEzNDU3NGU4ZjgyODg2OTNiMzEzMjNmOCJ9"
+        },
+        {
+          "resource": "repo://local/keycloak/realm-smart-tutor.json",
+          "version": "repo-file-v1:sha256:e70f6b78abde068e553a2de7beb4621a2c08dda58f9494f86c6f682f9a5915db"
+        }
+      ]
+    },
+    {
+      "id": "claim_d385598101d04a528007571d119ee825",
+      "statement": "The `make lint` target runs four tools in sequence inside backend/: `ruff check`, `ruff format --check`, `mypy` (strict, Python 3.12, files=src), and `lint-imports` (import-linter enforcing 18 architectural contracts defined in backend/pyproject.toml under [tool.importlinter]).",
+      "evidence": [
+        {
+          "resource": "repo://Makefile#L22-L22",
+          "version": "repo-lines-v1:sha256:5479edcdbd569d846f102c1447578e117414af482bac328f3305a7fd400b6a70:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTQ3OWVkY2RiZDU2OWQ4NDZmMTAyYzE0NDc1NzhlMTE3NDE0YWY0ODJiYWMzMjhmMzMwNWE3ZmQ0MDBiNmE3MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTQ3OWVkY2RiZDU2OWQ4NDZmMTAyYzE0NDc1NzhlMTE3NDE0YWY0ODJiYWMzMjhmMzMwNWE3ZmQ0MDBiNmE3MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTVkYTgyNzdiYWQ5YWEzYTc4MjEyMjViNTM4NGUwOWMxOGNlODAxZTIwZDkzOTkyMGM3ODgwYmMwYWZkOWZlYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTQ3NjRjYzdmZjIxNjMzYTk5OTkyOGMwYjhmNmFmMzA4ZTM4ZGE1ZDg4MmNlMGE2MTM4ZGRiZGM5MWZhY2U1ZCJ9"
+        },
+        {
+          "resource": "repo://backend/pyproject.toml#L71-L93",
+          "version": "repo-lines-v1:sha256:04ee195d3d45025599606bce93cd46b77ffc59eafeeaad52770fe211eb1dd623:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk0NjE5YmM1OTAxYWM0NGZlZjJhYjg3YzUzZjA1NjgxNmIxNmQxM2U5N2U3ZmMyNjQ1NTg1MWRhNDYxOTk2ODciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlYjcwMjU3NTkzZGEwNmY2ODJhM2RkZGE1NGE5ZDI2MGQ0ZmM1MTRmNjQ1MjM3ZjVjYTc0YjA4ZjhkYTYxYTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ4MTYyNDVmMGZlYjIwYjY2NTQwZTFhY2IwYjYxYjY2M2VlOWEzM2I3ODE4ZTQxYWE1MzEzNWFjNmUzMmVhNzEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA5NTZjZGE5MjU3ZDY3OWExZTBiODRiMGI3MjQwMGFmMzBiYWQxZjk0ZGQ2MWFkZTE1MWU3ODM1NTMwMWZkN2MifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_aec04295659347a09d5db6efb630d757",
+      "statement": "`make test` runs `uv run pytest` in backend/, which by default excludes the `integration` marker, executing only unit tests from tests/unit/ with asyncio_mode=auto and no real I/O.",
+      "evidence": [
+        {
+          "resource": "repo://Makefile#L25-L25",
+          "version": "repo-lines-v1:sha256:84b2fc881107ff6c7ec4c3b8fcd869a115fa90f470d063af4e596b928c8028a0:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODRiMmZjODgxMTA3ZmY2YzdlYzRjM2I4ZmNkODY5YTExNWZhOTBmNDcwZDA2M2FmNGU1OTZiOTI4YzgwMjhhMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODRiMmZjODgxMTA3ZmY2YzdlYzRjM2I4ZmNkODY5YTExNWZhOTBmNDcwZDA2M2FmNGU1OTZiOTI4YzgwMjhhMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWNhYTgwZTFhZGUwNDdhNDk4ZDUxYTU3Y2JhYTk3MTgwMWE1MGFjZjgxN2MyMDU0YmFkMTRhZmM3NjgxNDdkZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGI0ZjAxOTJhZWU0MjMwYWU5Y2FlZDJiYmI1MDBiZWU2OTNlMGQ0ZTBjOGY0OTNkNTc5NDZjYTM4NTkwOTc2MyJ9"
+        },
+        {
+          "resource": "repo://backend/pyproject.toml#L54-L59",
+          "version": "repo-lines-v1:sha256:0a9b7bf15a990d8e5b8079a27bf27a9120857a56cc207c4217540bf232e12b4e:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTBiYjUyNzdiM2M1ZDgyOGQxM2UxMDg4M2E4NTE0NmNiMmZiOGEwYzJjMDAwZjBjNTRjYzk2YmEwZGY3MDA1OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTJkOTIyZTIzNjE2NTJjODRlZDhiYmFiOWRmNjI5ZmIyNWNkZTlmNTU1NDU4Y2I3YTExYTljMDg2NmVlMzgwNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjYxZTRlNTg2MDRlYzk4ZWU2YjYwMzJiOTZhNWZkYTljMGJjYzM1OGY4NmE1MjE1NmJhYTRlZDVjZjlmZmIwNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWZhMWE1OWFjZjMzMzI3YzVkMzEzMTY2NWNiODRhZGIxMTBhNTUxYWZjYWNiNzdiOTkyM2NkN2UwZjdhZDg0ZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_db66be7b27c5451fbb528e6349e2da15",
+      "statement": "`make test-integration` runs `uv run pytest -m integration` against the live Compose stack and requires `make up` to be executed first.",
+      "evidence": [
+        {
+          "resource": "repo://Makefile#L27-L27",
+          "version": "repo-lines-v1:sha256:e7fb0b282c3aacdd182c89fb07d9484026ad7b356effd362dcb2f63f8f8cc64b:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTdmYjBiMjgyYzNhYWNkZDE4MmM4OWZiMDdkOTQ4NDAyNmFkN2IzNTZlZmZkMzYyZGNiMmY2M2Y4ZjhjYzY0YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTdmYjBiMjgyYzNhYWNkZDE4MmM4OWZiMDdkOTQ4NDAyNmFkN2IzNTZlZmZkMzYyZGNiMmY2M2Y4ZjhjYzY0YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2RkZjhkZjE2ZDkwZjZiNTBmOTQ2M2EwOTNjNGU5Yjk4YTM4ZTFlMTY5OWY4MTliZWVmZTBiMzY0ZTQwMDc4YiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWJjZjkyNTkxNTkwNWQ0ZDE4NjhiY2MwMGM1MDBlZTc0MzNlN2NiZDQxYmQxYmNhMGZjZmE2ODY2Mjc0MjUyMyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_4b874bac4d8246648040253d30215df7",
+      "statement": "`make evals-smoke` runs the ~30-item smoke eval split (`uv run --extra eval python -m evals.run --split smoke`) against real Bedrock in us-east-1, pushing results to LangSmith and comparing against thresholds in backend/evals/thresholds.yaml.",
+      "evidence": [
+        {
+          "resource": "repo://Makefile#L37-L37",
+          "version": "repo-lines-v1:sha256:18d5abd290b0c166598d23f8558a4df450a1f2c37960d60ffaa1f35a156032ad:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMThkNWFiZDI5MGIwYzE2NjU5OGQyM2Y4NTU4YTRkZjQ1MGExZjJjMzc5NjBkNjBmZmFhMWYzNWExNTYwMzJhZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMThkNWFiZDI5MGIwYzE2NjU5OGQyM2Y4NTU4YTRkZjQ1MGExZjJjMzc5NjBkNjBmZmFhMWYzNWExNTYwMzJhZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWY4ZDU0ZTZlNjBmMTQ5OThlNGRjOTg1MjUzOGZhMzgwZWRiNmI3YzUyMzBhOTEyZDU2MTM0ZTViOGQ5YjQ0MCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjA1ODMwMzNhNGQ1N2MxNmIwZTY2NmNkOWE1OWRhNWE2ZTJmMjVhYWRhMDc2ODdlMjYzOWI2YTUxZTA4YmU1ZiJ9"
+        },
+        {
+          "resource": "repo://backend/evals/README.md",
+          "version": "repo-file-v1:sha256:f5ec9a89714f55f75d4d4a7469c85d382c77a55c1824541b2e04aea975783dc1"
+        }
+      ]
+    },
+    {
+      "id": "claim_7ed9f2d16e5c4be4a74c7505b46eea65",
+      "statement": "The Makefile exports `PYTHONUTF8=1` globally; on Windows, this environment variable is also required when running `lint-imports` directly, and `MSYS_NO_PATHCONV=1` must be set for commands taking SSM paths like `/smart-tutor/...` in Git Bash.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L48-L48",
+          "version": "repo-lines-v1:sha256:33999b7a8fca54743cf7f6600b7810813e238ca4878c4b572b6215ec73923e7d:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzM5OTliN2E4ZmNhNTQ3NDNjZjdmNjYwMGI3ODEwODEzZTIzOGNhNDg3OGM0YjU3MmI2MjE1ZWM3MzkyM2U3ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzM5OTliN2E4ZmNhNTQ3NDNjZjdmNjYwMGI3ODEwODEzZTIzOGNhNDg3OGM0YjU3MmI2MjE1ZWM3MzkyM2U3ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmEyODYyZGY2MmExNjFiYmRmMTc5MWQ4OWFiYTIzODI2ZTgzNWQ1YjQzYmMxZGNkODIyZWQxMjU5NGE0YjRkNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWVkZTJlMWM4MzU3YTE3ZDJhNzcyOTg1NTAyMzRmMWExNGE1MmMxMDkyMTI1Njg3NGUxYzg1Y2UzOTk1YTFjMyJ9"
+        },
+        {
+          "resource": "repo://Makefile#L6-L6",
+          "version": "repo-lines-v1:sha256:563fa66acfab6a26f55f181a30552f0440f65928cb3b95f683340fdc71a1be8d:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTYzZmE2NmFjZmFiNmEyNmY1NWYxODFhMzA1NTJmMDQ0MGY2NTkyOGNiM2I5NWY2ODMzNDBmZGM3MWExYmU4ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTYzZmE2NmFjZmFiNmEyNmY1NWYxODFhMzA1NTJmMDQ0MGY2NTkyOGNiM2I5NWY2ODMzNDBmZGM3MWExYmU4ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiY2M1MmMzZWViNzNhYTZiYjE0Mjc5ZGQ5YTUwOGVlZjkxMDBkOWViNWYwMTVmMDhmZGRhMDA3ZmJiMjZkOGNiMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTI1ODRjMzYxNDdiYjZlNTk1MmM2MzViMjBkYTE3MjUzOWY5ZTkyZjczNjRkMDI4MGZiZTllNGE5YmRmZjZjNiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_bc7cb483cf8f494484ce1b52b529b2f8",
+      "statement": "Bedrock and LangSmith have no local emulator; local runs (including app containers and evals) call real us-east-1 models using a developer AWS profile supplied via .env.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L46-L46",
+          "version": "repo-lines-v1:sha256:ef2aa529c79f5fb22856ea55846aa1e37fb96d917d2713d46e6d9f422eaecc7c:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZWYyYWE1MjljNzlmNWZiMjI4NTZlYTU1ODQ2YWExZTM3ZmI5NmQ5MTdkMjcxM2Q0NmU2ZDlmNDIyZWFlY2M3YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZWYyYWE1MjljNzlmNWZiMjI4NTZlYTU1ODQ2YWExZTM3ZmI5NmQ5MTdkMjcxM2Q0NmU2ZDlmNDIyZWFlY2M3YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDQ3NTA4NzIxMTY3ODJmNzNjM2Y4NjFlNTc2ODJkNjQ1ZWJlZjNlOGRhNDIwN2JhMmVlYWI5MWU5ODg3NTVlMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiM2Y5MGRkZWZiY2IyOTNhODQ1ZDllMWFhOTdhNDA3MzllMDc0NjE1OTRmZjk4ZDNkNWJkODU4OTUyNzBmNDA1YyJ9"
+        },
+        {
+          "resource": "repo://compose.yaml#L3-L5",
+          "version": "repo-lines-v1:sha256:23ab3da67d0e472fdd6fbcd49ab0a5144734cb9deb810feafe9a3affe6d55100:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTRlNDllZDlhZTYyOGY3NThmZWJjNzVlMTYzNDc3MDVhMjI1MDdhYjUzM2EzN2FhOTg2YmU4NGI0NGJhOGM5MiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjIsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDc2MzE0NjljMTY3NmQzYzk0OGMzZGM3MDkyMWZjMTY2MzZkOWI0NzM4OWExOTUwYjMzNjc2MzYwYWM5Njc3OCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGI5M2RjYzRhYWY4OGEyZjAwYmExOGVjNTVmYjZhY2MzMGZiNTNmMThmODAwOWJiMTZlZTBkZGFlNTk1NjI1MCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_de7ecce3f8ea4e84ba98f98b376b611c",
+      "statement": "The pre-commit check sequence from AGENTS.md is a single chained pipeline for the backend: `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && PYTHONUTF8=1 uv run lint-imports && uv run pytest`; separately, `cd web && npm ci && npm run build` for web changes; `cd infra && uv run pytest` for infra changes; and `helm lint deploy/helm/smart-tutor` for deploy changes — the same sequence run by CI.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L54-L59",
+          "version": "repo-lines-v1:sha256:e0fae9f4fc434f2d713189cd592c076f625b218e65b74e8e1f70f6b705a2ba45:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmJlY2RiZWY2ZGNiYWE4YmU1ZWVhMGFkMWQ5MTZmNjY3MWMxOWQ0MmE3NzQ5MmNiMGE5OWQ1YzdhMDhkMzZjNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2VjNTY4ZWFkZGNjNDg0MDI2ZjFlMzJhZjIyYzc1ZjM4NTM2MmNmMmM1YzFkZDk2OGMwNTkyZjU3MTk1ODMzMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTk3YWMzMGYwNzU0NDJmZjNkY2RiZjIyODhlNTRmZmY0ZTRhN2UyNzBlYTYyODVjZThlMzczOWZmYWU0Zjg0NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiN2JhNjZhODNkZWQ5MTZhZDFlOGFlYjlhZTA1ZWMzMmRiODVhMzM0ZmMzOGY2NzMyMzA1ZTFjNzQ4NGFkZjZmYSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_5521d81879804bb794906afcadfb399e",
+      "statement": "The Makefile also provides one-shot job targets: `sweep` (learning-record sweeper, PRD §9.2), `glacier-tag` (Glacier tagger, PRD §9.5), and `retention` (trace/decline-log retention: 180 days and 90 days respectively, PRD §9.6); plus `infra-synth` (CDK synth) and `helm-lint`.",
+      "evidence": [
+        {
+          "resource": "repo://Makefile#L29-L46",
+          "version": "repo-lines-v1:sha256:2d440552d2aa41d2529a10d20364919f7a8af1f7fa08bf6b0a1dbb38e7d5e0d3:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVlMjlkZmM2ZGM4NWJmZmY0Y2JiM2ZmODQ1NWI3NTY1ZmJjOTVmNDg5NGE3ZTc3NDM1ZjI0ZDYzMzdhMGU1NGEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI2YzFjYzZmZWI1NzZjOWE1Y2U1MDZjNjE3MWI0ZDcyMmNkZmM2MmYxNWJiOTE5ZDYzNTkzOTIzYWRkMGY5ZWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRiNGYwMTkyYWVlNDIzMGFlOWNhZWQyYmJiNTAwYmVlNjkzZTBkNGUwYzhmNDkzZDU3OTQ2Y2EzODU5MDk3NjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-03T03:19:50.688Z"
+  }
+}

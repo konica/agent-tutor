@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:b8da148c931d950ae47b8da76a56e415e9771944b0604a3f1cc602c68510672f",
+  "claims": [
+    {
+      "id": "claim_fc6f8adaa76d4e7698706c2e8d79c0b5",
+      "statement": "ModelFactory takes a Settings instance and builds ChatModel or EmbeddingModel adapters by role (agent, judge, or embedding); business code names a role and never references a model ID or vendor SDK directly (PRD D15).",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/adapters/model_factory.py",
+          "version": "repo-file-v1:sha256:f4a04a40c8676893d1e3d79c256ee1ede597f743573292487c20a0a7450414ed"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L110-L110",
+          "version": "repo-lines-v1:sha256:3fddf40df51df7ce2bd9fd7f4229b1317fc7c044258fabc008ae4f83765d311a:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2ZkZGY0MGRmNTFkZjdjZTJiZDlmZDdmNDIyOWIxMzE3ZmM3YzA0NDI1OGZhYmMwMDhhZTRmODM3NjVkMzExYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiM2ZkZGY0MGRmNTFkZjdjZTJiZDlmZDdmNDIyOWIxMzE3ZmM3YzA0NDI1OGZhYmMwMDhhZTRmODM3NjVkMzExYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDIxNzVkNDZiZjdjZmM3MjFiMTBkMTA2NGMwMjEwNzFjZGFmNjUwNjRiNDRmYmE1MzQyNmFmYjNlNTIzYjI2YiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZmIyZDcwOWU4Zjg0ZTkzMTE4OTE3NTBmM2JjNTE1ZjIzYTZiYTBjNzk0NDhmNmM5N2Y4MmU3ODQyYzc5ODU0NiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_e173d328f50846e99588a0255d587206",
+      "statement": "The agent role is mapped to the us.amazon.nova-2-lite-v1:0 inference profile (not the base model ID), routing all agent requests within US regions (PRD §9.14).",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/config.py#L19-L19",
+          "version": "repo-lines-v1:sha256:31b1813655861343cb14d906abeabc1a4b10966d5345990332a87a2680b9b9a4:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzFiMTgxMzY1NTg2MTM0M2NiMTRkOTA2YWJlYWJjMWE0YjEwOTY2ZDUzNDU5OTAzMzJhODdhMjY4MGI5YjlhNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzFiMTgxMzY1NTg2MTM0M2NiMTRkOTA2YWJlYWJjMWE0YjEwOTY2ZDUzNDU5OTAzMzJhODdhMjY4MGI5YjlhNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDU0ZWM3MTY3NjVhYzhhMzI0OTczNzM1NzJkY2QzOGEyOWIzODJhYjc0ZDgzNDFjZGIyZDQwMjc1NGE2YWQ3ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmEzNjJhOWE2OGEzNjVlYzc2NTIyZmJiNTI2ZDNiMWYwMDE2OWQzM2Q0OGQ3MmIxMGZjYzIxNTMyYzlkZDliNCJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L470-L470",
+          "version": "repo-lines-v1:sha256:b04aa03733133a476c1cd1a825e58a44a528a80f5d245ef492569cbc755fb4ad:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjA0YWEwMzczMzEzM2E0NzZjMWNkMWE4MjVlNThhNDRhNTI4YTgwZjVkMjQ1ZWY0OTI1NjljYmM3NTVmYjRhZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjA0YWEwMzczMzEzM2E0NzZjMWNkMWE4MjVlNThhNDRhNTI4YTgwZjVkMjQ1ZWY0OTI1NjljYmM3NTVmYjRhZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGZkMjEyMDliOGU0NDVjNDEyOWNjYTIxMzQzNzRkZTg3ODNjZDM4YWExNjA0NmU5ODRjZGZmODgxN2Y2YzQ0NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmY0MDcxZWYwZmU3YmE2NWU0ZTg2NTkwZDlkZmQwOTg5MjdmYjJkYzVkZWFlMTI1YWE3Mzc4NjNkN2MyMjc5NiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_ea7bdcdb6fd94ad7a836af4532d60676",
+      "statement": "The judge role is mapped to qwen.qwen3-32b-v1:0 with temperature=0; a different model family from the agent is used to reduce correlated bias in LLM-as-judge evaluation.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/config.py#L20-L20",
+          "version": "repo-lines-v1:sha256:e261e95861bfb594584d7143e27da689d8aed78381e4ed43b6ce9af1dccf70b7:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTI2MWU5NTg2MWJmYjU5NDU4NGQ3MTQzZTI3ZGE2ODlkOGFlZDc4MzgxZTRlZDQzYjZjZTlhZjFkY2NmNzBiNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTI2MWU5NTg2MWJmYjU5NDU4NGQ3MTQzZTI3ZGE2ODlkOGFlZDc4MzgxZTRlZDQzYjZjZTlhZjFkY2NmNzBiNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDZmMTNmOWM0YjZhM2Q4M2Q4Njk5MjM3Nzg5YTQ1NDVlNzdkNTI3ZWRiNjRmYTA5N2JlNzIxMjI0MmI1NTE2YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzFlMDgwM2I3ZDM1ZGRmZGQyM2MzNjg4ODVkODA5YjRmMjlhYjljOTA1NTExMTIxOGE0M2MxZTgwYmNhYzlhOSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L417-L417",
+          "version": "repo-lines-v1:sha256:16dad7edffe0ae0c30256ebf324bc61f650577947ffa7eeeb0d55f4f339c5769:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTZkYWQ3ZWRmZmUwYWUwYzMwMjU2ZWJmMzI0YmM2MWY2NTA1Nzc5NDdmZmE3ZWVlYjBkNTVmNGYzMzljNTc2OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTZkYWQ3ZWRmZmUwYWUwYzMwMjU2ZWJmMzI0YmM2MWY2NTA1Nzc5NDdmZmE3ZWVlYjBkNTVmNGYzMzljNTc2OSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjE2OGZiYmEwNzZkYTRmMzdhYTQxZjVhZWYwZTk4ZTQ4NDBhZTY4MjgyZmVmZGVhNDQ5ZjU5YWJhNDlmYjA3YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDMzYzJmNjY5ZmEzMDZlNTNhYTA4ZGZkZGQwZDdkOWZlMDEyMzIwZDY2YWQwZDdkZDIxOTdmNzYxZmM4ZDM3MiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_ecd016278d564bdc8b56ff493ecff5e5",
+      "statement": "The embedding role is mapped to amazon.nova-2-multimodal-embeddings-v1:0 with 1024 dimensions; the model_id and dimension are recorded on every chunk row and on the contents table.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/config.py#L21-L23",
+          "version": "repo-lines-v1:sha256:31e0803b7d35ddfdd23c368885d809b4f29ab9c9055111218a43c1e80bcac9a9:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDlhMjAxZjI4ZGQzN2MyNTgyMTYyZGE1YTI3NmM1YWUyYzYyYTA3ZWFkMGEwNjU5ZDg5MzA3ZmNjMzhhYzZkMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzkyMjA0YzY1ZjUwMmRjMTY0NTRiNjI0MDg1NmE5YWI3YWRlMDAzYThlOWY4NjMzM2VjMGI3YzllNDA5NDkxZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTk2MThkMDRkMGQ1ZTU5MDBhZWJlMGZjZWEyMGM2Mjc5Njg2MDY2YzVhNWE0YjYyMDY3Y2RjMGFhNDExYzdmMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODdkZmY1YWY2ODBhZjI1NDU4MTJjODMxZjY5MTk1ZjUzYWJhYjJkMjM0Nzk1MGRjZmE5ODg0OTQ3OGEyODExNyJ9"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/ports/embedding_model.py",
+          "version": "repo-file-v1:sha256:45cceac4ce6be02e5940f717d3d6cde95d810c5ac0c7d1d8e419b28c360b3771"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L413-L413",
+          "version": "repo-lines-v1:sha256:2916df1b5a0aeec183003b0aaac85f93fd43c7e52e598150f6ba83121d88a415:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjkxNmRmMWI1YTBhZWVjMTgzMDAzYjBhYWFjODVmOTNmZDQzYzdlNTJlNTk4MTUwZjZiYTgzMTIxZDg4YTQxNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjkxNmRmMWI1YTBhZWVjMTgzMDAzYjBhYWFjODVmOTNmZDQzYzdlNTJlNTk4MTUwZjZiYTgzMTIxZDg4YTQxNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjljMGMxNmI2NTU0YzVhNmQwYzE2M2QwYmQxYmM0ODMzMDY3MTlkMWNiODcxNjhjNGIxOWMzY2JiODk0NWRhZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjE2OGZiYmEwNzZkYTRmMzdhYTQxZjVhZWYwZTk4ZTQ4NDBhZTY4MjgyZmVmZGVhNDQ5ZjU5YWJhNDlmYjA3YyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_a05ffc0d9c1d4140bd4c58ce772255bb",
+      "statement": "ChatModel defines three call patterns: stream (returns AsyncIterator[ChatChunk] where the last chunk carries usage), invoke (returns a complete ChatResult), and structured (returns StructuredResult[T] with a validated Pydantic object).",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/ports/chat_model.py#L56-L67",
+          "version": "repo-lines-v1:sha256:130a674988ce14848ff444eacc513ac994b149cc05ff8444adc90bce38cd72c0:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ4NGRiOTUwNDIyZjczOWM5NzM2ZWFkYTVkNjA3NTg4ZWVmYTMzMmFmNTcwYjcxMjdjNTQyOTYzYzA5NWEzZDUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgyYTU0NDFkOGRjOGVlMWE3ZDA1NjlmNjM3YWIxODk4Yzg5MGI0ZGI3NTlhZDNlYzZkNDVjOTlhY2JkZTdmZTgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk5MGUzZjQ2MDk5ZGVmYzAzYTI2N2MwOTQyOGE5MTI0NzUzOTlhNWI4ZGZkZmUzN2IzNGZkNWRiNjE2YzQ1NjgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_50e323c9efc14c368b52e0008d9f981b",
+      "statement": "EmbeddingModel.embed_documents uses the Nova GENERIC_INDEX input type for chunk and passage indexing, while embed_query uses TEXT_RETRIEVAL for search queries; the distinction is required for correct asymmetric retrieval.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/ports/embedding_model.py",
+          "version": "repo-file-v1:sha256:45cceac4ce6be02e5940f717d3d6cde95d810c5ac0c7d1d8e419b28c360b3771"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L413-L413",
+          "version": "repo-lines-v1:sha256:2916df1b5a0aeec183003b0aaac85f93fd43c7e52e598150f6ba83121d88a415:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjkxNmRmMWI1YTBhZWVjMTgzMDAzYjBhYWFjODVmOTNmZDQzYzdlNTJlNTk4MTUwZjZiYTgzMTIxZDg4YTQxNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjkxNmRmMWI1YTBhZWVjMTgzMDAzYjBhYWFjODVmOTNmZDQzYzdlNTJlNTk4MTUwZjZiYTgzMTIxZDg4YTQxNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjljMGMxNmI2NTU0YzVhNmQwYzE2M2QwYmQxYmM0ODMzMDY3MTlkMWNiODcxNjhjNGIxOWMzY2JiODk0NWRhZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjE2OGZiYmEwNzZkYTRmMzdhYTQxZjVhZWYwZTk4ZTQ4NDBhZTY4MjgyZmVmZGVhNDQ5ZjU5YWJhNDlmYjA3YyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_60e70b5d85cc4ac9ac1a2b76d80526e6",
+      "statement": "The Nova embedding model has a hard limit of 8192 characters per call, a recommended chunk size of 1500–3000 characters, 1024 dimensions, and truncationMode NONE (the caller must enforce the character limit).",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L413-L413",
+          "version": "repo-lines-v1:sha256:2916df1b5a0aeec183003b0aaac85f93fd43c7e52e598150f6ba83121d88a415:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjkxNmRmMWI1YTBhZWVjMTgzMDAzYjBhYWFjODVmOTNmZDQzYzdlNTJlNTk4MTUwZjZiYTgzMTIxZDg4YTQxNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjkxNmRmMWI1YTBhZWVjMTgzMDAzYjBhYWFjODVmOTNmZDQzYzdlNTJlNTk4MTUwZjZiYTgzMTIxZDg4YTQxNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjljMGMxNmI2NTU0YzVhNmQwYzE2M2QwYmQxYmM0ODMzMDY3MTlkMWNiODcxNjhjNGIxOWMzY2JiODk0NWRhZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjE2OGZiYmEwNzZkYTRmMzdhYTQxZjVhZWYwZTk4ZTQ4NDBhZTY4MjgyZmVmZGVhNDQ5ZjU5YWJhNDlmYjA3YyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_83a0bb49ac594ccbbe372f8a46c9f50d",
+      "statement": "All Bedrock adapter methods (BedrockConverseChatModel and NovaEmbeddingModel) raise NotImplementedError at M0; M0 exit requires verifying Bedrock reachability — synchronous InvokeModel for Nova embeddings is verified at M0, and ConverseStream with tool calls for Nova 2 Lite is also required.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/adapters/bedrock/__init__.py",
+          "version": "repo-file-v1:sha256:fb034edc661fd175f05b90f71185c7644dd5e716a3c36c0dbe8c0524ebeaa452"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/adapters/model_factory.py#L23-L27",
+          "version": "repo-lines-v1:sha256:46e97372d0433f73eb2b83d6b2aac6c4688a6313b06901a79f64d20da979d4b6:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTkwZjYyYzQ2M2ZlNTc0OTM4ODMzOTMxYjZmNDhmZDQ2YzBhZDNhZmFmMjc3YzBlNDQ0OTM5Y2JlODk5YjA1OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzliN2ExNjRiMzk5YzQzNTMxMTdmMjllNDQ3MDRjNmJjNjc2ZTRkNzBjY2QyYmY3OTEwMTBjN2M0ZDgyNTJiNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNmIwODRjNTA4NzlkZTUzNzcxMGI1NDZlYmE4NTBkMjA1ZmI0Y2RmMmFhYzliMTRiNWYyYzAzNWYzNjVlOGFhZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMGM2Y2Q4ZDA5ODJmM2UyYzZkM2E5MmM1MmMzNWY3OTFlMjE0NDY0MDlkMDVhNDY4YTNkNWJlNzUwZDU0MWVmNiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L470-L470",
+          "version": "repo-lines-v1:sha256:b04aa03733133a476c1cd1a825e58a44a528a80f5d245ef492569cbc755fb4ad:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjA0YWEwMzczMzEzM2E0NzZjMWNkMWE4MjVlNThhNDRhNTI4YTgwZjVkMjQ1ZWY0OTI1NjljYmM3NTVmYjRhZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjA0YWEwMzczMzEzM2E0NzZjMWNkMWE4MjVlNThhNDRhNTI4YTgwZjVkMjQ1ZWY0OTI1NjljYmM3NTVmYjRhZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGZkMjEyMDliOGU0NDVjNDEyOWNjYTIxMzQzNzRkZTg3ODNjZDM4YWExNjA0NmU5ODRjZGZmODgxN2Y2YzQ0NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmY0MDcxZWYwZmU3YmE2NWU0ZTg2NTkwZDlkZmQwOTg5MjdmYjJkYzVkZWFlMTI1YWE3Mzc4NjNkN2MyMjc5NiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_1f69a5b51d774d78967471ab7a624fee",
+      "statement": "Bedrock and LangSmith have no local emulator; local development uses the real us-east-1 Bedrock endpoint with a developer AWS profile. LocalStack covers S3, SQS, and SSM only.",
+      "evidence": [
+        {
+          "resource": "repo://sdd/prd.md#L446-L446",
+          "version": "repo-lines-v1:sha256:753f4fe127b178c033237efe4c8ba47d20e7cf5332b4372d4faa20e9895a9149:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzUzZjRmZTEyN2IxNzhjMDMzMjM3ZWZlNGM4YmE0N2QyMGU3Y2Y1MzMyYjQzNzJkNGZhYTIwZTk4OTVhOTE0OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzUzZjRmZTEyN2IxNzhjMDMzMjM3ZWZlNGM4YmE0N2QyMGU3Y2Y1MzMyYjQzNzJkNGZhYTIwZTk4OTVhOTE0OSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzU1NTg4OGI4N2ViZTIzMGIyZTRlOTQzNTY2NTEwMDI4OWMwNGI1NzFkZjc5OGUwMjJiZjFkNzdkZGJhMjU5NCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODczYTcyYTYzOGE1ZDhiMDY4NzQxMjViZjkxNTA2YjUzZTU1NGI2ODJkYmUzNTVjNzA3YWJhNGIzNWM2MGIzNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_b9cbb0177f4147b092adfed5bc41c361",
+      "statement": "Switching a chat model is a configuration change gated on the full evaluation split passing before deployment. Switching the embedding model triggers re-embedding of all content chunks from stored chunk text (no Glacier restore needed), recorded as system usage, with search continuing to serve old vectors until each content's chunks are updated.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/config.py#L17-L17",
+          "version": "repo-lines-v1:sha256:5f8989aacb87ccebdfcc09ccb8839a8444014e5e642e07564018285d5a790dbd:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNWY4OTg5YWFjYjg3Y2NlYmRmY2MwOWNjYjg4MzlhODQ0NDAxNGU1ZTY0MmUwNzU2NDAxODI4NWQ1YTc5MGRiZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWY4OTg5YWFjYjg3Y2NlYmRmY2MwOWNjYjg4MzlhODQ0NDAxNGU1ZTY0MmUwNzU2NDAxODI4NWQ1YTc5MGRiZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODhlZDM5NTVmMDQxN2VmNWRhN2IyNDNmOTZiMTQ4YTJiZDBiN2Y2ZjhlZTE4NDdlM2MzMmViZWU3ZWQ4ZjI1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTk2MThkMDRkMGQ1ZTU5MDBhZWJlMGZjZWEyMGM2Mjc5Njg2MDY2YzVhNWE0YjYyMDY3Y2RjMGFhNDExYzdmMSJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L373-L373",
+          "version": "repo-lines-v1:sha256:31156d87ded78392aeb8655a0704f9a82330af7e310346c51db40cad748b8356:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzExNTZkODdkZWQ3ODM5MmFlYjg2NTVhMDcwNGY5YTgyMzMwYWY3ZTMxMDM0NmM1MWRiNDBjYWQ3NDhiODM1NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzExNTZkODdkZWQ3ODM5MmFlYjg2NTVhMDcwNGY5YTgyMzMwYWY3ZTMxMDM0NmM1MWRiNDBjYWQ3NDhiODM1NiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzI4MGE5NzMzN2EwMmNhYzU2ZjVlMjliYjY1ZmY5MTNmMDQ1OWUxYzI0NjViYTE4OTM5YmE3ODdkYTllNzE5ZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTg4NjgxOWE5NjYyZTEzNDM5MTg1OTU1ZjZkMGY2NjY2NjczYjUwZDQzZmNlMTlmZDI2NWI4MzE4MDIzYWY3NiJ9"
+        },
+        {
+          "resource": "repo://sdd/prd.md#L495-L495",
+          "version": "repo-lines-v1:sha256:ecf5e9c4a9b109f25a98cafdbdced6963d44748dfba26c0b12decf86f668325d:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZWNmNWU5YzRhOWIxMDlmMjVhOThjYWZkYmRjZWQ2OTYzZDQ0NzQ4ZGZiYTI2YzBiMTJkZWNmODZmNjY4MzI1ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZWNmNWU5YzRhOWIxMDlmMjVhOThjYWZkYmRjZWQ2OTYzZDQ0NzQ4ZGZiYTI2YzBiMTJkZWNmODZmNjY4MzI1ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWY1MmY3NmYyNmQzYjQ4ZjE1YWRjZmQ4ZjcxYzkyOWE1MWY0ZTJkMDNjMDdiMDRhNjJkYWE4OTdiOTc0ZTBmNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWJkYWNlMTY2ZGY5ODkzZGRhNGM3MjczYTllMWVhYWUwYTAwMjllNTNlNTFhZjA1ZDIxMzRlOGVlNTQ0ODNmNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_48d3e50d885e4f068c570ad4a35cf532",
+      "statement": "Settings.models can be overridden per-role via environment variables using the SMART_TUTOR_ prefix and __ nested delimiter (e.g. SMART_TUTOR_MODELS__AGENT__MODEL_ID), allowing model ID or params changes without redeploying.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/config.py#L26-L28",
+          "version": "repo-lines-v1:sha256:70797adf6acda4adb104dbc35cfc5af992924197a4764b3464c10514db88bbbd:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTM4YWVlZjM2N2E4OTIwZjljMTlmYWNhYWU4YThmYjJhZWIzMDA0ZDQ0YmVlNmJmMjZmMWY1YjAxYTE2OTkwZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGI5NzRkYTQwODYzMmE0YWE3ZTJhZTgwYjg2MDM5MWEzZGNkODIxMWM3OWVjYWQ3Y2E4ZTk1MTI4YjAwMTgzMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTdjNTA1NmFkZWQ5ODk5MTBiMTE3N2ViNGViNDY2ZWY3OTE4NTQxZGE4NDE1ZmUzNmU5M2I2MjNiZGYwZDM3NSJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-03T03:19:50.688Z"
+  }
+}

@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:75efe8175f3de24099ddca9c23a829c49ad33e109acf0ee87c13d3ceba740dbc",
+  "claims": [
+    {
+      "id": "claim_053c9f042e5a495893e1281a385cdf85",
+      "statement": "FakeChatModel stores scripted ChatResult replies (consumed FIFO via replies.pop(0)) and records every message list passed to invoke or structured in the public .calls attribute, making call-site assertions possible in unit tests.",
+      "evidence": [
+        {
+          "resource": "repo://backend/tests/fakes/models.py#L19-L41",
+          "version": "repo-lines-v1:sha256:deeef9bfa57e24877a11d67ccbb76a13f9efb4142de2489923217afca9a2fb41:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYzMTJmY2FhYThiNjlmNjUwMjBiN2MzZGQ4MGE1MzA0ZjU4YjFiZTdkYzc0NjdmYjNiOTc2NTQwN2E5NzE3NTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZlZWM3ODEzZTdlMmE1NTFhYmYwMzIwZWFkZjVhYWRhNWExZjQxZWM0ZDU3YWQ2NzJjODk1MTYzY2Q0YzRhZDAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUyZGQ5OWYwMjM1NDAyMDY0YjZjMDAzNmUwOTZjY2NjMjA5OGI4ZjI1NzM0NjllMWQwMDc0ZmJhOTdmOTlmODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk3Y2VhYWFlMzg3ZGM2MGJjM2M4YWU5ZmE0YzViZmU2NDg5MWNlZDVlODczOGU4MmI4MWE1ZDllZjJlZTk5Y2QifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_13bf88634bf742d5ac917175595ede27",
+      "statement": "FakeChatModel.stream delegates to invoke, then yields word-by-word ChatChunk(text=…) chunks (split on spaces), followed by one ChatChunk(tool_call=…) per tool call, and finally ChatChunk(usage=…) as the last chunk.",
+      "evidence": [
+        {
+          "resource": "repo://backend/tests/fakes/models.py#L27-L33",
+          "version": "repo-lines-v1:sha256:5b176fed4d81a2a65b2f58689661198a0f18ea9b9ee79bcc90eb1788d48e4076:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGVjNzcwYTYzNjZhZjlmMWI5Zjg4MTc2MTExZWMzOTJjYzgwZDQ1OGY0MWVhZmMxZGFiNDNhMGI3MDBlNjc3MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjhkYWJlZmIzMGNiYTZlMjQyNDE4YjE3N2QyZTgzZWIyMTY2YWQ5YWU5YjM2MWZkZTExODFhNDU5NmZhMjE2MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTc4MTM5NTg3ZjljNDcyNjA1MjY5MTkyYjYyODAwNWI5OTVmZTljOGFkYWE0ODIzMDEwM2I2MzdmN2M4MTU3ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTEyYjRmYTRkZDhlMzI4Yjg3MWIyZDk1YmRmNDkxNTYzZTdmY2UxYmQyYTA2M2VkYzE4NGE1ZTVhMmY0ZmFhZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_a96fbfd328ea4c148a517478aca74eed",
+      "statement": "FakeChatModel.structured pops the next structured_values entry, validates it with schema.model_validate, and returns a StructuredResult with an empty TokenUsage; the message list is recorded in .calls.",
+      "evidence": [
+        {
+          "resource": "repo://backend/tests/fakes/models.py#L39-L41",
+          "version": "repo-lines-v1:sha256:99cf4c4685b8940f17c99e711be5a139c5191206d43b3a359f3e8d9f708a2b6b:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjljY2JhYzk0NGU0YTBjNzAzZTYyNzMyNTY3Y2Y3OWRlNjkwYjlhZDNhM2NmMDQ2ZjA0ZTdkYmRhMzU0YjcwYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmVlYzc4MTNlN2UyYTU1MWFiZjAzMjBlYWRmNWFhZGE1YTFmNDFlYzRkNTdhZDY3MmM4OTUxNjNjZDRjNGFkMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTJiMmIwMjgzZGEzZGU1ZTU5MjA4Mjc5YmQ0ZTNmOTllZDdmZTQyZjYyNWM5MzdhMTcxYTRiYjkwZDM4Y2E5ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTdjZWFhYWUzODdkYzYwYmMzYzhhZTlmYTRjNWJmZTY0ODkxY2VkNWU4NzM4ZTgyYjgxYTVkOWVmMmVlOTljZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_9c4da3fe217a4464b17cfd5db2b0db9f",
+      "statement": "FakeEmbeddingModel produces a deterministic vector of configurable dimension by summing Unicode code points of characters at each stride position (text[i::dimension]); identical inputs always yield identical vectors, and both embed_documents and embed_query use the same algorithm.",
+      "evidence": [
+        {
+          "resource": "repo://backend/tests/fakes/models.py#L44-L65",
+          "version": "repo-lines-v1:sha256:0ea9789d3ef73696c78f877b42e9903799a6abaf430d75102c853d13c475e445:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk1Y2YzOTQ4NTE1OTE5ZTBmMmUzYmRlMGZjZDIyNTc2YzVkNDgxYTNkNDI0YTg3ZDFmZDM4OWQxMGZjYzhjZTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZmZTI1ZTQ4YmEzNmZhN2ZlMGEwMzk2ODA3ZTYwYjJmMDkyMmI0MWFkNGE4MjBiYTViYzdiNDcwNjUzNWM1N2MiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAxYTk5OGUxYTVjNzg5YzBhNzI4OTA1YmI1NmIzMGMwZGZiYzk3YjZjM2Q5MWU4ZTQyMGYyN2Y1ZjY0NGNiMGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_90502c67e1d745a1b008628c26288ea6",
+      "statement": "FakeEmbeddingModel reports model_id as the fixed string 'fake-embedding' and its dimension property reflects the dimension passed at construction (default 4).",
+      "evidence": [
+        {
+          "resource": "repo://backend/tests/fakes/models.py#L47-L56",
+          "version": "repo-lines-v1:sha256:90023e0289c516ba67162a903dcc5c20327eec5c99d0cdf04391590ff8ccb906:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMmEwNzY0Njk2MDFmY2RmMWQ4MjExMTBhZjQ5ZjU2ZmU1OTg1YTY0ZmYyMGJiYjM2MmNlNzI2MTJlNzlkYTYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE3YjhlOGQwNTU5ZTdkMGVlNTQ0OTBlMDhhZTU4MDdiNjgzYTI1MThlM2Q3MjU0ZWIyN2Q3ZjkxYjU4OTY1ZWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFhZmYyZTVkMGE1NWQwMmU2Nzc0OWMyMGZlNDQ2OGM5YTVmOWJkYjg4ZmNhZjIzZGU4NzM0OGQyYThkNjg1MDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQxYThlNjcwYTg3N2U3NTM2M2UwNjM2ZjdkZmNlMDM1ZDRhODkzYWYzODE0ZGYxMGMzY2Y5Y2ViMzk2YTQwNjcifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_096a8e2cde3246f0900f20eb1197ac4d",
+      "statement": "The fakes package re-exports FakeChatModel and FakeEmbeddingModel so test files can import them with `from fakes import FakeChatModel`; this import works because pyproject.toml adds tests/ to pythonpath.",
+      "evidence": [
+        {
+          "resource": "repo://backend/pyproject.toml#L58-L58",
+          "version": "repo-lines-v1:sha256:885eb312565cc9f1e8abfee473d3f563340146b8a1f9a959cc1f9b0f3603b2e6:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODg1ZWIzMTI1NjVjYzlmMWU4YWJmZWU0NzNkM2Y1NjMzNDAxNDZiOGExZjlhOTU5Y2MxZjliMGYzNjAzYjJlNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODg1ZWIzMTI1NjVjYzlmMWU4YWJmZWU0NzNkM2Y1NjMzNDAxNDZiOGExZjlhOTU5Y2MxZjliMGYzNjAzYjJlNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDExNjA5MTc5ZWY3YjhjODQ1M2Q1MDIyNmExNTk5YmNiZWY2OTEwMjkwZDBjMWU4ZDFhMzY0OWJhM2Y1MDEyNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZWYyMGIzZmFmYTRiMDA5MmNlNTQyNzg3MDcxMThjNTIxYWQ3ZjJmNjg5MDUxMjgyYjY3NmFlOGMxMDJiOGVkYiJ9"
+        },
+        {
+          "resource": "repo://backend/tests/fakes/__init__.py",
+          "version": "repo-file-v1:sha256:294244557d5751887f88232cb3c9ae68474887b58194b6b10d2b29fbd9b5c083"
+        }
+      ]
+    },
+    {
+      "id": "claim_b4558524ad144e21ba76961b6a3559f2",
+      "statement": "pytest is configured with asyncio_mode='auto', so all async def test_* functions run under asyncio without requiring @pytest.mark.asyncio; the default addopts excludes integration-marked tests with -m 'not integration'.",
+      "evidence": [
+        {
+          "resource": "repo://backend/pyproject.toml#L54-L59",
+          "version": "repo-lines-v1:sha256:0a9b7bf15a990d8e5b8079a27bf27a9120857a56cc207c4217540bf232e12b4e:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTBiYjUyNzdiM2M1ZDgyOGQxM2UxMDg4M2E4NTE0NmNiMmZiOGEwYzJjMDAwZjBjNTRjYzk2YmEwZGY3MDA1OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTJkOTIyZTIzNjE2NTJjODRlZDhiYmFiOWRmNjI5ZmIyNWNkZTlmNTU1NDU4Y2I3YTExYTljMDg2NmVlMzgwNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjYxZTRlNTg2MDRlYzk4ZWU2YjYwMzJiOTZhNWZkYTljMGJjYzM1OGY4NmE1MjE1NmJhYTRlZDVjZjlmZmIwNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWZhMWE1OWFjZjMzMzI3YzVkMzEzMTY2NWNiODRhZGIxMTBhNTUxYWZjYWNiNzdiOTkyM2NkN2UwZjdhZDg0ZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_ea865085a8fe4c5081581b97736e9e67",
+      "statement": "The test suite is divided into three tiers: tests/unit/<module>/ for domain and application tests using fakes (included in the default pytest run); tests/integration/<module>/ for adapter tests against the Docker Compose stack (pgvector, Keycloak, LocalStack), marked @pytest.mark.integration and excluded by default; and tests/isolation/ for cross-user access and deduplication guarantees.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L55-L58",
+          "version": "repo-lines-v1:sha256:1239282c30934e69bf7c857292a03290c30ad2751c71de8b292722c28dc3afac:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDhjNmE3ZjU0MDU3ODEwMDZkZjE0NGE3OWIyMjRkMTIwM2M2MmZjNDVmYzBhZTBjZGI5M2FkNTNhZWMyMDIwZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDZjYmFiNjY0NGE5ZTE2ODg5NGQ1YjQzOTQ4OGUyODg3NmFmZTllMTA3MDkzMTVhMzk4NTllODMxMTdkNDVmNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGZhZWJjMWMxN2YyYmNlY2Y3Yjc4ZTI3MmI3OTQwZDJkNTNiNTIzYmE3NzlhMDFiNzljY2ZiMGJlZjFjNWYxYiJ9"
+        },
+        {
+          "resource": "repo://backend/tests/integration/README.md",
+          "version": "repo-file-v1:sha256:046150e407de93a4b78f0cb597c6cd8439da26c851745401acaadc7c94aa8c04"
+        },
+        {
+          "resource": "repo://backend/tests/isolation/README.md",
+          "version": "repo-file-v1:sha256:997ab5e402f43f29bd3e0d9b0767043821a1d7ad73df57a15106bebade9e2ff7"
+        }
+      ]
+    },
+    {
+      "id": "claim_96aaa07b47cc4701a7457fae2bf6b42f",
+      "statement": "AGENTS.md mandates that every behaviour change comes with tests, unit tests must use fakes, and real Bedrock calls are permitted only in the evals/ suite.",
+      "evidence": [
+        {
+          "resource": "repo://backend/AGENTS.md#L55-L57",
+          "version": "repo-lines-v1:sha256:953b583c621e087d824b037474213d9fd3d62606b5104c0cfdbe8c8cc81e1eea:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDhjNmE3ZjU0MDU3ODEwMDZkZjE0NGE3OWIyMjRkMTIwM2M2MmZjNDVmYzBhZTBjZGI5M2FkNTNhZWMyMDIwZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDQyZDllYWUxMTZjN2MxOGFiN2ExY2QyZGJiNjM2MDdiZTYzMjY5OWM2MGRlNDkxNDU4ZDUzNTY3ZmFmMTZmOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDZjYmFiNjY0NGE5ZTE2ODg5NGQ1YjQzOTQ4OGUyODg3NmFmZTllMTA3MDkzMTVhMzk4NTllODMxMTdkNDVmNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWJkODZmMGNiNzZlMTc5NGVmNjAwMmRiYzdkZTE2NzAwZjkwYzBlOTg0NzFmYmY0ZTllMDRjMjU4YjQwM2Y5ZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_13816f02f4324581a33559827f5804b6",
+      "statement": "tests/unit/shared/test_fake_models.py verifies the fakes honour the port contracts: the last stream chunk carries TokenUsage, structured returns a schema-validated value, and embed_documents/embed_query produce vectors whose length matches the declared dimension with identical inputs yielding identical vectors.",
+      "evidence": [
+        {
+          "resource": "repo://backend/tests/unit/shared/test_fake_models.py",
+          "version": "repo-file-v1:sha256:674dd5f876ba4bc82b46ab4ae860f09be1f01919b9ac6c575256f0e31b7ae1a3"
+        }
+      ]
+    },
+    {
+      "id": "claim_d35b919e5d1447d8ba94df6d8bb36397",
+      "statement": "tests/conftest.py provides a shared embedding_model fixture that returns a FakeEmbeddingModel() instance, available to all tests without additional imports because tests/ is on pythonpath.",
+      "evidence": [
+        {
+          "resource": "repo://backend/tests/conftest.py",
+          "version": "repo-file-v1:sha256:b69e1fb1424e1929fca42556b1267c5597ec2a885ff1d27b7c9c0a6a28246e7a"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-03T03:19:50.688Z"
+  }
+}

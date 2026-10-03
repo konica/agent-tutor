@@ -1,0 +1,6 @@
+# Files
+
+- [Access Control and Identity Propagation](access-control.md) - Defines the can_read rule that governs every document access, documents the JWT forwarding chain from browser to MCP server, explains how the MCP SQL search filter is constructed, and describes the isolation guarantee that learners never see each other's data.
+- [Content and Document Lifecycles](content-document-lifecycle.md) - Explains the Content state machine (processing/ready/failed with shared retry), the Document state machine (processing/awaiting_subjects/ready/failed with an archived flag), SHA-256 deduplication flow, and Glacier archiving for unreferenced content files.
+- [Data Model](data-model.md) - Describes every PostgreSQL table, the LangGraph store namespace, SSM parameters, and key derived values including display title, subject name resolution, and a learner's active subjects. Explains why Content and Document are separate entities and how the SHA-256 deduplication invariant is maintained.
+- [Subject Catalog and Personal Names](subject-catalog.md) - Explains the shared subject catalog design, how subjects acquire and keep stable identifiers, the new-name pipeline (trim, normalize, near-duplicate reuse, personal-data check), personal subject names stored per learner, and the subject suggestion ranking algorithm used at upload time.

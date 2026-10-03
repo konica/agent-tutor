@@ -1,0 +1,260 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:48d556e63a56dd6858751d16538f0bcb3abb10b5fa1402ed2fa97c02764517b4",
+  "claims": [
+    {
+      "id": "claim_5a56517f35c749229c51c3f86dd055da",
+      "statement": "The shared/ package is the foundation layer for all other modules; it owns cross-module value objects, typed identifiers, abstract ports, ModelFactory, Settings, and infrastructure adapters. The strict rule is that business code imports only from shared.domain or shared.ports, and all vendor SDK imports are confined to shared.adapters.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/__init__.py",
+          "version": "repo-file-v1:sha256:26fa22aed31ea22b44c6e07ea0b71afdf7078fa3c35a5b6c0bd7b668e30bc460"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/adapters/__init__.py",
+          "version": "repo-file-v1:sha256:a0fe2d26f7271f39d228396d7c288df9217f7dc4bbabd261f9698c947e3a1e3f"
+        }
+      ]
+    },
+    {
+      "id": "claim_762b1371ed2b4beba9247c96785e9a3a",
+      "statement": "Five typed identifiers are defined using typing.NewType, each wrapping str: UserId (Keycloak sub), ThreadId, SubjectId (UUID in the shared subject catalogue that never changes even if names change), DocumentId (a learner's library entry), and ContentId (SHA-256 of file bytes, shared by all DocumentIds pointing to identical content). NewType is used so that type-checkers treat each identifier as a distinct type while the runtime value remains a plain str.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/domain/ids.py",
+          "version": "repo-file-v1:sha256:20c81ce8e668afd69137b1f8309b2da0a1eec9fd464b5a634a63726f8c952ea4"
+        }
+      ]
+    },
+    {
+      "id": "claim_6eba96240667421ca078844ad9189a84",
+      "statement": "TokenUsage is a frozen dataclass with input_tokens, output_tokens, and a computed total_tokens property. It enforces non-negativity in __post_init__ (raises ValueError on violation), and supports addition via __add__ to accumulate usage across multiple model calls without mutable state.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/domain/token_usage.py",
+          "version": "repo-file-v1:sha256:e7c0d9bdf19501ebf7c278b12ca5dcd315f4d2b607ae748a9cc4dba9a9a92e4f"
+        }
+      ]
+    },
+    {
+      "id": "claim_37ab4e7f807d477a9ae2c437a2b5f8d0",
+      "statement": "Citation is a frozen dataclass carrying chunk_id, document_title, page, and an archived flag. When archived is True the citation still resolves but the UI is expected to mark it; archived documents remain in the citation record rather than producing broken references.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/domain/citation.py",
+          "version": "repo-file-v1:sha256:2b72e8ad2b16a786bf0415f7c89bbf3fc7eb02e6655ce7fa26ca8f85c893572a"
+        }
+      ]
+    },
+    {
+      "id": "claim_dc4cec08883942979628aac84f3a89de",
+      "statement": "Three base exception classes form the domain error hierarchy: DomainError (business rule violated), NotFoundError (entity does not exist or is not visible), and AccessDeniedError (caller may not access the resource). Entrypoints catch these and map them to HTTP status codes; modules subclass them so handlers can distinguish error kinds.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/domain/errors.py",
+          "version": "repo-file-v1:sha256:e05c2a6a8f32dc3148fbc9c75e35a00acebaa85c8c1f17a907b437e7b3aee96f"
+        }
+      ]
+    },
+    {
+      "id": "claim_34ebe91c6f1849bcaa8c005cf6cebc2b",
+      "statement": "ChatModel is an ABC defining three abstract methods: stream (returns AsyncIterator[ChatChunk], last chunk carries usage), invoke (returns ChatResult), and structured[T: BaseModel] (returns StructuredResult[T], validated Pydantic object). Business code programs only against this interface, never against a vendor SDK or model ID.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/ports/chat_model.py",
+          "version": "repo-file-v1:sha256:3b6561d40df0f0bac9fcc6cc3409734669f4289c7173e65ed82dca657eb02868"
+        }
+      ]
+    },
+    {
+      "id": "claim_935d7f81fc8b4627924e34d19c3f1968",
+      "statement": "The ChatModel port defines Message (role: system/user/assistant/tool, optional tool_call_id), ToolSpec (name, description, parameters as JSON Schema dict), ToolCall (id, name, arguments), ChatResult (text, tool_calls list, usage), ChatChunk (text delta, completed ToolCall, or final TokenUsage — one field set per chunk), and StructuredResult[T] (value and usage).",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/ports/chat_model.py",
+          "version": "repo-file-v1:sha256:3b6561d40df0f0bac9fcc6cc3409734669f4289c7173e65ed82dca657eb02868"
+        }
+      ]
+    },
+    {
+      "id": "claim_daa52b2cb00a49cdb721ab1995ae9603",
+      "statement": "EmbeddingModel is an ABC with abstract properties model_id (recorded as embedding_model per chunk) and dimension (recorded as embedding_dim per chunk), and async methods embed_documents (for indexing with GENERIC_INDEX input type) and embed_query (for search with TEXT_RETRIEVAL input type). Keeping the two methods separate lets adapters pass the correct embedding purpose to Nova's asymmetric model.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/ports/embedding_model.py",
+          "version": "repo-file-v1:sha256:45cceac4ce6be02e5940f717d3d6cde95d810c5ac0c7d1d8e419b28c360b3771"
+        }
+      ]
+    },
+    {
+      "id": "claim_354665b65f0c4ceeb6b522998edb2053",
+      "statement": "Clock is a minimal ABC with a single abstract method now() -> datetime that returns a timezone-aware UTC datetime. It exists to allow time-dependent business rules to be tested deterministically by injecting a fake clock rather than patching datetime.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/ports/clock.py",
+          "version": "repo-file-v1:sha256:6ed5c3bc0feb4a548290913f84f9be6b4e6c8df07640635e8b923021e3c2b0d6"
+        }
+      ]
+    },
+    {
+      "id": "claim_dfea416b9cdb4248ab44135efcc7b515",
+      "statement": "Settings is a pydantic-settings BaseSettings subclass with env_prefix SMART_TUTOR_ and nested delimiter __, loading from environment variables and an optional .env file. In production, secrets are injected by External Secrets Operator from AWS Secrets Manager as environment variables.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/config.py#L26-L38",
+          "version": "repo-lines-v1:sha256:179a3f8bfbb2ce8824edcb171a75922d9f83a37711f99fa929c39903eb89f7a2:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUzOGFlZWYzNjdhODkyMGY5YzE5ZmFjYWFlOGE4ZmIyYWViMzAwNGQ0NGJlZTZiZjI2ZjFmNWIwMWExNjk5MGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgzN2QxNjEyMmNiM2ZiYzY2YzA2MjhkZDY3YzczOGUwYTgzYmM2MDlkOTJmYjllNGJhNTZjZWMyYmJkNzYwMDEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhiOTc0ZGE0MDg2MzJhNGFhN2UyYWU4MGI4NjAzOTFhM2RjZDgyMTFjNzllY2FkN2NhOGU5NTEyOGIwMDE4MzIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFjNzAwYTM1ZGY5N2VhM2Y1OTIyMjFiNDgwY2FkMWQ2YjljN2UzNTA2NjI1NGZmMTJhODBiZmU2ZjYyZGJhOTgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_886c3ceb59ca412ebc7df7dc69ed30c3",
+      "statement": "Settings defines these keys and defaults: environment (local), aws_region (us-east-1), database_url (postgresql+psycopg://smart_tutor:smart_tutor@localhost:5432/smart_tutor), keycloak_issuer (http://localhost:8080/realms/smart-tutor), keycloak_audience (smart-tutor-api), documents_bucket (smart-tutor-documents), ingest_queue_url (LocalStack default SQS URL), mcp_url (http://localhost:8000/mcp), learning_record_idle_minutes_param (/smart-tutor/learning-record-idle-minutes), rate_limit_per_minute (20), and models (ModelsConfig()).",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/config.py#L26-L38",
+          "version": "repo-lines-v1:sha256:179a3f8bfbb2ce8824edcb171a75922d9f83a37711f99fa929c39903eb89f7a2:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUzOGFlZWYzNjdhODkyMGY5YzE5ZmFjYWFlOGE4ZmIyYWViMzAwNGQ0NGJlZTZiZjI2ZjFmNWIwMWExNjk5MGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgzN2QxNjEyMmNiM2ZiYzY2YzA2MjhkZDY3YzczOGUwYTgzYmM2MDlkOTJmYjllNGJhNTZjZWMyYmJkNzYwMDEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhiOTc0ZGE0MDg2MzJhNGFhN2UyYWU4MGI4NjAzOTFhM2RjZDgyMTFjNzllY2FkN2NhOGU5NTEyOGIwMDE4MzIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFjNzAwYTM1ZGY5N2VhM2Y1OTIyMjFiNDgwY2FkMWQ2YjljN2UzNTA2NjI1NGZmMTJhODBiZmU2ZjYyZGJhOTgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_803f3539283348c09eeabc6a4f02a936",
+      "statement": "ModelsConfig is a nested BaseModel in Settings defining three roles: agent (us.amazon.nova-2-lite-v1:0, no extra params), judge (qwen.qwen3-32b-v1:0, temperature=0), and embedding (amazon.nova-2-multimodal-embeddings-v1:0, dimension=1024). Switching a model is a configuration change gated on the full eval split (PRD D15).",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/config.py#L16-L23",
+          "version": "repo-lines-v1:sha256:7445728daa8b1ee674b5eab3cabab17a93bfdb5ea6736208c5ce7bd24651cc8a:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjhkZmI4NzIyMzQ0Y2NiYjE2ZjRkZmIxMTY5YzZhNDI1NjVkMTljNDQxMWViZGJhY2JhMTQzMTU2ZTYzODQ2OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzkyMjA0YzY1ZjUwMmRjMTY0NTRiNjI0MDg1NmE5YWI3YWRlMDAzYThlOWY4NjMzM2VjMGI3YzllNDA5NDkxZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmI5YzIwOGEyMWIyNDFjMTlkMjRkMDMzNjg4YTZmNjJlMWFkZTJjMTk5MGI2YWQzOTg0YmU4YTY0ZGZhZmVlMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODdkZmY1YWY2ODBhZjI1NDU4MTJjODMxZjY5MTk1ZjUzYWJhYjJkMjM0Nzk1MGRjZmE5ODg0OTQ3OGEyODExNyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_809b816a547c49b592e82257d0b940bb",
+      "statement": "ModelFactory takes a Settings instance and exposes chat(role: ChatRole) -> ChatModel and embedding() -> EmbeddingModel. ChatRole is a StrEnum with AGENT and JUDGE members. Both methods currently raise NotImplementedError (M0 milestone stub) with a message indicating the provider and model ID; the Bedrock adapter implementations are planned but not yet written.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/adapters/model_factory.py",
+          "version": "repo-file-v1:sha256:f4a04a40c8676893d1e3d79c256ee1ede597f743573292487c20a0a7450414ed"
+        }
+      ]
+    },
+    {
+      "id": "claim_fa96ee2a3e6444dc90a805c854e4f0ab",
+      "statement": "Business code must ask ModelFactory for a role (ChatRole.AGENT or ChatRole.JUDGE), never hard-code a model ID. ModelFactory is the single translation point from role to adapter; changing which model serves a role requires only a Settings change, not a code change, and is gated on the full evaluation split defined in PRD D15.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/adapters/model_factory.py",
+          "version": "repo-file-v1:sha256:f4a04a40c8676893d1e3d79c256ee1ede597f743573292487c20a0a7450414ed"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/config.py#L16-L18",
+          "version": "repo-lines-v1:sha256:054ec716765ac8a32497373572dcd38a29b382ab74d8341cdb2d402754a6ad7e:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjhkZmI4NzIyMzQ0Y2NiYjE2ZjRkZmIxMTY5YzZhNDI1NjVkMTljNDQxMWViZGJhY2JhMTQzMTU2ZTYzODQ2OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmI5YzIwOGEyMWIyNDFjMTlkMjRkMDMzNjg4YTZmNjJlMWFkZTJjMTk5MGI2YWQzOTg0YmU4YTY0ZGZhZmVlMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNWRlOWY3YWEzYzA2ZWIyMDk0MWI2NzM3NzY0NTNiOTc5YTcyYmM2MTJiMjdhYmI3NjJhNzA2NzU5YzJjNTVlYSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_a089b270d5cb4d99905db693f6df5bdf",
+      "statement": "The auth adapter (shared.adapters.auth) is an M0 stub whose docstring declares planned Keycloak JWT verification for the API server and MCP server, covering JWKS signature validation, iss claim (against keycloak_issuer), aud claim (against keycloak_audience), and exp claim. No implementation exists yet; a verified token will yield a UserId from the sub claim.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/adapters/auth/__init__.py",
+          "version": "repo-file-v1:sha256:526272e6ed41cf58e31a6590a8ca92445619f0ff049b934efc72a6494db45fb1"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/config.py#L31-L32",
+          "version": "repo-lines-v1:sha256:9a45acc26e233c5cbf4c220e3d2c63e95274cd140d7cf2cc210d238b56f4983c:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjg4MzY0OTkzZTcwOGQzOTVkNzNmYjRjMTk3ODhjMjI0Y2I0NDMzOTU4MWE5Njk5MmIwMjhkZmI3NzYwYzQ0ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzkzM2U0NmFiZDE3ZDUwMmNjOGFhNGM5NzdlNDc4MjcxNWZmYzU5ZjY4ZjA3M2ZkOGRiM2UwNjI3NDNkZDVkZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWYyZmUwZDRjN2M5MGFlN2UzYmJjMjY1NzE5YjA1ZjRiZjcxMGY5ZTU5ZjIyOTE3MjI1MDRmNzhlMzFjNTRhMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzFhOGQ0NTM5NzcxN2U0YmU1M2FhNzg1NzIwOGQxOThmNTA3M2UwNjM5ZGI0ZGRhYjMzZGY1YWE0M2RiNmFiMiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_5e4f7c742a7b4493b85c556011b589c6",
+      "statement": "The postgres adapter (shared.adapters.postgres) is an M0 stub whose docstring declares planned provision of an async SQLAlchemy engine built from settings.database_url using the psycopg driver, a session factory for dependency injection, and a unit-of-work helper. No implementation exists yet; it will be the only place the database engine is constructed.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/adapters/postgres/__init__.py",
+          "version": "repo-file-v1:sha256:9f75878379492401a9510b88cf73a69f091eaa064899c73db8c9d73e77dcaba7"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/config.py#L31-L31",
+          "version": "repo-lines-v1:sha256:f88364993e708d395d73fb4c19788c224cb44339581a96992b028dfb7760c44e:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjg4MzY0OTkzZTcwOGQzOTVkNzNmYjRjMTk3ODhjMjI0Y2I0NDMzOTU4MWE5Njk5MmIwMjhkZmI3NzYwYzQ0ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjg4MzY0OTkzZTcwOGQzOTVkNzNmYjRjMTk3ODhjMjI0Y2I0NDMzOTU4MWE5Njk5MmIwMjhkZmI3NzYwYzQ0ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWYyZmUwZDRjN2M5MGFlN2UzYmJjMjY1NzE5YjA1ZjRiZjcxMGY5ZTU5ZjIyOTE3MjI1MDRmNzhlMzFjNTRhMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiN2VmNTA4Y2QxZTRjNzQxMDlkYWZkMTI2OTAzNTVkNGFjZGZkZjYwMmY3MTU4NjlkZTcwNjY2MmE4ZTJmZmVlNSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_29368d2a402443a99e94c803a7c02b90",
+      "statement": "The AWS adapter (shared.adapters.aws) is an M0 stub whose docstring declares planned provision of configured boto3 clients for S3 (documents_bucket), SQS (ingest_queue_url), and SSM Parameter Store (learning_record_idle_minutes_param), all using the aws_region setting. No implementation exists yet.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/adapters/aws/__init__.py",
+          "version": "repo-file-v1:sha256:64770e92fac0c08623491ac2e431234f233bd7d753b92b71c163cc403cb8d743"
+        },
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/config.py#L29-L37",
+          "version": "repo-lines-v1:sha256:a0cf36dba5c9a8846f37c15b882c525ecaf10607c2f45f4d622c9b4404f378f3:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNWQ2YTFjYzdjNWMyMzgxYTRkNWE1YTg5NmY5NWI4YTM0YjFhY2IzZmRiY2UyNjEyY2FhMGZhMzRhM2Q3ZmJmZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjUwYTRiYjFmMzhhZDNjOTc4MjZjZDU4N2ZhMzUyMzc5ZDBlYjEzZTdmMGMyZDZhNGJjYmM5N2E1NzZhOGMwZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzA3OTdhZGY2YWNkYTRhZGIxMDRkYmMzNWNmYzVhZjk5MjkyNDE5N2E0NzY0YjM0NjRjMTA1MTRkYjg4YmJiZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjIsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjljYWIzNGY0MGRhMDc2ZmM4YTQ1Y2U1ZDFjMTYxOWM4ZjMwYThmNzllMTY0ZTU0NmFhZGVmMmY1MjgwNTY3ZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_393149e8ae7b44c69475bfc5df0445f5",
+      "statement": "The Bedrock adapter (shared.adapters.bedrock) is an M0 stub whose docstring declares BedrockConverseChatModel (implementing ChatModel) and NovaEmbeddingModel (implementing EmbeddingModel). No implementation exists yet; these will use the Amazon Bedrock Converse API.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/adapters/bedrock/__init__.py",
+          "version": "repo-file-v1:sha256:fb034edc661fd175f05b90f71185c7644dd5e716a3c36c0dbe8c0524ebeaa452"
+        }
+      ]
+    },
+    {
+      "id": "claim_e3c1baa1683f48fca50e1c5a0f00f49c",
+      "statement": "FakeChatModel in tests/fakes/models.py is a ChatModel implementation that returns scripted ChatResult replies in order, records all calls in self.calls, and satisfies the streaming contract: stream delegates to invoke then yields text word-by-word, tool calls, and a final usage-only chunk. FakeEmbeddingModel produces deterministic vectors using character statistics with exactly dimension floats.",
+      "evidence": [
+        {
+          "resource": "repo://backend/tests/fakes/models.py",
+          "version": "repo-file-v1:sha256:a9be05f1de70f7a6af7c31ba394bfab290f9c309adf9628f0308821804d53ab6"
+        }
+      ]
+    },
+    {
+      "id": "claim_a3021dd78f874c4c8885cc18fae352d9",
+      "statement": "The test test_stream_ends_with_usage (tests/unit/shared/test_fake_models.py) verifies that the last chunk from ChatModel.stream always carries usage and no text, enforcing the streaming contract that real adapters must also uphold.",
+      "evidence": [
+        {
+          "resource": "repo://backend/tests/unit/shared/test_fake_models.py#L14-L19",
+          "version": "repo-lines-v1:sha256:7029c587f5eea55d58964ca9cf8a9a2b0e8892ca0d2ad9a54eeda4502a67ea23:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZWQ3YjRhMTFkYmM5YTAzYmI0MjM5OWNjNDdjNzkwNmUzNGZkMGZmYThhOGU3ZTAyOWJkODc3OTdlMjUxMzdmMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzVmN2EyNGU3YTQxZjZlNjBmY2I3YWYzZDU1MzEyZDJiN2UzNDNjZTdlODg5NmRkMWJlM2Q4NmIxMzZmZTcxZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTc0MTdhZGJkZGU3MDRiNmUyMDg3MDIzYWU4ZTc4MGM5NWIyMzMxN2M3MGVmYTNhYzU3NmIzMjVmMDJiMzNiYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjVlYjk0ZDI4MDRlNTM2MmYxYjFjZWRlNWQ1NjFhNzJlMjllYjRhZmIzY2U4ZGE3ZDMwMDI5YTc4Y2UzOThjMSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_91266c75545f411c908d1f1a6080a28f",
+      "statement": "The test test_negative_counts_are_rejected (tests/unit/shared/test_token_usage.py) verifies that TokenUsage raises ValueError when constructed with a negative token count, testing the non-negativity invariant enforced in __post_init__.",
+      "evidence": [
+        {
+          "resource": "repo://backend/tests/unit/shared/test_token_usage.py#L12-L14",
+          "version": "repo-lines-v1:sha256:b5c2eede73d4f4b43d7a3f3da43f84e75ed3669f23ad6b338f35ffd569dc06ec:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDI3MDZiMDBkOTk5MzI3Y2M3ZDFiZjM1NjYxZmNjYTIzM2E5ZTBlMjFhNDlmMGVkZjcxZDFjNTRlNzQyMjliMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTEwODBmYjQ1YzNjOWM3ZDU3YzExMzRiZjM0YWVlNjI1OWE2ZjMwMGEzMjM2YzFjNGE5OTM3ZGZlNTNhNDNkZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWNkOWZiZTc2ZTU1ZTlhZDBiZjMzMDRlZGRhNGYyODNiZTVhZDhkYTE3MmU3ZGJiZmYwYjRiYmY1OWVhYzExYiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_13c1bfc158b8412bb2f02560ecf50747",
+      "statement": "ModelFactory.chat reads the ModelConfig via getattr(settings.models, role.value), allowing the provider and model_id to be looked up dynamically by the ChatRole StrEnum value without hard-coding attribute access per role.",
+      "evidence": [
+        {
+          "resource": "repo://backend/src/smart_tutor/shared/adapters/model_factory.py#L22-L24",
+          "version": "repo-lines-v1:sha256:26fdc2539a6e278b90941ecb6b87ae3524cb4997231ed8237287900ea74a0863:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzQ1OTJkNmQyZjc2YjM0NjY3NWNhOTQwZDBmNTBmOTNmYTJhNGUyMTZhOWQ3YWFjZThkYzRhMjI4MGM0ZTc5YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTYwY2ZjYmY4NTMzZjg1YmEwYjhhYmYzOTQ4Yjg4N2Y5OGQ2ZTVlOWIwYjU4Y2QzNjk0NTM3NzYxZTZmNDM1ZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDAzYzNhOGFjMTViZGZiYTA2NmFkNGJmNWYxNzk5NDNiYjk3ZjkwYWEwN2Y4YzMxMmE5MTFkMzY5MzE5OWNmNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDQwZDNjMGVmNWVhNGU0M2E0OWFmNDdmNjRjZTE5YzBjZDI1NDg1NTUzOWVmNmQ3MTkwYjQ3YzhiNGNlZWU0NiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_d1c8a5e6531f4acd9a1551fa3f3285bc",
+      "statement": "FakeEmbeddingModel.embed_documents and embed_query both call the same internal _embed method, so they return identical vectors for the same input text, enabling tests to assert equality across both call paths.",
+      "evidence": [
+        {
+          "resource": "repo://backend/tests/fakes/models.py#L58-L65",
+          "version": "repo-lines-v1:sha256:ba82134c2a5e885d1d752d6313d8b7bad50f59478257794217a585695a7d2a92:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmUwMDlkNjdhMWI4YzljYWQxYzAwNmQ3NjdkODZmYjdjM2M5NGZkOWI5Y2UyN2I2NmUzNmMyMWEwM2E5YTE0ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmZlMjVlNDhiYTM2ZmE3ZmUwYTAzOTY4MDdlNjBiMmYwOTIyYjQxYWQ0YTgyMGJhNWJjN2I0NzA2NTM1YzU3YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTMxZDJkY2U5MTdiNGQxNTY3ZGU0NmJmOTM5MGQwZTRmMzhhNTE0YTc3ZGZjMTY5NmJiYmRhYjRlZmNhZjc1NCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-03T03:19:50.688Z"
+  }
+}
