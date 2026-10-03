@@ -13,7 +13,7 @@ from verify import ISSUER, Unauthorized, verify
 class KeycloakVerifier:
     async def verify_token(self, token: str) -> AccessToken | None:
         try:
-            claims = verify(token, audience="rag-mcp")
+            claims = await verify(token, audience="rag-mcp")
         except Unauthorized as e:
             print(f"[mcp] rejected token: {e}", flush=True)
             return None  # -> 401 from RequireAuthMiddleware

@@ -79,7 +79,7 @@ app = FastAPI(title="agent-prototype")
 async def invoke(body: dict[str, Any], authorization: str | None = Header(None), leak: bool = False) -> dict:
     try:
         token = bearer(authorization)
-        claims = verify(token, audience="smart-tutor-api")
+        claims = await verify(token, audience="smart-tutor-api")
     except Unauthorized as e:
         print(f"[agent] 401: {e}", flush=True)
         raise HTTPException(401, "unauthorized") from e

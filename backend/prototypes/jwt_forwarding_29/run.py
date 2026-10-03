@@ -13,6 +13,7 @@ import secrets
 from urllib.parse import parse_qs, urlparse
 
 import httpx
+import jwt
 
 KC = "http://localhost:8080/realms/smart-tutor/protocol/openid-connect"
 REDIRECT = "http://localhost:5173/callback"
@@ -116,6 +117,28 @@ r = mcp_initialize({})
 check("MCP without token -> 401", r.status_code == 401, r.headers.get("www-authenticate"))
 check("MCP with tampered token -> 401", mcp_initialize({"Authorization": f"Bearer {tampered}"}).status_code == 401)
 check("MCP with valid token -> 200", mcp_initialize({"Authorization": f"Bearer {t1}"}).status_code == 200)
+
+# Revocation: what introspection buys over a local JWKS check. Log learner 1 out (ends their sessions);
+# their token is unexpired and correctly signed, but Keycloak now reports it inactive.
+admin = httpx.post(
+    "http://localhost:8080/realms/master/protocol/openid-connect/token",
+    data={"grant_type": "password", "client_id": "admin-cli", "username": "admin", "password": "admin"},
+).json()["access_token"]
+r = httpx.post(
+    f"http://localhost:8080/admin/realms/smart-tutor/users/{c1['sub']}/logout",
+    headers={"Authorization": f"Bearer {admin}"},
+)
+print(f"\nadmin logout of learner 1: {r.status_code}")
+jwks = jwt.PyJWKClient(f"{KC}/certs")
+still_valid_locally = bool(
+    jwt.decode(t1, jwks.get_signing_key_from_jwt(t1).key, algorithms=["RS256"], audience="smart-tutor-api")
+)
+check("after logout: local JWKS check would still accept the token", still_valid_locally)
+r = httpx.post(f"{API}/ask", json=ask, headers={"Authorization": f"Bearer {t1}"})
+check("after logout: API -> 401 (introspection)", r.status_code == 401)
+check("after logout: MCP -> 401 (introspection)", mcp_initialize({"Authorization": f"Bearer {t1}"}).status_code == 401)
+r = httpx.post(f"{API}/ask", json=ask, headers={"Authorization": f"Bearer {t2}"}, timeout=60)
+check("after logout: learner 2 unaffected -> 200", r.status_code == 200)
 
 print(f"\n{sum(ok for _, ok in results)}/{len(results)} checks passed")
 raise SystemExit(0 if all(ok for _, ok in results) else 1)

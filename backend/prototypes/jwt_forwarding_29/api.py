@@ -16,7 +16,7 @@ app = FastAPI(title="api-prototype")
 async def ask(body: dict[str, Any], request: Request, authorization: str | None = Header(None)) -> Any:
     try:
         token = bearer(authorization)
-        claims = verify(token, audience="smart-tutor-api")
+        claims = await verify(token, audience="smart-tutor-api")
     except Unauthorized as e:
         print(f"[api] 401: {e}", flush=True)
         raise HTTPException(401, "unauthorized") from e
