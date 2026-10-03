@@ -11,10 +11,24 @@ from smart_tutor.shared.domain.token_usage import TokenUsage
 
 
 @dataclass(frozen=True, slots=True)
+class ToolCall:
+    id: str
+    name: str
+    arguments: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
 class Message:
+    """One conversation turn.
+
+    An assistant turn that called tools carries those `tool_calls`; each result follows as a `tool` message
+    whose `tool_call_id` names the call it answers.
+    """
+
     role: Literal["system", "user", "assistant", "tool"]
     content: str
     tool_call_id: str | None = None
+    tool_calls: tuple[ToolCall, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,13 +36,6 @@ class ToolSpec:
     name: str
     description: str
     parameters: dict[str, Any]  # JSON Schema
-
-
-@dataclass(frozen=True, slots=True)
-class ToolCall:
-    id: str
-    name: str
-    arguments: dict[str, Any]
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,4 +71,7 @@ class ChatModel(ABC):
 
     @abstractmethod
     async def structured[T: BaseModel](self, messages: Sequence[Message], schema: type[T]) -> StructuredResult[T]:
-        """Return a validated object. Adapters may use a forced tool call (Nova) or native structured output."""
+        """Return a validated object, or raise `ModelOutputError` when the model's payload does not validate.
+
+        Adapters may use a forced tool call (Nova) or native structured output.
+        """

@@ -437,7 +437,7 @@ Every decline (relevance gate, growth check, or `decline` tool) writes `subject_
 | **Malicious PDFs against the parser.** | Worker isolation: non-root, read-only root filesystem, NetworkPolicy egress only to AWS endpoints and PostgreSQL, resource limits, per-file timeout. |
 | **Wrong subjects detected.** | Thresholds and margins tuned on labeled data; "ask when unsure"; detection and growth evals. |
 | **Poor metadata (scanned or unusual PDFs).** Missing year or title weakens the research map. | Fields optional; display title editable; works without a year listed separately; extraction accuracy measured. |
-| **Tool calling in streamed answers; cross-region routing; token cost; long streams on Kubernetes; EKS operations; judge bias.** | M0 spike verifies streamed text + tool calls through `ChatBedrockConverse`; the `us.` inference profile keeps requests in US regions; capped history and chunks, prompt caching, budget alerts; `preStop` hooks, grace periods, and PodDisruptionBudgets for streaming pods; managed node group with a small add-on set; judges use a different model family (Qwen) calibrated against human feedback. |
+| **Tool calling in streamed answers; cross-region routing; token cost; long streams on Kubernetes; EKS operations; judge bias.** | Streamed text + tool calls verified in M0 through the boto3 Converse adapter (ADR 0006; `make bedrock-check`); the `us.` inference profile keeps requests in US regions; capped history and chunks, prompt caching, budget alerts; `preStop` hooks, grace periods, and PodDisruptionBudgets for streaming pods; managed node group with a small add-on set; judges use a different model family (Qwen) calibrated against human feedback. |
 | **Copyright of published or imported documents** *(R4)*. | Terms of use with upload warranty from R1; publishing terms, takedown per document visibility, imports limited to open-access sources. |
 
 ### 9.11 Hosting
@@ -470,7 +470,7 @@ Agent, MCP server, API, web, Keycloak, ingestion worker, and CronJobs run on **E
 
 ### 9.14 Region: us-east-1
 
-All environments run in **us-east-1**, the only commercial region offering `amazon.nova-2-multimodal-embeddings-v1:0`; Nova 2 Lite via the `us.` inference profile; Qwen in-region. **Open check (M0):** verify synchronous `InvokeModel` for Nova embeddings.
+All environments run in **us-east-1**, the only commercial region offering `amazon.nova-2-multimodal-embeddings-v1:0`; Nova 2 Lite via the `us.` inference profile; Qwen in-region. Verified in M0: synchronous `InvokeModel` works for Nova embeddings (ADR 0006). On-demand quotas: Nova embeddings 2,000 requests/min (not adjustable), Nova 2 Lite 2,000 requests/min and 8M tokens/min, Qwen3 32B 10,000 requests/min.
 
 ### 9.15 Code architecture and model abstraction
 
@@ -495,7 +495,7 @@ One Python package organized **by module first**, with `domain`, `application`, 
 | `adapters` | Bedrock, PostgreSQL, MCP client, LangGraph store, S3/SQS, PDF loader | `ports`, vendor SDKs |
 | `entrypoints` (`apps/`) | FastAPI routes, LangGraph graph, MCP tools, SQS worker, CronJobs | `application` (and `adapters`, for wiring) |
 
-**Model abstraction:** `ChatModel` (`stream`, `invoke`, `structured`, normalized `TokenUsage`) and `EmbeddingModel` (`embed_documents`, `embed_query`, `model_id`, `dimension`) ports; Bedrock adapters; a `ModelFactory` builds models by role (`agent`, `judge`, `embedding`). Switching chat models is a configuration change gated on the full evaluation split. Switching the embedding model re-embeds each **content** once from stored chunk text, recorded as `system` usage.
+**Model abstraction:** `ChatModel` (`stream`, `invoke`, `structured`, normalized `TokenUsage`, cached prompt tokens counted as input) and `EmbeddingModel` (`embed_documents`, `embed_query` returning vectors with `TokenUsage`, `model_id`, `dimension`) ports; Bedrock adapters; a `ModelFactory` builds models by role (`agent`, `judge`, `embedding`). Switching chat models is a configuration change gated on the full evaluation split. Switching the embedding model re-embeds each **content** once from stored chunk text, recorded as `system` usage.
 
 **OOP guidelines:** constructor injection; domain objects protect invariants; Pydantic at API and tool boundaries; later-release modules are added without changing Release 1 services.
 
@@ -621,7 +621,7 @@ M4 Production launch (R1)
 
 | Milestone | Exit criteria |
 |---|---|
-| M0 Foundations | Repo, CI, Compose stack, CDK and Helm skeletons, Keycloak realm, LangSmith project, package skeleton with ports and `ModelFactory` *(scaffold done)*; Bedrock models reachable (sync Nova embeddings verified; Nova 2 Lite streaming + tool call verified); forwarded JWT agent → MCP in Compose; page-text extraction with `pypdf` checked on seed-corpus PDFs. |
+| M0 Foundations | Repo, CI, Compose stack, CDK and Helm skeletons, Keycloak realm, LangSmith project, package skeleton with ports and `ModelFactory` *(scaffold done)*; Bedrock models reachable *(done: adapters and `make bedrock-check`, ADR 0006)*; forwarded JWT agent → MCP in Compose; page-text extraction with `pypdf` checked on seed-corpus PDFs. |
 | M1 Library and ingestion | Presigned upload, browser duplicate check, server SHA-256 dedupe with insert-or-get, content and document state machines with retry, first-pages step, page text with saved output, work key, chunks and embeddings, subject suggestions and shared catalog (1–3 per document, name check), personal names, archive/restore, Glacier tagger (tag/untag test), MCP search with `can_read` and iterative scans; suggestion, name-check, metadata, retrieval, filtered-recall, and dedupe/isolation tests passing on the seed corpus. |
 | M2 Tutor agent | First-turn multi-subject detection, growth to 3 with notices and warning, search, relevance gate, answer with document-as-data prompting, decline log, summarize path with edit-aware overwrite, idle sweeper, learning records; Release 1 evals passing on the smoke split, including adversarial PDFs. |
 | M3 App (API + Web) | Auth and terms, library and upload UX, subject choice and rename, chat streaming with subject notices, conversation and note management, usage view, rate limits and daily caps; isolation tests passing. |

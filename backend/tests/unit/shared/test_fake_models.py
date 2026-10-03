@@ -29,7 +29,7 @@ async def test_structured_returns_validated_schema() -> None:
 
 
 async def test_embeddings_match_declared_dimension(embedding_model: FakeEmbeddingModel) -> None:
-    [vector] = await embedding_model.embed_documents(["chunk"])
+    [vector] = (await embedding_model.embed_documents(["chunk"])).vectors
 
     assert len(vector) == embedding_model.dimension
-    assert await embedding_model.embed_query("chunk") == vector
+    assert (await embedding_model.embed_query("chunk")).vectors == [vector]

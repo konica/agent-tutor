@@ -13,7 +13,7 @@ from smart_tutor.shared.ports.chat_model import (
     StructuredResult,
     ToolSpec,
 )
-from smart_tutor.shared.ports.embedding_model import EmbeddingModel
+from smart_tutor.shared.ports.embedding_model import EmbeddingModel, Embeddings
 
 
 class FakeChatModel(ChatModel):
@@ -55,11 +55,11 @@ class FakeEmbeddingModel(EmbeddingModel):
     def dimension(self) -> int:
         return self._dimension
 
-    async def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
-        return [self._embed(t) for t in texts]
+    async def embed_documents(self, texts: Sequence[str]) -> Embeddings:
+        return Embeddings(vectors=[self._embed(t) for t in texts], usage=TokenUsage(input_tokens=len(texts)))
 
-    async def embed_query(self, text: str) -> list[float]:
-        return self._embed(text)
+    async def embed_query(self, text: str) -> Embeddings:
+        return Embeddings(vectors=[self._embed(text)], usage=TokenUsage(input_tokens=1))
 
     def _embed(self, text: str) -> list[float]:
         return [float(sum(ord(c) for c in text[i :: self._dimension])) for i in range(self._dimension)]

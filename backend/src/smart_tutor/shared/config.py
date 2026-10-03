@@ -10,13 +10,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class ModelConfig(BaseModel):
     provider: str = "bedrock"
     model_id: str
+    # Chat: temperature, max_tokens, top_p. Embedding: dimension, max_concurrency.
     params: dict[str, float | int | str] = {}
+    # Chat only: cache the system prompt (Bedrock prompt caching; cached tokens still count as input).
+    prompt_cache: bool = False
 
 
 class ModelsConfig(BaseModel):
     """Models by role (PRD §9.13). Switching a model is a configuration change gated on the full eval split."""
 
-    agent: ModelConfig = ModelConfig(model_id="us.amazon.nova-2-lite-v1:0")
+    agent: ModelConfig = ModelConfig(model_id="us.amazon.nova-2-lite-v1:0", prompt_cache=True)
     judge: ModelConfig = ModelConfig(model_id="qwen.qwen3-32b-v1:0", params={"temperature": 0})
     embedding: ModelConfig = ModelConfig(
         model_id="amazon.nova-2-multimodal-embeddings-v1:0", params={"dimension": 1024}

@@ -21,3 +21,5 @@ Product decisions are recorded in `sdd/prd.md` (§6, §13); ADRs cover architect
 | [0002](0002-content-document-split-sha256-dedupe.md) | Separate contents from documents; deduplicate by SHA-256 |
 | [0003](0003-shared-subject-catalog.md) | Shared subject catalog with stable ids and personal names |
 | [0004](0004-subjects-module.md) | Split the subject catalog out of `knowledge` into `subjects` |
+| [0005](0005-pypdf-page-text-instead-of-docling.md) | Extract PDF page text with `pypdf` instead of Docling in Release 1 |
+| [0006](0006-bedrock-adapters-on-boto3-converse.md) | Bedrock adapters on boto3 Converse/InvokeModel, traced with LangSmith |

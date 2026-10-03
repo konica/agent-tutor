@@ -30,6 +30,7 @@ eval = ["openevals>=0.1", "pyyaml>=6.0"]
 
 [dependency-groups]
 dev = [
+    "boto3-stubs[bedrock-runtime]>=1.40",
     "import-linter>=2.3",
     "mypy>=1.17",
     "pytest>=8.4",
@@ -54,9 +55,12 @@ known-first-party = ["smart_tutor", "fakes"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-addopts = "-m 'not integration' --import-mode=importlib"
+addopts = "-m 'not integration and not bedrock' --import-mode=importlib"
 pythonpath = ["tests"]  # so tests can `import fakes`
-markers = ["integration: needs the Docker Compose stack (make up)"]
+markers = [
+    "integration: needs the Docker Compose stack (make up)",
+    "bedrock: real Bedrock calls in us-east-1 with your AWS credentials (make bedrock-check)",
+]
 
 [tool.mypy]
 python_version = "3.12"
