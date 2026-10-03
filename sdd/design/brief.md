@@ -283,6 +283,7 @@ Use this realistic sample data, not lorem ipsum.
 3. Wireframes for §7 and §8.
 4. The components page (§10).
 5. A short list of questions or proposed changes to this brief.
+6. A prototype that tools can read (applies from the next round). Expose every state in `window.ST.STATES` as `{ id, group, ref, desc }`, where `ref` names the brief section and the specific user stories of that state (`§6.6 · US-3b`, not a range such as `US-3–10`). Open any state at `index.html#/<state-id>`, and hide the design-review chrome when the URL has `?shot=1`. The coding team renders states from these URLs (`sdd/specs/2026-10-03-design-to-code-loop-design.md` §5.1).
 
 ## 12. Open questions
 
@@ -336,4 +337,4 @@ Use this realistic sample data, not lorem ipsum.
 
 Paste this, together with this file, to start or continue a round:
 
-> You are designing **Smart Tutor**, a laptop web app (1440 px, light mode) where learners upload their own PDFs and ask a tutor that answers only from them, with citations. Follow the attached design brief **v0.3** exactly; it is the source of truth. Start with **§0 What changed**. Produce: (1) the four clickable flows in §5, (2) every Release 1 screen and state in §6, (3) low-fidelity wireframes for §7 and §8, (4) a components page (§10). Use the sample data in §9 and the quoted wording verbatim. Name each frame `<screen>-<state>@v0.3`. Do not design anything listed as out of scope in §4. End with a list of questions or proposed changes to the brief.
+> You are designing **Smart Tutor**, a laptop web app (1440 px, light mode) where learners upload their own PDFs and ask a tutor that answers only from them, with citations. Follow the attached design brief **v0.3** exactly; it is the source of truth. Start with **§0 What changed**. Produce: (1) the four clickable flows in §5, (2) every Release 1 screen and state in §6, (3) low-fidelity wireframes for §7 and §8, (4) a components page (§10). Use the sample data in §9 and the quoted wording verbatim. Name each frame `<screen>-<state>@v0.3`. Do not design anything listed as out of scope in §4. Follow the prototype contract in §11 item 6: every state in `window.ST.STATES` with its specific user stories in `ref`, each state at `index.html#/<state-id>`, and review chrome hidden when the URL has `?shot=1`. End with a list of questions or proposed changes to the brief.

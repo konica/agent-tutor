@@ -26,7 +26,7 @@ Sources of truth — read the relevant one before changing behavior or structure
 | `infra/` | AWS CDK app (Python, separate uv project), one stack per concern |
 | `deploy/helm/` | Umbrella chart `smart-tutor` and cluster add-on values |
 | `local/` | Compose-only files: Keycloak realm, LocalStack init, Postgres init |
-| `sdd/` | PRD, spec, ADRs, reviews |
+| `sdd/` | PRD, specs, plans, ADRs, reviews; `sdd/design/` holds the design brief, the Open Design prototype, and accepted rounds |
 
 ## Product invariants
 
@@ -98,6 +98,17 @@ mattpocock skills decide **what** to build and run the tracker; superpowers skil
 - `grilling` is for project-level decision tickets; `brainstorming` is for designing one slice.
 - Save superpowers specs and plans under `sdd/`, not `docs/superpowers/`. The PRD stays the product spec; a design doc narrows it for one slice and cites its PRD section.
 - Decided in `sdd/reviews/2026-10-03-delivery-process-discussion.md`.
+
+## Design inputs
+
+Mockups live in `sdd/design/` (brief, prototype, accepted rounds). Process: `sdd/specs/2026-10-03-design-to-code-loop-design.md`; commands: `sdd/design/README.md`.
+
+1. Read the ticket's `## Design` section, then the round's row in `sdd/design/rounds.md`.
+2. Render the ticket's states and look at them before writing code: `make design-shots ROUND=v0.3 STATES="chat-*" THEME=both` (PNGs in `.design-shots/`). First time: `cd web && npx playwright install chromium`.
+3. The prototype is a spec, not code to copy. Rebuild it with `web/src/components/` and the design tokens; never paste prototype HTML or CSS into a feature.
+4. If the mockup and the PRD disagree, follow the PRD and record the conflict in the PR description and the brief's Feedback log.
+5. Read the prototype at the ticket's tag (`ROUND=`), not the working copy, which may hold a round in progress. Never read Open Design or its data folder.
+6. After changing `sdd/design/prototype/`, run `make design-states`; CI fails when `sdd/design/states.json` is stale.
 
 ## Commits, PRs, and docs
 

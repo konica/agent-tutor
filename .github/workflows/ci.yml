@@ -39,6 +39,25 @@ jobs:
       - run: npm ci
       - run: npm run build
 
+  design:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Design tooling tests
+        run: npm run test:design
+      - name: states.json matches the prototype
+        run: npm run design:states -- --check
+
   helm:
     runs-on: ubuntu-latest
     steps:
