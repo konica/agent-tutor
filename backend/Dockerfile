@@ -1,6 +1,6 @@
 # One image per deployable, all from the smart_tutor package (spec S1).
 #   docker build --target api|agent|mcp|worker -t smart-tutor-<target> backend/
-# CronJobs reuse the api image. Only the worker installs the `ingest` extra (Docling + PyTorch).
+# CronJobs reuse the api image. Only the worker installs the `ingest` extra (pypdf and LangChain text splitters, ADR 0005).
 
 FROM python:3.12-slim AS base
 COPY --from=ghcr.io/astral-sh/uv:0.8 /uv /bin/uv

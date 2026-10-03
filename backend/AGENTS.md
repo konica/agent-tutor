@@ -27,7 +27,7 @@ Each module has `domain/` (entities and rules, no I/O), `application/` (one serv
 
 - A business rule → a method on the owning domain class (e.g. `Thread.add_subject()`, `Document.set_subjects()`, `Content.retry()`).
 - A use case → a service in the owning module's `application/`, receiving ports through its constructor.
-- Talking to Bedrock, PostgreSQL, S3, SQS, MCP, Docling, or the LangGraph store → a port in `ports/` and its implementation in `adapters/`.
+- Talking to Bedrock, PostgreSQL, S3, SQS, MCP, the PDF loader, or the LangGraph store → a port in `ports/` and its implementation in `adapters/`.
 - An HTTP route, graph node, MCP tool, SQS handler, or CronJob → `apps/<app>/`: parse input, call one service, format output.
 - A flow that crosses modules against the dependency order → orchestrate it in `apps/` (e.g. "Discuss this note": `apps/api` reads the note from `learning`, then starts a thread in `tutoring`).
 - A model call → ask `ModelFactory` for a role (`agent`, `judge`, `embedding`).
@@ -39,7 +39,7 @@ Enforced by `PYTHONUTF8=1 uv run lint-imports` (18 contracts in `pyproject.toml`
 1. Inside a module: `adapters | application` → `ports` → `domain`.
 2. Another module is used only through its `application` package; `shared` is open to all and imports no module.
 3. `apps` is a leaf: nothing imports it.
-4. `domain`, `application`, and `ports` stay free of vendor SDKs and `shared.adapters`; Docling lives only in `knowledge.adapters` (it pulls in PyTorch and ships only in the worker image).
+4. `domain`, `application`, and `ports` stay free of vendor SDKs and `shared.adapters`; the PDF loader (`pypdf`, `langchain_text_splitters`) lives only in `knowledge.adapters` and ships only in the worker image (ADR 0005).
 5. Module order, top to bottom: `reports` → `recommendations` → `quizzes | catalog` → `learning` → `tutoring` → `graph` → `knowledge` → `subjects` → `accounts | insights`. A module imports only modules below it.
 6. The agent retrieves through `tutoring`'s `Retriever` port (MCP client) → `apps/mcp_server` → `knowledge.application.SearchService`; chunk tables are read only by `knowledge`.
 
@@ -47,7 +47,7 @@ A new cross-module dependency means moving a module in the order on purpose and 
 
 ## Dependencies
 
-- Core dependencies in `[project.dependencies]`; heavy single-service ones behind an extra: `ingest` (Docling, worker only) or `eval`. Dev tools in the `dev` dependency group. Run `uv lock` and commit `uv.lock` after editing.
+- Core dependencies in `[project.dependencies]`; heavy single-service ones behind an extra: `ingest` (PDF loader and text splitter, worker only) or `eval`. Dev tools in the `dev` dependency group. Run `uv lock` and commit `uv.lock` after editing.
 - `mcp` is 2.x: the server class is `mcp.server.MCPServer`, and host/port go to `run()`.
 
 ## Tests

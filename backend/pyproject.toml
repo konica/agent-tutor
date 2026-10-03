@@ -23,8 +23,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Installed only in the worker image (pulls in PyTorch).
-ingest = ["docling>=2.40"]
+# Installed only in the worker image: PDF page text and chunking (ADR 0005).
+ingest = ["langchain-text-splitters>=1.1", "pypdf>=6.0"]
 # Evaluation runs (backend/evals) and CI eval gates.
 eval = ["openevals>=0.1", "pyyaml>=6.0"]
 
@@ -412,17 +412,18 @@ forbidden_modules = [
     "smart_tutor.shared.adapters",
     "boto3",
     "botocore",
-    "docling",
     "fastapi",
+    "langchain_text_splitters",
     "langchain_aws",
     "langgraph",
     "mcp",
     "psycopg",
+    "pypdf",
     "sqlalchemy",
 ]
 
 [[tool.importlinter.contracts]]
-name = "Docling only in knowledge.adapters (keeps the ingest extra in the worker image)"
+name = "PDF loader only in knowledge.adapters (keeps the ingest extra in the worker image)"
 type = "forbidden"
 source_modules = [
     "smart_tutor.shared",
@@ -438,7 +439,7 @@ source_modules = [
     "smart_tutor.reports",
     "smart_tutor.graph",
 ]
-forbidden_modules = ["docling"]
+forbidden_modules = ["langchain_text_splitters", "pypdf"]
 
 # Rule 5: the module dependency graph, top to bottom. Higher modules may use lower ones (application only);
 # "|" marks independent siblings. Lower never imports higher, so there are no cycles.
