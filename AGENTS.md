@@ -66,6 +66,20 @@ Other tasks (Compose, jobs, evals, CDK synth) are targets in the `Makefile`; ima
 - Endpoints and MCP tools that return learner data get a test in `backend/tests/isolation/`.
 - Agent quality is gated by LangSmith evals in `backend/evals/`, targets in `thresholds.yaml`, data from the seed corpus manifest. Fix the agent until a run meets its threshold.
 
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues in `konica/agent-tutor`: milestones M0–M4, one parent issue per user story, slices as sub-issues, `area:*` labels. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`, with `bug`/`enhancement`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` at the root, ADRs in `sdd/adr/`. See `docs/agents/domain.md`.
+
 ## Commits, PRs, and docs
 
 - Work on a branch and open a PR into `main`. Commit subjects in the imperative mood; the body says why.
