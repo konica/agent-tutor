@@ -1,0 +1,20 @@
+# Seed corpus for evaluation (PRD §10.3). Learners' documents are private, so every eval uses these
+# openly licensed documents instead. PDFs are NOT committed: run the download step (README) to fetch them
+# into data/seed_corpus/ (git-ignored), verified against sha256.
+#
+# Target shape (PRD §10.3): 3–4 overlapping subjects; chains of papers that cite and build on each other;
+# a few preprint/published pairs of the same work (different sha256, same work_key).
+#
+# Entry schema:
+#   - id: short stable key used by datasets (e.g. "attn-2017")
+#     source: {type: arxiv, ref: "<arXiv id with version>"}   # or {type: url, ref: "<https url>"}
+#     license: "<SPDX id, e.g. CC-BY-4.0>"                     # must allow redistribution of excerpts
+#     sha256: "<hex digest of the exact PDF>"
+#     subjects: ["<subject name>", ...]                        # 1–3 labeled subjects (suggestion eval)
+#     metadata: {title: "...", authors: ["..."], year: 2017, doi: "10.xxxx/..." }  # metadata eval; doi optional
+#     work_key: "<doi or normalized title + year>"             # same value for files of the same work
+#     cites: ["<id>", ...]                                     # true citation links within the corpus (R2 eval)
+#     adversarial: false                                       # true for PDFs with injected instructions
+#
+# Add entries in M1 after checking each document's license.
+documents: []

@@ -1,6 +1,6 @@
 # One entry point for local work. On Windows, run from Git Bash/WSL with `make` installed,
 # or run the commands below directly.
-.PHONY: help up down up-app sync lint test test-integration sweep glacier-tag evals-smoke web infra-synth helm-lint
+.PHONY: help up down up-app sync lint test test-integration sweep glacier-tag retention evals-smoke web infra-synth helm-lint
 
 BACKEND := cd backend &&
 export PYTHONUTF8 := 1
@@ -30,6 +30,8 @@ sweep:         ## run the learning-record sweeper once (PRD §9.2)
 	$(BACKEND) uv run python -m smart_tutor.apps.jobs.record_sweeper
 glacier-tag:   ## run the Glacier tagger once (PRD §9.5)
 	$(BACKEND) uv run python -m smart_tutor.apps.jobs.glacier_tagger
+retention:     ## run the retention job once: traces 180 days, decline log 90 days (PRD D25, §9.6)
+	$(BACKEND) uv run python -m smart_tutor.apps.jobs.retention
 
 evals-smoke:
 	$(BACKEND) uv run --extra eval python -m evals.run --split smoke

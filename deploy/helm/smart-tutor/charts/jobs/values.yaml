@@ -1,8 +1,10 @@
-# CronJobs: learning-record sweeper (every minute), Glacier tagger (daily), (R2) learner reports.
+# CronJobs (PRD §9.1): learning-record sweeper (every minute), Glacier tagger (daily),
+# retention of traces and decline log (daily), (R3) learner reports (hourly).
 image:
   repository: smart-tutor-api
   tag: ""  # defaults to global.imageTag
 schedules:
   recordSweeper: "* * * * *"
   glacierTagger: "0 3 * * *"
+  retention: "30 3 * * *"
 # Owns its NetworkPolicy and ExternalSecret (spec §8).

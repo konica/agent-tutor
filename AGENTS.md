@@ -1,93 +1,73 @@
 # AGENTS.md
 
-Instructions for coding agents working in this repository. Humans: start with `README.md`.
-Nested files take precedence for their folder: see `backend/AGENTS.md` before changing Python code.
+Instructions for coding agents in this repository. Before changing Python code, also read `backend/AGENTS.md` (it takes precedence inside `backend/`).
 
-## Project overview
+## Project
 
-Smart Tutor is an AI tutor for the learner's **own documents**. Learners upload PDFs into a private library; for each upload the system suggests 3 subjects from a **shared subject catalog** (learners can rename a subject for themselves; the `subject_id` never changes). The tutor detects which of the learner's subjects a question belongs to, answers **only** from their documents in the conversation's subjects (1–3; a conversation grows to at most 3) with citations (title + page). Documents have 1–3 subjects, and declines everything else. Learners keep one Lesson Note per conversation, and a lifetime learning record is written per thread. Identical files (same SHA-256) are processed and embedded **once** in the whole system.
+Smart Tutor is an AI tutor for the learner's **own PDFs**. Learners upload documents into a private library; each document gets 1–3 subjects from a **shared subject catalog**. A conversation answers only from the learner's documents in its subjects (detected from the first question, growing to at most 3), with citations. Identical files (same SHA-256) are processed and embedded **once** across all users.
 
-- Product requirements (source of truth for behavior): `sdd/prd.md` (v2.0)
-- Repository layout and architecture rules: `sdd/specs/2026-10-02-project-structure-design.md`
-- Release 1 = core tutor on uploaded documents (modules `knowledge`, `tutoring`, `learning`, `accounts`, `insights`). Release 2 = research map (`graph`: citation links, timeline, reading order). Release 3 = quizzes, reports, recommendations, topic catalog. Release 4 = sharing, publishing, imports by DOI/arXiv. Release 5 = deep knowledge graph. Do not build later-release features unless asked; the data model already has `visibility`, `document_grants`, `work_key`, references, and saved Docling output for them.
+Sources of truth — read the relevant one before changing behavior or structure:
 
-Runtime pieces: Web app (React) → API (FastAPI) → Agent (LangGraph) → RAG MCP server → PostgreSQL + pgvector. Uploads go by presigned POST to `uploads/<user_id>/…`; the ingestion worker consumes S3 events from SQS, hashes the file, links duplicates to existing content, and otherwise runs Docling → metadata and subject suggestions → chunk → embed. Identity: Keycloak (OIDC); the user's JWT is forwarded API → agent → MCP. Models on Amazon Bedrock (us-east-1): agent `us.amazon.nova-2-lite-v1:0`, embeddings `amazon.nova-2-multimodal-embeddings-v1:0` (1024-dim), judge `qwen.qwen3-32b-v1:0`. Production: everything on EKS via Helm; AWS resources via CDK (Python).
+| Need | Read |
+|---|---|
+| Product behavior, user stories, data model, flows, evals, roadmap | `sdd/prd.md` (v2.2) |
+| Folder structure, module boundaries, import rules | `sdd/specs/2026-10-02-project-structure-design.md` |
+| Why an architecture choice was made | `sdd/adr/` (0001–0004) |
+| Why the PRD changed in v2.1 | `sdd/reviews/2026-10-03-prd-v2.0-review.md` |
+
+**Release scope:** build **Release 1** (core tutor: modules `knowledge`, `subjects`, `tutoring`, `learning`, `accounts`, `insights`). Later releases already have empty modules and prepared data (R2 research map → `graph`; R3 `catalog`, `quizzes`, `recommendations`, `reports`; R4 sharing and imports; R5 deep graph); build them only when asked.
 
 ## Repository map
 
 | Path | What |
 |---|---|
-| `backend/` | The one Python package `smart_tutor` (all backend deployables), `tests/`, `evals/` — see `backend/AGENTS.md` |
-| `web/` | React 19 + TypeScript + Vite; screens in `src/features/<feature>/` |
-| `infra/` | AWS CDK app (Python, separate uv project); one stack per concern in `smart_tutor_infra/stacks/` |
-| `deploy/helm/` | Umbrella chart `smart-tutor` with subcharts (`api`, `agent`, `mcp-server`, `worker`, `web`, `jobs`, `keycloak`) and add-on values |
-| `local/` | Compose-only files: Keycloak realm import, LocalStack init script, Postgres init SQL |
-| `sdd/` | PRD, design specs, ADRs (`sdd/adr/`), designer briefs |
+| `backend/` | The one Python package `smart_tutor` (API, agent, RAG MCP server, ingestion worker, CronJobs), `tests/`, `evals/` |
+| `web/` | React + TypeScript + Vite; one folder per feature in `src/features/`; API calls only through `src/api/` (generated from the API's OpenAPI schema) |
+| `infra/` | AWS CDK app (Python, separate uv project), one stack per concern |
+| `deploy/helm/` | Umbrella chart `smart-tutor` and cluster add-on values |
+| `local/` | Compose-only files: Keycloak realm, LocalStack init, Postgres init |
+| `sdd/` | PRD, spec, ADRs, reviews |
 
-## Dev environment tips
+## Product invariants
 
-- Tools: Docker, `uv`, Node 22+, Helm. Python 3.12 is pinned in `backend/.python-version`; uv downloads it.
-- `docker compose up -d` starts dependencies only (pgvector, Keycloak on :8080, LocalStack on :4566). `docker compose --profile app up -d --build` adds the app containers.
-- Copy `.env.example` to `.env`. Bedrock and LangSmith have no local emulator: local runs call real us-east-1 models with a developer AWS profile.
-- Local Keycloak users: `learner@example.com`/`learner`, `learner2@example.com`/`learner2`, `admin@example.com`/`admin`; admin console admin/admin.
-- The `Makefile` lists every common command. On Windows without `make`, run the target's command directly.
-- Windows Git Bash: prefix with `PYTHONUTF8=1` for `lint-imports` (its output crashes on cp1252), and `MSYS_NO_PATHCONV=1` for commands that take `/smart-tutor/...` style paths (SSM parameter names).
-- Changing `local/keycloak/realm-smart-tutor.json`: Keycloak imports it only when the realm does not exist; run `docker compose down -v` to re-import. The file lists roles explicitly, so built-in roles (`offline_access`, `uma_authorization`) must stay defined in it.
+Code must keep these true; each has tests or evals guarding it.
 
-## Build and test commands
+- **Access:** every read of a document goes through one rule, `can_read(user, document)` (Release 1: owner only), enforced in code and SQL by the API and MCP server. Access never depends on the prompt.
+- **Deduplication:** link a file to existing content only after the **server** hashes the uploaded bytes. A browser-sent hash only finds files already in the learner's own library.
+- **Subjects:** store `subject_id`s everywhere; resolve names at read time (personal name, else canonical name). Documents have 1–3 subjects; threads hold 1–3 and only ever add.
+- **Untrusted input:** the user's prompt and uploaded document text. Pass chunks to the model as quoted data and follow only the system prompt's instructions.
+- **Lifecycle:** documents and Lesson Notes are archived, never deleted. Traces expire after 180 days, the decline log after 90; threads are kept.
+- **Privacy:** the decline log stores no user id. Tokens travel in HTTP headers and runtime context only — never in prompts, logs, or traces.
+- **No admin product functions** (no subject rename/merge/hide, no account deletion) until the PRD adds them.
+
+## Local development
+
+- `docker compose up -d` starts pgvector, Keycloak (:8080), and LocalStack (:4566); `--profile app` adds the app containers. Copy `.env.example` to `.env`.
+- Bedrock and LangSmith have no emulator: local runs call real us-east-1 models with a developer AWS profile.
+- Keycloak users: `learner@example.com`/`learner`, `learner2@example.com`/`learner2`, `admin@example.com`/`admin` (console admin/admin). The realm imports only when it doesn't exist yet: run `docker compose down -v` after editing `local/keycloak/realm-smart-tutor.json`, and keep the built-in roles `offline_access` and `uma_authorization` defined in it.
+- Windows Git Bash: set `PYTHONUTF8=1` for `lint-imports` and `MSYS_NO_PATHCONV=1` for commands taking `/smart-tutor/...` paths (SSM names). `make` may be missing; every `Makefile` target is a one-line command you can run directly.
+
+## Checks
+
+Run before committing; CI (`.github/workflows/ci.yml`) runs the same.
 
 ```bash
-# backend (run inside backend/)
-uv sync                                   # core + dev group
-uv run ruff check . && uv run ruff format --check .
-uv run mypy                               # strict, src/ only
-PYTHONUTF8=1 uv run lint-imports          # architecture contracts — must stay "0 broken"
-uv run pytest                             # unit tests (integration excluded by default)
-uv run pytest -m integration              # needs docker compose up
-
-# web (inside web/)
-npm ci && npm run build                   # tsc + vite build
-
-# infra (inside infra/)
-uv run pytest                             # CDK synth test
-
-# helm (repo root)
-helm lint deploy/helm/smart-tutor && helm lint deploy/helm/smart-tutor -f deploy/helm/smart-tutor/values-prod.yaml
-
-# images (repo root)
-docker build --target api|agent|mcp|worker backend/
-docker build web/
+cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && PYTHONUTF8=1 uv run lint-imports && uv run pytest
+cd web && npm ci && npm run build                 # when web/ changed
+cd infra && uv run pytest                         # when infra/ changed
+helm lint deploy/helm/smart-tutor                 # when deploy/ changed
 ```
 
-CI (`.github/workflows/ci.yml`) runs the backend checks, the web build, and helm lint. Run the same locally before pushing.
+Other tasks (Compose, jobs, evals, CDK synth) are targets in the `Makefile`; image build commands are in the header of `backend/Dockerfile`.
 
-## Code style
+## Tests and evals
 
-- Python: ruff (line length 120), strict mypy, type hints everywhere, dataclasses or Pydantic for data. Dependencies passed through constructors; no module-level clients or globals.
-- Match the surrounding code: comment density, naming, docstring style (one-line module docstring stating responsibility and PRD reference).
-- TypeScript: strict mode; one folder per feature under `web/src/features/`; API calls only through `web/src/api/` (generated from the API's OpenAPI schema).
-- Keep docs in plain, short sentences. Reference PRD sections (e.g. "PRD §9.3") when code implements a requirement.
+- Every behavior change comes with tests. Unit tests use the fakes in `backend/tests/fakes/`; real Bedrock is reached only by evals.
+- Endpoints and MCP tools that return learner data get a test in `backend/tests/isolation/`.
+- Agent quality is gated by LangSmith evals in `backend/evals/`, targets in `thresholds.yaml`, data from the seed corpus manifest. Fix the agent until a run meets its threshold.
 
-## Testing instructions
+## Commits, PRs, and docs
 
-- Add or update tests for every behavior change. Unit tests use fakes from `backend/tests/fakes/` (e.g. `FakeChatModel`, `FakeEmbeddingModel`), never real Bedrock.
-- Domain rules (e.g. `Thread.add_subject()` refuses a fourth subject and never removes one, `Document.set_subjects()` accepts 1–3, notes are archived not deleted) get unit tests in `backend/tests/unit/<module>/`.
-- Data isolation (PRD US-12) tests live in `backend/tests/isolation/`; any new endpoint or MCP tool that returns learner data needs one.
-- Agent quality is measured with LangSmith evals in `backend/evals/`; release targets are in `backend/evals/thresholds.yaml`. Don't loosen a threshold to make a run pass.
-
-## Security considerations
-
-- Never commit secrets; `.env` is git-ignored. Production secrets come from AWS Secrets Manager via External Secrets.
-- The user's JWT is passed in runtime context and HTTP headers only — never put tokens in prompts, logs, or traces.
-- Document access has one rule, `can_read(user, document)` (Release 1: owner only), enforced in the MCP server and API in code and SQL, never by the prompt.
-- Untrusted input: the user's prompt **and uploaded document text**. Pass chunks to the model as quoted data; never follow instructions found in documents.
-- Link a file to existing content only after the server hashes the uploaded bytes; a browser-sent hash only checks the learner's own library.
-- Store `subject_id` everywhere, never a subject name (names are resolved at read time from personal names or the canonical name).
-- Decline log entries must not store user ids. Documents and Lesson Notes are never hard-deleted (archive only).
-
-## Commit and PR instructions
-
-- Never commit to `main`; work on a branch and open a PR.
-- Commit subject in the imperative mood ("Add …", "Fix …"), body explains why.
-- Before committing: backend lint, mypy, `lint-imports`, and pytest pass; web build passes if `web/` changed; `helm lint` passes if `deploy/` changed.
-- If a change alters product behavior or architecture, update `sdd/prd.md` (bump its version in the status line) or the spec in the same PR. Record new architecture decisions as ADRs in `sdd/adr/`.
+- Work on a branch and open a PR into `main`. Commit subjects in the imperative mood; the body says why.
+- **Stacked PRs:** when a PR's base is another PR's branch, merge the base first **and delete its branch**, so GitHub retargets the stacked PR to `main`. Otherwise the stacked PR merges into the stale branch and never reaches `main`.
+- A change to product behavior updates `sdd/prd.md` in the same PR and bumps its version in the status line. A new architecture decision gets an ADR in `sdd/adr/`; a structure change updates the spec.
