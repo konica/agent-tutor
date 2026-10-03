@@ -4,3 +4,5 @@
 Makefile text eol=lf
 Dockerfile text eol=lf
 *.pdf binary
+# Open Design project: keep bytes as Open Design wrote them (its version manifests store SHA-256 digests).
+sdd/design/prototype/** -text
