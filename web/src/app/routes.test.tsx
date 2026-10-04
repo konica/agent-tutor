@@ -2,14 +2,21 @@ import { act, render, screen, within } from "@testing-library/react";
 import { StrictMode } from "react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
+import { SessionContext } from "../auth/SessionProvider";
 import { NAV } from "./nav";
 import { routes } from "./routes";
 
+const signOut = vi.fn();
+
 function renderAt(path: string, { strict = false } = {}) {
   const router = createMemoryRouter(routes, { initialEntries: [path] });
-  const app = <RouterProvider router={router} />;
+  const app = (
+    <SessionContext.Provider value={{ name: "Ada Lovelace", signOut }}>
+      <RouterProvider router={router} />
+    </SessionContext.Provider>
+  );
   render(strict ? <StrictMode>{app}</StrictMode> : app);
   return router;
 }
@@ -68,6 +75,13 @@ describe("app shell routes", () => {
     expect(document.title).toBe("Library · Smart Tutor");
     await userEvent.click(nav().getByRole("link", { name: "Notes" }));
     expect(document.title).toBe("Notes · Smart Tutor");
+  });
+
+  it("shows the learner's name and signs out from the user menu", async () => {
+    renderAt("/library");
+    await userEvent.click(nav().getByRole("button", { name: /Ada Lovelace/ }));
+    await userEvent.click(nav().getByRole("button", { name: "Sign out" }));
+    expect(signOut).toHaveBeenCalledOnce();
   });
 
   it("moves focus to the main region after navigating", async () => {

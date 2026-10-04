@@ -21,7 +21,13 @@ export function createKeycloakClient(config: AuthConfig = authConfig()): AuthCli
     init() {
       initialized ??= keycloak
         .init({ onLoad: "login-required", pkceMethod: "S256", checkLoginIframe: false })
-        .then(() => undefined);
+        .then(
+          () => undefined,
+          (error: unknown) => {
+            initialized = undefined; // a failed init must not stay cached, so "Try again" can re-run it
+            throw error;
+          },
+        );
       return initialized;
     },
     async getToken() {

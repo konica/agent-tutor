@@ -32,6 +32,14 @@ describe("keycloak client", () => {
     expect(kc.init).toHaveBeenCalledOnce();
   });
 
+  it("retries init after a failure", async () => {
+    kc.init.mockRejectedValueOnce(new Error("network"));
+    const auth = createKeycloakClient(config);
+    await expect(auth.init()).rejects.toThrow("network");
+    await expect(auth.init()).resolves.toBeUndefined();
+    expect(kc.init).toHaveBeenCalledTimes(2);
+  });
+
   it("refreshes a token that expires within 60 seconds before handing it out", async () => {
     await expect(createKeycloakClient(config).getToken()).resolves.toBe("access-token");
     expect(kc.updateToken).toHaveBeenCalledWith(60);
