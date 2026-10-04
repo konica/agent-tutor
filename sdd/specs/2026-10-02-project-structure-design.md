@@ -187,6 +187,9 @@ web/src/
 ├── features/     # library (upload, documents), subjects, chat, conversations, notes, usage; (R2) research-map; (R3) quizzes, reports
 ├── api/          # typed client generated from the API's OpenAPI schema
 ├── auth/         # Keycloak OIDC (Authorization Code + PKCE)
+├── app/          # route table, nav config, placeholder page
+├── styles/       # design tokens, base styles, theme
+├── test/         # Vitest setup
 └── components/   # shared UI
 ```
 

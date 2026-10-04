@@ -15,7 +15,7 @@ The brand is Smart Tutor's own (`smart-tutor-ds`, light and dark). The Open Desi
 
 ## Tokens
 
-Every color, size, space, radius, shadow, and duration in feature code is a `var(--…)` from `tokens.css`. A value the tokens lack goes into `tokens.css` (both themes) first, then gets used.
+Every color, font size, space, radius, shadow, and duration in feature code is a `var(--…)` from `tokens.css`. Component dimensions (control heights, icon and avatar sizes, 1–2px borders and gaps) may be literal px. A value the tokens lack goes into `tokens.css` (both themes) first, then gets used.
 
 | Role | Tokens |
 |---|---|
@@ -28,7 +28,7 @@ Every color, size, space, radius, shadow, and duration in feature code is a `var
 | Focus | `--focus` (2px outline, 2px offset, on `:focus-visible`) |
 | Type | `--font-display` (serif: h1–h3, brand word), `--font-body` (system UI), `--font-mono` (numbers, ids, token counts; tabular figures); sizes `--fs-12` … `--fs-40`; `--lh-body` 1.55, `--lh-head` 1.2 |
 | Space and shape | `--sp-1` (4px) … `--sp-16` (64px); `--r-sm` 6px, `--r-md` 10px, `--r-pill` |
-| Motion | `--dur-fast`, `--dur-base`, `--ease-out`; everything stops under `prefers-reduced-motion: reduce` |
+| Motion | `--dur-fast`, `--dur-base`, `--dur-exit`, `--dur-spin`, `--ease-out`, `--ease-in`; everything stops under `prefers-reduced-motion: reduce` |
 | Layout | `--nav-w` 240px, `--page-w` 1120px, `--page-w-wide` 1200px (Library), `--chat-w` 760px, `--panel-w` 480px, `--tray-w` 384px |
 
 The prototype's `--chrome-*` tokens, `.rb-*` classes, and `od-*` layout primitives belong to the review tool, not the product: leave them out.
