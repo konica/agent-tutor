@@ -32,7 +32,7 @@ eval = ["openevals>=0.1", "pyyaml>=6.0"]
 
 [dependency-groups]
 dev = [
-    "boto3-stubs>=1.40",
+    "boto3-stubs[s3,sqs]>=1.40",
     "import-linter>=2.3",
     "mypy>=1.17",
     "pytest>=8.4",

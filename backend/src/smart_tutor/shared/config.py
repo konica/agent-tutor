@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     keycloak_client_secret: SecretStr = SecretStr("")
     cors_origins: list[str] = ["http://localhost:10453"]
     documents_bucket: str = "smart-tutor-documents"
+    # LocalStack serves buckets by path (http://localhost:10402/<bucket>); AWS uses virtual-hosted URLs.
+    s3_path_style: bool = False
     ingest_queue_url: str = "http://localhost:10402/000000000000/smart-tutor-ingest"
     mcp_url: str = "http://localhost:10452/mcp"
     learning_record_idle_minutes_param: str = "/smart-tutor/learning-record-idle-minutes"
