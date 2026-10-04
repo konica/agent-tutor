@@ -1,4 +1,5 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
+import { StrictMode } from "react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
@@ -6,9 +7,10 @@ import { describe, expect, it } from "vitest";
 import { NAV } from "./nav";
 import { routes } from "./routes";
 
-function renderAt(path: string) {
+function renderAt(path: string, { strict = false } = {}) {
   const router = createMemoryRouter(routes, { initialEntries: [path] });
-  render(<RouterProvider router={router} />);
+  const app = <RouterProvider router={router} />;
+  render(strict ? <StrictMode>{app}</StrictMode> : app);
   return router;
 }
 
@@ -72,5 +74,26 @@ describe("app shell routes", () => {
     renderAt("/library");
     await userEvent.click(nav().getByRole("link", { name: "Usage" }));
     expect(screen.getByRole("main")).toHaveFocus();
+  });
+
+  it("moves focus to the main region on browser Back", async () => {
+    const router = renderAt("/library");
+    await userEvent.click(nav().getByRole("link", { name: "Usage" }));
+    (document.activeElement as HTMLElement).blur();
+    await act(() => router.navigate(-1));
+    expect(screen.getByRole("heading", { level: 1, name: "Library" })).toBeInTheDocument();
+    expect(screen.getByRole("main")).toHaveFocus();
+  });
+
+  it("leaves focus alone when the app opens at / and redirects", async () => {
+    renderAt("/");
+    await screen.findByRole("heading", { level: 1, name: "Library" });
+    expect(screen.getByRole("main")).not.toHaveFocus();
+  });
+
+  it("leaves focus alone on first load in StrictMode", async () => {
+    renderAt("/library", { strict: true });
+    await screen.findByRole("heading", { level: 1, name: "Library" });
+    expect(screen.getByRole("main")).not.toHaveFocus();
   });
 });
