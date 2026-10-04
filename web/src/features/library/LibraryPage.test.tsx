@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -42,6 +42,7 @@ describe("LibraryPage", () => {
     const file = new File(["%PDF"], "lewis-rag-2020.pdf", { type: "application/pdf" });
     await userEvent.upload(screen.getByLabelText("Upload PDFs"), file);
     expect(upload).toHaveBeenCalledWith(file);
+    expect(screen.getByRole("status")).toHaveTextContent(/Uploading lewis-rag-2020.pdf…|Uploaded lewis-rag-2020.pdf. Processing./);
     expect(await screen.findByText("lewis-rag-2020.pdf")).toBeVisible();
   });
 
@@ -52,7 +53,20 @@ describe("LibraryPage", () => {
     render(<LibraryPage load={async () => []} upload={upload} />);
     await screen.findByText("Upload your first document");
     await userEvent.upload(screen.getByLabelText("Upload PDFs"), new File(["x"], "big.pdf", { type: "application/pdf" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't upload big.pdf. Try again.");
+    expect(await screen.findByText("Couldn't upload big.pdf. Try again.")).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("Upload failed: big.pdf.");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("announces a processing state change in the status region, but not the first load", async () => {
+    const failedNow: DocumentResponse = { ...processing, state: "failed", failure_reason: "Duplicate uploads aren't supported yet" };
+    const load = vi.fn().mockResolvedValueOnce([processing]).mockResolvedValue([failedNow]);
+    render(<LibraryPage load={load} upload={vi.fn()} pollMs={20} />);
+    await screen.findByText("Processing");
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("lewis-rag-2020.pdf failed: Duplicate uploads aren't supported yet."),
+    );
   });
 
   it("refreshes every 2 seconds", async () => {
