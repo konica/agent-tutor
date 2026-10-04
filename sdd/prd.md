@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Draft v2.5 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Status** | Draft v2.6 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Changes from v2.5** | Chunking decided (ADR 0008): each page split with `RecursiveCharacterTextSplitter` into chunks of ≤ 512 characters (overlap 50), one page per chunk, nothing dropped; new columns `chunks.seq` and `contents.chunker`; chunking methods plug in as LangChain document transformers. Search stays at k = 5. |
 | **Changes from v2.4** | Every service (API, agent, MCP server) has Keycloak validate the learner's token by introspection instead of checking its signature locally, so signing out or a revoked session ends access on the next request rather than at token expiry; the token travels in LangGraph runtime context (§9.3; ADR 0007). `smart-tutor-api` and `rag-mcp` become confidential clients. |
 | **Changes from v2.3** | Architecture only: LangChain's `BaseChatModel` and `Embeddings` replace the hand-written `ChatModel` / `EmbeddingModel` ports; `ModelFactory` builds chat models with `init_chat_model` (§9.15; ADR 0006). No product behavior changes. |
 | **Changes from v2.2** | Release 1 extracts PDF text page by page with `pypdf` into LangChain `Document`s instead of Docling (D26, ADR 0005): no PyTorch in the worker, no OCR (PDFs without a text layer fail with a reason), saved page text replaces saved Docling output. Reference lists and section headings move to a structured-extraction step added in Release 2, backfilled from stored PDFs. M0 drops the Docling benchmark. |
@@ -121,7 +122,7 @@ Learners and researchers work through many documents on a topic but lack the bac
 | D23 | The admin content-gap report is removed; declines are logged anonymously for evals and monitoring. | No admin corpus to fill gaps in. |
 | D24 | **No limit on the number of documents** per learner. Per-file limits (PDF, ≤ 50 MB, ≤ 500 pages), upload rate limits, and daily caps apply. | Researchers accumulate papers; archive-only must not trap them. |
 | D25 | **Traces are deleted after 180 days; threads are kept** for the account's lifetime, so notes and learning records keep their links. | Long-term learning history with bounded trace storage. |
-| D26 | Release 1 extracts text **page by page with `pypdf`** into LangChain `Document`s (page number in metadata), chunked with LangChain's `RecursiveCharacterTextSplitter`: no layout model, no OCR. A PDF without extractable text fails with a reason. | Smaller, faster worker (no PyTorch); Release 1 needs only page text for chunks and citations. Structured extraction waits until a feature needs it (ADR 0005). |
+| D26 | Release 1 extracts text **page by page with `pypdf`** into LangChain `Document`s (page number in metadata), chunked with LangChain's `RecursiveCharacterTextSplitter` (≤ 512 characters, overlap 50, one page per chunk; ADR 0008): no layout model, no OCR. A PDF without extractable text fails with a reason. | Smaller, faster worker (no PyTorch); Release 1 needs only page text for chunks and citations. Structured extraction waits until a feature needs it (ADR 0005). |
 
 ## 7. Scope
 
@@ -315,7 +316,7 @@ Thresholds (`detect_threshold`, `detect_margin`, `multi_margin`, `answer_floor`)
 3. **New content:** move the file to `contents/<sha256>.pdf`.
 4. **First-pages step (fast, one model call, `describe_document` tool call)** on text extracted from pages 1–2: title, authors, year, DOI, a two-sentence summary, and 3 proposed subject names; an embedding of the summary is stored on the content.
 5. **Suggestions for this learner (code):** rank shared subjects by similarity between the summary embedding and subject name embeddings, boosting subjects the learner already has and matching their personal names; fill the remaining of 3 slots with the model's proposed names that don't match an existing subject.
-6. **Full extraction:** `pypdf` reads the text page by page into LangChain `Document`s → save `contents/<sha256>.pages.json` → **work key** (DOI, else normalized title + year) in code from the first-pages metadata → split each page with `RecursiveCharacterTextSplitter` into chunks that keep their page number → embed (chunk writes idempotent per content). Runs while the learner chooses subjects. A PDF with no extractable text fails with "No text layer (scanned PDFs are not supported yet)".
+6. **Full extraction:** `pypdf` reads the text page by page into LangChain `Document`s → save `contents/<sha256>.pages.json` → **work key** (DOI, else normalized title + year) in code from the first-pages metadata → split each page with `RecursiveCharacterTextSplitter` (separators `\n\n`, `\n`, `. `, space; ≤ 512 characters, overlap 50) into chunks that keep their page number, after light cleanup (NFKC, joined line-end hyphens, no control characters); reference lists and front matter are kept; pages without text yield no chunks → embed (chunk writes idempotent per content, ordered by `seq`; `contents.chunker` records the method and settings). Runs while the learner chooses subjects. A PDF whose pages average fewer than 50 non-whitespace characters fails with "No text layer (scanned PDFs are not supported yet)".
 
 **Release 2 path (research map):** at ingestion (from Release 2, which adds structured extraction of reference lists; backfilled from stored PDFs for older contents) references are matched to works by DOI, then normalized title + year; the map and reading order for a learner are computed in code from their works. Reading-path answers retrieve per work in reading order and cite each step.
 
@@ -345,8 +346,8 @@ Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow onl
 
 | Data | Store | Key | Notes |
 |---|---|---|---|
-| Content | PostgreSQL `contents` | `content_id`; unique `sha256` | `s3_key`, `text_key`, `bytes`, `pages`, `state` (`processing` / `ready` / `failed`), `failure_reason`, `attempts`, `title`, `authors[]`, `year`, `doi`, `work_key`, `references[]` (from Release 2), `summary`, `summary_embedding`, `proposed_subject_names[]`, `embedding_model`, `embedding_dim`, `processed_by_user_id` (who triggered first processing; for usage), `processed_at`. No owner. |
-| Chunk | PostgreSQL `chunks` (pgvector) | `chunk_id` | `content_id`, `page` (nullable), `text`, `embedding` (1024-dim, HNSW). |
+| Content | PostgreSQL `contents` | `content_id`; unique `sha256` | `s3_key`, `text_key`, `bytes`, `pages`, `state` (`processing` / `ready` / `failed`), `failure_reason`, `attempts`, `title`, `authors[]`, `year`, `doi`, `work_key`, `references[]` (from Release 2), `summary`, `summary_embedding`, `proposed_subject_names[]`, `embedding_model`, `embedding_dim`, `chunker` (method, settings, version; ADR 0008), `processed_by_user_id` (who triggered first processing; for usage), `processed_at`. No owner. |
+| Chunk | PostgreSQL `chunks` (pgvector) | `chunk_id` | `content_id`, `seq` (order within the content; unique per content), `page` (physical 1-based page; nullable for future non-PDF sources), `text`, `embedding` (1024-dim, HNSW). |
 | Document | PostgreSQL `documents` | `document_id`; unique `(owner_id, content_id)` where `content_id` is set | `owner_id`, `content_id` (null until hashed), `upload_id`, `state` (`processing` / `awaiting_subjects` / `ready` / `failed`), `archived` (bool), `archived_at`, `visibility` (`private`; R4: `shared` / `public`), `title_override`, `added_via` (`upload` / `dedupe`; R4: `share` / `public` / `import`), `created_at`. |
 | Document subjects | PostgreSQL `document_subjects` | `(document_id, subject_id)` | 1–3 rows per ready document (enforced in the domain and by a check). |
 | Document grant *(R4)* | PostgreSQL `document_grants` | `(document_id, grantee_id)` | `grantee_type` (`user`; later `group`), `permission` (`read`), `granted_at`. Created in Release 1, unused. |
@@ -415,7 +416,7 @@ Every decline (relevance gate, growth check, or `decline` tool) writes `subject_
 
 ### 9.9 Model integration notes
 
-**Embeddings: `amazon.nova-2-multimodal-embeddings-v1:0`** — `GENERIC_INDEX` for chunks, `TEXT_RETRIEVAL` for queries; 1024 dimensions; ≤ 8,192 characters per call; chunks of ~1,500–3,000 characters; `truncationMode: NONE`. Also used for subject name and content summary embeddings. Multimodal input (figures) is a Release 5 option.
+**Embeddings: `amazon.nova-2-multimodal-embeddings-v1:0`** — `GENERIC_INDEX` for chunks, `TEXT_RETRIEVAL` for queries; 1024 dimensions; ≤ 8,192 characters per call; chunks of ≤ 512 characters (ADR 0008); `truncationMode: NONE`. Also used for subject name and content summary embeddings. Multimodal input (figures) is a Release 5 option.
 
 **LLM: `amazon.nova-2-lite-v1:0`** (agent, document description, name checks; no fallback) — Converse/ConverseStream via the `us.amazon.nova-2-lite-v1:0` inference profile; 1M context, 64K output; client-side tool calling for `decline`, `save_learning_record`, `describe_document`, `check_subject_name`, and later-release tools; every tool payload validated in code; prompt caching for the fixed system prompt; history and chunks capped per turn.
 
@@ -460,7 +461,7 @@ Agent, MCP server, API, web, Keycloak, ingestion worker, and CronJobs run on **E
 |---|---|
 | Agent framework | LangChain + LangGraph |
 | Tracing and evaluation | LangSmith |
-| Document extraction | `pypdf` page text as LangChain `Document`s (also for the first-pages step), chunked with `langchain-text-splitters`; structured extraction (reference lists, headings) chosen for Release 2 |
+| Document extraction | `pypdf` page text as LangChain `Document`s (also for the first-pages step), chunked with `langchain-text-splitters` (`RecursiveCharacterTextSplitter`, behind a LangChain document transformer; ADR 0008); structured extraction (reference lists, headings) chosen for Release 2 |
 | LLM (agent, document description) | `amazon.nova-2-lite-v1:0` via `us.amazon.nova-2-lite-v1:0` |
 | Embeddings | `amazon.nova-2-multimodal-embeddings-v1:0`, 1024 dimensions |
 | LLM (judges, synthetic data) | `qwen.qwen3-32b-v1:0` |
