@@ -14,3 +14,4 @@
 .default .text { max-width: 46ch; }
 .dropzone .text { max-width: 52ch; }
 .actions { display: flex; gap: var(--sp-3); margin-top: var(--sp-2); }
+.note { color: var(--text-2); font-size: var(--fs-14); max-width: 52ch; }

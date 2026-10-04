@@ -11,7 +11,7 @@ export const routes: RouteObject[] = [
     element: <AppShell />,
     children: [
       { index: true, element: <Navigate to="/library" replace /> },
-      { path: "library", element: <LibraryPage /> },
+      { path: "library", element: <LibraryPage />, handle: { wide: true } },
       ...NAV.filter((item) => item.path !== "/library").map((item) => ({
         path: item.path.slice(1),
         element: <PlaceholderPage title={item.label} description={item.description} />,

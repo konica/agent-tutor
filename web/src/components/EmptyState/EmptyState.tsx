@@ -8,11 +8,13 @@ type Props = {
   title: string;
   children?: ReactNode;
   actions?: ReactNode;
+  // Small print below the actions (the drop hint).
+  note?: ReactNode;
   // "dropzone" is the larger first-run card (library-empty); "default" is the dashed empty list.
   variant?: "default" | "dropzone";
 };
 
-export function EmptyState({ icon: Icon, title, children, actions, variant = "default" }: Props) {
+export function EmptyState({ icon: Icon, title, children, actions, note, variant = "default" }: Props) {
   return (
     <div className={`${styles.empty} ${styles[variant]}`}>
       <span className={styles.iconWrap}>
@@ -21,6 +23,7 @@ export function EmptyState({ icon: Icon, title, children, actions, variant = "de
       <h2 className={styles.title}>{title}</h2>
       {children && <div className={styles.text}>{children}</div>}
       {actions && <div className={styles.actions}>{actions}</div>}
+      {note && <p className={styles.note}>{note}</p>}
     </div>
   );
 }
