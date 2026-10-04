@@ -21,6 +21,36 @@ describe("UserMenu", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "false");
   });
 
+  it("moves focus to Sign out when the menu opens", async () => {
+    render(<UserMenu name="Ada Lovelace" onSignOut={() => {}} />);
+    await userEvent.click(screen.getByRole("button", { name: /Ada Lovelace/ }));
+    expect(screen.getByRole("button", { name: "Sign out" })).toHaveFocus();
+  });
+
+  it("closes on Escape and returns focus to the toggle", async () => {
+    render(<UserMenu name="Ada Lovelace" onSignOut={() => {}} />);
+    const toggle = screen.getByRole("button", { name: /Ada Lovelace/ });
+    await userEvent.click(toggle);
+    await userEvent.keyboard("{Escape}");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveFocus();
+  });
+
+  it("closes when focus leaves the menu", async () => {
+    render(
+      <>
+        <UserMenu name="Ada Lovelace" onSignOut={() => {}} />
+        <button type="button">Outside</button>
+      </>,
+    );
+    const toggle = screen.getByRole("button", { name: /Ada Lovelace/ });
+    await userEvent.click(toggle);
+    await userEvent.tab(); // Sign out -> toggle
+    await userEvent.tab(); // toggle -> Outside
+    expect(screen.getByRole("button", { name: "Outside" })).toHaveFocus();
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+  });
+
   it("calls onSignOut", async () => {
     const onSignOut = vi.fn();
     render(<UserMenu name="Ada Lovelace" onSignOut={onSignOut} />);

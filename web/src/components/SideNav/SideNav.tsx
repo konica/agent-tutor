@@ -8,7 +8,7 @@ import styles from "./SideNav.module.css";
 export function SideNav() {
   return (
     <nav className={styles.sidenav} aria-label="Main">
-      <Link className={styles.brand} to="/library">
+      <Link className={styles.brand} to="/library" aria-label="Smart Tutor, Library">
         <BrandMark />
       </Link>
       <ul className={styles.list}>

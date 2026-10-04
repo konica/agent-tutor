@@ -21,7 +21,8 @@ describe("Button", () => {
 
   it("keeps the icon out of the accessible name", () => {
     render(<Button icon={Upload}>Upload</Button>);
-    expect(screen.getByRole("button", { name: "Upload" })).toBeInTheDocument();
+    const button = screen.getByRole("button", { name: "Upload" });
+    expect(button.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
   });
 
   it("is disabled and says so", async () => {

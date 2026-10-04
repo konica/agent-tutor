@@ -17,8 +17,8 @@ const nav = () => within(screen.getByRole("navigation", { name: "Main" }));
 describe("app shell routes", () => {
   it("lists the Release 1 nav items in brief order", () => {
     renderAt("/library");
-    const labels = nav().getAllByRole("link").map((a) => a.textContent?.trim());
-    expect(labels).toEqual(["Smart Tutor", "Library", "Chat", "Conversations", "Notes", "Subjects", "Usage", "Settings"]);
+    const labels = nav().getAllByRole("link").map((a) => a.getAttribute("aria-label") ?? a.textContent?.trim());
+    expect(labels).toEqual(["Smart Tutor, Library", "Library", "Chat", "Conversations", "Notes", "Subjects", "Usage", "Settings"]);
   });
 
   it("nav items are links", () => {
@@ -59,5 +59,18 @@ describe("app shell routes", () => {
     renderAt("/library");
     expect(screen.getByRole("heading", { level: 2, name: "Upload your first document" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Choose PDFs" })).toBeDisabled();
+  });
+
+  it("sets the document title from the current page", async () => {
+    renderAt("/library");
+    expect(document.title).toBe("Library · Smart Tutor");
+    await userEvent.click(nav().getByRole("link", { name: "Notes" }));
+    expect(document.title).toBe("Notes · Smart Tutor");
+  });
+
+  it("moves focus to the main region after navigating", async () => {
+    renderAt("/library");
+    await userEvent.click(nav().getByRole("link", { name: "Usage" }));
+    expect(screen.getByRole("main")).toHaveFocus();
   });
 });
