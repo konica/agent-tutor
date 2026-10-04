@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Draft v2.9 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
-| **Changes from v2.8** | Data model only: `documents` gains `file_name` (the display title's last fallback, §9.4) and `failure_reason` (why this learner's document failed, e.g. a duplicate before US-11 links it). No product behavior changes. |
+| **Changes from v2.8** | Data model only: `documents` gains `file_name` (the display title's last fallback, §9.4) and `failure_reason` (why this learner's document failed, e.g. a duplicate before US-11 links it). Interim behavior: until US-11 links duplicates, an upload whose bytes are already known fails with "Duplicate uploads aren't supported yet". |
 | **Changes from v2.7** | Roadmap status only: the M0 criteria for the forwarded JWT (prototype #29, ADR 0007) and for `pypdf` page text (probe on 6 arXiv papers in #30, ADR 0008) are marked done; the `pypdf` check no longer waits for the seed corpus, which is filled in M1 (§10.3). No product behavior changes. |
 | **Changes from v2.6** | Product owner decisions on the design round v0.3 questions (Q38–Q43): subjects are chosen only after processing finishes (US-2b, §9.3, §11); a question carried into a new conversation is sent right away (US-3b); a question that fits none of the learner's subjects gets "Upload a document" to continue (US-5); subjects of an archived document can be changed (US-10); a personal subject name may equal the name of a shared subject the learner doesn't have (US-10b); Release 1 uses one time zone, GMT+7 (D27). |
 | **Changes from v2.5** | Chunking decided (ADR 0008): each page split with `RecursiveCharacterTextSplitter` into chunks of ≤ 1,000 characters (overlap 200), one page per chunk, nothing dropped; new columns `chunks.seq` and `contents.chunker`; chunking methods plug in as LangChain document transformers. Search stays at k = 5. |
@@ -390,6 +390,7 @@ Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow onl
 - `processing` → `awaiting_subjects` when the content is `ready` (or linked to a ready content); suggestions are shown.
 - `awaiting_subjects` → `ready` when 1–3 subjects are chosen.
 - `processing` → `failed` when its content fails or validation fails; **Retry** returns it to `processing`.
+- Open gap: a document whose upload never arrives (the browser's POST to S3 failed or was abandoned) stays `processing`; a follow-up will fail it once the presign/upload lifecycle expires.
 - `archived` is a separate flag on any state: archive hides the document from search and lists; restore clears the flag.
 - **Searchable** only when the document is `ready`, not archived, and its content is `ready`.
 

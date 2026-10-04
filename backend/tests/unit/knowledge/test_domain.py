@@ -31,6 +31,7 @@ def test_a_started_upload_is_processing_and_titled_by_its_file_name() -> None:
         ("/home/ada/paper.pdf", "paper.pdf"),
         ("  paper.pdf  ", "paper.pdf"),
         ("pa\x00per\n.pdf", "paper.pdf"),
+        ("pa\x85per\u202e.\u200fpdf", "paper.pdf"),
         ("x" * 300 + ".pdf", "x" * 255),
     ],
 )
@@ -96,13 +97,24 @@ def test_content_needs_a_lowercase_sha256(bad: str) -> None:
 
 
 def test_upload_key_round_trips() -> None:
-    upload = Upload(UploadId("u1"), UserId("ada"), NOW)
-    assert upload.key == upload_key(UserId("ada"), UploadId("u1")) == "uploads/ada/u1.pdf"
-    assert parse_upload_key("uploads/ada/u1.pdf") == ("ada", "u1")
+    uid = "b5f3c1a2-0d4e-4f6a-9b7c-1e2d3c4b5a69"
+    upload = Upload(UploadId(uid), UserId("ada"), NOW)
+    assert upload.key == upload_key(UserId("ada"), UploadId(uid)) == f"uploads/ada/{uid}.pdf"
+    assert parse_upload_key(f"uploads/ada/{uid}.pdf") == ("ada", uid)
+    assert parse_upload_key(f"uploads/ada/{uid.upper()}.pdf") == ("ada", uid.upper())
 
 
 @pytest.mark.parametrize(
-    "key", ["contents/x.pdf", "uploads/ada.pdf", "uploads/ada/u1.txt", "uploads/a/b/c.pdf", "uploads//u1.pdf"]
+    "key",
+    [
+        "contents/x.pdf",
+        "uploads/ada.pdf",
+        "uploads/ada/u1.txt",
+        "uploads/ada/nope.pdf",
+        "uploads/ada/b5f3c1a2-0d4e-4f6a-9b7c-1e2d3c4b5a6.pdf",
+        "uploads/a/b/c.pdf",
+        "uploads//u1.pdf",
+    ],
 )
 def test_other_keys_are_not_upload_keys(key: str) -> None:
     assert parse_upload_key(key) is None

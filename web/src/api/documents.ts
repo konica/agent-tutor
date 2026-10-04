@@ -17,8 +17,12 @@ export async function loadDocuments(apiClient: Client = client): Promise<Documen
   return data;
 }
 
+export const MAX_UPLOAD_BYTES = 52_428_800; // 50 MiB, the cap the backend presigns
+
 // The API presigns a POST for this learner's key; the browser then sends the file straight to S3 (PRD §9.3).
 export async function uploadPdf(file: File, apiClient: Client = client, post: typeof fetch = fetch): Promise<void> {
+  // S3 would refuse these anyway; fail before creating a document row.
+  if (file.size === 0 || file.size > MAX_UPLOAD_BYTES) throw new Error("File is empty or over 50 MB");
   const { data, error, response } = await startUpload({ client: apiClient, body: { file_name: file.name }, throwOnError: false });
   if (sessionOver(error, response)) throw new SessionExpiredError();
   if (!data) throw new Error(`POST /uploads failed (${response?.status ?? "no response"})`);

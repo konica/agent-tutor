@@ -7,7 +7,8 @@ from enum import StrEnum
 
 from smart_tutor.shared.domain.ids import UploadId, UserId
 
-_KEY = re.compile(r"uploads/([^/]+)/([^/]+)\.pdf")
+_UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+_KEY = re.compile(rf"uploads/([^/]+)/({_UUID})\.pdf", re.IGNORECASE)
 
 
 class UploadOutcome(StrEnum):

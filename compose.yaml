@@ -17,6 +17,7 @@ x-localstack-aws: &localstack-aws
   AWS_SECRET_ACCESS_KEY: test
 
 configs:
+  # Inline `content:` needs Docker Compose >= 2.23.1.
   localstack-aws-config:
     content: |
       [profile localstack]
