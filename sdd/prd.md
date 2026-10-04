@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Draft v2.6 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Status** | Draft v2.7 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Changes from v2.6** | Product owner decisions on the design round v0.3 questions (Q38–Q43): subjects are chosen only after processing finishes (US-2b, §9.3, §11); a question carried into a new conversation is sent right away (US-3b); a question that fits none of the learner's subjects gets "Upload a document" and an empty "New conversation" (US-5); subjects of an archived document can be changed (US-10); a personal subject name may equal the name of a shared subject the learner doesn't have (US-10b); Release 1 uses one time zone, GMT+7 (D27). |
 | **Changes from v2.5** | Chunking decided (ADR 0008): each page split with `RecursiveCharacterTextSplitter` into chunks of ≤ 1,000 characters (overlap 200), one page per chunk, nothing dropped; new columns `chunks.seq` and `contents.chunker`; chunking methods plug in as LangChain document transformers. Search stays at k = 5. |
 | **Changes from v2.4** | Every service (API, agent, MCP server) has Keycloak validate the learner's token by introspection instead of checking its signature locally, so signing out or a revoked session ends access on the next request rather than at token expiry; the token travels in LangGraph runtime context (§9.3; ADR 0007). `smart-tutor-api` and `rag-mcp` become confidential clients. |
 | **Changes from v2.3** | Architecture only: LangChain's `BaseChatModel` and `Embeddings` replace the hand-written `ChatModel` / `EmbeddingModel` ports; `ModelFactory` builds chat models with `init_chat_model` (§9.15; ADR 0006). No product behavior changes. |
@@ -123,6 +124,7 @@ Learners and researchers work through many documents on a topic but lack the bac
 | D24 | **No limit on the number of documents** per learner. Per-file limits (PDF, ≤ 50 MB, ≤ 500 pages), upload rate limits, and daily caps apply. | Researchers accumulate papers; archive-only must not trap them. |
 | D25 | **Traces are deleted after 180 days; threads are kept** for the account's lifetime, so notes and learning records keep their links. | Long-term learning history with bounded trace storage. |
 | D26 | Release 1 extracts text **page by page with `pypdf`** into LangChain `Document`s (page number in metadata), chunked with LangChain's `RecursiveCharacterTextSplitter` (≤ 1,000 characters, overlap 200, one page per chunk; ADR 0008): no layout model, no OCR. A PDF without extractable text fails with a reason. | Smaller, faster worker (no PyTorch); Release 1 needs only page text for chunks and citations. Structured extraction waits until a feature needs it (ADR 0005). |
+| D27 | Release 1 uses **one time zone, GMT+7 (`Asia/Ho_Chi_Minh`)**, for daily caps, "today" in usage totals, and the times shown when a limit ends ("You can upload again at 11:40"). It is a setting (`app-time-zone`), not chosen per learner. | The pilot's learners share one time zone; per-learner time zones wait for Release 3 reports (D13). |
 
 ## 7. Scope
 
@@ -179,9 +181,9 @@ Story IDs are stable. Release 1: US-1 to US-13b. Release 2: US-19, US-20. Releas
 - There is no limit on the number of documents; uploads are rate-limited (§11).
 
 **US-2b Choose subjects**
-- *Within* 30 seconds (p95), measured from upload completion to suggestions shown, the learner sees **3 suggested subjects**: matching shared subjects first, then their own subjects, then new names proposed from the first 1–2 pages.
+- The learner chooses subjects **only after processing has finished**. Until then the document shows *processing* (with its extracted title once the first pages are read) and there is no "Choose subjects" action. When processing finishes, the learner sees **3 suggested subjects**: matching shared subjects first, then their own subjects, then new names proposed from the first 1–2 pages. The suggestions are computed early (p95 ≤ 30 s from upload completion) and shown when the document reaches *choose subjects*.
 - They keep **1 to 3 subjects** in total, from the suggestions and/or typed names. A typed name is trimmed, limited to 60 characters, mapped to an existing subject if it is a near-duplicate (the learner is told which), checked for personal data or offensive content (rejected with a request to rephrase), and otherwise added to the **shared catalog**.
-- The document becomes searchable only after at least one subject is chosen and processing has finished.
+- The document becomes searchable as soon as at least one subject is chosen.
 
 **US-3 Subject detection for a new thread**
 - *Given* a learner with exactly one subject, *when* they start a thread, *then* it starts with that subject.
@@ -192,14 +194,16 @@ Story IDs are stable. Release 1: US-1 to US-13b. Release 2: US-19, US-20. Releas
 **US-3b Thread grows to another subject**
 - *Given* a thread with fewer than 3 subjects, *when* a question is not answerable from the thread's subjects but clearly matches another of the learner's subjects, *then* that subject is added to the thread, the answer uses it, and the UI shows "Added *subject* to this conversation".
 - *When* the thread reaches 3 subjects, *then* the learner is told "This conversation now covers 3 subjects, the maximum. For other topics, start a new conversation."
-- *Given* a thread with 3 subjects, *when* a question clearly matches a fourth subject, *then* the tutor does not answer it and recommends a new conversation, with a **"New conversation"** action that carries the question over.
+- *Given* a thread with 3 subjects, *when* a question clearly matches a fourth subject, *then* the tutor does not answer it and recommends a new conversation, with a **"New conversation"** action that carries the question over and sends it there right away, so the learner doesn't retype or resend it.
 - Subjects are never removed from a thread.
 
 **US-4 Ask a grounded question**
 - *Given* a thread with subjects *S1..Sn*, *when* the learner asks a question, *then* the search step retrieves chunks **only from contents of the learner's own ready, non-archived documents in any of S1..Sn**, never from another learner's documents in the same shared subjects, and a streamed answer lists ≥ 1 citation (document display title; page, or "page unavailable").
 
 **US-5 Decline what the documents don't cover**
-- *When* a question matches none of the learner's subjects, or their documents don't support an answer, *then* the tutor declines in one or two friendly sentences, without answering from its own knowledge, and offers **"New conversation"** when the question seems to belong elsewhere.
+- *When* a question matches none of the learner's subjects, or their documents don't support an answer, *then* the tutor declines in one or two friendly sentences, without answering from its own knowledge.
+  - When the question clearly matches another of the learner's subjects, it offers **"New conversation"**, which carries the question over and sends it (as in US-3b).
+  - When it matches none of the learner's subjects, it recommends adding a document on the topic (**"Upload a document"**) and offers **"New conversation"**, which starts an ordinary, empty conversation.
 - Each decline is written to the decline log (§9.6).
 
 **US-6 Prompt-injection resistance**
@@ -217,15 +221,16 @@ Story IDs are stable. Release 1: US-1 to US-13b. Release 2: US-19, US-20. Releas
 
 **US-9 Token usage**
 - The learner sees input/output tokens per thread, for **document processing** they triggered (first processing of a new content: metadata, suggestions, embeddings), and in total; daily totals across all usage rows match Bedrock's reported usage. Linking to existing content (D18) costs the learner nothing.
-- Exceeding a rate limit or daily cap returns `429` with a retry-after message.
+- Exceeding a rate limit or daily cap returns `429` with a retry-after message; the UI shows the time it ends in GMT+7 (D27).
+- "Today" in usage totals and the daily caps follow GMT+7 (D27).
 
 **US-10 Manage documents**
 - The learner lists their documents (display title, subjects, upload date, state, authors, year) and filters by **subject** (any of the document's subjects), **date range**, and **state**, combined.
-- They can **change a document's subjects** (1–3; metadata only, no re-embedding), **edit its display title** (their library only), and **archive** or **restore** it. Archived documents are excluded from search, still resolve in old citations, and are restorable. There is no delete.
+- They can **change a document's subjects** (1–3; metadata only, no re-embedding), **edit its display title** (their library only), and **archive** or **restore** it. Archived documents are excluded from search, still resolve in old citations, and are restorable. There is no delete. A document's subjects can be changed while it is archived too; they apply when it is restored.
 - *Given* a thread whose subjects have no ready, non-archived documents left, *then* the thread stays readable, and new questions are answered with "There are no active documents in this conversation's subjects".
 
 **US-10b Rename a subject**
-- *When* the learner renames one of their subjects, *then* the new name is checked like a new subject name, must differ from the names of their other subjects, and is shown everywhere for that learner. "Reset name" restores the shared name.
+- *When* the learner renames one of their subjects, *then* the new name is checked like a new subject name, must differ from the names of their other subjects, and is shown everywhere for that learner. It may equal the name of a shared subject the learner doesn't have: documents and threads link by `subject_id`, never by name. "Reset name" restores the shared name.
 - The `subject_id`, documents, chunks, threads, notes, and learning records are unchanged; other learners still see the canonical name.
 
 **US-11 Duplicate uploads**
@@ -316,7 +321,7 @@ Thresholds (`detect_threshold`, `detect_margin`, `multi_margin`, `answer_floor`)
 3. **New content:** move the file to `contents/<sha256>.pdf`.
 4. **First-pages step (fast, one model call, `describe_document` tool call)** on text extracted from pages 1–2: title, authors, year, DOI, a two-sentence summary, and 3 proposed subject names; an embedding of the summary is stored on the content.
 5. **Suggestions for this learner (code):** rank shared subjects by similarity between the summary embedding and subject name embeddings, boosting subjects the learner already has and matching their personal names; fill the remaining of 3 slots with the model's proposed names that don't match an existing subject.
-6. **Full extraction:** `pypdf` reads the text page by page into LangChain `Document`s → save `contents/<sha256>.pages.json` → **work key** (DOI, else normalized title + year) in code from the first-pages metadata → split each page with `RecursiveCharacterTextSplitter` (separators `\n\n`, `\n`, `. `, space; ≤ 1,000 characters, overlap 200) into chunks that keep their page number, after light cleanup (NFKC, joined line-end hyphens, no control characters); reference lists and front matter are kept; pages without text yield no chunks → embed (chunk writes idempotent per content, ordered by `seq`; `contents.chunker` records the method and settings). Runs while the learner chooses subjects. A PDF whose pages average fewer than 50 non-whitespace characters fails with "No text layer (scanned PDFs are not supported yet)".
+6. **Full extraction:** `pypdf` reads the text page by page into LangChain `Document`s → save `contents/<sha256>.pages.json` → **work key** (DOI, else normalized title + year) in code from the first-pages metadata → split each page with `RecursiveCharacterTextSplitter` (separators `\n\n`, `\n`, `. `, space; ≤ 1,000 characters, overlap 200) into chunks that keep their page number, after light cleanup (NFKC, joined line-end hyphens, no control characters); reference lists and front matter are kept; pages without text yield no chunks → embed (chunk writes idempotent per content, ordered by `seq`; `contents.chunker` records the method and settings). Runs before the learner can choose subjects (US-2b). A PDF whose pages average fewer than 50 non-whitespace characters fails with "No text layer (scanned PDFs are not supported yet)".
 
 **Release 2 path (research map):** at ingestion (from Release 2, which adds structured extraction of reference lists; backfilled from stored PDFs for older contents) references are matched to works by DOI, then normalized title + year; the map and reading order for a learner are computed in code from their works. Reading-path answers retrieve per work in reading order and cite each step.
 
@@ -360,7 +365,7 @@ Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow onl
 | Learner profile | PostgreSQL `learners` | `user_id` | `time_zone`, `terms_accepted_at`. |
 | Usage | PostgreSQL `token_usage` | `usage_id` | `user_id` (null for system work such as re-embedding), `source` (`chat` / `document_processing` / `background` / `system`), `ref_id` (thread or content id), input/output tokens, `created_at`. |
 | Upload | PostgreSQL `uploads` | `upload_id` | `user_id`, `bytes`, `created_at`, `outcome` — for rate limits and daily caps. |
-| Settings | SSM Parameter Store | `/smart-tutor/*` | `learning-record-idle-minutes` (10), file limits, rate limits and daily caps, detection thresholds, retry attempts (3). |
+| Settings | SSM Parameter Store | `/smart-tutor/*` | `learning-record-idle-minutes` (10), file limits, rate limits and daily caps, `app-time-zone` (`Asia/Ho_Chi_Minh`, D27), detection thresholds, retry attempts (3). |
 | Research map *(R2)* | PostgreSQL `work_links` | `(citing_work_key, cited_work_key)` | Evidence (`content_id`, `page`), match method (`doi` / `title_year`). Computed once per content and shared. |
 | Quiz *(R3)* | PostgreSQL `quizzes`, `quiz_questions`, `quiz_attempts` | `quiz_id` | Source `note_ids[]`, questions (`subject_id`, topic, options, correct index, explanation), attempts with answers, score, per-topic scores, `status`. |
 | Report *(R3)* | PostgreSQL `reports` | `report_id` | `user_id`, `period_type`, `period_start`, `summary`, `stats`, `recommendations[]`, `trigger`, `status`; unique on `(user_id, period_type, period_start)` for scheduled reports. |
@@ -560,7 +565,7 @@ Trace every run; sample production traces for answer relevance, decline, detecti
 | Area | Target |
 |---|---|
 | Scale | 50 concurrent learners; no limit on documents per learner; ≤ 500 pages and ≤ 50 MB per document |
-| Latency | First streamed token p95 ≤ 3 s (from question sent); list/filter p95 ≤ 500 ms; suggestions shown p95 ≤ 30 s (from upload completion); duplicate of a ready content reaches *choose subjects* p95 ≤ 10 s; new content searchable p95 ≤ 5 min for ≤ 200 pages and ≤ 15 min for 201–500 pages (from upload completion to `ready` content, subjects chosen) |
+| Latency | First streamed token p95 ≤ 3 s (from question sent); list/filter p95 ≤ 500 ms; suggestions computed p95 ≤ 30 s (from upload completion; shown at *choose subjects*); duplicate of a ready content reaches *choose subjects* p95 ≤ 10 s; new content reaches *choose subjects* p95 ≤ 5 min for ≤ 200 pages and ≤ 15 min for 201–500 pages (from upload completion), and is searchable as soon as subjects are chosen |
 | Availability | Best-effort; no data loss on restart |
 | Security | Every service has Keycloak validate the token (introspection); documents private by default; `can_read` in code and SQL; worker isolation; secrets in Secrets Manager; TLS; tokens never logged or put in prompts |
 | Rate limits and caps (configurable) | Chat: 20 messages/minute and 500/day per learner. Uploads: 20/hour and 100/day per learner; duplicates and failed uploads count. Processing retries: 3 per content. |
@@ -606,6 +611,12 @@ Measured over the pilot unless stated; minimum sample 100 events per metric.
 | Q35 | Release order | R1 core tutor; R2 research map; R3 learning loop; R4 sharing and imports; R5 deep knowledge graph (D17). |
 | Q36 | Subject catalog module | Split out of `knowledge` into `subjects` (§9.15, ADR 0004). |
 | Q37 | PDF extraction in Release 1 | `pypdf` page text as LangChain `Document`s, no OCR; structured extraction (e.g. Docling) reconsidered for Release 2 (D26, ADR 0005). |
+| Q38 | Choosing subjects while processing continues (design Q7) | No: subjects are chosen once processing has finished (US-2b). |
+| Q39 | Carried question in a new conversation (design D2) | Sent right away; the learner doesn't resend it (US-3b). |
+| Q40 | Question that fits none of the learner's subjects (design D4) | Decline, recommend "Upload a document", and offer an empty "New conversation" (US-5). |
+| Q41 | Personal name equal to another shared subject's name (design D6) | Allowed; everything links by `subject_id` (US-10b). |
+| Q42 | Changing subjects of an archived document (design D7) | Allowed; applies on restore (US-10). |
+| Q43 | Time zone for "today", daily caps, and limit times (design D8) | GMT+7 for all learners in Release 1 (D27). |
 
 ## 14. Roadmap: releases and milestones
 
