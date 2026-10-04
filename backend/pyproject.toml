@@ -51,6 +51,10 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM"]
 
+[tool.ruff.lint.per-file-ignores]
+# New revisions import `op` and `sa` before they use them.
+"**/migrations/versions/*.py" = ["F401"]
+
 [tool.ruff.lint.isort]
 known-first-party = ["smart_tutor", "fakes"]
 
