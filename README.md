@@ -22,10 +22,10 @@ cp .env.example .env          # fill in AWS_PROFILE and LANGSMITH_API_KEY
 make up                       # pgvector, Keycloak (realm imported), LocalStack
 make sync                     # backend dependencies
 make lint test                # ruff, mypy, import contracts, unit tests
-make web                      # http://localhost:5173
+make web                      # http://localhost:10453
 ```
 
-Keycloak admin console: http://localhost:10480 (admin / admin). Test users: `learner@example.com` / `learner`, `learner2@example.com` / `learner2`, `admin@example.com` / `admin`.
+Keycloak admin console: http://localhost:10401 (admin / admin). Test users: `learner@example.com` / `learner`, `learner2@example.com` / `learner2`, `admin@example.com` / `admin`.
 
 No `make` on Windows? Each target in the `Makefile` is a one-line command you can run directly.
 

@@ -13,7 +13,7 @@ from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.domain.principal import Principal
 from smart_tutor.shared.ports.token_verifier import TokenVerifier
 
-ORIGIN = "http://localhost:5173"
+ORIGIN = "http://localhost:10453"
 TOKEN = "secret-token-value"
 ADA = Principal(user_id=UserId("user-ada"), name="Ada Lovelace", roles=frozenset({"learner", "offline_access"}))
 

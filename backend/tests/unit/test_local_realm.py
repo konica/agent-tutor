@@ -28,4 +28,4 @@ def test_web_client_can_log_out_back_to_the_app() -> None:
     c = _client("smart-tutor-web")
     assert c["publicClient"] is True
     assert c["attributes"]["pkce.code.challenge.method"] == "S256"
-    assert c["attributes"]["post.logout.redirect.uris"] == "http://localhost:5173/*"
+    assert c["attributes"]["post.logout.redirect.uris"] == "http://localhost:10453/*"
