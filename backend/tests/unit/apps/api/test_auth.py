@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from fakes import FakeTokenVerifier
 from smart_tutor.apps.api.main import PUBLIC_PATHS, create_app
+from smart_tutor.apps.api.routes import accounts
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.domain.principal import Principal
@@ -59,13 +60,24 @@ def test_healthz_is_public(client: TestClient) -> None:
 
 
 def test_every_route_requires_a_token(client: TestClient) -> None:
-    protected = [
-        (route.path, method)
-        for route in client.app.routes  # type: ignore[attr-defined]
-        if isinstance(route, APIRoute) and route.path not in PUBLIC_PATHS
-        for method in route.methods
-    ]
+    # Collect all protected routes by walking the route tree
+    # (include_router wraps routes in _IncludedRouter with effective_candidates)
+    protected = []
+    app = client.app  # type: ignore[attr-defined]
+    for route in app.routes:
+        if isinstance(route, APIRoute) and route.path not in PUBLIC_PATHS:
+            for method in route.methods:
+                protected.append((route.path, method))
+        elif hasattr(route, "effective_candidates"):
+            # _IncludedRouter: walk its effective routes
+            for candidate in route.effective_candidates():
+                path = candidate.path
+                if path not in PUBLIC_PATHS:
+                    for method in candidate.methods:
+                        protected.append((path, method))
+
     assert protected, "expected at least GET /me"
+    assert ("/me", "GET") in protected, "GET /me should be in protected routes"
     for path, method in protected:
         r = client.request(method, path)
         assert r.status_code == 401, f"{method} {path} answered {r.status_code} without a token"
@@ -107,3 +119,48 @@ def test_openapi_declares_bearer_auth(client: TestClient) -> None:
     schema = client.get("/openapi.json").json()
     assert schema["components"]["securitySchemes"]["HTTPBearer"]["scheme"] == "bearer"
     assert schema["paths"]["/me"]["get"]["operationId"] == "get_me"
+
+
+def test_route_without_principal_parameter_is_still_protected() -> None:
+    """Regression: routes included via include_protected must be protected even if their
+    handler doesn't take a principal parameter (protection comes from include_router
+    dependencies, not from parameter presence)."""
+    from fastapi import APIRouter
+
+    from smart_tutor.apps.api.main import create_app, include_protected
+
+    verifier = FakeTokenVerifier()
+    verifier.add(TOKEN, ADA)
+
+    # Create a router with a route that takes no principal
+    test_router = APIRouter()
+
+    @test_router.get("/test-no-principal")
+    async def test_endpoint() -> dict[str, str]:
+        return {"status": "ok"}
+
+    app = create_app(Settings(cors_origins=[ORIGIN]), verifier=verifier)
+    include_protected(app, test_router)
+    client = TestClient(app)
+
+    # Without token, should be 401
+    r = client.get("/test-no-principal")
+    assert r.status_code == 401, "Route without principal param should still be protected"
+
+    # With valid token, should be 200
+    r = client.get("/test-no-principal", headers=bearer(TOKEN))
+    assert r.status_code == 200, "Route without principal param should work with valid token"
+
+
+def test_router_mutation_does_not_occur_on_multiple_app_creations() -> None:
+    """Regression: create_app() should not mutate the original router's dependencies."""
+    original_deps_count = len(accounts.router.routes[0].dependencies)
+
+    # Create two apps
+    create_app(Settings(cors_origins=[ORIGIN]), verifier=FakeTokenVerifier())
+    create_app(Settings(cors_origins=[ORIGIN]), verifier=FakeTokenVerifier())
+
+    # Router's dependencies should not have grown
+    assert len(accounts.router.routes[0].dependencies) == original_deps_count, (
+        "Router should not be mutated by create_app()"
+    )
