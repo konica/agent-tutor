@@ -142,3 +142,54 @@ async def test_display_name(claims: dict[str, Any], name: str) -> None:
 async def test_missing_roles_mean_no_roles() -> None:
     claims = {k: v for k, v in active().items() if k != "realm_access"}
     assert (await verifier(returning(claims)).verify(TOKEN)).roles == frozenset()
+
+
+async def test_malformed_aud_as_int_is_rejected() -> None:
+    with pytest.raises(UnauthenticatedError, match="another audience"):
+        await verifier(returning(active(aud=123))).verify(TOKEN)
+
+
+async def test_malformed_aud_as_none_is_rejected() -> None:
+    with pytest.raises(UnauthenticatedError, match="another audience"):
+        await verifier(returning(active(aud=None))).verify(TOKEN)
+
+
+async def test_aud_list_with_non_string_entry_plus_valid_entry_is_accepted() -> None:
+    principal = await verifier(returning(active(aud=[123, "smart-tutor-api", None]))).verify(TOKEN)
+    assert principal.user_id == "user-1"
+
+
+async def test_realm_access_as_list_means_no_roles() -> None:
+    claims = active(realm_access=[])
+    assert (await verifier(returning(claims)).verify(TOKEN)).roles == frozenset()
+
+
+async def test_realm_access_as_none_means_no_roles() -> None:
+    claims = active(realm_access=None)
+    assert (await verifier(returning(claims)).verify(TOKEN)).roles == frozenset()
+
+
+async def test_roles_as_string_means_no_roles() -> None:
+    claims = active(realm_access={"roles": "learner"})
+    assert (await verifier(returning(claims)).verify(TOKEN)).roles == frozenset()
+
+
+async def test_roles_list_with_non_string_entry_keeps_only_strings() -> None:
+    principal = await verifier(returning(active(realm_access={"roles": [123, "learner", None, "admin"]}))).verify(TOKEN)
+    assert principal.roles == frozenset({"learner", "admin"})
+
+
+async def test_given_name_as_int_falls_back_cleanly() -> None:
+    claims = {k: v for k, v in active().items() if k != "name"}
+    claims["given_name"] = 123
+    claims["family_name"] = "Smith"
+    assert (await verifier(returning(claims)).verify(TOKEN)).name == "Smith"
+
+
+async def test_display_name_all_fields_non_string() -> None:
+    claims = {k: v for k, v in active().items() if k not in ("name", "given_name", "family_name", "preferred_username")}
+    claims["name"] = 123
+    claims["given_name"] = []
+    claims["family_name"] = {}
+    claims["preferred_username"] = True
+    assert (await verifier(returning(claims)).verify(TOKEN)).name == "Learner"

@@ -45,7 +45,7 @@ class KeycloakIntrospectionVerifier(TokenVerifier):
         if not isinstance(claims, dict) or claims.get("active") is not True:
             raise UnauthenticatedError("inactive token")
         aud = claims.get("aud", [])
-        audiences = [aud] if isinstance(aud, str) else list(aud)
+        audiences = _extract_audiences(aud)
         if self._audience not in audiences:
             raise UnauthenticatedError("token is for another audience")
         if claims.get("iss") != self._issuer:
@@ -53,13 +53,58 @@ class KeycloakIntrospectionVerifier(TokenVerifier):
         sub = claims.get("sub")
         if not isinstance(sub, str) or not sub:
             raise UnauthenticatedError("token has no subject")
-        roles = claims.get("realm_access", {}).get("roles", [])
+        roles = _extract_roles(claims.get("realm_access"))
         return Principal(user_id=UserId(sub), name=_display_name(claims), roles=frozenset(roles))
 
 
+def _extract_audiences(aud: Any) -> list[str]:
+    """Extract audiences, handling str, list, or malformed formats.
+
+    Returns empty list for malformed aud (not str and not list), treating it as no audience.
+    For lists, keeps only string entries.
+    """
+    if isinstance(aud, str):
+        return [aud]
+    if isinstance(aud, list):
+        return [a for a in aud if isinstance(a, str)]
+    return []
+
+
+def _extract_roles(realm_access: Any) -> list[str]:
+    """Extract roles from realm_access, handling dict, malformed, or missing data.
+
+    Returns empty list for malformed realm_access or roles (not a dict or roles not a list).
+    For lists, keeps only string entries.
+    """
+    if not isinstance(realm_access, dict):
+        return []
+    roles = realm_access.get("roles", [])
+    if isinstance(roles, list):
+        return [r for r in roles if isinstance(r, str)]
+    return []
+
+
 def _display_name(claims: dict[str, Any]) -> str:
-    given = " ".join(p for p in (claims.get("given_name"), claims.get("family_name")) if p)
-    return str(claims.get("name") or given or claims.get("preferred_username") or "Learner")
+    """Extract display name with fallback chain: name → given_name+family_name → preferred_username → 'Learner'.
+
+    Ignores non-string values to avoid type errors.
+    """
+    name = claims.get("name")
+    if isinstance(name, str):
+        return name
+
+    given_name = claims.get("given_name")
+    family_name = claims.get("family_name")
+    if isinstance(given_name, str) or isinstance(family_name, str):
+        parts = [p for p in (given_name, family_name) if isinstance(p, str)]
+        if parts:
+            return " ".join(parts)
+
+    preferred_username = claims.get("preferred_username")
+    if isinstance(preferred_username, str):
+        return preferred_username
+
+    return "Learner"
 
 
 def keycloak_verifier(settings: Settings, http: httpx.AsyncClient) -> KeycloakIntrospectionVerifier:
