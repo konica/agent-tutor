@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.routing import APIRouter
 
 from smart_tutor.apps.api.deps import current_principal
 from smart_tutor.apps.api.routes import accounts
@@ -15,6 +16,11 @@ from smart_tutor.shared.ports.token_verifier import TokenVerifier
 
 # Everything else needs a token Keycloak says is active (tests/unit/apps/api/test_auth.py checks every route).
 PUBLIC_PATHS = frozenset({"/healthz", "/openapi.json", "/docs", "/docs/oauth2-redirect", "/redoc"})
+
+
+def include_protected(app: FastAPI, router: APIRouter) -> None:
+    """Include a router on the app with authentication required on all its routes."""
+    app.include_router(router, dependencies=[Depends(current_principal)])
 
 
 def create_app(settings: Settings | None = None, verifier: TokenVerifier | None = None) -> FastAPI:
@@ -43,13 +49,7 @@ def create_app(settings: Settings | None = None, verifier: TokenVerifier | None 
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
 
-    # Add protected routes with authentication dependency
-    from fastapi.routing import APIRoute
-
-    for route in accounts.router.routes:
-        if isinstance(route, APIRoute):
-            route.dependencies.append(Depends(current_principal))
-            app.routes.append(route)
+    include_protected(app, accounts.router)
     return app
 
 
