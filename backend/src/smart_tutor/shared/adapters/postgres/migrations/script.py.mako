@@ -7,12 +7,14 @@ Create Date: ${create_date}
 
 from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
-${imports if imports else ""}
+from alembic import op
+% if imports:
+${imports}
+% endif
 
-revision: str = ${repr(up_revision)}
-down_revision: str | None = ${repr(down_revision)}
+revision: str = "${up_revision}"
+down_revision: str | None = ${"None" if down_revision is None else '"%s"' % down_revision}
 branch_labels: str | Sequence[str] | None = ${repr(branch_labels)}
 depends_on: str | Sequence[str] | None = ${repr(depends_on)}
 

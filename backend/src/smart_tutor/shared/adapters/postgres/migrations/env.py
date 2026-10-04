@@ -3,11 +3,12 @@
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from smart_tutor.shared.adapters.postgres.migrate import escape_percent
 from smart_tutor.shared.config import Settings
 
 config = context.config
 if not config.get_main_option("sqlalchemy.url"):
-    config.set_main_option("sqlalchemy.url", Settings().database_url)
+    config.set_main_option("sqlalchemy.url", escape_percent(Settings().database_url))
 
 target_metadata = None
 
