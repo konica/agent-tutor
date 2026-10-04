@@ -7,7 +7,7 @@ import httpx
 import pytest
 
 from smart_tutor.shared.adapters.auth.keycloak_introspection import KeycloakIntrospectionVerifier
-from smart_tutor.shared.domain.errors import UnauthenticatedError
+from smart_tutor.shared.domain.errors import IntrospectionUnavailableError, UnauthenticatedError
 
 ISSUER = "http://localhost:8080/realms/smart-tutor"
 URL = "http://keycloak:8080/realms/smart-tutor/protocol/openid-connect/token/introspect"
@@ -83,17 +83,18 @@ async def test_accepts_a_single_string_audience() -> None:
     ids=["inactive", "active-as-string", "wrong-aud-list", "wrong-aud-string", "wrong-iss", "empty-sub", "no-sub"],
 )
 async def test_rejects_tokens_that_fail_a_check(claims: dict[str, Any]) -> None:
-    with pytest.raises(UnauthenticatedError):
+    with pytest.raises(UnauthenticatedError) as excinfo:
         await verifier(returning(claims)).verify(TOKEN)
+    assert type(excinfo.value) is UnauthenticatedError  # a bad token, not an outage
 
 
 async def test_rejects_when_keycloak_returns_500() -> None:
-    with pytest.raises(UnauthenticatedError):
+    with pytest.raises(IntrospectionUnavailableError):
         await verifier(lambda _req: httpx.Response(500)).verify(TOKEN)
 
 
 async def test_rejects_when_keycloak_returns_non_json() -> None:
-    with pytest.raises(UnauthenticatedError):
+    with pytest.raises(IntrospectionUnavailableError):
         await verifier(lambda _req: httpx.Response(200, text="<html>")).verify(TOKEN)
 
 
@@ -101,8 +102,13 @@ async def test_rejects_when_keycloak_unreachable() -> None:
     def handler(req: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("refused", request=req)
 
-    with pytest.raises(UnauthenticatedError):
+    with pytest.raises(IntrospectionUnavailableError):
         await verifier(handler).verify(TOKEN)
+
+
+async def test_rejects_when_the_client_credentials_are_refused() -> None:
+    with pytest.raises(IntrospectionUnavailableError):
+        await verifier(lambda _req: httpx.Response(401, json={"error": "unauthorized_client"})).verify(TOKEN)
 
 
 async def test_rejects_an_empty_token_without_calling_keycloak() -> None:

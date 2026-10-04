@@ -31,6 +31,8 @@ def create_app(settings: Settings | None = None, verifier: TokenVerifier | None 
         if verifier is not None:
             yield
             return
+        if not settings.keycloak_client_secret.get_secret_value():
+            raise RuntimeError("SMART_TUTOR_KEYCLOAK_CLIENT_SECRET is not set")
         async with httpx.AsyncClient(timeout=5) as http:
             app.state.verifier = keycloak_verifier(settings, http)
             yield

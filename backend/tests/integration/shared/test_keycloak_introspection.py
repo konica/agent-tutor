@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 from smart_tutor.shared.adapters.auth.keycloak_introspection import KeycloakIntrospectionVerifier
-from smart_tutor.shared.domain.errors import UnauthenticatedError
+from smart_tutor.shared.domain.errors import IntrospectionUnavailableError, UnauthenticatedError
 
 pytestmark = pytest.mark.integration
 
@@ -28,5 +28,5 @@ async def test_a_made_up_token_is_inactive() -> None:
 
 
 async def test_a_wrong_client_secret_is_rejected() -> None:
-    with pytest.raises(UnauthenticatedError, match="introspection failed"):
+    with pytest.raises(IntrospectionUnavailableError, match="introspection failed"):
         await verifier("wrong-secret").verify("not-a-real-token")

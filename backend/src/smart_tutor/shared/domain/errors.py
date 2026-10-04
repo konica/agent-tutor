@@ -18,3 +18,7 @@ class UnauthenticatedError(Exception):
 
     Messages give the reason only, never the token.
     """
+
+
+class IntrospectionUnavailableError(UnauthenticatedError):
+    """Keycloak couldn't be asked or refused our client: a server-side problem, still a 401 for the caller."""

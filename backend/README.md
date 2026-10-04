@@ -32,7 +32,7 @@ Design: `sdd/specs/2026-10-02-project-structure-design.md`.
 
 The unit tests fake Keycloak; this is the end-to-end check for US-1 (#45).
 
-1. `docker compose down -v && docker compose --profile app up -d --build` (re-imports the realm, runs `migrate`).
+1. `docker compose down -v && docker compose --profile app up -d --build` (re-imports the realm, runs `migrate`). `down -v` wipes local Compose data (database, Keycloak users).
 2. Open http://localhost:5173, sign in as `learner@example.com` / `learner`: the Library shows "Upload your first document" and the user menu shows "Local Learner".
 3. In the browser's dev tools, copy the `Authorization` header of the `GET /me` request, then:
    `curl -i http://localhost:8001/me -H "Authorization: Bearer <token>"` → `200`.
