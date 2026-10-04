@@ -52,6 +52,15 @@ services:
       - ./local/localstack/init/ready.d:/etc/localstack/init/ready.d:ro
 
   # --- app profile: same images as production -------------------------------------------
+  migrate:
+    profiles: [app]
+    build: {context: ./backend, target: api}
+    command: ["python", "-m", "smart_tutor.apps.jobs.migrate"]
+    environment:
+      SMART_TUTOR_DATABASE_URL: postgresql+psycopg://smart_tutor:smart_tutor@postgres:5432/smart_tutor
+    depends_on:
+      postgres: {condition: service_healthy}
+
   api:
     profiles: [app]
     build: {context: ./backend, target: api}
@@ -63,7 +72,10 @@ services:
       SMART_TUTOR_KEYCLOAK_CLIENT_ID: smart-tutor-api
       SMART_TUTOR_KEYCLOAK_CLIENT_SECRET: local-api-secret
     ports: ["8001:8080"]
-    depends_on: [postgres, keycloak, agent]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      keycloak: {condition: service_started}
+      agent: {condition: service_started}
 
   agent:
     profiles: [app]

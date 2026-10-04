@@ -5,6 +5,7 @@ description = "Smart Tutor: subject-scoped AI tutor (API, agent, RAG MCP server,
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
 dependencies = [
+    "alembic>=1.16",
     "boto3>=1.40",
     "fastapi>=0.115",
     "httpx>=0.28",
@@ -67,6 +68,7 @@ markers = [
 python_version = "3.12"
 strict = true
 files = ["src"]
+exclude = ["shared/adapters/postgres/migrations/versions/"]
 
 # ---------------------------------------------------------------------------
 # Import rules (sdd/specs/2026-10-02-project-structure-design.md §6). Run: lint-imports
