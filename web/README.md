@@ -1,6 +1,6 @@
 # web
 
-React + TypeScript (Vite). `npm install && npm run dev` → http://localhost:5173 (Keycloak client `smart-tutor-web`).
+React + TypeScript (Vite). `npm install && npm run dev` → http://localhost:10453 (Keycloak client `smart-tutor-web`).
 
 | Path | What |
 |---|---|
@@ -13,7 +13,7 @@ Mockups follow the versioned briefs in `sdd/design-briefs/`.
 
 ## Configuration
 
-Build-time variables, defaulting to Docker Compose: `VITE_API_URL` (`http://localhost:8001`), `VITE_KEYCLOAK_URL` (`http://localhost:10480`), `VITE_KEYCLOAK_REALM` (`smart-tutor`), `VITE_KEYCLOAK_CLIENT_ID` (`smart-tutor-web`).
+Build-time variables, defaulting to Docker Compose: `VITE_API_URL` (`http://localhost:10450`), `VITE_KEYCLOAK_URL` (`http://localhost:10401`), `VITE_KEYCLOAK_REALM` (`smart-tutor`), `VITE_KEYCLOAK_CLIENT_ID` (`smart-tutor-web`).
 
 ## API client
 

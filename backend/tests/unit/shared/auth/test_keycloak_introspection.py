@@ -9,7 +9,7 @@ import pytest
 from smart_tutor.shared.adapters.auth.keycloak_introspection import KeycloakIntrospectionVerifier
 from smart_tutor.shared.domain.errors import IntrospectionUnavailableError, UnauthenticatedError
 
-ISSUER = "http://localhost:10480/realms/smart-tutor"
+ISSUER = "http://localhost:10401/realms/smart-tutor"
 URL = "http://keycloak:8080/realms/smart-tutor/protocol/openid-connect/token/introspect"
 TOKEN = "eyJ.secret-token-value.sig"
 

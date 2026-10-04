@@ -3,7 +3,7 @@ import { type Client } from "./generated/client";
 import { client } from "./generated/client.gen";
 
 export function apiBaseUrl(): string {
-  return import.meta.env.VITE_API_URL ?? "http://localhost:8001";
+  return import.meta.env.VITE_API_URL ?? "http://localhost:10450";
 }
 
 type Options = {

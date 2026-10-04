@@ -42,7 +42,7 @@ Code must keep these true; each has tests or evals guarding it.
 
 ## Local development
 
-- `docker compose up -d` starts pgvector (host port 10432), Keycloak (:10480), and LocalStack (:10466); dependency services use 104xx host ports, never the defaults; `--profile app` adds the app containers. Copy `.env.example` to `.env`.
+- `docker compose up -d` starts pgvector (host port 10400), Keycloak (:10401), and LocalStack (:10402); `--profile app` adds api (:10450), agent (:10451), mcp (:10452), and web (:10453). Host ports count up from 10400 for dependency services and from 10450 for app services; a new service takes the next free port in its group. Copy `.env.example` to `.env`.
 - Bedrock and LangSmith have no emulator: local runs call real us-east-1 models with your AWS credentials. `make bedrock-check` (pytest marker `bedrock`, under a cent) verifies the configured models and adapters.
 - Keycloak users: `learner@example.com`/`learner`, `learner2@example.com`/`learner2`, `admin@example.com`/`admin` (console admin/admin). The realm imports only when it doesn't exist yet: run `docker compose down -v` after editing `local/keycloak/realm-smart-tutor.json`, and keep the built-in roles `offline_access` and `uma_authorization` defined in it.
 - `make migrate` applies Alembic migrations to the Compose database (the app profile runs it before the API). After changing an API route, run `make api-client` to regenerate `web/src/api/`; CI fails when it is stale.
