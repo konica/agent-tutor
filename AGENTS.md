@@ -101,7 +101,7 @@ mattpocock skills decide **what** to build and run the tracker; superpowers skil
 
 ## Design inputs
 
-Mockups live in `sdd/design/` (brief, prototype, accepted rounds). Process: `sdd/specs/2026-10-03-design-to-code-loop-design.md`; commands: `sdd/design/README.md`.
+Mockups live in `sdd/design/` (brief, prototype, accepted rounds). Process: `sdd/specs/2026-10-03-design-to-code-loop-design.md`; commands: `sdd/design/README.md`. **Visual rules** (tokens, themes, app shell, components, document states, accessibility): `DESIGN.md`, read before writing UI in `web/src/`.
 
 1. Read the ticket's `## Design` section, then the round's row in `sdd/design/rounds.md`.
 2. Render the ticket's states and look at them before writing code: `make design-shots ROUND=v0.3 STATES="chat-*" THEME=both` (PNGs in `.design-shots/`). First time: `cd web && npx playwright install chromium`.
