@@ -11,6 +11,8 @@ How the web app looks and how to build its UI. Read this before writing anything
 | Token values | `web/src/styles/tokens.css` (ported from `sdd/design/prototype/styles.css` and `v03.css` at tag `design-v0.3`) |
 | Open design questions (D1–D12, Q7) | the brief's Feedback log; the ticket's `## Design` section says which apply |
 
+The brand is Smart Tutor's own (`smart-tutor-ds`, light and dark). The Open Design project has the Cisco design system switched on, but the owner chose the own brand instead (2026-10-02, `sdd/design/prototype/history/`); follow the accepted round's tokens, not Cisco.
+
 ## Tokens
 
 Every color, size, space, radius, shadow, and duration in feature code is a `var(--…)` from `tokens.css`. A value the tokens lack goes into `tokens.css` (both themes) first, then gets used.
