@@ -1,4 +1,4 @@
-/* Smart Tutor v0.3 — documents: sign-in theme, terms, shared list pattern, Library, uploads,
+/* Smart Tutor v0.4 — documents: sign-in theme, terms, shared list pattern, Library, uploads,
    subject picker (§6.4), document details (§6.5), Subjects (§6.9). */
 (function () {
   const ST = window.ST;
@@ -149,14 +149,14 @@
     if (d.archived) return `<span class="state state-archived">${ic('archive')}Archived</span>`;
     const m = {
       uploading: ['state-uploading', ic('upload'), 'Uploading', ''],
-      processing: ['state-processing', '<span class="spinner" aria-hidden="true"></span>', 'Processing', d.subjects.length ? 'Preparing for search · ready in a few minutes' : 'Reading the first pages to suggest subjects…'],
-      choose: ['state-choose', ic('tag'), 'Needs subjects', 'Suggestions are ready'],
+      processing: ['state-processing', '<span class="spinner" aria-hidden="true"></span>', 'Processing', 'You can choose subjects when processing finishes.'],
+      choose: ['state-choose', ic('tag'), 'Needs subjects', 'Processing finished · suggestions ready'],
       ready: ['state-ready', ic('check'), 'Ready', ''],
       failed: ['state-failed', ic('alert'), 'Failed', d.attempts >= 3 ? 'This file could not be processed' : d.failReason]
     }[d.state];
     return `<span class="state ${m[0]}">${m[1]}${m[2]}</span>${withHint && m[3] ? `<span class="state-hint ${d.state === 'failed' ? 'err' : ''}">${esc(m[3])}</span>` : ''}`;
   };
-  const docMeta = (d) => d.book ? `${esc(d.authors)} · Book` : d.authors ? `${esc(d.authors)}${d.year ? ' · ' + d.year : ''}` : `${esc(d.file)} · ${d.size}`;
+  const docMeta = (d) => d.titlePending ? `${esc(d.file)} · Reading the first pages…` : d.book ? `${esc(d.authors)} · Book` : d.authors ? `${esc(d.authors)}${d.year ? ' · ' + d.year : ''}` : `${esc(d.file)} · ${d.size}`;
 
   /* =========================================================
      §6.3 Library
@@ -167,10 +167,11 @@
     const inTab = all.filter((d) => (ST.L.tab === 'archived') === d.archived);
     const rows = ST.applyFilters(inTab, 'uploaded').sort((a, b) => b.uploaded.localeCompare(a.uploaded));
     const choose = all.filter((d) => !d.archived && d.state === 'choose');
+    const processingFirst = S.convs.length ? [] : all.filter((d) => !d.archived && ['uploading', 'processing'].includes(d.state));
     const subjOpts = [];
     all.forEach((d) => d.subjects.forEach((s) => { if (!subjOpts.includes(s)) subjOpts.push(s); }));
     const uploadBtn = `<button class="btn btn-primary" type="button" data-action="upload" data-fk="upload-btn" ${S.uploadLimit ? 'disabled aria-describedby="limit-msg"' : ''}>${ic('upload', 'sm')}Upload</button>`;
-    const limit = S.uploadLimit ? `<div class="banner banner-warn" style="margin-bottom:16px" id="limit-msg">${ic('clock')}<div class="b-body"><strong>Upload limit reached.</strong><span>You can upload up to 20 files per hour and 100 per day. You can upload again at 11:40.</span></div></div>` : '';
+    const limit = S.uploadLimit ? `<div class="banner banner-warn" style="margin-bottom:16px" id="limit-msg">${ic('clock')}<div class="b-body"><strong>Upload limit reached.</strong><span>You can upload up to 20 files per hour and 100 per day. You can upload again at 11:40 (${ST.TZ.short}).</span></div></div>` : '';
 
     let body;
     if (all.length === 0) {
@@ -189,7 +190,7 @@
         <div class="lib-head" role="row"><span role="columnheader">Document</span><span role="columnheader">Subjects</span><span role="columnheader">State</span><span role="columnheader">Uploaded</span><span role="columnheader"><span class="vh">Actions</span></span></div>
         ${rows.map(libRow).join('')}</div>`;
       body = `${ST.tabsHtml(counts)}
-        ${ST.L.tab === 'archived' ? `<p class="legend-line">${ic('info', 'sm')}Archived documents aren't used for answers, but citations to them in past conversations still work.</p>` : ''}
+        ${ST.L.tab === 'archived' ? `<p class="legend-line">${ic('info', 'sm')}Archived documents aren't used for answers, but citations to them in past conversations still work. You can still change their subjects.</p>` : ''}
         ${ST.filterBar({ count: rows.length, noun: 'document', subjects: subjOpts, states: ST.L.tab === 'active' })}
         <div id="list-panel" role="tabpanel" aria-labelledby="tab-${ST.L.tab}">${list}</div>`;
     }
@@ -198,7 +199,8 @@
       ${limit}
       ${!S.convs.length && all.some((d) => d.state === 'ready' && !d.archived) && ST.L.tab === 'active' ? `<div class="banner banner-success" style="margin-bottom:16px" role="status">${ic('checkCircle')}<div class="b-body"><strong>Your documents are ready.</strong><span>Ask anything about them. Answers cite the document and page.</span></div>
         <a class="btn btn-primary btn-sm" href="#/chat-new" data-fk="ask-first">${ic('message', 'sm')}Ask a question</a></div>` : ''}
-      ${choose.length && ST.L.tab === 'active' ? `<div class="banner" style="margin-bottom:16px;background:var(--attn-soft);border-color:transparent">${ic('tag')}<div class="b-body"><strong>${ST.plural(choose.length, 'document')} need${choose.length === 1 ? 's' : ''} subjects</strong><span>Suggestions are ready. Accepting them takes one click.</span></div>
+      ${processingFirst.length && !choose.length && ST.L.tab === 'active' ? `<div class="banner banner-info" style="margin-bottom:16px" role="status">${ic('clock')}<div class="b-body"><strong>Processing ${ST.plural(processingFirst.length, 'document')}</strong><span>Titles appear within about 30 seconds. Processing takes up to 5 minutes (15 for very long documents). You can choose subjects when processing finishes.</span></div></div>` : ''}
+      ${choose.length && ST.L.tab === 'active' ? `<div class="banner" style="margin-bottom:16px;background:var(--attn-soft);border-color:transparent">${ic('tag')}<div class="b-body"><strong>${ST.plural(choose.length, 'document')} need${choose.length === 1 ? 's' : ''} subjects</strong><span>Processing has finished. Accept the suggested subjects in one click, and each document is ready to use.</span></div>
         <button class="btn btn-primary btn-sm" type="button" data-action="choose-all" data-fk="choose-all">Choose subjects</button></div>` : ''}
       ${body}
     </div>` });
@@ -212,7 +214,7 @@
     else if (d.state === 'failed' && (d.attempts || 0) < 3) primary = `<button class="btn btn-secondary btn-sm" type="button" data-action="doc-retry" data-id="${d.id}" data-fk="retry-${d.id}" aria-label="Retry ${esc(d.title)}">${ic('retry', 'sm')}Retry</button>`;
     else primary = `<button class="btn btn-quiet btn-sm" type="button" data-action="open-doc" data-id="${d.id}" aria-label="Open ${esc(d.title)}">Open</button>`;
     const open = S.rowMenu === d.id;
-    const canChange = !d.archived && ['ready', 'processing'].includes(d.state) && d.subjects.length;
+    const canChange = d.subjects.length && (d.archived || d.state === 'ready');
     const menu = open ? `<div class="row-menu" role="menu" aria-label="Actions for ${esc(d.title)}">
       <button class="menu-item" role="menuitem" type="button" data-action="open-doc" data-id="${d.id}">${ic('doc')}Open details</button>
       ${canChange ? `<button class="menu-item" role="menuitem" type="button" data-action="change-subjects" data-id="${d.id}">${ic('tag')}Change subjects</button>` : ''}
@@ -257,7 +259,7 @@
   const alive = (d) => S.docs.includes(d);
   const prettify = (name) => name.replace(/\.pdf$/i, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   ST.addFiles = (files) => {
-    if (S.uploadLimit) { ST.toast('Upload limit reached. You can upload again at 11:40.'); return; }
+    if (S.uploadLimit) { ST.toast(`Upload limit reached. You can upload again at 11:40 (${ST.TZ.short}).`); return; }
     S.trayCollapsed = false;
     const added = [];
     files.forEach((f) => {
@@ -289,10 +291,11 @@
       if (!alive(d)) return;
       t.progress = Math.min(100, t.progress + 18 + k * 3);
       if (t.progress < 100) { ST.renderTray(); bg(tick, 320); return; }
-      t.status = 'done'; d.state = 'processing';
+      t.status = 'done'; d.state = 'processing'; d.titlePending = true; d.realTitle = d.title; d.title = d.file;
       ST.announce(`${t.name} uploaded. Processing.`);
       ST.render();
-      bg(() => { if (!alive(d) || d.state !== 'processing') return; d.state = 'choose'; d.tokens = [5800, 410]; ST.announce(`Subjects suggested for ${d.title}.`); ST.render(); }, 3200 + k * 700);
+      bg(() => { if (!alive(d) || !d.titlePending) return; d.titlePending = false; d.title = d.realTitle; ST.render(); }, 1100 + k * 500);
+      bg(() => { if (!alive(d) || d.state !== 'processing') return; if (d.titlePending) { d.titlePending = false; d.title = d.realTitle; } d.state = 'choose'; d.tokens = [5800, 410]; ST.announce(`${d.title} has finished processing. Choose its subjects.`); ST.render(); }, 4200 + k * 900);
     };
     bg(tick, 300 + k * 150);
   }
@@ -341,7 +344,7 @@
     if (/\b(stupid|idiot|damn|crap)\b/i.test(v)) return { kind: 'reject', msg: 'This name could offend other learners.' };
     if (personal) {
       const clash = ST.mySubjects().find((id) => id !== exclude && ST.sname(id).toLowerCase() === v.toLowerCase());
-      if (clash) return { kind: 'reject', msg: `You already have a subject called “${ST.sname(clash)}”.` };
+      if (clash) return { kind: 'reject', msg: `You already call another of your subjects “${ST.sname(clash)}”. Your own subject names must differ from each other.` };
       return { kind: 'ok' };
     }
     const n = norm(v);
@@ -367,13 +370,15 @@
   function pickerView() {
     const P = ST.PK; const d = ST.doc(P.queue[P.i]);
     const multi = P.queue.length > 1;
-    const head = `<header><div><p class="sp-kicker" style="font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2)">${multi ? `Document ${P.i + 1} of ${P.queue.length}` : P.mode === 'change' ? 'Change subjects' : 'Choose subjects'}</p>
+    const head = `<header><div><p class="sp-kicker" style="font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2)">${multi ? `Document ${P.i + 1} of ${P.queue.length}` : d.archived ? 'Archived document' : P.mode === 'change' ? 'Ready document' : 'Processing finished'}</p>
       <h2 id="pk-title">${P.mode === 'change' ? 'Change subjects' : 'Choose subjects'}</h2></div>
       <button class="icon-btn sm" type="button" data-action="pk-close" aria-label="Close">${ic('x')}</button></header>`;
     if (P.saved) {
-      const processing = d.state !== 'ready';
+      const msg = P.mode === 'change'
+        ? (d.archived ? `<em>${esc(d.title)}</em> stays archived. Its new subjects apply if you restore it.` : `<em>${esc(d.title)}</em> now uses ${d.subjects.map((s) => esc(ST.sname(s))).join(', ')}.`)
+        : `<em>${esc(d.title)}</em> is ready to use.`;
       return `<div class="dialog-scrim" data-scrim><div class="dialog picker" role="dialog" aria-modal="true" aria-labelledby="pk-title">${head}
-        <div class="d-body" role="status"><div class="banner banner-success">${ic('checkCircle')}<div class="b-body"><strong>Subjects saved.</strong><span>${processing ? `<em>${esc(d.title)}</em> will be ready to use in a few minutes.` : `<em>${esc(d.title)}</em> now uses ${d.subjects.map((s) => esc(ST.sname(s))).join(', ')}.`}</span></div></div>
+        <div class="d-body" role="status"><div class="banner banner-success">${ic('checkCircle')}<div class="b-body"><strong>Subjects saved.</strong><span>${msg}</span></div></div>
           <p>${ST.chips(d.subjects)}</p></div>
         <footer><button class="btn btn-primary" type="button" data-action="pk-close" data-autofocus>Done</button></footer></div></div>`;
     }
@@ -395,6 +400,7 @@
       <div class="d-body" style="gap:20px;color:var(--text)" data-keep-scroll="pk">
         <div class="picker-doc"><span class="pd-title">${esc(d.title)}</span><span class="small muted">${docMeta(d)}</span>
           ${d.summary ? `<p class="pd-sum">${esc(d.summary)}</p>` : ''}</div>
+        ${d.archived ? `<p class="field-note info">${ic('archive')}<span>This document is archived and stays archived. It isn't used for answers; its new subjects apply if you restore it.</span></p>` : ''}
         <fieldset style="border:0;margin:0;padding:0;display:grid;gap:12px">
           <legend class="od-row" style="width:100%;justify-content:space-between;margin-bottom:12px"><span class="label">Suggested subjects</span>
             <span class="counter ${n === 3 ? 'max' : ''}" aria-live="polite">${n === 3 ? '3 of 3 selected · the maximum' : `${n} of 3 selected`}</span></legend>
@@ -438,13 +444,13 @@
   function savePicker() {
     const P = ST.PK; const d = ST.doc(P.queue[P.i]);
     d.subjects = P.sel.slice();
-    if (d.state === 'choose') { d.state = 'processing'; ST.finishProcessing(d, 5000 + P.i * 1500); }
+    if (d.state === 'choose') { d.state = 'ready'; ST.announce(`Subjects saved. ${d.title} is ready to use.`); }
     P.done++;
     ST.render();
     if (P.queue.length > 1) {
       if (P.i < P.queue.length - 1) { P.i++; initPickerDoc(); ST.redrawOverlay(); ST.announce(`Saved. Document ${P.i + 1} of ${P.queue.length}.`); const f = document.querySelector('.sugg button'); if (f) f.focus(); return; }
       ST.hideOverlay();
-      ST.toast(`Subjects saved for ${ST.plural(P.done, 'document')}. They'll be ready to use in a few minutes.`);
+      ST.toast(`Subjects saved for ${ST.plural(P.done, 'document')}. They're ready to use.`);
       return;
     }
     P.saved = true; ST.redrawOverlay();
@@ -492,9 +498,10 @@
           ${!d.archived && d.state !== 'failed' ? `<button class="btn btn-ghost btn-sm od-fixed" type="button" data-action="dp-edit-title" data-fk="dp-edit">${ic('pen', 'sm')}Edit title</button>` : ''}</div>
           ${d.extracted && d.title !== d.extracted ? `<p class="small muted">Extracted title: ${esc(d.extracted)} · <button class="btn btn-ghost btn-sm" type="button" data-action="dp-reset-title" style="padding:0 4px;min-height:24px">Reset to extracted title</button></p>` : ''}`;
     const failed = d.state === 'failed' && !d.archived
-      ? `<div class="banner banner-danger">${ic('alert')}<div class="b-body"><strong>${d.attempts >= 3 ? 'This file could not be processed' : 'Processing failed'}</strong><span>${d.attempts >= 3 ? 'We tried 3 times. Try exporting the PDF again, or uploading a text-based copy.' : `${esc(d.failReason)}. Attempt ${d.attempts} of 3.`}</span></div>
+      ? `<div class="banner banner-danger">${ic('alert')}<div class="b-body"><strong>${d.attempts >= 3 ? 'This file could not be processed' : 'Processing failed'}</strong><span>${d.attempts >= 3 ? 'We tried 3 times. Try exporting the PDF again, or uploading a text-based copy.' : `${esc(d.failReason)}. Attempt ${d.attempts} of 3.${d.scanned ? ' A copy with selectable text will work.' : ''}`}</span></div>
           ${d.attempts < 3 ? `<button class="btn btn-secondary btn-sm" type="button" data-action="doc-retry" data-id="${d.id}">${ic('retry', 'sm')}Retry</button>` : ''}</div>` : '';
-    const archived = d.archived ? `<div class="banner">${ic('archive')}<div class="b-body"><strong>Archived</strong><span>Not used for answers. Citations to it in past conversations still open here.</span></div></div>` : '';
+    const archived = d.archived ? `<div class="banner">${ic('archive')}<div class="b-body"><strong>Archived</strong><span>Not used for answers. Citations to it in past conversations still open here. You can still change its subjects.</span></div></div>` : '';
+    const processing = d.state === 'processing' && !d.archived ? `<div class="banner banner-info" role="status"><span class="spinner" aria-hidden="true" style="margin-top:3px"></span><div class="b-body"><strong>Processing all ${d.pages} pages</strong><span>${d.pages > 300 ? 'Very long documents can take up to 15 minutes.' : 'This can take up to 5 minutes.'} You can choose subjects when processing finishes.</span></div></div>` : '';
     const cited = P.cited ? `<div class="banner banner-info">${ic('quote')}<div class="b-body"><strong>Cited ${P.cited.page ? `on page ${P.cited.page}` : '· page unavailable'}</strong><span>From an answer in your conversation.</span></div></div>` : '';
     const facts = [['Authors', d.authors || '—'], ['Year', d.year || (d.book ? 'Not shown' : '—')], ['DOI', d.doi || '—'], ['File name', d.file], ['Pages', d.pages], ['Uploaded', ST.fmtLong(d.uploaded)]];
     return `<div class="panel-scrim" data-scrim></div>
@@ -502,14 +509,14 @@
         <header><div class="od-fill od-stack" style="--od-gap:6px"><span class="sp-kicker">Document details</span><span>${ST.stateBadge(d)}</span></div>
           <button class="icon-btn sm" type="button" data-action="dp-close" aria-label="Close document details" ${P.editing ? '' : 'data-autofocus'}>${ic('x')}</button></header>
         <div class="sp-body" data-keep-scroll="dp">
-          ${cited}${failed}${archived}
+          ${cited}${processing}${failed}${archived}
           <div class="sp-section">${titleBlock}</div>
           <dl class="facts">${facts.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
           <section class="sp-section" aria-labelledby="dp-sum"><h3 id="dp-sum">Summary</h3>${d.summary ? `<p class="summary-text">${esc(d.summary)}</p>` : '<p class="small muted">A summary appears once Smart Tutor can read this PDF.</p>'}</section>
           <section class="sp-section" aria-labelledby="dp-sub"><h3 id="dp-sub">Subjects</h3>
-            ${d.subjects.length ? ST.chips(d.subjects) : `<p class="small muted">${d.state === 'choose' ? 'Suggestions are ready.' : 'No subjects yet.'}</p>`}
+            ${d.subjects.length ? ST.chips(d.subjects) : `<p class="small muted">${d.state === 'choose' ? 'Processing has finished and suggestions are ready.' : d.state === 'processing' ? 'You can choose subjects when processing finishes.' : 'No subjects yet.'}</p>`}
             ${!d.archived && d.state === 'choose' ? `<button class="btn btn-primary btn-sm" type="button" data-action="dp-change" style="justify-self:start">Choose subjects</button>` : ''}
-            ${!d.archived && d.subjects.length && d.state !== 'failed' ? `<button class="btn btn-secondary btn-sm" type="button" data-action="dp-change" data-fk="dp-change" style="justify-self:start">${ic('tag', 'sm')}Change subjects</button>` : ''}
+            ${d.subjects.length && (d.archived || d.state === 'ready') ? `<button class="btn btn-secondary btn-sm" type="button" data-action="dp-change" data-fk="dp-change" style="justify-self:start">${ic('tag', 'sm')}Change subjects</button>` : ''}
           </section>
         </div>
         <footer>${d.archived ? `<button class="btn btn-primary" type="button" data-action="dp-restore">${ic('restore', 'sm')}Restore</button>`

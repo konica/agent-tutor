@@ -2,8 +2,8 @@
   {
     "id": "index",
     "group": "Overview",
-    "ref": "",
-    "desc": "Round 2 overview, the four review flows and every state.",
+    "ref": "§5 · review flows",
+    "desc": "Round 3 overview: what changed in v0.4, the four review flows and every state.",
     "release": 1,
     "stories": []
   },
@@ -60,205 +60,171 @@
   {
     "id": "library-default",
     "group": "Library",
-    "ref": "§6.3 · US-2, US-10, US-11",
+    "ref": "§6.3 · US-2",
     "desc": "Live Library: the home screen, with the sample documents (where navigation lands).",
     "release": 1,
     "stories": [
-      "US-2",
-      "US-10",
-      "US-11"
+      "US-2"
     ]
   },
   {
     "id": "library-empty",
     "group": "Library",
-    "ref": "§6.3 · US-2, US-10, US-11",
+    "ref": "§6.3 · US-2",
     "desc": "Empty, first run: “Upload your first document”.",
     "release": 1,
     "stories": [
-      "US-2",
-      "US-10",
-      "US-11"
+      "US-2"
     ]
   },
   {
     "id": "library-drop-active",
     "group": "Library",
-    "ref": "§6.3 · US-2, US-10, US-11",
+    "ref": "§6.3 · US-2",
     "desc": "Files dragged over the page: the whole page accepts the drop.",
     "release": 1,
     "stories": [
-      "US-2",
-      "US-10",
-      "US-11"
+      "US-2"
     ]
   },
   {
     "id": "library-uploading",
     "group": "Library",
-    "ref": "§6.3 · US-2, US-10, US-11",
+    "ref": "§6.3 · US-2",
     "desc": "Three PDFs uploading, each with a progress bar in the tray.",
     "release": 1,
     "stories": [
-      "US-2",
-      "US-10",
-      "US-11"
+      "US-2"
     ]
   },
   {
     "id": "library-first-processing",
     "group": "Library",
-    "ref": "§6.3 · US-2, US-10, US-11",
-    "desc": "Processing: “Reading the first pages to suggest subjects…”.",
+    "ref": "§6.3 · US-2",
+    "desc": "Processing: titles appear first; no “Choose subjects” until processing finishes.",
     "release": 1,
     "stories": [
-      "US-2",
-      "US-10",
-      "US-11"
+      "US-2"
     ]
   },
   {
     "id": "library-first-choose",
     "group": "Library",
-    "ref": "§6.3 · US-2, US-10, US-11",
-    "desc": "Suggestions ready: highlighted rows and “3 documents need subjects”.",
+    "ref": "§6.3 · US-2",
+    "desc": "Processing finished: highlighted rows, “Choose subjects” and “3 documents need subjects”.",
     "release": 1,
     "stories": [
-      "US-2",
-      "US-10",
-      "US-11"
+      "US-2"
     ]
   },
   {
     "id": "library-first-ready",
     "group": "Library",
-    "ref": "§6.3 · US-2, US-10, US-11",
+    "ref": "§6.3 · US-2",
     "desc": "All three documents ready; “Ask a question” leads to the first answer.",
     "release": 1,
     "stories": [
-      "US-2",
-      "US-10",
-      "US-11"
+      "US-2"
     ]
   },
   {
     "id": "library-choose-subjects",
     "group": "Library",
-    "ref": "§6.3 · US-2, US-10, US-11",
+    "ref": "§6.3 · US-2",
     "desc": "Needs action: Toolformer needs subjects; banner and Library badge.",
     "release": 1,
     "stories": [
-      "US-2",
-      "US-10",
-      "US-11"
+      "US-2"
     ]
   },
   {
     "id": "library-rejected",
     "group": "Library",
-    "ref": "§6.3 · US-2, US-10, US-11",
+    "ref": "§6.3 · US-2",
     "desc": "Rejected before upload: not a PDF, or over 50 MB.",
     "release": 1,
     "stories": [
-      "US-2",
-      "US-10",
-      "US-11"
+      "US-2"
     ]
   },
   {
     "id": "library-already-in-library",
     "group": "Library",
-    "ref": "§6.3 · US-2, US-10, US-11",
+    "ref": "§6.3 · US-2",
     "desc": "Already in your library: a link to the document, or Restore if archived.",
     "release": 1,
     "stories": [
-      "US-2",
-      "US-10",
-      "US-11"
+      "US-2"
     ]
   },
   {
     "id": "library-failed",
     "group": "Library",
-    "ref": "§6.3 · US-2, US-10, US-11",
-    "desc": "Failed: the reason in plain words and Retry; after 3 attempts, no Retry.",
+    "ref": "§6.3 · US-2",
+    "desc": "Failed: the scanned PDF has no text layer, with Retry; after 3 attempts, no Retry.",
     "release": 1,
     "stories": [
-      "US-2",
-      "US-10",
-      "US-11"
+      "US-2"
     ]
   },
   {
     "id": "library-retry-processing",
     "group": "Library",
-    "ref": "§6.3 · US-2, US-10, US-11",
+    "ref": "§6.3 · US-2",
     "desc": "After Retry: the document is processing again (attempt 2 of 3).",
     "release": 1,
     "stories": [
-      "US-2",
-      "US-10",
-      "US-11"
+      "US-2"
     ]
   },
   {
     "id": "library-archived",
     "group": "Library",
-    "ref": "§6.3 · US-2, US-10, US-11",
-    "desc": "Archived tab: read-only, Restore, and what archiving means for answers.",
+    "ref": "§6.3 · US-10",
+    "desc": "Archived tab: Restore, what archiving means for answers, and “Change subjects” still available under More.",
     "release": 1,
     "stories": [
-      "US-2",
-      "US-10",
-      "US-11"
+      "US-10"
     ]
   },
   {
     "id": "library-archived-after-archive",
     "group": "Library",
-    "ref": "§6.3 · US-2, US-10, US-11",
+    "ref": "§6.3 · US-10",
     "desc": "After archiving ReAct (J4): find it under Archived.",
     "release": 1,
     "stories": [
-      "US-2",
-      "US-10",
-      "US-11"
+      "US-10"
     ]
   },
   {
     "id": "library-no-results",
     "group": "Library",
-    "ref": "§6.3 · US-2, US-10, US-11",
+    "ref": "§6.3 · US-10",
     "desc": "No results: “No documents match these filters” and Clear filters.",
     "release": 1,
     "stories": [
-      "US-2",
-      "US-10",
-      "US-11"
+      "US-10"
     ]
   },
   {
     "id": "library-filtered-by-subject",
     "group": "Library",
-    "ref": "§6.3 · US-2, US-10, US-11",
+    "ref": "§6.3 · US-10",
     "desc": "Filtered by subject (matches any of a document's subjects).",
     "release": 1,
     "stories": [
-      "US-2",
-      "US-10",
-      "US-11"
+      "US-10"
     ]
   },
   {
     "id": "library-rate-limited",
     "group": "Library",
-    "ref": "§6.3 · US-2, US-10, US-11",
-    "desc": "Upload limit reached: when uploads are available again; Upload disabled.",
+    "ref": "§6.3 · US-2",
+    "desc": "Upload limit reached: “You can upload again at 11:40 (GMT+7)”; Upload disabled.",
     "release": 1,
     "stories": [
-      "US-2",
-      "US-10",
-      "US-11"
+      "US-2"
     ]
   },
   {
@@ -335,7 +301,7 @@
     "id": "picker-saved",
     "group": "Choose subjects",
     "ref": "§6.4 · US-2b",
-    "desc": "Saved while processing continues.",
+    "desc": "Saved: “Subjects saved. Toolformer… is ready to use.” The document is Ready right away.",
     "release": 1,
     "stories": [
       "US-2b"
@@ -354,11 +320,21 @@
   {
     "id": "picker-change-subjects",
     "group": "Choose subjects",
-    "ref": "§6.4 · US-2b",
+    "ref": "§6.4 · US-10",
     "desc": "Change subjects of a ready document (J4).",
     "release": 1,
     "stories": [
-      "US-2b"
+      "US-10"
+    ]
+  },
+  {
+    "id": "picker-change-subjects-archived",
+    "group": "Choose subjects",
+    "ref": "§6.4 · US-10",
+    "desc": "Change subjects of an archived document from the Archived tab (D7); it stays archived.",
+    "release": 1,
+    "stories": [
+      "US-10"
     ]
   },
   {
@@ -385,7 +361,7 @@
     "id": "details-processing",
     "group": "Document details",
     "ref": "§6.5 · US-10",
-    "desc": "Processing document (a book with no year).",
+    "desc": "Processing a 424-page book: up to 15 minutes; subjects can be chosen when processing finishes.",
     "release": 1,
     "stories": [
       "US-10"
@@ -395,7 +371,7 @@
     "id": "details-failed",
     "group": "Document details",
     "ref": "§6.5 · US-10",
-    "desc": "Failed document with Retry.",
+    "desc": "Failed: “No text layer (scanned PDFs are not supported yet)”, with Retry.",
     "release": 1,
     "stories": [
       "US-10"
@@ -405,7 +381,7 @@
     "id": "details-archived",
     "group": "Document details",
     "ref": "§6.5 · US-10",
-    "desc": "Archived document with Restore (J4).",
+    "desc": "Archived document with Restore (J4); “Change subjects” stays available (D7).",
     "release": 1,
     "stories": [
       "US-10"
@@ -414,514 +390,281 @@
   {
     "id": "chat-new",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
+    "ref": "§6.6 · US-3",
     "desc": "Live chat: a new conversation (where navigation lands).",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-3"
     ]
   },
   {
     "id": "chat-no-documents",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
+    "ref": "§6.6 · US-3",
     "desc": "No documents yet: chat is replaced by “Upload a document first”.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-3"
     ]
   },
   {
     "id": "chat-new-conversation",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
+    "ref": "§6.6 · US-3",
     "desc": "New conversation: “Your subjects”, optional example questions, no subject picker.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-3"
     ]
   },
   {
     "id": "chat-documents-processing",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
+    "ref": "§6.6 · US-3",
     "desc": "Documents still processing: a quiet hint above the input.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-3"
     ]
   },
   {
     "id": "chat-streaming",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
+    "ref": "§6.6 · US-4",
     "desc": "Streaming answer with Stop.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-4"
     ]
   },
   {
     "id": "chat-subjects-detected",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
+    "ref": "§6.6 · US-3",
     "desc": "Subjects detected: one chip in the header, cited answer with a quoted passage.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-3"
     ]
   },
   {
     "id": "chat-subjects-detected-multi",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
+    "ref": "§6.6 · US-3",
     "desc": "First question covering two subjects: two chips.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-3"
     ]
   },
   {
     "id": "chat-detection-unsure",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
+    "ref": "§6.6 · US-3",
     "desc": "Detection unsure: pick 1–3 subjects, then Continue; the question stays.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-3"
     ]
   },
   {
     "id": "chat-answer-citations",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
-    "desc": "Answer with citations; a citation to an archived document shows “Archived”.",
+    "ref": "§6.6 · US-4",
+    "desc": "Answer with citations (one to an archived document shows “Archived”), and labelled “Helpful” / “Not helpful” thumbs.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-4"
     ]
   },
   {
     "id": "chat-citations-off",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
+    "ref": "§6.6 · US-4",
     "desc": "Citations switched off: the same thread, answers unchanged.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-4"
     ]
   },
   {
     "id": "chat-feedback-reason",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
-    "desc": "Thumbs down opens an optional reason.",
+    "ref": "§6.6 · US-4",
+    "desc": "“Not helpful” is pressed and opens an optional reason; “Helpful” pressed on the first answer.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-4"
     ]
   },
   {
     "id": "chat-citation-opens-details",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
+    "ref": "§6.6 · US-10",
     "desc": "Clicking a citation opens the document details at the cited page.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-10"
     ]
   },
   {
     "id": "chat-subject-added",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
+    "ref": "§6.6 · US-3b",
     "desc": "Subject added: inline notice, new chip highlighted in the header.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-3b"
     ]
   },
   {
     "id": "chat-maximum-reached",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
+    "ref": "§6.6 · US-3b",
     "desc": "Maximum reached: the third subject is added and the learner is told.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-3b"
     ]
   },
   {
     "id": "chat-fourth-subject-refused",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
-    "desc": "Fourth subject refused: no answer, “New conversation” carries the question.",
+    "ref": "§6.6 · US-3b",
+    "desc": "Fourth subject refused: no answer; “A new conversation will answer it straight away.”",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-3b"
     ]
   },
   {
     "id": "chat-new-from-refused",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
-    "desc": "The new conversation answers the carried question (Reinforcement Learning).",
+    "ref": "§6.6 · US-3b",
+    "desc": "The carried question was sent right away; the new conversation answers it (Reinforcement Learning).",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-3b"
     ]
   },
   {
     "id": "chat-decline",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
-    "desc": "Decline: the documents don't cover this; not styled as an error.",
+    "ref": "§6.6 · US-5",
+    "desc": "Decline, no subject fits: a document on the topic is needed to continue; “Upload a document” is the only action.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-5"
+    ]
+  },
+  {
+    "id": "chat-decline-other-subject",
+    "group": "Chat",
+    "ref": "§6.6 · US-5",
+    "desc": "Decline, another of the learner's subjects fits: “New conversation” sends the question there right away.",
+    "release": 1,
+    "stories": [
+      "US-5"
     ]
   },
   {
     "id": "chat-no-active-documents",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
+    "ref": "§6.6 · US-10",
     "desc": "No active documents in these subjects: history readable, input disabled.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-10"
     ]
   },
   {
     "id": "chat-summarize-progress",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
+    "ref": "§6.6 · US-7",
     "desc": "“Summarize lesson” in progress.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-7"
     ]
   },
   {
     "id": "chat-summarize-done",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
+    "ref": "§6.6 · US-7",
     "desc": "Note saved: confirmation with a link; the header now links the note.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-7"
     ]
   },
   {
     "id": "chat-update-note",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
+    "ref": "§6.6 · US-7",
     "desc": "A note exists and wasn't edited: “Update lesson note” replaces it directly.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-7"
     ]
   },
   {
     "id": "chat-update-edited-note",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
+    "ref": "§6.6 · US-7",
     "desc": "The note was edited: “You've edited this note. Replace it with a new summary?”",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-7"
     ]
   },
   {
     "id": "chat-archived",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
+    "ref": "§6.6 · US-13",
     "desc": "Archived conversation: banner with Restore, input disabled.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-13"
     ]
   },
   {
     "id": "chat-rate-limited",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
-    "desc": "Rate limited: when the learner can send again; input disabled until then.",
+    "ref": "§6.6 · US-9",
+    "desc": "Rate limited: “You can send again at 11:25 (GMT+7)”; input disabled until then.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-9"
     ]
   },
   {
     "id": "chat-error",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
+    "ref": "§6.6 · US-4",
     "desc": "The answer failed: Retry.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-4"
     ]
   },
   {
     "id": "chat-from-note",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
+    "ref": "§6.6 · US-7",
     "desc": "Started from a note: “Started from note: title” at the top.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-7"
     ]
   },
   {
     "id": "chat-first-answer",
     "group": "Chat",
-    "ref": "§6.6 · US-3–10",
+    "ref": "§6.6 · US-4",
     "desc": "J1 ends here: the first cited answer from freshly uploaded papers.",
     "release": 1,
     "stories": [
-      "US-3",
-      "US-3b",
-      "US-4",
-      "US-5",
-      "US-6",
-      "US-7",
-      "US-8",
-      "US-9",
-      "US-10",
-      "US-10b"
+      "US-4"
     ]
   },
   {
@@ -987,77 +730,70 @@
   {
     "id": "notes-active",
     "group": "Notes",
-    "ref": "§6.8 · US-7, US-13b",
+    "ref": "§6.8 · US-13b",
     "desc": "Live list: subjects, date, source conversation, “Edited” marker.",
     "release": 1,
     "stories": [
-      "US-7",
       "US-13b"
     ]
   },
   {
     "id": "notes-archived",
     "group": "Notes",
-    "ref": "§6.8 · US-7, US-13b",
+    "ref": "§6.8 · US-13b",
     "desc": "Archived notes with Restore.",
     "release": 1,
     "stories": [
-      "US-7",
       "US-13b"
     ]
   },
   {
     "id": "notes-empty",
     "group": "Notes",
-    "ref": "§6.8 · US-7, US-13b",
+    "ref": "§6.8 · US-13b",
     "desc": "No lesson notes yet.",
     "release": 1,
     "stories": [
-      "US-7",
       "US-13b"
     ]
   },
   {
     "id": "notes-editor",
     "group": "Notes",
-    "ref": "§6.8 · US-7, US-13b",
+    "ref": "§6.8 · US-7",
     "desc": "Generated note: Markdown and preview, Discuss this note, source link.",
     "release": 1,
     "stories": [
-      "US-7",
-      "US-13b"
+      "US-7"
     ]
   },
   {
     "id": "notes-editor-edited",
     "group": "Notes",
-    "ref": "§6.8 · US-7, US-13b",
+    "ref": "§6.8 · US-7",
     "desc": "Edited note: the “Edited” marker that triggers the overwrite confirmation.",
     "release": 1,
     "stories": [
-      "US-7",
-      "US-13b"
+      "US-7"
     ]
   },
   {
     "id": "notes-editor-unsaved",
     "group": "Notes",
-    "ref": "§6.8 · US-7, US-13b",
+    "ref": "§6.8 · US-7",
     "desc": "Unsaved changes; Save enabled.",
     "release": 1,
     "stories": [
-      "US-7",
-      "US-13b"
+      "US-7"
     ]
   },
   {
     "id": "notes-archived-view",
     "group": "Notes",
-    "ref": "§6.8 · US-7, US-13b",
+    "ref": "§6.8 · US-13b",
     "desc": "Archived note: read-only with Restore.",
     "release": 1,
     "stories": [
-      "US-7",
       "US-13b"
     ]
   },
@@ -1085,7 +821,7 @@
     "id": "subjects-rename-duplicate",
     "group": "Subjects",
     "ref": "§6.9 · US-10b",
-    "desc": "Rename must differ from the learner's other subject names.",
+    "desc": "Rename clashes with another of the learner's own subject names (a shared name she doesn't have is allowed, D6).",
     "release": 1,
     "stories": [
       "US-10b"
@@ -1104,8 +840,8 @@
   {
     "id": "usage-overview",
     "group": "Usage & settings",
-    "ref": "§6.10–6.11 · US-9",
-    "desc": "Today and all time; Conversations, Document processing, Background.",
+    "ref": "§6.10 · US-9",
+    "desc": "Today (the GMT+7 day) and all time; Conversations, Document processing, Background.",
     "release": 1,
     "stories": [
       "US-9"
@@ -1114,168 +850,145 @@
   {
     "id": "settings-default",
     "group": "Usage & settings",
-    "ref": "§6.10–6.11 · US-9",
-    "desc": "Time zone from the browser; the accepted terms version and date.",
+    "ref": "§6.11 · no user story",
+    "desc": "Time zone “GMT+7 (Ho Chi Minh City)”, read-only; the accepted terms version and date.",
     "release": 1,
-    "stories": [
-      "US-9"
-    ]
+    "stories": []
   },
   {
     "id": "r2-map",
     "group": "R2 research map (wireframes)",
-    "ref": "§7 · US-19, US-20",
+    "ref": "§7 · US-19",
     "desc": "Subject selector, timeline by year, citation links, works without a year.",
     "release": 2,
     "stories": [
-      "US-19",
-      "US-20"
+      "US-19"
     ]
   },
   {
     "id": "r2-work-details",
     "group": "R2 research map (wireframes)",
-    "ref": "§7 · US-19, US-20",
+    "ref": "§7 · US-19",
     "desc": "Work details: files, cites and cited-by within the library.",
     "release": 2,
     "stories": [
-      "US-19",
-      "US-20"
+      "US-19"
     ]
   },
   {
     "id": "r2-reading-order",
     "group": "R2 research map (wireframes)",
-    "ref": "§7 · US-19, US-20",
+    "ref": "§7 · US-20",
     "desc": "Numbered reading order with a reason for each step.",
     "release": 2,
     "stories": [
-      "US-19",
       "US-20"
     ]
   },
   {
     "id": "r2-ask-path",
     "group": "R2 research map (wireframes)",
-    "ref": "§7 · US-19, US-20",
+    "ref": "§7 · US-20",
     "desc": "“How did idea develop?” opens a chat answer that walks the works in order.",
     "release": 2,
     "stories": [
-      "US-19",
       "US-20"
     ]
   },
   {
     "id": "r2-sparse-map",
     "group": "R2 research map (wireframes)",
-    "ref": "§7 · US-19, US-20",
+    "ref": "§7 · US-19",
     "desc": "Sparse subject: explains what is missing.",
     "release": 2,
     "stories": [
-      "US-19",
-      "US-20"
+      "US-19"
     ]
   },
   {
     "id": "r3-quiz-select",
     "group": "R3 learning loop (wireframes)",
-    "ref": "§8 · US-14–16",
+    "ref": "§8 · US-14",
     "desc": "Select 1–10 active notes and generate a quiz.",
     "release": 3,
     "stories": [
-      "US-14",
-      "US-15",
-      "US-16"
+      "US-14"
     ]
   },
   {
     "id": "r3-quiz-generating",
     "group": "R3 learning loop (wireframes)",
-    "ref": "§8 · US-14–16",
+    "ref": "§8 · US-14",
     "desc": "Quiz generation progress (up to ~15 s).",
     "release": 3,
     "stories": [
-      "US-14",
-      "US-15",
-      "US-16"
+      "US-14"
     ]
   },
   {
     "id": "r3-quiz-take",
     "group": "R3 learning loop (wireframes)",
-    "ref": "§8 · US-14–16",
+    "ref": "§8 · US-14",
     "desc": "Multiple-choice questions, 4 options.",
     "release": 3,
     "stories": [
-      "US-14",
-      "US-15",
-      "US-16"
+      "US-14"
     ]
   },
   {
     "id": "r3-quiz-results",
     "group": "R3 learning loop (wireframes)",
-    "ref": "§8 · US-14–16",
+    "ref": "§8 · US-14",
     "desc": "Score, explanations, score per topic, retake, flag.",
     "release": 3,
     "stories": [
-      "US-14",
-      "US-15",
-      "US-16"
+      "US-14"
     ]
   },
   {
     "id": "r3-quizzes-list",
     "group": "R3 learning loop (wireframes)",
-    "ref": "§8 · US-14–16",
+    "ref": "§8 · US-14",
     "desc": "Same list pattern for quizzes.",
     "release": 3,
     "stories": [
-      "US-14",
-      "US-15",
-      "US-16"
+      "US-14"
     ]
   },
   {
     "id": "r3-reports",
     "group": "R3 learning loop (wireframes)",
-    "ref": "§8 · US-14–16",
+    "ref": "§8 · US-15",
     "desc": "Daily / weekly reports with Generate now.",
     "release": 3,
     "stories": [
-      "US-14",
-      "US-15",
-      "US-16"
+      "US-15"
     ]
   },
   {
     "id": "r3-report-view",
     "group": "R3 learning loop (wireframes)",
-    "ref": "§8 · US-14–16",
+    "ref": "§8 · US-15",
     "desc": "Report: topics, conversations, quiz results, weak topics, recommendations.",
     "release": 3,
     "stories": [
-      "US-14",
-      "US-15",
-      "US-16"
+      "US-15"
     ]
   },
   {
     "id": "r3-learn-next",
     "group": "R3 learning loop (wireframes)",
-    "ref": "§8 · US-14–16",
+    "ref": "§8 · US-16",
     "desc": "“What should I learn next?” cards with Start learning.",
     "release": 3,
     "stories": [
-      "US-14",
-      "US-15",
       "US-16"
     ]
   },
   {
     "id": "components",
     "group": "Components & questions",
-    "ref": "§10–11",
+    "ref": "§10 · components",
     "desc": "Every reusable component, in both themes.",
     "release": 1,
     "stories": []
@@ -1283,8 +996,8 @@
   {
     "id": "brief-questions",
     "group": "Components & questions",
-    "ref": "§10–11",
-    "desc": "Questions and proposed changes to brief v0.3.",
+    "ref": "§11 · questions",
+    "desc": "Brief v0.4 decisions (Q7, D1–D8) and new questions.",
     "release": 1,
     "stories": []
   }

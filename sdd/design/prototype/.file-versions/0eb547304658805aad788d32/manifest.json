@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "fileName": "index.html",
-  "currentVersionId": "03490b48-6b61-4295-b1d7-9e1da9fba7f5",
+  "currentVersionId": "5bc99885-edc2-4801-af7b-b526603c3fb1",
   "entries": [
     {
       "id": "f36e6729-f195-4945-9c3c-52c32a4f64eb",
@@ -30,7 +30,22 @@
       "mime": "text/html; charset=utf-8",
       "kind": "html",
       "contentPath": "0002-03490b48-6b61-4295-b1d7-9e1da9fba7f5.html",
-      "contentDigest": "0820441d6a4c38962020666a06d176416ce94b96ff693bf0c6cdc0ed26db4a75",
+      "promptSource": "message",
+      "contentDigest": "0820441d6a4c38962020666a06d176416ce94b96ff693bf0c6cdc0ed26db4a75"
+    },
+    {
+      "id": "5bc99885-edc2-4801-af7b-b526603c3fb1",
+      "fileName": "index.html",
+      "version": 3,
+      "label": "Version 3",
+      "createdAt": 1791080909040,
+      "source": "ai",
+      "prompt": "You are designing **Smart Tutor**, a laptop web app (1440 px, light mode) where learners upload their own PDFs and ask a tutor that answers only from them, with citations. Follow the design brief **v0.4** in this project (`brief-v0.4.md`) exactly; it is the source of truth. Start with **§0 What changed**: this round updates the existing prototype in this project (round v0.3: `index.html`, `styles.css`, `v03.css`, `js/*.js`), so change only the states listed in §0 and keep everything else as it is. Keep (1) the four clickable flows in §5 working, (2) every Release 1 screen and state in §6, (3) the wireframes for §7 and §8, and (4) the components page (§10). Use the sample data in §9 and the quoted wording verbatim. Name each state `<screen>-<state>@v0.4` (set `ST.BRIEF = 'v0.4'` and update the page title, the overview and the questions page for brief v0.4). Do not design anything listed as out of scope in §4. Follow the prototype contract in §11 item 6: every state in `window.ST.STATES` with its specific user stories in `ref` (e.g. `§6.6 · US-3b`, never a range like `US-3–10`), each state at `index.html#/<state-id>`, and review chrome hidden when the URL has `?shot=1`.\n\nRules for this round:\n- Keep the Smart Tutor brand and tokens (smart-tutor-ds, light and dark). Do not apply any other design system.\n- Do not edit `brief-v0.4.md`, `history/`, `.file-versions/`, `.od-frames/`, `.od-skills/`, or the old round in `v0.2/`.\n- Keep existing state ids; add a new id only for a genuinely new state (e.g. a second decline variant), and list any new or removed ids in your final message.\n- D4 is narrower than in v0.3: when a question fits none of the learner's subjects, the tutor declines and says a document on the topic is needed to continue, with \"Upload a document\" as the only action (no \"New conversation\").\n- Replace the \"Questions for the brief\" page with the v0.4 decisions (Q7, D1–D8 answered as in §0) and any new questions you have.\n\nEnd with a list of the states you changed, any new or removed state ids, and questions or proposed changes to the brief.",
+      "size": 3178,
+      "mime": "text/html; charset=utf-8",
+      "kind": "html",
+      "contentPath": "0003-5bc99885-edc2-4801-af7b-b526603c3fb1.html",
+      "contentDigest": "7979ee7e0d50afbbd822264a1c3aed142e5583f5ce26cf045cc0367b263cc2e6",
       "promptSource": "message"
     }
   ]

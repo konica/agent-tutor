@@ -1,4 +1,4 @@
-/* Smart Tutor v0.3 — Conversations (§6.7), Notes (§6.8), Usage (§6.10), Settings (§6.11). */
+/* Smart Tutor v0.4 — Conversations (§6.7), Notes (§6.8), Usage (§6.10), Settings (§6.11). */
 (function () {
   const ST = window.ST;
   const S = ST.S;
@@ -118,7 +118,8 @@
     const stat = (label, v, unit) => `<div class="stat od-stat"><span class="s-label">${label}</span><span class="s-value">${ST.num(v)}</span><span class="s-unit">${unit}</span></div>`;
     return ST.shell({ nav: 'usage', content: `<div class="page">
       <div class="page-head"><div><h1>Usage</h1><p>Tokens used for your conversations, your documents and background work. Shown for your information only.</p></div></div>
-      <div class="stats four">${stat('Input tokens', tIn, 'Today')}${stat('Output tokens', tOut, 'Today')}${stat('Input tokens', allIn, 'All time')}${stat('Output tokens', allOut, 'All time')}</div>
+      <div class="stats four">${stat('Input tokens', tIn, `Today · ${ST.TZ.short}`)}${stat('Output tokens', tOut, `Today · ${ST.TZ.short}`)}${stat('Input tokens', allIn, 'All time')}${stat('Output tokens', allOut, 'All time')}</div>
+      <p class="legend-line" style="margin-top:12px">${ic('clock', 'sm')}“Today” runs from midnight to midnight in ${esc(ST.TZ.long)}, the time zone Smart Tutor uses for everyone.</p>
 
       <section class="usage-section" aria-labelledby="u-conv"><h2 id="u-conv">Conversations</h2>
         <div class="table-wrap"><table class="data"><caption class="vh">Tokens per conversation</caption>
@@ -144,17 +145,12 @@
   ST.actions.sort = (el) => { const key = el.dataset.key; if (ST.U.key === key) ST.U.dir = ST.U.dir === 'asc' ? 'desc' : 'asc'; else { ST.U.key = key; ST.U.dir = key === 'title' ? 'asc' : 'desc'; } ST.render(); };
 
   /* ---------- §6.11 Settings ---------- */
-  const ZONES = ['Asia/Ho_Chi_Minh', 'Asia/Bangkok', 'Asia/Singapore', 'Asia/Tokyo', 'Australia/Sydney', 'Europe/London', 'Europe/Berlin', 'America/New_York', 'America/Los_Angeles', 'UTC'];
   ST.settingsView = () => {
-    let detected = 'UTC'; try { detected = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch (e) {}
-    if (!ST.tz) ST.tz = detected;
-    const zones = [...new Set([detected, ...ZONES])];
     return ST.shell({ nav: 'settings', content: `<div class="page"><div class="page-head"><div><h1>Settings</h1></div></div>
       <div class="settings-grid">
         <section class="card" aria-labelledby="set-tz"><h2 id="set-tz">Time zone</h2>
-          <div class="field"><label for="tz">Time zone</label><select class="select" id="tz" data-change="tz" aria-describedby="tz-h" style="max-width:360px">${zones.map((z) => `<option ${z === ST.tz ? 'selected' : ''}>${esc(z)}</option>`).join('')}</select>
-            <span class="helper" id="tz-h">${ST.tz === detected ? `Detected from your browser: ${esc(detected)}.` : `Your browser reports ${esc(detected)}.`} Used for dates and for upload limits.</span></div>
-          <div class="card-actions"><button class="btn btn-primary" type="button" data-action="tz-save">Save time zone</button></div></section>
+          <dl class="facts"><dt>Time zone</dt><dd><span class="od-row" style="--od-gap:6px">${ic('lock', 'sm')}${esc(ST.TZ.long)}</span></dd></dl>
+          <p class="helper">Smart Tutor uses one time zone for everyone. It sets “today” in Usage and the times shown when an upload or message limit ends. It can't be changed.</p></section>
         <section class="card" aria-labelledby="set-terms"><h2 id="set-terms">Terms of use</h2>
           <dl class="facts"><dt>Version</dt><dd>1.0 · effective 1 Oct 2026</dd><dt>Accepted</dt><dd>3 Oct 2026, 08:12</dd></dl>
           <div class="card-actions"><button class="btn btn-secondary" type="button" data-action="full-terms">${ic('doc', 'sm')}View the terms you accepted</button></div></section>
@@ -167,7 +163,5 @@
             <button class="switch od-fixed" type="button" role="switch" aria-checked="${S.citations}" aria-labelledby="cit-l" data-action="toggle-citations" data-fk="cit-set"><span class="track" aria-hidden="true"></span><span class="state" aria-hidden="true">${S.citations ? 'On' : 'Off'}</span></button></div></section>
       </div></div>` });
   };
-  ST.actions.tz = (el) => { ST.tz = el.value; ST.render(); };
-  ST.actions['tz-save'] = () => ST.toast(`Time zone saved: ${ST.tz}.`);
   ST.actions['set-theme'] = (el) => { ST.setTheme(el.dataset.t); ST.render(); };
 })();
