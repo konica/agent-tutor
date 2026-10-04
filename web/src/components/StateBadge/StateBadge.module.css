@@ -5,6 +5,7 @@
 .icon { width: 14px; height: 14px; flex: none; }
 .processing { background: var(--surface-2); color: var(--text-2); }
 .processing .icon { animation: spin var(--dur-spin) linear infinite; }
+.awaiting_subjects { background: var(--attn-soft); color: var(--attn); }
 .ready { background: var(--success-soft); color: var(--success); }
 .failed { background: var(--danger-soft); color: var(--danger); }
 

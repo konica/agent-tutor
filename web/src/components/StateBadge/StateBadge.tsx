@@ -1,12 +1,13 @@
-import { CircleAlert, CircleCheck, LoaderCircle, type LucideIcon } from "lucide-react";
+import { CircleAlert, CircleCheck, ListChecks, LoaderCircle, type LucideIcon } from "lucide-react";
 
 import styles from "./StateBadge.module.css";
 
-// Release 1 skeleton states; "choose subjects", "uploading" and "archived" arrive with their stories (DESIGN.md → Document states).
-export type DocumentState = "processing" | "ready" | "failed";
+// Release 1 states; "uploading" and "archived" arrive with their stories (DESIGN.md → Document states).
+export type DocumentState = "processing" | "awaiting_subjects" | "ready" | "failed";
 
 const LOOK: Record<DocumentState, { label: string; icon: LucideIcon }> = {
   processing: { label: "Processing", icon: LoaderCircle },
+  awaiting_subjects: { label: "Choose subjects", icon: ListChecks },
   ready: { label: "Ready", icon: CircleCheck },
   failed: { label: "Failed", icon: CircleAlert },
 };

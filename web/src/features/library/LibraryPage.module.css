@@ -1,0 +1,5 @@
+.status { margin: 0 0 var(--sp-3); min-height: 1lh; color: var(--text-2); font-size: var(--fs-14); }
+.error {
+  margin: 0 0 var(--sp-4); padding: var(--sp-3) var(--sp-4); border-radius: var(--r-md);
+  background: var(--danger-soft); color: var(--danger);
+}

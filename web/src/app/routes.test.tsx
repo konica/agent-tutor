@@ -8,6 +8,9 @@ import { SessionContext } from "../auth/SessionProvider";
 import { NAV } from "./nav";
 import { routes } from "./routes";
 
+// The Library loads documents from the API; these tests are about routing, so it sees an empty library.
+vi.mock("../api/documents", () => ({ loadDocuments: async () => [], uploadPdf: vi.fn() }));
+
 const signOut = vi.fn();
 
 function renderAt(path: string, { strict = false } = {}) {
@@ -64,10 +67,10 @@ describe("app shell routes", () => {
     expect(nav().getByRole("link", { name: "Usage" })).toHaveAttribute("aria-current", "page");
   });
 
-  it("shows the first-run Library", () => {
+  it("shows the first-run Library", async () => {
     renderAt("/library");
-    expect(screen.getByRole("heading", { level: 2, name: "Upload your first document" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Choose PDFs" })).toBeDisabled();
+    expect(await screen.findByRole("heading", { level: 2, name: "Upload your first document" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Choose PDFs" })).toBeEnabled();
   });
 
   it("sets the document title from the current page", async () => {
