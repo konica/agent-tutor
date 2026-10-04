@@ -1,0 +1,30 @@
+.screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-6);
+  background: var(--bg);
+}
+
+.card {
+  display: grid;
+  gap: var(--sp-3);
+  justify-items: start;
+  max-width: 28rem;
+  padding: var(--sp-6);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-24);
+  line-height: var(--lh-head);
+}
+
+.note {
+  margin: 0;
+  color: var(--text-2);
+}
