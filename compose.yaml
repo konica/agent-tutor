@@ -1,9 +1,26 @@
 # Local development (PRD §9.12).
 #   docker compose up -d                 # dependencies only: pgvector, Keycloak, LocalStack
 #   docker compose --profile app up -d   # + app services from the same images as production
-# Bedrock and LangSmith have no emulator: app services call the real us-east-1 models with your AWS profile.
+# Bedrock and LangSmith have no emulator: agent and mcp call the real us-east-1 models with your AWS profile.
 
 name: smart-tutor
+
+# Services that talk only to LocalStack (api, worker) get its dummy credentials, never your real ones.
+# .env may set AWS_PROFILE to a developer profile that doesn't exist in the container, and boto3 then
+# raises ProfileNotFound even with the keys set (an empty AWS_PROFILE fails the same way), so these
+# services point AWS_CONFIG_FILE at a file that defines the profile they use instead.
+x-localstack-aws: &localstack-aws
+  AWS_PROFILE: localstack
+  AWS_CONFIG_FILE: /etc/smart-tutor/aws-config
+  AWS_SHARED_CREDENTIALS_FILE: /dev/null
+  AWS_ACCESS_KEY_ID: test
+  AWS_SECRET_ACCESS_KEY: test
+
+configs:
+  localstack-aws-config:
+    content: |
+      [profile localstack]
+      region = us-east-1
 
 services:
   postgres:
@@ -71,11 +88,17 @@ services:
       SMART_TUTOR_KEYCLOAK_INTERNAL_URL: http://keycloak:8080/realms/smart-tutor
       SMART_TUTOR_KEYCLOAK_CLIENT_ID: smart-tutor-api
       SMART_TUTOR_KEYCLOAK_CLIENT_SECRET: local-api-secret
+      # The API only signs presigned POSTs; the browser sends them, so sign for the URL it can reach.
+      AWS_ENDPOINT_URL_S3: http://localhost:10402
+      SMART_TUTOR_S3_PATH_STYLE: "true"
+      <<: *localstack-aws
+    configs: [{source: localstack-aws-config, target: /etc/smart-tutor/aws-config}]
     ports: ["10450:8080"]
     depends_on:
       migrate: {condition: service_completed_successfully}
       keycloak: {condition: service_started}
       agent: {condition: service_started}
+      localstack: {condition: service_started}
 
   agent:
     profiles: [app]
@@ -114,7 +137,12 @@ services:
       SMART_TUTOR_INGEST_QUEUE_URL: http://localstack:4566/000000000000/smart-tutor-ingest
       AWS_ENDPOINT_URL_S3: http://localstack:4566
       AWS_ENDPOINT_URL_SQS: http://localstack:4566
-    depends_on: [postgres, localstack]
+      SMART_TUTOR_S3_PATH_STYLE: "true"
+      <<: *localstack-aws
+    configs: [{source: localstack-aws-config, target: /etc/smart-tutor/aws-config}]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      localstack: {condition: service_started}
 
   web:
     profiles: [app]
