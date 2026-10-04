@@ -1,5 +1,5 @@
-/* Smart Tutor v0.3 — overview with flows, R2 research map and R3 learning loop wireframes,
-   components page (§10), questions for the brief owner (§11.5). */
+/* Smart Tutor v0.4 — overview with what changed and the flows, R2 research map and R3 learning loop
+   wireframes, components page (§10), decisions and questions for the brief owner (§11.5). */
 (function () {
   const ST = window.ST;
   const S = ST.S;
@@ -8,25 +8,48 @@
   /* =========================================================
      Overview
      ========================================================= */
+  /* §0 What changed in v0.4: decision → states redone in this round. */
+  ST.CHANGES = [
+    ['Q7', 'Subjects are chosen after processing finishes', ['library-first-processing', 'library-first-choose', 'picker-saved', 'details-processing']],
+    ['D2', 'The carried question is sent right away', ['chat-fourth-subject-refused', 'chat-new-from-refused']],
+    ['D4', 'No subject fits: ask for a document', ['chat-decline', 'chat-decline-other-subject']],
+    ['D6', 'A personal name may match a shared one', ['subjects-rename-duplicate']],
+    ['D7', 'Archived documents can change subjects', ['library-archived', 'details-archived', 'picker-change-subjects-archived']],
+    ['D8', 'One time zone, GMT+7', ['library-rate-limited', 'chat-rate-limited', 'usage-overview', 'settings-default']],
+    ['D1', 'Labelled thumbs with a pressed state', ['chat-answer-citations', 'chat-feedback-reason', 'components']],
+    ['D3', 'Fourth-subject wording', ['chat-fourth-subject-refused']],
+    ['D5', 'One contextual button per Library row', ['library-default']],
+    ['PRD v2.3', 'Scanned PDFs fail with “No text layer”', ['library-failed', 'details-failed']]
+  ];
+  ST.NEW_IDS = ['chat-decline-other-subject', 'picker-change-subjects-archived'];
+  const changed = () => { const set = new Set(); ST.CHANGES.forEach((c) => c[2].forEach((id) => set.add(id))); return set; };
   ST.indexView = () => {
     const groups = [];
+    const ch = changed();
     ST.STATES.forEach((s) => { if (s.id === 'index') return; let g = groups.find((x) => x.name === s.group); if (!g) { g = { name: s.group, ref: s.ref || '', items: [] }; groups.push(g); } g.items.push(s); });
     return `<main class="index-page" id="main-content" tabindex="-1">
       <section class="index-hero">
         <div><span class="brand" style="padding:0 0 24px">${ST.logo('logo', 'Smart Tutor logo')}<span class="word">Smart Tutor</span></span>
-          <h1>Round 2: your own documents</h1>
-          <p>Brief v0.3 rebuilt the product: learners upload their own PDFs, accept suggested subjects, and ask a tutor that answers only from them. The visual style continues round 1. Review the four flows first, then any single state. Every state is labelled <code class="mono">&lt;screen&gt;-&lt;state&gt;@v0.3</code>.</p>
+          <h1>Round 3: the owner's decisions</h1>
+          <p>Brief v0.4 answers the round 2 questions. This round changes only the states listed in §0; everything else is the accepted v0.3 design. Review the changed states first, then walk the four flows. Every state is labelled <code class="mono">&lt;screen&gt;-&lt;state&gt;@v0.4</code> and opens at <code class="mono">index.html#/&lt;state-id&gt;</code>; add <code class="mono">?shot=1</code> to hide this review chrome.</p>
           <div class="od-cluster" style="margin-top:24px;--od-gap:12px">
             <button class="btn btn-primary btn-lg" type="button" data-action="start-flow" data-flow="J1">Start with J1 · First run${ic('arrowRight', 'sm')}</button>
             <a class="btn btn-secondary btn-lg" href="#/library-default">Open the Library</a>
             <a class="btn btn-ghost btn-lg" href="#/brief-questions">Questions for the brief</a>
           </div></div>
         <dl class="meta">
-          <div><dt>Brief</dt><dd>v0.3 · PRD v2.1</dd></div><div><dt>Owner</dt><dd>Thao Dinh</dd></div><div><dt>Date</dt><dd>3 Oct 2026</dd></div>
+          <div><dt>Brief</dt><dd>v0.4 · PRD v2.7</dd></div><div><dt>Owner</dt><dd>Thao Dinh</dd></div><div><dt>Date</dt><dd>4 Oct 2026</dd></div>
           <div><dt>Screens</dt><dd>Laptop, 1280–1920 px</dd></div><div><dt>Themes</dt><dd>Light and dark</dd></div><div><dt>States</dt><dd>${ST.STATES.length - 1}</dd></div>
           <div><dt>Round 1</dt><dd><a href="v0.2/index.html">v0.2 prototype</a></dd></div>
         </dl>
       </section>
+
+      <h2 class="section-title">What changed in v0.4</h2>
+      <div class="changes" role="table" aria-label="Decisions and the states they changed">
+        ${ST.CHANGES.map(([id, title, states]) => `<div class="change-row" role="row"><span class="qid" role="cell">${esc(id)}</span><span class="change-title" role="cell">${esc(title)}</span>
+          <span class="change-states" role="cell">${states.map((sid) => `<a href="#/${sid}"><code>${sid}</code>${ST.NEW_IDS.includes(sid) ? '<span class="badge badge-note">New</span>' : ''}</a>`).join('')}</span></div>`).join('')}
+        <div class="change-row" role="row"><span class="qid" role="cell">§11.6</span><span class="change-title" role="cell">Prototype contract</span><span class="change-states" role="cell"><span class="small muted">Every state: one user story in <code class="mono">ref</code>, <code class="mono">?shot=1</code> hides the review bar.</span></span></div>
+      </div>
 
       <h2 class="section-title">Review flows</h2>
       <div class="flow-grid">${ST.FLOWS.map((f) => `<section class="flow-card" aria-labelledby="fl-${f.id}">
@@ -45,7 +68,7 @@
       <h2 class="section-title">All states</h2>
       <div class="index-groups">${groups.map((g) => `<section class="index-group ${g.items.length > 12 ? 'span2' : ''}" aria-labelledby="g-${g.items[0].id}">
         <h2 id="g-${g.items[0].id}">${esc(g.name)}<span class="ig-ref">${esc(g.ref)}</span></h2>
-        <ul>${g.items.map((s) => `<li><a href="#/${s.id}"><code>${s.id}@${ST.BRIEF}</code><span>${esc(s.desc)}</span></a></li>`).join('')}</ul></section>`).join('')}</div>
+        <ul>${g.items.map((s) => `<li><a href="#/${s.id}"><code>${s.id}@${ST.BRIEF}</code>${ST.NEW_IDS.includes(s.id) ? '<span class="badge badge-note">New in v0.4</span>' : ch.has(s.id) ? '<span class="badge">Changed in v0.4</span>' : ''}<span>${esc(s.desc)}</span></a></li>`).join('')}</ul></section>`).join('')}</div>
     </main>`;
   };
   ST.actions['start-flow-at'] = (el, e) => { ST.flow = el.dataset.flow; try { sessionStorage.setItem('st3_flow', ST.flow); } catch (x) {} };
@@ -174,7 +197,7 @@
   ST.componentsView = () => {
     const d = { id: 'dx', title: 'Toolformer: Language Models Can Teach Themselves to Use Tools', authors: 'Schick et al.', year: 2023, state: 'choose', subjects: [], attempts: 0 };
     return `<main class="index-page" id="main-content" tabindex="-1">
-    <div class="page-head" style="margin-bottom:48px"><div><h1 style="font-size:48px">Components</h1><p>The reusable set for v0.3. Tokens live once in <code class="mono">styles.css</code> and <code class="mono">v03.css</code>, for light and dark.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
+    <div class="page-head" style="margin-bottom:48px"><div><h1 style="font-size:48px">Components</h1><p>The reusable set for v0.4. Tokens live once in <code class="mono">styles.css</code> and <code class="mono">v03.css</code>, for light and dark.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
 
     <section class="cmp-section"><h2>Tokens</h2><p>The round 1 palette, plus an attention colour for “needs action” and one hue per subject. Chip text always uses the main text colour, so contrast holds whatever the hue.</p>
       <div class="cmp-grid">${tokenGrid('light')}${tokenGrid('dark')}</div></section>
@@ -221,10 +244,14 @@
         ${spec('citation', `<div class="cite-list"><button class="cite" type="button">${ic('doc')}<span><span class="doc-name">ReAct: Synergizing Reasoning and Acting in Language Models</span><span class="page">, p. 3</span></span></button>
           <button class="cite" type="button">${ic('doc')}<span><span class="doc-name">Proximal Policy Optimization Algorithms</span><span class="page">, page unavailable</span></span></button>
           <button class="cite" type="button">${ic('doc')}<span><span class="doc-name">Language Models are Few-Shot Learners</span><span class="page">, p. 8</span></span><span class="badge badge-archived">${ic('archive')}Archived</span></button></div>`)}
+        ${spec('answer feedback · default / “Helpful” pressed / “Not helpful” pressed (D1)', `<div class="feedback" role="group" aria-label="Example, default"><button class="fb-btn" type="button" aria-pressed="false">${ic('thumb', 'sm')}Helpful</button><button class="fb-btn" type="button" aria-pressed="false">${ic('thumb', 'sm flip-y')}Not helpful</button></div>
+          <div class="feedback" role="group" aria-label="Example, helpful pressed"><button class="fb-btn" type="button" aria-pressed="true">${ic('thumb', 'sm')}Helpful</button><button class="fb-btn" type="button" aria-pressed="false">${ic('thumb', 'sm flip-y')}Not helpful</button><span class="fb-thanks">Thanks — glad it helped.</span></div>
+          <div class="feedback" role="group" aria-label="Example, not helpful pressed"><button class="fb-btn" type="button" aria-pressed="false">${ic('thumb', 'sm')}Helpful</button><button class="fb-btn" type="button" aria-pressed="true">${ic('thumb', 'sm flip-y')}Not helpful</button></div>
+          <p class="small muted">Outline icons with a text label. Pressed adds a tinted fill, an accent border and a heavier label, so the state never relies on colour alone.</p>`)}
         ${spec('system notice · added / maximum', `<div class="notice"><div>${ic('plusCircle')}<span>Added <em>Retrieval-Augmented Generation</em> to this conversation</span></div></div>
           <div class="notice max"><div>${ic('info')}<span>This conversation now covers 3 subjects, the maximum. For other topics, start a new conversation.</span></div></div>`)}
         ${spec('quoted material', `<figure class="excerpt"><blockquote>“reasoning traces help the model induce, track, and update action plans as well as handle exceptions”</blockquote><figcaption>${ic('quote', 'sm')}Quoted from <span style="text-transform:none;letter-spacing:0"><em>ReAct…</em>, p. 3</span></figcaption></figure>`)}
-        ${spec('banner', `<div class="banner" style="background:var(--attn-soft);border-color:transparent">${ic('tag')}<div class="b-body"><strong>2 documents need subjects</strong><span>Suggestions are ready.</span></div><button class="btn btn-primary btn-sm" type="button">Choose subjects</button></div>
+        ${spec('banner', `<div class="banner" style="background:var(--attn-soft);border-color:transparent">${ic('tag')}<div class="b-body"><strong>2 documents need subjects</strong><span>Processing has finished.</span></div><button class="btn btn-primary btn-sm" type="button">Choose subjects</button></div>
           <div class="banner">${ic('archive')}<div class="b-body"><strong>This conversation is archived.</strong></div><button class="btn btn-primary btn-sm" type="button">Restore</button></div>`)}
       </div></section>
 
@@ -245,27 +272,42 @@
   };
 
   /* =========================================================
-     Questions & proposed changes
+     Brief v0.4 decisions and new questions
      ========================================================= */
+  const DECISIONS = [
+    ['Q7', 'Subjects are chosen once processing has finished', 'No “Choose subjects” while a document is processing; the hint reads “You can choose subjects when processing finishes.” Saving makes the document Ready and searchable at once.', ['library-first-processing', 'library-first-choose', 'picker-saved', 'details-processing']],
+    ['D1', 'Labelled thumbs (accepted)', 'Outline thumb icons labelled “Helpful” and “Not helpful”, with a visible pressed state.', ['chat-answer-citations', 'chat-feedback-reason', 'components']],
+    ['D2', 'The carried question is sent right away', '“New conversation” opens a new conversation and sends the question there; a line at the top links back to where it came from.', ['chat-fourth-subject-refused', 'chat-new-from-refused']],
+    ['D3', 'Fourth-subject wording (accepted)', 'Used verbatim from §6.6, followed by “A new conversation will answer it straight away.”', ['chat-fourth-subject-refused']],
+    ['D4', 'No subject fits: a document is needed', 'The tutor says a document on the topic is needed to continue. “Upload a document” is the only action; it opens the file picker on the Library.', ['chat-decline', 'chat-decline-other-subject']],
+    ['D5', 'Calmer Library rows (accepted)', 'One contextual button per row (Choose subjects, Retry, Restore or Open); the rest under “More”.', ['library-default']],
+    ['D6', 'A personal name may match a shared name', 'No warning. Only the learner\'s own subject names must differ from each other.', ['subjects-rename-duplicate']],
+    ['D7', 'Archived documents can change subjects', '“Change subjects” stays in the row menu and the details panel; the document stays archived.', ['library-archived', 'details-archived', 'picker-change-subjects-archived']],
+    ['D8', 'One time zone, GMT+7', 'Limit messages give the end time in GMT+7, “Today” in Usage is the GMT+7 day, and Settings shows the time zone read-only.', ['library-rate-limited', 'chat-rate-limited', 'usage-overview', 'settings-default']],
+    ['PRD v2.3', 'Scanned PDFs', '“No text layer (scanned PDFs are not supported yet)” for lecture-03-scan.pdf.', ['library-failed', 'details-failed']]
+  ];
   const QUESTIONS = [
-    ['Q7', 'PRD conflict', 'Choosing subjects while processing continues', 'US-2b shows suggestions within 30 s, but PRD §9.5 moves a document to “choose subjects” only after processing finishes.', 'Used the brief\'s default: the picker opens as soon as suggestions exist; the document shows Processing until it can be searched. PRD owner to confirm and align §9.5.'],
-    ['D1', 'Proposal', 'Thumbs instead of emoji', 'The brief shows 👍 / 👎. Emoji render differently across systems and can\'t carry a pressed state.', 'Outline thumb icons with labels “Helpful” / “Not helpful” and a visible pressed state.'],
-    ['D2', 'Question', 'Carrying the question into a new conversation', 'J3 says the new conversation “answers it”. The brief doesn\'t say whether the learner presses Send again.', 'The new conversation sends the carried question straight away, so it is answered without retyping. Please confirm, or ask for a prefilled input instead.'],
-    ['D3', 'Proposal', 'Wording for the refusal of a fourth subject', 'No required wording in the brief.', '“This conversation already covers 3 subjects: LLMs, AI Agents and Retrieval-Augmented Generation. Your question is about Reinforcement Learning, so I haven\'t answered it here.” plus “New conversation”.'],
-    ['D4', 'Proposal', 'Decline when no subject fits', '§6.6 offers “New conversation” only when the question belongs to other subjects.', 'When no subject fits (e.g. the laptop question), offer “Add a document” instead, since a new conversation would decline it too.'],
-    ['D5', 'Proposal', 'Calmer Library rows', 'Five row actions on every row compete with the document titles.', 'One contextual button per row (Choose subjects, Retry, Restore or Open) and the rest in a “More” menu.'],
-    ['D6', 'Question', 'Renaming to an existing shared name', '§6.9 requires a rename to differ from the learner\'s other names. What if it matches a different shared subject, e.g. renaming “AI Agents” to “Tool Use”?', 'Allow it, since it\'s personal, but warn: “Another subject is called Tool Use; this might be confusing.”'],
-    ['D7', 'Question', 'Changing subjects of an archived document', 'Not covered by the brief.', 'Disabled while archived; available again after Restore.'],
-    ['D8', 'Proposal', 'Time zone for “today” and limits', 'Usage shows today\'s totals; upload limits reset hourly and daily.', 'Use the learner\'s time zone from Settings for both, and show absolute times (“You can upload again at 11:40”).'],
-    ['D9', 'Note', 'Sample data addition', 'The Archived tab and archived citations need an archived document; §9 has none.', 'Added “Language Models are Few-Shot Learners” (Brown et al., 2020) as archived. Remove it if you prefer.'],
-    ['D10', 'Note', 'Optional example questions', 'Not in the PRD; marked optional in §6.6.', 'A “Try asking” slot with 3 questions from the learner\'s documents. It can be removed without changing the layout.'],
-    ['D11', 'Note', 'Duplicate detection in the prototype', 'The prototype matches duplicates by file name; the product would match file content.', 'No UI difference; the message never mentions other users.'],
-    ['D12', 'PRD note', 'Q1–Q3 missing from PRD v2.1', 'Brief §12 notes the v1.6 branch wasn\'t merged.', 'Designs follow the brief: laptop only, citations switch, usage in the status line.'],
-    ['Q4–Q8', 'Defaults adopted', 'Open questions', 'Q4 citations switch also covers notes · Q5 several files at once · Q6 terms in the app · Q8 first suggestion pre-selected.', 'All shown as designed. Q7 is listed above.']
+    ['N1', 'Conflict', '§9 and §0 disagree on lecture-03-scan.pdf', '§9 still gives “We couldn\'t read this PDF”; §0 asks for the scanned-PDF wording.', 'Followed §0. Update the §9 sample row.'],
+    ['N2', 'Conflict', 'Agentic Design Patterns is “Processing” with a subject in §9', 'Under Q7 a document being processed for the first time has no subjects yet.', 'Shown as Processing with “Not chosen yet”. Update §9, or say it is being processed again.'],
+    ['N3', 'Question', 'Which id is which decline variant?', '§0 asks for “chat-decline (and a variant for the no-subject case)”, but v0.3\'s chat-decline already was the no-subject case (the §9 laptop question).', 'Kept chat-decline as the no-subject case (D4) and added chat-decline-other-subject. Say if you want the ids swapped.'],
+    ['N4', 'Question', 'When does the “another subject” decline appear?', 'With fewer than 3 subjects the conversation grows instead; at 3, a question detected as a fourth subject is refused (J3).', 'Shown when the question was matched to one of the conversation\'s subjects, its documents had nothing, and another of the learner\'s subjects does. Please confirm the trigger in the PRD, or drop this variant.'],
+    ['N5', 'Proposal', 'The processing hint in chat also counts documents waiting for subjects', 'Under Q7 those documents have finished processing but still can\'t be used, so “2 documents are still processing” is slightly wrong.', '“2 documents can\'t be used yet: 1 is processing, 1 needs subjects.” Not applied, since chat-documents-processing isn\'t in §0.'],
+    ['N6', 'Question', 'After “Upload a document”, what happens to the declined question?', 'The new document needs processing and subjects before it can answer.', 'Nothing is kept: the learner asks again once the document is ready. Alternative: remember the question and offer “Ask again” when the document is ready.'],
+    ['N7', 'Question', 'Subjects added to an archived document', '“My subjects” counts only ready, active documents, so a new subject on an archived document doesn\'t appear in Subjects or as a chat subject until it is restored.', 'Keep it that way; the picker says the new subjects apply if the document is restored.'],
+    ['N8', 'Question', 'When do the daily limits reset?', 'D8 fixes GMT+7 but not the reset time for 100 uploads and 500 messages per day.', 'Midnight GMT+7, shown as “You can send again at 00:00 (GMT+7)”.'],
+    ['N9', 'Check', 'One user story per state is inferred', 'PRD v2.7 wasn\'t attached, so each ref is inferred from the §6 lists: US-3 asking, US-3b subjects in a conversation, US-4 citations, US-5 declines, US-6 feedback, US-7 lesson notes, US-9 usage, US-10 managing documents, US-11 filters, US-13 conversations, US-13b notes. Settings has no story (“§6.11 · no user story”).', 'Please correct any that differ from the PRD.'],
+    ['N10', 'Question', 'Should D6 have its own state?', 'subjects-rename-duplicate shows the rule that remains (own names must differ). Renaming to a shared name the learner doesn\'t have, e.g. “Information Retrieval”, simply shows no message.', 'No separate state unless you want one.'],
+    ['Q4–Q8', 'Defaults kept', 'Still open in §12', 'Q4 the citations switch also covers notes · Q5 several files at once · Q6 terms in the app · Q8 first suggestion pre-selected.', 'All shown as designed.']
   ];
   ST.questionsView = () => `<main class="index-page" id="main-content" tabindex="-1">
-    <div class="page-head" style="margin-bottom:32px"><div><h1 style="font-size:48px">Questions &amp; proposed changes</h1><p>For brief v0.3, round 2. Items marked “Proposal” are already in the prototype. Items marked “Question” need a decision from you.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
-    <ol class="qa-list">${QUESTIONS.map(([id, type, title, ctx, prop]) => `<li class="qa-item"><span class="qid">${id}</span>
+    <div class="page-head" style="margin-bottom:32px"><div><h1 style="font-size:48px">Decisions &amp; questions</h1><p>For brief v0.4, round 3. First the owner's answers to round 2 and where they are applied, then new questions for the next version.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
+    <h2 class="section-title" style="margin-top:0">Decided in v0.4</h2>
+    <ol class="qa-list">${DECISIONS.map(([id, title, what, states]) => `<li class="qa-item"><span class="qid">${esc(id)}</span>
+      <div><h3>${esc(title)}</h3><p>${esc(what)}</p><p class="proposal"><strong>Applied in:</strong> ${states.map((sid) => `<a href="#/${sid}"><code class="mono">${sid}</code></a>`).join(', ')}</p></div>
+      <span class="badge qtype badge-ready-q">${ic('check')}Decided</span></li>`).join('')}</ol>
+    <p class="legend-line">${ic('info', 'sm')}D9–D12 from round 2 were notes; nothing changed for them.</p>
+    <h2 class="section-title" style="margin-top:48px">New questions for the brief</h2>
+    <ol class="qa-list">${QUESTIONS.map(([id, type, title, ctx, prop]) => `<li class="qa-item"><span class="qid">${esc(id)}</span>
       <div><h3>${esc(title)}</h3><p>${esc(ctx)}</p><p class="proposal"><strong>Proposed:</strong> ${esc(prop)}</p></div>
-      <span class="badge qtype ${/Question|conflict/.test(type) ? 'badge-archived' : type === 'Proposal' ? 'badge-note' : ''}">${type}</span></li>`).join('')}</ol></main>`;
+      <span class="badge qtype ${/Question|Conflict/.test(type) ? 'badge-archived' : type === 'Proposal' ? 'badge-note' : ''}">${type}</span></li>`).join('')}</ol></main>`;
 })();
