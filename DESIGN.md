@@ -29,7 +29,7 @@ Every color, size, space, radius, shadow, and duration in feature code is a `var
 | Type | `--font-display` (serif: h1–h3, brand word), `--font-body` (system UI), `--font-mono` (numbers, ids, token counts; tabular figures); sizes `--fs-12` … `--fs-40`; `--lh-body` 1.55, `--lh-head` 1.2 |
 | Space and shape | `--sp-1` (4px) … `--sp-16` (64px); `--r-sm` 6px, `--r-md` 10px, `--r-pill` |
 | Motion | `--dur-fast`, `--dur-base`, `--ease-out`; everything stops under `prefers-reduced-motion: reduce` |
-| Layout | `--nav-w` 240px, `--page-w` 1120px, `--chat-w` 760px, `--panel-w` 480px, `--tray-w` 384px |
+| Layout | `--nav-w` 240px, `--page-w` 1120px, `--page-w-wide` 1200px (Library), `--chat-w` 760px, `--panel-w` 480px, `--tray-w` 384px |
 
 The prototype's `--chrome-*` tokens, `.rb-*` classes, and `od-*` layout primitives belong to the review tool, not the product: leave them out.
 
@@ -40,7 +40,7 @@ Light is required, dark is supported: `tokens.css` defines both under `[data-the
 ## Layout
 
 - **Laptop only:** designed at 1440px, checked at 1280px, `body { min-width: 1024px }`. No phone or tablet breakpoints.
-- **App shell:** a two-column grid, left nav (`--nav-w`, `--surface`, right border) and a scrolling `<main id="main-content">`. Pages sit in a centered column of `--page-w` with `--sp-8` padding; chat uses `--chat-w`.
+- **App shell:** a two-column grid, left nav (`--nav-w`, `--surface`, right border) and a scrolling `<main id="main-content">`. Pages sit in a centered column of `--page-w` with `--sp-8` padding (a route sets `handle: { wide: true }` for `--page-w-wide`); chat uses `--chat-w`.
 - **Page header:** h1 at `--fs-32` in the display font, an optional one-line description in `--text-2` (max 64ch), and the page's primary action on the right.
 - **Left nav,** in this order: Library (home), Chat (starts a new conversation), Conversations, Notes, Subjects, Usage, Settings. Later releases slot in without reordering: Research map after Library (R2), Quizzes and Reports after Notes (R3); they are not rendered in Release 1. The current item has `aria-current="page"` (`--accent-soft` fill, `--accent-text`). Library shows a count badge (`--attn-soft` / `--attn`) for documents needing the learner's action. The user menu sits at the bottom: avatar initials, name, and Sign out.
 - **Upload tray:** fixed bottom right (`--tray-w`), on every screen, non-blocking.
@@ -54,7 +54,7 @@ Shared components live in `web/src/components/`, one folder each (`Button/Button
 | `AppShell`, `SideNav`, `UserMenu` | `.app`, `.sidenav`, `.nav-link`, `.user-btn`, `.user-menu` | routes come from one nav config |
 | `PageHeader` | `.page-head` | |
 | `Button`, `IconButton` | `.btn-primary` / `-secondary` / `-ghost` / `-quiet`, `-sm` / `-lg`; `.icon-btn` | one primary button per view; an icon button always has `aria-label` |
-| `EmptyState` | `.empty` | icon, h2, one sentence, actions |
+| `EmptyState` | `.empty` | icon, h2, one sentence, actions, optional `note` below the actions |
 | `StateBadge` | `.state-*` | see Document states |
 | `SubjectChip` | `.schip` | the one chip for subjects everywhere (Library, picker, chat header, lists), learner's subject name, stable hue per subject |
 | `Banner`, `Toast`, `Dialog`, `SidePanel`, `Tabs`, `FilterBar`, `UploadTray`, `Citation`, `SystemNotice` | `.banner-*`, `.toast`, `.dialog`, `.side-panel`, `.tabs`, `.filter-bar`, `.tray`, `.cite`, `.notice` | built with the story that first shows them |
