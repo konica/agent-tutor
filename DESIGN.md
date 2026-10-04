@@ -7,9 +7,9 @@ How the web app looks and how to build its UI. Read this before writing anything
 | Need | Read |
 |---|---|
 | Screens, required wording, accessibility rules | `sdd/design/brief.md` (§6 screens, §10 visual rules) |
-| What a state looks like | `make design-shots ROUND=v0.3 STATES="<ids>" THEME=both`; ids in `sdd/design/states.json` |
-| Token values | `web/src/styles/tokens.css` (ported from `sdd/design/prototype/styles.css` and `v03.css` at tag `design-v0.3`) |
-| The designer's round 2 questions (Q7, D1–D12) | Decided: PRD v2.7 (Q38–Q43) and brief v0.4 §0; the ticket's `## Design` section says which apply. Where `design-v0.3` still shows the old behavior, follow the PRD. |
+| What a state looks like | `make design-shots ROUND=v0.4 STATES="<ids>" THEME=both` (the round in the ticket's `## Design` section); ids in `sdd/design/states.json` |
+| Token values | `web/src/styles/tokens.css` (ported from `sdd/design/prototype/styles.css` and `v03.css` at tag `design-v0.3`; round v0.4 added no tokens) |
+| Design decisions and open questions | PRD v2.7 (Q38–Q43) and brief v0.4 (§0, Feedback log). The designer's round 3 questions E1–E10 are open; the ticket's `## Design` section says which apply. |
 
 The brand is Smart Tutor's own (`smart-tutor-ds`, light and dark). The Open Design project has the Cisco design system switched on, but the owner chose the own brand instead (2026-10-02, `sdd/design/prototype/history/`); follow the accepted round's tokens, not Cisco.
 
