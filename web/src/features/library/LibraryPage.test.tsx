@@ -58,6 +58,19 @@ describe("LibraryPage", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
+  it("refuses an oversized file in the browser: no API call, same message and announcement", async () => {
+    const fetch = vi.spyOn(globalThis, "fetch");
+    render(<LibraryPage load={async () => []} />);
+    await screen.findByText("Upload your first document");
+    const big = new File(["x"], "huge.pdf", { type: "application/pdf" });
+    Object.defineProperty(big, "size", { value: 52_428_801 });
+    await userEvent.upload(screen.getByLabelText("Upload PDFs"), big);
+    expect(await screen.findByText("Couldn't upload huge.pdf. Try again.")).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("Upload failed: huge.pdf.");
+    expect(fetch).not.toHaveBeenCalled();
+    fetch.mockRestore();
+  });
+
   it("announces a processing state change in the status region, but not the first load", async () => {
     const failedNow: DocumentResponse = { ...processing, state: "failed", failure_reason: "Duplicate uploads aren't supported yet" };
     const load = vi.fn().mockResolvedValueOnce([processing]).mockResolvedValue([failedNow]);

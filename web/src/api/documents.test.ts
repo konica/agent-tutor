@@ -48,6 +48,28 @@ describe("uploadPdf", () => {
     expect(form.get("file")).toBe(file);
   });
 
+  it.each([
+    ["empty", 0],
+    ["oversized", 52_428_801],
+  ])("rejects an %s file without calling the API", async (_label, size) => {
+    const { apiClient, fetch } = api(() => json(started, 201));
+    const post = vi.fn();
+    const file = new File(["x"], "x.pdf");
+    Object.defineProperty(file, "size", { value: size });
+    await expect(uploadPdf(file, apiClient, post)).rejects.toThrow();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it("accepts a file of exactly 50 MiB", async () => {
+    const { apiClient, fetch } = api(() => json(started, 201));
+    const post = vi.fn(async () => new Response(null, { status: 204 }));
+    const file = new File(["x"], "x.pdf");
+    Object.defineProperty(file, "size", { value: 52_428_800 });
+    await uploadPdf(file, apiClient, post);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects when S3 refuses the file", async () => {
     const { apiClient } = api(() => json(started, 201));
     const post = vi.fn(async () => new Response("<Error/>", { status: 403 }));

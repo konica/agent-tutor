@@ -13,7 +13,7 @@ class QueueMessage:
 class MessageQueue(ABC):
     @abstractmethod
     def receive(self) -> list[QueueMessage]:
-        """Wait briefly for messages, oldest first; may return none."""
+        """Wait briefly for messages, roughly oldest first; may return none."""
 
     @abstractmethod
     def delete(self, message: QueueMessage) -> None: ...

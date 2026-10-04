@@ -44,5 +44,7 @@ The unit tests fake Keycloak; this is the end-to-end check for US-1 (#45).
 1. `docker compose --profile app up -d --build` and open http://localhost:10453; sign in as `learner@example.com` / `learner`.
 2. Library → **Choose PDFs** (**Upload** once the library has documents) → pick a PDF under 50 MB. A row with the file name shows **Processing** within a few seconds.
 3. `docker compose logs worker` shows `upload <id>: stored`; the object is in `contents/`, not in `uploads/`:
-   `aws --endpoint-url http://localhost:10402 s3 ls s3://smart-tutor-documents/ --recursive`
-4. Upload the same file again (or as `learner2@example.com`): the new row shows **Failed — Duplicate uploads aren't supported yet**, and `select count(*) from contents` is unchanged.
+   `docker compose exec localstack awslocal s3 ls s3://smart-tutor-documents/ --recursive`
+4. Upload the same file again (or as `learner2@example.com`): the new row shows **Failed — Duplicate uploads aren't supported yet**, and the content count is unchanged: `docker compose exec postgres psql -U smart_tutor -c "select count(*) from contents"`.
+
+The inline `configs.content` in `compose.yaml` needs Docker Compose 2.23.1 or newer.

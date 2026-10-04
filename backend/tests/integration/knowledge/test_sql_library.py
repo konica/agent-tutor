@@ -62,7 +62,7 @@ def test_uncommitted_work_rolls_back(engine: Engine) -> None:
 
 def test_concurrent_insert_or_get_makes_one_content_row(engine: Engine) -> None:
     sha = hashlib.sha256(uid().encode()).hexdigest()
-    barrier = threading.Barrier(2)
+    barrier = threading.Barrier(2, timeout=10)
     results: list[bool] = []
 
     def worker(user: str) -> None:
@@ -72,11 +72,12 @@ def test_concurrent_insert_or_get_makes_one_content_row(engine: Engine) -> None:
             results.append(created)
             tx.commit()
 
-    threads = [threading.Thread(target=worker, args=(u,)) for u in ("ada", "bob")]
+    threads = [threading.Thread(target=worker, args=(u,), daemon=True) for u in ("ada", "bob")]
     for t in threads:
         t.start()
     for t in threads:
         t.join(timeout=30)
+    assert not any(t.is_alive() for t in threads)
     assert sorted(results) == [False, True]
     with engine.connect() as conn:
         rows = conn.execute(text("select count(*) from contents where sha256 = :s"), {"s": sha}).scalar_one()

@@ -1,4 +1,4 @@
-"""Ingestion worker: read S3 upload events from SQS in order and hand each upload to IngestionService (PRD §9.5).
+"""Ingestion worker: read S3 upload events from SQS, roughly in order, and hand each to IngestionService (PRD §9.5).
 
 One message at a time (plain FIFO, no per-learner fairness). A message is deleted only after it was handled;
 a failure leaves it to come back after the visibility timeout, and the queue's redrive policy moves it to the
