@@ -45,6 +45,7 @@ Code must keep these true; each has tests or evals guarding it.
 - `docker compose up -d` starts pgvector, Keycloak (:8080), and LocalStack (:4566); `--profile app` adds the app containers. Copy `.env.example` to `.env`.
 - Bedrock and LangSmith have no emulator: local runs call real us-east-1 models with your AWS credentials. `make bedrock-check` (pytest marker `bedrock`, under a cent) verifies the configured models and adapters.
 - Keycloak users: `learner@example.com`/`learner`, `learner2@example.com`/`learner2`, `admin@example.com`/`admin` (console admin/admin). The realm imports only when it doesn't exist yet: run `docker compose down -v` after editing `local/keycloak/realm-smart-tutor.json`, and keep the built-in roles `offline_access` and `uma_authorization` defined in it.
+- `make migrate` applies Alembic migrations to the Compose database (the app profile runs it before the API). After changing an API route, run `make api-client` to regenerate `web/src/api/`; CI fails when it is stale.
 - Windows Git Bash: set `PYTHONUTF8=1` for `lint-imports` and `MSYS_NO_PATHCONV=1` for commands taking `/smart-tutor/...` paths (SSM names). `make` may be missing; every `Makefile` target is a one-line command you can run directly.
 
 ## Checks
