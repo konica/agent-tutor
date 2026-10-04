@@ -38,3 +38,11 @@ The unit tests fake Keycloak; this is the end-to-end check for US-1 (#45).
    `curl -i http://localhost:10450/me -H "Authorization: Bearer <token>"` → `200`.
 4. Sign out from the user menu, then repeat the `curl` → `401` (the token is revoked although not expired).
 5. `curl -i http://localhost:10450/me` → `401` with `WWW-Authenticate: Bearer`.
+
+## Compose check: upload a PDF (#60)
+
+1. `docker compose --profile app up -d --build` and open http://localhost:10453; sign in as `learner@example.com` / `learner`.
+2. Library → **Choose PDFs** (**Upload** once the library has documents) → pick a PDF under 50 MB. A row with the file name shows **Processing** within a few seconds.
+3. `docker compose logs worker` shows `upload <id>: stored`; the object is in `contents/`, not in `uploads/`:
+   `aws --endpoint-url http://localhost:10402 s3 ls s3://smart-tutor-documents/ --recursive`
+4. Upload the same file again (or as `learner2@example.com`): the new row shows **Failed — Duplicate uploads aren't supported yet**, and `select count(*) from contents` is unchanged.
