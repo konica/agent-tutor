@@ -4,6 +4,7 @@ from fakes.auth import FakeTokenVerifier
 from fakes.clock import FixedClock
 from fakes.knowledge import FakeObjectStore, InMemoryLibrary
 from fakes.models import FakeChatModel, fake_chat_model, fake_embeddings
+from fakes.queue import FakeQueue
 
 __all__ = [
     "FakeChatModel",
@@ -13,4 +14,5 @@ __all__ = [
     "FixedClock",
     "InMemoryLibrary",
     "FakeObjectStore",
+    "FakeQueue",
 ]
