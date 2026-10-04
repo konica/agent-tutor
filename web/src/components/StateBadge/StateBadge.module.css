@@ -1,0 +1,15 @@
+.state {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 26px; padding: 0 10px;
+  border-radius: var(--r-pill); font-size: var(--fs-14); font-weight: 650; white-space: nowrap;
+}
+.icon { width: 14px; height: 14px; flex: none; }
+.processing { background: var(--surface-2); color: var(--text-2); }
+.processing .icon { animation: spin 800ms linear infinite; }
+.ready { background: var(--success-soft); color: var(--success); }
+.failed { background: var(--danger-soft); color: var(--danger); }
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

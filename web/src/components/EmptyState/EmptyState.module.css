@@ -1,0 +1,16 @@
+.empty {
+  display: grid; justify-items: center; gap: var(--sp-3); text-align: center;
+  padding: var(--sp-16) var(--sp-8); background: var(--surface); border-radius: var(--r-md);
+}
+.default { border: 1px dashed var(--border-strong); }
+.dropzone { border: 2px dashed var(--border-strong); }
+.iconWrap { display: grid; place-items: center; border-radius: 50%; }
+.default .iconWrap { width: 56px; height: 56px; background: var(--surface-2); color: var(--text-2); }
+.dropzone .iconWrap { width: 72px; height: 72px; background: var(--accent-soft); color: var(--accent-text); }
+.icon { width: 28px; height: 28px; }
+.default .title { font-size: var(--fs-24); }
+.dropzone .title { font-size: var(--fs-32); }
+.text { display: grid; gap: var(--sp-3); color: var(--text-2); }
+.default .text { max-width: 46ch; }
+.dropzone .text { max-width: 52ch; }
+.actions { display: flex; gap: var(--sp-3); margin-top: var(--sp-2); }
