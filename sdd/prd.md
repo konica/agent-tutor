@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Draft v2.7 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
-| **Changes from v2.6** | Product owner decisions on the design round v0.3 questions (Q38–Q43): subjects are chosen only after processing finishes (US-2b, §9.3, §11); a question carried into a new conversation is sent right away (US-3b); a question that fits none of the learner's subjects gets "Upload a document" and an empty "New conversation" (US-5); subjects of an archived document can be changed (US-10); a personal subject name may equal the name of a shared subject the learner doesn't have (US-10b); Release 1 uses one time zone, GMT+7 (D27). |
+| **Changes from v2.6** | Product owner decisions on the design round v0.3 questions (Q38–Q43): subjects are chosen only after processing finishes (US-2b, §9.3, §11); a question carried into a new conversation is sent right away (US-3b); a question that fits none of the learner's subjects gets "Upload a document" to continue (US-5); subjects of an archived document can be changed (US-10); a personal subject name may equal the name of a shared subject the learner doesn't have (US-10b); Release 1 uses one time zone, GMT+7 (D27). |
 | **Changes from v2.5** | Chunking decided (ADR 0008): each page split with `RecursiveCharacterTextSplitter` into chunks of ≤ 1,000 characters (overlap 200), one page per chunk, nothing dropped; new columns `chunks.seq` and `contents.chunker`; chunking methods plug in as LangChain document transformers. Search stays at k = 5. |
 | **Changes from v2.4** | Every service (API, agent, MCP server) has Keycloak validate the learner's token by introspection instead of checking its signature locally, so signing out or a revoked session ends access on the next request rather than at token expiry; the token travels in LangGraph runtime context (§9.3; ADR 0007). `smart-tutor-api` and `rag-mcp` become confidential clients. |
 | **Changes from v2.3** | Architecture only: LangChain's `BaseChatModel` and `Embeddings` replace the hand-written `ChatModel` / `EmbeddingModel` ports; `ModelFactory` builds chat models with `init_chat_model` (§9.15; ADR 0006). No product behavior changes. |
@@ -203,7 +203,7 @@ Story IDs are stable. Release 1: US-1 to US-13b. Release 2: US-19, US-20. Releas
 **US-5 Decline what the documents don't cover**
 - *When* a question matches none of the learner's subjects, or their documents don't support an answer, *then* the tutor declines in one or two friendly sentences, without answering from its own knowledge.
   - When the question clearly matches another of the learner's subjects, it offers **"New conversation"**, which carries the question over and sends it (as in US-3b).
-  - When it matches none of the learner's subjects, it recommends adding a document on the topic (**"Upload a document"**) and offers **"New conversation"**, which starts an ordinary, empty conversation.
+  - When it matches none of the learner's subjects, it tells the learner to upload a document on the topic to continue, with an **"Upload a document"** action, and offers nothing else.
 - Each decline is written to the decline log (§9.6).
 
 **US-6 Prompt-injection resistance**
@@ -613,7 +613,7 @@ Measured over the pilot unless stated; minimum sample 100 events per metric.
 | Q37 | PDF extraction in Release 1 | `pypdf` page text as LangChain `Document`s, no OCR; structured extraction (e.g. Docling) reconsidered for Release 2 (D26, ADR 0005). |
 | Q38 | Choosing subjects while processing continues (design Q7) | No: subjects are chosen once processing has finished (US-2b). |
 | Q39 | Carried question in a new conversation (design D2) | Sent right away; the learner doesn't resend it (US-3b). |
-| Q40 | Question that fits none of the learner's subjects (design D4) | Decline, recommend "Upload a document", and offer an empty "New conversation" (US-5). |
+| Q40 | Question that fits none of the learner's subjects (design D4) | Decline and tell the learner to upload a document on the topic to continue ("Upload a document"); no "New conversation" (US-5). |
 | Q41 | Personal name equal to another shared subject's name (design D6) | Allowed; everything links by `subject_id` (US-10b). |
 | Q42 | Changing subjects of an archived document (design D7) | Allowed; applies on restore (US-10). |
 | Q43 | Time zone for "today", daily caps, and limit times (design D8) | GMT+7 for all learners in Release 1 (D27). |
