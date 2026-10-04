@@ -1,0 +1,25 @@
+.foot { margin-top: auto; padding-top: var(--sp-4); position: relative; }
+.user {
+  width: 100%; display: flex; align-items: center; gap: var(--sp-3); min-height: 52px; padding: var(--sp-2) var(--sp-3);
+  background: transparent; border: 1px solid transparent; border-radius: var(--r-md); text-align: left;
+}
+.user:hover { background: var(--surface-2); }
+.avatar {
+  width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  background: var(--surface-3); color: var(--text); font-size: var(--fs-12); font-weight: 700;
+}
+.who { flex: 1 1 0; min-width: 0; display: grid; }
+.name { font-size: var(--fs-14); font-weight: 600; }
+.detail { font-size: var(--fs-12); color: var(--text-2); }
+.icon { width: 16px; height: 16px; flex: none; }
+.flip { transform: rotate(180deg); }
+.menu {
+  position: absolute; left: 0; right: 0; bottom: calc(100% - var(--sp-2)); z-index: 20; padding: var(--sp-2);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--shadow-lg);
+}
+.head { padding: var(--sp-2) var(--sp-3) var(--sp-3); border-bottom: 1px solid var(--border); margin-bottom: var(--sp-2); }
+.item {
+  width: 100%; display: flex; align-items: center; gap: var(--sp-3); min-height: 40px; padding: 0 var(--sp-3);
+  background: transparent; border: 0; border-radius: var(--r-sm); text-align: left; font-size: var(--fs-14); color: var(--text);
+}
+.item:hover { background: var(--surface-2); }

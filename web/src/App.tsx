@@ -1,4 +1,10 @@
-// Screens live in src/features/<feature>; Keycloak login (PKCE) in src/auth; API client in src/api (M3).
+// Screens live in src/features/<feature>; shared UI in src/components; Keycloak login (PKCE) in src/auth; API client in src/api.
+import { createBrowserRouter, RouterProvider } from "react-router";
+
+import { routes } from "./app/routes";
+
+const router = createBrowserRouter(routes);
+
 export function App() {
-  return <h1>Smart Tutor</h1>;
+  return <RouterProvider router={router} />;
 }
