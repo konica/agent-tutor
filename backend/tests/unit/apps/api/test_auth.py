@@ -8,8 +8,10 @@ from fakes import FakeTokenVerifier
 from smart_tutor.apps.api.main import PUBLIC_PATHS, create_app
 from smart_tutor.apps.api.routes import accounts
 from smart_tutor.shared.config import Settings
+from smart_tutor.shared.domain.errors import IntrospectionUnavailableError
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.domain.principal import Principal
+from smart_tutor.shared.ports.token_verifier import TokenVerifier
 
 ORIGIN = "http://localhost:5173"
 TOKEN = "secret-token-value"
@@ -113,6 +115,30 @@ def test_tokens_never_reach_the_logs(client: TestClient, caplog: pytest.LogCaptu
     client.get("/me", headers=bearer("another-secret-token"))
     assert "secret-token-value" not in caplog.text
     assert "another-secret-token" not in caplog.text
+
+
+class BrokenVerifier(TokenVerifier):
+    async def verify(self, token: str) -> Principal:
+        raise IntrospectionUnavailableError("introspection failed: ConnectError")
+
+
+def test_an_unavailable_token_check_is_a_401_and_a_warning(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.DEBUG)
+    r = TestClient(create_app(Settings(), verifier=BrokenVerifier())).get("/me", headers=bearer(TOKEN))
+    assert r.status_code == 401
+    assert r.headers["WWW-Authenticate"] == "Bearer"
+    warnings = [rec for rec in caplog.records if rec.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    assert "introspection failed" in warnings[0].getMessage()
+    assert TOKEN not in caplog.text
+
+
+def test_startup_fails_without_a_client_secret() -> None:
+    with (
+        pytest.raises(RuntimeError, match="SMART_TUTOR_KEYCLOAK_CLIENT_SECRET"),
+        TestClient(create_app(Settings(keycloak_client_secret=""))),
+    ):
+        pass
 
 
 def test_openapi_declares_bearer_auth(client: TestClient) -> None:

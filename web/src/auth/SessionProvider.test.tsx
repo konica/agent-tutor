@@ -51,6 +51,7 @@ describe("SessionProvider", () => {
     const auth = fakeAuth();
     renderSession(auth, () => Promise.reject(new SessionExpiredError()));
     expect(await screen.findByRole("heading", { name: "Please sign in again" })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Please sign in again");
     await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
     expect(auth.signIn).toHaveBeenCalledOnce();
   });
@@ -67,6 +68,7 @@ describe("SessionProvider", () => {
     const loadMe = vi.fn().mockRejectedValueOnce(new TypeError("Failed to fetch")).mockResolvedValue({ name: "Ada Lovelace" });
     renderSession(fakeAuth(), loadMe);
     expect(await screen.findByRole("heading", { name: "Can't reach Smart Tutor" })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Can't reach Smart Tutor");
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("button", { name: "Ada Lovelace" })).toBeInTheDocument();
   });

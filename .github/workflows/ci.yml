@@ -55,7 +55,9 @@ jobs:
       - run: npm ci
       - run: npm --prefix tools/api-gen ci
       - name: Generated API client is current
-        run: npm run api:generate && git diff --exit-code -- src/api
+        run: |
+          npm run api:generate
+          if [ -n "$(git status --porcelain -- src/api)" ]; then git status --porcelain -- src/api; exit 1; fi
       - run: npm test
       - run: npm run build
 

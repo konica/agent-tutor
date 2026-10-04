@@ -8,7 +8,7 @@ from typing import Any
 import httpx
 
 from smart_tutor.shared.config import Settings
-from smart_tutor.shared.domain.errors import UnauthenticatedError
+from smart_tutor.shared.domain.errors import IntrospectionUnavailableError, UnauthenticatedError
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.domain.principal import Principal
 from smart_tutor.shared.ports.token_verifier import TokenVerifier
@@ -41,7 +41,7 @@ class KeycloakIntrospectionVerifier(TokenVerifier):
             response.raise_for_status()
             claims: Any = response.json()
         except (httpx.HTTPError, ValueError) as e:
-            raise UnauthenticatedError(f"introspection failed: {type(e).__name__}") from None
+            raise IntrospectionUnavailableError(f"introspection failed: {type(e).__name__}") from None
         if not isinstance(claims, dict) or claims.get("active") is not True:
             raise UnauthenticatedError("inactive token")
         aud = claims.get("aud", [])

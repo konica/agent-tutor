@@ -6,7 +6,7 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from smart_tutor.shared.domain.errors import UnauthenticatedError
+from smart_tutor.shared.domain.errors import IntrospectionUnavailableError, UnauthenticatedError
 from smart_tutor.shared.domain.principal import Principal
 from smart_tutor.shared.ports.token_verifier import TokenVerifier
 
@@ -28,6 +28,10 @@ async def current_principal(
     verifier: TokenVerifier = request.app.state.verifier
     try:
         return await verifier.verify(credentials.credentials.strip())
+    except IntrospectionUnavailableError as e:
+        # Keycloak outage or a wrong client secret: ours to fix, so louder than a bad token.
+        logger.warning("token check unavailable for %s: %s", request.url.path, e)  # the reason only, never the token
+        raise _unauthorized() from None
     except UnauthenticatedError as e:
         logger.info("rejected request to %s: %s", request.url.path, e)  # the reason only, never the token
         raise _unauthorized() from None

@@ -52,7 +52,7 @@ export function SessionProvider({ auth, loadMe, children }: Props) {
         </p>
       )}
       {status.kind === "expired" && (
-        <div className={styles.card}>
+        <div role="alert" className={styles.card}>
           <h1 className={styles.title}>Please sign in again</h1>
           <p className={styles.note}>Your session has ended.</p>
           <Button variant="primary" onClick={() => void auth.signIn()}>
@@ -61,7 +61,7 @@ export function SessionProvider({ auth, loadMe, children }: Props) {
         </div>
       )}
       {status.kind === "error" && (
-        <div className={styles.card}>
+        <div role="alert" className={styles.card}>
           <h1 className={styles.title}>Can't reach Smart Tutor</h1>
           <p className={styles.note}>Check your connection and try again.</p>
           <Button variant="secondary" onClick={() => void load()}>
