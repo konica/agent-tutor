@@ -49,8 +49,13 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: |
+            web/package-lock.json
+            web/tools/api-gen/package-lock.json
       - run: npm ci
+      - run: npm --prefix tools/api-gen ci
+      - name: Generated API client is current
+        run: npm run api:generate && git diff --exit-code -- src/api
       - run: npm test
       - run: npm run build
 

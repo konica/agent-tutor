@@ -1,0 +1,13 @@
+{
+  "name": "smart-tutor-api-gen",
+  "private": true,
+  "type": "module",
+  "description": "OpenAPI client generator. Separate package because @hey-api/openapi-ts needs the TypeScript 6 compiler API, which TypeScript 7 (used by the app) does not ship.",
+  "scripts": {
+    "generate": "openapi-ts"
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "0.99.0",
+    "typescript": "6.0.3"
+  }
+}

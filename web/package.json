@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "api:generate": "npm --prefix tools/api-gen run generate",
     "test:design": "node --test \"scripts/design/test/*.test.mjs\"",
     "design:states": "node scripts/design/states.mjs",
     "design:accept": "node scripts/design/accept.mjs",

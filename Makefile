@@ -1,6 +1,6 @@
 # One entry point for local work. On Windows, run from Git Bash/WSL with `make` installed,
 # or run the commands below directly.
-.PHONY: help up down up-app sync migrate lint test test-integration bedrock-check sweep glacier-tag retention evals-smoke web infra-synth helm-lint
+.PHONY: help up down up-app sync migrate lint test test-integration bedrock-check sweep glacier-tag retention evals-smoke web api-client infra-synth helm-lint
 .PHONY: design-states design-accept design-shots design-diff
 
 BACKEND := cd backend &&
@@ -41,6 +41,9 @@ retention:     ## run the retention job once: traces 180 days, decline log 90 da
 
 evals-smoke:
 	$(BACKEND) uv run --extra eval python -m evals.run --split smoke
+
+api-client:    ## regenerate web/src/api from the API's OpenAPI schema
+	$(BACKEND) uv run python -m smart_tutor.apps.api.openapi_export ../web/src/api/openapi.json && cd ../web && npm --prefix tools/api-gen ci && npm run api:generate
 
 web:
 	cd web && npm run dev
