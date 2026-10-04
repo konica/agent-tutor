@@ -11,3 +11,10 @@ class NotFoundError(DomainError):
 
 class AccessDeniedError(DomainError):
     """The caller may not access this resource (e.g. a document they cannot read)."""
+
+
+class UnauthenticatedError(Exception):
+    """No valid credentials: the token is missing, inactive, for another audience, or can't be checked.
+
+    Messages give the reason only, never the token.
+    """
