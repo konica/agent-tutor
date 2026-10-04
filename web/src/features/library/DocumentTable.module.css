@@ -1,0 +1,22 @@
+.table {
+  width: 100%; border-collapse: separate; border-spacing: 0;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden;
+}
+.table th {
+  text-align: left; padding: var(--sp-3) var(--sp-5); background: var(--surface-2); color: var(--text-2);
+  font-size: var(--fs-12); font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+.table td { padding: var(--sp-4) var(--sp-5); vertical-align: middle; border-bottom: 1px solid var(--border); }
+.table tbody tr:last-child td { border-bottom: 0; }
+.doc { display: flex; align-items: center; gap: var(--sp-3); }
+.fileIcon {
+  display: inline-grid; place-items: center; width: 32px; height: 36px; flex: none;
+  border: 1px solid var(--border-strong); border-radius: var(--r-sm); color: var(--text-2);
+}
+.fileIcon svg { width: 18px; height: 18px; }
+.title { font-weight: 650; color: var(--text); overflow-wrap: anywhere; }
+.muted { color: var(--text-2); }
+.hint, .reason { margin: var(--sp-1) 0 0; font-size: var(--fs-12); max-width: 22ch; }
+.hint { color: var(--text-2); }
+.reason { color: var(--danger); }

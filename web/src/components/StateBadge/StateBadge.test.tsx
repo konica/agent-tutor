@@ -6,6 +6,7 @@ import { StateBadge, type DocumentState } from "./StateBadge";
 describe("StateBadge", () => {
   it.each<[DocumentState, string]>([
     ["processing", "Processing"],
+    ["awaiting_subjects", "Choose subjects"],
     ["ready", "Ready"],
     ["failed", "Failed"],
   ])("shows a text label for every state (%s)", (state, label) => {

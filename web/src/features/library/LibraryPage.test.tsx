@@ -1,0 +1,67 @@
+import { act, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import type { DocumentResponse } from "../../api/documents";
+import { LibraryPage } from "./LibraryPage";
+
+const today = new Date().toISOString();
+const processing: DocumentResponse = { document_id: "d1", title: "lewis-rag-2020.pdf", state: "processing", failure_reason: null, created_at: today };
+const duplicate: DocumentResponse = { document_id: "d2", title: "copy.pdf", state: "failed", failure_reason: "Duplicate uploads aren't supported yet", created_at: today };
+
+afterEach(() => vi.useRealTimers());
+
+describe("LibraryPage", () => {
+  it("shows the first-run card when the library is empty", async () => {
+    render(<LibraryPage load={async () => []} upload={vi.fn()} />);
+    expect(await screen.findByText("Upload your first document")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Choose PDFs" })).toBeEnabled();
+  });
+
+  it("lists a processing document by its file name with the subjects hint", async () => {
+    render(<LibraryPage load={async () => [processing]} upload={vi.fn()} />);
+    const row = (await screen.findByText("lewis-rag-2020.pdf")).closest("tr")!;
+    expect(within(row).getByText("Processing")).toBeVisible();
+    expect(within(row).getByText("Not chosen yet")).toBeVisible();
+    expect(within(row).getByText("You can choose subjects when processing finishes.")).toBeVisible();
+    expect(within(row).getByText("Today")).toBeVisible();
+  });
+
+  it("shows a failed document's reason", async () => {
+    render(<LibraryPage load={async () => [duplicate]} upload={vi.fn()} />);
+    const row = (await screen.findByText("copy.pdf")).closest("tr")!;
+    expect(within(row).getByText("Failed")).toBeVisible();
+    expect(within(row).getByText("Duplicate uploads aren't supported yet")).toBeVisible();
+  });
+
+  it("uploads the picked PDF and refreshes the list", async () => {
+    const load = vi.fn().mockResolvedValueOnce([]).mockResolvedValue([processing]);
+    const upload = vi.fn(async () => {});
+    render(<LibraryPage load={load} upload={upload} />);
+    await screen.findByText("Upload your first document");
+    const file = new File(["%PDF"], "lewis-rag-2020.pdf", { type: "application/pdf" });
+    await userEvent.upload(screen.getByLabelText("Upload PDFs"), file);
+    expect(upload).toHaveBeenCalledWith(file);
+    expect(await screen.findByText("lewis-rag-2020.pdf")).toBeVisible();
+  });
+
+  it("shows an error when the upload fails", async () => {
+    const upload = vi.fn(async () => {
+      throw new Error("Upload to storage failed (403)");
+    });
+    render(<LibraryPage load={async () => []} upload={upload} />);
+    await screen.findByText("Upload your first document");
+    await userEvent.upload(screen.getByLabelText("Upload PDFs"), new File(["x"], "big.pdf", { type: "application/pdf" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't upload big.pdf. Try again.");
+  });
+
+  it("refreshes every 2 seconds", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const load = vi.fn(async () => [processing]);
+    render(<LibraryPage load={load} upload={vi.fn()} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4100);
+    });
+    expect(load.mock.calls.length).toBeGreaterThanOrEqual(3);
+  });
+});
