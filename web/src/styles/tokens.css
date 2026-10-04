@@ -42,7 +42,7 @@
 
   --r-sm: 6px; --r-md: 10px; --r-pill: 999px;
 
-  --dur-fast: 150ms; --dur-base: 220ms; --dur-exit: 150ms;
+  --dur-fast: 150ms; --dur-base: 220ms; --dur-exit: 150ms; --dur-spin: 800ms;
   --ease-out: cubic-bezier(.2, .7, .2, 1);
   --ease-in: cubic-bezier(.5, 0, .75, .2);
 
