@@ -5,6 +5,42 @@ export type ClientOptions = {
 };
 
 /**
+ * DocumentResponse
+ */
+export type DocumentResponse = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Document Id
+     */
+    document_id: string;
+    /**
+     * Failure Reason
+     */
+    failure_reason: string | null;
+    /**
+     * State
+     */
+    state: 'processing' | 'awaiting_subjects' | 'ready' | 'failed';
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * HTTPValidationError
+ */
+export type HttpValidationError = {
+    /**
+     * Detail
+     */
+    detail?: Array<ValidationError>;
+};
+
+/**
  * MeResponse
  */
 export type MeResponse = {
@@ -22,6 +58,86 @@ export type MeResponse = {
     user_id: string;
 };
 
+/**
+ * StartUploadRequest
+ */
+export type StartUploadRequest = {
+    /**
+     * File Name
+     */
+    file_name: string;
+};
+
+/**
+ * StartUploadResponse
+ */
+export type StartUploadResponse = {
+    /**
+     * Document Id
+     */
+    document_id: string;
+    /**
+     * Fields
+     */
+    fields: {
+        [key: string]: string;
+    };
+    /**
+     * Upload Id
+     */
+    upload_id: string;
+    /**
+     * Url
+     */
+    url: string;
+};
+
+/**
+ * ValidationError
+ */
+export type ValidationError = {
+    /**
+     * Context
+     */
+    ctx?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Input
+     */
+    input?: unknown;
+    /**
+     * Location
+     */
+    loc: Array<string | number>;
+    /**
+     * Message
+     */
+    msg: string;
+    /**
+     * Error Type
+     */
+    type: string;
+};
+
+export type ListDocumentsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/documents';
+};
+
+export type ListDocumentsResponses = {
+    /**
+     * Response List Documents
+     *
+     * Successful Response
+     */
+    200: Array<DocumentResponse>;
+};
+
+export type ListDocumentsResponse = ListDocumentsResponses[keyof ListDocumentsResponses];
+
 export type GetMeData = {
     body?: never;
     path?: never;
@@ -37,3 +153,28 @@ export type GetMeResponses = {
 };
 
 export type GetMeResponse = GetMeResponses[keyof GetMeResponses];
+
+export type StartUploadData = {
+    body: StartUploadRequest;
+    path?: never;
+    query?: never;
+    url: '/uploads';
+};
+
+export type StartUploadErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StartUploadError = StartUploadErrors[keyof StartUploadErrors];
+
+export type StartUploadResponses = {
+    /**
+     * Successful Response
+     */
+    201: StartUploadResponse;
+};
+
+export type StartUploadResponse2 = StartUploadResponses[keyof StartUploadResponses];
