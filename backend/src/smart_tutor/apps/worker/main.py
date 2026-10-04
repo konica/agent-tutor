@@ -25,11 +25,12 @@ logger = logging.getLogger(__name__)
 def run_once(queue: MessageQueue, ingestion: IngestionService) -> int:
     messages = queue.receive()
     for message in messages:
+        keys = upload_keys(message.body)
         try:
-            for key in upload_keys(message.body):
+            for key in keys:
                 ingestion.ingest_upload(key)
         except Exception:
-            logger.exception("ingestion failed; the message will be redelivered")
+            logger.exception("ingestion failed for %s; the message will be redelivered", keys)
             continue
         queue.delete(message)
     return len(messages)
@@ -49,7 +50,11 @@ def main() -> None:
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
     logger.info("worker started")
     while not stop.is_set():
-        run_once(queue, ingestion)
+        try:
+            run_once(queue, ingestion)
+        except Exception:
+            logger.exception("worker loop failed; retrying in 5 s")
+            stop.wait(5)
 
 
 if __name__ == "__main__":

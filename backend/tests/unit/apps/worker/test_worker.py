@@ -46,7 +46,21 @@ def test_s3_test_event_is_deleted_without_ingesting() -> None:
     assert len(queue.deleted) == 1 and library.commits == 0
 
 
-def test_a_failing_message_stays_for_redelivery_and_the_next_is_handled() -> None:
+def test_malformed_records_are_skipped_but_valid_ones_kept() -> None:
+    body = json.dumps(
+        {
+            "Records": [
+                {"eventName": "ObjectCreated:Put"},
+                "junk",
+                {"eventName": "ObjectCreated:Put", "s3": {"object": {"key": "uploads/ada/ok.pdf"}}},
+            ]
+        }
+    )
+    assert upload_keys('{"Records": [{"eventName": "ObjectCreated:Put"}, "junk"]}') == []
+    assert upload_keys(body) == ["uploads/ada/ok.pdf"]
+
+
+def test_a_failing_message_stays_for_redelivery() -> None:
     library, objects, uploads, ingestion = world()
     started = uploads.start_upload(UserId("ada"), "paper.pdf")
     objects.objects[started.fields["key"]] = b"%PDF"

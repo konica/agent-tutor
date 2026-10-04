@@ -16,8 +16,12 @@ def upload_keys(body: str) -> list[str]:
         logger.warning("dropping a message that isn't JSON")
         return []
     records = event.get("Records", []) if isinstance(event, dict) else []
-    return [
-        unquote_plus(r["s3"]["object"]["key"])  # S3 URL-encodes keys in events
-        for r in records
-        if str(r.get("eventName", "")).startswith("ObjectCreated:")
-    ]
+    keys: list[str] = []
+    for record in records:
+        try:
+            if not str(record.get("eventName", "")).startswith("ObjectCreated:"):
+                continue
+            keys.append(unquote_plus(record["s3"]["object"]["key"]))  # S3 URL-encodes keys in events
+        except (AttributeError, KeyError, TypeError):
+            logger.warning("skipping a malformed S3 event record")
+    return keys
