@@ -10,7 +10,7 @@ const kc = {
 vi.mock("keycloak-js", () => ({ default: vi.fn(function () { return kc; }) }));
 
 const { createKeycloakClient } = await import("./keycloakClient");
-const config = { url: "http://localhost:8080", realm: "smart-tutor", clientId: "smart-tutor-web" };
+const config = { url: "http://localhost:10480", realm: "smart-tutor", clientId: "smart-tutor-web" };
 
 describe("keycloak client", () => {
   beforeEach(() => {

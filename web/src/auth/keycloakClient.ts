@@ -6,7 +6,7 @@ export type AuthConfig = { url: string; realm: string; clientId: string };
 
 export function authConfig(): AuthConfig {
   return {
-    url: import.meta.env.VITE_KEYCLOAK_URL ?? "http://localhost:8080",
+    url: import.meta.env.VITE_KEYCLOAK_URL ?? "http://localhost:10480",
     realm: import.meta.env.VITE_KEYCLOAK_REALM ?? "smart-tutor",
     clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID ?? "smart-tutor-web",
   };

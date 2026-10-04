@@ -25,7 +25,7 @@ make lint test                # ruff, mypy, import contracts, unit tests
 make web                      # http://localhost:5173
 ```
 
-Keycloak admin console: http://localhost:8080 (admin / admin). Test users: `learner@example.com` / `learner`, `learner2@example.com` / `learner2`, `admin@example.com` / `admin`.
+Keycloak admin console: http://localhost:10480 (admin / admin). Test users: `learner@example.com` / `learner`, `learner2@example.com` / `learner2`, `admin@example.com` / `admin`.
 
 No `make` on Windows? Each target in the `Makefile` is a one-line command you can run directly.
 
