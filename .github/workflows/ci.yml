@@ -11,6 +11,16 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: smart_tutor
+          POSTGRES_PASSWORD: smart_tutor
+          POSTGRES_DB: smart_tutor
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U smart_tutor -d smart_tutor" --health-interval 5s --health-retries 20
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -23,6 +33,10 @@ jobs:
         run: uv run lint-imports
       - name: Unit tests
         run: uv run pytest
+      - name: Migrations apply
+        run: uv run python -m smart_tutor.apps.jobs.migrate
+        env:
+          SMART_TUTOR_DATABASE_URL: postgresql+psycopg://smart_tutor:smart_tutor@localhost:5432/smart_tutor
 
   web:
     runs-on: ubuntu-latest

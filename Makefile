@@ -1,6 +1,6 @@
 # One entry point for local work. On Windows, run from Git Bash/WSL with `make` installed,
 # or run the commands below directly.
-.PHONY: help up down up-app sync lint test test-integration bedrock-check sweep glacier-tag retention evals-smoke web infra-synth helm-lint
+.PHONY: help up down up-app sync migrate lint test test-integration bedrock-check sweep glacier-tag retention evals-smoke web infra-synth helm-lint
 .PHONY: design-states design-accept design-shots design-diff
 
 BACKEND := cd backend &&
@@ -18,6 +18,9 @@ up-app:        ## dependencies + app services (same images as prod)
 
 sync:
 	$(BACKEND) uv sync
+
+migrate:       ## bring the local database to the latest Alembic revision (needs `make up`)
+	$(BACKEND) uv run python -m smart_tutor.apps.jobs.migrate
 
 lint:          ## ruff, mypy, and the architecture import contracts
 	$(BACKEND) uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run lint-imports
