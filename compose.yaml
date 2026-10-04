@@ -12,7 +12,7 @@ services:
       POSTGRES_USER: smart_tutor
       POSTGRES_PASSWORD: smart_tutor
       POSTGRES_DB: smart_tutor
-    ports: ["5432:5432"]
+    ports: ["10432:5432"]
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./local/postgres/init:/docker-entrypoint-initdb.d:ro
@@ -32,11 +32,11 @@ services:
       KC_DB_USERNAME: smart_tutor
       KC_DB_PASSWORD: smart_tutor
       KC_HEALTH_ENABLED: "true"
-      # Tokens are issued to the browser at localhost:8080; containers introspect them at keycloak:8080.
+      # Tokens are issued to the browser at localhost:10480; containers introspect them at keycloak:8080.
       # Without a pinned hostname Keycloak reports such tokens as inactive (ADR 0007).
-      KC_HOSTNAME: http://localhost:8080
+      KC_HOSTNAME: http://localhost:10480
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
-    ports: ["8080:8080"]
+    ports: ["10480:8080"]
     volumes:
       - ./local/keycloak:/opt/keycloak/data/import:ro
     depends_on:
@@ -47,7 +47,7 @@ services:
     environment:
       SERVICES: s3,sqs,ssm,secretsmanager
       AWS_DEFAULT_REGION: us-east-1
-    ports: ["4566:4566"]
+    ports: ["10466:4566"]
     volumes:
       - ./local/localstack/init/ready.d:/etc/localstack/init/ready.d:ro
 
@@ -67,7 +67,7 @@ services:
     env_file: [{path: .env, required: false}]
     environment:
       SMART_TUTOR_DATABASE_URL: postgresql+psycopg://smart_tutor:smart_tutor@postgres:5432/smart_tutor
-      SMART_TUTOR_KEYCLOAK_ISSUER: http://localhost:8080/realms/smart-tutor
+      SMART_TUTOR_KEYCLOAK_ISSUER: http://localhost:10480/realms/smart-tutor
       SMART_TUTOR_KEYCLOAK_INTERNAL_URL: http://keycloak:8080/realms/smart-tutor
       SMART_TUTOR_KEYCLOAK_CLIENT_ID: smart-tutor-api
       SMART_TUTOR_KEYCLOAK_CLIENT_SECRET: local-api-secret
@@ -83,7 +83,7 @@ services:
     env_file: [{path: .env, required: false}]
     environment:
       SMART_TUTOR_DATABASE_URL: postgresql+psycopg://smart_tutor:smart_tutor@postgres:5432/smart_tutor
-      SMART_TUTOR_KEYCLOAK_ISSUER: http://localhost:8080/realms/smart-tutor
+      SMART_TUTOR_KEYCLOAK_ISSUER: http://localhost:10480/realms/smart-tutor
       SMART_TUTOR_KEYCLOAK_INTERNAL_URL: http://keycloak:8080/realms/smart-tutor
       SMART_TUTOR_KEYCLOAK_CLIENT_ID: smart-tutor-api
       SMART_TUTOR_KEYCLOAK_CLIENT_SECRET: local-api-secret
@@ -97,7 +97,7 @@ services:
     env_file: [{path: .env, required: false}]
     environment:
       SMART_TUTOR_DATABASE_URL: postgresql+psycopg://smart_tutor:smart_tutor@postgres:5432/smart_tutor
-      SMART_TUTOR_KEYCLOAK_ISSUER: http://localhost:8080/realms/smart-tutor
+      SMART_TUTOR_KEYCLOAK_ISSUER: http://localhost:10480/realms/smart-tutor
       SMART_TUTOR_KEYCLOAK_INTERNAL_URL: http://keycloak:8080/realms/smart-tutor
       SMART_TUTOR_KEYCLOAK_CLIENT_ID: rag-mcp
       SMART_TUTOR_KEYCLOAK_CLIENT_SECRET: local-mcp-secret

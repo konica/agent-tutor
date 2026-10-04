@@ -1,6 +1,6 @@
 from smart_tutor.shared.config import Settings
 
-ISSUER = "http://localhost:8080/realms/smart-tutor"
+ISSUER = "http://localhost:10480/realms/smart-tutor"
 
 
 def test_introspection_url_defaults_to_the_issuer() -> None:

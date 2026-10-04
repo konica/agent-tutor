@@ -37,8 +37,8 @@ class Settings(BaseSettings):
 
     environment: str = "local"
     aws_region: str = "us-east-1"
-    database_url: str = "postgresql+psycopg://smart_tutor:smart_tutor@localhost:5432/smart_tutor"
-    keycloak_issuer: str = "http://localhost:8080/realms/smart-tutor"
+    database_url: str = "postgresql+psycopg://smart_tutor:smart_tutor@localhost:10432/smart_tutor"
+    keycloak_issuer: str = "http://localhost:10480/realms/smart-tutor"
     keycloak_audience: str = "smart-tutor-api"
     # How services reach Keycloak. In Compose this differs from the issuer the browser sees (ADR 0007).
     keycloak_internal_url: str | None = None
@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     keycloak_client_secret: SecretStr = SecretStr("")
     cors_origins: list[str] = ["http://localhost:5173"]
     documents_bucket: str = "smart-tutor-documents"
-    ingest_queue_url: str = "http://localhost:4566/000000000000/smart-tutor-ingest"
+    ingest_queue_url: str = "http://localhost:10466/000000000000/smart-tutor-ingest"
     mcp_url: str = "http://localhost:8000/mcp"
     learning_record_idle_minutes_param: str = "/smart-tutor/learning-record-idle-minutes"
     rate_limit_per_minute: int = 20

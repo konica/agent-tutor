@@ -8,7 +8,7 @@ from smart_tutor.shared.domain.errors import IntrospectionUnavailableError, Unau
 
 pytestmark = pytest.mark.integration
 
-ISSUER = "http://localhost:8080/realms/smart-tutor"
+ISSUER = "http://localhost:10480/realms/smart-tutor"
 
 
 def verifier(secret: str) -> KeycloakIntrospectionVerifier:
