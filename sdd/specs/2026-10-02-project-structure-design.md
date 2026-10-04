@@ -79,7 +79,7 @@ backend/src/smart_tutor/
 │   │   ├── bedrock/           # NovaEmbeddings (BedrockEmbeddings subclass); chat via init_chat_model
 │   │   ├── model_factory.py   # builds models by role: agent | judge | embedding
 │   │   ├── auth/              # Keycloak JWT verifier (API and MCP server)
-│   │   ├── postgres/          # engine, session, unit of work
+│   │   ├── postgres/          # engine, session, unit of work; migrations/ (Alembic)
 │   │   └── aws/               # S3, SQS, SSM clients
 │   └── config.py      # pydantic-settings; model roles; SSM-backed settings
 │
@@ -100,7 +100,7 @@ backend/src/smart_tutor/
     ├── agent/         # server.py, graph.py, state.py, nodes/ (resolve_subject, search, gate, answer, summarize)
     ├── mcp_server/    # server.py, tools.py (search, get_chunk) → knowledge.application
     ├── worker/        # SQS consumer → knowledge.application.IngestionService
-    └── jobs/          # record_sweeper.py, glacier_tagger.py, retention.py, (R3) learner_reports.py
+    └── jobs/          # migrate.py, record_sweeper.py, glacier_tagger.py, retention.py, (R3) learner_reports.py
 ```
 
 Every module has the same shape:
