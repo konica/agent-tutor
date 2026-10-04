@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetMeData, GetMeResponses } from './types.gen';
+import type { GetMeData, GetMeResponses, ListDocumentsData, ListDocumentsResponses, StartUploadData, StartUploadErrors, StartUploadResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -19,10 +19,32 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 };
 
 /**
+ * List Documents
+ */
+export const listDocuments = <ThrowOnError extends boolean = false>(options?: Options<ListDocumentsData, ThrowOnError>): RequestResult<ListDocumentsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListDocumentsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/documents',
+    ...options
+});
+
+/**
  * Get Me
  */
 export const getMe = <ThrowOnError extends boolean = false>(options?: Options<GetMeData, ThrowOnError>): RequestResult<GetMeResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetMeResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/me',
     ...options
+});
+
+/**
+ * Start Upload
+ */
+export const startUpload = <ThrowOnError extends boolean = false>(options: Options<StartUploadData, ThrowOnError>): RequestResult<StartUploadResponses, StartUploadErrors, ThrowOnError> => (options.client ?? client).post<StartUploadResponses, StartUploadErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/uploads',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });

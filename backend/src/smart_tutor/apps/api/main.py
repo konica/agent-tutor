@@ -9,7 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRouter
 
 from smart_tutor.apps.api.deps import current_principal
-from smart_tutor.apps.api.routes import accounts
+from smart_tutor.apps.api.routes import accounts, knowledge
+from smart_tutor.apps.api.services import ApiServices, build_services
 from smart_tutor.shared.adapters.auth.keycloak_introspection import keycloak_verifier
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.ports.token_verifier import TokenVerifier
@@ -23,7 +24,9 @@ def include_protected(app: FastAPI, router: APIRouter) -> None:
     app.include_router(router, dependencies=[Depends(current_principal)])
 
 
-def create_app(settings: Settings | None = None, verifier: TokenVerifier | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None, verifier: TokenVerifier | None = None, services: ApiServices | None = None
+) -> FastAPI:
     settings = settings or Settings()
 
     @asynccontextmanager
@@ -33,6 +36,8 @@ def create_app(settings: Settings | None = None, verifier: TokenVerifier | None 
             return
         if not settings.keycloak_client_secret.get_secret_value():
             raise RuntimeError("SMART_TUTOR_KEYCLOAK_CLIENT_SECRET is not set")
+        if services is None:
+            app.state.services = build_services(settings)
         async with httpx.AsyncClient(timeout=5) as http:
             app.state.verifier = keycloak_verifier(settings, http)
             yield
@@ -40,6 +45,8 @@ def create_app(settings: Settings | None = None, verifier: TokenVerifier | None 
     app = FastAPI(title="Smart Tutor API", lifespan=lifespan)
     if verifier is not None:
         app.state.verifier = verifier
+    if services is not None:
+        app.state.services = services
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -52,6 +59,7 @@ def create_app(settings: Settings | None = None, verifier: TokenVerifier | None 
         return {"status": "ok"}
 
     include_protected(app, accounts.router)
+    include_protected(app, knowledge.router)
     return app
 
 

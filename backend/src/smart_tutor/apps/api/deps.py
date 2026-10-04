@@ -6,6 +6,8 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from smart_tutor.apps.api.services import ApiServices
+from smart_tutor.knowledge.application import DocumentService, UploadService
 from smart_tutor.shared.domain.errors import IntrospectionUnavailableError, UnauthenticatedError
 from smart_tutor.shared.domain.principal import Principal
 from smart_tutor.shared.ports.token_verifier import TokenVerifier
@@ -38,3 +40,20 @@ async def current_principal(
 
 
 CurrentPrincipal = Annotated[Principal, Depends(current_principal)]
+
+
+def _services(request: Request) -> ApiServices:
+    services: ApiServices = request.app.state.services
+    return services
+
+
+def _uploads(request: Request) -> UploadService:
+    return _services(request).uploads
+
+
+def _documents(request: Request) -> DocumentService:
+    return _services(request).documents
+
+
+Uploads = Annotated[UploadService, Depends(_uploads)]
+Documents = Annotated[DocumentService, Depends(_documents)]
