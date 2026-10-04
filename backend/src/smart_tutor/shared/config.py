@@ -5,7 +5,7 @@ Secrets come from Secrets Manager (via External Secrets) in prod.
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -40,9 +40,20 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://smart_tutor:smart_tutor@localhost:5432/smart_tutor"
     keycloak_issuer: str = "http://localhost:8080/realms/smart-tutor"
     keycloak_audience: str = "smart-tutor-api"
+    # How services reach Keycloak. In Compose this differs from the issuer the browser sees (ADR 0007).
+    keycloak_internal_url: str | None = None
+    # This service's confidential client for token introspection: smart-tutor-api (API, agent) or rag-mcp (MCP).
+    keycloak_client_id: str = "smart-tutor-api"
+    keycloak_client_secret: SecretStr = SecretStr("")
+    cors_origins: list[str] = ["http://localhost:5173"]
     documents_bucket: str = "smart-tutor-documents"
     ingest_queue_url: str = "http://localhost:4566/000000000000/smart-tutor-ingest"
     mcp_url: str = "http://localhost:8000/mcp"
     learning_record_idle_minutes_param: str = "/smart-tutor/learning-record-idle-minutes"
     rate_limit_per_minute: int = 20
     models: ModelsConfig = ModelsConfig()
+
+    @property
+    def keycloak_introspection_url(self) -> str:
+        base = (self.keycloak_internal_url or self.keycloak_issuer).rstrip("/")
+        return f"{base}/protocol/openid-connect/token/introspect"

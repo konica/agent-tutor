@@ -48,17 +48,27 @@
     },
     {
       "clientId": "smart-tutor-api",
-      "name": "Smart Tutor API (resource server)",
+      "name": "Smart Tutor API and agent (token introspection)",
       "publicClient": false,
-      "bearerOnly": true,
-      "standardFlowEnabled": false
+      "bearerOnly": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "local-api-secret",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false
     },
     {
       "clientId": "rag-mcp",
-      "name": "RAG MCP server (resource server)",
+      "name": "RAG MCP server (token introspection)",
       "publicClient": false,
-      "bearerOnly": true,
-      "standardFlowEnabled": false
+      "bearerOnly": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "local-mcp-secret",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false
     }
   ],
   "users": [
