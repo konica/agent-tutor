@@ -3,10 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Smart Tutor — Round 2 design @v0.3</title>
-  <meta name="description" content="Smart Tutor learner web app, round 2 design answering design brief v0.3: Library, subject picker, multi-subject chat, flows J1–J4, R2 and R3 wireframes, components and questions." />
+  <title>Smart Tutor — Round 3 design @v0.4</title>
+  <meta name="description" content="Smart Tutor learner web app, round 3 design answering design brief v0.4: the owner's decisions on Q7 and D1–D8 applied to the v0.3 prototype, flows J1–J4, R2 and R3 wireframes, components, decisions and questions." />
   <script>
     try { var t = localStorage.getItem('st_theme'); if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+    if (/[?&]shot=1(&|$)/.test(location.search)) document.documentElement.classList.add('shot'); // hide review chrome (§11 item 6)
   </script>
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="v03.css" />
@@ -16,7 +17,7 @@
 
   <!-- Design review chrome: not part of the product UI. -->
   <header class="review-bar" aria-label="Design review">
-    <div class="rb-brand"><span>Smart Tutor</span><span class="muted">· Round 2 · brief v0.3</span></div>
+    <div class="rb-brand"><span>Smart Tutor</span><span class="muted">· Round 3 · brief v0.4</span></div>
     <div class="rb-state" id="rb-state" aria-live="polite"></div>
     <div class="rb-actions">
       <button class="rb-btn" type="button" id="rb-sim" data-action="rb-sim" hidden title="Review aid: simulates dropping the three J1 sample PDFs">

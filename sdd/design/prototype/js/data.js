@@ -1,8 +1,10 @@
-/* Smart Tutor — sample data for round 2 (brief v0.3, §9). Dates relative to 3 Oct 2026. */
+/* Smart Tutor — sample data for round 3 (brief v0.4, §9). Dates relative to 3 Oct 2026. */
 window.ST = window.ST || {};
 
 ST.TODAY = '2026-10-03';
-ST.BRIEF = 'v0.3';
+ST.BRIEF = 'v0.4';
+/* D8: one time zone for everyone in Release 1. */
+ST.TZ = { short: 'GMT+7', long: 'GMT+7 (Ho Chi Minh City)' };
 ST.USER = { name: 'Mai Nguyen', first: 'Mai', email: 'mai.nguyen@example.com', initials: 'MN', tz: 'Asia/Ho_Chi_Minh' };
 
 /* Shared subject catalog. `mine` is Mai's personal name for a subject (only she sees it). */
@@ -35,9 +37,9 @@ ST.DOCS = [
   { id: 'd5', title: 'Toolformer: Language Models Can Teach Themselves to Use Tools', extracted: 'Toolformer: Language Models Can Teach Themselves to Use Tools', authors: 'Schick et al.', year: 2023, doi: '10.48550/arXiv.2302.04761', file: 'toolformer.pdf', pages: 24, size: '1.4 MB', uploaded: '2026-10-03T10:52', state: 'choose', subjects: [], archived: false, tokens: [6100, 420],
     suggestions: [{ id: 'agents', origin: 'yours' }, { id: 'llm', origin: 'yours' }, { id: 'tool', origin: 'new' }],
     summary: 'Teaches a language model to decide when to call external tools such as a calculator, search engine or calendar, using self-supervised examples. Tool use improves zero-shot results without hurting core language modelling.' },
-  { id: 'd6', title: 'Agentic Design Patterns', extracted: 'Agentic Design Patterns', authors: 'Antonio Gulli', year: null, book: true, doi: null, file: 'agentic-design-patterns.pdf', pages: 424, size: '18.6 MB', uploaded: '2026-10-03T10:41', state: 'processing', subjects: ['agents'], archived: false, tokens: [7300, 380],
+  { id: 'd6', title: 'Agentic Design Patterns', extracted: 'Agentic Design Patterns', authors: 'Antonio Gulli', year: null, book: true, doi: null, file: 'agentic-design-patterns.pdf', pages: 424, size: '18.6 MB', uploaded: '2026-10-03T10:41', state: 'processing', subjects: [], archived: false, tokens: [7300, 380],
     summary: 'A practical book of reusable patterns for building agents, from prompt chaining and routing to tool use, planning, memory and multi-agent collaboration. Each pattern pairs an explanation with code examples.' },
-  { id: 'd7', title: 'lecture-03-scan.pdf', extracted: null, authors: null, year: null, doi: null, file: 'lecture-03-scan.pdf', pages: 28, size: '11.4 MB', uploaded: '2026-10-02T21:15', state: 'failed', failReason: "We couldn't read this PDF", attempts: 1, subjects: [], archived: false, tokens: [0, 0], summary: null },
+  { id: 'd7', title: 'lecture-03-scan.pdf', extracted: null, authors: null, year: null, doi: null, file: 'lecture-03-scan.pdf', pages: 28, size: '11.4 MB', uploaded: '2026-10-02T21:15', state: 'failed', failReason: 'No text layer (scanned PDFs are not supported yet)', scanned: true, attempts: 1, subjects: [], archived: false, tokens: [0, 0], summary: null },
   { id: 'd8', title: 'Proximal Policy Optimization Algorithms', extracted: 'Proximal Policy Optimization Algorithms', authors: 'Schulman et al.', year: 2017, doi: '10.48550/arXiv.1707.06347', file: 'ppo-schulman-2017.pdf', pages: 12, size: '0.7 MB', uploaded: '2026-09-25T13:20', state: 'ready', subjects: ['rl'], archived: false, tokens: [27900, 1720],
     summary: 'Introduces PPO, a policy-gradient method that optimises a clipped surrogate objective so each update stays close to the previous policy. It is simpler than trust-region methods and performs as well or better.' },
   { id: 'd9', title: 'Language Models are Few-Shot Learners', extracted: 'Language Models are Few-Shot Learners', authors: 'Brown et al.', year: 2020, doi: '10.48550/arXiv.2005.14165', file: 'gpt3-brown-2020.pdf', pages: 75, size: '6.6 MB', uploaded: '2026-08-30T17:05', state: 'ready', subjects: ['llm'], archived: true, tokens: [158300, 2340],

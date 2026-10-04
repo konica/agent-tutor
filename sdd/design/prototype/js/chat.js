@@ -1,4 +1,4 @@
-/* Smart Tutor v0.3 — chat (§6.6): multi-subject conversations that grow to 3, simulated tutor, every state. */
+/* Smart Tutor v0.4 — chat (§6.6): multi-subject conversations that grow to 3, simulated tutor, every state. */
 (function () {
   const ST = window.ST;
   const S = ST.S;
@@ -22,7 +22,7 @@
     if (/hallucinat|retriev.*loop/i.test(q)) return 'rag_loop';
     if (/long documents|long input|handle long/i.test(q)) return 'long_docs';
     if (/attention/i.test(q)) return 'attention';
-    if (/\bppo\b|clip/i.test(q)) return 'ppo';
+    if (/\bppo\b|clip|polic(y|ies)/i.test(q)) return 'ppo';
     if (/chain/i.test(q)) return 'cot';
     if (/dense|bm25/i.test(q)) return 'rag_dense';
     return 'generic_' + (subjects[0] || 'llm');
@@ -80,9 +80,9 @@
         ${ic('doc')}<span><span class="doc-name">${esc(d ? d.title : 'Document')}</span><span class="page">, ${c.page ? 'p. ' + c.page : 'page unavailable'}</span></span>${d && d.archived ? `<span class="badge badge-archived">${ic('archive')}Archived</span>` : ''}</button></span>`; }).join('')}</div></div>`;
   }
   function feedbackHtml(m) {
-    let html = `<div class="feedback" role="group" aria-label="Rate this answer"><span class="fb-label">Helpful?</span>
-      <button class="icon-btn sm" type="button" data-action="fb-up" data-mid="${m.id}" data-fk="up-${m.id}" aria-pressed="${m.fb === 'up'}" aria-label="Helpful">${ic('thumb', 'sm')}</button>
-      <button class="icon-btn sm" type="button" data-action="fb-down" data-mid="${m.id}" data-fk="down-${m.id}" aria-pressed="${m.fb === 'down'}" aria-label="Not helpful">${ic('thumb', 'sm flip-y')}</button>
+    let html = `<div class="feedback" role="group" aria-label="Rate this answer">
+      <button class="fb-btn" type="button" data-action="fb-up" data-mid="${m.id}" data-fk="up-${m.id}" aria-pressed="${m.fb === 'up'}">${ic('thumb', 'sm')}Helpful</button>
+      <button class="fb-btn" type="button" data-action="fb-down" data-mid="${m.id}" data-fk="down-${m.id}" aria-pressed="${m.fb === 'down'}">${ic('thumb', 'sm flip-y')}Not helpful</button>
       ${m.fb === 'up' ? '<span class="fb-thanks">Thanks — glad it helped.</span>' : ''}${m.fb === 'down' && m.reasonSent ? '<span class="fb-thanks">Thanks — your feedback helps improve answers.</span>' : ''}</div>`;
     if (m.fb === 'down' && m.reasonOpen) {
       const reasons = ['Not accurate', "Didn't answer my question", "Citation doesn't match", 'Hard to follow'];
@@ -97,6 +97,8 @@
     <div class="msg-body" ${busy ? 'aria-busy="true"' : ''}><span class="msg-name">Smart Tutor</span>${inner}</div></article>`;
   const quoteHtml = (q) => { const d = ST.doc(q.doc); return `<figure class="excerpt"><blockquote>“${esc(q.text)}”</blockquote><figcaption>${ic('quote', 'sm')}Quoted from <span style="text-transform:none;letter-spacing:0"><em>${esc(d ? d.title : '')}</em>, p. ${q.page}</span></figcaption></figure>`; };
   const names = (ids) => { const n = ids.map((i) => ST.sname(i)); return n.length > 1 ? n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1] : n[0]; };
+  const catOrder = (ids) => ids.slice().sort((a, b) => S.catalog.findIndex((c) => c.id === a) - S.catalog.findIndex((c) => c.id === b));
+  const emNames = (ids) => { const n = catOrder(ids).map((i) => `<em>${esc(ST.sname(i))}</em>`); return n.length > 1 ? n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1] : n[0]; };
 
   function msgHtml(m) {
     if (m.role === 'user') return `<div class="msg-user msg-enter"><span class="vh">You asked: </span>${esc(m.text)}</div>`;
@@ -118,14 +120,21 @@
     }
     if (m.kind === 'refused') {
       return tutorWrap(m, `<div class="tutor-card decline">
-        <p>This conversation already covers 3 subjects: ${esc(names(T().subjects))}. Your question is about <em>${esc(ST.sname(m.subject))}</em>, so I haven't answered it here.</p>
-        <p class="small muted">A new conversation can answer it. I'll bring your question with you.</p>
+        <p>This conversation already covers 3 subjects: ${emNames(T().subjects)}. Your question is about <em>${esc(ST.sname(m.subject))}</em>, so I haven't answered it here.</p>
+        <p class="small muted">A new conversation will answer it straight away.</p>
         <div class="tc-actions"><button class="btn btn-primary" type="button" data-action="carry-over" data-mid="${m.id}" data-fk="carry">${ic('plus', 'sm')}New conversation</button></div></div>`);
+    }
+    if (m.kind === 'decline' && m.other) {
+      return tutorWrap(m, `<div class="tutor-card decline">
+        <p>The documents in this conversation's subjects don't cover this. It belongs to <em>${esc(ST.sname(m.other))}</em>, another of your subjects.</p>
+        <p class="small muted">A new conversation will answer it straight away.</p>
+        <div class="tc-actions"><button class="btn btn-secondary" type="button" data-action="carry-over" data-mid="${m.id}" data-fk="carry">${ic('plus', 'sm')}New conversation</button></div></div>`);
     }
     if (m.kind === 'decline') {
       return tutorWrap(m, `<div class="tutor-card decline">
-        <p>Your documents don't cover this. I can only answer from the documents in your Library, and none of them discuss ${esc(m.topic || 'this question')}.</p>
-        <div class="tc-actions">${m.other ? `<button class="btn btn-secondary" type="button" data-action="carry-over" data-mid="${m.id}">${ic('plus', 'sm')}New conversation</button>` : `<a class="btn btn-secondary" href="#/library-default">${ic('upload', 'sm')}Add a document</a>`}</div></div>`);
+        <p>Your documents don't cover this. I answer only from your Library, and none of your subjects is about ${esc(m.topic || 'this topic')}.</p>
+        <p class="small muted">To continue, upload a document on this topic.</p>
+        <div class="tc-actions"><button class="btn btn-secondary" type="button" data-action="decline-upload" data-fk="decline-upload">${ic('upload', 'sm')}Upload a document</button></div></div>`);
     }
     if (m.kind === 'error') {
       return tutorWrap(m, `<div class="tutor-card error" role="alert"><p class="tc-head">${ic('alertCircle', 'sm')}This answer didn't come through.</p>
@@ -177,7 +186,7 @@
       banner = `<div class="banner">${ic('archive')}<div class="b-body"><strong>There are no active documents in this conversation's subjects.</strong><span>The history stays readable. Restore a document to keep asking.</span></div><a class="btn btn-secondary btn-sm" href="#/library-archived">Open archived documents</a></div>`;
     } else if (t.rateLimit > 0) {
       disabled = true; placeholder = 'Sending is paused for a moment';
-      banner = `<div class="banner banner-warn">${ic('clock')}<div class="b-body"><strong>You've sent 20 messages in the last minute.</strong><span>You can send again in <span id="rl-count" class="mono">${t.rateLimit}</span> seconds.</span></div></div>`;
+      banner = `<div class="banner banner-warn">${ic('clock')}<div class="b-body"><strong>You've sent 20 messages in the last minute.</strong><span>You can send again at 11:25 (${ST.TZ.short}), in <span id="rl-count" class="mono">${t.rateLimit}</span> seconds.</span></div></div>`;
     }
     const processing = ST.stillProcessing();
     const hint = !disabled && processing ? `<p class="input-hint">${ic('clock', 'sm')}${ST.plural(processing, 'document')} ${processing === 1 ? 'is' : 'are'} still processing and can't be used yet.</p>` : '';
@@ -207,8 +216,10 @@
       return ST.shell({ nav: 'chat', content: `<div class="page"><div style="margin-top:48px">${ST.emptyState({ icon: 'upload', title: 'Upload a document first', text: 'The tutor answers only from your documents. Add a PDF to your Library and you can start asking in a few minutes.', actions: `<a class="btn btn-primary" href="#/library-empty" data-autofocus>${ic('upload', 'sm')}Upload</a>` })}</div></div>` });
     }
     const fromNote = t.fromNote ? ST.note(t.fromNote) : null;
-    const body = !t.messages.length && !fromNote ? emptyHtml()
+    const carried = t.carriedFrom ? ST.conv(t.carriedFrom) : null;
+    const body = !t.messages.length && !fromNote && !carried ? emptyHtml()
       : `<div class="thread" id="thread">${fromNote ? `<div class="banner banner-info">${ic('note')}<div class="b-body">Started from note: <a href="#/note/${fromNote.id}"><em>${esc(fromNote.title)}</em></a></div></div>` : ''}
+          ${carried ? `<div class="banner banner-info">${ic('arrowRight')}<div class="b-body"><span>Your question was carried over from <a href="#/open/${carried.id}"><em>${esc(carried.title)}</em></a> and sent right away.</span></div></div>` : ''}
           ${!t.messages.length ? `<p class="muted">Ask a question to discuss this note. This conversation starts with ${esc(names(t.subjects))}.</p>` : ''}
           ${t.messages.map(msgHtml).join('')}${summaryCard()}</div>`;
     return ST.shell({ nav: t.convId ? 'conversations' : 'chat', currentConv: t.convId, content: `<div class="chat">${headerHtml()}
@@ -265,13 +276,13 @@
     t.convId = id; if (t.title === 'New conversation') t.title = q;
     S.convs.push({ id, title: q, subjects: t.subjects, last: ST.TODAY + 'T11:24', noteId: null, archived: false, tokens: t.tokens });
   }
-  ST.ask = (q) => {
+  ST.ask = (q, { subjects = null } = {}) => {
     const t = T(); q = (q || '').trim();
     if (!q || t.streaming || t.readOnly || t.rateLimit > 0 || noActiveDocs(t)) return;
     t.draft = '';
     t.messages.push(M({ role: 'user', text: q }));
     if (t.title === 'New conversation') t.title = q;
-    const det = ST.classify(q);
+    const det = subjects || ST.classify(q); // a carried question keeps the subject it was refused or declined for
     if (!det.length) {
       if (OFF_TOPIC.test(q)) {
         t.messages.push(M({ role: 'tutor', kind: 'decline', question: q, topic: /laptop/i.test(q) ? 'choosing a laptop' : null }));
@@ -321,7 +332,8 @@
       m.done = true; t.subjects = m.picks.slice(); ensureConv(m.question); ST.conv(t.convId).subjects = t.subjects;
       ST.streamAnswer(ST.pickAnswer(m.question, t.subjects));
     },
-    'carry-over': (el) => { ST.pendingAsk = findMsg(el).question; ST.goto('chat-new'); },
+    'carry-over': (el) => { const m = findMsg(el); ST.pendingAsk = { q: m.question, subjects: [m.other || m.subject].filter(Boolean) }; ST.pendingThread = ST.newThread({ carriedFrom: T().convId }); ST.goto('chat-new'); },
+    'decline-upload': () => { ST.goto('library-default'); if (!S.uploadLimit) document.getElementById('file-input').click(); },
     retry: (el) => { const t = T(); t.messages = t.messages.filter((m) => m.id !== el.dataset.mid); const q = [...t.messages].reverse().find((m) => m.role === 'user'); ST.streamAnswer(ST.pickAnswer(q.text, t.subjects)); },
     summarize: () => {
       const t = T(); const n = t.noteId ? ST.note(t.noteId) : null;
