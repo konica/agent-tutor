@@ -1,4 +1,4 @@
-/* Smart Tutor v0.3 — core: helpers, icons, store, shell, overlays, upload tray, router, review chrome. */
+/* Smart Tutor v0.4 — core: helpers, icons, store, shell, overlays, upload tray, router, review chrome. */
 (function () {
   const ST = window.ST;
 
@@ -299,7 +299,7 @@
     const d = t.docId ? ST.doc(t.docId) : null;
     let cls = '', icon = 'doc', status = '', actions = '', bar = '';
     if (t.status === 'uploading') { status = `Uploading · ${t.size}`; bar = `<div class="bar" role="progressbar" aria-label="Upload progress for ${ST.esc(t.name)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(t.progress)}"><span style="transform:scaleX(${t.progress / 100})"></span></div>`; }
-    else if (t.status === 'done') { cls = 'ok'; icon = 'checkCircle'; status = d && d.state === 'ready' ? 'Ready' : d && d.state === 'choose' ? 'Uploaded · subjects suggested' : 'Uploaded · processing'; }
+    else if (t.status === 'done') { cls = 'ok'; icon = 'checkCircle'; status = d && d.state === 'ready' ? 'Ready' : d && d.state === 'choose' ? 'Processed · choose subjects' : 'Uploaded · processing'; }
     else if (t.status === 'rejected') { cls = 'bad'; icon = 'alertCircle'; status = `Not uploaded. ${t.reason}`; }
     else if (t.status === 'duplicate') { icon = 'info'; status = 'Already in your library'; actions = `<button class="btn btn-ghost btn-sm" type="button" data-action="open-doc" data-id="${t.docId}">Open document</button>`; }
     else if (t.status === 'duplicate-archived') { icon = 'info'; status = 'Already in your library, archived'; actions = `<button class="btn btn-secondary btn-sm" type="button" data-action="doc-restore" data-id="${t.docId}">${ST.ic('restore', 'sm')}Restore</button>`; }
@@ -393,8 +393,10 @@
   };
 
   /* ---------- review chrome (not product UI) ---------- */
+  /* ?shot=1 hides the review bar so tools can render a state at index.html?shot=1#/<state-id> (§11 item 6). */
+  ST.shot = /[?&]shot=1(&|$)/.test(location.search);
   ST.flow = null; // { id, steps }
-  try { const f = sessionStorage.getItem('st3_flow'); if (f) ST.flow = f; } catch (e) {}
+  try { const f = sessionStorage.getItem('st3_flow'); if (f && !ST.shot) ST.flow = f; } catch (e) {}
   function flowInfo(st) {
     if (!ST.flow || !ST.FLOWS) return null;
     const f = ST.FLOWS.find((x) => x.id === ST.flow);
