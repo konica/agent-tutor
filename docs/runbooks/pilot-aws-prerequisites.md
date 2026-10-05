@@ -1,17 +1,19 @@
 # Pilot environment on AWS: human steps
 
-Checklist for the human work in #54 (PRD §9.11, §9.12, Appendix A). Most of it is #55, the one-time AWS setup that needs an account admin. The agent slices #56–#59 need a few more human actions, listed at the end. When #56 writes the deploy runbook, it absorbs this file.
+Checklist for #55, the one-time AWS setup for the pilot environment (#54, PRD §9.11, §9.12, Appendix A). It needs an account admin. The agent slices #56–#59 need a few more human actions, listed at the end. When #56 writes the deploy runbook, it absorbs this file.
 
-Commands are for **Git Bash** on Windows (they also work on macOS and Linux). Run them from the repository root. Replace `<ACCOUNT_ID>` and other placeholders as you go.
+For the big picture (GitHub and AWS trust, runtime request flow, deploy on merge, which slice builds what), see [`pilot-environment-overview.md`](pilot-environment-overview.md).
+
+Commands are for **PowerShell 7** (`pwsh`) on Windows. Run them from the repository root. Steps 3 and 4 are done by [`pilot-aws-prerequisites.ps1`](pilot-aws-prerequisites.ps1), which you can run again safely and which has a `-DryRun` switch.
 
 ## Names the later slices depend on
 
-The deploy role's permissions use these names, so #56–#59 must use them too. If you change a name here, change it everywhere.
+The deploy role's permissions use these names, so #56–#59 must use them too. If you change a name here, change it in the script and everywhere else.
 
 | What | Name |
 |---|---|
 | Region | `us-east-1` |
-| Admin CLI profile (your laptop) | `smart-tutor-admin` |
+| Admin CLI profile (your laptop) | `smart-tutor-admin` (any admin profile works; pass it with `-AwsProfile`) |
 | GitHub Actions deploy role | `smart-tutor-github-deploy` |
 | GitHub environment | `pilot` (deploys from `main` only) |
 | ECR repositories | `smart-tutor/<service>` (`api`, `web`, `keycloak`; later `agent`, `mcp`, `worker`) |
@@ -22,6 +24,7 @@ The deploy role's permissions use these names, so #56–#59 must use them too. I
 
 | Tool | Check | Needed for |
 |---|---|---|
+| PowerShell 7 | `$PSVersionTable.PSVersion` | this checklist |
 | AWS CLI v2 | `aws --version` | everything |
 | Node 22+ | `node --version` | the CDK CLI (`npx aws-cdk`) |
 | uv | `uv --version` | the CDK app in `infra/` |
@@ -29,170 +32,105 @@ The deploy role's permissions use these names, so #56–#59 must use them too. I
 | kubectl, helm | `kubectl version --client`, `helm version` | #56 onwards, not #55 |
 | Docker | `docker version` | #56 onwards (image builds) |
 
+If PowerShell refuses to run the script because of the execution policy, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once, or start the script with `pwsh -ExecutionPolicy Bypass -File <script>`.
+
 ## 1. Admin access to the AWS account (about 10 min)
 
 1. Make sure the root user has MFA and you don't use it day to day.
 2. Get an admin identity. Prefer IAM Identity Center with the `AdministratorAccess` permission set, then:
-   ```bash
+   ```powershell
    aws configure sso --profile smart-tutor-admin      # SSO start URL, region us-east-1, the account, AdministratorAccess
    aws sso login --profile smart-tutor-admin
    ```
    Without Identity Center, use `aws login --profile smart-tutor-admin` (AWS CLI 2.32 or later) with an IAM principal that has admin rights.
 3. Check it and save the values for the record in step 7:
-   ```bash
-   export AWS_PROFILE=smart-tutor-admin AWS_REGION=us-east-1
+   ```powershell
+   $env:AWS_PROFILE = "smart-tutor-admin"; $env:AWS_REGION = "us-east-1"
    aws sts get-caller-identity
-   export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-   echo $ACCOUNT_ID
+   $AccountId = aws sts get-caller-identity --query Account --output text
+   $AccountId
    ```
    Record the `Arn`. For an SSO session it looks like `arn:aws:sts::<ACCOUNT_ID>:assumed-role/AWSReservedSSO_AdministratorAccess_<hash>/<you>`. #56 grants the matching **role** ARN (`arn:aws:iam::<ACCOUNT_ID>:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_<hash>`) access to the EKS cluster, so you can run `kubectl` and `helm` from your laptop. Look it up with:
-   ```bash
+   ```powershell
    aws iam list-roles --query "Roles[?starts_with(RoleName,'AWSReservedSSO_AdministratorAccess')].Arn" --output text
    ```
    If the admin is an IAM **user** with access keys (for example `arn:aws:iam::<ACCOUNT_ID>:user/poweruser`), the `Arn` from `get-caller-identity` is already the principal to record. In that case, turn on MFA for the user, and don't use the same admin key as the developer profile that Compose mounts into containers. A separate developer user with only Bedrock rights is safer.
 
-Keep `AWS_PROFILE`, `AWS_REGION` and `ACCOUNT_ID` exported for the rest of this checklist.
+Keep `$env:AWS_PROFILE`, `$env:AWS_REGION` and `$AccountId` set in this PowerShell window for the rest of this checklist.
 
 ## 2. Bootstrap CDK in us-east-1 (about 5 min)
 
-```bash
-cd infra
+```powershell
+Push-Location infra
 uv sync
-npx aws-cdk@latest bootstrap aws://$ACCOUNT_ID/us-east-1
-cd ..
+npx aws-cdk@latest bootstrap "aws://$AccountId/us-east-1"
+Pop-Location
 ```
 
 This creates the `CDKToolkit` stack: an S3 bucket and an ECR repository for CDK assets, and four roles named `cdk-hnb659fds-{deploy,file-publishing,image-publishing,lookup}-role-<ACCOUNT_ID>-us-east-1`. CloudFormation deploys with `AdministratorAccess` by default. That is fine for a single-purpose pilot account. In a shared account, pass `--cloudformation-execution-policies <narrower policy ARN>`.
 
 Check:
 
-```bash
+```powershell
 aws cloudformation describe-stacks --stack-name CDKToolkit --query "Stacks[0].StackStatus" --output text   # CREATE_COMPLETE
-MSYS_NO_PATHCONV=1 aws ssm get-parameter --name /cdk-bootstrap/hnb659fds/version --query Parameter.Value --output text
+aws ssm get-parameter --name /cdk-bootstrap/hnb659fds/version --query Parameter.Value --output text
 ```
 
-## 3. GitHub Actions deploy role, trusted through OIDC (about 15 min)
+## 3–4. Deploy role and GitHub environment: run the script (about 5 min)
 
-### 3a. Trust GitHub's OIDC provider (once per account)
-
-```bash
-aws iam list-open-id-connect-providers     # skip the next command if token.actions.githubusercontent.com is listed
-aws iam create-open-id-connect-provider \
-  --url https://token.actions.githubusercontent.com \
-  --client-id-list sts.amazonaws.com
+```powershell
+./docs/runbooks/pilot-aws-prerequisites.ps1 -AwsProfile smart-tutor-admin -DryRun   # shows the policies and the planned changes
+./docs/runbooks/pilot-aws-prerequisites.ps1 -AwsProfile smart-tutor-admin
 ```
 
-AWS no longer checks the thumbprint for this provider. If an older CLI insists on one, add `--thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1`.
+Add `-DeleteBudget "<name>"` to also remove a hand-made budget (see step 5). The script does the following.
 
-### 3b. Check the repository's OIDC subject format
+### 3a. Trusts GitHub's OIDC provider (once per account)
 
-```bash
+It creates the IAM OIDC provider for `https://token.actions.githubusercontent.com` with audience `sts.amazonaws.com`, unless one already exists. AWS no longer checks the thumbprint for this provider.
+
+### 3b. Reads the repository's OIDC subject
+
+```powershell
 gh api repos/konica/agent-tutor/actions/oidc/customization/sub
 ```
 
-This repository uses GitHub's **immutable** subject: the answer has `"use_immutable_subject":true` and `"sub_claim_prefix":"repo:konica@1114311/agent-tutor@1399048529"` (owner and repository IDs, so a renamed or re-created repo can't inherit the trust). A job in the `pilot` environment gets the subject `<sub_claim_prefix>:environment:pilot`. The commands in 3c read the prefix from this API, so they stay right if it changes.
+This repository uses GitHub's **immutable** subject: the answer has `"use_immutable_subject":true` and `"sub_claim_prefix":"repo:konica@1114311/agent-tutor@1399048529"` (owner and repository IDs, so a renamed or re-created repo can't inherit the trust). A job in the `pilot` environment gets the subject `repo:konica@1114311/agent-tutor@1399048529:environment:pilot`. The script reads the prefix from this API, so it stays right if the prefix changes.
 
-```bash
-export SUB_PREFIX=$(gh api repos/konica/agent-tutor/actions/oidc/customization/sub --jq '.sub_claim_prefix // "repo:konica/agent-tutor"')
-echo "$SUB_PREFIX:environment:pilot"     # repo:konica@1114311/agent-tutor@1399048529:environment:pilot
-```
+### 3c. Creates the role `smart-tutor-github-deploy`
 
-### 3c. Create the role
+The role trusts **only jobs in the `pilot` environment** (`StringEquals` on `aud` and `sub`). Step 4 limits that environment to the `main` branch, so a pull request or another branch can never assume it. Together this is the "only `main` and environment-protected jobs" rule from #55 and #59. Maximum session: 1 hour.
 
-The role trusts **only jobs in the `pilot` environment**. Step 4 limits that environment to the `main` branch, so a pull request or another branch can never assume it. Together this is the "only `main` and environment-protected jobs" rule from #55 and #59.
+### 3d. Gives it only what deployment needs (inline policy `deploy`)
 
-```bash
-mkdir -p .aws-setup     # scratch folder, ignored by Git
+| Permission | Resource | Why |
+|---|---|---|
+| `sts:AssumeRole` | `cdk-hnb659fds-*-<ACCOUNT_ID>-us-east-1` | `cdk deploy` works through the CDK bootstrap roles, so the deploy role never gets CloudFormation or IAM rights directly |
+| `ecr:GetAuthorizationToken` | `*` | `docker login` to ECR (this action has no resource) |
+| ECR push and pull actions | `smart-tutor/*` repositories | push app images |
+| `eks:DescribeCluster` | `smart-tutor-*` clusters | `aws eks update-kubeconfig`. Kubernetes permissions come from an **EKS access entry**, which #56 creates in CDK for this role. |
+| `cloudformation:DescribeStacks` | `SmartTutor-prod-*` stacks | the #59 smoke test reads the CloudFront address from the stack outputs |
 
-cat > .aws-setup/trust.json <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": { "Federated": "arn:aws:iam::${ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com" },
-    "Action": "sts:AssumeRoleWithWebIdentity",
-    "Condition": {
-      "StringEquals": {
-        "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-        "token.actions.githubusercontent.com:sub": "${SUB_PREFIX}:environment:pilot"
-      }
-    }
-  }]
-}
-EOF
+If #59 finds a missing permission, add it to the policy in the script with a specific resource, never `*` on a service, and run the script again.
 
-aws iam create-role \
-  --role-name smart-tutor-github-deploy \
-  --description "GitHub Actions (konica/agent-tutor, environment pilot) deploys the pilot" \
-  --max-session-duration 3600 \
-  --assume-role-policy-document file://.aws-setup/trust.json
-```
+### 4. Creates the GitHub environment `pilot`
 
-### 3d. Give it only what deployment needs
-
-- `cdk deploy` uses the **CDK bootstrap roles**, so the deploy role only needs to assume them. It never gets CloudFormation or IAM rights directly.
-- The pipeline pushes app images to the `smart-tutor/*` ECR repositories.
-- `aws eks update-kubeconfig` needs `eks:DescribeCluster`. Kubernetes permissions come from an **EKS access entry**, which #56 creates in CDK for this role.
-- The smoke test in #59 reads the CloudFront address from the stack outputs.
-
-```bash
-cat > .aws-setup/deploy-policy.json <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    { "Sid": "AssumeCdkBootstrapRoles", "Effect": "Allow", "Action": "sts:AssumeRole",
-      "Resource": "arn:aws:iam::${ACCOUNT_ID}:role/cdk-hnb659fds-*-${ACCOUNT_ID}-us-east-1" },
-    { "Sid": "EcrLogin", "Effect": "Allow", "Action": "ecr:GetAuthorizationToken", "Resource": "*" },
-    { "Sid": "EcrPushAppImages", "Effect": "Allow",
-      "Action": [
-        "ecr:BatchCheckLayerAvailability", "ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer",
-        "ecr:InitiateLayerUpload", "ecr:UploadLayerPart", "ecr:CompleteLayerUpload",
-        "ecr:PutImage", "ecr:DescribeImages"
-      ],
-      "Resource": "arn:aws:ecr:us-east-1:${ACCOUNT_ID}:repository/smart-tutor/*" },
-    { "Sid": "EksKubeconfig", "Effect": "Allow", "Action": "eks:DescribeCluster",
-      "Resource": "arn:aws:eks:us-east-1:${ACCOUNT_ID}:cluster/smart-tutor-*" },
-    { "Sid": "ReadStackOutputs", "Effect": "Allow", "Action": "cloudformation:DescribeStacks",
-      "Resource": "arn:aws:cloudformation:us-east-1:${ACCOUNT_ID}:stack/SmartTutor-prod-*/*" }
-  ]
-}
-EOF
-
-aws iam put-role-policy \
-  --role-name smart-tutor-github-deploy \
-  --policy-name deploy \
-  --policy-document file://.aws-setup/deploy-policy.json
-
-aws iam get-role --role-name smart-tutor-github-deploy --query Role.Arn --output text   # record this ARN
-```
-
-If #59 finds a missing permission, add it to this inline policy with a specific resource, never `*` on a service, and update this file.
-
-## 4. GitHub environment `pilot` (about 5 min, needs repo admin)
-
-Create the environment and allow deployments from `main` only:
-
-```bash
-gh api -X PUT repos/konica/agent-tutor/environments/pilot \
-  -F "deployment_branch_policy[protected_branches]=false" \
-  -F "deployment_branch_policy[custom_branch_policies]=true"
-
-gh api -X POST repos/konica/agent-tutor/environments/pilot/deployment-branch-policies \
-  -f name=main -f type=branch
-```
+- **Deployment branches:** `main` only (custom branch policy).
+- **Variables:** `AWS_ROLE_ARN`, `AWS_REGION`, `AWS_ACCOUNT_ID`. There are no AWS keys to store, because OIDC replaces them.
 
 Optional: in **Settings → Environments → pilot**, add **Required reviewers** if every deploy should wait for an approval.
 
-Store the non-secret values the workflow needs as environment variables. There are no AWS keys to store, because OIDC replaces them.
+The deploy workflow in #59 declares `environment: pilot`, `permissions: id-token: write`, and calls `aws-actions/configure-aws-credentials` with `role-to-assume: ${{ vars.AWS_ROLE_ARN }}`. Nothing here can be tested end to end before #59, but a wrong `sub` or a missing environment shows up there as `Not authorized to perform sts:AssumeRoleWithWebIdentity`.
 
-```bash
-gh variable set AWS_ROLE_ARN   --env pilot --body "arn:aws:iam::${ACCOUNT_ID}:role/smart-tutor-github-deploy"
-gh variable set AWS_REGION     --env pilot --body us-east-1
-gh variable set AWS_ACCOUNT_ID --env pilot --body "$ACCOUNT_ID"
-gh variable list --env pilot
+### Check
+
+```powershell
+aws iam get-role --role-name smart-tutor-github-deploy --query "Role.[Arn,AssumeRolePolicyDocument.Statement[0].Condition]" --output json
+aws iam get-role-policy --role-name smart-tutor-github-deploy --policy-name deploy --query "PolicyDocument.Statement[].Sid" --output text
+gh api repos/konica/agent-tutor/environments/pilot --jq "{name, deployment_branch_policy}"
+gh api repos/konica/agent-tutor/environments/pilot/deployment-branch-policies --jq ".branch_policies[].name"   # main
+gh variable list --repo konica/agent-tutor --env pilot
 ```
-
-The deploy workflow in #59 declares `environment: pilot`, `permissions: id-token: write`, and calls `aws-actions/configure-aws-credentials` with `role-to-assume: ${{ vars.AWS_ROLE_ARN }}`. Nothing in this step can be tested end to end before #59, but a wrong `sub` or a missing environment shows up there as `Not authorized to perform sts:AssumeRoleWithWebIdentity`.
 
 ## 5. Decide the budget and the alert email (decision, about 5 min)
 
@@ -204,7 +142,13 @@ Decide:
 - **Alert recipients.** One or more email addresses, ideally a shared inbox rather than one person.
 - **Thresholds.** Suggested: email at 80% of **actual** spend and at 100% of **forecasted** spend.
 
-Check for budgets someone created by hand: `aws budgets describe-budgets --account-id $ACCOUNT_ID --query "Budgets[].[BudgetName,BudgetLimit.Amount]" --output text`. A small account-wide budget will alert within days once the pilot runs, so delete or raise it, or note that it stays.
+Check for budgets someone created by hand:
+
+```powershell
+aws budgets describe-budgets --account-id $AccountId --query "Budgets[].[BudgetName,BudgetLimit.Amount]" --output text
+```
+
+A small account-wide budget will alert within days once the pilot runs. Delete it (the script's `-DeleteBudget "<name>"`, or `aws budgets delete-budget --account-id $AccountId --budget-name "<name>"`), raise it, or note that it stays.
 
 #56 creates the budget in `BudgetsStack` from these values. Budget emails go straight to the addresses, with no subscription to confirm. Optional: in **Billing → Cost Explorer**, enable Cost Explorer now, because it takes up to 24 hours to show data.
 
@@ -212,14 +156,15 @@ Check for budgets someone created by hand: `aws budgets describe-budgets --accou
 
 The pilot needs one EKS cluster with a managed node group of 2 small nodes (2–4 vCPU each), one NAT gateway with one Elastic IP, and one new VPC. Node upgrades briefly add extra nodes, so plan for at least **16 vCPU**.
 
-```bash
-q() { aws service-quotas get-service-quota --service-code "$1" --quota-code "$2" \
-        --query "Quota.[QuotaName,Value]" --output text; }
-q ec2 L-1216C47A    # Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances, in vCPUs; need >= 16
-q ec2 L-0263D0A3    # EC2-VPC Elastic IPs; need 1 free
-q vpc L-F678F1CE    # VPCs per Region; need 1 free
-aws service-quotas list-service-quotas --service-code eks \
-  --query "Quotas[?QuotaName=='Clusters' || QuotaName=='Managed node groups per cluster'].[QuotaName,Value]" --output text
+```powershell
+function Get-Quota($Service, $Code) {
+    aws service-quotas get-service-quota --service-code $Service --quota-code $Code --query "Quota.[QuotaName,Value]" --output text
+}
+Get-Quota ec2 L-1216C47A    # Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances, in vCPUs; need >= 16
+Get-Quota ec2 L-0263D0A3    # EC2-VPC Elastic IPs; need 1 free
+Get-Quota vpc L-F678F1CE    # VPCs per Region; need 1 free
+aws service-quotas list-service-quotas --service-code eks `
+    --query "Quotas[?QuotaName=='Clusters' || QuotaName=='Managed node groups per cluster'].[QuotaName,Value]" --output text
 
 # Current usage, to compare with the "free" requirements above
 aws ec2 describe-vpcs --query "length(Vpcs)"
@@ -229,10 +174,10 @@ aws eks list-clusters --query "length(clusters)"
 
 If the vCPU quota is below 16, request an increase. Approval usually takes minutes to a day.
 
-```bash
+```powershell
 aws service-quotas request-service-quota-increase --service-code ec2 --quota-code L-1216C47A --desired-value 16
-aws service-quotas list-requested-service-quota-change-history --service-code ec2 \
-  --query "RequestedQuotas[].[QuotaCode,DesiredValue,Status]" --output text
+aws service-quotas list-requested-service-quota-change-history --service-code ec2 `
+    --query "RequestedQuotas[].[QuotaCode,DesiredValue,Status]" --output text
 ```
 
 A brand-new account may also be "pending verification" for EC2. If launching nodes later fails with that message, open a support case.
@@ -241,8 +186,8 @@ A brand-new account may also be "pending verification" for EC2. If launching nod
 
 Fill this in and post it, then tick the acceptance criteria on #55:
 
-```bash
-gh issue comment 55 --body-file - <<'EOF'
+```powershell
+$Record = @'
 ## AWS prerequisites — done
 
 | Item | Value |
@@ -250,7 +195,7 @@ gh issue comment 55 --body-file - <<'EOF'
 | Account ID | <ACCOUNT_ID> |
 | Region | us-east-1 |
 | CDK bootstrap | CDKToolkit stack, bootstrap version <N>, done <date> |
-| Admin role for EKS access (#56) | arn:aws:iam::<ACCOUNT_ID>:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_<hash> |
+| Admin principal for EKS access (#56) | <admin role or user ARN from step 1> |
 | GitHub deploy role | arn:aws:iam::<ACCOUNT_ID>:role/smart-tutor-github-deploy (trusts repo:konica@1114311/agent-tutor@1399048529:environment:pilot) |
 | GitHub environment | pilot, deployment branches: main; required reviewers: <yes/no>; vars AWS_ROLE_ARN, AWS_REGION, AWS_ACCOUNT_ID |
 | Monthly budget | $<amount> |
@@ -260,12 +205,11 @@ gh issue comment 55 --body-file - <<'EOF'
 | Elastic IPs / VPCs / EKS clusters | <quota> / <quota> / <quota>, in use <n> / <n> / <n> |
 
 Steps followed: docs/runbooks/pilot-aws-prerequisites.md
-EOF
+'@
+$Record | gh issue comment 55 --repo konica/agent-tutor --body-file -
 ```
 
 The account ID isn't a secret, but don't post access keys, session tokens or passwords on the issue.
-
-Clean up the scratch folder: `rm -rf .aws-setup`.
 
 ## Not needed for #54 (Appendix A items deferred)
 
@@ -282,7 +226,7 @@ The agent builds #56–#59; a human still does these:
 
 | Slice | Human action |
 |---|---|
-| #56 public web app | Review and merge the PR. Run the first `cdk deploy` and add-on install from your laptop with `AWS_PROFILE=smart-tutor-admin`, following the runbook the slice writes. Open the CloudFront address and check that the app shell loads and the load balancer has no public address. Check that the budget email address is right in the Budgets console. |
+| #56 public web app | Review and merge the PR. Run the first `cdk deploy` and add-on install from your laptop with your admin profile, following the runbook the slice writes. Open the CloudFront address and check that the app shell loads and the load balancer has no public address. Check that the budget email address is right in the Budgets console. |
 | #57 Keycloak | Get the Keycloak admin password from Secrets Manager (the secret name is in the #57 runbook) and sign in at `https://<id>.cloudfront.net/auth/admin`. Create the client's account: realm **smart-tutor** → **Users → Add user** → email, first and last name, **Email verified** on → **Create** → **Credentials → Set password** with **Temporary** on, so the client chooses their own password at first sign-in. To remove access, **disable** the user (Users → user → Enabled off); the PRD has no account-deletion function yet. Do the #57 demo: the new user signs in to `/auth/realms/smart-tutor/account`. |
 | #58 sign-in end to end | Run or watch the demo against the public address: sign-in reaches the Library with the user's name; `GET /api/me` with the token gives 200; after sign-out the token gets 401; without a token, 401 with `WWW-Authenticate: Bearer`. Then send the client the address and username, and the temporary password **through a separate channel**. **The client has access from here.** |
 | #59 deploy on merge | Merge the workflow PR. If you turned on required reviewers, approve the `pilot` deployment in the Actions run. Check that the first run's smoke test passes. Practice one rollback to the previous image tag, following the runbook. |
