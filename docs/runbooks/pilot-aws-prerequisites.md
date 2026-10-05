@@ -49,6 +49,7 @@ The deploy role's permissions use these names, so #56–#59 must use them too. I
    ```bash
    aws iam list-roles --query "Roles[?starts_with(RoleName,'AWSReservedSSO_AdministratorAccess')].Arn" --output text
    ```
+   If the admin is an IAM **user** with access keys (for example `arn:aws:iam::<ACCOUNT_ID>:user/poweruser`), the `Arn` from `get-caller-identity` is already the principal to record. In that case, turn on MFA for the user, and don't use the same admin key as the developer profile that Compose mounts into containers. A separate developer user with only Bedrock rights is safer.
 
 Keep `AWS_PROFILE`, `AWS_REGION` and `ACCOUNT_ID` exported for the rest of this checklist.
 
@@ -89,7 +90,12 @@ AWS no longer checks the thumbprint for this provider. If an older CLI insists o
 gh api repos/konica/agent-tutor/actions/oidc/customization/sub
 ```
 
-Expect `{"use_default":true}`. A job in the `pilot` environment then gets the subject `repo:konica/agent-tutor:environment:pilot`. If the organization uses a custom subject template, change the `sub` value in 3c to match.
+This repository uses GitHub's **immutable** subject: the answer has `"use_immutable_subject":true` and `"sub_claim_prefix":"repo:konica@1114311/agent-tutor@1399048529"` (owner and repository IDs, so a renamed or re-created repo can't inherit the trust). A job in the `pilot` environment gets the subject `<sub_claim_prefix>:environment:pilot`. The commands in 3c read the prefix from this API, so they stay right if it changes.
+
+```bash
+export SUB_PREFIX=$(gh api repos/konica/agent-tutor/actions/oidc/customization/sub --jq '.sub_claim_prefix // "repo:konica/agent-tutor"')
+echo "$SUB_PREFIX:environment:pilot"     # repo:konica@1114311/agent-tutor@1399048529:environment:pilot
+```
 
 ### 3c. Create the role
 
@@ -108,7 +114,7 @@ cat > .aws-setup/trust.json <<EOF
     "Condition": {
       "StringEquals": {
         "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-        "token.actions.githubusercontent.com:sub": "repo:konica/agent-tutor:environment:pilot"
+        "token.actions.githubusercontent.com:sub": "${SUB_PREFIX}:environment:pilot"
       }
     }
   }]
@@ -198,6 +204,8 @@ Decide:
 - **Alert recipients.** One or more email addresses, ideally a shared inbox rather than one person.
 - **Thresholds.** Suggested: email at 80% of **actual** spend and at 100% of **forecasted** spend.
 
+Check for budgets someone created by hand: `aws budgets describe-budgets --account-id $ACCOUNT_ID --query "Budgets[].[BudgetName,BudgetLimit.Amount]" --output text`. A small account-wide budget will alert within days once the pilot runs, so delete or raise it, or note that it stays.
+
 #56 creates the budget in `BudgetsStack` from these values. Budget emails go straight to the addresses, with no subscription to confirm. Optional: in **Billing → Cost Explorer**, enable Cost Explorer now, because it takes up to 24 hours to show data.
 
 ## 6. Confirm the service quotas (about 5 min, longer if an increase is needed)
@@ -243,7 +251,7 @@ gh issue comment 55 --body-file - <<'EOF'
 | Region | us-east-1 |
 | CDK bootstrap | CDKToolkit stack, bootstrap version <N>, done <date> |
 | Admin role for EKS access (#56) | arn:aws:iam::<ACCOUNT_ID>:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_<hash> |
-| GitHub deploy role | arn:aws:iam::<ACCOUNT_ID>:role/smart-tutor-github-deploy (trusts repo:konica/agent-tutor:environment:pilot) |
+| GitHub deploy role | arn:aws:iam::<ACCOUNT_ID>:role/smart-tutor-github-deploy (trusts repo:konica@1114311/agent-tutor@1399048529:environment:pilot) |
 | GitHub environment | pilot, deployment branches: main; required reviewers: <yes/no>; vars AWS_ROLE_ARN, AWS_REGION, AWS_ACCOUNT_ID |
 | Monthly budget | $<amount> |
 | Budget alert email(s) | <address(es)> |
