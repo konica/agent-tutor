@@ -6,6 +6,7 @@ from smart_tutor_infra.stacks.budgets import BudgetsStack
 from smart_tutor_infra.stacks.cluster import ClusterStack
 from smart_tutor_infra.stacks.config import ConfigStack
 from smart_tutor_infra.stacks.data import DataStack
+from smart_tutor_infra.stacks.github_deploy import GitHubDeployStack
 from smart_tutor_infra.stacks.network import NetworkStack
 from smart_tutor_infra.stacks.registry import RegistryStack
 from smart_tutor_infra.stacks.storage import StorageStack
@@ -26,4 +27,14 @@ def build_app(app: cdk.App, env_name: str = "prod") -> list[cdk.Stack]:
     ]
     for stack in stacks[1:]:
         stack.add_dependency(network)
+    stacks.append(
+        GitHubDeployStack(
+            app,
+            f"{prefix}-GitHubDeploy",
+            env=env,
+            subject_prefix=app.node.get_context("smart-tutor:github-oidc-subject-prefix"),
+            github_environment=app.node.get_context("smart-tutor:github-environment"),
+            existing_provider_arn=app.node.try_get_context("smart-tutor:github-oidc-provider-arn"),
+        )
+    )
     return stacks

@@ -170,7 +170,8 @@ backend/evals/              # datasets live in LangSmith (versioned there); the 
 infra/
 ├── app.py  cdk.json  pyproject.toml
 ├── smart_tutor_infra/stacks/   # network, data (RDS), storage (S3 + SQS/DLQ + lifecycle), cluster (EKS + Pod Identity),
-│                               # registry (ECR), config (SSM, Secrets Manager), budgets
+│                               # registry (ECR), config (SSM, Secrets Manager), budgets,
+│                               # github_deploy (GitHub OIDC provider + CI deploy role; admin deploys it once)
 └── tests/                      # CDK assertion tests
 
 deploy/helm/

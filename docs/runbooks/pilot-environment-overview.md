@@ -16,7 +16,7 @@ flowchart TB
   end
 
   subgraph AWS["AWS account 685394474162 — us-east-1"]
-    subgraph IAM["IAM (#55, by hand)"]
+    subgraph IAM["IAM — stack SmartTutor-prod-GitHubDeploy + CDK bootstrap (#55)"]
       OIDC["OIDC provider<br/>token.actions.githubusercontent.com"]
       ROLE["Role smart-tutor-github-deploy<br/>trusts only that sub"]
       CDKR["CDK bootstrap roles<br/>cdk-hnb659fds-*"]
@@ -140,7 +140,7 @@ To roll back, run `helm upgrade` with an earlier commit SHA as the image tag (th
 
 | Piece | Built in | By | How |
 |---|---|---|---|
-| CDK bootstrap, OIDC provider, deploy role, GitHub environment `pilot`, quota checks, budget decision | #55 | Human (admin) | `pilot-aws-prerequisites.md` and `.ps1` |
+| CDK bootstrap, OIDC provider, deploy role, GitHub environment `pilot`, quota checks, budget decision | #55 | Human (admin) runs one script, once | CDK `GitHubDeployStack`; `pilot-aws-prerequisites.ps1` for bootstrap and the GitHub environment |
 | VPC, NAT, EKS + node group, Pod Identity, ECR, add-ons (load balancer controller, External Secrets, metrics-server), internal load balancer, CloudFront with VPC origin, `web`, budget alarm, ADR + PRD update | #56 | Agent; human runs the first deploy | CDK `NetworkStack`, `ClusterStack`, `RegistryStack`, `BudgetsStack`; `deploy/helm/addons/`; chart `web` |
 | RDS (DB app, DB keycloak), Secrets Manager entries, `keycloak` at `/auth`, production realm | #57 | Agent; human creates the client's account | CDK `DataStack`, `ConfigStack`; chart `keycloak` |
 | `api` at `/api`, `migrate` hook Job, same-origin web build, probes | #58 | Agent; human runs the demo and hands over access | chart `api`, `values-prod.yaml` |
