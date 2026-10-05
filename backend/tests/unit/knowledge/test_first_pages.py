@@ -21,6 +21,7 @@ from smart_tutor.knowledge.domain.content import Content, ContentState
 from smart_tutor.shared.domain.ids import UserId
 
 SENTENCE = "A sentence about attention mechanisms. " * 5
+PRINTED_DOI = SENTENCE + "arXiv:1706.03762 doi:10.48550/arXiv.1706.03762"  # the fake model's DOI must be printed
 
 
 def pdf(*pages: str) -> bytes:
@@ -67,7 +68,7 @@ class World:
 
 def test_the_content_stores_the_description_embedding_and_work_key() -> None:
     w = World()
-    w.upload(pdf(SENTENCE, SENTENCE, SENTENCE))
+    w.upload(pdf(PRINTED_DOI, SENTENCE, SENTENCE))
     c = w.content()
     assert c.state is ContentState.READY
     assert (c.title, c.year, c.doi) == (DESCRIPTION_ARGS["title"], 2017, "10.48550/arxiv.1706.03762")
@@ -98,7 +99,6 @@ def test_a_ready_document_keeps_the_extracted_title() -> None:
     [
         AIMessage(content="It's a paper about attention."),
         describe_reply(proposed_subject_names=["Only One"]),
-        describe_reply(doi="not a doi"),
     ],
 )
 def test_an_invalid_description_stores_nothing_and_processing_continues(reply: AIMessage) -> None:
@@ -110,6 +110,15 @@ def test_an_invalid_description_stores_nothing_and_processing_continues(reply: A
     assert (c.authors, c.proposed_subject_names) == ([], [])
     [view] = w.documents.list_documents(UserId("ada"))
     assert (view.state, view.title) == ("ready", "1706.03762v7.pdf")
+
+
+def test_an_invalid_doi_is_dropped_but_the_title_is_stored() -> None:
+    w = World(chat=describing_chat_model(describe_reply(doi="not a doi")))
+    w.upload(pdf(SENTENCE))
+    c = w.content()
+    assert c.state is ContentState.READY
+    assert (c.title, c.doi) == (DESCRIPTION_ARGS["title"], None)
+    assert c.work_key == f"title:attention is all you need:{DESCRIPTION_ARGS['year']}"
 
 
 # The crash leaves the content processing; the redelivery re-runs process_content with a working chunker.

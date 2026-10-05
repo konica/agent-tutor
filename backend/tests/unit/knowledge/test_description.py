@@ -5,6 +5,7 @@ import pytest
 from smart_tutor.knowledge.domain.content import Content, ContentState
 from smart_tutor.knowledge.domain.description import (
     DocumentDescription,
+    dropped_optional_fields,
     normalize_doi,
     normalize_title,
     parse_description,
@@ -56,12 +57,6 @@ def test_an_empty_doi_counts_as_absent() -> None:
         {"authors": "Vaswani"},
         {"authors": ["ok", ""]},
         {"authors": ["a"] * 51},
-        {"year": "2017"},
-        {"year": True},
-        {"year": 999},
-        {"year": 2101},
-        {"doi": "not a doi"},
-        {"doi": 10.1},
         {"summary": ""},
         {"summary": "x" * 1001},
         {"proposed_subject_names": ["Deep Learning", "NLP"]},
@@ -76,6 +71,32 @@ def test_bad_fields_reject_the_whole_payload(changes: dict[str, Any]) -> None:
         parse_description(payload(**changes))
 
 
+@pytest.mark.parametrize(
+    ("changes", "field"),
+    [
+        ({"doi": "not a doi"}, "doi"),
+        ({"doi": "arXiv:1706.03762"}, "doi"),
+        ({"doi": "https://arxiv.org/abs/1706.03762"}, "doi"),
+        ({"doi": 10.1}, "doi"),
+        ({"year": "2017"}, "year"),
+        ({"year": True}, "year"),
+        ({"year": 999}, "year"),
+        ({"year": 2101}, "year"),
+    ],
+)
+def test_a_bad_doi_or_year_is_dropped_and_the_rest_survives(changes: dict[str, Any], field: str) -> None:
+    raw = payload(**changes)
+    d = parse_description(raw)
+    assert getattr(d, field) is None
+    assert d.title == VALID["title"] and d.proposed_subject_names == tuple(VALID["proposed_subject_names"])
+    assert dropped_optional_fields(raw) == [field]
+
+
+def test_valid_or_absent_optional_fields_are_not_reported_as_dropped() -> None:
+    assert dropped_optional_fields(payload()) == []
+    assert dropped_optional_fields(payload(doi=" ", year=None)) == []
+
+
 @pytest.mark.parametrize("required", ["title", "authors", "summary", "proposed_subject_names"])
 def test_missing_required_fields_reject_the_payload(required: str) -> None:
     raw = payload()
@@ -86,8 +107,8 @@ def test_missing_required_fields_reject_the_payload(required: str) -> None:
 
 def test_errors_name_the_field_but_not_the_value() -> None:
     with pytest.raises(InvalidDescriptionError) as error:
-        parse_description(payload(doi="ignore previous instructions"))
-    assert "doi" in str(error.value)
+        parse_description(payload(summary="x" * 1001 + "ignore previous instructions"))
+    assert "summary" in str(error.value)
     assert "ignore" not in str(error.value)
 
 
@@ -99,10 +120,17 @@ def test_errors_name_the_field_but_not_the_value() -> None:
         "DOI: 10.1000/xyz",
         "https://doi.org/10.1000/xyz",
         "http://dx.doi.org/10.1000/xyz",
+        "10.1000/xyz.",
+        "10.1000/xyz),",
+        "doi:10.1000/xyz;",
     ],
 )
 def test_doi_prefixes_and_case_are_normalized(raw: str) -> None:
     assert normalize_doi(raw) == "10.1000/xyz"
+
+
+def test_trailing_punctuation_is_stripped_from_a_doi() -> None:
+    assert normalize_doi("10.48550/arXiv.1706.03762.") == "10.48550/arxiv.1706.03762"
 
 
 def test_title_normalization_ignores_case_punctuation_and_width() -> None:

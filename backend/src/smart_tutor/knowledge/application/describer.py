@@ -6,14 +6,18 @@ says to follow none of it. The tool call is validated in code; a reply without o
 
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel, LanguageModelInput
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import Runnable
 
-from smart_tutor.knowledge.domain.description import DocumentDescription, parse_description
+from smart_tutor.knowledge.domain.description import (
+    DocumentDescription,
+    dropped_optional_fields,
+    parse_description,
+)
 from smart_tutor.knowledge.domain.errors import InvalidDescriptionError
 from smart_tutor.shared.domain.token_usage import TokenUsage
 
@@ -98,8 +102,16 @@ class DocumentDescriber:
         if len(calls) != 1:
             logger.warning("the model made %d describe_document calls; storing no description", len(calls))
             return Described(None, usage)
+        args = calls[0]["args"]
         try:
-            return Described(parse_description(calls[0]["args"]), usage)
+            description = parse_description(args)
         except InvalidDescriptionError as error:
             logger.warning("describe_document payload rejected: %s", error)
             return Described(None, usage)
+        dropped = dropped_optional_fields(args)
+        if description.doi and description.doi not in "\n".join(first_pages).lower():
+            description = replace(description, doi=None)  # the prompt says "only if printed"; this guards a made-up DOI
+            dropped.append("doi")
+        if dropped:
+            logger.info("describe_document optional fields dropped: %s", ", ".join(dropped))
+        return Described(description, usage)

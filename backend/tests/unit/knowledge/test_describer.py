@@ -1,7 +1,6 @@
 from typing import Any, ClassVar
 
 import pytest
-
 from langchain_core.messages import AIMessage, BaseMessage
 
 from fakes import DESCRIPTION_ARGS, FakeChatModel, describe_reply, describing_chat_model
@@ -90,3 +89,27 @@ def test_two_describe_calls_give_no_description() -> None:
     reply = AIMessage(content="", tool_calls=[call, {**call, "id": "b"}])
     assert DocumentDescriber(describing_chat_model(reply)).describe(["p1"]).description is None
 
+
+def test_a_doi_that_is_not_printed_in_the_pages_is_dropped() -> None:
+    described = DocumentDescriber(describing_chat_model()).describe(["Attention Is All You Need", "no identifier here"])
+    assert described.description is not None
+    assert described.description.doi is None
+    assert described.description.work_key.startswith("title:")
+    assert described.description.title == DESCRIPTION_ARGS["title"]
+
+
+def test_a_printed_doi_is_kept() -> None:
+    pages = ["Attention Is All You Need\nDOI: 10.48550/arXiv.1706.03762.", "page two"]
+    described = DocumentDescriber(describing_chat_model()).describe(pages)
+    assert described.description is not None
+    assert described.description.doi == "10.48550/arxiv.1706.03762"
+    assert described.description.work_key == "doi:10.48550/arxiv.1706.03762"
+
+
+def test_dropped_fields_are_logged_by_name_only(caplog: pytest.LogCaptureFixture) -> None:
+    reply = describe_reply(doi="arXiv:1706.03762", year="2017")
+    with caplog.at_level("INFO"):
+        described = DocumentDescriber(describing_chat_model(reply)).describe(["p1"])
+    assert described.description is not None and described.description.year is None
+    assert "doi" in caplog.text and "year" in caplog.text
+    assert "1706" not in caplog.text and "2017" not in caplog.text

@@ -1,12 +1,13 @@
 """What the first-pages step learns about a content, and its work key (PRD §9.2 steps 4 and 6, §9.9, D22).
 
 The payload comes from a model reading untrusted page text, so every field is checked here and any bad field
-rejects the whole payload. Error messages name the field, never its value.
+rejects the whole payload, except the optional `doi` and `year`: an invalid one becomes None and the rest is kept
+(`dropped_optional_fields` names them). Error messages name the field, never its value.
 """
 
 import re
 import unicodedata
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -52,16 +53,22 @@ def parse_description(payload: Mapping[str, Any]) -> DocumentDescription:
     return DocumentDescription(
         title=title,
         authors=tuple(authors),
-        year=_year(payload.get("year")),
-        doi=_doi(payload.get("doi")),
+        year=_optional(_year, payload.get("year")),
+        doi=_optional(_doi, payload.get("doi")),
         summary=_text(payload.get("summary"), "summary", MAX_SUMMARY),
         proposed_subject_names=tuple(names),
     )
 
 
+def dropped_optional_fields(payload: Mapping[str, Any]) -> list[str]:
+    """The optional fields (`year`, `doi`) whose value is present but invalid, so parse_description left them out."""
+    return [field for field, check in (("year", _year), ("doi", _doi)) if _is_invalid(check, payload.get(field))]
+
+
 def normalize_doi(raw: str) -> str:
-    """Lowercase, without a doi.org or `doi:` prefix; raises InvalidDescriptionError unless it matches 10.xxxx/yyy."""
-    doi = _DOI_PREFIX.sub("", raw.strip()).lower()
+    """Lowercase, without a doi.org or `doi:` prefix or trailing punctuation; raises InvalidDescriptionError unless
+    it matches 10.xxxx/yyy."""
+    doi = _DOI_PREFIX.sub("", raw.strip()).lower().rstrip(".,;)")
     if not _DOI.fullmatch(doi):
         raise InvalidDescriptionError("doi isn't a DOI")
     return doi
@@ -93,6 +100,22 @@ def _texts(value: Any, field: str, limit: int) -> list[str]:
     if not isinstance(value, list):
         raise InvalidDescriptionError(f"{field} must be a list")
     return [_text(item, field, limit) for item in value]
+
+
+def _optional(check: Callable[[Any], Any], value: Any) -> Any:
+    """`check(value)`, or None when the optional value is invalid."""
+    try:
+        return check(value)
+    except InvalidDescriptionError:
+        return None
+
+
+def _is_invalid(check: Callable[[Any], Any], value: Any) -> bool:
+    try:
+        check(value)
+    except InvalidDescriptionError:
+        return True
+    return False
 
 
 def _year(value: Any) -> int | None:
