@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Draft v2.9 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Status** | Draft v2.10 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Changes from v2.9** | Interim behavior only, until US-2b (#10): when a document's content becomes `ready`, the document gets the subject "General" and goes straight to `ready` (§9.5). `contents.text_key` holds `contents/<sha256>.pages.json` (§9.4). Failure reasons: "This file isn't a readable PDF", "No text layer (scanned PDFs are not supported yet)". |
 | **Changes from v2.8** | Data model only: `documents` gains `file_name` (the display title's last fallback, §9.4) and `failure_reason` (why this learner's document failed, e.g. a duplicate before US-11 links it). Interim behavior: until US-11 links duplicates, an upload whose bytes are already known fails with "Duplicate uploads aren't supported yet". |
 | **Changes from v2.7** | Roadmap status only: the M0 criteria for the forwarded JWT (prototype #29, ADR 0007) and for `pypdf` page text (probe on 6 arXiv papers in #30, ADR 0008) are marked done; the `pypdf` check no longer waits for the seed corpus, which is filled in M1 (§10.3). No product behavior changes. |
 | **Changes from v2.6** | Product owner decisions on the design round v0.3 questions (Q38–Q43): subjects are chosen only after processing finishes (US-2b, §9.3, §11); a question carried into a new conversation is sent right away (US-3b); a question that fits none of the learner's subjects gets "Upload a document" to continue (US-5); subjects of an archived document can be changed (US-10); a personal subject name may equal the name of a shared subject the learner doesn't have (US-10b); Release 1 uses one time zone, GMT+7 (D27). |
@@ -353,7 +354,7 @@ Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow onl
 
 | Data | Store | Key | Notes |
 |---|---|---|---|
-| Content | PostgreSQL `contents` | `content_id`; unique `sha256` | `s3_key`, `text_key`, `bytes`, `pages`, `state` (`processing` / `ready` / `failed`), `failure_reason`, `attempts`, `title`, `authors[]`, `year`, `doi`, `work_key`, `references[]` (from Release 2), `summary`, `summary_embedding`, `proposed_subject_names[]`, `embedding_model`, `embedding_dim`, `chunker` (method, settings, version; ADR 0008), `processed_by_user_id` (who triggered first processing; for usage), `processed_at`. No owner. |
+| Content | PostgreSQL `contents` | `content_id`; unique `sha256` | `s3_key`, `text_key` (`contents/<sha256>.pages.json`, the saved page text), `bytes`, `pages`, `state` (`processing` / `ready` / `failed`), `failure_reason`, `attempts`, `title`, `authors[]`, `year`, `doi`, `work_key`, `references[]` (from Release 2), `summary`, `summary_embedding`, `proposed_subject_names[]`, `embedding_model`, `embedding_dim`, `chunker` (method, settings, version; ADR 0008), `processed_by_user_id` (who triggered first processing; for usage), `processed_at`. No owner. |
 | Chunk | PostgreSQL `chunks` (pgvector) | `chunk_id` | `content_id`, `seq` (order within the content; unique per content), `page` (physical 1-based page; nullable for future non-PDF sources), `text`, `embedding` (1024-dim, HNSW). |
 | Document | PostgreSQL `documents` | `document_id`; unique `(owner_id, content_id)` where `content_id` is set | `owner_id`, `content_id` (null until hashed), `upload_id`, `state` (`processing` / `awaiting_subjects` / `ready` / `failed`), `archived` (bool), `archived_at`, `visibility` (`private`; R4: `shared` / `public`), `title_override`, `file_name` (the picked file's name; the title until the first-pages step), `failure_reason`, `added_via` (`upload` / `dedupe`; R4: `share` / `public` / `import`), `created_at`. |
 | Document subjects | PostgreSQL `document_subjects` | `(document_id, subject_id)` | 1–3 rows per ready document (enforced in the domain and by a check). |
@@ -381,7 +382,7 @@ Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow onl
 **Content states (shared, keyed by SHA-256):**
 - (none) → `processing`: first server-verified hash (insert-or-get on the unique hash; concurrent uploads share the row).
 - `processing` → `ready`: extraction, metadata, saved page text, and embeddings all succeed.
-- `processing` → `failed`: validation, parse, timeout, or model error; reason and attempt count recorded.
+- `processing` → `failed`: validation, parse, timeout, or model error; reason and attempt count recorded (e.g. "This file isn't a readable PDF"; "No text layer (scanned PDFs are not supported yet)" for a PDF with no extractable text).
 - `failed` → `processing`: **Retry** by any linked learner, or a re-upload of the same file, up to 3 attempts in total; after that it stays `failed` ("This file could not be processed").
 - `ready` → `processing` (system only): embedding-model change; re-embedding works from chunk text in PostgreSQL (no file needed); search keeps serving old vectors until it finishes.
 
@@ -389,6 +390,7 @@ Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow onl
 - (none) → `processing` when the upload starts (`content_id` null until hashed).
 - `processing` → `awaiting_subjects` when the content is `ready` (or linked to a ready content); suggestions are shown.
 - `awaiting_subjects` → `ready` when 1–3 subjects are chosen.
+- Interim until US-2b (#10): when its content becomes `ready`, a `processing` document gets the subject "General" and goes straight to `ready`, with no `awaiting_subjects` step.
 - `processing` → `failed` when its content fails or validation fails; **Retry** returns it to `processing`.
 - Open gap: a document whose upload never arrives (the browser's POST to S3 failed or was abandoned) stays `processing`; a follow-up will fail it once the presign/upload lifecycle expires.
 - `archived` is a separate flag on any state: archive hides the document from search and lists; restore clears the flag.

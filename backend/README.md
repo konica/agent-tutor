@@ -13,7 +13,7 @@ The one Python package, `smart_tutor`, shared by every backend deployable.
 ## Commands
 
 ```bash
-uv sync                      # core + dev group
+uv sync                      # core + dev group (includes the PDF loader and chunking deps)
 uv sync --extra ingest       # + PDF loader (worker)
 uv sync --extra eval         # + evaluation deps
 uv run pytest                # unit tests
@@ -46,5 +46,15 @@ The unit tests fake Keycloak; this is the end-to-end check for US-1 (#45).
 3. `docker compose logs worker` shows `upload <id>: stored`; the object is in `contents/`, not in `uploads/`:
    `docker compose exec localstack awslocal s3 ls s3://smart-tutor-documents/ --recursive`
 4. Upload the same file again (or as `learner2@example.com`): the new row shows **Failed — Duplicate uploads aren't supported yet**, and the content count is unchanged: `docker compose exec postgres psql -U smart_tutor -c "select count(*) from contents"`.
+
+## Compose check: processing to ready (#61)
+
+1. Put `AWS_PROFILE=<profile>` in `.env` (Bedrock embeddings; the worker mounts `~/.aws` read-only), then `docker compose --profile app up -d --build`.
+2. Sign in at http://localhost:10453 as `learner@example.com` / `learner` and upload an arXiv PDF in the Library. After processing, the row turns **Ready** with subject **General**.
+3. Verify:
+   - `docker compose exec localstack awslocal s3 ls s3://smart-tutor-documents/contents/` shows `<sha256>.pdf` and `<sha256>.pages.json`.
+   - `docker compose exec postgres psql -U smart_tutor -c "select seq, page, left(text, 40) from chunks order by content_id, seq limit 5"`
+   - `docker compose exec postgres psql -U smart_tutor -c "select chunker, embedding_model, embedding_dim, pages from contents"`
+4. Upload a non-PDF renamed `.pdf`: the row shows **Failed — This file isn't a readable PDF**. Upload a scanned (image-only) PDF: **Failed — No text layer (scanned PDFs are not supported yet)**. Neither creates chunks.
 
 The inline `configs.content` in `compose.yaml` needs Docker Compose 2.23.1 or newer.
