@@ -26,6 +26,10 @@ class ObjectStore(ABC):
         """The object's bytes; raises ObjectNotFoundError."""
 
     @abstractmethod
+    def put(self, key: str, data: bytes, content_type: str) -> None:
+        """Store `data` at `key`, replacing any object there."""
+
+    @abstractmethod
     def copy(self, source_key: str, dest_key: str) -> None:
         """Copy within the bucket (same bytes at `dest_key`)."""
 

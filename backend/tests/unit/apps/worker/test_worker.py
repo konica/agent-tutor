@@ -1,10 +1,12 @@
 import json
 
-from fakes import FakeObjectStore, FakeQueue, FixedClock, InMemoryLibrary
+from fakes import FakeObjectStore, FakeQueue, FixedClock, InMemoryLibrary, fake_tools
 from smart_tutor.apps.worker.events import upload_keys
 from smart_tutor.apps.worker.main import run_once
 from smart_tutor.knowledge.application import IngestionService, UploadService
 from smart_tutor.shared.domain.ids import UserId
+
+PDF = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
 
 
 def s3_event(key: str, name: str = "ObjectCreated:Post") -> str:
@@ -17,7 +19,7 @@ def world() -> tuple[InMemoryLibrary, FakeObjectStore, UploadService, IngestionS
         library,
         objects,
         UploadService(library.unit_of_work, objects, FixedClock()),
-        IngestionService(library.unit_of_work, objects),
+        IngestionService(library.unit_of_work, objects, fake_tools()),
     )
 
 
@@ -31,7 +33,7 @@ def test_upload_keys_reads_created_events_and_decodes_keys() -> None:
 def test_an_upload_event_is_ingested_and_its_message_deleted() -> None:
     library, objects, uploads, ingestion = world()
     started = uploads.start_upload(UserId("ada"), "paper.pdf")
-    objects.objects[started.fields["key"]] = b"%PDF"
+    objects.objects[started.fields["key"]] = PDF
     queue = FakeQueue(s3_event(started.fields["key"]))
 
     assert run_once(queue, ingestion) == 1
@@ -63,7 +65,7 @@ def test_malformed_records_are_skipped_but_valid_ones_kept() -> None:
 def test_a_failing_message_stays_for_redelivery() -> None:
     library, objects, uploads, ingestion = world()
     started = uploads.start_upload(UserId("ada"), "paper.pdf")
-    objects.objects[started.fields["key"]] = b"%PDF"
+    objects.objects[started.fields["key"]] = PDF
 
     def broken(source_key: str, dest_key: str) -> None:
         raise RuntimeError("S3 down")

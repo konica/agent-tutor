@@ -2,12 +2,12 @@ import hashlib
 
 import pytest
 
-from fakes import FakeObjectStore, FixedClock, InMemoryLibrary
+from fakes import FakeObjectStore, FixedClock, InMemoryLibrary, fake_tools
 from smart_tutor.knowledge.application import IngestionService, StartedUpload, UploadOutcome, UploadService
 from smart_tutor.knowledge.domain.document import Document
 from smart_tutor.shared.domain.ids import UserId
 
-PDF = b"%PDF-1.7 the same bytes"
+PDF = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
 SHA = hashlib.sha256(PDF).hexdigest()
 
 
@@ -15,7 +15,7 @@ class World:
     def __init__(self) -> None:
         self.library, self.objects = InMemoryLibrary(), FakeObjectStore()
         self.uploads = UploadService(self.library.unit_of_work, self.objects, FixedClock())
-        self.ingestion = IngestionService(self.library.unit_of_work, self.objects)
+        self.ingestion = IngestionService(self.library.unit_of_work, self.objects, fake_tools())
 
     def upload(self, user: str, data: bytes = PDF, name: str = "paper.pdf") -> StartedUpload:
         started = self.uploads.start_upload(UserId(user), name)
@@ -30,16 +30,17 @@ def test_a_new_file_is_stored_once_under_its_hash_and_the_upload_copy_removed() 
     w = World()
     a = w.upload("ada")
     assert w.ingestion.ingest_upload(a.fields["key"]) is UploadOutcome.STORED
-    assert w.objects.objects == {f"contents/{SHA}.pdf": PDF}
+    assert set(w.objects.objects) == {f"contents/{SHA}.pdf", f"contents/{SHA}.pages.json"}
+    assert w.objects.objects[f"contents/{SHA}.pdf"] == PDF
     [content] = w.library.state.contents.values()
     assert (content.sha256, content.size, content.state, content.processed_by_user_id) == (
         SHA,
         len(PDF),
-        "processing",
+        "ready",
         "ada",
     )
     doc = w.doc(a)
-    assert (doc.content_id, doc.state) == (content.content_id, "processing")
+    assert (doc.content_id, doc.state) == (content.content_id, "ready")
     upload = w.library.state.uploads[a.upload_id]
     assert (upload.size, upload.outcome) == (len(PDF), UploadOutcome.STORED)
 
@@ -66,7 +67,10 @@ def test_same_learner_same_file_is_a_duplicate() -> None:
 
 def test_different_bytes_make_different_contents() -> None:
     w = World()
-    a, b = w.upload("ada"), w.upload("ada", data=b"%PDF other")
+    a, b = (
+        w.upload("ada"),
+        w.upload("ada", data=b"%PDF-1.7 " + ("Another sentence about gradient descent. " * 5).encode()),
+    )
     w.ingestion.ingest_upload(a.fields["key"])
     assert w.ingestion.ingest_upload(b.fields["key"]) is UploadOutcome.STORED
     assert len(w.library.state.contents) == 2
@@ -78,7 +82,7 @@ def test_redelivery_after_success_changes_nothing() -> None:
     w.ingestion.ingest_upload(a.fields["key"])
     w.objects.objects[a.fields["key"]] = PDF  # S3 event redelivered; say the delete hadn't happened
     assert w.ingestion.ingest_upload(a.fields["key"]) is None
-    assert w.doc(a).state == "processing" and w.doc(a).content_id is not None
+    assert w.doc(a).state == "ready" and w.doc(a).content_id is not None
     assert a.fields["key"] not in w.objects.objects
     w.ingestion.ingest_upload(b.fields["key"])
     assert w.ingestion.ingest_upload(b.fields["key"]) is None

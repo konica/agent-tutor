@@ -33,6 +33,9 @@ class S3ObjectStore(ObjectStore):
                 raise ObjectNotFoundError(key) from None
             raise
 
+    def put(self, key: str, data: bytes, content_type: str) -> None:
+        raise NotImplementedError  # implemented in the next commit (SQL/S3 adapters for processing)
+
     def copy(self, source_key: str, dest_key: str) -> None:
         self._client.copy_object(
             Bucket=self._bucket, Key=dest_key, CopySource={"Bucket": self._bucket, "Key": source_key}

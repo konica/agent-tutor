@@ -4,17 +4,19 @@ import copy
 from types import TracebackType
 from typing import Self
 
+from smart_tutor.knowledge.domain.chunk import Chunk
 from smart_tutor.knowledge.domain.content import Content
-from smart_tutor.knowledge.domain.document import Document
+from smart_tutor.knowledge.domain.document import Document, DocumentState
 from smart_tutor.knowledge.domain.upload import Upload, UploadOutcome
 from smart_tutor.knowledge.ports.library import (
+    ChunkRepository,
     ContentRepository,
     DocumentRepository,
     LibraryUnitOfWork,
     UploadRepository,
 )
 from smart_tutor.knowledge.ports.object_store import ObjectNotFoundError, ObjectStore, PresignedPost
-from smart_tutor.shared.domain.ids import UploadId, UserId
+from smart_tutor.shared.domain.ids import ContentId, UploadId, UserId
 
 
 class _State:
@@ -22,6 +24,7 @@ class _State:
         self.contents: dict[str, Content] = {}
         self.documents: dict[str, Document] = {}
         self.uploads: dict[str, Upload] = {}
+        self.chunks: dict[str, list[Chunk]] = {}
 
 
 class InMemoryLibrary:
@@ -43,6 +46,16 @@ class _Contents(ContentRepository):
                 return copy.deepcopy(existing), False
         self._s.contents[content.content_id] = copy.deepcopy(content)
         return content, True
+
+    def get(self, content_id: ContentId) -> Content | None:
+        found = self._s.contents.get(content_id)
+        return copy.deepcopy(found) if found else None
+
+    def get_for_update(self, content_id: ContentId) -> Content | None:
+        return self.get(content_id)
+
+    def save(self, content: Content) -> None:
+        self._s.contents[content.content_id] = copy.deepcopy(content)
 
 
 class _Documents(DocumentRepository):
@@ -66,6 +79,13 @@ class _Documents(DocumentRepository):
             raise AssertionError("unique (owner_id, content_id) violated")
         self._s.documents[document.document_id] = copy.deepcopy(document)
 
+    def list_processing_for_content_for_update(self, content_id: ContentId) -> list[Document]:
+        return [
+            copy.deepcopy(d)
+            for d in self._s.documents.values()
+            if d.content_id == content_id and d.state is DocumentState.PROCESSING
+        ]
+
     def list_readable_by(self, user_id: UserId) -> list[Document]:
         mine = [copy.deepcopy(d) for d in self._s.documents.values() if d.can_be_read_by(user_id)]
         return sorted(mine, key=lambda d: d.created_at, reverse=True)
@@ -83,6 +103,14 @@ class _Uploads(UploadRepository):
         upload.size, upload.outcome = size, outcome
 
 
+class _Chunks(ChunkRepository):
+    def __init__(self, state: _State) -> None:
+        self._s = state
+
+    def replace(self, content_id: ContentId, chunks: list[Chunk]) -> None:
+        self._s.chunks[content_id] = copy.deepcopy(chunks)
+
+
 class FakeLibraryUnitOfWork(LibraryUnitOfWork):
     def __init__(self, library: InMemoryLibrary) -> None:
         self._library = library
@@ -90,6 +118,7 @@ class FakeLibraryUnitOfWork(LibraryUnitOfWork):
         self.contents = _Contents(self._staged)
         self.documents = _Documents(self._staged)
         self.uploads = _Uploads(self._staged)
+        self.chunks = _Chunks(self._staged)
 
     def commit(self) -> None:
         self._library.state = copy.deepcopy(self._staged)
@@ -107,6 +136,7 @@ class FakeLibraryUnitOfWork(LibraryUnitOfWork):
 class FakeObjectStore(ObjectStore):
     def __init__(self) -> None:
         self.objects: dict[str, bytes] = {}
+        self.content_types: dict[str, str] = {}  # of objects stored with `put`
         self.presigned: list[tuple[str, str, int, int]] = []  # key, content type, max bytes, expires in
 
     def presign_post(self, key: str, *, content_type: str, max_bytes: int, expires_in: int) -> PresignedPost:
@@ -118,6 +148,10 @@ class FakeObjectStore(ObjectStore):
             return self.objects[key]
         except KeyError:
             raise ObjectNotFoundError(key) from None
+
+    def put(self, key: str, data: bytes, content_type: str) -> None:
+        self.objects[key] = data
+        self.content_types[key] = content_type
 
     def copy(self, source_key: str, dest_key: str) -> None:
         self.objects[dest_key] = self.read(source_key)
