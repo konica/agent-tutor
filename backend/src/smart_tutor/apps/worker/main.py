@@ -10,11 +10,14 @@ import signal
 import threading
 
 from smart_tutor.apps.worker.events import upload_keys
+from smart_tutor.knowledge.adapters.chunking import build_chunker
+from smart_tutor.knowledge.adapters.pypdf_extractor import PypdfExtractor
 from smart_tutor.knowledge.adapters.s3_object_store import S3ObjectStore
 from smart_tutor.knowledge.adapters.sql_library import SqlLibraryUnitOfWork
-from smart_tutor.knowledge.application import IngestionService
+from smart_tutor.knowledge.application import IngestionService, ProcessingTools
 from smart_tutor.shared.adapters.aws.clients import s3_client, sqs_client
 from smart_tutor.shared.adapters.aws.sqs_queue import SqsMessageQueue
+from smart_tutor.shared.adapters.model_factory import ModelFactory
 from smart_tutor.shared.adapters.postgres.engine import create_db_engine
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.ports.message_queue import MessageQueue
@@ -44,7 +47,17 @@ def main() -> None:
     def library() -> SqlLibraryUnitOfWork:
         return SqlLibraryUnitOfWork(engine)
 
-    ingestion = IngestionService(library, S3ObjectStore(s3_client(settings), settings.documents_bucket))
+    chunker, chunker_id = build_chunker(settings.chunking)
+    embedding = settings.models.embedding
+    tools = ProcessingTools(
+        extractor=PypdfExtractor(),
+        chunker=chunker,
+        chunker_id=chunker_id,
+        embeddings=ModelFactory(settings).embedding(),
+        embedding_model=embedding.model_id,
+        embedding_dim=embedding.params["dimensions"],
+    )
+    ingestion = IngestionService(library, S3ObjectStore(s3_client(settings), settings.documents_bucket), tools)
     queue = SqsMessageQueue(sqs_client(settings), settings.ingest_queue_url)
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stop.set())

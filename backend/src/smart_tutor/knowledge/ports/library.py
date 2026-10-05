@@ -4,10 +4,11 @@ from abc import ABC, abstractmethod
 from types import TracebackType
 from typing import Self
 
+from smart_tutor.knowledge.domain.chunk import Chunk
 from smart_tutor.knowledge.domain.content import Content
 from smart_tutor.knowledge.domain.document import Document
 from smart_tutor.knowledge.domain.upload import Upload, UploadOutcome
-from smart_tutor.shared.domain.ids import UploadId, UserId
+from smart_tutor.shared.domain.ids import ContentId, UploadId, UserId
 
 
 class ContentRepository(ABC):
@@ -17,6 +18,17 @@ class ContentRepository(ABC):
 
         Concurrent callers with the same sha256 get one row: the second waits for the first to commit.
         """
+
+    @abstractmethod
+    def get(self, content_id: ContentId) -> Content | None: ...
+
+    @abstractmethod
+    def get_for_update(self, content_id: ContentId) -> Content | None:
+        """The content, locked until the unit of work ends."""
+
+    @abstractmethod
+    def save(self, content: Content) -> None:
+        """Write back state, failure_reason, and how it was processed (pages, text_key, chunker, embedding)."""
 
 
 class DocumentRepository(ABC):
@@ -29,7 +41,11 @@ class DocumentRepository(ABC):
 
     @abstractmethod
     def save(self, document: Document) -> None:
-        """Write back content_id, state, and failure_reason."""
+        """Write back content_id, state, failure_reason, and replace the document's subject rows."""
+
+    @abstractmethod
+    def list_processing_for_content_for_update(self, content_id: ContentId) -> list[Document]:
+        """Every processing document linked to this content, locked until the unit of work ends."""
 
     @abstractmethod
     def list_readable_by(self, user_id: UserId) -> list[Document]:
@@ -44,12 +60,19 @@ class UploadRepository(ABC):
     def record_outcome(self, upload_id: UploadId, size: int, outcome: UploadOutcome) -> None: ...
 
 
+class ChunkRepository(ABC):
+    @abstractmethod
+    def replace(self, content_id: ContentId, chunks: list[Chunk]) -> None:
+        """Make these the content's only chunks (idempotent: processing twice never duplicates)."""
+
+
 class LibraryUnitOfWork(ABC):
     """`with factory() as tx: …; tx.commit()` — leaving without commit rolls back."""
 
     contents: ContentRepository
     documents: DocumentRepository
     uploads: UploadRepository
+    chunks: ChunkRepository
 
     @abstractmethod
     def commit(self) -> None: ...

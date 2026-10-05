@@ -1,0 +1,49 @@
+"""Fakes for processing a stored content: no pypdf, no text splitters, no Bedrock."""
+
+from collections.abc import Sequence
+from typing import Any
+
+from langchain_core.documents import BaseDocumentTransformer, Document
+from langchain_core.embeddings import Embeddings
+
+from fakes.models import fake_embeddings
+from smart_tutor.knowledge.application import ProcessingTools, UnreadablePdfError
+from smart_tutor.knowledge.ports.pdf_extractor import PdfExtractor
+
+CHUNK_CHARS = 100
+
+
+class FakePdfExtractor(PdfExtractor):
+    """`%PDF-x.y <text>` bytes: the text after the first space, split into pages on form feeds. Else unreadable."""
+
+    def extract_pages(self, data: bytes) -> list[str]:
+        if not data.startswith(b"%PDF"):
+            raise UnreadablePdfError("not a PDF")
+        return data.decode("utf-8").partition(" ")[2].split("\f")
+
+
+class PageChunker(BaseDocumentTransformer):
+    """Splits each page into 100-character pieces and keeps the page's metadata."""
+
+    def transform_documents(self, documents: Sequence[Document], **kwargs: Any) -> Sequence[Document]:
+        return [
+            Document(page_content=d.page_content[i : i + CHUNK_CHARS], metadata=dict(d.metadata))
+            for d in documents
+            for i in range(0, len(d.page_content), CHUNK_CHARS)
+        ]
+
+
+def fake_tools(
+    dim: int = 8,
+    extractor: PdfExtractor | None = None,
+    chunker: BaseDocumentTransformer | None = None,
+    embeddings: Embeddings | None = None,
+) -> ProcessingTools:
+    return ProcessingTools(
+        extractor=extractor or FakePdfExtractor(),
+        chunker=chunker or PageChunker(),
+        chunker_id="fake:100:v1",
+        embeddings=embeddings or fake_embeddings(dim),
+        embedding_model="fake-embedding",
+        embedding_dim=dim,
+    )

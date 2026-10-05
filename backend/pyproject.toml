@@ -115,6 +115,7 @@ containers = ["smart_tutor.shared"]
 [[tool.importlinter.contracts]]
 name = "knowledge internals are private"
 type = "forbidden"
+allow_indirect_imports = true  # a public application layer may use its own domain
 source_modules = [
     "smart_tutor.subjects",
     "smart_tutor.tutoring",
@@ -136,6 +137,7 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 name = "subjects internals are private"
 type = "forbidden"
+allow_indirect_imports = true  # a public application layer may use its own domain
 source_modules = [
     "smart_tutor.knowledge",
     "smart_tutor.tutoring",
@@ -157,6 +159,7 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 name = "tutoring internals are private"
 type = "forbidden"
+allow_indirect_imports = true  # a public application layer may use its own domain
 source_modules = [
     "smart_tutor.knowledge",
     "smart_tutor.subjects",
@@ -178,6 +181,7 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 name = "learning internals are private"
 type = "forbidden"
+allow_indirect_imports = true  # a public application layer may use its own domain
 source_modules = [
     "smart_tutor.knowledge",
     "smart_tutor.subjects",
@@ -199,6 +203,7 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 name = "accounts internals are private"
 type = "forbidden"
+allow_indirect_imports = true  # a public application layer may use its own domain
 source_modules = [
     "smart_tutor.knowledge",
     "smart_tutor.subjects",
@@ -220,6 +225,7 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 name = "insights internals are private"
 type = "forbidden"
+allow_indirect_imports = true  # a public application layer may use its own domain
 source_modules = [
     "smart_tutor.knowledge",
     "smart_tutor.subjects",
@@ -241,6 +247,7 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 name = "catalog internals are private"
 type = "forbidden"
+allow_indirect_imports = true  # a public application layer may use its own domain
 source_modules = [
     "smart_tutor.knowledge",
     "smart_tutor.subjects",
@@ -262,6 +269,7 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 name = "quizzes internals are private"
 type = "forbidden"
+allow_indirect_imports = true  # a public application layer may use its own domain
 source_modules = [
     "smart_tutor.knowledge",
     "smart_tutor.subjects",
@@ -283,6 +291,7 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 name = "recommendations internals are private"
 type = "forbidden"
+allow_indirect_imports = true  # a public application layer may use its own domain
 source_modules = [
     "smart_tutor.knowledge",
     "smart_tutor.subjects",
@@ -304,6 +313,7 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 name = "reports internals are private"
 type = "forbidden"
+allow_indirect_imports = true  # a public application layer may use its own domain
 source_modules = [
     "smart_tutor.knowledge",
     "smart_tutor.subjects",
@@ -325,6 +335,7 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 name = "graph internals are private"
 type = "forbidden"
+allow_indirect_imports = true  # a public application layer may use its own domain
 source_modules = [
     "smart_tutor.knowledge",
     "smart_tutor.subjects",
@@ -440,6 +451,7 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 name = "PDF loader only in knowledge.adapters (keeps the ingest extra in the worker image)"
 type = "forbidden"
+allow_indirect_imports = true  # the worker's composition root builds the adapters that use them
 source_modules = [
     "smart_tutor.shared",
     "smart_tutor.apps",

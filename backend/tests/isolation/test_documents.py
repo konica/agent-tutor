@@ -2,7 +2,7 @@
 
 from fastapi.testclient import TestClient
 
-from fakes import FakeObjectStore, FakeTokenVerifier, FixedClock, InMemoryLibrary
+from fakes import FakeObjectStore, FakeTokenVerifier, FixedClock, InMemoryLibrary, fake_tools
 from smart_tutor.apps.api.main import create_app
 from smart_tutor.apps.api.services import ApiServices
 from smart_tutor.knowledge.application import DocumentService, IngestionService, UploadService
@@ -24,14 +24,14 @@ def setup() -> tuple[TestClient, FakeObjectStore, IngestionService]:
         documents=DocumentService(library.unit_of_work),
     )
     client = TestClient(create_app(Settings(), verifier=verifier, services=services))
-    return client, objects, IngestionService(library.unit_of_work, objects)
+    return client, objects, IngestionService(library.unit_of_work, objects, fake_tools())
 
 
 def test_b_never_sees_a_documents_in_any_state() -> None:
     client, objects, ingestion = setup()
     stored = client.post("/uploads", json={"file_name": "a1.pdf"}, headers=A).json()
     client.post("/uploads", json={"file_name": "a2.pdf"}, headers=A)  # stays processing
-    objects.objects[stored["fields"]["key"]] = b"%PDF a"
+    objects.objects[stored["fields"]["key"]] = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
     ingestion.ingest_upload(stored["fields"]["key"])
 
     assert client.get("/documents", headers=B).json() == []

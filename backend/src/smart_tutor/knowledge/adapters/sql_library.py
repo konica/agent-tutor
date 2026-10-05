@@ -7,10 +7,12 @@ from sqlalchemy import ColumnElement, Connection, Engine, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from smart_tutor.knowledge.adapters.sql_tables import contents, documents, uploads
+from smart_tutor.knowledge.domain.chunk import Chunk
 from smart_tutor.knowledge.domain.content import Content, ContentState
 from smart_tutor.knowledge.domain.document import Document, DocumentState
 from smart_tutor.knowledge.domain.upload import Upload, UploadOutcome
 from smart_tutor.knowledge.ports.library import (
+    ChunkRepository,
     ContentRepository,
     DocumentRepository,
     LibraryUnitOfWork,
@@ -76,6 +78,16 @@ class _Contents(ContentRepository):
         row = self._conn.execute(select(contents).where(contents.c.sha256 == content.sha256)).one()
         return _content(row), False
 
+    # The three methods below are implemented in the next commit (SQL/S3 adapters for processing).
+    def get(self, content_id: ContentId) -> Content | None:
+        raise NotImplementedError
+
+    def get_for_update(self, content_id: ContentId) -> Content | None:
+        raise NotImplementedError
+
+    def save(self, content: Content) -> None:
+        raise NotImplementedError
+
 
 class _Documents(DocumentRepository):
     def __init__(self, conn: Connection) -> None:
@@ -104,6 +116,9 @@ class _Documents(DocumentRepository):
             .values(content_id=document.content_id, state=document.state.value, failure_reason=document.failure_reason)
         )
 
+    def list_processing_for_content_for_update(self, content_id: ContentId) -> list[Document]:
+        raise NotImplementedError  # implemented in the next commit (SQL/S3 adapters for processing)
+
     def list_readable_by(self, user_id: UserId) -> list[Document]:
         rows = self._conn.execute(
             select(documents)
@@ -128,6 +143,11 @@ class _Uploads(UploadRepository):
         )
 
 
+class _Chunks(ChunkRepository):
+    def replace(self, content_id: ContentId, chunks: list[Chunk]) -> None:
+        raise NotImplementedError  # implemented in the next commit (SQL/S3 adapters for processing)
+
+
 class SqlLibraryUnitOfWork(LibraryUnitOfWork):
     def __init__(self, engine: Engine) -> None:
         self._engine = engine
@@ -138,6 +158,7 @@ class SqlLibraryUnitOfWork(LibraryUnitOfWork):
         self.contents = _Contents(self._conn)
         self.documents = _Documents(self._conn)
         self.uploads = _Uploads(self._conn)
+        self.chunks = _Chunks()
         return self
 
     def commit(self) -> None:
