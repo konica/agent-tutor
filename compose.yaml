@@ -143,10 +143,12 @@ services:
       AWS_ENDPOINT_URL_SQS: http://localstack:4566
       SMART_TUTOR_S3_PATH_STYLE: "true"
       SMART_TUTOR_LOCALSTACK: "true"
-      # Bedrock uses AWS_PROFILE and AWS_REGION from .env, read from the mounted ~/.aws.
-      AWS_CONFIG_FILE: /aws/config
-      AWS_SHARED_CREDENTIALS_FILE: /aws/credentials
-    volumes: ["~/.aws:/aws:ro"]
+      # Bedrock uses AWS_PROFILE and SMART_TUTOR_AWS_REGION (Settings.aws_region) from .env. botocore reads
+      # config, credentials and the SSO / `aws login` caches under $HOME/.aws; the image user (uid 10001) has no
+      # home, so give it one and mount your ~/.aws there. The mount is read-only, so SSO token refresh can't write
+      # its cache: run `aws sso login` / `aws login` on the host first.
+      HOME: /home/app
+    volumes: ["~/.aws:/home/app/.aws:ro"]
     depends_on:
       migrate: {condition: service_completed_successfully}
       localstack: {condition: service_started}

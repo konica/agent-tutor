@@ -1,7 +1,7 @@
 from io import BytesIO
 
 import pytest
-from pypdf import PdfReader, PdfWriter
+from pypdf import PageObject, PdfReader, PdfWriter
 
 from fakes.pdfs import make_pdf
 from smart_tutor.knowledge.adapters.pypdf_extractor import PypdfExtractor
@@ -38,3 +38,15 @@ def test_encrypted_pdf_raises() -> None:
 
     with pytest.raises(UnreadablePdfError):
         PypdfExtractor().extract_pages(out.getvalue())
+
+
+@pytest.mark.parametrize("error", [KeyError("/DescendantFonts"), AttributeError("get_object"), TypeError("bad")])
+def test_any_parser_exception_becomes_unreadable(monkeypatch: pytest.MonkeyPatch, error: Exception) -> None:
+    def broken(self: PageObject, *args: object, **kwargs: object) -> str:
+        raise error
+
+    monkeypatch.setattr(PageObject, "extract_text", broken)
+
+    with pytest.raises(UnreadablePdfError) as raised:
+        PypdfExtractor().extract_pages(make_pdf(["Hello"]))
+    assert raised.value.__cause__ is error

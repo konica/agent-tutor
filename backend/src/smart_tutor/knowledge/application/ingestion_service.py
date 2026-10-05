@@ -130,12 +130,12 @@ class IngestionService:
             return self._fail(content_id, UNREADABLE_PDF)
         if not has_text_layer(pages):
             return self._fail(content_id, NO_TEXT_LAYER)
-        text_key = pages_key(content.sha256)
-        listing = {"pages": [{"page": number, "text": text} for number, text in enumerate(pages, start=1)]}
-        self._objects.put(text_key, json.dumps(listing, ensure_ascii=False).encode(), "application/json")
         chunks = self._chunks(content_id, pages)
         if not chunks:
             return self._fail(content_id, NO_TEXT_LAYER)
+        text_key = pages_key(content.sha256)
+        listing = {"pages": [{"page": number, "text": text} for number, text in enumerate(pages, start=1)]}
+        self._objects.put(text_key, json.dumps(listing, ensure_ascii=False).encode(), "application/json")
 
         with self._uow() as tx:
             locked = tx.contents.get_for_update(content_id)
