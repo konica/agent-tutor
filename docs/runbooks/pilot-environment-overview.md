@@ -1,6 +1,6 @@
 # Pilot environment on AWS: the big picture
 
-How the pilot environment (#54) fits together across GitHub and AWS: who deploys what, how the pieces trust each other, and how a learner's request travels. It shows the **target** after #55–#59, per the decisions on #54 and PRD §9.11–§9.12. Today only the CDK bootstrap exists; the CDK stacks in `infra/` are still empty. The human setup is in [`pilot-aws-prerequisites.md`](pilot-aws-prerequisites.md).
+How the pilot environment (#54) fits together across GitHub and AWS: who deploys what, how the pieces trust each other, and how a learner's request travels. It shows the **target** after #55–#59, per the decisions on #54 and PRD §9.11–§9.12. Today the CDK bootstrap and the deploy role exist (#55), and #56 adds the network, cluster, registry, edge (internal ALB and CloudFront), and budget stacks. The deploy steps are in [`pilot-deploy.md`](pilot-deploy.md). The human setup is in [`pilot-aws-prerequisites.md`](pilot-aws-prerequisites.md).
 
 ## 1. Platforms and trust
 
@@ -75,7 +75,7 @@ flowchart LR
   ADM["Admin's browser"] -->|"HTTPS /auth/admin"| CF
 
   subgraph VPC["VPC — private subnets"]
-    ALB["Internal Application Load Balancer<br/>(AWS Load Balancer Controller)"]
+    ALB["Internal Application Load Balancer<br/>(CDK EdgeStack; pods registered by the LB controller)"]
     subgraph K8S["EKS — Helm chart smart-tutor"]
       WEB["web<br/>React app shell"]
       API["api<br/>FastAPI"]
@@ -172,7 +172,7 @@ To roll back, run `helm upgrade` with an earlier commit SHA as the image tag (th
 | Piece | Built in | By | How |
 |---|---|---|---|
 | CDK bootstrap, OIDC provider, deploy role, GitHub environment `pilot`, quota checks, budget decision | #55 | Human (admin) runs one script, once | CDK `GitHubDeployStack`; `pilot-aws-prerequisites.ps1` for bootstrap and the GitHub environment |
-| VPC, NAT, EKS + node group, Pod Identity, ECR, add-ons (load balancer controller, External Secrets, metrics-server), internal load balancer, CloudFront with VPC origin, `web`, budget alarm, ADR + PRD update | #56 | Agent; human runs the first deploy | CDK `NetworkStack`, `ClusterStack`, `RegistryStack`, `BudgetsStack`; `deploy/helm/addons/`; chart `web` |
+| VPC, NAT, EKS + node group, Pod Identity, ECR, add-ons (load balancer controller, External Secrets, metrics-server), internal load balancer, CloudFront with VPC origin, `web`, budget alarm, ADR + PRD update | #56 | Agent; human runs the first deploy | CDK `NetworkStack`, `ClusterStack`, `RegistryStack`, `EdgeStack`, `BudgetsStack`; `deploy/helm/addons/`; chart `web` |
 | RDS (DB app, DB keycloak), Secrets Manager entries, `keycloak` at `/auth`, production realm | #57 | Agent; human creates the client's account | CDK `DataStack`, `ConfigStack`; chart `keycloak` |
 | `api` at `/api`, `migrate` hook Job, same-origin web build, probes | #58 | Agent; human runs the demo and hands over access | chart `api`, `values-prod.yaml` |
 | Deploy-on-merge workflow, smoke test, rollback runbook | #59 | Agent; human merges and approves | `.github/workflows/` |

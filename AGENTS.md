@@ -12,7 +12,7 @@ Sources of truth — read the relevant one before changing behavior or structure
 |---|---|
 | Product behavior, user stories, data model, flows, evals, roadmap | `sdd/prd.md` (v2.8) |
 | Folder structure, module boundaries, import rules | `sdd/specs/2026-10-02-project-structure-design.md` |
-| Why an architecture choice was made | `sdd/adr/` (0001–0008) |
+| Why an architecture choice was made | `sdd/adr/` (0001–0009) |
 | Why the PRD changed in v2.1 | `sdd/reviews/2026-10-03-prd-v2.0-review.md` |
 
 **Release scope:** build **Release 1** (core tutor: modules `knowledge`, `subjects`, `tutoring`, `learning`, `accounts`, `insights`). Later releases already have empty modules and prepared data (R2 research map → `graph`; R3 `catalog`, `quizzes`, `recommendations`, `reports`; R4 sharing and imports; R5 deep graph); build them only when asked.
