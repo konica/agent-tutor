@@ -6,7 +6,13 @@ from langchain_core.documents import BaseDocumentTransformer, Document
 from langchain_core.embeddings import Embeddings
 
 from fakes import FakeObjectStore, FixedClock, InMemoryLibrary, fake_embeddings, fake_tools
-from smart_tutor.knowledge.application import ContentState, IngestionService, ProcessingTools, UploadService
+from smart_tutor.knowledge.application import (
+    ContentState,
+    IngestionService,
+    ProcessingTools,
+    UnreadablePdfError,
+    UploadService,
+)
 from smart_tutor.knowledge.domain.content import NO_TEXT_LAYER, UNREADABLE_PDF, pages_key
 from smart_tutor.knowledge.domain.errors import InvalidChunkError
 from smart_tutor.shared.domain.ids import ContentId, UserId
@@ -177,3 +183,47 @@ def test_wrong_embedding_dimension_crashes_and_stores_nothing() -> None:
 
 def test_an_unknown_content_is_ignored() -> None:
     assert World().ingestion.process_content(ContentId("nope")) is None
+
+
+class FinishesElsewhere(Embeddings):
+    """While this run embeds, a concurrent run finishes the content (the state flips under it)."""
+
+    def __init__(self) -> None:
+        self.library: InMemoryLibrary | None = None
+        self._inner = fake_embeddings(8)
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        assert self.library is not None
+        [content] = self.library.state.contents.values()
+        content.state = ContentState.READY
+        return self._inner.embed_documents(texts)
+
+    def embed_query(self, text: str) -> list[float]:
+        return self._inner.embed_query(text)
+
+
+def test_a_content_finished_by_another_run_is_left_alone_at_the_final_lock() -> None:
+    embeddings = FinishesElsewhere()
+    w = World(fake_tools(embeddings=embeddings))
+    embeddings.library = w.library
+    started = w.uploads.start_upload(UserId("ada"), "paper.pdf")
+    w.objects.objects[started.fields["key"]] = pdf(SENTENCE)
+
+    w.ingestion.ingest_upload(started.fields["key"])
+
+    assert w.library.state.chunks == {}
+    assert w.library.state.documents[started.document_id].state == "processing"
+
+
+def test_a_content_finished_by_another_run_is_left_alone_when_failing() -> None:
+    w = World()
+    _, content_id = w.upload(pdf(SENTENCE))
+    w.library.state.contents[content_id].state = ContentState.PROCESSING
+
+    def finish_then_unreadable(data: bytes) -> list[str]:
+        w.library.state.contents[content_id].state = ContentState.READY
+        raise UnreadablePdfError("unreadable")
+
+    w.tools.extractor.extract_pages = finish_then_unreadable  # type: ignore[method-assign]
+    assert w.ingestion.process_content(ContentId(content_id)) is None
+    assert w.library.state.contents[content_id].failure_reason is None
