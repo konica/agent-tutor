@@ -1,12 +1,13 @@
 """PostgreSQL library: one connection and transaction per unit of work."""
 
+import uuid
 from types import TracebackType
 from typing import Any, Self
 
-from sqlalchemy import ColumnElement, Connection, Engine, func, select, update
+from sqlalchemy import ColumnElement, Connection, Engine, delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 
-from smart_tutor.knowledge.adapters.sql_tables import contents, documents, uploads
+from smart_tutor.knowledge.adapters.sql_tables import chunks, contents, document_subjects, documents, uploads
 from smart_tutor.knowledge.domain.chunk import Chunk
 from smart_tutor.knowledge.domain.content import Content, ContentState
 from smart_tutor.knowledge.domain.document import Document, DocumentState
@@ -18,7 +19,7 @@ from smart_tutor.knowledge.ports.library import (
     LibraryUnitOfWork,
     UploadRepository,
 )
-from smart_tutor.shared.domain.ids import ContentId, DocumentId, UploadId, UserId
+from smart_tutor.shared.domain.ids import ContentId, DocumentId, SubjectId, UploadId, UserId
 
 
 def readable_by(user_id: UserId) -> ColumnElement[bool]:
@@ -35,10 +36,16 @@ def _content(row: Any) -> Content:
         ContentState(row.state),
         row.attempts,
         UserId(row.processed_by_user_id) if row.processed_by_user_id else None,
+        failure_reason=row.failure_reason,
+        pages=row.pages,
+        text_key=row.text_key,
+        chunker=row.chunker,
+        embedding_model=row.embedding_model,
+        embedding_dim=row.embedding_dim,
     )
 
 
-def _document(row: Any) -> Document:
+def _document(row: Any, subject_ids: list[SubjectId]) -> Document:
     return Document(
         document_id=DocumentId(row.document_id),
         owner_id=UserId(row.owner_id),
@@ -49,6 +56,7 @@ def _document(row: Any) -> Document:
         content_id=ContentId(row.content_id) if row.content_id else None,
         failure_reason=row.failure_reason,
         title_override=row.title_override,
+        subject_ids=subject_ids,
     )
 
 
@@ -78,15 +86,28 @@ class _Contents(ContentRepository):
         row = self._conn.execute(select(contents).where(contents.c.sha256 == content.sha256)).one()
         return _content(row), False
 
-    # The three methods below are implemented in the next commit (SQL/S3 adapters for processing).
     def get(self, content_id: ContentId) -> Content | None:
-        raise NotImplementedError
+        row = self._conn.execute(select(contents).where(contents.c.content_id == content_id)).first()
+        return _content(row) if row else None
 
     def get_for_update(self, content_id: ContentId) -> Content | None:
-        raise NotImplementedError
+        row = self._conn.execute(select(contents).where(contents.c.content_id == content_id).with_for_update()).first()
+        return _content(row) if row else None
 
     def save(self, content: Content) -> None:
-        raise NotImplementedError
+        self._conn.execute(
+            update(contents)
+            .where(contents.c.content_id == content.content_id)
+            .values(
+                state=content.state.value,
+                failure_reason=content.failure_reason,
+                pages=content.pages,
+                text_key=content.text_key,
+                chunker=content.chunker,
+                embedding_model=content.embedding_model,
+                embedding_dim=content.embedding_dim,
+            )
+        )
 
 
 class _Documents(DocumentRepository):
@@ -107,7 +128,7 @@ class _Documents(DocumentRepository):
 
     def get_by_upload_for_update(self, upload_id: UploadId) -> Document | None:
         row = self._conn.execute(select(documents).where(documents.c.upload_id == upload_id).with_for_update()).first()
-        return _document(row) if row else None
+        return self._load([row])[0] if row else None
 
     def save(self, document: Document) -> None:
         self._conn.execute(
@@ -115,9 +136,21 @@ class _Documents(DocumentRepository):
             .where(documents.c.document_id == document.document_id)
             .values(content_id=document.content_id, state=document.state.value, failure_reason=document.failure_reason)
         )
+        self._conn.execute(delete(document_subjects).where(document_subjects.c.document_id == document.document_id))
+        if document.subject_ids:
+            self._conn.execute(
+                document_subjects.insert(),
+                [{"document_id": document.document_id, "subject_id": sid} for sid in document.subject_ids],
+            )
 
     def list_processing_for_content_for_update(self, content_id: ContentId) -> list[Document]:
-        raise NotImplementedError  # implemented in the next commit (SQL/S3 adapters for processing)
+        rows = self._conn.execute(
+            select(documents)
+            .where(documents.c.content_id == content_id, documents.c.state == DocumentState.PROCESSING.value)
+            .order_by(documents.c.document_id)  # a stable lock order for concurrent workers
+            .with_for_update()
+        ).all()
+        return self._load(list(rows))
 
     def list_readable_by(self, user_id: UserId) -> list[Document]:
         rows = self._conn.execute(
@@ -125,7 +158,20 @@ class _Documents(DocumentRepository):
             .where(readable_by(user_id), documents.c.archived.is_(False))
             .order_by(documents.c.created_at.desc(), documents.c.document_id)
         )
-        return [_document(r) for r in rows]
+        return self._load(list(rows))
+
+    def _load(self, rows: list[Any]) -> list[Document]:
+        """Documents with their subject ids in one extra query. Postgres keeps no insertion order, so by id."""
+        by_document: dict[str, list[SubjectId]] = {}
+        if rows:
+            subject_rows = self._conn.execute(
+                select(document_subjects.c.document_id, document_subjects.c.subject_id)
+                .where(document_subjects.c.document_id.in_([r.document_id for r in rows]))
+                .order_by(document_subjects.c.subject_id)
+            )
+            for r in subject_rows:
+                by_document.setdefault(str(r.document_id), []).append(SubjectId(str(r.subject_id)))
+        return [_document(r, by_document.get(str(r.document_id), [])) for r in rows]
 
 
 class _Uploads(UploadRepository):
@@ -144,8 +190,26 @@ class _Uploads(UploadRepository):
 
 
 class _Chunks(ChunkRepository):
-    def replace(self, content_id: ContentId, chunks: list[Chunk]) -> None:
-        raise NotImplementedError  # implemented in the next commit (SQL/S3 adapters for processing)
+    def __init__(self, conn: Connection) -> None:
+        self._conn = conn
+
+    def replace(self, content_id: ContentId, new_chunks: list[Chunk]) -> None:
+        self._conn.execute(delete(chunks).where(chunks.c.content_id == content_id))
+        if new_chunks:
+            self._conn.execute(
+                chunks.insert(),
+                [
+                    {
+                        "chunk_id": str(uuid.uuid4()),
+                        "content_id": c.content_id,
+                        "seq": c.seq,
+                        "page": c.page,
+                        "text": c.text,
+                        "embedding": c.embedding,
+                    }
+                    for c in new_chunks
+                ],
+            )
 
 
 class SqlLibraryUnitOfWork(LibraryUnitOfWork):
@@ -158,7 +222,7 @@ class SqlLibraryUnitOfWork(LibraryUnitOfWork):
         self.contents = _Contents(self._conn)
         self.documents = _Documents(self._conn)
         self.uploads = _Uploads(self._conn)
-        self.chunks = _Chunks()
+        self.chunks = _Chunks(self._conn)
         return self
 
     def commit(self) -> None:

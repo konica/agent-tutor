@@ -70,3 +70,11 @@ def test_another_key_is_rejected(store: S3ObjectStore) -> None:
     assert post(p, b"%PDF", key=other).status_code in (400, 403)
     with pytest.raises(ObjectNotFoundError):
         store.read(other)
+
+
+def test_put_stores_bytes_with_the_content_type_and_replaces(store: S3ObjectStore) -> None:
+    key = f"contents/it-{uuid.uuid4()}.pages.json"
+    store.put(key, b'{"pages": []}', "application/json")
+    store.put(key, b'{"pages": [1]}', "application/json")
+    assert store.read(key) == b'{"pages": [1]}'
+    store.delete(key)

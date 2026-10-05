@@ -9,13 +9,14 @@ import pytest
 from sqlalchemy import Engine, text
 
 from smart_tutor.knowledge.adapters.sql_library import SqlLibraryUnitOfWork
-from smart_tutor.knowledge.domain.content import Content
+from smart_tutor.knowledge.domain.chunk import Chunk
+from smart_tutor.knowledge.domain.content import UNREADABLE_PDF, Content
 from smart_tutor.knowledge.domain.document import DUPLICATE_UPLOAD, Document
 from smart_tutor.knowledge.domain.upload import Upload, UploadOutcome
 from smart_tutor.shared.adapters.postgres.engine import create_db_engine
 from smart_tutor.shared.adapters.postgres.migrate import upgrade_to_head
 from smart_tutor.shared.config import Settings
-from smart_tutor.shared.domain.ids import ContentId, DocumentId, UploadId, UserId
+from smart_tutor.shared.domain.ids import ContentId, DocumentId, SubjectId, UploadId, UserId
 
 pytestmark = pytest.mark.integration
 
@@ -108,3 +109,137 @@ def test_duplicate_document_keeps_content_id_null(engine: Engine) -> None:
         by_id = {d.document_id: d for d in tx.documents.list_readable_by(UserId(owner))}
     assert by_id[first.document_id].content_id == content.content_id
     assert (by_id[second.document_id].state, by_id[second.document_id].content_id) == ("failed", None)
+
+
+GENERAL = SubjectId("00000000-0000-4000-8000-000000000001")
+
+
+def stored_content(engine: Engine, owner: str) -> Content:
+    sha = hashlib.sha256(uid().encode()).hexdigest()
+    with SqlLibraryUnitOfWork(engine) as tx:
+        content, _ = tx.contents.insert_or_get(Content.first_upload(ContentId(uid()), sha, 10, UserId(owner)))
+        tx.commit()
+    return content
+
+
+def link(engine: Engine, doc: Document, content: Content) -> None:
+    with SqlLibraryUnitOfWork(engine) as tx:
+        loaded = tx.documents.get_by_upload_for_update(doc.upload_id)
+        assert loaded is not None
+        loaded.link_content(content.content_id)
+        tx.documents.save(loaded)
+        tx.commit()
+
+
+def chunk(content: Content, seq: int, page: int | None, value: float) -> Chunk:
+    return Chunk(content.content_id, seq, page, f"text {seq}", [value] * 1024)
+
+
+def test_replace_chunks_is_idempotent(engine: Engine) -> None:
+    content = stored_content(engine, f"ada-{uid()}")
+    first = [chunk(content, 0, 1, 0.1), chunk(content, 1, 2, 0.2), chunk(content, 2, None, 0.3)]
+    second = [chunk(content, 0, 1, 0.5), chunk(content, 1, 3, 0.25)]
+    for batch in (first, second, second):
+        with SqlLibraryUnitOfWork(engine) as tx:
+            tx.chunks.replace(content.content_id, batch)
+            tx.commit()
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("select seq, page, text, embedding::text as emb from chunks where content_id = :c order by seq"),
+            {"c": content.content_id},
+        ).all()
+    assert [(r.seq, r.page, r.text) for r in rows] == [(0, 1, "text 0"), (1, 3, "text 1")]
+    vectors = [[float(v) for v in r.emb.strip("[]").split(",")] for r in rows]
+    assert [len(v) for v in vectors] == [1024, 1024]
+    assert vectors[0][0] == pytest.approx(0.5)
+    assert vectors[1][-1] == pytest.approx(0.25)
+
+
+def test_replace_with_no_chunks_only_deletes(engine: Engine) -> None:
+    content = stored_content(engine, f"ada-{uid()}")
+    with SqlLibraryUnitOfWork(engine) as tx:
+        tx.chunks.replace(content.content_id, [chunk(content, 0, 1, 0.1)])
+        tx.chunks.replace(content.content_id, [])
+        tx.commit()
+    with engine.connect() as conn:
+        count = conn.execute(text("select count(*) from chunks where content_id = :c"), {"c": content.content_id})
+        assert count.scalar_one() == 0
+
+
+def test_ready_content_fields_round_trip(engine: Engine) -> None:
+    content = stored_content(engine, f"ada-{uid()}")
+    with SqlLibraryUnitOfWork(engine) as tx:
+        locked = tx.contents.get_for_update(content.content_id)
+        assert locked is not None
+        locked.ready(pages=3, text_key="contents/x.pages.json", chunker="c:v1", embedding_model="m", embedding_dim=1024)
+        tx.contents.save(locked)
+        tx.commit()
+    with SqlLibraryUnitOfWork(engine) as tx:
+        loaded = tx.contents.get(content.content_id)
+    assert loaded is not None
+    assert (loaded.state, loaded.pages, loaded.text_key, loaded.chunker) == (
+        "ready",
+        3,
+        "contents/x.pages.json",
+        "c:v1",
+    )
+    assert (loaded.embedding_model, loaded.embedding_dim, loaded.failure_reason) == ("m", 1024, None)
+
+
+def test_failed_content_round_trips_its_reason(engine: Engine) -> None:
+    content = stored_content(engine, f"ada-{uid()}")
+    with SqlLibraryUnitOfWork(engine) as tx:
+        locked = tx.contents.get_for_update(content.content_id)
+        assert locked is not None
+        locked.fail(UNREADABLE_PDF)
+        tx.contents.save(locked)
+        tx.commit()
+    with SqlLibraryUnitOfWork(engine) as tx:
+        loaded = tx.contents.get(content.content_id)
+    assert loaded is not None
+    assert (loaded.state, loaded.failure_reason) == ("failed", UNREADABLE_PDF)
+
+
+def test_missing_content_is_none(engine: Engine) -> None:
+    with SqlLibraryUnitOfWork(engine) as tx:
+        assert tx.contents.get(ContentId(uid())) is None
+        assert tx.contents.get_for_update(ContentId(uid())) is None
+
+
+def test_ready_document_round_trips_its_subjects(engine: Engine) -> None:
+    owner = f"ada-{uid()}"
+    doc = start(engine, owner)
+    link(engine, doc, stored_content(engine, owner))
+    with SqlLibraryUnitOfWork(engine) as tx:
+        loaded = tx.documents.get_by_upload_for_update(doc.upload_id)
+        assert loaded is not None
+        assert loaded.subject_ids == []
+        loaded.ready([GENERAL])
+        tx.documents.save(loaded)
+        tx.documents.save(loaded)  # saving twice replaces the rows
+        tx.commit()
+    with SqlLibraryUnitOfWork(engine) as tx:
+        (listed,) = tx.documents.list_readable_by(UserId(owner))
+        locked = tx.documents.get_by_upload_for_update(doc.upload_id)
+    assert (listed.state, listed.subject_ids) == ("ready", [GENERAL])
+    assert locked is not None and locked.subject_ids == [GENERAL]
+
+
+def test_list_processing_for_content_excludes_ready_and_failed(engine: Engine) -> None:
+    owners = [f"u{i}-{uid()}" for i in range(3)]
+    docs = [start(engine, o) for o in owners]
+    content = stored_content(engine, owners[0])
+    for d in docs:
+        link(engine, d, content)
+    with SqlLibraryUnitOfWork(engine) as tx:
+        ready = tx.documents.get_by_upload_for_update(docs[1].upload_id)
+        failed = tx.documents.get_by_upload_for_update(docs[2].upload_id)
+        assert ready is not None and failed is not None
+        ready.ready([GENERAL])
+        failed.fail("nope")
+        tx.documents.save(ready)
+        tx.documents.save(failed)
+        tx.commit()
+    with SqlLibraryUnitOfWork(engine) as tx:
+        processing = tx.documents.list_processing_for_content_for_update(content.content_id)
+    assert [d.document_id for d in processing] == [docs[0].document_id]

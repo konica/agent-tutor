@@ -9,12 +9,12 @@ from smart_tutor.shared.config import Settings
 pytestmark = pytest.mark.integration
 
 
-def test_upgrade_to_head_reaches_the_library_head_and_is_repeatable() -> None:
+def test_upgrade_to_head_reaches_the_chunks_head_and_is_repeatable() -> None:
     url = Settings().database_url
     upgrade_to_head(url)
     upgrade_to_head(url)  # running twice is a no-op
     with create_engine(url).connect() as conn:
-        assert conn.execute(text("select version_num from alembic_version")).scalar_one() == "0002"
+        assert conn.execute(text("select version_num from alembic_version")).scalar_one() == "0003"
 
 
 def test_general_subject_is_seeded() -> None:

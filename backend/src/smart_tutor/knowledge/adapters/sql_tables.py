@@ -1,5 +1,6 @@
 """SQLAlchemy Core views of the library tables (the schema itself lives in the Alembic migrations)."""
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import BigInteger, Boolean, Column, DateTime, Integer, MetaData, String, Table, Text, Uuid
 
 metadata = MetaData()
@@ -15,6 +16,12 @@ contents = Table(
     Column("attempts", Integer),
     Column("processed_by_user_id", Text),
     Column("processed_at", DateTime(timezone=True)),
+    Column("failure_reason", Text),
+    Column("pages", Integer),
+    Column("text_key", Text),
+    Column("chunker", Text),
+    Column("embedding_model", Text),
+    Column("embedding_dim", Integer),
 )
 
 uploads = Table(
@@ -40,4 +47,22 @@ documents = Table(
     Column("archived", Boolean),
     Column("title_override", Text),
     Column("created_at", DateTime(timezone=True)),
+)
+
+document_subjects = Table(
+    "document_subjects",
+    metadata,
+    Column("document_id", Uuid(as_uuid=False), primary_key=True),
+    Column("subject_id", Uuid(as_uuid=False), primary_key=True),
+)
+
+chunks = Table(
+    "chunks",
+    metadata,
+    Column("chunk_id", Uuid(as_uuid=False), primary_key=True),
+    Column("content_id", Uuid(as_uuid=False)),
+    Column("seq", Integer),
+    Column("page", Integer),
+    Column("text", Text),
+    Column("embedding", Vector(1024)),
 )
