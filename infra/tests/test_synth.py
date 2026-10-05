@@ -14,9 +14,13 @@ def make_app(**extra_context: Any) -> cdk.App:
     return cdk.App(context={**CDK_CONTEXT, **extra_context})
 
 
-def github_deploy_template(app: cdk.App) -> Template:
-    stack = next(s for s in build_app(app) if s.stack_name == "SmartTutor-prod-GitHubDeploy")
+def template(app: cdk.App, suffix: str) -> Template:
+    stack = next(s for s in build_app(app) if s.stack_name == f"SmartTutor-prod-{suffix}")
     return Template.from_stack(stack)
+
+
+def github_deploy_template(app: cdk.App) -> Template:
+    return template(app, "GitHubDeploy")
 
 
 def test_all_stacks_synthesize_in_us_east_1() -> None:
@@ -91,4 +95,52 @@ def test_an_existing_oidc_provider_is_imported_instead_of_created() -> None:
     template.has_resource_properties(
         "AWS::IAM::Role",
         {"AssumeRolePolicyDocument": {"Statement": [Match.object_like({"Principal": {"Federated": arn}})]}},
+    )
+
+
+def test_network_has_private_subnets_and_one_nat_gateway() -> None:
+    t = template(make_app(), "Network")
+
+    t.resource_count_is("AWS::EC2::VPC", 1)
+    t.resource_count_is("AWS::EC2::NatGateway", 1)
+    t.resource_count_is("AWS::EC2::InternetGateway", 1)  # CloudFront VPC origins require one
+    t.resource_count_is("AWS::EC2::Subnet", 4)
+    for subnet in t.find_resources("AWS::EC2::Subnet").values():
+        assert subnet["Properties"]["MapPublicIpOnLaunch"] is False
+    t.has_output("VpcId", {})
+
+
+def test_registry_has_one_repository_per_service_and_empties_them_on_delete() -> None:
+    t = template(make_app(), "Registry")
+
+    names = sorted(r["Properties"]["RepositoryName"] for r in t.find_resources("AWS::ECR::Repository").values())
+    assert names == [f"smart-tutor/{s}" for s in ["agent", "api", "keycloak", "mcp", "web", "worker"]]
+    t.has_resource_properties("AWS::ECR::Repository", {"ImageScanningConfiguration": {"ScanOnPush": True}})
+    t.resource_count_is("Custom::ECRAutoDeleteImages", 6)  # teardown works with images inside
+    t.has_output("RegistryUri", {})
+
+
+def test_budget_alerts_at_80_percent_actual_and_100_percent_forecast() -> None:
+    t = template(make_app(), "Budgets")
+
+    t.has_resource_properties(
+        "AWS::Budgets::Budget",
+        {
+            "Budget": {
+                "BudgetName": "smart-tutor-prod-monthly",
+                "BudgetType": "COST",
+                "TimeUnit": "MONTHLY",
+                "BudgetLimit": {"Amount": 400, "Unit": "USD"},
+            },
+            "NotificationsWithSubscribers": [
+                {
+                    "Notification": Match.object_like({"NotificationType": "ACTUAL", "Threshold": 80}),
+                    "Subscribers": [{"SubscriptionType": "EMAIL", "Address": "dtrungthao@gmail.com"}],
+                },
+                {
+                    "Notification": Match.object_like({"NotificationType": "FORECASTED", "Threshold": 100}),
+                    "Subscribers": [{"SubscriptionType": "EMAIL", "Address": "dtrungthao@gmail.com"}],
+                },
+            ],
+        },
     )

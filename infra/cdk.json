@@ -3,6 +3,9 @@
   "context": {
     "smart-tutor:region": "us-east-1",
     "smart-tutor:github-oidc-subject-prefix": "repo:konica@1114311/agent-tutor@1399048529",
-    "smart-tutor:github-environment": "pilot"
+    "smart-tutor:github-environment": "pilot",
+    "smart-tutor:eks-admin-principal-arns": ["arn:aws:iam::685394474162:user/poweruser"],
+    "smart-tutor:budget-monthly-usd": 400,
+    "smart-tutor:budget-alert-emails": ["dtrungthao@gmail.com"]
   }
 }

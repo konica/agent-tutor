@@ -15,6 +15,7 @@ from smart_tutor_infra.stacks.storage import StorageStack
 def build_app(app: cdk.App, env_name: str = "prod") -> list[cdk.Stack]:
     env = cdk.Environment(region=app.node.try_get_context("smart-tutor:region") or "us-east-1")
     prefix = f"SmartTutor-{env_name}"
+    name = f"smart-tutor-{env_name}"
     network = NetworkStack(app, f"{prefix}-Network", env=env)
     stacks: list[cdk.Stack] = [
         network,
@@ -23,7 +24,14 @@ def build_app(app: cdk.App, env_name: str = "prod") -> list[cdk.Stack]:
         ClusterStack(app, f"{prefix}-Cluster", env=env),
         RegistryStack(app, f"{prefix}-Registry", env=env),
         ConfigStack(app, f"{prefix}-Config", env=env),
-        BudgetsStack(app, f"{prefix}-Budgets", env=env),
+        BudgetsStack(
+            app,
+            f"{prefix}-Budgets",
+            env=env,
+            budget_name=f"{name}-monthly",
+            monthly_usd=app.node.get_context("smart-tutor:budget-monthly-usd"),
+            alert_emails=app.node.get_context("smart-tutor:budget-alert-emails"),
+        ),
     ]
     for stack in stacks[1:]:
         stack.add_stack_dependency(network)
