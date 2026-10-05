@@ -19,13 +19,14 @@ Requirements: Docker, [uv](https://docs.astral.sh/uv/), Node 22+, an AWS profile
 
 ```bash
 cp .env.example .env          # fill in AWS_PROFILE and LANGSMITH_API_KEY
-make up                       # pgvector, Keycloak (realm imported), LocalStack
+make up                       # pgvector, Keycloak (realm imported), LocalStack, Mailpit
 make sync                     # backend dependencies
 make lint test                # ruff, mypy, import contracts, unit tests
 make web                      # http://localhost:10453
 ```
 
 Keycloak admin console: http://localhost:10401 (admin / admin). Test users: `learner@example.com` / `learner`, `learner2@example.com` / `learner2`, `admin@example.com` / `admin`.
+Sign up from the app's sign-in page: Keycloak sends the verification email to Mailpit, http://localhost:10403. After pulling a realm change, run `docker compose down -v` so the realm re-imports.
 
 No `make` on Windows? Each target in the `Makefile` is a one-line command you can run directly.
 
@@ -38,6 +39,7 @@ Two ways, on the same ports: dependency services count up from 10400, app servic
 | Postgres (pgvector) | 10400 | Docker | Docker |
 | Keycloak | 10401 | Docker | Docker |
 | LocalStack (S3, SQS, SSM) | 10402 | Docker | Docker |
+| Mailpit (email UI) | 10403 | Docker | Docker |
 | API | 10450 | Docker | `make api` (reloads on change) |
 | Agent | 10451 | Docker | `make agent` |
 | RAG MCP server | 10452 | Docker | `make mcp` |
@@ -50,7 +52,7 @@ Two ways, on the same ports: dependency services count up from 10400, app servic
 
 ```bash
 docker compose --profile app stop     # only if Option A is running: it holds 10450–10453
-make up                               # pgvector, Keycloak, LocalStack
+make up                               # pgvector, Keycloak, LocalStack, Mailpit
 make sync migrate                     # backend dependencies, database schema
 cd web && npm ci && cd ..             # web dependencies (first time)
 # then one terminal each:

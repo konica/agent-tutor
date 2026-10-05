@@ -1,5 +1,5 @@
 # Local development (PRD §9.12).
-#   docker compose up -d                 # dependencies only: pgvector, Keycloak, LocalStack
+#   docker compose up -d                 # dependencies only: pgvector, Keycloak, LocalStack, Mailpit
 #   docker compose --profile app up -d   # + app services from the same images as production
 # Bedrock and LangSmith have no emulator: agent and mcp call the real us-east-1 models with your AWS profile.
 
@@ -61,6 +61,7 @@ services:
       - ./local/keycloak:/opt/keycloak/data/import:ro
     depends_on:
       postgres: {condition: service_healthy}
+      mailpit: {condition: service_started}
 
   localstack:
     image: localstack/localstack:4
@@ -78,6 +79,11 @@ services:
       timeout: 10s
       retries: 40
       start_period: 10s
+
+  # Catches Keycloak's emails (sign-up verification). Web UI at http://localhost:10403; SMTP stays on the network.
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports: ["10403:8025"]
 
   # --- app profile: same images as production -------------------------------------------
   migrate:
