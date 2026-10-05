@@ -22,7 +22,8 @@ logger = logging.getLogger(__name__)
 FIRST_PAGES = 2
 MAX_PAGE_CHARS = 4_000  # per page; title pages are short, and this caps the cost of one call
 TOOL_NAME = "describe_document"
-_QUOTE_TAG = re.compile(r"</?\s*first_pages\s*>", re.IGNORECASE)
+# Any look-alike of our tag: `</first_pages>`, `< first_pages foo>`, or one cut off by the end of the page.
+_QUOTE_TAG = re.compile(r"<\s*/?\s*first_pages[^>]*(?:>|\Z)", re.IGNORECASE)
 
 DESCRIBE_DOCUMENT_TOOL: dict[str, Any] = {
     "name": TOOL_NAME,
@@ -69,10 +70,17 @@ class Described:
     usage: TokenUsage
 
 
+def _without_quote_tags(text: str) -> str:
+    """Removes tag look-alikes until none are left: one pass can join the halves of a nested tag into a new one."""
+    while (stripped := _QUOTE_TAG.sub("", text)) != text:
+        text = stripped
+    return text
+
+
 def quoted_pages(pages: list[str]) -> str:
     """The pages as one quoted block; tag look-alikes in the text are removed so it can't end the quote early."""
     body = "\n\n".join(
-        f"[page {number}]\n{_QUOTE_TAG.sub('', text[:MAX_PAGE_CHARS])}" for number, text in enumerate(pages, start=1)
+        f"[page {number}]\n{_without_quote_tags(text[:MAX_PAGE_CHARS])}" for number, text in enumerate(pages, start=1)
     )
     return f"<first_pages>\n{body}\n</first_pages>"
 
