@@ -2,11 +2,26 @@ from datetime import UTC, datetime
 
 import pytest
 
-from smart_tutor.knowledge.domain.content import Content, ContentState, content_key
+from smart_tutor.knowledge.domain.chunk import MAX_CHUNK_CHARS, validate_chunk
+from smart_tutor.knowledge.domain.content import (
+    NO_TEXT_LAYER,
+    UNREADABLE_PDF,
+    Content,
+    ContentState,
+    content_key,
+    has_text_layer,
+    pages_key,
+)
 from smart_tutor.knowledge.domain.document import DUPLICATE_UPLOAD, Document, DocumentState
-from smart_tutor.knowledge.domain.errors import DocumentStateError, InvalidFileNameError
+from smart_tutor.knowledge.domain.errors import (
+    ContentStateError,
+    DocumentStateError,
+    InvalidChunkError,
+    InvalidFileNameError,
+)
 from smart_tutor.knowledge.domain.upload import Upload, parse_upload_key, upload_key
-from smart_tutor.shared.domain.ids import ContentId, DocumentId, UploadId, UserId
+from smart_tutor.shared.domain.ids import ContentId, DocumentId, SubjectId, UploadId, UserId
+from smart_tutor.subjects.application import GENERAL_SUBJECT_ID
 
 NOW = datetime(2026, 10, 4, 9, 0, tzinfo=UTC)
 SHA = "a" * 64
@@ -118,3 +133,94 @@ def test_upload_key_round_trips() -> None:
 )
 def test_other_keys_are_not_upload_keys(key: str) -> None:
     assert parse_upload_key(key) is None
+
+
+def test_pages_key_and_failure_reasons() -> None:
+    assert pages_key(SHA) == f"contents/{SHA}.pages.json"
+    assert UNREADABLE_PDF == "This file isn't a readable PDF"
+    assert NO_TEXT_LAYER == "No text layer (scanned PDFs are not supported yet)"
+    assert GENERAL_SUBJECT_ID == "00000000-0000-4000-8000-000000000001"
+
+
+@pytest.mark.parametrize(
+    ("pages", "expected"),
+    [
+        (["x" * 49], False),
+        (["x" * 60, ""], False),
+        (["x" * 100], True),
+        (["x" * 50], True),
+        ([], False),
+        ([" \n\t" * 100], False),
+        (["x " * 50], True),
+    ],
+)
+def test_has_text_layer(pages: list[str], expected: bool) -> None:
+    assert has_text_layer(pages) is expected
+
+
+def processing_content() -> Content:
+    return Content.first_upload(ContentId("c1"), SHA, 10, UserId("ada"))
+
+
+def test_content_ready_records_how_it_was_processed() -> None:
+    content = processing_content()
+    content.ready(pages=3, text_key=pages_key(SHA), chunker="c:v1", embedding_model="m", embedding_dim=1024)
+    assert content.state is ContentState.READY
+    assert (content.pages, content.text_key, content.chunker) == (3, pages_key(SHA), "c:v1")
+    assert (content.embedding_model, content.embedding_dim) == ("m", 1024)
+
+
+def test_content_fail_records_the_reason() -> None:
+    content = processing_content()
+    content.fail(UNREADABLE_PDF)
+    assert content.state is ContentState.FAILED
+    assert content.failure_reason == UNREADABLE_PDF
+
+
+def test_only_processing_content_can_become_ready_or_failed() -> None:
+    content = processing_content()
+    content.ready(pages=1, text_key="k", chunker="c", embedding_model="m", embedding_dim=2)
+    with pytest.raises(ContentStateError):
+        content.ready(pages=1, text_key="k", chunker="c", embedding_model="m", embedding_dim=2)
+    with pytest.raises(ContentStateError):
+        content.fail("x")
+
+
+def test_validate_chunk_returns_the_page() -> None:
+    assert validate_chunk(3, "text") == 3
+    assert validate_chunk(1, "x" * MAX_CHUNK_CHARS) == 1
+
+
+@pytest.mark.parametrize(
+    ("page", "text"),
+    [(None, "t"), ("3", "t"), (True, "t"), (0, "t"), (1, "  \n"), (1, ""), (1, "x" * (MAX_CHUNK_CHARS + 1))],
+)
+def test_validate_chunk_refuses_bad_chunks(page: object, text: str) -> None:
+    with pytest.raises(InvalidChunkError):
+        validate_chunk(page, text)
+
+
+def linked_document() -> Document:
+    doc = new_document()
+    doc.link_content(ContentId("c1"))
+    return doc
+
+
+def test_document_ready_takes_its_subjects() -> None:
+    doc = linked_document()
+    doc.ready([GENERAL_SUBJECT_ID])
+    assert doc.state is DocumentState.READY
+    assert doc.subject_ids == [GENERAL_SUBJECT_ID]
+
+
+def test_document_ready_refuses_bad_states_and_subjects() -> None:
+    general = [GENERAL_SUBJECT_ID]
+    with pytest.raises(DocumentStateError):
+        new_document().ready(general)  # no content
+    for bad in ([], [SubjectId(str(i)) for i in range(4)], [GENERAL_SUBJECT_ID, GENERAL_SUBJECT_ID]):
+        with pytest.raises(DocumentStateError):
+            linked_document().ready(bad)
+    failed = linked_document()
+    failed.fail("x")
+    with pytest.raises(DocumentStateError):
+        failed.ready(general)

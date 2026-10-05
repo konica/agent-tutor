@@ -1,15 +1,16 @@
 """A learner's library entry (PRD §9.4, §9.5). Access: `can_be_read_by` is the domain half of `can_read`."""
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 
 from smart_tutor.knowledge.domain.errors import DocumentStateError, InvalidFileNameError
-from smart_tutor.shared.domain.ids import ContentId, DocumentId, UploadId, UserId
+from smart_tutor.shared.domain.ids import ContentId, DocumentId, SubjectId, UploadId, UserId
 
 DUPLICATE_UPLOAD = "Duplicate uploads aren't supported yet"  # until US-11 links duplicates
 MAX_FILE_NAME = 255
+MAX_SUBJECTS = 3
 # C0/C1 controls and bidi controls (which can disguise a file name)
 _CONTROL = re.compile("[\\x00-\\x1f\\x7f-\\x9f\\u200e\\u200f\\u202a-\\u202e\\u2066-\\u2069]")
 
@@ -40,6 +41,7 @@ class Document:
     content_id: ContentId | None = None
     failure_reason: str | None = None
     title_override: str | None = None
+    subject_ids: list[SubjectId] = field(default_factory=list)
 
     @classmethod
     def start_upload(
@@ -71,3 +73,12 @@ class Document:
             raise DocumentStateError("Only a processing document can fail")
         self.state = DocumentState.FAILED
         self.failure_reason = reason
+
+    def ready(self, subject_ids: list[SubjectId]) -> None:
+        """processing → ready with 1-3 distinct subjects (interim: US-2b adds awaiting_subjects before this)."""
+        if self.state is not DocumentState.PROCESSING or self.content_id is None:
+            raise DocumentStateError("Only a processing document with content can become ready")
+        if not 1 <= len(subject_ids) <= MAX_SUBJECTS or len(set(subject_ids)) != len(subject_ids):
+            raise DocumentStateError("A document has 1 to 3 distinct subjects")
+        self.subject_ids = list(subject_ids)
+        self.state = DocumentState.READY
