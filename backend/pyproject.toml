@@ -451,7 +451,11 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 name = "PDF loader only in knowledge.adapters (keeps the ingest extra in the worker image)"
 type = "forbidden"
-allow_indirect_imports = true  # the worker's composition root builds the adapters that use them
+# Only the worker image installs the ingest extra, so only its composition root may build these adapters.
+ignore_imports = [
+    "smart_tutor.apps.worker.main -> smart_tutor.knowledge.adapters.pypdf_extractor",
+    "smart_tutor.apps.worker.main -> smart_tutor.knowledge.adapters.chunking",
+]
 source_modules = [
     "smart_tutor.shared",
     "smart_tutor.apps",
