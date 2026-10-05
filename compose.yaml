@@ -126,6 +126,7 @@ services:
       SMART_TUTOR_KEYCLOAK_CLIENT_ID: rag-mcp
       SMART_TUTOR_KEYCLOAK_CLIENT_SECRET: local-mcp-secret
       SMART_TUTOR_KEYCLOAK_AUDIENCE: rag-mcp
+      SMART_TUTOR_MCP_PORT: "8000"  # .env sets the host port (10452)
     ports: ["10452:8000"]
     depends_on: [postgres]
 
