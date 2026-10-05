@@ -4,7 +4,9 @@ Checklist for #55, the one-time AWS setup for the pilot environment (#54, PRD §
 
 For the big picture (GitHub and AWS trust, runtime request flow, deploy on merge, which slice builds what), see [`pilot-environment-overview.md`](pilot-environment-overview.md).
 
-Commands are for **PowerShell 7** (`pwsh`) on Windows. Run them from the repository root. Steps 3 and 4 are done by [`pilot-aws-prerequisites.ps1`](pilot-aws-prerequisites.ps1), which you can run again safely and which has a `-DryRun` switch.
+Commands are for **PowerShell 7** (`pwsh`) on Windows. Run them from the repository root.
+
+**What's code and what's by hand.** The AWS side is infrastructure as code. The OIDC provider and the deploy role are the CDK stack `SmartTutor-prod-GitHubDeploy` ([`infra/smart_tutor_infra/stacks/github_deploy.py`](../../infra/smart_tutor_infra/stacks/github_deploy.py)), reviewed and tested like every other stack. An admin deploys it once from a laptop, because GitHub Actions can't create the role it signs in with; after that, the deploy workflow (#59) keeps it up to date. The rest can't be CDK: `cdk bootstrap` must exist before any CDK deploy, the GitHub environment lives on GitHub rather than AWS, and quotas and the budget amount are checks and decisions. [`pilot-aws-prerequisites.ps1`](pilot-aws-prerequisites.ps1) does steps 2–4 in one go. You can run it again safely, and it has a `-DryRun` switch.
 
 ## Names the later slices depend on
 
@@ -79,25 +81,25 @@ aws ssm get-parameter --name /cdk-bootstrap/hnb659fds/version --query Parameter.
 ## 3–4. Deploy role and GitHub environment: run the script (about 5 min)
 
 ```powershell
-./docs/runbooks/pilot-aws-prerequisites.ps1 -AwsProfile smart-tutor-admin -DryRun   # shows the policies and the planned changes
+./docs/runbooks/pilot-aws-prerequisites.ps1 -AwsProfile smart-tutor-admin -DryRun   # read-only; prints the cdk diff and the planned changes
 ./docs/runbooks/pilot-aws-prerequisites.ps1 -AwsProfile smart-tutor-admin
 ```
 
-Add `-DeleteBudget "<name>"` to also remove a hand-made budget (see step 5). The script does the following.
+Add `-DeleteBudget "<name>"` to also remove a hand-made budget (see step 5). If step 2 hasn't run yet, the script bootstraps CDK first. Then it does the following.
 
-### 3a. Trusts GitHub's OIDC provider (once per account)
-
-It creates the IAM OIDC provider for `https://token.actions.githubusercontent.com` with audience `sts.amazonaws.com`, unless one already exists. AWS no longer checks the thumbprint for this provider.
-
-### 3b. Reads the repository's OIDC subject
+### 3a. Checks the repository's OIDC subject against `infra/cdk.json`
 
 ```powershell
 gh api repos/konica/agent-tutor/actions/oidc/customization/sub
 ```
 
-This repository uses GitHub's **immutable** subject: the answer has `"use_immutable_subject":true` and `"sub_claim_prefix":"repo:konica@1114311/agent-tutor@1399048529"` (owner and repository IDs, so a renamed or re-created repo can't inherit the trust). A job in the `pilot` environment gets the subject `repo:konica@1114311/agent-tutor@1399048529:environment:pilot`. The script reads the prefix from this API, so it stays right if the prefix changes.
+This repository uses GitHub's **immutable** subject: the answer has `"use_immutable_subject":true` and `"sub_claim_prefix":"repo:konica@1114311/agent-tutor@1399048529"` (owner and repository IDs, so a renamed or re-created repo can't inherit the trust). A job in the `pilot` environment gets the subject `repo:konica@1114311/agent-tutor@1399048529:environment:pilot`. `infra/cdk.json` holds the prefix (`smart-tutor:github-oidc-subject-prefix`) and the environment name (`smart-tutor:github-environment`). The script stops if the prefix differs from GitHub's.
 
-### 3c. Creates the role `smart-tutor-github-deploy`
+### 3b. Deploys `SmartTutor-prod-GitHubDeploy`: the OIDC provider
+
+The stack creates the IAM OIDC provider for `https://token.actions.githubusercontent.com` with audience `sts.amazonaws.com`. An account can hold only one such provider. If another tool already created it, put its ARN in `infra/cdk.json` as `smart-tutor:github-oidc-provider-arn`, and the stack imports it instead (the script tells you).
+
+### 3c. … and the role `smart-tutor-github-deploy`
 
 The role trusts **only jobs in the `pilot` environment** (`StringEquals` on `aud` and `sub`). Step 4 limits that environment to the `main` branch, so a pull request or another branch can never assume it. Together this is the "only `main` and environment-protected jobs" rule from #55 and #59. Maximum session: 1 hour.
 
@@ -111,7 +113,7 @@ The role trusts **only jobs in the `pilot` environment** (`StringEquals` on `aud
 | `eks:DescribeCluster` | `smart-tutor-*` clusters | `aws eks update-kubeconfig`. Kubernetes permissions come from an **EKS access entry**, which #56 creates in CDK for this role. |
 | `cloudformation:DescribeStacks` | `SmartTutor-prod-*` stacks | the #59 smoke test reads the CloudFront address from the stack outputs |
 
-If #59 finds a missing permission, add it to the policy in the script with a specific resource, never `*` on a service, and run the script again.
+If #59 finds a missing permission, add it to `github_deploy.py` with a specific resource, never `*` on a service, and extend `infra/tests/test_synth.py`. The merge deploys it.
 
 ### 4. Creates the GitHub environment `pilot`
 

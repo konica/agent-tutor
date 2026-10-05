@@ -1,6 +1,8 @@
 {
   "app": "uv run python app.py",
   "context": {
-    "smart-tutor:region": "us-east-1"
+    "smart-tutor:region": "us-east-1",
+    "smart-tutor:github-oidc-subject-prefix": "repo:konica@1114311/agent-tutor@1399048529",
+    "smart-tutor:github-environment": "pilot"
   }
 }
