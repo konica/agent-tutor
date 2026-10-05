@@ -1,2 +1,8 @@
-# Values for the AWS Load Balancer Controller (ALB for api and web). Installed by the deploy pipeline.
+# AWS Load Balancer Controller, chart eks/aws-load-balancer-controller 3.5.0 (https://aws.github.io/eks-charts).
+# CDK owns the ALB and its target groups (EdgeStack); the controller only registers pods via TargetGroupBinding.
+# IAM comes from Pod Identity (ClusterStack). Install: docs/runbooks/pilot-deploy.md, with
+#   --set vpcId=<SmartTutor-prod-Network output VpcId>
 clusterName: smart-tutor-prod
+region: us-east-1
+serviceAccount:
+  name: aws-load-balancer-controller
