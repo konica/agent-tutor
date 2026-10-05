@@ -36,7 +36,7 @@ def build_app(app: cdk.App, env_name: str = "prod") -> list[cdk.Stack]:
         deploy_role_name=DEPLOY_ROLE_NAME,
     )
     # The cluster's access entry names the deploy role by ARN string, so CloudFormation cannot infer the order.
-    cluster.add_dependency(deploy)
+    cluster.add_stack_dependency(deploy)
     stacks: list[cdk.Stack] = [
         network,
         DataStack(app, f"{prefix}-Data", env=env),
