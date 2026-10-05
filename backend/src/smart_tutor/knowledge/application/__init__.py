@@ -4,7 +4,6 @@ from smart_tutor.knowledge.application.document_service import DocumentService, 
 from smart_tutor.knowledge.application.ingestion_service import IngestionService, ProcessingTools
 from smart_tutor.knowledge.application.limits import load_file_limits
 from smart_tutor.knowledge.application.upload_service import (
-    MAX_UPLOAD_BYTES,
     PDF_CONTENT_TYPE,
     StartedUpload,
     UploadService,
@@ -18,7 +17,6 @@ from smart_tutor.knowledge.ports.object_store import ObjectStore
 from smart_tutor.knowledge.ports.pdf_extractor import PdfExtractor, UnreadablePdfError
 
 __all__ = [
-    "MAX_UPLOAD_BYTES",
     "PDF_CONTENT_TYPE",
     "ContentState",
     "DocumentService",

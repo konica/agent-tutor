@@ -1,7 +1,15 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from fakes import FakeObjectStore, FakeTokenVerifier, FixedClock, InMemoryLibrary, InMemorySubjects, fake_tools
+from fakes import (
+    TEST_LIMITS,
+    FakeObjectStore,
+    FakeTokenVerifier,
+    FixedClock,
+    InMemoryLibrary,
+    InMemorySubjects,
+    fake_tools,
+)
 from smart_tutor.apps.api.main import create_app
 from smart_tutor.apps.api.services import ApiServices
 from smart_tutor.knowledge.application import DocumentService, IngestionService, UploadService
@@ -19,7 +27,7 @@ def client() -> TestClient:
     verifier.add("ada-token", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
     library, objects = InMemoryLibrary(), FakeObjectStore()
     services = ApiServices(
-        uploads=UploadService(library.unit_of_work, objects, FixedClock()),
+        uploads=UploadService(library.unit_of_work, objects, FixedClock(), TEST_LIMITS),
         documents=DocumentService(library.unit_of_work),
         subjects=SubjectNames(InMemorySubjects()),
     )
@@ -70,3 +78,14 @@ def test_openapi_names_the_operations(client: TestClient) -> None:
     paths = client.get("/openapi.json").json()["paths"]
     assert paths["/uploads"]["post"]["operationId"] == "start_upload"
     assert paths["/documents"]["get"]["operationId"] == "list_documents"
+
+
+def test_upload_limits_come_from_the_upload_service(client: TestClient) -> None:
+    response = client.get("/uploads/limits", headers=AUTH)
+
+    assert response.status_code == 200
+    assert response.json() == {"max_bytes": 50 * 1024 * 1024, "max_pages": 500}
+
+
+def test_upload_limits_need_a_token(client: TestClient) -> None:
+    assert client.get("/uploads/limits").status_code == 401

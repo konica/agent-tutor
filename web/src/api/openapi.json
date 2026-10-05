@@ -160,6 +160,24 @@
         "title": "SubjectResponse",
         "type": "object"
       },
+      "UploadLimitsResponse": {
+        "properties": {
+          "max_bytes": {
+            "title": "Max Bytes",
+            "type": "integer"
+          },
+          "max_pages": {
+            "title": "Max Pages",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "max_bytes",
+          "max_pages"
+        ],
+        "title": "UploadLimitsResponse",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -311,6 +329,33 @@
           }
         ],
         "summary": "Start Upload",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/uploads/limits": {
+      "get": {
+        "description": "The per-file limits, so the browser can refuse a file before uploading it (PRD \u00a78 US-2).",
+        "operationId": "get_upload_limits",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadLimitsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Upload Limits",
         "tags": [
           "knowledge"
         ]
