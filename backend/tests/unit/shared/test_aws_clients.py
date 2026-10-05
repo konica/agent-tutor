@@ -1,6 +1,6 @@
 import pytest
 
-from smart_tutor.shared.adapters.aws.clients import s3_client, sqs_client
+from smart_tutor.shared.adapters.aws.clients import s3_client, sqs_client, ssm_client
 from smart_tutor.shared.config import Settings
 
 
@@ -20,6 +20,7 @@ def test_localstack_signs_s3_and_sqs_with_dummy_keys() -> None:
 
     assert _access_key(s3_client(settings)) == "test"
     assert _access_key(sqs_client(settings)) == "test"
+    assert _access_key(ssm_client(settings)) == "test"
 
 
 def test_default_settings_keep_the_environment_credentials() -> None:
@@ -27,3 +28,4 @@ def test_default_settings_keep_the_environment_credentials() -> None:
 
     assert _access_key(s3_client(settings)) == "real-ish"
     assert _access_key(sqs_client(settings)) == "real-ish"
+    assert _access_key(ssm_client(settings)) == "real-ish"
