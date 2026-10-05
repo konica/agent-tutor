@@ -70,6 +70,14 @@ services:
     ports: ["10402:4566"]
     volumes:
       - ./local/localstack/init/ready.d:/etc/localstack/init/ready.d:ro
+    # Healthy only once the ready.d init script has seeded settings (it sets max-pages last, or at least by the end);
+    # the api and worker read SSM at startup and exit when a parameter is missing.
+    healthcheck:
+      test: ["CMD", "awslocal", "ssm", "get-parameter", "--name", "/smart-tutor/max-pages"]
+      interval: 3s
+      timeout: 10s
+      retries: 40
+      start_period: 10s
 
   # --- app profile: same images as production -------------------------------------------
   migrate:
@@ -103,7 +111,7 @@ services:
       migrate: {condition: service_completed_successfully}
       keycloak: {condition: service_started}
       agent: {condition: service_started}
-      localstack: {condition: service_started}
+      localstack: {condition: service_healthy}
 
   agent:
     profiles: [app]
@@ -154,7 +162,7 @@ services:
     volumes: ["~/.aws:/home/app/.aws:ro"]
     depends_on:
       migrate: {condition: service_completed_successfully}
-      localstack: {condition: service_started}
+      localstack: {condition: service_healthy}
 
   web:
     profiles: [app]
