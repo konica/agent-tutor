@@ -30,7 +30,7 @@
 
 1. **Compose builds the web image with no build args.** An empty `VITE_*` value must fall back to the localhost defaults, not produce `""` URLs. Pinned in Task 4 (`falls back to the local API when VITE_API_URL is empty`).
 2. **The web pod runs with a read-only root filesystem.** nginx must still start (writable `/tmp`). Pinned in Task 4 Step 6 (`docker run --read-only --tmpfs /tmp`).
-3. **Teardown with images in ECR.** `cdk destroy` must not fail on non-empty repositories. Pinned in Task 1 (`empty_on_delete`, asserted via `Custom::ECRAutoDeleteImages`).
+3. **Teardown with images in ECR.** `cdk destroy` must not fail on non-empty repositories. Pinned in Task 1 (`empty_on_delete`, asserted as `EmptyOnDelete: true` on each repository).
 4. **The LB controller policy fits a managed policy.** Pinned in Task 2 (`test_load_balancer_controller_policy_fits_a_managed_policy`).
 5. **The load balancer is reachable from the internet.** Pinned in Task 3 (`test_load_balancer_is_internal_and_has_no_internet_ingress`).
 
@@ -84,10 +84,11 @@ def test_network_has_private_subnets_and_one_nat_gateway() -> None:
 def test_registry_has_one_repository_per_service_and_empties_them_on_delete() -> None:
     t = template(make_app(), "Registry")
 
-    names = sorted(r["Properties"]["RepositoryName"] for r in t.find_resources("AWS::ECR::Repository").values())
+    repos = t.find_resources("AWS::ECR::Repository")
+    names = sorted(r["Properties"]["RepositoryName"] for r in repos.values())
     assert names == [f"smart-tutor/{s}" for s in ["agent", "api", "keycloak", "mcp", "web", "worker"]]
     t.has_resource_properties("AWS::ECR::Repository", {"ImageScanningConfiguration": {"ScanOnPush": True}})
-    t.resource_count_is("Custom::ECRAutoDeleteImages", 6)  # teardown works with images inside
+    assert all(r["Properties"]["EmptyOnDelete"] is True for r in repos.values())  # teardown works with images inside
     t.has_output("RegistryUri", {})
 
 
