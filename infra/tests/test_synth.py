@@ -113,10 +113,11 @@ def test_network_has_private_subnets_and_one_nat_gateway() -> None:
 def test_registry_has_one_repository_per_service_and_empties_them_on_delete() -> None:
     t = template(make_app(), "Registry")
 
-    names = sorted(r["Properties"]["RepositoryName"] for r in t.find_resources("AWS::ECR::Repository").values())
+    repos = t.find_resources("AWS::ECR::Repository")
+    names = sorted(r["Properties"]["RepositoryName"] for r in repos.values())
     assert names == [f"smart-tutor/{s}" for s in ["agent", "api", "keycloak", "mcp", "web", "worker"]]
     t.has_resource_properties("AWS::ECR::Repository", {"ImageScanningConfiguration": {"ScanOnPush": True}})
-    t.resource_count_is("Custom::ECRAutoDeleteImages", 6)  # teardown works with images inside
+    assert all(r["Properties"]["EmptyOnDelete"] is True for r in repos.values())  # teardown works with images inside
     t.has_output("RegistryUri", {})
 
 
