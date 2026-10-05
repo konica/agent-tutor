@@ -41,6 +41,7 @@ class Document:
     content_id: ContentId | None = None
     failure_reason: str | None = None
     title_override: str | None = None
+    content_title: str | None = None  # contents.title, filled when listing; never saved
     subject_ids: list[SubjectId] = field(default_factory=list)
 
     @classmethod
@@ -52,8 +53,8 @@ class Document:
 
     @property
     def title(self) -> str:
-        # Display title = title_override, else contents.title (first-pages step, US-2b), else the file name.
-        return self.title_override or self.file_name
+        """Display title (PRD §9.4): the learner's override, else the extracted title, else the file name."""
+        return self.title_override or self.content_title or self.file_name
 
     @property
     def awaiting_upload(self) -> bool:
