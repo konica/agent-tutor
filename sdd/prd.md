@@ -460,7 +460,7 @@ Agent, MCP server, API, web, Keycloak, ingestion worker, and CronJobs run on **E
 
 ### 9.12 Environments, infrastructure as code, and delivery
 
-**Local (Docker Compose):** PostgreSQL + pgvector; Keycloak with realm import; LocalStack with the documents bucket (versioning; `ObjectCreated` notifications for `uploads/` to SQS + DLQ; CORS for the web origin), SSM parameters. Bedrock and LangSmith are real (developer AWS profile, separate LangSmith project).
+**Local (Docker Compose):** PostgreSQL + pgvector; Keycloak with realm import; LocalStack with the documents bucket (versioning; `ObjectCreated` notifications for `uploads/` to SQS + DLQ; CORS for the web origin), SSM parameters; Mailpit (catches Keycloak's verification emails). Bedrock and LangSmith are real (developer AWS profile, separate LangSmith project).
 
 **Production (us-east-1):** AWS CDK (Python) for VPC, EKS, RDS, S3 (versioning; `uploads/` event notifications; lifecycle: `uploads/` expires after 1 day, tagged content PDFs to Glacier after 30 days), SQS + DLQ, ECR, IAM/Pod Identity, Secrets Manager, SSM, ACM, budgets. Helm for all workloads, NetworkPolicies, External Secrets.
 

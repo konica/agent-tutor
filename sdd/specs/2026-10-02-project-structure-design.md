@@ -200,7 +200,7 @@ web/src/
 - All folders above, with `__init__.py` files and a `README.md` per module stating its responsibility, public services, and dependencies.
 - `backend/pyproject.toml` with extras and the import-linter contracts of §6; `make lint` runs them.
 - `shared/ports` stubs: `Clock`. Model interfaces are LangChain's `BaseChatModel` and `Embeddings` (ADR 0006).
-- Root `Makefile`, `compose.yaml` (pgvector, Keycloak, LocalStack), `.env.example`.
+- Root `Makefile`, `compose.yaml` (pgvector, Keycloak, LocalStack, Mailpit), `.env.example`.
 - Minimal placeholders for `backend/Dockerfile`, `infra/` (CDK app that synthesizes empty stacks), `deploy/helm/smart-tutor/Chart.yaml`, and `web/` (Vite React TypeScript skeleton).
 - `data/` untracked and ignored (S8).
 
