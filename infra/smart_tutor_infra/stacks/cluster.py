@@ -45,6 +45,11 @@ class ClusterStack(cdk.Stack):
             default_capacity=0,
             bootstrap_cluster_creator_admin_permissions=False,  # the creator is CloudFormation's role
         )
+        # The L2 has no upgrade-policy prop. Without this, a version past standard support moves to extended support
+        # silently, at about six times the control-plane price.
+        cfn_cluster = self.cluster.node.default_child
+        assert isinstance(cfn_cluster, eks.CfnCluster)
+        cfn_cluster.add_property_override("UpgradePolicy.SupportType", "STANDARD")
         self.cluster_security_group_id = self.cluster.cluster_security_group_id
         self.cluster.add_nodegroup_capacity(
             "Nodes",
@@ -93,7 +98,10 @@ class ClusterStack(cdk.Stack):
         role = iam.Role(
             self,
             f"{name}Role",
-            assumed_by=iam.SessionTagsPrincipal(iam.ServicePrincipal("pods.eks.amazonaws.com")),
+            assumed_by=iam.PrincipalWithConditions(
+                iam.SessionTagsPrincipal(iam.ServicePrincipal("pods.eks.amazonaws.com")),
+                {"StringEquals": {"aws:SourceAccount": self.account}},  # confused-deputy guard
+            ),
             managed_policies=[iam.ManagedPolicy(self, f"{name}Policy", document=document)],
         )
         eks.CfnPodIdentityAssociation(

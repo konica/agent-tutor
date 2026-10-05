@@ -64,10 +64,11 @@ class EdgeStack(cdk.Stack):
             vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
             security_group=alb_sg,
         )
+        web_target_group_name = f"{name_prefix}-web"  # one name for the group and the output, so they cannot drift
         web_targets = elbv2.ApplicationTargetGroup(
             self,
             "WebTargets",
-            target_group_name=f"{name_prefix}-web",
+            target_group_name=web_target_group_name,
             vpc=vpc,
             port=WEB_PORT,
             protocol=elbv2.ApplicationProtocol.HTTP,
@@ -102,4 +103,4 @@ class EdgeStack(cdk.Stack):
 
         cdk.CfnOutput(self, "CloudFrontUrl", value=f"https://{distribution.distribution_domain_name}")
         cdk.CfnOutput(self, "DistributionId", value=distribution.distribution_id)
-        cdk.CfnOutput(self, "WebTargetGroupName", value=f"{name_prefix}-web")
+        cdk.CfnOutput(self, "WebTargetGroupName", value=web_target_group_name)

@@ -19,10 +19,6 @@ def template(app: cdk.App, suffix: str) -> Template:
     return Template.from_stack(stack)
 
 
-def github_deploy_template(app: cdk.App) -> Template:
-    return template(app, "GitHubDeploy")
-
-
 def test_all_stacks_synthesize_in_us_east_1() -> None:
     app = make_app()
 
@@ -35,14 +31,14 @@ def test_all_stacks_synthesize_in_us_east_1() -> None:
 
 
 def test_deploy_role_trusts_only_the_pilot_environment_of_this_repository() -> None:
-    template = github_deploy_template(make_app())
+    t = template(make_app(), "GitHubDeploy")
 
-    template.resource_count_is("AWS::IAM::OIDCProvider", 1)
-    template.has_resource_properties(
+    t.resource_count_is("AWS::IAM::OIDCProvider", 1)
+    t.has_resource_properties(
         "AWS::IAM::OIDCProvider",
         {"Url": "https://token.actions.githubusercontent.com", "ClientIdList": ["sts.amazonaws.com"]},
     )
-    template.has_resource_properties(
+    t.has_resource_properties(
         "AWS::IAM::Role",
         {
             "RoleName": "smart-tutor-github-deploy",
@@ -69,9 +65,9 @@ def test_deploy_role_trusts_only_the_pilot_environment_of_this_repository() -> N
 
 
 def test_deploy_role_gets_only_the_deployment_permissions() -> None:
-    template = github_deploy_template(make_app())
+    t = template(make_app(), "GitHubDeploy")
 
-    policies = template.find_resources("AWS::IAM::Policy")
+    policies = t.find_resources("AWS::IAM::Policy")
     assert len(policies) == 1
     statements = next(iter(policies.values()))["Properties"]["PolicyDocument"]["Statement"]
     assert [s["Sid"] for s in statements] == [
@@ -89,10 +85,10 @@ def test_deploy_role_gets_only_the_deployment_permissions() -> None:
 
 def test_an_existing_oidc_provider_is_imported_instead_of_created() -> None:
     arn = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
-    template = github_deploy_template(make_app(**{"smart-tutor:github-oidc-provider-arn": arn}))
+    t = template(make_app(**{"smart-tutor:github-oidc-provider-arn": arn}), "GitHubDeploy")
 
-    template.resource_count_is("AWS::IAM::OIDCProvider", 0)
-    template.has_resource_properties(
+    t.resource_count_is("AWS::IAM::OIDCProvider", 0)
+    t.has_resource_properties(
         "AWS::IAM::Role",
         {"AssumeRolePolicyDocument": {"Statement": [Match.object_like({"Principal": {"Federated": arn}})]}},
     )
@@ -165,6 +161,7 @@ def test_cluster_runs_eks_1_36_with_two_small_nodes() -> None:
     )
     cluster = next(iter(t.find_resources("AWS::EKS::Cluster").values()))
     assert cluster["Properties"]["ComputeConfig"] == {"Enabled": False}
+    assert cluster["Properties"]["UpgradePolicy"] == {"SupportType": "STANDARD"}  # never drift into extended support
     t.resource_count_is("AWS::EKS::Nodegroup", 1)
     t.has_resource_properties(
         "AWS::EKS::Nodegroup",
@@ -209,6 +206,7 @@ def test_add_ons_get_iam_through_pod_identity() -> None:
                         {
                             "Action": ["sts:AssumeRole", "sts:TagSession"],
                             "Principal": {"Service": "pods.eks.amazonaws.com"},
+                            "Condition": {"StringEquals": {"aws:SourceAccount": Match.any_value()}},
                         }
                     )
                 ]
@@ -243,6 +241,20 @@ def test_load_balancer_is_internal_and_has_no_internet_ingress() -> None:
     rendered = json.dumps(t.to_json())
     assert "0.0.0.0/0" not in rendered
     assert "::/0" not in rendered
+    t.has_resource_properties(
+        "AWS::EC2::SecurityGroup",
+        {
+            "SecurityGroupIngress": [
+                {"IpProtocol": "tcp", "FromPort": 80, "ToPort": 80, "CidrIp": Match.any_value()}
+            ],
+            "SecurityGroupEgress": [
+                {"IpProtocol": "tcp", "FromPort": 8080, "ToPort": 8080, "DestinationSecurityGroupId": Match.any_value()}
+            ],
+        },
+    )
+    t.has_resource_properties(
+        "AWS::EC2::SecurityGroupIngress", {"FromPort": 8080, "SourceSecurityGroupId": Match.any_value()}
+    )
     t.has_resource_properties("AWS::ElasticLoadBalancingV2::Listener", {"Port": 80, "Protocol": "HTTP"})
 
 
