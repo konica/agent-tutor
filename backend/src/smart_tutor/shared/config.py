@@ -32,6 +32,13 @@ class ModelsConfig(BaseModel):
     )
 
 
+class ChunkingConfig(BaseModel):
+    """How page text is split into chunks (ADR 0008); `params` go to the method's splitter."""
+
+    method: str = "recursive_character"
+    params: dict[str, Any] = {"chunk_size": 1000, "chunk_overlap": 200}
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="SMART_TUTOR_", env_nested_delimiter="__", env_file=".env")
 
@@ -56,6 +63,7 @@ class Settings(BaseSettings):
     learning_record_idle_minutes_param: str = "/smart-tutor/learning-record-idle-minutes"
     rate_limit_per_minute: int = 20
     models: ModelsConfig = ModelsConfig()
+    chunking: ChunkingConfig = ChunkingConfig()
 
     @property
     def keycloak_introspection_url(self) -> str:

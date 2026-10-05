@@ -4,6 +4,7 @@ from fakes.auth import FakeTokenVerifier
 from fakes.clock import FixedClock
 from fakes.knowledge import FakeObjectStore, InMemoryLibrary
 from fakes.models import FakeChatModel, fake_chat_model, fake_embeddings
+from fakes.pdfs import make_pdf
 from fakes.queue import FakeQueue
 
 __all__ = [
@@ -15,4 +16,5 @@ __all__ = [
     "InMemoryLibrary",
     "FakeObjectStore",
     "FakeQueue",
+    "make_pdf",
 ]
