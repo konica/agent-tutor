@@ -2,6 +2,7 @@
 
 import re
 import unicodedata
+from collections.abc import Sequence
 from typing import Any
 
 from langchain_core.documents import BaseDocumentTransformer, Document
@@ -23,7 +24,7 @@ class CleanedSplitter(BaseDocumentTransformer):
     def __init__(self, splitter: RecursiveCharacterTextSplitter) -> None:
         self._splitter = splitter
 
-    def transform_documents(self, documents: Any, **kwargs: Any) -> list[Document]:
+    def transform_documents(self, documents: Sequence[Document], **kwargs: Any) -> Sequence[Document]:
         cleaned = [Document(page_content=clean_page_text(d.page_content), metadata=dict(d.metadata)) for d in documents]
         return self._splitter.split_documents(cleaned)
 
@@ -31,7 +32,15 @@ class CleanedSplitter(BaseDocumentTransformer):
 def build_chunker(config: ChunkingConfig) -> tuple[BaseDocumentTransformer, str]:
     """The transformer for `config.method` and its chunker id (changes whenever chunking output would)."""
     if config.method == "recursive_character":
-        params = {"chunk_size": 1000, "chunk_overlap": 200, **config.params}
-        chunker_id = f"recursive_character:{params['chunk_size']}/{params['chunk_overlap']}:v1"
-        return CleanedSplitter(RecursiveCharacterTextSplitter(**params)), chunker_id
+        params = {**ChunkingConfig().params, **config.params}
+        size, overlap = params["chunk_size"], params["chunk_overlap"]
+        # ADR 0008 separators: paragraph, line, sentence end, word, character (the library default lacks ". ").
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=size,
+            chunk_overlap=overlap,
+            separators=["\n\n", "\n", ". ", " ", ""],
+            length_function=len,
+            is_separator_regex=False,
+        )
+        return CleanedSplitter(splitter), f"recursive_character:{size}/{overlap}:v1"
     raise ValueError(f"Unknown chunking method: {config.method!r}")
