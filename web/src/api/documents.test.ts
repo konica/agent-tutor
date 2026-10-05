@@ -74,6 +74,12 @@ describe("rejectionReason", () => {
     expect(rejectionReason(file("notes.txt", ""), limits)).toBe("Not uploaded. Only PDF files can be uploaded.");
   });
 
+  it("still refuses a non-PDF and an empty file when the limits are unknown, and skips only the size check", () => {
+    expect(rejectionReason(file("notes.docx", "application/msword"), null)).toBe("Not uploaded. Only PDF files can be uploaded.");
+    expect(rejectionReason(file("a.pdf", "application/pdf", 0), null)).toBe("Not uploaded. This file is empty.");
+    expect(rejectionReason(file("big.pdf", "application/pdf", 72 * 1_048_576), null)).toBeNull();
+  });
+
   it("refuses an empty file", () => {
     expect(rejectionReason(file("a.pdf", "application/pdf", 0), limits)).toBe("Not uploaded. This file is empty.");
   });

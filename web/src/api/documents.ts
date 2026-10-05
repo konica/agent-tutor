@@ -35,10 +35,11 @@ function isPdf(file: File): boolean {
 }
 
 // Checked before upload (PRD §8 US-2); the presigned POST enforces the size again on the server.
-export function rejectionReason(file: File, limits: UploadLimits): string | null {
+// Without limits (null) only the size check is skipped; the caller must not upload an unchecked file.
+export function rejectionReason(file: File, limits: UploadLimits | null): string | null {
   if (!isPdf(file)) return "Not uploaded. Only PDF files can be uploaded.";
   if (file.size === 0) return "Not uploaded. This file is empty.";
-  if (file.size > limits.max_bytes)
+  if (limits && file.size > limits.max_bytes)
     return `Not uploaded. This file is ${megabytes(file.size)} MB; the limit is ${megabytes(limits.max_bytes)} MB.`;
   return null;
 }

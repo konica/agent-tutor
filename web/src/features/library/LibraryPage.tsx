@@ -1,5 +1,5 @@
 import { AlertCircle, Upload } from "lucide-react";
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import { loadDocuments, loadUploadLimits, megabytes, rejectionReason, uploadPdf, type DocumentResponse, type UploadLimits } from "../../api/documents";
 import { Button } from "../../components/Button/Button";
@@ -49,35 +49,61 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, load
     if (changes.length) setStatus(changes.join(" "));
   }, [documents]);
 
-  // Failure is ignored here: the pick handler retries, and never uploads without a check.
+  const loadLimitsRef = useRef(loadLimits);
+  const alive = useRef(true);
   useEffect(() => {
-    loadLimits().then(setLimits, () => {});
+    loadLimitsRef.current = loadLimits; // an inline `loadLimits` must not restart the load
   }, [loadLimits]);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+
+  // Failure leaves the limits null: the pick handler retries, and never uploads without a size check.
+  const ensureLimits = useCallback(async (): Promise<UploadLimits | null> => {
+    try {
+      const loaded = await loadLimitsRef.current();
+      if (alive.current) setLimits(loaded);
+      return loaded;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    void ensureLimits();
+  }, [ensureLimits]);
 
   async function onPick(event: ChangeEvent<HTMLInputElement>) {
     const files = [...(event.target.files ?? [])];
     event.target.value = ""; // picking the same file again fires change again
     setFailed(null);
     setRejected([]);
-    const current = limits ?? (await loadLimits().then((l) => (setLimits(l), l), () => null));
+    const current = limits ?? (await ensureLimits());
+    // One combined message for the whole pick, so no file's result overwrites another's in the live region.
+    const parts: string[] = [];
     for (const file of files) {
-      const reason = current && rejectionReason(file, current);
+      const reason = rejectionReason(file, current);
       if (reason) {
         setRejected((list) => [...list, { name: file.name, reason }]);
-        setStatus(`Not uploaded: ${file.name}.`);
+        parts.push(`${file.name}: ${reason}`);
+        setStatus(parts.join(" "));
         continue;
       }
       setFailed(null);
-      setStatus(`Uploading ${file.name}…`);
+      setStatus([...parts, `Uploading ${file.name}…`].join(" "));
       try {
         if (!current) throw new Error("Upload limits unavailable");
         await upload(file);
-        setStatus(`Uploaded ${file.name}. Processing.`);
+        parts.push(`Uploaded ${file.name}. Processing.`);
       } catch {
         // A 401 is handled by the API client: the session screen replaces this page.
-        setStatus(`Upload failed: ${file.name}.`);
+        parts.push(`Upload failed: ${file.name}.`);
         setFailed(file.name);
       }
+      setStatus(parts.join(" "));
       await refresh();
     }
   }
