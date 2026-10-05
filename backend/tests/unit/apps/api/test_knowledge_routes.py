@@ -1,13 +1,14 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from fakes import FakeObjectStore, FakeTokenVerifier, FixedClock, InMemoryLibrary
+from fakes import FakeObjectStore, FakeTokenVerifier, FixedClock, InMemoryLibrary, InMemorySubjects, fake_tools
 from smart_tutor.apps.api.main import create_app
 from smart_tutor.apps.api.services import ApiServices
-from smart_tutor.knowledge.application import DocumentService, UploadService
+from smart_tutor.knowledge.application import DocumentService, IngestionService, UploadService
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.domain.principal import Principal
+from smart_tutor.subjects.application import GENERAL_SUBJECT_ID, SubjectNames
 
 AUTH = {"Authorization": "Bearer ada-token"}
 
@@ -16,12 +17,15 @@ AUTH = {"Authorization": "Bearer ada-token"}
 def client() -> TestClient:
     verifier = FakeTokenVerifier()
     verifier.add("ada-token", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
-    library = InMemoryLibrary()
+    library, objects = InMemoryLibrary(), FakeObjectStore()
     services = ApiServices(
-        uploads=UploadService(library.unit_of_work, FakeObjectStore(), FixedClock()),
+        uploads=UploadService(library.unit_of_work, objects, FixedClock()),
         documents=DocumentService(library.unit_of_work),
+        subjects=SubjectNames(InMemorySubjects()),
     )
-    return TestClient(create_app(Settings(), verifier=verifier, services=services))
+    app = create_app(Settings(), verifier=verifier, services=services)
+    app.state.objects, app.state.ingestion = objects, IngestionService(library.unit_of_work, objects, fake_tools())
+    return TestClient(app)
 
 
 def test_start_upload_returns_the_presigned_post(client: TestClient) -> None:
@@ -39,6 +43,22 @@ def test_the_new_document_is_listed_as_processing(client: TestClient) -> None:
     assert doc["document_id"] == started["document_id"]
     assert (doc["title"], doc["state"], doc["failure_reason"]) == ("paper.pdf", "processing", None)
     assert doc["created_at"].startswith("2026-10-04T09:00:00")
+
+
+def test_a_ready_document_lists_its_subject_with_the_resolved_name(client: TestClient) -> None:
+    started = client.post("/uploads", json={"file_name": "paper.pdf"}, headers=AUTH).json()
+    key = started["fields"]["key"]
+    client.app.state.objects.objects[key] = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()  # type: ignore[attr-defined]
+    client.app.state.ingestion.ingest_upload(key)  # type: ignore[attr-defined]
+    [doc] = client.get("/documents", headers=AUTH).json()
+    assert doc["state"] == "ready"
+    assert doc["subjects"] == [{"subject_id": str(GENERAL_SUBJECT_ID), "name": "General"}]
+
+
+def test_a_processing_document_has_no_subjects(client: TestClient) -> None:
+    client.post("/uploads", json={"file_name": "paper.pdf"}, headers=AUTH)
+    [doc] = client.get("/documents", headers=AUTH).json()
+    assert doc["subjects"] == []
 
 
 def test_blank_file_name_is_422(client: TestClient) -> None:

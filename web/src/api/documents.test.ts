@@ -17,7 +17,7 @@ const json = (body: unknown, status = 200) =>
 
 describe("loadDocuments", () => {
   it("returns the caller's documents", async () => {
-    const doc = { document_id: "d1", title: "a.pdf", state: "processing", failure_reason: null, created_at: "2026-10-04T09:00:00Z" };
+    const doc = { document_id: "d1", title: "a.pdf", state: "processing", failure_reason: null, created_at: "2026-10-04T09:00:00Z", subjects: [] };
     const { apiClient } = api(() => json([doc]));
     await expect(loadDocuments(apiClient)).resolves.toEqual([doc]);
   });

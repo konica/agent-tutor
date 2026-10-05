@@ -6,7 +6,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from smart_tutor.apps.api.deps import CurrentPrincipal, Documents, Uploads
+from smart_tutor.apps.api.deps import CurrentPrincipal, Documents, Subjects, Uploads
 from smart_tutor.knowledge.application import InvalidFileNameError
 
 router = APIRouter(tags=["knowledge"])
@@ -25,12 +25,18 @@ class StartUploadResponse(BaseModel):
     fields: dict[str, str]
 
 
+class SubjectResponse(BaseModel):
+    subject_id: str
+    name: str
+
+
 class DocumentResponse(BaseModel):
     document_id: str
     title: str
     state: Literal["processing", "awaiting_subjects", "ready", "failed"]
     failure_reason: str | None
     created_at: datetime
+    subjects: list[SubjectResponse]
 
 
 @router.post("/uploads", operation_id="start_upload", status_code=status.HTTP_201_CREATED)
@@ -45,7 +51,9 @@ def start_upload(body: StartUploadRequest, principal: CurrentPrincipal, uploads:
 
 
 @router.get("/documents", operation_id="list_documents")
-def list_documents(principal: CurrentPrincipal, documents: Documents) -> list[DocumentResponse]:
+def list_documents(principal: CurrentPrincipal, documents: Documents, subjects: Subjects) -> list[DocumentResponse]:
+    views = documents.list_documents(principal.user_id)
+    names = subjects.names_for(principal.user_id, {s for d in views for s in d.subject_ids})
     return [
         DocumentResponse(
             document_id=d.document_id,
@@ -53,6 +61,7 @@ def list_documents(principal: CurrentPrincipal, documents: Documents) -> list[Do
             state=d.state,
             failure_reason=d.failure_reason,
             created_at=d.created_at,
+            subjects=[SubjectResponse(subject_id=s, name=names[s]) for s in d.subject_ids if s in names],
         )
-        for d in documents.list_documents(principal.user_id)
+        for d in views
     ]

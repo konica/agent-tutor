@@ -25,6 +25,10 @@ export type DocumentResponse = {
      */
     state: 'processing' | 'awaiting_subjects' | 'ready' | 'failed';
     /**
+     * Subjects
+     */
+    subjects: Array<SubjectResponse>;
+    /**
      * Title
      */
     title: string;
@@ -90,6 +94,20 @@ export type StartUploadResponse = {
      * Url
      */
     url: string;
+};
+
+/**
+ * SubjectResponse
+ */
+export type SubjectResponse = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Subject Id
+     */
+    subject_id: string;
 };
 
 /**

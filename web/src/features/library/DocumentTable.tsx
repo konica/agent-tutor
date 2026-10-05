@@ -42,7 +42,7 @@ export function DocumentTable({ documents }: { documents: DocumentResponse[] }) 
                 <span className={styles.title}>{doc.title}</span>
               </span>
             </td>
-            <td className={styles.muted}>Not chosen yet</td>
+            <td className={doc.subjects.length ? undefined : styles.muted}>{doc.subjects.map((s) => s.name).join(", ") || "Not chosen yet"}</td>
             <td>
               <StateCell doc={doc} />
             </td>
