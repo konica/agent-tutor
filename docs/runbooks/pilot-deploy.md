@@ -20,6 +20,8 @@ $env:JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION = "1"
 aws sts get-caller-identity
 ```
 
+- The profile must resolve to a principal listed in `smart-tutor:eks-admin-principal-arns` in `infra/cdk.json` (pilot: `arn:aws:iam::685394474162:user/poweruser`). The cluster creator gets no admin access, so any other principal gets `Unauthorized` from kubectl and helm. Check the `Arn` that `aws sts get-caller-identity` prints.
+
 ## 2. Deploy the stacks (about 25 min; EKS is most of it)
 
 ```powershell
@@ -49,7 +51,7 @@ aws eks update-kubeconfig --name smart-tutor-prod --region us-east-1
 kubectl get nodes        # 2 nodes, both Ready
 ```
 
-Your admin principal and the deploy role have cluster-admin access entries; no other principal does.
+Your admin principal and the deploy role have cluster-admin access entries; no other principal does. If kubectl says `Unauthorized`, run `aws sts get-caller-identity` and compare the `Arn` with `smart-tutor:eks-admin-principal-arns` in `infra/cdk.json`.
 
 ## 4. Install the add-ons
 
@@ -86,6 +88,8 @@ helm upgrade --install smart-tutor deploy/helm/smart-tutor -n smart-tutor --crea
 
 ## 7. Check
 
+A new distribution and new targets can take a few minutes to settle. A 502 or 503 at first is expected: retry after 2 to 3 minutes.
+
 ```powershell
 kubectl -n smart-tutor get pods,targetgroupbindings
 aws elbv2 describe-target-health --target-group-arn (aws elbv2 describe-target-groups --names smart-tutor-prod-web --query "TargetGroups[0].TargetGroupArn" --output text)
@@ -100,8 +104,9 @@ curl.exe -sI ($Url -replace '^https','http')
 - The ALB is not public:
 
 ```powershell
-aws elbv2 describe-load-balancers --names smart-tutor-prod --query "LoadBalancers[0].[Scheme,DNSName]"   # internal
-Resolve-DnsName <DNSName>                                                                              # only 10.40.x.x addresses
+aws elbv2 describe-load-balancers --names smart-tutor-prod --query "LoadBalancers[0].Scheme" --output text   # internal
+$Alb = aws elbv2 describe-load-balancers --names smart-tutor-prod --query "LoadBalancers[0].DNSName" --output text
+Resolve-DnsName $Alb                                                                                       # only 10.40.x.x addresses
 ```
 
 - Check the budget in **Billing → Budgets → smart-tutor-prod-monthly** (USD 400, emails at 80% actual and 100% forecasted). Delete the old $20 budget if it is still there (#55 follow-up).
@@ -112,7 +117,13 @@ Rebuild and push the image with a new tag, then run the `helm upgrade` from step
 
 ## 9. Tear down
 
-This keeps the #55 prerequisites, which cost nothing. Uninstall the app first, so the controller deregisters targets and removes its finalizers:
+This keeps the #55 prerequisites, which cost nothing. First note the VPC ID, which you need if the `Network` destroy fails (see below):
+
+```powershell
+$VpcId = Get-Output Network VpcId
+```
+
+Uninstall the app first, so the controller deregisters targets and removes its finalizers:
 
 ```powershell
 helm uninstall smart-tutor -n smart-tutor --wait
@@ -124,7 +135,16 @@ npx aws-cdk@latest destroy SmartTutor-prod-Edge SmartTutor-prod-Cluster SmartTut
 Pop-Location
 ```
 
-Never use `--all` here: it would delete the GitHub deploy role. CloudFront takes about 15 min to disable and delete. If `Network` fails because the VPC origin's network interfaces are still being released, wait 10 minutes and run the destroy for `SmartTutor-prod-Network` again. ECR images are deleted with their repositories. From #57 on, RDS keeps a final snapshot, and that slice adds the step.
+Never use `--all` here: it would delete the GitHub deploy role. CloudFront takes about 15 min to disable and delete. If `Network` fails because the VPC origin's network interfaces are still being released, wait 10 minutes and run the destroy for `SmartTutor-prod-Network` again.
+
+If it still fails, CloudFront may have left its `CloudFront-VPCOrigins-Service-SG` security group in the VPC. Find and delete it, then run the `Network` destroy again:
+
+```powershell
+$Sg = aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VpcId" "Name=group-name,Values=CloudFront-VPCOrigins-Service-SG" --query "SecurityGroups[0].GroupId" --output text
+aws ec2 delete-security-group --group-id $Sg
+```
+
+ECR images are deleted with their repositories. From #57 on, RDS keeps a final snapshot, and that slice adds the step.
 
 ## 10. Costs
 
