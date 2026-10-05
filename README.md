@@ -79,6 +79,29 @@ cd backend; uv run --env-file ../.env python -m smart_tutor.apps.mcp_server.serv
 - The web app's defaults already point at the API (:10450) and Keycloak (:10401), and Keycloak's `smart-tutor-web` client allows only http://localhost:10453. Keep Vite on that port; `strictPort` makes it fail rather than move to another one.
 - Back to Option A: stop the host processes, then run `make up-app`.
 
+### Debug the backend
+
+Backend services run under [debugpy](https://github.com/microsoft/debugpy) on the host, using Option B's ports. Each service's debugger listens on its app port + 10. Stop the plain `make api` (or the Docker container) first, because the debug run takes the same app port.
+
+| Service | App port | Debugger port | Start for attaching |
+|---|---|---|---|
+| API | 10450 | 10460 | `make api-debug` |
+| Agent | 10451 | 10461 | `make agent-debug` |
+| RAG MCP server | 10452 | 10462 | `make mcp-debug` |
+| Ingestion worker | — | 10463 | `make worker-debug` |
+
+**VS Code** (Python Debugger extension). `.vscode/launch.json` is checked in. Set breakpoints, open Run and Debug, and pick one of these:
+
+- **API**, **Worker**, **Agent**, **MCP server**: VS Code starts the service under the debugger with `backend/.venv` and the root `.env`. **API + Worker** starts both, which lets you follow an upload from the API through the worker.
+- **Attach: API** (and the others): connects to a service you started with `make <service>-debug`. Use this from a terminal, or with any editor that speaks the Debug Adapter Protocol. In PyCharm, use a "Python Debug Server"-style remote config or the debugpy attach plugin.
+
+Notes:
+
+- Run `make sync` once first. It installs the worker's `ingest` extra, which the **Worker** launch config needs.
+- Debug runs don't reload on change: restart the session after you edit code.
+- To stop before startup code runs (settings, app factory), add `--wait-for-client` after the `--listen` port in the `make` target. The process then waits until a debugger attaches.
+- Breakpoints in requests: use **API**, open http://localhost:10453 (or http://localhost:10450/docs), and act in the app. Breakpoints in ingestion: use **Worker**, then upload a PDF from the Library.
+
 ## Architecture rules
 
 Code is organized by module (`knowledge`, `tutoring`, `learning`, `accounts`, `insights`, ...) with `domain / application / ports / adapters` inside each, and entrypoints in `smart_tutor/apps`. The rules are enforced by `lint-imports` (contracts in `backend/pyproject.toml`) in CI.

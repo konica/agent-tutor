@@ -87,7 +87,9 @@ dmypy.json
 cython_debug/
 
 # Editors / OS
-.vscode/
+# Shared debug configurations (README "Debug the backend"); other editor settings stay local.
+.vscode/*
+!.vscode/launch.json
 .idea/
 .DS_Store
 Thumbs.db

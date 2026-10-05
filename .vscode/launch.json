@@ -1,0 +1,81 @@
+{
+  // Debug the backend on the host (README "Debug the backend"). Needs the Python Debugger extension,
+  // `make up`, `make sync`, and `make migrate`. Launch configs start a service under the debugger;
+  // attach configs connect to one started with `make <service>-debug` (debugger port = app port + 10).
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "API",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["smart_tutor.apps.api.main:app", "--port", "10450"],
+      "cwd": "${workspaceFolder}/backend",
+      "envFile": "${workspaceFolder}/.env",
+      "python": "${workspaceFolder}/backend/.venv/bin/python",
+      "windows": { "python": "${workspaceFolder}/backend/.venv/Scripts/python.exe" }
+    },
+    {
+      "name": "Worker",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "smart_tutor.apps.worker.main",
+      "cwd": "${workspaceFolder}/backend",
+      "envFile": "${workspaceFolder}/.env",
+      "python": "${workspaceFolder}/backend/.venv/bin/python",
+      "windows": { "python": "${workspaceFolder}/backend/.venv/Scripts/python.exe" }
+    },
+    {
+      "name": "Agent",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["smart_tutor.apps.agent.server:app", "--port", "10451"],
+      "cwd": "${workspaceFolder}/backend",
+      "envFile": "${workspaceFolder}/.env",
+      "python": "${workspaceFolder}/backend/.venv/bin/python",
+      "windows": { "python": "${workspaceFolder}/backend/.venv/Scripts/python.exe" }
+    },
+    {
+      "name": "MCP server",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "smart_tutor.apps.mcp_server.server",
+      "cwd": "${workspaceFolder}/backend",
+      "envFile": "${workspaceFolder}/.env",
+      "python": "${workspaceFolder}/backend/.venv/bin/python",
+      "windows": { "python": "${workspaceFolder}/backend/.venv/Scripts/python.exe" }
+    },
+    {
+      "name": "Attach: API",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": { "host": "127.0.0.1", "port": 10460 }
+    },
+    {
+      "name": "Attach: Agent",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": { "host": "127.0.0.1", "port": 10461 }
+    },
+    {
+      "name": "Attach: MCP server",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": { "host": "127.0.0.1", "port": 10462 }
+    },
+    {
+      "name": "Attach: Worker",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": { "host": "127.0.0.1", "port": 10463 }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "API + Worker",
+      "configurations": ["API", "Worker"],
+      "stopAll": true
+    }
+  ]
+}
