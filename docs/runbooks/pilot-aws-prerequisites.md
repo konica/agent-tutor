@@ -15,7 +15,7 @@ The deploy role's permissions use these names, so #56–#59 must use them too. I
 | What | Name |
 |---|---|
 | Region | `us-east-1` |
-| Admin CLI profile (your laptop) | `smart-tutor-admin` (any admin profile works; pass it with `-AwsProfile`) |
+| Admin CLI profile (your laptop) | Any profile with admin rights (pilot account: `default`); pass it with `-AwsProfile` |
 | GitHub Actions deploy role | `smart-tutor-github-deploy` |
 | GitHub environment | `pilot` (deploys from `main` only) |
 | ECR repositories | `smart-tutor/<service>` (`api`, `web`, `keycloak`; later `agent`, `mcp`, `worker`) |
@@ -39,15 +39,18 @@ If PowerShell refuses to run the script because of the execution policy, run `Se
 ## 1. Admin access to the AWS account (about 10 min)
 
 1. Make sure the root user has MFA and you don't use it day to day.
-2. Get an admin identity. Prefer IAM Identity Center with the `AdministratorAccess` permission set, then:
+2. Use **any AWS CLI profile with admin rights**. No new profile is needed if you already have one (in the pilot account that's `default`, the IAM user `poweruser` with `AdministratorAccess`). Check what you have:
    ```powershell
-   aws configure sso --profile smart-tutor-admin      # SSO start URL, region us-east-1, the account, AdministratorAccess
-   aws sso login --profile smart-tutor-admin
+   aws configure list-profiles
+   aws sts get-caller-identity --profile default
+   aws iam list-attached-user-policies --user-name <user from the Arn> --profile default   # look for AdministratorAccess
    ```
-   Without Identity Center, use `aws login --profile smart-tutor-admin` (AWS CLI 2.32 or later) with an IAM principal that has admin rights.
-3. Check it and save the values for the record in step 7:
+   Only if you have no admin profile, create one:
+   - **IAM Identity Center** (needs Identity Center enabled; check with `aws sso-admin list-instances`): `aws configure sso --profile smart-tutor-admin`. The session name it asks for is any label, such as `smart-tutor`. Then sign in with `aws sso login --profile smart-tutor-admin`.
+   - **IAM user or console sign-in**: `aws login --profile smart-tutor-admin` (AWS CLI 2.32 or later), or `aws configure --profile smart-tutor-admin` with that user's access keys.
+3. Check it and save the values for the record in step 7. Below, replace `default` with your admin profile:
    ```powershell
-   $env:AWS_PROFILE = "smart-tutor-admin"; $env:AWS_REGION = "us-east-1"
+   $env:AWS_PROFILE = "default"; $env:AWS_REGION = "us-east-1"
    aws sts get-caller-identity
    $AccountId = aws sts get-caller-identity --query Account --output text
    $AccountId
@@ -81,8 +84,8 @@ aws ssm get-parameter --name /cdk-bootstrap/hnb659fds/version --query Parameter.
 ## 3–4. Deploy role and GitHub environment: run the script (about 5 min)
 
 ```powershell
-./docs/runbooks/pilot-aws-prerequisites.ps1 -AwsProfile smart-tutor-admin -DryRun   # read-only; prints the cdk diff and the planned changes
-./docs/runbooks/pilot-aws-prerequisites.ps1 -AwsProfile smart-tutor-admin
+./docs/runbooks/pilot-aws-prerequisites.ps1 -AwsProfile default -DryRun   # read-only; prints the cdk diff and the planned changes
+./docs/runbooks/pilot-aws-prerequisites.ps1 -AwsProfile default
 ```
 
 Add `-DeleteBudget "<name>"` to also remove a hand-made budget (see step 5). If step 2 hasn't run yet, the script bootstraps CDK first. Then it does the following.

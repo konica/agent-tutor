@@ -17,7 +17,8 @@
 #>
 [CmdletBinding()]
 param(
-    [string] $AwsProfile = "smart-tutor-admin",
+    # Any AWS CLI profile with admin rights in the target account.
+    [string] $AwsProfile = $(if ($env:AWS_PROFILE) { $env:AWS_PROFILE } else { "default" }),
     [string] $Region = "us-east-1",
     [string] $Repo = "konica/agent-tutor",
     [string] $DeleteBudget,
