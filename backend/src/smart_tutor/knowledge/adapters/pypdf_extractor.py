@@ -8,7 +8,7 @@ from smart_tutor.knowledge.ports.pdf_extractor import PdfExtractor, TooManyPages
 
 
 class PypdfExtractor(PdfExtractor):
-    def extract_pages(self, data: bytes, max_pages: int) -> list[str]:
+    def extract_pages(self, data: bytes, max_pages: int, first: int | None = None) -> list[str]:
         try:
             reader = PdfReader(BytesIO(data))
             if reader.is_encrypted:
@@ -16,7 +16,7 @@ class PypdfExtractor(PdfExtractor):
             count = len(reader.pages)
             if count > max_pages:
                 raise TooManyPagesError(count)
-            return [page.extract_text() or "" for page in reader.pages]
+            return [reader.pages[i].extract_text() or "" for i in range(count if first is None else min(first, count))]
         except (UnreadablePdfError, TooManyPagesError):
             raise
         except Exception as error:
