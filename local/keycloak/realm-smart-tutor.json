@@ -3,10 +3,19 @@
   "enabled": true,
   "registrationAllowed": true,
   "registrationEmailAsUsername": true,
-  "verifyEmail": false,
+  "verifyEmail": true,
   "loginWithEmailAllowed": true,
   "sslRequired": "none",
   "accessTokenLifespan": 900,
+  "smtpServer": {
+    "host": "mailpit",
+    "port": "1025",
+    "from": "no-reply@smart-tutor.local",
+    "fromDisplayName": "Smart Tutor",
+    "auth": "false",
+    "ssl": "false",
+    "starttls": "false"
+  },
   "roles": {
     "realm": [
       { "name": "offline_access", "description": "${role_offline-access}" },

@@ -42,7 +42,7 @@ Code must keep these true; each has tests or evals guarding it.
 
 ## Local development
 
-- `docker compose up -d` starts pgvector (host port 10400), Keycloak (:10401), and LocalStack (:10402); `--profile app` adds api (:10450), agent (:10451), mcp (:10452), and web (:10453). Host ports count up from 10400 for dependency services and from 10450 for app services; a new service takes the next free port in its group. Copy `.env.example` to `.env`.
+- `docker compose up -d` starts pgvector (host port 10400), Keycloak (:10401), LocalStack (:10402), and Mailpit (:10403, web UI for emails Keycloak sends); `--profile app` adds api (:10450), agent (:10451), mcp (:10452), and web (:10453). Host ports count up from 10400 for dependency services and from 10450 for app services; a new service takes the next free port in its group. Copy `.env.example` to `.env`.
 - To iterate faster, run the app services on the host on the same ports: `make api`, `make agent`, `make mcp`, `make worker`, and `make web` (README "Run the app"). Start host backend processes with `uv run --env-file ../.env`; otherwise boto3 skips LocalStack and calls real AWS. To debug, use `make <service>-debug` (debugpy listens at app port + 10, 10460–10463) or the checked-in `.vscode/launch.json` (README "Debug the backend").
 - The worker calls Bedrock with your AWS profile (in Compose, `~/.aws` is mounted read-only); its S3/SQS calls use LocalStack's dummy keys (`SMART_TUTOR_LOCALSTACK`).
 - Bedrock and LangSmith have no emulator: local runs call real us-east-1 models with your AWS credentials. `make bedrock-check` (pytest marker `bedrock`, under a cent) verifies the configured models and adapters.
