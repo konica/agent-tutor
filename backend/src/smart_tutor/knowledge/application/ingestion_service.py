@@ -1,7 +1,8 @@
 """Hash an uploaded file on the server, store its content once, and process it (PRD §9.5; ADR 0002, 0008).
 
-Processing: extract the page text, save it as JSON, chunk, embed, then make the content and the learner's
-document ready. Crashes (S3, Bedrock, database) are raised so SQS redelivers the message;
+Processing: describe the first pages (title, metadata, summary embedding, work key; committed at once so the
+Library shows the title), extract the page text, save it as JSON, chunk, embed, then make the content and the
+learner's document ready. Crashes (S3, Bedrock, database) are raised so SQS redelivers the message;
 only a file over the page limit, one we can't read, or one with no text layer ends failed.
 """
 
@@ -15,6 +16,7 @@ from langchain_core.documents import BaseDocumentTransformer
 from langchain_core.documents import Document as TextDocument
 from langchain_core.embeddings import Embeddings
 
+from smart_tutor.knowledge.application.describer import FIRST_PAGES, DocumentDescriber
 from smart_tutor.knowledge.application.upload_service import new_uuid
 from smart_tutor.knowledge.domain.chunk import Chunk, validate_chunk
 from smart_tutor.knowledge.domain.content import (
@@ -40,9 +42,10 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ProcessingTools:
-    """What turns a stored PDF into embedded chunks; the ids are recorded on the content."""
+    """What turns a stored PDF into a description and embedded chunks; the ids are recorded on the content."""
 
     extractor: PdfExtractor
+    describer: DocumentDescriber
     chunker: BaseDocumentTransformer
     chunker_id: str
     embeddings: Embeddings
@@ -128,8 +131,12 @@ class IngestionService:
             content = tx.contents.get(content_id)
         if content is None or content.state is not ContentState.PROCESSING:
             return None
+        data = self._objects.read(content.s3_key)
         try:
-            pages = self._tools.extractor.extract_pages(self._objects.read(content.s3_key), self._limits.max_pages)
+            if not content.described:
+                first = self._tools.extractor.extract_pages(data, self._limits.max_pages, first=FIRST_PAGES)
+                self._describe(content_id, first)
+            pages = self._tools.extractor.extract_pages(data, self._limits.max_pages)
         except TooManyPagesError as error:
             return self._fail(content_id, too_many_pages(error.pages, self._limits.max_pages))
         except UnreadablePdfError:
@@ -162,6 +169,37 @@ class IngestionService:
             tx.commit()
         logger.info("content %s: ready with %d chunks", content_id, len(chunks))
         return ContentState.READY
+
+    def _describe(self, content_id: ContentId, first_pages: list[str]) -> None:
+        """First-pages step (PRD §9.2 step 4): store the description in its own transaction, before full extraction.
+
+        A reply without a valid describe_document call leaves the fields empty and processing goes on; the
+        document then keeps its file name as title. Model and embedding errors propagate (redelivery).
+        """
+        if not any(page.strip() for page in first_pages):
+            return
+        described = self._tools.describer.describe(first_pages)
+        # Until accounts records usage, the document_processing tokens are logged.
+        logger.info(
+            "content %s: describe_document used %d input and %d output tokens (document_processing)",
+            content_id,
+            described.usage.input_tokens,
+            described.usage.output_tokens,
+        )
+        if described.description is None:
+            return
+        [vector] = self._tools.embeddings.embed_documents([described.description.summary])
+        if len(vector) != self._tools.embedding_dim:
+            raise ValueError(
+                f"The embedding model must return {self._tools.embedding_dim} floats per summary (dimension mismatch)"
+            )
+        with self._uow() as tx:
+            locked = tx.contents.get_for_update(content_id)
+            if locked is None or locked.state is not ContentState.PROCESSING or locked.described:
+                return
+            locked.describe(described.description, vector)
+            tx.contents.save(locked)
+            tx.commit()
 
     def _chunks(self, content_id: ContentId, pages: list[str]) -> list[Chunk]:
         """Chunk each non-blank page (keeping its physical number), check every chunk, and embed them."""

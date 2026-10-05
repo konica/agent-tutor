@@ -88,6 +88,9 @@ class _Documents(DocumentRepository):
 
     def list_readable_by(self, user_id: UserId) -> list[Document]:
         mine = [copy.deepcopy(d) for d in self._s.documents.values() if d.can_be_read_by(user_id)]
+        for d in mine:
+            content = self._s.contents.get(d.content_id) if d.content_id is not None else None
+            d.content_title = content.title if content else None
         return sorted(mine, key=lambda d: d.created_at, reverse=True)
 
 

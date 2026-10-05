@@ -5,9 +5,10 @@ from typing import Any
 
 from langchain_core.documents import BaseDocumentTransformer, Document
 from langchain_core.embeddings import Embeddings
+from langchain_core.language_models import BaseChatModel
 
-from fakes.models import fake_embeddings
-from smart_tutor.knowledge.application import ProcessingTools, TooManyPagesError, UnreadablePdfError
+from fakes.models import describing_chat_model, fake_embeddings
+from smart_tutor.knowledge.application import DocumentDescriber, ProcessingTools, TooManyPagesError, UnreadablePdfError
 from smart_tutor.knowledge.ports.pdf_extractor import PdfExtractor
 
 CHUNK_CHARS = 100
@@ -41,9 +42,11 @@ def fake_tools(
     extractor: PdfExtractor | None = None,
     chunker: BaseDocumentTransformer | None = None,
     embeddings: Embeddings | None = None,
+    chat: BaseChatModel | None = None,
 ) -> ProcessingTools:
     return ProcessingTools(
         extractor=extractor or FakePdfExtractor(),
+        describer=DocumentDescriber(chat or describing_chat_model()),
         chunker=chunker or PageChunker(),
         chunker_id="fake:100:v1",
         embeddings=embeddings or fake_embeddings(dim),

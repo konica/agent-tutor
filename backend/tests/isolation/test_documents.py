@@ -3,6 +3,7 @@
 from fastapi.testclient import TestClient
 
 from fakes import (
+    DESCRIPTION_ARGS,
     TEST_LIMITS,
     FakeObjectStore,
     FakeTokenVerifier,
@@ -46,7 +47,7 @@ def test_b_never_sees_documents_in_any_state() -> None:
 
     assert client.get("/documents", headers=B).json() == []
     assert client.get("/documents", headers=B, params={"user_id": "learner-a"}).json() == []
-    assert {d["title"] for d in client.get("/documents", headers=A).json()} == {"a1.pdf", "a2.pdf"}
+    assert {d["title"] for d in client.get("/documents", headers=A).json()} == {DESCRIPTION_ARGS["title"], "a2.pdf"}
 
 
 def test_b_never_sees_the_subjects_of_a_document() -> None:

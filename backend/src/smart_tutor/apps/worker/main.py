@@ -16,11 +16,11 @@ from smart_tutor.knowledge.adapters.pypdf_extractor import PypdfExtractor
 from smart_tutor.knowledge.adapters.s3_object_store import S3ObjectStore
 from smart_tutor.knowledge.adapters.sql_library import SqlLibraryUnitOfWork
 from smart_tutor.knowledge.adapters.sql_tables import EMBEDDING_DIM
-from smart_tutor.knowledge.application import IngestionService, ProcessingTools, load_file_limits
+from smart_tutor.knowledge.application import DocumentDescriber, IngestionService, ProcessingTools, load_file_limits
 from smart_tutor.shared.adapters.aws.clients import s3_client, sqs_client, ssm_client
 from smart_tutor.shared.adapters.aws.sqs_queue import SqsMessageQueue
 from smart_tutor.shared.adapters.aws.ssm_parameters import SsmParameterStore
-from smart_tutor.shared.adapters.model_factory import ModelFactory
+from smart_tutor.shared.adapters.model_factory import ChatRole, ModelFactory
 from smart_tutor.shared.adapters.postgres.engine import create_db_engine
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.ports.message_queue import MessageQueue
@@ -61,12 +61,14 @@ def main() -> None:
         return SqlLibraryUnitOfWork(engine)
 
     chunker, chunker_id = build_chunker(settings.chunking)
+    models = ModelFactory(settings)
     embedding = settings.models.embedding
     tools = ProcessingTools(
         extractor=PypdfExtractor(),
+        describer=DocumentDescriber(models.chat(ChatRole.AGENT)),  # PRD §9.13: document description
         chunker=chunker,
         chunker_id=chunker_id,
-        embeddings=ModelFactory(settings).embedding(),
+        embeddings=models.embedding(),
         embedding_model=embedding.model_id,
         embedding_dim=embedding_dimension(embedding.params),
     )
