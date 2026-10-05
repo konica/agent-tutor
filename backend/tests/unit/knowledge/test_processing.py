@@ -6,14 +6,17 @@ from langchain_core.documents import BaseDocumentTransformer, Document
 from langchain_core.embeddings import Embeddings
 
 from fakes import TEST_LIMITS, FakeObjectStore, FixedClock, InMemoryLibrary, fake_embeddings, fake_tools
+from fakes.pdfs import make_pdf, make_scanned_pdf
+from smart_tutor.knowledge.adapters.pypdf_extractor import PypdfExtractor
 from smart_tutor.knowledge.application import (
     ContentState,
+    FileLimits,
     IngestionService,
     ProcessingTools,
     UnreadablePdfError,
     UploadService,
 )
-from smart_tutor.knowledge.domain.content import NO_TEXT_LAYER, UNREADABLE_PDF, pages_key
+from smart_tutor.knowledge.domain.content import NO_TEXT_LAYER, UNREADABLE_PDF, pages_key, too_many_pages
 from smart_tutor.knowledge.domain.errors import InvalidChunkError
 from smart_tutor.shared.domain.ids import ContentId, UserId
 from smart_tutor.subjects.application import GENERAL_SUBJECT_ID
@@ -22,11 +25,11 @@ SENTENCE = "A sentence about attention mechanisms. " * 5  # 190 characters: two 
 
 
 class World:
-    def __init__(self, tools: ProcessingTools | None = None) -> None:
+    def __init__(self, tools: ProcessingTools | None = None, limits: FileLimits = TEST_LIMITS) -> None:
         self.library, self.objects = InMemoryLibrary(), FakeObjectStore()
         self.uploads = UploadService(self.library.unit_of_work, self.objects, FixedClock(), TEST_LIMITS)
         self.tools = tools or fake_tools()
-        self.ingestion = IngestionService(self.library.unit_of_work, self.objects, self.tools)
+        self.ingestion = IngestionService(self.library.unit_of_work, self.objects, self.tools, limits)
 
     def upload(self, data: bytes) -> tuple[str, str]:
         """Upload and ingest; returns the document id and the content id (processing already ran)."""
@@ -234,10 +237,47 @@ def test_a_content_finished_by_another_run_is_left_alone_when_failing() -> None:
     _, content_id = w.upload(pdf(SENTENCE))
     w.library.state.contents[content_id].state = ContentState.PROCESSING
 
-    def finish_then_unreadable(data: bytes) -> list[str]:
+    def finish_then_unreadable(data: bytes, max_pages: int) -> list[str]:
         w.library.state.contents[content_id].state = ContentState.READY
         raise UnreadablePdfError("unreadable")
 
     w.tools.extractor.extract_pages = finish_then_unreadable  # type: ignore[method-assign]
     assert w.ingestion.process_content(ContentId(content_id)) is None
     assert w.library.state.contents[content_id].failure_reason is None
+
+
+def _assert_failed_without_output(w: World, document_id: str, content_id: str, reason: str) -> None:
+    content = w.library.state.contents[content_id]
+    assert (content.state, content.failure_reason) == (ContentState.FAILED, reason)
+    document = w.library.state.documents[document_id]
+    assert (document.state, document.failure_reason) == ("failed", reason)
+    assert content_id not in w.library.state.chunks
+    assert pages_key(content.sha256) not in w.objects.objects
+
+
+def test_a_pdf_over_the_page_limit_fails_with_its_reason_and_stores_no_chunks() -> None:
+    w = World(fake_tools(extractor=PypdfExtractor()), limits=FileLimits(max_bytes=50 * 1024 * 1024, max_pages=500))
+    document_id, content_id = w.upload(make_pdf(["page text " * 10] * 501))
+
+    _assert_failed_without_output(w, document_id, content_id, "This PDF has 501 pages; the limit is 500")
+
+
+def test_a_fake_pdf_over_the_page_limit_fails_with_its_reason() -> None:
+    w = World(limits=FileLimits(max_bytes=TEST_LIMITS.max_bytes, max_pages=2))
+    document_id, content_id = w.upload(pdf(SENTENCE, SENTENCE, SENTENCE))
+
+    _assert_failed_without_output(w, document_id, content_id, too_many_pages(3, 2))
+
+
+def test_a_scanned_pdf_fails_with_no_text_layer_and_stores_no_chunks() -> None:
+    w = World(fake_tools(extractor=PypdfExtractor()))
+    document_id, content_id = w.upload(make_scanned_pdf(2))
+
+    _assert_failed_without_output(w, document_id, content_id, NO_TEXT_LAYER)
+
+
+def test_a_corrupt_pdf_fails_as_unreadable_and_stores_no_chunks() -> None:
+    w = World(fake_tools(extractor=PypdfExtractor()))
+    document_id, content_id = w.upload(make_pdf(["Hello"])[:40])
+
+    _assert_failed_without_output(w, document_id, content_id, UNREADABLE_PDF)

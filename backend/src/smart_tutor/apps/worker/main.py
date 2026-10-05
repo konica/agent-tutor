@@ -16,9 +16,10 @@ from smart_tutor.knowledge.adapters.pypdf_extractor import PypdfExtractor
 from smart_tutor.knowledge.adapters.s3_object_store import S3ObjectStore
 from smart_tutor.knowledge.adapters.sql_library import SqlLibraryUnitOfWork
 from smart_tutor.knowledge.adapters.sql_tables import EMBEDDING_DIM
-from smart_tutor.knowledge.application import IngestionService, ProcessingTools
-from smart_tutor.shared.adapters.aws.clients import s3_client, sqs_client
+from smart_tutor.knowledge.application import IngestionService, ProcessingTools, load_file_limits
+from smart_tutor.shared.adapters.aws.clients import s3_client, sqs_client, ssm_client
 from smart_tutor.shared.adapters.aws.sqs_queue import SqsMessageQueue
+from smart_tutor.shared.adapters.aws.ssm_parameters import SsmParameterStore
 from smart_tutor.shared.adapters.model_factory import ModelFactory
 from smart_tutor.shared.adapters.postgres.engine import create_db_engine
 from smart_tutor.shared.config import Settings
@@ -69,7 +70,10 @@ def main() -> None:
         embedding_model=embedding.model_id,
         embedding_dim=embedding_dimension(embedding.params),
     )
-    ingestion = IngestionService(library, S3ObjectStore(s3_client(settings), settings.documents_bucket), tools)
+    limits = load_file_limits(
+        SsmParameterStore(ssm_client(settings)), settings.max_upload_mb_param, settings.max_pages_param
+    )
+    ingestion = IngestionService(library, S3ObjectStore(s3_client(settings), settings.documents_bucket), tools, limits)
     queue = SqsMessageQueue(sqs_client(settings), settings.ingest_queue_url)
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stop.set())

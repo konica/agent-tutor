@@ -11,6 +11,7 @@ from smart_tutor.knowledge.domain.content import (
     content_key,
     has_text_layer,
     pages_key,
+    too_many_pages,
 )
 from smart_tutor.knowledge.domain.document import DUPLICATE_UPLOAD, Document, DocumentState
 from smart_tutor.knowledge.domain.errors import (
@@ -224,3 +225,7 @@ def test_document_ready_refuses_bad_states_and_subjects() -> None:
     failed.fail("x")
     with pytest.raises(DocumentStateError):
         failed.ready(general)
+
+
+def test_too_many_pages_reason_names_both_counts() -> None:
+    assert too_many_pages(501, 500) == "This PDF has 501 pages; the limit is 500"
