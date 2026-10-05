@@ -145,3 +145,84 @@ def test_budget_alerts_at_80_percent_actual_and_100_percent_forecast() -> None:
             ],
         },
     )
+
+
+LB_POLICY = Path(__file__).parents[1] / "smart_tutor_infra/policies/aws-load-balancer-controller-v3.5.0.json"
+
+
+def test_cluster_runs_eks_1_36_with_two_small_nodes() -> None:
+    t = template(make_app(), "Cluster")
+
+    t.has_resource_properties(
+        "AWS::EKS::Cluster",
+        {
+            "Name": "smart-tutor-prod",
+            "Version": "1.36",
+            "AccessConfig": Match.object_like(
+                {"AuthenticationMode": "API", "BootstrapClusterCreatorAdminPermissions": False}
+            ),
+        },
+    )
+    cluster = next(iter(t.find_resources("AWS::EKS::Cluster").values()))
+    assert "ComputeConfig" not in cluster["Properties"] or not cluster["Properties"]["ComputeConfig"].get("Enabled")
+    t.resource_count_is("AWS::EKS::Nodegroup", 1)
+    t.has_resource_properties(
+        "AWS::EKS::Nodegroup",
+        {
+            "NodegroupName": "smart-tutor-prod-default",
+            "InstanceTypes": ["t3.large"],
+            "AmiType": "AL2023_x86_64_STANDARD",
+            "ScalingConfig": {"MinSize": 2, "DesiredSize": 2, "MaxSize": 3},
+        },
+    )
+    t.has_resource_properties("AWS::EKS::Addon", {"AddonName": "eks-pod-identity-agent"})
+    t.has_output("ClusterName", {})
+
+
+def test_admin_and_deploy_role_get_cluster_admin_access_entries() -> None:
+    t = template(make_app(), "Cluster")
+
+    entries = t.find_resources("AWS::EKS::AccessEntry")
+    principals = [json.dumps(e["Properties"]["PrincipalArn"]) for e in entries.values()]
+    assert len(entries) == 2
+    assert any("arn:aws:iam::685394474162:user/poweruser" in p for p in principals)
+    assert any("role/smart-tutor-github-deploy" in p for p in principals)
+    assert all("AmazonEKSClusterAdminPolicy" in json.dumps(e["Properties"]["AccessPolicies"]) for e in entries.values())
+
+
+def test_add_ons_get_iam_through_pod_identity() -> None:
+    t = template(make_app(), "Cluster")
+
+    t.has_resource_properties(
+        "AWS::EKS::PodIdentityAssociation",
+        {"Namespace": "kube-system", "ServiceAccount": "aws-load-balancer-controller"},
+    )
+    t.has_resource_properties(
+        "AWS::EKS::PodIdentityAssociation", {"Namespace": "external-secrets", "ServiceAccount": "external-secrets"}
+    )
+    t.has_resource_properties(
+        "AWS::IAM::Role",
+        {
+            "AssumeRolePolicyDocument": {
+                "Statement": [
+                    Match.object_like(
+                        {
+                            "Action": ["sts:AssumeRole", "sts:TagSession"],
+                            "Principal": {"Service": "pods.eks.amazonaws.com"},
+                        }
+                    )
+                ]
+            }
+        },
+    )
+    secrets = json.dumps(t.find_resources("AWS::IAM::ManagedPolicy"))
+    assert "secret:smart-tutor/*" in secrets
+
+
+def test_load_balancer_controller_policy_fits_a_managed_policy() -> None:
+    document = json.loads(LB_POLICY.read_text())
+
+    assert len(json.dumps(document, separators=(",", ":"))) <= 6144
+    t = template(make_app(), "Cluster")
+    policies = [p["Properties"]["PolicyDocument"] for p in t.find_resources("AWS::IAM::ManagedPolicy").values()]
+    assert any(len(p["Statement"]) == len(document["Statement"]) for p in policies)

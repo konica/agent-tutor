@@ -6,7 +6,7 @@ from smart_tutor_infra.stacks.budgets import BudgetsStack
 from smart_tutor_infra.stacks.cluster import ClusterStack
 from smart_tutor_infra.stacks.config import ConfigStack
 from smart_tutor_infra.stacks.data import DataStack
-from smart_tutor_infra.stacks.github_deploy import GitHubDeployStack
+from smart_tutor_infra.stacks.github_deploy import DEPLOY_ROLE_NAME, GitHubDeployStack
 from smart_tutor_infra.stacks.network import NetworkStack
 from smart_tutor_infra.stacks.registry import RegistryStack
 from smart_tutor_infra.stacks.storage import StorageStack
@@ -21,7 +21,15 @@ def build_app(app: cdk.App, env_name: str = "prod") -> list[cdk.Stack]:
         network,
         DataStack(app, f"{prefix}-Data", env=env),
         StorageStack(app, f"{prefix}-Storage", env=env),
-        ClusterStack(app, f"{prefix}-Cluster", env=env),
+        ClusterStack(
+            app,
+            f"{prefix}-Cluster",
+            env=env,
+            vpc=network.vpc,
+            cluster_name=name,
+            admin_principal_arns=app.node.get_context("smart-tutor:eks-admin-principal-arns"),
+            deploy_role_name=DEPLOY_ROLE_NAME,
+        ),
         RegistryStack(app, f"{prefix}-Registry", env=env),
         ConfigStack(app, f"{prefix}-Config", env=env),
         BudgetsStack(
