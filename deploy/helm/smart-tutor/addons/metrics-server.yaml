@@ -1,0 +1,2 @@
+# metrics-server, chart metrics-server/metrics-server 3.14.0 (https://kubernetes-sigs.github.io/metrics-server/).
+args: []
