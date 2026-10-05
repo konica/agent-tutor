@@ -8,7 +8,8 @@
        smart-tutor-github-deploy (infra/smart_tutor_infra/stacks/github_deploy.py).
     3. Creates the GitHub environment `pilot`, limited to `main`, with the variables the deploy workflow reads.
     4. Optionally deletes a hand-made budget.
-    Safe to run again. Run with -DryRun first: it only reads, and prints what it would do.
+    Safe to run again. Run with -DryRun first: it only reads (AWS and GitHub), prints the template-only cdk diff, and
+    lists what it would do.
 
 .EXAMPLE
     ./docs/runbooks/pilot-aws-prerequisites.ps1 -AwsProfile default -DryRun
@@ -90,7 +91,8 @@ if ($DryRun -and (Test-Path (Join-Path $InfraDir ".venv"))) {
     Push-Location $InfraDir
     try {
         Write-Host "Changes cdk deploy would make to ${Stack}:"
-        npx -y aws-cdk@latest diff $Stack
+        # Template-only diff: the default method uploads the template and creates a temporary stack for a change set.
+        npx -y aws-cdk@latest diff $Stack --method=template
     } finally { Pop-Location }
 }
 Invoke-Step "cdk deploy $Stack (OIDC provider, role smart-tutor-github-deploy)" {
