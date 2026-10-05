@@ -73,3 +73,14 @@ def test_more_pages_than_the_limit_raise_before_reading_text(monkeypatch: pytest
 
 def test_exactly_the_limit_is_accepted() -> None:
     assert len(PypdfExtractor().extract_pages(make_pdf(["p"] * 3), 3)) == 3
+
+
+def test_first_reads_only_the_first_pages() -> None:
+    data = make_pdf(["one " * 20, "two " * 20, "three " * 20])
+    pages = PypdfExtractor().extract_pages(data, 500, first=2)
+    assert len(pages) == 2 and "two" in pages[1]
+
+
+def test_first_still_checks_the_page_limit() -> None:
+    with pytest.raises(TooManyPagesError):
+        PypdfExtractor().extract_pages(make_pdf(["a", "b", "c"]), 2, first=2)

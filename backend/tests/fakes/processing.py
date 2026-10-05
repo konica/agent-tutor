@@ -16,13 +16,13 @@ CHUNK_CHARS = 100
 class FakePdfExtractor(PdfExtractor):
     """`%PDF-x.y <text>` bytes: the text after the first space, split into pages on form feeds. Else unreadable."""
 
-    def extract_pages(self, data: bytes, max_pages: int) -> list[str]:
+    def extract_pages(self, data: bytes, max_pages: int, first: int | None = None) -> list[str]:
         if not data.startswith(b"%PDF"):
             raise UnreadablePdfError("not a PDF")
         pages = data.decode("utf-8").partition(" ")[2].split("\f")
         if len(pages) > max_pages:
             raise TooManyPagesError(len(pages))
-        return pages
+        return pages if first is None else pages[:first]
 
 
 class PageChunker(BaseDocumentTransformer):
