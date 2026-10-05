@@ -34,4 +34,8 @@ awslocal s3api put-bucket-cors --bucket "$BUCKET" --cors-configuration '{
 
 awslocal ssm put-parameter --name /smart-tutor/learning-record-idle-minutes --type String --value 10 --overwrite
 
+# Per-file limits (PRD §11): the API presigns and serves them, the worker checks pages.
+awslocal ssm put-parameter --name /smart-tutor/max-upload-mb --type String --value 50 --overwrite
+awslocal ssm put-parameter --name /smart-tutor/max-pages --type String --value 500 --overwrite
+
 echo "smart-tutor LocalStack resources ready"
