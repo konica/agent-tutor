@@ -1,8 +1,8 @@
 """Hash an uploaded file on the server, store its content once, and process it (PRD §9.5; ADR 0002, 0008).
 
 Processing: extract the page text, save it as JSON, chunk, embed, then make the content and the learner's
-document ready. Crashes (S3, Bedrock, database) are raised so SQS redelivers the message; only a file we
-can't read, or one with no text layer, ends failed.
+document ready. Crashes (S3, Bedrock, database) are raised so SQS redelivers the message;
+only a file over the page limit, one we can't read, or one with no text layer ends failed.
 """
 
 import hashlib
@@ -24,12 +24,14 @@ from smart_tutor.knowledge.domain.content import (
     ContentState,
     has_text_layer,
     pages_key,
+    too_many_pages,
 )
 from smart_tutor.knowledge.domain.document import DUPLICATE_UPLOAD, DocumentState
+from smart_tutor.knowledge.domain.limits import FileLimits
 from smart_tutor.knowledge.domain.upload import UploadOutcome, parse_upload_key
 from smart_tutor.knowledge.ports.library import LibraryUnitOfWork
 from smart_tutor.knowledge.ports.object_store import ObjectNotFoundError, ObjectStore
-from smart_tutor.knowledge.ports.pdf_extractor import PdfExtractor, UnreadablePdfError
+from smart_tutor.knowledge.ports.pdf_extractor import PdfExtractor, TooManyPagesError, UnreadablePdfError
 from smart_tutor.shared.domain.ids import ContentId, UploadId, UserId
 from smart_tutor.subjects.application import GENERAL_SUBJECT_ID
 
@@ -54,9 +56,11 @@ class IngestionService:
         uow: Callable[[], LibraryUnitOfWork],
         objects: ObjectStore,
         tools: ProcessingTools,
+        limits: FileLimits,
         new_id: Callable[[], str] = new_uuid,
     ) -> None:
-        self._uow, self._objects, self._tools, self._new_id = uow, objects, tools, new_id
+        self._uow, self._objects, self._tools, self._limits = uow, objects, tools, limits
+        self._new_id = new_id
 
     def ingest_upload(self, key: str) -> UploadOutcome | None:
         """Store or reject one uploaded file. None means there was nothing new to store (not ours, or already handled).
@@ -125,7 +129,9 @@ class IngestionService:
         if content is None or content.state is not ContentState.PROCESSING:
             return None
         try:
-            pages = self._tools.extractor.extract_pages(self._objects.read(content.s3_key))
+            pages = self._tools.extractor.extract_pages(self._objects.read(content.s3_key), self._limits.max_pages)
+        except TooManyPagesError as error:
+            return self._fail(content_id, too_many_pages(error.pages, self._limits.max_pages))
         except UnreadablePdfError:
             return self._fail(content_id, UNREADABLE_PDF)
         if not has_text_layer(pages):

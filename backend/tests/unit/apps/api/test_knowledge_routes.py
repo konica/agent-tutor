@@ -32,7 +32,10 @@ def client() -> TestClient:
         subjects=SubjectNames(InMemorySubjects()),
     )
     app = create_app(Settings(), verifier=verifier, services=services)
-    app.state.objects, app.state.ingestion = objects, IngestionService(library.unit_of_work, objects, fake_tools())
+    app.state.objects, app.state.ingestion = (
+        objects,
+        IngestionService(library.unit_of_work, objects, fake_tools(), TEST_LIMITS),
+    )
     return TestClient(app)
 
 

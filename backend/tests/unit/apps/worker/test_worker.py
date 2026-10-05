@@ -21,7 +21,7 @@ def world() -> tuple[InMemoryLibrary, FakeObjectStore, UploadService, IngestionS
         library,
         objects,
         UploadService(library.unit_of_work, objects, FixedClock(), TEST_LIMITS),
-        IngestionService(library.unit_of_work, objects, fake_tools()),
+        IngestionService(library.unit_of_work, objects, fake_tools(), TEST_LIMITS),
     )
 
 

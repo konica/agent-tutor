@@ -14,7 +14,7 @@ from smart_tutor.knowledge.domain.limits import FileLimits
 from smart_tutor.knowledge.domain.upload import UploadOutcome
 from smart_tutor.knowledge.ports.library import LibraryUnitOfWork
 from smart_tutor.knowledge.ports.object_store import ObjectStore
-from smart_tutor.knowledge.ports.pdf_extractor import PdfExtractor, UnreadablePdfError
+from smart_tutor.knowledge.ports.pdf_extractor import PdfExtractor, TooManyPagesError, UnreadablePdfError
 
 __all__ = [
     "PDF_CONTENT_TYPE",
@@ -29,6 +29,7 @@ __all__ = [
     "PdfExtractor",
     "ProcessingTools",
     "StartedUpload",
+    "TooManyPagesError",
     "UnreadablePdfError",
     "UploadOutcome",
     "UploadService",

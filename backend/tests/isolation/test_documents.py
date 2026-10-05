@@ -34,7 +34,7 @@ def setup() -> tuple[TestClient, FakeObjectStore, IngestionService]:
         subjects=SubjectNames(InMemorySubjects()),
     )
     client = TestClient(create_app(Settings(), verifier=verifier, services=services))
-    return client, objects, IngestionService(library.unit_of_work, objects, fake_tools())
+    return client, objects, IngestionService(library.unit_of_work, objects, fake_tools(), TEST_LIMITS)
 
 
 def test_b_never_sees_documents_in_any_state() -> None:

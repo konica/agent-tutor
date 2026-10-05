@@ -13,6 +13,10 @@ MIN_AVERAGE_CHARS = 50  # non-whitespace characters per page below which a PDF c
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 
 
+def too_many_pages(pages: int, limit: int) -> str:
+    return f"This PDF has {pages} pages; the limit is {limit}"
+
+
 class ContentState(StrEnum):
     PROCESSING = "processing"
     READY = "ready"

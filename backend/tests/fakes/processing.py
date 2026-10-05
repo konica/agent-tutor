@@ -7,7 +7,7 @@ from langchain_core.documents import BaseDocumentTransformer, Document
 from langchain_core.embeddings import Embeddings
 
 from fakes.models import fake_embeddings
-from smart_tutor.knowledge.application import ProcessingTools, UnreadablePdfError
+from smart_tutor.knowledge.application import ProcessingTools, TooManyPagesError, UnreadablePdfError
 from smart_tutor.knowledge.ports.pdf_extractor import PdfExtractor
 
 CHUNK_CHARS = 100
@@ -16,10 +16,13 @@ CHUNK_CHARS = 100
 class FakePdfExtractor(PdfExtractor):
     """`%PDF-x.y <text>` bytes: the text after the first space, split into pages on form feeds. Else unreadable."""
 
-    def extract_pages(self, data: bytes) -> list[str]:
+    def extract_pages(self, data: bytes, max_pages: int) -> list[str]:
         if not data.startswith(b"%PDF"):
             raise UnreadablePdfError("not a PDF")
-        return data.decode("utf-8").partition(" ")[2].split("\f")
+        pages = data.decode("utf-8").partition(" ")[2].split("\f")
+        if len(pages) > max_pages:
+            raise TooManyPagesError(len(pages))
+        return pages
 
 
 class PageChunker(BaseDocumentTransformer):

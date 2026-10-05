@@ -15,7 +15,7 @@ class World:
     def __init__(self) -> None:
         self.library, self.objects = InMemoryLibrary(), FakeObjectStore()
         self.uploads = UploadService(self.library.unit_of_work, self.objects, FixedClock(), TEST_LIMITS)
-        self.ingestion = IngestionService(self.library.unit_of_work, self.objects, fake_tools())
+        self.ingestion = IngestionService(self.library.unit_of_work, self.objects, fake_tools(), TEST_LIMITS)
 
     def upload(self, user: str, data: bytes = PDF, name: str = "paper.pdf") -> StartedUpload:
         started = self.uploads.start_upload(UserId(user), name)
