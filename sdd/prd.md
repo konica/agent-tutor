@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Draft v2.11 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Status** | Draft v2.12 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Changes from v2.11** | Pilot hosting: served from the AWS-generated CloudFront address with path routing (`/`, `/api/*`, `/auth/*`) through a VPC origin to an internal ALB; no custom domain, DNS, or ACM certificate for now (§9.12, Appendix A item 4; ADR 0009). No product behavior changes. |
 | **Changes from v2.10** | The per-file limits are SSM parameters `/smart-tutor/max-upload-mb` (50, MiB) and `/smart-tutor/max-pages` (500), read once at startup by the API and worker (a missing or invalid value stops startup); `GET /uploads/limits` serves them to the browser, which refuses a non-PDF, empty, or oversized file before uploading ("Not uploaded. …"). New failure reason: "This PDF has N pages; the limit is 500", checked before the text is read (§9.5). The API and worker roles need `ssm:GetParameter` on `/smart-tutor/*` (§9.4 settings; Appendix A). |
 | **Changes from v2.9** | Interim behavior only, until US-2b (#10): when a document's content becomes `ready`, the document gets the subject "General" and goes straight to `ready` (§9.5). `contents.text_key` holds `contents/<sha256>.pages.json` (§9.4). Failure reasons: "This file isn't a readable PDF", "No text layer (scanned PDFs are not supported yet)". |
 | **Changes from v2.8** | Data model only: `documents` gains `file_name` (the display title's last fallback, §9.4) and `failure_reason` (why this learner's document failed, e.g. a duplicate before US-11 links it). Interim behavior: until US-11 links duplicates, an upload whose bytes are already known fails with "Duplicate uploads aren't supported yet". |
@@ -14,7 +15,7 @@
 | **Changes from v2.2** | Release 1 extracts PDF text page by page with `pypdf` into LangChain `Document`s instead of Docling (D26, ADR 0005): no PyTorch in the worker, no OCR (PDFs without a text layer fail with a reason), saved page text replaces saved Docling output. Reference lists and section headings move to a structured-extraction step added in Release 2, backfilled from stored PDFs. M0 drops the Docling benchmark. |
 | **Changes from v2.1** | Architecture only: the subject catalog moves from `knowledge` into a new `subjects` module (§9.15; ADR 0004). No product behavior changes. |
 | **Owner** | Thao Dinh |
-| **Last updated** | 2026-10-04 |
+| **Last updated** | 2026-10-05 |
 | **Lifecycle** | Build → Test → Deploy → Monitor ([The Agent Development Lifecycle](https://www.langchain.com/blog/the-agent-development-lifecycle)) |
 | **Changes from v2.0** | Product owner, business analyst, and technical review applied. Documents take 1–3 subjects; threads start with the detected subjects and grow to at most 3 (warning at the maximum). No admin functions (no subject rename/merge/hide, no account-deletion process — recorded as a known gap). No limit on the number of documents. Re-summarizing an edited note asks first. Traces deleted after 180 days; threads kept. Explicit document and content state machines, shared retry, work identity (same paper, different files), saved Docling output. Release order: R2 research map, R3 learning loop, R4 sharing and imports, R5 deep knowledge graph. |
 
@@ -462,7 +463,7 @@ Agent, MCP server, API, web, Keycloak, ingestion worker, and CronJobs run on **E
 
 **Local (Docker Compose):** PostgreSQL + pgvector; Keycloak with realm import; LocalStack with the documents bucket (versioning; `ObjectCreated` notifications for `uploads/` to SQS + DLQ; CORS for the web origin), SSM parameters; Mailpit (catches Keycloak's verification emails). Bedrock and LangSmith are real (developer AWS profile, separate LangSmith project).
 
-**Production (us-east-1):** AWS CDK (Python) for VPC, EKS, RDS, S3 (versioning; `uploads/` event notifications; lifecycle: `uploads/` expires after 1 day, tagged content PDFs to Glacier after 30 days), SQS + DLQ, ECR, IAM/Pod Identity, Secrets Manager, SSM, ACM, budgets. Helm for all workloads, NetworkPolicies, External Secrets.
+**Production (us-east-1):** AWS CDK (Python) for VPC, EKS, RDS, S3 (versioning; `uploads/` event notifications; lifecycle: `uploads/` expires after 1 day, tagged content PDFs to Glacier after 30 days), SQS + DLQ, ECR, IAM/Pod Identity, Secrets Manager, SSM, a CloudFront distribution and an internal ALB, budgets. Helm for all workloads, NetworkPolicies, External Secrets. CloudFront is the single public entry point and routes by path (`/` to web, `/api/*` to the API, `/auth/*` to Keycloak) through a VPC origin to the internal ALB (ADR 0009).
 
 **Delivery:** on merge to `main`: tests and the smoke evaluation split → images to ECR → `cdk deploy` → `helm upgrade`. Releases gated on the full evaluation split.
 
@@ -623,6 +624,7 @@ Measured over the pilot unless stated; minimum sample 100 events per metric.
 | Q41 | Personal name equal to another shared subject's name (design D6) | Allowed; everything links by `subject_id` (US-10b). |
 | Q42 | Changing subjects of an archived document (design D7) | Allowed; applies on restore (US-10). |
 | Q43 | Time zone for "today", daily caps, and limit times (design D8) | GMT+7 for all learners in Release 1 (D27). |
+| Q44 | Pilot address | The AWS-generated CloudFront domain with path routing; no custom domain until needed (ADR 0009). |
 
 ## 14. Roadmap: releases and milestones
 
@@ -685,9 +687,9 @@ M4 Production launch (R1)
 1. Region us-east-1.
 2. Model access for `amazon.nova-2-lite-v1:0` (and the `us.` inference profile), `amazon.nova-2-multimodal-embeddings-v1:0`, `qwen.qwen3-32b-v1:0`.
 3. Service quotas for the three models, sized for ingestion of uploads plus 50 concurrent learners; EKS/EC2 quotas.
-4. Domain and DNS for web, API, and Keycloak (ACM certificate).
+4. ~~Domain and DNS for web, API, and Keycloak (ACM certificate).~~ Not needed for the pilot: everything is served from the CloudFront address with path routing (ADR 0009). A custom domain later needs an ACM certificate in us-east-1 and an alternate domain name on the distribution.
 5. `cdk bootstrap`; CI deploy role trusted by GitHub Actions (OIDC).
 6. Developer access: AWS profile allowed to invoke the models; LangSmith API key.
 7. Decisions: PrivateLink for `bedrock-runtime`; monthly budget and alert recipients; optional Bedrock Guardrail; seed corpus license check for evaluation documents; data-erasure obligations for the pilot's users.
 
-**Created by CDK:** VPC, EKS and node group, RDS, S3 (versioning; `ObjectCreated` notifications for `uploads/` to SQS; lifecycle: `uploads/` expire after 1 day, `status=archived` content PDFs to Glacier Flexible Retrieval after 30 days; CORS for presigned POST from the web origin), SQS + DLQ, ECR, Secrets Manager, SSM parameters, ACM, budgets, IAM roles with Pod Identity (API: presign `uploads/*`, `ssm:GetParameter` on `/smart-tutor/*`; worker: `ssm:GetParameter` on `/smart-tutor/*`, read `uploads/*`, write `contents/*`, tag objects; agent: Bedrock invoke on the inference profile and underlying model ARNs in every destination region).
+**Created by CDK:** VPC, EKS and node group, RDS, S3 (versioning; `ObjectCreated` notifications for `uploads/` to SQS; lifecycle: `uploads/` expire after 1 day, `status=archived` content PDFs to Glacier Flexible Retrieval after 30 days; CORS for presigned POST from the web origin), SQS + DLQ, ECR, Secrets Manager, SSM parameters, internal ALB and CloudFront distribution (VPC origin), budgets, IAM roles with Pod Identity (API: presign `uploads/*`, `ssm:GetParameter` on `/smart-tutor/*`; worker: `ssm:GetParameter` on `/smart-tutor/*`, read `uploads/*`, write `contents/*`, tag objects; agent: Bedrock invoke on the inference profile and underlying model ARNs in every destination region).
