@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const kc = {
   init: vi.fn(),
@@ -13,17 +13,27 @@ const { authConfig, createKeycloakClient } = await import("./keycloakClient");
 const config = { url: "http://localhost:10401", realm: "smart-tutor", clientId: "smart-tutor-web" };
 
 describe("keycloak client", () => {
-  it("uses Keycloak on the page's origin when built with VITE_KEYCLOAK_URL=/auth", () => {
-    vi.stubEnv("VITE_KEYCLOAK_URL", "/auth");
-    expect(authConfig().url).toBe(`${window.location.origin}/auth`);
-    vi.unstubAllEnvs();
-  });
-
   beforeEach(() => {
     vi.clearAllMocks();
     kc.init.mockResolvedValue(true);
     kc.updateToken.mockResolvedValue(false);
     kc.token = "access-token";
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("uses Keycloak on the page's origin when built with VITE_KEYCLOAK_URL=/auth", () => {
+    vi.stubEnv("VITE_KEYCLOAK_URL", "/auth");
+    expect(authConfig().url).toBe(`${window.location.origin}/auth`);
+  });
+
+  it("falls back to the local Keycloak defaults when the build variables are empty", () => {
+    vi.stubEnv("VITE_KEYCLOAK_URL", "");
+    vi.stubEnv("VITE_KEYCLOAK_REALM", "");
+    vi.stubEnv("VITE_KEYCLOAK_CLIENT_ID", "");
+    expect(authConfig()).toEqual(config);
   });
 
   it("signs in with PKCE and login-required", async () => {
