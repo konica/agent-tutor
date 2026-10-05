@@ -9,10 +9,16 @@ const kc = {
 };
 vi.mock("keycloak-js", () => ({ default: vi.fn(function () { return kc; }) }));
 
-const { createKeycloakClient } = await import("./keycloakClient");
+const { authConfig, createKeycloakClient } = await import("./keycloakClient");
 const config = { url: "http://localhost:10401", realm: "smart-tutor", clientId: "smart-tutor-web" };
 
 describe("keycloak client", () => {
+  it("uses Keycloak on the page's origin when built with VITE_KEYCLOAK_URL=/auth", () => {
+    vi.stubEnv("VITE_KEYCLOAK_URL", "/auth");
+    expect(authConfig().url).toBe(`${window.location.origin}/auth`);
+    vi.unstubAllEnvs();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     kc.init.mockResolvedValue(true);

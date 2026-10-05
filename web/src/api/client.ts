@@ -1,9 +1,10 @@
 import { SessionExpiredError } from "../auth/authClient";
+import { absoluteUrl } from "./absoluteUrl";
 import { type Client } from "./generated/client";
 import { client } from "./generated/client.gen";
 
 export function apiBaseUrl(): string {
-  return import.meta.env.VITE_API_URL ?? "http://localhost:10450";
+  return absoluteUrl(import.meta.env.VITE_API_URL || "http://localhost:10450");
 }
 
 type Options = {

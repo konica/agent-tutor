@@ -1,14 +1,15 @@
 import Keycloak from "keycloak-js";
 
+import { absoluteUrl } from "../api/absoluteUrl";
 import type { AuthClient } from "./authClient";
 
 export type AuthConfig = { url: string; realm: string; clientId: string };
 
 export function authConfig(): AuthConfig {
   return {
-    url: import.meta.env.VITE_KEYCLOAK_URL ?? "http://localhost:10401",
-    realm: import.meta.env.VITE_KEYCLOAK_REALM ?? "smart-tutor",
-    clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID ?? "smart-tutor-web",
+    url: absoluteUrl(import.meta.env.VITE_KEYCLOAK_URL || "http://localhost:10401"),
+    realm: import.meta.env.VITE_KEYCLOAK_REALM || "smart-tutor",
+    clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || "smart-tutor-web",
   };
 }
 

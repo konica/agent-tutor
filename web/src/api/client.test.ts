@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SessionExpiredError } from "../auth/authClient";
-import { configureApiClient } from "./client";
+import { apiBaseUrl, configureApiClient } from "./client";
 import { createClient, createConfig } from "./generated/client";
 import { getMe } from "./generated/sdk.gen";
 
@@ -20,6 +20,18 @@ function setup(status: number, getToken: () => Promise<string> = async () => "ac
 }
 
 describe("API client", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("calls the API on the page's origin when built with VITE_API_URL=/api", () => {
+    vi.stubEnv("VITE_API_URL", "/api");
+    expect(apiBaseUrl()).toBe(`${window.location.origin}/api`);
+  });
+
+  it("falls back to the local API when VITE_API_URL is empty", () => {
+    vi.stubEnv("VITE_API_URL", "");
+    expect(apiBaseUrl()).toBe("http://localhost:10450");
+  });
+
   it("sends a fresh bearer token", async () => {
     const { apiClient, fetch } = setup(200);
     const { data } = await getMe({ client: apiClient });
