@@ -34,6 +34,37 @@ flowchart TB
   EKS -->|pulls images| ECR
 ```
 
+### Setup order: AWS first, then GitHub
+
+The only real dependency is that GitHub stores the role's ARN, so the role has to exist first. Trust is checked only when a deploy job signs in: the role trusts a subject string, so AWS doesn't need the GitHub environment when the role is created. The environment just has to exist before the first deploy. `pilot-aws-prerequisites.ps1` runs steps 0–4 in this order.
+
+| # | Where | What | Needs |
+|---|---|---|---|
+| 0 | GitHub (read only) | Read the repository's OIDC subject prefix `repo:konica@1114311/agent-tutor@1399048529`; it must match `infra/cdk.json` | Nothing; GitHub fixes it for the repository |
+| 1 | AWS | `cdk bootstrap` (`CDKToolkit` stack) | Admin credentials |
+| 2 | AWS | Deploy `SmartTutor-prod-GitHubDeploy`: the OIDC provider, then the role that trusts `…:environment:pilot` | Step 1, and the prefix from step 0 |
+| 3 | GitHub | Create the environment `pilot`, limited to `main` | Nothing (it can run before step 2) |
+| 4 | GitHub | Set the variables `AWS_ROLE_ARN`, `AWS_REGION`, `AWS_ACCOUNT_ID` in `pilot` | The role ARN from step 2 |
+| 5 | Both, from #59 on | A deploy job sends its token; AWS STS checks it against the role's trust and returns 1-hour credentials | Steps 2–4 |
+
+```mermaid
+sequenceDiagram
+  actor A as Admin (script, once)
+  participant GH as GitHub
+  participant AWS as AWS account
+
+  A->>GH: read OIDC subject prefix (step 0)
+  GH-->>A: repo:konica@1114311/agent-tutor@1399048529
+  A->>AWS: cdk bootstrap (step 1)
+  A->>AWS: cdk deploy SmartTutor-prod-GitHubDeploy (step 2)
+  AWS-->>A: role ARN (trusts ...:environment:pilot)
+  A->>GH: create environment pilot, main only (step 3)
+  A->>GH: set AWS_ROLE_ARN, AWS_REGION, AWS_ACCOUNT_ID (step 4)
+  Note over GH,AWS: Later, on every merge to main (issue 59)
+  GH->>AWS: deploy job in pilot sends its OIDC token (step 5)
+  AWS-->>GH: token matches the role's trust, so 1-hour credentials
+```
+
 ## 2. Production runtime
 
 There's a single public entry point: the AWS-generated CloudFront address, served over HTTPS. CloudFront routes by path. It reaches an **internal** load balancer through a VPC origin, so nothing inside the VPC has a public address, and tokens never cross the internet unencrypted. Because the browser, API and Keycloak share one origin, the API needs no CORS.
