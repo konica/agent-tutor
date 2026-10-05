@@ -2,6 +2,7 @@
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import BigInteger, Boolean, Column, DateTime, Integer, MetaData, String, Table, Text, Uuid
+from sqlalchemy.dialects.postgresql import ARRAY
 
 metadata = MetaData()
 
@@ -24,6 +25,14 @@ contents = Table(
     Column("chunker", Text),
     Column("embedding_model", Text),
     Column("embedding_dim", Integer),
+    Column("title", Text),
+    Column("authors", ARRAY(Text)),
+    Column("year", Integer),
+    Column("doi", Text),
+    Column("summary", Text),
+    Column("summary_embedding", Vector(EMBEDDING_DIM)),
+    Column("proposed_subject_names", ARRAY(Text)),
+    Column("work_key", Text),
 )
 
 uploads = Table(

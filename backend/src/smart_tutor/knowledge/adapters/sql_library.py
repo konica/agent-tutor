@@ -42,6 +42,14 @@ def _content(row: Any) -> Content:
         chunker=row.chunker,
         embedding_model=row.embedding_model,
         embedding_dim=row.embedding_dim,
+        title=row.title,
+        authors=list(row.authors),
+        year=row.year,
+        doi=row.doi,
+        summary=row.summary,
+        summary_embedding=None if row.summary_embedding is None else [float(x) for x in row.summary_embedding],
+        proposed_subject_names=list(row.proposed_subject_names),
+        work_key=row.work_key,
     )
 
 
@@ -56,6 +64,7 @@ def _document(row: Any, subject_ids: list[SubjectId]) -> Document:
         content_id=ContentId(row.content_id) if row.content_id else None,
         failure_reason=row.failure_reason,
         title_override=row.title_override,
+        content_title=getattr(row, "content_title", None),  # only listings join contents (FOR UPDATE can't)
         subject_ids=subject_ids,
     )
 
@@ -106,6 +115,14 @@ class _Contents(ContentRepository):
                 chunker=content.chunker,
                 embedding_model=content.embedding_model,
                 embedding_dim=content.embedding_dim,
+                title=content.title,
+                authors=content.authors,
+                year=content.year,
+                doi=content.doi,
+                summary=content.summary,
+                summary_embedding=content.summary_embedding,
+                proposed_subject_names=content.proposed_subject_names,
+                work_key=content.work_key,
             )
         )
 
@@ -154,7 +171,8 @@ class _Documents(DocumentRepository):
 
     def list_readable_by(self, user_id: UserId) -> list[Document]:
         rows = self._conn.execute(
-            select(documents)
+            select(documents, contents.c.title.label("content_title"))
+            .select_from(documents.outerjoin(contents, documents.c.content_id == contents.c.content_id))
             .where(readable_by(user_id), documents.c.archived.is_(False))
             .order_by(documents.c.created_at.desc(), documents.c.document_id)
         )
