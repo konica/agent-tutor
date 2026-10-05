@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Literal
 
 from smart_tutor.knowledge.ports.library import LibraryUnitOfWork
-from smart_tutor.shared.domain.ids import DocumentId, UserId
+from smart_tutor.shared.domain.ids import DocumentId, SubjectId, UserId
 
 DocumentStateName = Literal["processing", "awaiting_subjects", "ready", "failed"]
 
@@ -18,6 +18,7 @@ class DocumentView:
     state: DocumentStateName
     failure_reason: str | None
     created_at: datetime
+    subject_ids: tuple[SubjectId, ...]
 
 
 class DocumentService:
@@ -27,4 +28,7 @@ class DocumentService:
     def list_documents(self, user_id: UserId) -> list[DocumentView]:
         with self._uow() as tx:
             documents = tx.documents.list_readable_by(user_id)
-        return [DocumentView(d.document_id, d.title, d.state.value, d.failure_reason, d.created_at) for d in documents]
+        return [
+            DocumentView(d.document_id, d.title, d.state.value, d.failure_reason, d.created_at, tuple(d.subject_ids))
+            for d in documents
+        ]

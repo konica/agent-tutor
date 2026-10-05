@@ -9,12 +9,15 @@ from smart_tutor.shared.adapters.aws.clients import s3_client
 from smart_tutor.shared.adapters.clock import SystemClock
 from smart_tutor.shared.adapters.postgres.engine import create_db_engine
 from smart_tutor.shared.config import Settings
+from smart_tutor.subjects.adapters.sql_subjects import SqlSubjectRepository
+from smart_tutor.subjects.application import SubjectNames
 
 
 @dataclass(frozen=True)
 class ApiServices:
     uploads: UploadService
     documents: DocumentService
+    subjects: SubjectNames
 
 
 def build_services(settings: Settings) -> ApiServices:
@@ -24,4 +27,8 @@ def build_services(settings: Settings) -> ApiServices:
         return SqlLibraryUnitOfWork(engine)
 
     objects = S3ObjectStore(s3_client(settings), settings.documents_bucket)
-    return ApiServices(uploads=UploadService(library, objects, SystemClock()), documents=DocumentService(library))
+    return ApiServices(
+        uploads=UploadService(library, objects, SystemClock()),
+        documents=DocumentService(library),
+        subjects=SubjectNames(SqlSubjectRepository(engine)),
+    )

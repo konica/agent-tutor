@@ -33,6 +33,13 @@
             "title": "State",
             "type": "string"
           },
+          "subjects": {
+            "items": {
+              "$ref": "#/components/schemas/SubjectResponse"
+            },
+            "title": "Subjects",
+            "type": "array"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -43,7 +50,8 @@
           "title",
           "state",
           "failure_reason",
-          "created_at"
+          "created_at",
+          "subjects"
         ],
         "title": "DocumentResponse",
         "type": "object"
@@ -132,6 +140,24 @@
           "fields"
         ],
         "title": "StartUploadResponse",
+        "type": "object"
+      },
+      "SubjectResponse": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "subject_id": {
+            "title": "Subject Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject_id",
+          "name"
+        ],
+        "title": "SubjectResponse",
         "type": "object"
       },
       "ValidationError": {

@@ -6,8 +6,8 @@ import type { DocumentResponse } from "../../api/documents";
 import { LibraryPage } from "./LibraryPage";
 
 const today = new Date().toISOString();
-const processing: DocumentResponse = { document_id: "d1", title: "lewis-rag-2020.pdf", state: "processing", failure_reason: null, created_at: today };
-const duplicate: DocumentResponse = { document_id: "d2", title: "copy.pdf", state: "failed", failure_reason: "Duplicate uploads aren't supported yet", created_at: today };
+const processing: DocumentResponse = { document_id: "d1", title: "lewis-rag-2020.pdf", state: "processing", failure_reason: null, created_at: today, subjects: [] };
+const duplicate: DocumentResponse = { document_id: "d2", title: "copy.pdf", state: "failed", failure_reason: "Duplicate uploads aren't supported yet", created_at: today, subjects: [] };
 
 afterEach(() => vi.useRealTimers());
 
@@ -25,6 +25,15 @@ describe("LibraryPage", () => {
     expect(within(row).getByText("Not chosen yet")).toBeVisible();
     expect(within(row).getByText("You can choose subjects when processing finishes.")).toBeVisible();
     expect(within(row).getByText("Today")).toBeVisible();
+  });
+
+  it("shows a ready document's subjects by name", async () => {
+    const ready: DocumentResponse = { ...processing, state: "ready", subjects: [{ subject_id: "s1", name: "General" }] };
+    render(<LibraryPage load={async () => [ready]} upload={vi.fn()} />);
+    const row = (await screen.findByText("lewis-rag-2020.pdf")).closest("tr")!;
+    expect(within(row).getByText("General")).toBeVisible();
+    expect(within(row).queryByText("Not chosen yet")).toBeNull();
+    expect(within(row).queryByText("You can choose subjects when processing finishes.")).toBeNull();
   });
 
   it("shows a failed document's reason", async () => {
