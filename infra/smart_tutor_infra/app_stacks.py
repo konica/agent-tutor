@@ -26,7 +26,7 @@ def build_app(app: cdk.App, env_name: str = "prod") -> list[cdk.Stack]:
         BudgetsStack(app, f"{prefix}-Budgets", env=env),
     ]
     for stack in stacks[1:]:
-        stack.add_dependency(network)
+        stack.add_stack_dependency(network)
     stacks.append(
         GitHubDeployStack(
             app,
