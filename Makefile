@@ -11,7 +11,7 @@ export PYTHONUTF8 := 1
 help:
 	@grep -E '^[a-z-]+:' Makefile | cut -d: -f1
 
-up:            ## dependencies: pgvector, Keycloak, LocalStack
+up:            ## dependencies: pgvector, Keycloak, LocalStack, Mailpit
 	docker compose up -d
 down:
 	docker compose down
