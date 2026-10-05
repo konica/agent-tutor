@@ -111,6 +111,20 @@ export type SubjectResponse = {
 };
 
 /**
+ * UploadLimitsResponse
+ */
+export type UploadLimitsResponse = {
+    /**
+     * Max Bytes
+     */
+    max_bytes: number;
+    /**
+     * Max Pages
+     */
+    max_pages: number;
+};
+
+/**
  * ValidationError
  */
 export type ValidationError = {
@@ -196,3 +210,19 @@ export type StartUploadResponses = {
 };
 
 export type StartUploadResponse2 = StartUploadResponses[keyof StartUploadResponses];
+
+export type GetUploadLimitsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/uploads/limits';
+};
+
+export type GetUploadLimitsResponses = {
+    /**
+     * Successful Response
+     */
+    200: UploadLimitsResponse;
+};
+
+export type GetUploadLimitsResponse = GetUploadLimitsResponses[keyof GetUploadLimitsResponses];

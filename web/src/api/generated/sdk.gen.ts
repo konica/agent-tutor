@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetMeData, GetMeResponses, ListDocumentsData, ListDocumentsResponses, StartUploadData, StartUploadErrors, StartUploadResponses } from './types.gen';
+import type { GetMeData, GetMeResponses, GetUploadLimitsData, GetUploadLimitsResponses, ListDocumentsData, ListDocumentsResponses, StartUploadData, StartUploadErrors, StartUploadResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -47,4 +47,15 @@ export const startUpload = <ThrowOnError extends boolean = false>(options: Optio
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * Get Upload Limits
+ *
+ * The per-file limits, so the browser can refuse a file before uploading it (PRD §8 US-2).
+ */
+export const getUploadLimits = <ThrowOnError extends boolean = false>(options?: Options<GetUploadLimitsData, ThrowOnError>): RequestResult<GetUploadLimitsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetUploadLimitsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/uploads/limits',
+    ...options
 });

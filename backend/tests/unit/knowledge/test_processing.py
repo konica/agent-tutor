@@ -5,7 +5,7 @@ import pytest
 from langchain_core.documents import BaseDocumentTransformer, Document
 from langchain_core.embeddings import Embeddings
 
-from fakes import FakeObjectStore, FixedClock, InMemoryLibrary, fake_embeddings, fake_tools
+from fakes import TEST_LIMITS, FakeObjectStore, FixedClock, InMemoryLibrary, fake_embeddings, fake_tools
 from smart_tutor.knowledge.application import (
     ContentState,
     IngestionService,
@@ -24,7 +24,7 @@ SENTENCE = "A sentence about attention mechanisms. " * 5  # 190 characters: two 
 class World:
     def __init__(self, tools: ProcessingTools | None = None) -> None:
         self.library, self.objects = InMemoryLibrary(), FakeObjectStore()
-        self.uploads = UploadService(self.library.unit_of_work, self.objects, FixedClock())
+        self.uploads = UploadService(self.library.unit_of_work, self.objects, FixedClock(), TEST_LIMITS)
         self.tools = tools or fake_tools()
         self.ingestion = IngestionService(self.library.unit_of_work, self.objects, self.tools)
 

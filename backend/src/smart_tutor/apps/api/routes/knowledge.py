@@ -25,6 +25,11 @@ class StartUploadResponse(BaseModel):
     fields: dict[str, str]
 
 
+class UploadLimitsResponse(BaseModel):
+    max_bytes: int
+    max_pages: int
+
+
 class SubjectResponse(BaseModel):
     subject_id: str
     name: str
@@ -48,6 +53,12 @@ def start_upload(body: StartUploadRequest, principal: CurrentPrincipal, uploads:
     return StartUploadResponse(
         document_id=started.document_id, upload_id=started.upload_id, url=started.url, fields=started.fields
     )
+
+
+@router.get("/uploads/limits", operation_id="get_upload_limits")
+def get_upload_limits(uploads: Uploads) -> UploadLimitsResponse:
+    """The per-file limits, so the browser can refuse a file before uploading it (PRD §8 US-2)."""
+    return UploadLimitsResponse(max_bytes=uploads.limits.max_bytes, max_pages=uploads.limits.max_pages)
 
 
 @router.get("/documents", operation_id="list_documents")

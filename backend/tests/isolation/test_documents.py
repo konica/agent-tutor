@@ -2,7 +2,15 @@
 
 from fastapi.testclient import TestClient
 
-from fakes import FakeObjectStore, FakeTokenVerifier, FixedClock, InMemoryLibrary, InMemorySubjects, fake_tools
+from fakes import (
+    TEST_LIMITS,
+    FakeObjectStore,
+    FakeTokenVerifier,
+    FixedClock,
+    InMemoryLibrary,
+    InMemorySubjects,
+    fake_tools,
+)
 from smart_tutor.apps.api.main import create_app
 from smart_tutor.apps.api.services import ApiServices
 from smart_tutor.knowledge.application import DocumentService, IngestionService, UploadService
@@ -21,7 +29,7 @@ def setup() -> tuple[TestClient, FakeObjectStore, IngestionService]:
     verifier.add("token-b", Principal(UserId("learner-b"), "B", frozenset({"learner"})))
     library, objects = InMemoryLibrary(), FakeObjectStore()
     services = ApiServices(
-        uploads=UploadService(library.unit_of_work, objects, FixedClock()),
+        uploads=UploadService(library.unit_of_work, objects, FixedClock(), TEST_LIMITS),
         documents=DocumentService(library.unit_of_work),
         subjects=SubjectNames(InMemorySubjects()),
     )

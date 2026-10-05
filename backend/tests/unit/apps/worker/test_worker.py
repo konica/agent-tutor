@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from fakes import FakeObjectStore, FakeQueue, FixedClock, InMemoryLibrary, fake_tools
+from fakes import TEST_LIMITS, FakeObjectStore, FakeQueue, FixedClock, InMemoryLibrary, fake_tools
 from smart_tutor.apps.worker.events import upload_keys
 from smart_tutor.apps.worker.main import embedding_dimension, run_once
 from smart_tutor.knowledge.application import IngestionService, UploadService
@@ -20,7 +20,7 @@ def world() -> tuple[InMemoryLibrary, FakeObjectStore, UploadService, IngestionS
     return (
         library,
         objects,
-        UploadService(library.unit_of_work, objects, FixedClock()),
+        UploadService(library.unit_of_work, objects, FixedClock(), TEST_LIMITS),
         IngestionService(library.unit_of_work, objects, fake_tools()),
     )
 
