@@ -6,7 +6,7 @@ from smart_tutor.shared.ports.parameter_store import ParameterStore
 
 def _positive(store: ParameterStore, name: str) -> int:
     value = store.get(name)
-    if not value.isdigit() or int(value) <= 0:
+    if not (value.isascii() and value.isdigit()) or int(value) <= 0:
         raise ValueError(f"SSM parameter {name} must be a positive whole number, got {value!r}")
     return int(value)
 

@@ -14,7 +14,7 @@ def test_reads_megabytes_and_pages_from_parameters() -> None:
     assert load_file_limits(store, MB, PAGES) == FileLimits(max_bytes=50 * MIB, max_pages=500)
 
 
-@pytest.mark.parametrize("bad", ["abc", "0", "-3", "1.5", ""])
+@pytest.mark.parametrize("bad", ["abc", "0", "-3", "1.5", "", "²"])
 def test_a_bad_value_names_the_parameter(bad: str) -> None:
     store = FakeParameterStore({MB: "50", PAGES: bad})
 
