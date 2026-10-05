@@ -1,9 +1,11 @@
 # One entry point for local work. On Windows, run from Git Bash/WSL with `make` installed,
 # or run the commands below directly.
-.PHONY: help up down up-app sync migrate lint test test-integration bedrock-check sweep glacier-tag retention evals-smoke web api-client infra-synth helm-lint
+.PHONY: help up down up-app api agent mcp worker sync migrate lint test test-integration bedrock-check sweep glacier-tag retention evals-smoke web api-client infra-synth helm-lint
 .PHONY: design-states design-accept design-shots design-diff
 
 BACKEND := cd backend &&
+# Host processes load the root .env into the environment: boto3 reads AWS_ENDPOINT_URL_* (LocalStack) only from there.
+HOST := $(BACKEND) uv run --env-file ../.env
 export PYTHONUTF8 := 1
 
 help:
@@ -15,6 +17,16 @@ down:
 	docker compose down
 up-app:        ## dependencies + app services (same images as prod)
 	docker compose --profile app up -d --build
+
+# App services on the host, one terminal each, on the same ports as the app profile (needs `make up`, `make migrate`).
+api:           ## API at :10450, reloads on change
+	$(HOST) uvicorn smart_tutor.apps.api.main:app --reload --port 10450
+agent:         ## agent at :10451, reloads on change
+	$(HOST) uvicorn smart_tutor.apps.agent.server:app --reload --port 10451
+mcp:           ## RAG MCP server at :10452/mcp (SMART_TUTOR_MCP_PORT in .env)
+	$(HOST) python -m smart_tutor.apps.mcp_server.server
+worker:        ## ingestion worker (no port); restart it after code changes
+	$(HOST) --extra ingest python -m smart_tutor.apps.worker.main
 
 sync:
 	$(BACKEND) uv sync
