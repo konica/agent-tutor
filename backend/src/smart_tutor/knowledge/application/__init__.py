@@ -2,6 +2,7 @@
 
 from smart_tutor.knowledge.application.document_service import DocumentService, DocumentView
 from smart_tutor.knowledge.application.ingestion_service import IngestionService, ProcessingTools
+from smart_tutor.knowledge.application.limits import load_file_limits
 from smart_tutor.knowledge.application.upload_service import (
     MAX_UPLOAD_BYTES,
     PDF_CONTENT_TYPE,
@@ -10,6 +11,7 @@ from smart_tutor.knowledge.application.upload_service import (
 )
 from smart_tutor.knowledge.domain.content import ContentState
 from smart_tutor.knowledge.domain.errors import InvalidFileNameError
+from smart_tutor.knowledge.domain.limits import FileLimits
 from smart_tutor.knowledge.domain.upload import UploadOutcome
 from smart_tutor.knowledge.ports.library import LibraryUnitOfWork
 from smart_tutor.knowledge.ports.object_store import ObjectStore
@@ -21,6 +23,7 @@ __all__ = [
     "ContentState",
     "DocumentService",
     "DocumentView",
+    "FileLimits",
     "IngestionService",
     "InvalidFileNameError",
     "LibraryUnitOfWork",
@@ -31,4 +34,5 @@ __all__ = [
     "UnreadablePdfError",
     "UploadOutcome",
     "UploadService",
+    "load_file_limits",
 ]

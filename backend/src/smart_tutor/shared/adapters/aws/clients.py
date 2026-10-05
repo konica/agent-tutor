@@ -1,4 +1,7 @@
-"""boto3 clients. Endpoints come from AWS_ENDPOINT_URL_S3 / AWS_ENDPOINT_URL_SQS (LocalStack) when set."""
+"""boto3 clients.
+
+Endpoints come from AWS_ENDPOINT_URL_S3 / AWS_ENDPOINT_URL_SQS / AWS_ENDPOINT_URL_SSM (LocalStack) when set.
+"""
 
 from typing import TYPE_CHECKING
 
@@ -10,6 +13,7 @@ from smart_tutor.shared.config import Settings
 if TYPE_CHECKING:
     from mypy_boto3_s3 import S3Client
     from mypy_boto3_sqs import SQSClient
+    from mypy_boto3_ssm import SSMClient
 
 
 def _dummy_key(settings: Settings) -> str | None:
@@ -30,6 +34,15 @@ def s3_client(settings: Settings) -> "S3Client":
 def sqs_client(settings: Settings) -> "SQSClient":
     return boto3.client(
         "sqs",
+        region_name=settings.aws_region,
+        aws_access_key_id=_dummy_key(settings),
+        aws_secret_access_key=_dummy_key(settings),
+    )
+
+
+def ssm_client(settings: Settings) -> "SSMClient":
+    return boto3.client(
+        "ssm",
         region_name=settings.aws_region,
         aws_access_key_id=_dummy_key(settings),
         aws_secret_access_key=_dummy_key(settings),

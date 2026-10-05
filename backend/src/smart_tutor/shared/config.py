@@ -64,6 +64,9 @@ class Settings(BaseSettings):
     # Port the MCP server listens on: 8000 in containers, 10452 when run on the host (.env).
     mcp_port: int = 8000
     learning_record_idle_minutes_param: str = "/smart-tutor/learning-record-idle-minutes"
+    # File limits (PRD §11), read once at startup by the API (presigned POST, GET /uploads/limits) and the worker.
+    max_upload_mb_param: str = "/smart-tutor/max-upload-mb"
+    max_pages_param: str = "/smart-tutor/max-pages"
     rate_limit_per_minute: int = 20
     models: ModelsConfig = ModelsConfig()
     chunking: ChunkingConfig = ChunkingConfig()
