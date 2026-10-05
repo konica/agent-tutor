@@ -54,6 +54,17 @@ def test_params_set_the_size_and_the_id() -> None:
     assert all(len(c.page_content) <= 100 for c in chunks)
 
 
+def test_chunks_break_at_sentence_ends_when_there_are_no_newlines() -> None:
+    chunker, _ = build_chunker(ChunkingConfig(params={"chunk_size": 100, "chunk_overlap": 0}))
+    text = " ".join(f"Sentence number {i} says something useful." for i in range(20))
+
+    chunks = chunker.transform_documents([Document(page_content=text, metadata={"page": 1})])
+
+    assert len(chunks) > 1
+    # The splitter keeps the ". " separator at the start of the next chunk, so every chunk starts at a sentence.
+    assert all(c.page_content.removeprefix(". ").startswith("Sentence number") for c in chunks)
+
+
 def test_unknown_method_raises() -> None:
     with pytest.raises(ValueError, match="semantic"):
         build_chunker(ChunkingConfig(method="semantic"))
