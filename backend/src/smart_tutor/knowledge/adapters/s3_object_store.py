@@ -34,7 +34,7 @@ class S3ObjectStore(ObjectStore):
             raise
 
     def put(self, key: str, data: bytes, content_type: str) -> None:
-        raise NotImplementedError  # implemented in the next commit (SQL/S3 adapters for processing)
+        self._client.put_object(Bucket=self._bucket, Key=key, Body=data, ContentType=content_type)
 
     def copy(self, source_key: str, dest_key: str) -> None:
         self._client.copy_object(
