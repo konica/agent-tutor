@@ -1,14 +1,94 @@
+import json
+from pathlib import Path
+from typing import Any
+
 import aws_cdk as cdk
+from aws_cdk.assertions import Match, Template
 
 from smart_tutor_infra.app_stacks import build_app
 
+CDK_CONTEXT = json.loads((Path(__file__).parents[1] / "cdk.json").read_text())["context"]
+
+
+def make_app(**extra_context: Any) -> cdk.App:
+    return cdk.App(context={**CDK_CONTEXT, **extra_context})
+
+
+def github_deploy_template(app: cdk.App) -> Template:
+    stack = next(s for s in build_app(app) if s.stack_name == "SmartTutor-prod-GitHubDeploy")
+    return Template.from_stack(stack)
+
 
 def test_all_stacks_synthesize_in_us_east_1() -> None:
-    app = cdk.App()
+    app = make_app()
 
     stacks = build_app(app)
     assembly = app.synth()
 
-    assert len(stacks) == 7
+    assert len(stacks) == 8
     assert {s.region for s in stacks} == {"us-east-1"}
-    assert len(assembly.stacks) == 7
+    assert len(assembly.stacks) == 8
+
+
+def test_deploy_role_trusts_only_the_pilot_environment_of_this_repository() -> None:
+    template = github_deploy_template(make_app())
+
+    template.resource_count_is("AWS::IAM::OIDCProvider", 1)
+    template.has_resource_properties(
+        "AWS::IAM::OIDCProvider",
+        {"Url": "https://token.actions.githubusercontent.com", "ClientIdList": ["sts.amazonaws.com"]},
+    )
+    template.has_resource_properties(
+        "AWS::IAM::Role",
+        {
+            "RoleName": "smart-tutor-github-deploy",
+            "MaxSessionDuration": 3600,
+            "AssumeRolePolicyDocument": {
+                "Statement": [
+                    Match.object_like(
+                        {
+                            "Action": "sts:AssumeRoleWithWebIdentity",
+                            "Condition": {
+                                "StringEquals": {
+                                    "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+                                    "token.actions.githubusercontent.com:sub": (
+                                        "repo:konica@1114311/agent-tutor@1399048529:environment:pilot"
+                                    ),
+                                }
+                            },
+                        }
+                    )
+                ]
+            },
+        },
+    )
+
+
+def test_deploy_role_gets_only_the_deployment_permissions() -> None:
+    template = github_deploy_template(make_app())
+
+    policies = template.find_resources("AWS::IAM::Policy")
+    assert len(policies) == 1
+    statements = next(iter(policies.values()))["Properties"]["PolicyDocument"]["Statement"]
+    assert [s["Sid"] for s in statements] == [
+        "AssumeCdkBootstrapRoles",
+        "EcrLogin",
+        "EcrPushAppImages",
+        "EksKubeconfig",
+        "ReadStackOutputs",
+    ]
+    # Only the ECR login, which has no resource, may use "*".
+    assert [s["Sid"] for s in statements if s["Resource"] == "*"] == ["EcrLogin"]
+    actions = [a for s in statements for a in ([s["Action"]] if isinstance(s["Action"], str) else s["Action"])]
+    assert not [a for a in actions if a.startswith(("iam:", "cloudformation:Create", "cloudformation:Update"))]
+
+
+def test_an_existing_oidc_provider_is_imported_instead_of_created() -> None:
+    arn = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
+    template = github_deploy_template(make_app(**{"smart-tutor:github-oidc-provider-arn": arn}))
+
+    template.resource_count_is("AWS::IAM::OIDCProvider", 0)
+    template.has_resource_properties(
+        "AWS::IAM::Role",
+        {"AssumeRolePolicyDocument": {"Statement": [Match.object_like({"Principal": {"Federated": arn}})]}},
+    )
