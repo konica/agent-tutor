@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     documents_bucket: str = "smart-tutor-documents"
     # LocalStack serves buckets by path (http://localhost:10402/<bucket>); AWS uses virtual-hosted URLs.
     s3_path_style: bool = False
+    # S3 and SQS go to LocalStack (AWS_ENDPOINT_URL_*): sign with its dummy keys so real credentials,
+    # used for Bedrock, never reach it.
+    localstack: bool = False
     ingest_queue_url: str = "http://localhost:10402/000000000000/smart-tutor-ingest"
     mcp_url: str = "http://localhost:10452/mcp"
     # Port the MCP server listens on: 8000 in containers, 10452 when run on the host (.env).
