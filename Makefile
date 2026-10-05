@@ -1,6 +1,6 @@
 # One entry point for local work. On Windows, run from Git Bash/WSL with `make` installed,
 # or run the commands below directly.
-.PHONY: help up down up-app api agent mcp worker sync migrate lint test test-integration bedrock-check sweep glacier-tag retention evals-smoke web api-client infra-synth helm-lint
+.PHONY: help up down up-app api agent mcp worker api-debug agent-debug mcp-debug worker-debug sync migrate lint test test-integration bedrock-check sweep glacier-tag retention evals-smoke web api-client infra-synth helm-lint
 .PHONY: design-states design-accept design-shots design-diff
 
 BACKEND := cd backend &&
@@ -28,8 +28,20 @@ mcp:           ## RAG MCP server at :10452/mcp (SMART_TUTOR_MCP_PORT in .env)
 worker:        ## ingestion worker (no port); restart it after code changes
 	$(HOST) --extra ingest python -m smart_tutor.apps.worker.main
 
-sync:
-	$(BACKEND) uv sync
+# The same services under debugpy, without reload: attach a debugger at the app port + 10 (e.g. VS Code
+# "Attach: API"). Add --wait-for-client after the port to stop before startup code runs.
+DEBUG := $(HOST) python -m debugpy --listen 127.0.0.1
+api-debug:     ## API at :10450, debugger at :10460
+	$(DEBUG):10460 -m uvicorn smart_tutor.apps.api.main:app --port 10450
+agent-debug:   ## agent at :10451, debugger at :10461
+	$(DEBUG):10461 -m uvicorn smart_tutor.apps.agent.server:app --port 10451
+mcp-debug:     ## RAG MCP server at :10452/mcp, debugger at :10462
+	$(DEBUG):10462 -m smart_tutor.apps.mcp_server.server
+worker-debug:  ## ingestion worker, debugger at :10463
+	$(HOST) --extra ingest python -m debugpy --listen 127.0.0.1:10463 -m smart_tutor.apps.worker.main
+
+sync:          ## backend dependencies, with the worker's ingest extra so IDE launch configs can run it
+	$(BACKEND) uv sync --extra ingest
 
 migrate:       ## bring the local database to the latest Alembic revision (needs `make up`)
 	$(BACKEND) uv run python -m smart_tutor.apps.jobs.migrate
