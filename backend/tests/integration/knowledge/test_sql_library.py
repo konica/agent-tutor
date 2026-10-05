@@ -11,6 +11,7 @@ from sqlalchemy import Engine, text
 from smart_tutor.knowledge.adapters.sql_library import SqlLibraryUnitOfWork
 from smart_tutor.knowledge.domain.chunk import Chunk
 from smart_tutor.knowledge.domain.content import UNREADABLE_PDF, Content
+from smart_tutor.knowledge.domain.description import DocumentDescription, parse_description
 from smart_tutor.knowledge.domain.document import DUPLICATE_UPLOAD, Document
 from smart_tutor.knowledge.domain.upload import Upload, UploadOutcome
 from smart_tutor.shared.adapters.postgres.engine import create_db_engine
@@ -243,3 +244,72 @@ def test_list_processing_for_content_excludes_ready_and_failed(engine: Engine) -
     with SqlLibraryUnitOfWork(engine) as tx:
         processing = tx.documents.list_processing_for_content_for_update(content.content_id)
     assert [d.document_id for d in processing] == [docs[0].document_id]
+
+
+def description() -> DocumentDescription:
+    return parse_description(
+        {
+            "title": "Attention Is All You Need",
+            "authors": ["Ashish Vaswani", "Noam Shazeer"],
+            "year": 2017,
+            "doi": "10.5555/3295222.3295349",
+            "summary": "Introduces the Transformer, a model built on attention alone.",
+            "proposed_subject_names": ["Machine learning", "Natural language processing", "Neural networks"],
+        }
+    )
+
+
+def test_described_content_round_trips(engine: Engine) -> None:
+    content = stored_content(engine, f"ada-{uid()}")
+    described = description()
+    with SqlLibraryUnitOfWork(engine) as tx:
+        locked = tx.contents.get_for_update(content.content_id)
+        assert locked is not None
+        locked.describe(described, [0.5] * 1024)
+        tx.contents.save(locked)
+        tx.commit()
+    with SqlLibraryUnitOfWork(engine) as tx:
+        loaded = tx.contents.get(content.content_id)
+    assert loaded is not None
+    assert (loaded.title, loaded.year, loaded.doi) == (described.title, 2017, described.doi)
+    assert loaded.summary == described.summary
+    assert loaded.authors == ["Ashish Vaswani", "Noam Shazeer"]
+    assert loaded.proposed_subject_names == list(described.proposed_subject_names)
+    assert loaded.work_key == described.work_key
+    assert isinstance(loaded.summary_embedding, list)
+    assert loaded.summary_embedding == [0.5] * 1024
+    assert all(isinstance(v, float) for v in loaded.summary_embedding)
+
+
+def test_an_undescribed_content_has_empty_description_fields(engine: Engine) -> None:
+    content = stored_content(engine, f"ada-{uid()}")
+    with SqlLibraryUnitOfWork(engine) as tx:
+        loaded = tx.contents.get(content.content_id)
+    assert loaded is not None
+    assert (loaded.title, loaded.summary, loaded.summary_embedding, loaded.work_key) == (None, None, None, None)
+    assert (loaded.authors, loaded.proposed_subject_names) == ([], [])
+
+
+def test_listing_shows_the_content_title_and_the_override_wins(engine: Engine) -> None:
+    owner = f"ada-{uid()}"
+    content = stored_content(engine, owner)
+    described = description()
+    with SqlLibraryUnitOfWork(engine) as tx:
+        locked = tx.contents.get_for_update(content.content_id)
+        assert locked is not None
+        locked.describe(described, [0.5] * 1024)
+        tx.contents.save(locked)
+        tx.commit()
+    titled, plain = start(engine, owner, "titled.pdf"), start(engine, owner, "plain.pdf")
+    link(engine, titled, content)
+
+    def titles() -> dict[str, str]:
+        with SqlLibraryUnitOfWork(engine) as tx:
+            return {d.document_id: d.title for d in tx.documents.list_readable_by(UserId(owner))}
+
+    assert titles() == {titled.document_id: "Attention Is All You Need", plain.document_id: "plain.pdf"}
+    with engine.begin() as conn:
+        conn.execute(
+            text("update documents set title_override = 'My notes' where document_id = :d"), {"d": titled.document_id}
+        )
+    assert titles()[titled.document_id] == "My notes"
