@@ -1,7 +1,13 @@
-# nginx serving the React build behind the ALB.
-image:
-  repository: smart-tutor-web
-  tag: ""  # defaults to global.imageTag
-port: 8080
+# The React app shell (nginx on 8080). Pods register in an ALB target group that CDK owns (EdgeStack, ADR 0009).
 replicaCount: 1
-# Owns its NetworkPolicy and ExternalSecret (spec §8).
+image:
+  repository: smart-tutor/web
+  tag: ""  # defaults to global.imageTag
+# ALB target group to register pods in (TargetGroupBinding). Empty renders no binding, e.g. on a local cluster.
+targetGroupName: ""
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 128Mi
