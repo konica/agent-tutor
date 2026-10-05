@@ -43,7 +43,9 @@ If PowerShell refuses to run the script because of the execution policy, run `Se
    ```powershell
    aws configure list-profiles
    aws sts get-caller-identity --profile default
-   aws iam list-attached-user-policies --user-name <user from the Arn> --profile default   # look for AdministratorAccess
+   # For an IAM user: --user-name takes the name after "user/" in the Arn (e.g. poweruser), not the whole Arn
+   $UserName = (aws sts get-caller-identity --profile default --query Arn --output text) -replace '^.*:user/', ''
+   aws iam list-attached-user-policies --user-name $UserName --profile default   # look for AdministratorAccess
    ```
    Only if you have no admin profile, create one:
    - **IAM Identity Center** (needs Identity Center enabled; check with `aws sso-admin list-instances`): `aws configure sso --profile smart-tutor-admin`. The session name it asks for is any label, such as `smart-tutor`. Then sign in with `aws sso login --profile smart-tutor-admin`.
