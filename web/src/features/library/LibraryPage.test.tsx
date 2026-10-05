@@ -87,6 +87,41 @@ describe("LibraryPage", () => {
     expect(upload).toHaveBeenCalledWith(good);
   });
 
+  it("announces every refusal reason and the upload in the one status region", async () => {
+    const upload = vi.fn(async () => {});
+    render(<LibraryPage load={async () => []} upload={upload} loadLimits={limits} />);
+    await screen.findByText("Upload your first document");
+    const docx = new File(["x"], "reading-list.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+    const big = new File(["x"], "deep-learning-book-full.pdf", { type: "application/pdf" });
+    Object.defineProperty(big, "size", { value: 72 * 1_048_576 });
+    const good = new File(["%PDF"], "paper.pdf", { type: "application/pdf" });
+
+    await userEvent.upload(screen.getByLabelText("Upload PDFs"), [docx, big, good], { applyAccept: false });
+
+    const status = screen.getByRole("status");
+    await waitFor(() => expect(status).toHaveTextContent("Uploaded paper.pdf. Processing."));
+    expect(status).toHaveTextContent("reading-list.docx: Not uploaded. Only PDF files can be uploaded.");
+    expect(status).toHaveTextContent("deep-learning-book-full.pdf: Not uploaded. This file is 72 MB; the limit is 50 MB.");
+  });
+
+  it("refuses a non-PDF with its reason even when the limits can't be loaded", async () => {
+    const upload = vi.fn(async () => {});
+    render(<LibraryPage load={async () => []} upload={upload} loadLimits={async () => { throw new Error("down"); }} />);
+    await screen.findByText("Upload your first document");
+    await userEvent.upload(screen.getByLabelText("Upload PDFs"), new File(["x"], "notes.docx", { type: "application/msword" }), { applyAccept: false });
+    expect(await screen.findByText("Not uploaded. Only PDF files can be uploaded.")).toBeVisible();
+    expect(screen.queryByText(/Couldn't upload/)).toBeNull();
+    expect(upload).not.toHaveBeenCalled();
+  });
+
+  it("loads the limits once when the loader is an inline function", async () => {
+    const loadLimits = vi.fn(limits);
+    const { rerender } = render(<LibraryPage load={async () => []} upload={vi.fn()} loadLimits={() => loadLimits()} />);
+    await screen.findByText(/PDFs up to 50 MB/);
+    rerender(<LibraryPage load={async () => []} upload={vi.fn()} loadLimits={() => loadLimits()} />);
+    expect(loadLimits).toHaveBeenCalledTimes(1);
+  });
+
   it("makes no request at all for a refused file", async () => {
     const fetch = vi.spyOn(globalThis, "fetch");
     const upload = vi.fn(async () => {});
