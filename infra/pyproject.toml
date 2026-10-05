@@ -1,7 +1,7 @@
 [project]
 name = "smart-tutor-infra"
 version = "0.1.0"
-description = "AWS CDK app for Smart Tutor (us-east-1): network, data, storage, cluster, registry, config, budgets"
+description = "AWS CDK app for Smart Tutor (us-east-1): network, data, storage, cluster, edge, registry, config, budgets"
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "aws-cdk-lib>=2.200",

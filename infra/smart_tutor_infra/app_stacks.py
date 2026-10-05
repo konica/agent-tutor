@@ -6,6 +6,7 @@ from smart_tutor_infra.stacks.budgets import BudgetsStack
 from smart_tutor_infra.stacks.cluster import ClusterStack
 from smart_tutor_infra.stacks.config import ConfigStack
 from smart_tutor_infra.stacks.data import DataStack
+from smart_tutor_infra.stacks.edge import EdgeStack
 from smart_tutor_infra.stacks.github_deploy import DEPLOY_ROLE_NAME, GitHubDeployStack
 from smart_tutor_infra.stacks.network import NetworkStack
 from smart_tutor_infra.stacks.registry import RegistryStack
@@ -17,19 +18,30 @@ def build_app(app: cdk.App, env_name: str = "prod") -> list[cdk.Stack]:
     prefix = f"SmartTutor-{env_name}"
     name = f"smart-tutor-{env_name}"
     network = NetworkStack(app, f"{prefix}-Network", env=env)
+    deploy = GitHubDeployStack(
+        app,
+        f"{prefix}-GitHubDeploy",
+        env=env,
+        subject_prefix=app.node.get_context("smart-tutor:github-oidc-subject-prefix"),
+        github_environment=app.node.get_context("smart-tutor:github-environment"),
+        existing_provider_arn=app.node.try_get_context("smart-tutor:github-oidc-provider-arn"),
+    )
+    cluster = ClusterStack(
+        app,
+        f"{prefix}-Cluster",
+        env=env,
+        vpc=network.vpc,
+        cluster_name=name,
+        admin_principal_arns=app.node.get_context("smart-tutor:eks-admin-principal-arns"),
+        deploy_role_name=DEPLOY_ROLE_NAME,
+    )
+    # The cluster's access entry names the deploy role by ARN string, so CloudFormation cannot infer the order.
+    cluster.add_dependency(deploy)
     stacks: list[cdk.Stack] = [
         network,
         DataStack(app, f"{prefix}-Data", env=env),
         StorageStack(app, f"{prefix}-Storage", env=env),
-        ClusterStack(
-            app,
-            f"{prefix}-Cluster",
-            env=env,
-            vpc=network.vpc,
-            cluster_name=name,
-            admin_principal_arns=app.node.get_context("smart-tutor:eks-admin-principal-arns"),
-            deploy_role_name=DEPLOY_ROLE_NAME,
-        ),
+        cluster,
         RegistryStack(app, f"{prefix}-Registry", env=env),
         ConfigStack(app, f"{prefix}-Config", env=env),
         BudgetsStack(
@@ -43,14 +55,15 @@ def build_app(app: cdk.App, env_name: str = "prod") -> list[cdk.Stack]:
     ]
     for stack in stacks[1:]:
         stack.add_stack_dependency(network)
+    stacks.append(deploy)
     stacks.append(
-        GitHubDeployStack(
+        EdgeStack(
             app,
-            f"{prefix}-GitHubDeploy",
+            f"{prefix}-Edge",
             env=env,
-            subject_prefix=app.node.get_context("smart-tutor:github-oidc-subject-prefix"),
-            github_environment=app.node.get_context("smart-tutor:github-environment"),
-            existing_provider_arn=app.node.try_get_context("smart-tutor:github-oidc-provider-arn"),
+            vpc=network.vpc,
+            cluster_security_group_id=cluster.cluster_security_group_id,
+            name_prefix=name,
         )
     )
     return stacks
