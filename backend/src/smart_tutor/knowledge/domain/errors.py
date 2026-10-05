@@ -9,3 +9,11 @@ class InvalidFileNameError(DomainError):
 
 class DocumentStateError(DomainError):
     """The document isn't in a state that allows this change (PRD §9.5)."""
+
+
+class ContentStateError(DomainError):
+    """The content isn't in a state that allows this change (PRD §9.5)."""
+
+
+class InvalidChunkError(DomainError):
+    """A chunker produced a chunk the store must not accept (PRD §9.4)."""
