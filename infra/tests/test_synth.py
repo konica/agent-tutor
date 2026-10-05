@@ -29,9 +29,9 @@ def test_all_stacks_synthesize_in_us_east_1() -> None:
     stacks = build_app(app)
     assembly = app.synth()
 
-    assert len(stacks) == 8
+    assert len(stacks) == 9
     assert {s.region for s in stacks} == {"us-east-1"}
-    assert len(assembly.stacks) == 8
+    assert len(assembly.stacks) == 9
 
 
 def test_deploy_role_trusts_only_the_pilot_environment_of_this_repository() -> None:
@@ -164,7 +164,7 @@ def test_cluster_runs_eks_1_36_with_two_small_nodes() -> None:
         },
     )
     cluster = next(iter(t.find_resources("AWS::EKS::Cluster").values()))
-    assert "ComputeConfig" not in cluster["Properties"] or not cluster["Properties"]["ComputeConfig"].get("Enabled")
+    assert cluster["Properties"]["ComputeConfig"] == {"Enabled": False}
     t.resource_count_is("AWS::EKS::Nodegroup", 1)
     t.has_resource_properties(
         "AWS::EKS::Nodegroup",
@@ -226,3 +226,67 @@ def test_load_balancer_controller_policy_fits_a_managed_policy() -> None:
     t = template(make_app(), "Cluster")
     policies = [p["Properties"]["PolicyDocument"] for p in t.find_resources("AWS::IAM::ManagedPolicy").values()]
     assert any(len(p["Statement"]) == len(document["Statement"]) for p in policies)
+
+
+def test_cluster_deploys_after_the_deploy_role_it_names_in_an_access_entry() -> None:
+    stacks = {s.stack_name: s for s in build_app(make_app())}
+
+    assert stacks["SmartTutor-prod-GitHubDeploy"] in stacks["SmartTutor-prod-Cluster"].dependencies
+
+
+def test_load_balancer_is_internal_and_has_no_internet_ingress() -> None:
+    t = template(make_app(), "Edge")
+
+    t.has_resource_properties(
+        "AWS::ElasticLoadBalancingV2::LoadBalancer", {"Name": "smart-tutor-prod", "Scheme": "internal"}
+    )
+    rendered = json.dumps(t.to_json())
+    assert "0.0.0.0/0" not in rendered
+    assert "::/0" not in rendered
+    t.has_resource_properties("AWS::ElasticLoadBalancingV2::Listener", {"Port": 80, "Protocol": "HTTP"})
+
+
+def test_web_target_group_takes_pod_ips_on_8080() -> None:
+    t = template(make_app(), "Edge")
+
+    t.has_resource_properties(
+        "AWS::ElasticLoadBalancingV2::TargetGroup",
+        {
+            "Name": "smart-tutor-prod-web",
+            "TargetType": "ip",
+            "Port": 8080,
+            "Protocol": "HTTP",
+            "HealthCheckPath": "/",
+        },
+    )
+    t.has_resource_properties(
+        "AWS::EC2::SecurityGroupIngress", {"FromPort": 8080, "ToPort": 8080, "IpProtocol": "tcp"}
+    )
+    t.has_output("WebTargetGroupName", {"Value": "smart-tutor-prod-web"})
+
+
+def test_cloudfront_serves_https_through_a_vpc_origin() -> None:
+    t = template(make_app(), "Edge")
+
+    t.has_resource_properties(
+        "AWS::CloudFront::VpcOrigin",
+        {
+            "VpcOriginEndpointConfig": Match.object_like(
+                {"Name": "smart-tutor-prod", "HTTPPort": 80, "OriginProtocolPolicy": "http-only"}
+            )
+        },
+    )
+    t.has_resource_properties(
+        "AWS::CloudFront::Distribution",
+        {
+            "DistributionConfig": Match.object_like(
+                {
+                    "PriceClass": "PriceClass_100",
+                    "DefaultCacheBehavior": Match.object_like({"ViewerProtocolPolicy": "redirect-to-https"}),
+                    "Origins": [Match.object_like({"VpcOriginConfig": Match.any_value()})],
+                }
+            )
+        },
+    )
+    t.has_output("CloudFrontUrl", {})
+    t.has_output("DistributionId", {})
