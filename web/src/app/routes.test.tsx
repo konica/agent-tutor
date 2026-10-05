@@ -9,7 +9,12 @@ import { NAV } from "./nav";
 import { routes } from "./routes";
 
 // The Library loads documents from the API; these tests are about routing, so it sees an empty library.
-vi.mock("../api/documents", () => ({ loadDocuments: async () => [], uploadPdf: vi.fn() }));
+vi.mock("../api/documents", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/documents")>()),
+  loadDocuments: async () => [],
+  loadUploadLimits: async () => ({ max_bytes: 52_428_800, max_pages: 500 }),
+  uploadPdf: vi.fn(),
+}));
 
 const signOut = vi.fn();
 

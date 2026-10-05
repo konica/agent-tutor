@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { SessionExpiredError } from "../auth/authClient";
 import { configureApiClient } from "./client";
-import { loadDocuments, uploadPdf } from "./documents";
+import { loadDocuments, loadUploadLimits, rejectionReason, uploadPdf } from "./documents";
 import { createClient, createConfig } from "./generated/client";
 
 function api(handler: (request: Request) => Response) {
@@ -48,31 +48,53 @@ describe("uploadPdf", () => {
     expect(form.get("file")).toBe(file);
   });
 
-  it.each([
-    ["empty", 0],
-    ["oversized", 52_428_801],
-  ])("rejects an %s file without calling the API", async (_label, size) => {
-    const { apiClient, fetch } = api(() => json(started, 201));
-    const post = vi.fn();
-    const file = new File(["x"], "x.pdf");
-    Object.defineProperty(file, "size", { value: size });
-    await expect(uploadPdf(file, apiClient, post)).rejects.toThrow();
-    expect(fetch).not.toHaveBeenCalled();
-    expect(post).not.toHaveBeenCalled();
-  });
-
-  it("accepts a file of exactly 50 MiB", async () => {
-    const { apiClient, fetch } = api(() => json(started, 201));
-    const post = vi.fn(async () => new Response(null, { status: 204 }));
-    const file = new File(["x"], "x.pdf");
-    Object.defineProperty(file, "size", { value: 52_428_800 });
-    await uploadPdf(file, apiClient, post);
-    expect(fetch).toHaveBeenCalledTimes(1);
-  });
-
   it("rejects when S3 refuses the file", async () => {
     const { apiClient } = api(() => json(started, 201));
     const post = vi.fn(async () => new Response("<Error/>", { status: 403 }));
     await expect(uploadPdf(new File(["x"], "x.pdf"), apiClient, post)).rejects.toThrow("403");
+  });
+});
+
+describe("rejectionReason", () => {
+  const limits = { max_bytes: 52_428_800, max_pages: 500 };
+  const file = (name: string, type: string, size = 10) => {
+    const f = new File(["x"], name, { type });
+    Object.defineProperty(f, "size", { value: size });
+    return f;
+  };
+
+  it("accepts a PDF by type, or by a .pdf name when the browser gives no type", () => {
+    expect(rejectionReason(file("a.pdf", "application/pdf"), limits)).toBeNull();
+    expect(rejectionReason(file("B.PDF", ""), limits)).toBeNull();
+  });
+
+  it("refuses other types", () => {
+    expect(rejectionReason(file("reading-list.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"), limits))
+      .toBe("Not uploaded. Only PDF files can be uploaded.");
+    expect(rejectionReason(file("notes.txt", ""), limits)).toBe("Not uploaded. Only PDF files can be uploaded.");
+  });
+
+  it("refuses an empty file", () => {
+    expect(rejectionReason(file("a.pdf", "application/pdf", 0), limits)).toBe("Not uploaded. This file is empty.");
+  });
+
+  it("refuses a file over the limit and never shows it as equal to the limit", () => {
+    expect(rejectionReason(file("big.pdf", "application/pdf", 72 * 1_048_576), limits))
+      .toBe("Not uploaded. This file is 72 MB; the limit is 50 MB.");
+    expect(rejectionReason(file("edge.pdf", "application/pdf", 52_428_801), limits))
+      .toBe("Not uploaded. This file is 50.1 MB; the limit is 50 MB.");
+    expect(rejectionReason(file("ok.pdf", "application/pdf", 52_428_800), limits)).toBeNull();
+  });
+});
+
+describe("loadUploadLimits", () => {
+  it("returns the limits", async () => {
+    const { apiClient } = api(() => json({ max_bytes: 1, max_pages: 2 }));
+    await expect(loadUploadLimits(apiClient)).resolves.toEqual({ max_bytes: 1, max_pages: 2 });
+  });
+
+  it("rejects with SessionExpiredError on 401", async () => {
+    const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
+    await expect(loadUploadLimits(apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
   });
 });

@@ -1,10 +1,11 @@
 import { SessionExpiredError } from "../auth/authClient";
 import type { Client } from "./generated/client";
 import { client } from "./generated/client.gen";
-import { listDocuments, startUpload } from "./generated/sdk.gen";
-import type { DocumentResponse } from "./generated/types.gen";
+import { getUploadLimits, listDocuments, startUpload } from "./generated/sdk.gen";
+import type { DocumentResponse, UploadLimitsResponse } from "./generated/types.gen";
 
 export type { DocumentResponse };
+export type UploadLimits = UploadLimitsResponse;
 
 function sessionOver(error: unknown, response: Response | undefined): boolean {
   return error instanceof SessionExpiredError || response?.status === 401;
@@ -17,12 +18,33 @@ export async function loadDocuments(apiClient: Client = client): Promise<Documen
   return data;
 }
 
-export const MAX_UPLOAD_BYTES = 52_428_800; // 50 MiB, the cap the backend presigns
+export async function loadUploadLimits(apiClient: Client = client): Promise<UploadLimits> {
+  const { data, error, response } = await getUploadLimits({ client: apiClient, throwOnError: false });
+  if (sessionOver(error, response)) throw new SessionExpiredError();
+  if (!data) throw new Error(`GET /uploads/limits failed (${response?.status ?? "no response"})`);
+  return data;
+}
 
-// The API presigns a POST for this learner's key; the browser then sends the file straight to S3 (PRD §9.3).
+const MIB = 1_048_576;
+
+// Rounded up, so a file just over the limit never reads as equal to it.
+export const megabytes = (bytes: number) => String(Math.ceil((bytes / MIB) * 10) / 10);
+
+function isPdf(file: File): boolean {
+  return file.type === "application/pdf" || (file.type === "" && file.name.toLowerCase().endsWith(".pdf"));
+}
+
+// Checked before upload (PRD §8 US-2); the presigned POST enforces the size again on the server.
+export function rejectionReason(file: File, limits: UploadLimits): string | null {
+  if (!isPdf(file)) return "Not uploaded. Only PDF files can be uploaded.";
+  if (file.size === 0) return "Not uploaded. This file is empty.";
+  if (file.size > limits.max_bytes)
+    return `Not uploaded. This file is ${megabytes(file.size)} MB; the limit is ${megabytes(limits.max_bytes)} MB.`;
+  return null;
+}
+
+// The API presigns a POST for this learner's key; the browser then sends the file straight to S3 (PRD §9.3). Callers check the file first with rejectionReason.
 export async function uploadPdf(file: File, apiClient: Client = client, post: typeof fetch = fetch): Promise<void> {
-  // S3 would refuse these anyway; fail before creating a document row.
-  if (file.size === 0 || file.size > MAX_UPLOAD_BYTES) throw new Error("File is empty or over 50 MB");
   const { data, error, response } = await startUpload({ client: apiClient, body: { file_name: file.name }, throwOnError: false });
   if (sessionOver(error, response)) throw new SessionExpiredError();
   if (!data) throw new Error(`POST /uploads failed (${response?.status ?? "no response"})`);
