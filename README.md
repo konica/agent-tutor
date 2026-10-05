@@ -95,9 +95,28 @@ Backend services run under [debugpy](https://github.com/microsoft/debugpy) on th
 - **API**, **Worker**, **Agent**, **MCP server**: VS Code starts the service under the debugger with `backend/.venv` and the root `.env`. **API + Worker** starts both, which lets you follow an upload from the API through the worker.
 - **Attach: API** (and the others): connects to a service you started with `make <service>-debug`. Use this from a terminal, or with any editor that speaks the Debug Adapter Protocol. In PyCharm, use a "Python Debug Server"-style remote config or the debugpy attach plugin.
 
+Without `make` (PowerShell, from the repository root, one terminal each):
+
+```powershell
+# First time: dependencies with the worker's ingest extra, and the database schema (make up, sync, migrate)
+docker compose up -d
+cd backend; uv sync --extra ingest; uv run python -m smart_tutor.apps.jobs.migrate; cd ..
+
+# API: app at :10450, debugger at :10460
+cd backend; uv run --env-file ../.env python -m debugpy --listen 127.0.0.1:10460 -m uvicorn smart_tutor.apps.api.main:app --port 10450
+# Worker: debugger at :10463
+cd backend; uv run --env-file ../.env --extra ingest python -m debugpy --listen 127.0.0.1:10463 -m smart_tutor.apps.worker.main
+# Agent: app at :10451, debugger at :10461
+cd backend; uv run --env-file ../.env python -m debugpy --listen 127.0.0.1:10461 -m uvicorn smart_tutor.apps.agent.server:app --port 10451
+# MCP server: app at :10452/mcp, debugger at :10462
+cd backend; uv run --env-file ../.env python -m debugpy --listen 127.0.0.1:10462 -m smart_tutor.apps.mcp_server.server
+```
+
+Then attach with **Attach: API** (or another service). With VS Code alone, you don't need these commands: pick a launch config after the first-time step.
+
 Notes:
 
-- Run `make sync` once first. It installs the worker's `ingest` extra, which the **Worker** launch config needs.
+- Run `make sync` once first (without `make`: `uv sync --extra ingest` in `backend/`). It installs the worker's `ingest` extra, which the **Worker** launch config needs.
 - Debug runs don't reload on change: restart the session after you edit code.
 - To stop before startup code runs (settings, app factory), add `--wait-for-client` after the `--listen` port in the `make` target. The process then waits until a debugger attaches.
 - Breakpoints in requests: use **API**, open http://localhost:10453 (or http://localhost:10450/docs), and act in the app. Breakpoints in ingestion: use **Worker**, then upload a PDF from the Library.
