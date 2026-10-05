@@ -110,7 +110,7 @@ def test_processing_twice_keeps_one_set_of_chunks() -> None:
     assert w.ingestion.process_content(ContentId(content_id)) is None  # already ready: nothing to do
     assert w.library.state.chunks[content_id] == before
 
-    # a crash between saving chunks and the message delete: chunks exist, content still processing
+    # simulate stale chunks from an earlier run: the content is processing again and processing replaces them
     w.library.state.contents[content_id].state = ContentState.PROCESSING
     assert w.ingestion.process_content(ContentId(content_id)) is ContentState.READY
     assert w.library.state.chunks[content_id] == before
@@ -170,6 +170,20 @@ def test_invalid_chunker_output_is_rejected(metadata: dict[str, Any], text: str)
     [content] = w.library.state.contents.values()
     assert content.state is ContentState.PROCESSING
     assert w.library.state.chunks == {}
+
+
+class NoChunker(BaseDocumentTransformer):
+    def transform_documents(self, documents: Any, **kwargs: Any) -> list[Document]:
+        return []
+
+
+def test_text_that_yields_no_chunks_fails_without_leaving_pages_json() -> None:
+    w = World(fake_tools(chunker=NoChunker()))
+    _, content_id = w.upload(pdf(SENTENCE))
+
+    content = w.library.state.contents[content_id]
+    assert (content.state, content.failure_reason) == (ContentState.FAILED, NO_TEXT_LAYER)
+    assert pages_key(content.sha256) not in w.objects.objects
 
 
 def test_wrong_embedding_dimension_crashes_and_stores_nothing() -> None:

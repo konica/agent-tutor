@@ -1,8 +1,10 @@
 import json
 
+import pytest
+
 from fakes import FakeObjectStore, FakeQueue, FixedClock, InMemoryLibrary, fake_tools
 from smart_tutor.apps.worker.events import upload_keys
-from smart_tutor.apps.worker.main import run_once
+from smart_tutor.apps.worker.main import embedding_dimension, run_once
 from smart_tutor.knowledge.application import IngestionService, UploadService
 from smart_tutor.shared.domain.ids import UserId
 
@@ -79,3 +81,11 @@ def test_a_failing_message_stays_for_redelivery() -> None:
 def test_no_messages_is_fine() -> None:
     *_, ingestion = world()
     assert run_once(FakeQueue(), ingestion) == 0
+
+
+def test_embedding_dimension_must_be_configured_and_match_the_column() -> None:
+    assert embedding_dimension({"dimensions": 1024}) == 1024
+    with pytest.raises(ValueError, match="params.dimensions"):
+        embedding_dimension({})
+    with pytest.raises(ValueError, match="1024"):
+        embedding_dimension({"dimensions": 256})

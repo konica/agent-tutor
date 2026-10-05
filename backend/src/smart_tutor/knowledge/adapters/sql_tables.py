@@ -5,6 +5,8 @@ from sqlalchemy import BigInteger, Boolean, Column, DateTime, Integer, MetaData,
 
 metadata = MetaData()
 
+EMBEDDING_DIM = 1024  # the chunks.embedding column width (migration 0003); Nova multimodal embeddings
+
 contents = Table(
     "contents",
     metadata,
@@ -64,5 +66,5 @@ chunks = Table(
     Column("seq", Integer),
     Column("page", Integer),
     Column("text", Text),
-    Column("embedding", Vector(1024)),
+    Column("embedding", Vector(EMBEDDING_DIM)),
 )
