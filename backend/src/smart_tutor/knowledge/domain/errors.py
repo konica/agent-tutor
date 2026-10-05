@@ -17,3 +17,7 @@ class ContentStateError(DomainError):
 
 class InvalidChunkError(DomainError):
     """A chunker produced a chunk the store must not accept (PRD §9.4)."""
+
+
+class InvalidDescriptionError(DomainError):
+    """A describe_document payload failed validation; the message names the field, never its value (PRD §9.9)."""
