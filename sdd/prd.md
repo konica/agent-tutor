@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Draft v2.10 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
-| **Changes from v2.9** | Interim behavior only, until US-2b (#10): when a document's content becomes `ready`, the document gets the subject "General" and goes straight to `ready` (§9.5). `contents.text_key` holds `contents/<sha256>.pages.json` (§9.4). Failure reasons: "This file isn't a readable PDF", "No text layer (scanned PDFs are not supported yet)". |
+| **Status** | Draft v2.11 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Changes from v2.10** | The per-file limits are SSM parameters `/smart-tutor/max-upload-mb` (50, MiB) and `/smart-tutor/max-pages` (500), read once at startup by the API and worker (a missing or invalid value stops startup); `GET /uploads/limits` serves them to the browser, which refuses a non-PDF, empty, or oversized file before uploading ("Not uploaded. …"). New failure reason: "This PDF has N pages; the limit is 500", checked before the text is read (§9.5, §9.6). The API and worker roles need `ssm:GetParameter` on `/smart-tutor/*` (§9.12). |
 | **Changes from v2.8** | Data model only: `documents` gains `file_name` (the display title's last fallback, §9.4) and `failure_reason` (why this learner's document failed, e.g. a duplicate before US-11 links it). Interim behavior: until US-11 links duplicates, an upload whose bytes are already known fails with "Duplicate uploads aren't supported yet". |
 | **Changes from v2.7** | Roadmap status only: the M0 criteria for the forwarded JWT (prototype #29, ADR 0007) and for `pypdf` page text (probe on 6 arXiv papers in #30, ADR 0008) are marked done; the `pypdf` check no longer waits for the seed corpus, which is filled in M1 (§10.3). No product behavior changes. |
 | **Changes from v2.6** | Product owner decisions on the design round v0.3 questions (Q38–Q43): subjects are chosen only after processing finishes (US-2b, §9.3, §11); a question carried into a new conversation is sent right away (US-3b); a question that fits none of the learner's subjects gets "Upload a document" to continue (US-5); subjects of an archived document can be changed (US-10); a personal subject name may equal the name of a shared subject the learner doesn't have (US-10b); Release 1 uses one time zone, GMT+7 (D27). |
@@ -348,7 +348,7 @@ Because subjects and readable documents come from code and the database, attacks
 
 Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow only API → agent and agent → MCP. Keycloak: realm with self-registration; clients `smart-tutor-web` (public), `smart-tutor-api` and `rag-mcp` (confidential, used only for introspection); audience mapper adding `smart-tutor-api` and `rag-mcp`. Keycloak is on the request path (several introspections per question), so its availability is chat availability.
 
-**Uploads:** the API issues a **presigned POST** for `uploads/<user_id>/<upload_id>.pdf` with `content-length-range` ≤ 50 MB and content type `application/pdf`; the key binds the upload to the user. The `uploads/` prefix expires after 1 day.
+**Uploads:** the API issues a **presigned POST** for `uploads/<user_id>/<upload_id>.pdf` with `content-length-range` ≤ the `max-upload-mb` limit (50 MB) and content type `application/pdf`; the key binds the upload to the user. The `uploads/` prefix expires after 1 day.
 
 ### 9.4 Data model
 
@@ -368,7 +368,7 @@ Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow onl
 | Learner profile | PostgreSQL `learners` | `user_id` | `time_zone`, `terms_accepted_at`. |
 | Usage | PostgreSQL `token_usage` | `usage_id` | `user_id` (null for system work such as re-embedding), `source` (`chat` / `document_processing` / `background` / `system`), `ref_id` (thread or content id), input/output tokens, `created_at`. |
 | Upload | PostgreSQL `uploads` | `upload_id` | `user_id`, `bytes`, `created_at`, `outcome` — for rate limits and daily caps. |
-| Settings | SSM Parameter Store | `/smart-tutor/*` | `learning-record-idle-minutes` (10), file limits, rate limits and daily caps, `app-time-zone` (`Asia/Ho_Chi_Minh`, D27), detection thresholds, retry attempts (3). |
+| Settings | SSM Parameter Store | `/smart-tutor/*` | `learning-record-idle-minutes` (10), file limits (`max-upload-mb` 50, `max-pages` 500), rate limits and daily caps, `app-time-zone` (`Asia/Ho_Chi_Minh`, D27), detection thresholds, retry attempts (3). |
 | Research map *(R2)* | PostgreSQL `work_links` | `(citing_work_key, cited_work_key)` | Evidence (`content_id`, `page`), match method (`doi` / `title_year`). Computed once per content and shared. |
 | Quiz *(R3)* | PostgreSQL `quizzes`, `quiz_questions`, `quiz_attempts` | `quiz_id` | Source `note_ids[]`, questions (`subject_id`, topic, options, correct index, explanation), attempts with answers, score, per-topic scores, `status`. |
 | Report *(R3)* | PostgreSQL `reports` | `report_id` | `user_id`, `period_type`, `period_start`, `summary`, `stats`, `recommendations[]`, `trigger`, `status`; unique on `(user_id, period_type, period_start)` for scheduled reports. |
@@ -382,7 +382,7 @@ Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow onl
 **Content states (shared, keyed by SHA-256):**
 - (none) → `processing`: first server-verified hash (insert-or-get on the unique hash; concurrent uploads share the row).
 - `processing` → `ready`: extraction, metadata, saved page text, and embeddings all succeed.
-- `processing` → `failed`: validation, parse, timeout, or model error; reason and attempt count recorded (e.g. "This file isn't a readable PDF"; "No text layer (scanned PDFs are not supported yet)" for a PDF with no extractable text).
+- `processing` → `failed`: validation, parse, timeout, or model error; reason and attempt count recorded (e.g. "This file isn't a readable PDF"; "This PDF has N pages; the limit is 500" before any text is read; "No text layer (scanned PDFs are not supported yet)" for a PDF with no extractable text).
 - `failed` → `processing`: **Retry** by any linked learner, or a re-upload of the same file, up to 3 attempts in total; after that it stays `failed` ("This file could not be processed").
 - `ready` → `processing` (system only): embedding-model change; re-embedding works from chunk text in PostgreSQL (no file needed); search keeps serving old vectors until it finishes.
 
@@ -689,4 +689,4 @@ M4 Production launch (R1)
 6. Developer access: AWS profile allowed to invoke the models; LangSmith API key.
 7. Decisions: PrivateLink for `bedrock-runtime`; monthly budget and alert recipients; optional Bedrock Guardrail; seed corpus license check for evaluation documents; data-erasure obligations for the pilot's users.
 
-**Created by CDK:** VPC, EKS and node group, RDS, S3 (versioning; `ObjectCreated` notifications for `uploads/` to SQS; lifecycle: `uploads/` expire after 1 day, `status=archived` content PDFs to Glacier Flexible Retrieval after 30 days; CORS for presigned POST from the web origin), SQS + DLQ, ECR, Secrets Manager, SSM parameters, ACM, budgets, IAM roles with Pod Identity (API: presign `uploads/*`; worker: read `uploads/*`, write `contents/*`, tag objects; agent: Bedrock invoke on the inference profile and underlying model ARNs in every destination region).
+**Created by CDK:** VPC, EKS and node group, RDS, S3 (versioning; `ObjectCreated` notifications for `uploads/` to SQS; lifecycle: `uploads/` expire after 1 day, `status=archived` content PDFs to Glacier Flexible Retrieval after 30 days; CORS for presigned POST from the web origin), SQS + DLQ, ECR, Secrets Manager, SSM parameters, ACM, budgets, IAM roles with Pod Identity (API: presign `uploads/*`, `ssm:GetParameter` on `/smart-tutor/*`; worker: `ssm:GetParameter` on `/smart-tutor/*`, read `uploads/*`, write `contents/*`, tag objects; agent: Bedrock invoke on the inference profile and underlying model ARNs in every destination region).
