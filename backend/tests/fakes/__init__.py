@@ -3,7 +3,14 @@
 from fakes.auth import FakeTokenVerifier
 from fakes.clock import FixedClock
 from fakes.knowledge import FakeObjectStore, InMemoryLibrary
-from fakes.models import FakeChatModel, fake_chat_model, fake_embeddings
+from fakes.models import (
+    DESCRIPTION_ARGS,
+    FakeChatModel,
+    describe_reply,
+    describing_chat_model,
+    fake_chat_model,
+    fake_embeddings,
+)
 from fakes.parameters import TEST_LIMITS, FakeParameterStore
 from fakes.pdfs import make_pdf
 from fakes.processing import FakePdfExtractor, PageChunker, fake_tools
@@ -11,6 +18,9 @@ from fakes.queue import FakeQueue
 from fakes.subjects import InMemorySubjects
 
 __all__ = [
+    "DESCRIPTION_ARGS",
+    "describe_reply",
+    "describing_chat_model",
     "FakeChatModel",
     "fake_chat_model",
     "fake_embeddings",
