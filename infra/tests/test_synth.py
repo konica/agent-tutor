@@ -315,8 +315,8 @@ def test_cloudfront_sends_auth_to_keycloak_uncached_with_every_method() -> None:
                                 "ViewerProtocolPolicy": "redirect-to-https",
                                 "AllowedMethods": ["GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"],
                                 "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",  # CachingDisabled
-                                # AllViewerExceptHostHeader: cookies, query strings, and Authorization reach Keycloak
-                                "OriginRequestPolicyId": "b689b0a8-53d0-40ab-baf2-68738e2966ac",
+                                # AllViewer: cookies, query strings, Authorization, and the viewer Host reach Keycloak
+                                "OriginRequestPolicyId": "216adef6-5c7f-47e4-b989-5492eafa07d3",
                             }
                         )
                     ],

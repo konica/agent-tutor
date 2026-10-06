@@ -1,8 +1,9 @@
 {{- if .Values.dbBootstrap.enabled }}
 {{- $hook := dict "helm.sh/hook" "pre-install,pre-upgrade" "helm.sh/hook-delete-policy" "before-hook-creation,hook-succeeded" }}
 # Creates the app and Keycloak roles and databases on RDS (files/db-bootstrap.sql) before anything that uses them
-# starts. The master credentials exist in the cluster only while the hooks run: Helm deletes the ExternalSecret once
-# the Job succeeds, and External Secrets deletes the Secret it owns.
+# starts. The master credentials leave the cluster once the Job succeeds: Helm deletes the ExternalSecret, and External
+# Secrets deletes the Secret it owns. After a failed run they stay for debugging until the next install or upgrade
+# replaces the hooks.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:

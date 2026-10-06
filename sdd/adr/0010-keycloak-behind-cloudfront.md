@@ -13,6 +13,7 @@ A spike showed what the proxy headers change. Without them, sign-in through an H
 
 - **Pinned hostname.** `KC_HOSTNAME` is the full public URL with `/auth` (`https://<id>.cloudfront.net/auth`), passed as `global.publicUrl`. Keycloak refuses to start without it.
 - **A trusted `Forwarded` header.** CloudFront adds `Forwarded: proto=https` to every origin request, and Keycloak reads only that header (`KC_PROXY_HEADERS=forwarded`). CloudFront overwrites a value the viewer sends, so the viewer cannot forge it.
+- **The viewer Host reaches Keycloak.** The `/auth/*` behavior uses the managed AllViewer origin request policy. With `KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true`, the backchannel URLs in the discovery document (`token_endpoint`, `jwks_uri`) come from the request Host, so public requests get public URLs and in-cluster requests (Host is the Service) get in-cluster URLs, which the API needs to introspect. The ALB routes by path only, so the viewer Host does no harm.
 - **An optimized image.** `deploy/keycloak/Dockerfile` runs `kc.sh build` once, so a pod starts with `start --optimized` and does not re-augment on every start.
 - **One RDS instance, two databases, two roles.** A Helm `pre-install,pre-upgrade` hook Job (`db-bootstrap`) connects with the master secret and creates the roles and databases idempotently. It sets the role passwords from the `smart-tutor/db/*` secrets. The Job leaves the cluster after it succeeds.
 - **The realm is imported once** from a file with environment placeholders. Client secrets come from Secrets Manager.
@@ -28,5 +29,5 @@ A spike showed what the proxy headers change. Without them, sign-in through an H
 ## Consequences
 
 - A new distribution address or a custom domain needs `--set global.publicUrl` on the next deploy, and the redirect URIs changed in the admin console. The realm import does not overwrite an existing realm.
-- A password rotation in Secrets Manager reaches the database on the next `helm upgrade`, because the hook runs before every install and upgrade.
+- A password rotation in Secrets Manager reaches the database on the next `helm upgrade`, because the hook runs before every install and upgrade. Running Keycloak pods keep the old password until the `keycloak-db` ExternalSecret syncs and the deployment restarts; the runbook has the steps.
 - Client IP addresses in Keycloak events are the ALB's.

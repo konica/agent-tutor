@@ -129,7 +129,9 @@ class EdgeStack(cdk.Stack):
                     viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                     allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,  # login form POST, admin REST PUT/DELETE
                     cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
-                    origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+                    # AllViewer forwards the viewer's Host: Keycloak builds the backchannel URLs in its discovery
+                    # document (token_endpoint, jwks_uri) from the request Host, and the ALB routes by path only.
+                    origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER,
                 ),
             },
         )
