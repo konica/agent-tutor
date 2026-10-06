@@ -1,6 +1,10 @@
 # Production overrides (us-east-1). The deploy sets global.imageRegistry and global.imageTag
 # (helm upgrade --set global.imageRegistry=<RegistryUri> --set global.imageTag=<commit sha>).
 # The pilot (#54) runs only the US-1 services; each is enabled by its slice.
+global:
+  secretStore: aws-secrets-manager
+dbBootstrap:
+  enabled: true
 web:
   replicaCount: 2
   targetGroupName: smart-tutor-prod-web  # SmartTutor-prod-Edge output WebTargetGroupName
