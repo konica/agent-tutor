@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Draft v2.14 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Status** | Draft v2.15 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Changes from v2.14** | A public landing page at `/` explains Smart Tutor and leads to sign-up and sign-in; every other page requires sign-in (US-1). Keycloak's hosted pages keep their stock layout with the Smart Tutor logo, colors, and font only (Q46; `sdd/reviews/2026-10-06-landing-page-discussion.md`). With no terms step (Q45), the Library's upload area says "Only upload documents you have the right to use." (US-2, Q47). |
 | **Changes from v2.13** | Product owner decision (Q45): Release 1 has no terms of use step and no Settings page. Sign-up ends on **My library** (US-1); the `learners` profile moves to Release 3 and keeps only `time_zone` for reports (D13, §9.4); the time zone stays one app setting (D27). The upload-warranty mitigation for copyright moves to Release 4 (§9.10). |
 | **Changes from v2.12** | The first-pages `describe_document` payload is validated in code; a reply without one valid call stores no metadata, and processing continues with the file name as title; an invalid optional DOI or year is dropped without losing the rest, and a DOI not printed in the pages is dropped too. `contents` gains the description columns (title, authors, year, DOI, summary, summary embedding, proposed subject names, work key). The first pages are read by `PdfExtractor.extract_pages(..., first=2)` (§9.2 step 4; §9.15 ports). |
 | **Changes from v2.11** | Pilot hosting: served from the AWS-generated CloudFront address with path routing (`/`, `/api/*`, `/auth/*`) through a VPC origin to an internal ALB; no custom domain, DNS, or ACM certificate for now (§9.12, Appendix A item 4; ADR 0009). No product behavior changes. |
@@ -136,7 +137,8 @@ Learners and researchers work through many documents on a topic but lack the bac
 ## 7. Scope
 
 ### Release 1: core tutor on your own documents
-- Registration, login, logout via **Keycloak's hosted pages**. No terms of use step and no Settings page (Q45).
+- A public **landing page** (what Smart Tutor does, "Create an account", "Sign in"); no pricing, testimonials, or later-release features.
+- Registration, login, logout via **Keycloak's hosted pages** (stock layout with the Smart Tutor logo, colors, and font). No terms of use step and no Settings page (Q45).
 - **Upload** PDFs with a client-side duplicate check and server-side SHA-256; per-document state.
 - **Subject suggestion** (3 choices, keep 1–3) and the **shared subject catalog**; personal subject names (rename, reset).
 - Ingestion once per unique content: fast first-pages step (metadata, suggestions), page text extraction with `pypdf` (saved), work key, chunking, embedding.
@@ -178,6 +180,7 @@ Learners and researchers work through many documents on a topic but lack the bac
 Story IDs are stable. Release 1: US-1 to US-13b. Release 2: US-19, US-20. Release 3: US-14 to US-16. Release 4: US-17. Release 5: US-18.
 
 **US-1 Register and sign in**
+- *Given* a visitor who isn't signed in, *when* they open Smart Tutor, *then* they see the **landing page**: what Smart Tutor does, that it answers only from their own documents, that documents are private, that it is a pilot for laptop browsers, and **"Create an account"** and **"Sign in"**. Both go to Keycloak and return to **My library**; signing out returns to the landing page. Every other page requires sign-in.
 - *Given* a new visitor, *when* they choose "Sign up", *then* they register on Keycloak's hosted page (with email verification), get the `learner` role, and land on **My library**, which prompts "Upload your first document" when empty.
 - Unauthenticated calls to the API, agent, or MCP server return `401`.
 
@@ -186,6 +189,7 @@ Story IDs are stable. Release 1: US-1 to US-13b. Release 2: US-19, US-20. Releas
 - **Checked before upload:** file type (PDF) and size (≤ 50 MB). **Checked after upload:** page count (≤ 500), whether the PDF can be parsed, and whether it has extractable text (scanned PDFs without a text layer are not supported yet); failures put the document in *failed* with the reason.
 - Each document shows its state: *processing → choose subjects → ready*, or *failed* with the reason and **Retry** (§9.5).
 - There is no limit on the number of documents; uploads are rate-limited (§11).
+- The upload area (the Library's drop zone and its first-run card) says "Only upload documents you have the right to use." (Q47).
 
 **US-2b Choose subjects**
 - The learner chooses subjects **only after processing has finished**. Until then the document shows *processing* (with its extracted title once the first pages are read) and there is no "Choose subjects" action. When processing finishes, the learner sees **3 suggested subjects**: matching shared subjects first, then their own subjects, then new names proposed from the first 1–2 pages. The suggestions are computed early (p95 ≤ 30 s from upload completion) and shown when the document reaches *choose subjects*.
@@ -299,7 +303,7 @@ Story IDs are stable. Release 1: US-1 to US-13b. Release 2: US-19, US-20. Releas
 | **RAG MCP Server** | `search(query, subject_ids, k)` over streamable HTTP: validates the forwarded JWT, resolves the learner's **readable, ready, non-archived documents** in any of those subjects (`can_read`), searches their contents' chunks only, returns chunks with scores and citation metadata. `get_chunk(chunk_id)` resolves old citations (only through a document the caller can read). |
 | **Smart Tutor agent** | Ask, summarize, idle-record paths (§9.2); checkpointer and long-term memory in PostgreSQL; token usage per call. |
 | **Scheduled jobs** (Kubernetes CronJobs) | Learning-record sweeper (every minute); Glacier tagger (daily); trace and decline-log retention (daily); *R3:* learner reports (hourly). |
-| **Web App** | Keycloak login, library and upload, subject choice and rename, chat, conversations, notes, usage; *R2:* research map; *R3:* quizzes, reports; *R4:* sharing, imports. |
+| **Web App** | Public landing page, Keycloak login, library and upload, subject choice and rename, chat, conversations, notes, usage; *R2:* research map; *R3:* quizzes, reports; *R4:* sharing, imports. |
 
 ### 9.2 Agent flow
 
@@ -455,7 +459,7 @@ Every decline (relevance gate, growth check, or `decline` tool) writes `subject_
 | **Wrong subjects detected.** | Thresholds and margins tuned on labeled data; "ask when unsure"; detection and growth evals. |
 | **Poor metadata (scanned or unusual PDFs).** Missing year or title weakens the research map. | Fields optional; display title editable; works without a year listed separately; extraction accuracy measured. |
 | **Tool calling in streamed answers; cross-region routing; token cost; long streams on Kubernetes; EKS operations; judge bias.** | Streamed text + tool calls verified in M0 through `ChatBedrockConverse` (ADR 0006; `make bedrock-check`); the `us.` inference profile keeps requests in US regions; capped history and chunks, prompt caching, budget alerts; `preStop` hooks, grace periods, and PodDisruptionBudgets for streaming pods; managed node group with a small add-on set; judges use a different model family (Qwen) calibrated against human feedback. |
-| **Copyright of published or imported documents** *(R4)*. | Terms of use with an upload warranty when sharing opens (R4; not in R1, Q45); publishing terms, takedown per document visibility, imports limited to open-access sources. |
+| **Copyright of published or imported documents** *(R4)*. | In R1, the upload area reminds learners to upload only documents they have the right to use (Q47); terms of use with an upload warranty when sharing opens (R4, Q45); publishing terms, takedown per document visibility, imports limited to open-access sources. |
 
 ### 9.11 Hosting
 
@@ -628,6 +632,8 @@ Measured over the pilot unless stated; minimum sample 100 events per metric.
 | Q43 | Time zone for "today", daily caps, and limit times (design D8) | GMT+7 for all learners in Release 1 (D27). |
 | Q44 | Pilot address | The AWS-generated CloudFront domain with path routing; no custom domain until needed (ADR 0009). |
 | Q45 | Terms of use and Settings in Release 1 | Removed (product owner, 2026-10-06): no terms step on first sign-in and no Settings page; no screen shows the time zone setting, which stays GMT+7 for limits and "today" (D27). Tickets #46, #49, #50 closed. |
+| Q46 | Landing page and Keycloak pages | Public landing page at `/`, text only (no product image) for the pilot; signed-in visitors see the same page and "Sign in" returns them to My library through single sign-on. Keycloak keeps its stock `keycloak.v2` layout with the Smart Tutor logo, colors, font, and display name; no custom templates. No terms of use step (Q45). |
+| Q47 | Upload rights without a terms step (design G2) | The Library's upload area says "Only upload documents you have the right to use." No checkbox or acceptance is stored (US-2). |
 
 ## 14. Roadmap: releases and milestones
 
