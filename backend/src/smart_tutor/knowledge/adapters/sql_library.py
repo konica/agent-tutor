@@ -1,16 +1,18 @@
 """PostgreSQL library: one connection and transaction per unit of work."""
 
 import uuid
+from collections.abc import Collection
 from types import TracebackType
 from typing import Any, Self
 
-from sqlalchemy import ColumnElement, Connection, Engine, delete, func, select, update
+from sqlalchemy import ColumnElement, Connection, Engine, delete, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 
 from smart_tutor.knowledge.adapters.sql_tables import chunks, contents, document_subjects, documents, uploads
 from smart_tutor.knowledge.domain.chunk import Chunk
 from smart_tutor.knowledge.domain.content import Content, ContentState
 from smart_tutor.knowledge.domain.document import Document, DocumentState
+from smart_tutor.knowledge.domain.search import ChunkHit
 from smart_tutor.knowledge.domain.upload import Upload, UploadOutcome
 from smart_tutor.knowledge.ports.library import (
     ChunkRepository,
@@ -57,6 +59,7 @@ def _document(row: Any, subject_ids: list[SubjectId]) -> Document:
         failure_reason=row.failure_reason,
         title_override=row.title_override,
         subject_ids=subject_ids,
+        archived=row.archived,
     )
 
 
@@ -210,6 +213,44 @@ class _Chunks(ChunkRepository):
                     for c in new_chunks
                 ],
             )
+
+    def search(
+        self, user_id: UserId, embedding: list[float], subject_ids: Collection[SubjectId], k: int
+    ) -> list[ChunkHit]:
+        # Exact search (#31): with index scans off, Postgres can't use HNSW and drop filtered-out rows after the scan.
+        self._conn.execute(text("SET LOCAL enable_indexscan = off"))
+        distance = chunks.c.embedding.cosine_distance(embedding)
+        in_subjects = (
+            select(document_subjects.c.document_id)
+            .where(
+                document_subjects.c.document_id == documents.c.document_id,
+                document_subjects.c.subject_id.in_(list(subject_ids)),
+            )
+            .exists()
+        )
+        rows = self._conn.execute(
+            select(
+                chunks.c.chunk_id,
+                chunks.c.page,
+                chunks.c.text,
+                documents.c.document_id,
+                func.coalesce(documents.c.title_override, documents.c.file_name).label("title"),
+                (1 - distance).label("score"),
+            )
+            .join(documents, documents.c.content_id == chunks.c.content_id)
+            .where(
+                readable_by(user_id),
+                documents.c.state == DocumentState.READY.value,
+                documents.c.archived.is_(False),
+                in_subjects,
+            )
+            .order_by(distance, chunks.c.chunk_id)
+            .limit(k)
+        )
+        return [
+            ChunkHit(str(r.chunk_id), DocumentId(str(r.document_id)), r.title, r.page, r.text, float(r.score))
+            for r in rows
+        ]
 
 
 class SqlLibraryUnitOfWork(LibraryUnitOfWork):

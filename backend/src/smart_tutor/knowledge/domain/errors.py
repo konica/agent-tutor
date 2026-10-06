@@ -17,3 +17,7 @@ class ContentStateError(DomainError):
 
 class InvalidChunkError(DomainError):
     """A chunker produced a chunk the store must not accept (PRD §9.4)."""
+
+
+class InvalidSearchError(DomainError):
+    """The search request is malformed (query, subjects, or k out of range)."""

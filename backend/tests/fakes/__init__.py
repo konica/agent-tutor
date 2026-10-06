@@ -2,6 +2,7 @@
 
 from fakes.auth import FakeTokenVerifier
 from fakes.clock import FixedClock
+from fakes.ingest import ingest_ready
 from fakes.knowledge import FakeObjectStore, InMemoryLibrary
 from fakes.models import FakeChatModel, fake_chat_model, fake_embeddings
 from fakes.parameters import TEST_LIMITS, FakeParameterStore
@@ -26,6 +27,7 @@ __all__ = [
     "PageChunker",
     "fake_tools",
     "make_pdf",
+    "ingest_ready",
     "FakeParameterStore",
     "TEST_LIMITS",
 ]

@@ -1,6 +1,7 @@
 """A learner's library entry (PRD §9.4, §9.5). Access: `can_be_read_by` is the domain half of `can_read`."""
 
 import re
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
@@ -42,6 +43,7 @@ class Document:
     failure_reason: str | None = None
     title_override: str | None = None
     subject_ids: list[SubjectId] = field(default_factory=list)
+    archived: bool = False
 
     @classmethod
     def start_upload(
@@ -62,6 +64,15 @@ class Document:
 
     def can_be_read_by(self, user_id: UserId) -> bool:
         return self.owner_id == user_id  # Release 1: owner only (PRD §9.3)
+
+    def searchable_by(self, user_id: UserId, subject_ids: Collection[SubjectId]) -> bool:
+        """`can_read` plus search's own filter: ready, not archived, in any of the subjects (PRD §9.3)."""
+        return (
+            self.can_be_read_by(user_id)
+            and self.state is DocumentState.READY
+            and not self.archived
+            and not set(subject_ids).isdisjoint(self.subject_ids)
+        )
 
     def link_content(self, content_id: ContentId) -> None:
         if not self.awaiting_upload:

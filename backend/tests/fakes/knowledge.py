@@ -1,12 +1,16 @@
 """In-memory library and object store. A unit of work edits a copy and publishes it on commit."""
 
 import copy
+import math
+import uuid
+from collections.abc import Collection
 from types import TracebackType
 from typing import Self
 
 from smart_tutor.knowledge.domain.chunk import Chunk
 from smart_tutor.knowledge.domain.content import Content
 from smart_tutor.knowledge.domain.document import Document, DocumentState
+from smart_tutor.knowledge.domain.search import ChunkHit
 from smart_tutor.knowledge.domain.upload import Upload, UploadOutcome
 from smart_tutor.knowledge.ports.library import (
     ChunkRepository,
@@ -16,7 +20,7 @@ from smart_tutor.knowledge.ports.library import (
     UploadRepository,
 )
 from smart_tutor.knowledge.ports.object_store import ObjectNotFoundError, ObjectStore, PresignedPost
-from smart_tutor.shared.domain.ids import ContentId, UploadId, UserId
+from smart_tutor.shared.domain.ids import ContentId, SubjectId, UploadId, UserId
 
 
 class _State:
@@ -87,7 +91,7 @@ class _Documents(DocumentRepository):
         ]
 
     def list_readable_by(self, user_id: UserId) -> list[Document]:
-        mine = [copy.deepcopy(d) for d in self._s.documents.values() if d.can_be_read_by(user_id)]
+        mine = [copy.deepcopy(d) for d in self._s.documents.values() if d.can_be_read_by(user_id) and not d.archived]
         return sorted(mine, key=lambda d: d.created_at, reverse=True)
 
 
@@ -103,12 +107,35 @@ class _Uploads(UploadRepository):
         upload.size, upload.outcome = size, outcome
 
 
+def _cosine(a: list[float], b: list[float]) -> float:
+    norms = math.hypot(*a) * math.hypot(*b)
+    return sum(x * y for x, y in zip(a, b, strict=True)) / norms if norms else 0.0
+
+
 class _Chunks(ChunkRepository):
     def __init__(self, state: _State) -> None:
         self._s = state
 
     def replace(self, content_id: ContentId, chunks: list[Chunk]) -> None:
         self._s.chunks[content_id] = copy.deepcopy(chunks)
+
+    def search(
+        self, user_id: UserId, embedding: list[float], subject_ids: Collection[SubjectId], k: int
+    ) -> list[ChunkHit]:
+        hits = [
+            ChunkHit(
+                str(uuid.uuid5(uuid.NAMESPACE_URL, f"{c.content_id}:{c.seq}")),
+                d.document_id,
+                d.title,
+                c.page,
+                c.text,
+                _cosine(embedding, c.embedding),
+            )
+            for d in self._s.documents.values()
+            if d.content_id is not None and d.searchable_by(user_id, subject_ids)
+            for c in self._s.chunks.get(d.content_id, [])
+        ]
+        return sorted(hits, key=lambda h: (-h.score, h.chunk_id))[:k]
 
 
 class FakeLibraryUnitOfWork(LibraryUnitOfWork):

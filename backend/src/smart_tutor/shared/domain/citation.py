@@ -7,5 +7,5 @@ from dataclasses import dataclass
 class Citation:
     chunk_id: str
     document_title: str
-    page: int
+    page: int | None  # None renders "page unavailable"
     archived: bool = False  # archived documents still resolve; the UI marks them
