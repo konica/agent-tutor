@@ -1,5 +1,6 @@
 """RAG MCP server: introspected token, caller from the token only, typed results."""
 
+import logging
 from typing import Any
 
 import httpx2
@@ -12,8 +13,10 @@ from fakes.mcp import MCP_TEST_URL
 from smart_tutor.apps.mcp_server import server
 from smart_tutor.knowledge.application import SearchService
 from smart_tutor.shared.config import Settings
+from smart_tutor.shared.domain.errors import IntrospectionUnavailableError, UnauthenticatedError
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.domain.principal import Principal
+from smart_tutor.shared.ports.token_verifier import TokenVerifier
 from smart_tutor.subjects.application import GENERAL_SUBJECT_ID
 
 GENERAL = str(GENERAL_SUBJECT_ID)
@@ -83,6 +86,31 @@ async def test_the_tool_takes_no_user_id() -> None:
     mcp = build(InMemoryLibrary(), verifier_with("t", "ada"))
     [tool] = [t for t in await mcp.list_tools() if t.name == "search"]
     assert set(tool.input_schema["properties"]) == {"query", "subject_ids", "k"}
+
+
+class FailingVerifier(TokenVerifier):
+    def __init__(self, error: UnauthenticatedError) -> None:
+        self.error = error
+
+    async def verify(self, token: str) -> Principal:
+        raise self.error
+
+
+@pytest.mark.parametrize(
+    ("error", "level"),
+    [
+        (IntrospectionUnavailableError("keycloak unreachable"), logging.WARNING),
+        (UnauthenticatedError("token not active"), logging.INFO),
+    ],
+)
+async def test_a_refused_token_is_logged_by_reason_at_its_level(
+    error: UnauthenticatedError, level: int, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.DEBUG, logger=server.__name__)
+    assert await server.IntrospectionBridge(FailingVerifier(error)).verify_token("t-secret") is None
+    [record] = [r for r in caplog.records if r.name == server.__name__]
+    assert record.levelno == level and str(error) in record.getMessage()
+    assert "t-secret" not in caplog.text
 
 
 def test_main_listens_on_the_configured_port(monkeypatch: pytest.MonkeyPatch) -> None:

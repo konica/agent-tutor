@@ -21,7 +21,7 @@ from smart_tutor.shared.adapters.auth.keycloak_introspection import keycloak_ver
 from smart_tutor.shared.adapters.model_factory import ModelFactory
 from smart_tutor.shared.adapters.postgres.engine import create_db_engine
 from smart_tutor.shared.config import Settings
-from smart_tutor.shared.domain.errors import UnauthenticatedError
+from smart_tutor.shared.domain.errors import IntrospectionUnavailableError, UnauthenticatedError
 from smart_tutor.shared.domain.ids import SubjectId, UserId
 from smart_tutor.shared.ports.token_verifier import TokenVerifier
 
@@ -50,6 +50,10 @@ class IntrospectionBridge:
     async def verify_token(self, token: str) -> AccessToken | None:
         try:
             principal = await self._verifier.verify(token)
+        except IntrospectionUnavailableError as e:
+            # Keycloak couldn't be asked: an outage to look at, not a bad token.
+            logger.warning("MCP token check unavailable: %s", e)  # the reason only, never the token
+            return None
         except UnauthenticatedError as e:
             logger.info("rejected MCP request: %s", e)  # the reason only, never the token
             return None
