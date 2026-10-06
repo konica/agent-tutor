@@ -1,7 +1,7 @@
 import { AlertCircle, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 
-import { loadDocuments, loadUploadLimits, megabytes, rejectionReason, retryProcessing, uploadPdf, type DocumentResponse, type UploadLimits } from "../../api/documents";
+import { loadDocuments, loadUploadLimits, megabytes, rejectionReason, RetriesUsedUpError, retryProcessing, uploadPdf, type DocumentResponse, type UploadLimits } from "../../api/documents";
 import { Button } from "../../components/Button/Button";
 import { EmptyState } from "../../components/EmptyState/EmptyState";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
@@ -117,9 +117,9 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
     try {
       await retry(doc.document_id);
       setStatus(`Retrying ${doc.title}. Processing again.`);
-    } catch {
-      // A 401 is handled by the API client; a 409 (attempts used up) shows on the refreshed row.
-      setStatus(`Couldn't retry ${doc.title}. Try again.`);
+    } catch (error) {
+      // A 401 is handled by the API client. A 409 means the attempts are used up; the refreshed row drops Retry.
+      setStatus(error instanceof RetriesUsedUpError ? `${doc.title} could not be processed.` : `Couldn't retry ${doc.title}. Try again.`);
     }
     await refresh();
     setRetrying((s) => {

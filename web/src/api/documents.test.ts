@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { SessionExpiredError } from "../auth/authClient";
 import { configureApiClient } from "./client";
-import { loadDocuments, loadUploadLimits, rejectionReason, retryProcessing, uploadPdf } from "./documents";
+import { loadDocuments, loadUploadLimits, rejectionReason, RetriesUsedUpError, retryProcessing, uploadPdf } from "./documents";
 import { createClient, createConfig } from "./generated/client";
 
 function api(handler: (request: Request) => Response) {
@@ -119,8 +119,15 @@ describe("retryProcessing", () => {
     await expect(retryProcessing("d3", apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
   });
 
-  it.each([409, 500])("rejects with an Error on %i", async (status) => {
-    const { apiClient } = api(() => json({ detail: "no" }, status));
-    await expect(retryProcessing("d3", apiClient)).rejects.toThrow(String(status));
+  it("rejects with RetriesUsedUpError on 409", async () => {
+    const { apiClient } = api(() => json({ detail: "no" }, 409));
+    await expect(retryProcessing("d3", apiClient)).rejects.toBeInstanceOf(RetriesUsedUpError);
+  });
+
+  it("rejects with an Error on 500", async () => {
+    const { apiClient } = api(() => json({ detail: "no" }, 500));
+    const rejection = retryProcessing("d3", apiClient);
+    await expect(rejection).rejects.toThrow("500");
+    await expect(rejection).rejects.not.toBeInstanceOf(RetriesUsedUpError);
   });
 });

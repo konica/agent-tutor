@@ -2,7 +2,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { DocumentResponse } from "../../api/documents";
+import { RetriesUsedUpError, type DocumentResponse } from "../../api/documents";
 import { LibraryPage } from "./LibraryPage";
 
 const today = new Date().toISOString();
@@ -208,5 +208,15 @@ describe("LibraryPage retry", () => {
     await userEvent.click(within(row).getByRole("button", { name: "Retry scan.pdf" }));
     expect(await screen.findByRole("status")).toHaveTextContent("Couldn't retry scan.pdf. Try again.");
     expect(within(row).getByRole("button", { name: "Retry scan.pdf" })).toBeEnabled();
+  });
+
+  it("says the document could not be processed when the attempts are used up", async () => {
+    const retry = vi.fn(async () => {
+      throw new RetriesUsedUpError();
+    });
+    render(<LibraryPage loadLimits={limits} load={async () => [scan]} upload={vi.fn()} retry={retry} />);
+    const row = (await screen.findByText("scan.pdf")).closest("tr")!;
+    await userEvent.click(within(row).getByRole("button", { name: "Retry scan.pdf" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("scan.pdf could not be processed.");
   });
 });

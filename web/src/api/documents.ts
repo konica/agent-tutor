@@ -18,10 +18,18 @@ export async function loadDocuments(apiClient: Client = client): Promise<Documen
   return data;
 }
 
+export class RetriesUsedUpError extends Error {
+  constructor() {
+    super("All processing attempts are used up");
+    this.name = "RetriesUsedUpError";
+  }
+}
+
 // Reprocesses a failed document's stored file (PRD §9.5). 409: the attempts are used up; the list then says so.
 export async function retryProcessing(documentId: string, apiClient: Client = client): Promise<void> {
   const { error, response } = await retryDocument({ client: apiClient, path: { document_id: documentId }, throwOnError: false });
   if (sessionOver(error, response)) throw new SessionExpiredError();
+  if (response?.status === 409) throw new RetriesUsedUpError();
   if (!response?.ok) throw new Error(`POST /documents/${documentId}/retry failed (${response?.status ?? "no response"})`);
 }
 
