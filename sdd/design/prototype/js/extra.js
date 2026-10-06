@@ -276,7 +276,7 @@
     ['E6', 'The declined question is not kept', 'No reminder or “ask again” prompt after “Upload a document”; the prototype already behaved this way.', []],
     ['E7', 'Archived documents: Restore first', 'No “Change subjects” on archived rows, in their More menu or in archived document details (reverses D7). picker-change-subjects-archived is removed.', ['library-archived', 'details-archived']],
     ['E8', 'Daily limits reset at midnight GMT+7', '“You can upload again at 00:00 (GMT+7)” and “You can send again at 00:00 (GMT+7)” for the daily limits; the hourly and per-minute messages keep their own end time.', ['library-rate-limited', 'chat-rate-limited']],
-    ['F1', 'Email as username', 'Stock registration with Email, First name, Last name, Password and Confirm password.', ['auth-sign-up']],
+    ['F1', 'Sign up with an email address', 'Stock registration asks for the email, first and last name, and a new secret twice; there is no separate sign-in name.', ['auth-sign-up']],
     ['F2, E3', 'Confirmed / settled', '“Sign in” stays for signed-in visitors. With one decline left, E3 (which decline id is which) no longer applies.', ['landing-default']]
   ];
   const QUESTIONS = [
