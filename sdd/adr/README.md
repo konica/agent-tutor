@@ -26,3 +26,4 @@ Product decisions are recorded in `sdd/prd.md` (§6, §13); ADRs cover architect
 | [0007](0007-forward-learner-jwt-via-runtime-context.md) | Forward the learner JWT through LangGraph runtime context; Keycloak validates it on every hop (introspection) |
 | [0008](0008-chunk-page-text-with-a-langchain-transformer.md) | Chunk page text with `RecursiveCharacterTextSplitter` (1,000 characters, overlap 200, one page per chunk) behind a LangChain document transformer |
 | [0009](0009-serve-the-pilot-from-the-cloudfront-domain.md) | Serve the pilot from the CloudFront domain with path routing, through a VPC origin to an internal ALB |
+| [0010](0010-keycloak-behind-cloudfront.md) | Keycloak behind CloudFront: pinned hostname, a trusted Forwarded header, databases made by a Helm hook |

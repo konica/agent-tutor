@@ -169,16 +169,19 @@ backend/evals/              # datasets live in LangSmith (versioned there); the 
 ```
 infra/
 ├── app.py  cdk.json  pyproject.toml
-├── smart_tutor_infra/stacks/   # network, data (RDS), storage (S3 + SQS/DLQ + lifecycle), cluster (EKS + Pod Identity),
-│                               # registry (ECR), edge (internal ALB + CloudFront), config (SSM, Secrets Manager), budgets,
+├── smart_tutor_infra/stacks/   # network, data (RDS + database secrets), storage (S3 + SQS/DLQ + lifecycle), cluster (EKS + Pod Identity),
+│                               # registry (ECR), edge (internal ALB + CloudFront), config (SSM, Keycloak secrets), budgets,
 │                               # github_deploy (GitHub OIDC provider + CI deploy role; admin deploys it once)
 └── tests/                      # CDK assertion tests
 
-deploy/helm/
-├── smart-tutor/                # umbrella chart: Chart.yaml, values.yaml, values-prod.yaml
-│   └── charts/                 # api, agent, mcp-server, worker, web, jobs (sweeper, Glacier tagger, retention), keycloak
-│                               # each sub-chart owns its NetworkPolicy and ExternalSecret
-└── addons/                     # values for AWS Load Balancer Controller, External Secrets Operator, metrics-server
+deploy/
+├── keycloak/Dockerfile         # optimized Keycloak image (#57)
+└── helm/
+    ├── smart-tutor/                # umbrella chart: Chart.yaml, values.yaml, values-prod.yaml
+    │   ├── templates/              # SecretStore and the db-bootstrap hook (files/db-bootstrap.sql)
+    │   └── charts/                 # api, agent, mcp-server, worker, web, jobs (sweeper, Glacier tagger, retention), keycloak
+    │                               # each sub-chart owns its NetworkPolicy and ExternalSecret
+    └── addons/                     # values for AWS Load Balancer Controller, External Secrets Operator, metrics-server
 ```
 
 ## 9. Web app
