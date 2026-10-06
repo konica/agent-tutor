@@ -61,11 +61,10 @@ def test_b_never_sees_the_subjects_of_a_document() -> None:
     objects.objects[stored["fields"]["key"]] = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
     ingestion.ingest_upload(stored["fields"]["key"])
 
-    assert [d["subjects"] for d in client.get("/documents", headers=A).json()] == [
-        [{"subject_id": "00000000-0000-4000-8000-000000000001", "name": "General"}]
+    assert [(d["state"], d["subjects"]) for d in client.get("/documents", headers=A).json()] == [
+        ("awaiting_subjects", [])
     ]
     assert client.get("/documents", headers=B).json() == []
-    assert "General" not in client.get("/documents", headers=B).text
 
 
 def test_b_cannot_get_a_presigned_post_for_a_key() -> None:

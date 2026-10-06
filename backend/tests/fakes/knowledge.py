@@ -16,7 +16,7 @@ from smart_tutor.knowledge.ports.library import (
     UploadRepository,
 )
 from smart_tutor.knowledge.ports.object_store import ObjectNotFoundError, ObjectStore, PresignedPost
-from smart_tutor.shared.domain.ids import ContentId, DocumentId, UploadId, UserId
+from smart_tutor.shared.domain.ids import ContentId, DocumentId, SubjectId, UploadId, UserId
 
 
 class _State:
@@ -105,6 +105,23 @@ class _Documents(DocumentRepository):
             key=lambda d: d.created_at,
         )
         return mine[0].document_id if mine else None
+
+    def get_readable(self, user_id: UserId, document_id: DocumentId, *, for_update: bool = False) -> Document | None:
+        found = self._s.documents.get(document_id)
+        if found is None or not found.can_be_read_by(user_id):
+            return None
+        doc = copy.deepcopy(found)
+        content = self._s.contents.get(doc.content_id) if doc.content_id is not None else None
+        doc.content_title = content.title if content else None
+        return doc
+
+    def subject_ids_readable_by(self, user_id: UserId) -> set[SubjectId]:
+        return {
+            sid
+            for d in self._s.documents.values()
+            if d.can_be_read_by(user_id) and d.state is DocumentState.READY
+            for sid in d.subject_ids
+        }
 
 
 class _Uploads(UploadRepository):

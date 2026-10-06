@@ -87,11 +87,11 @@ def test_the_library_shows_the_extracted_title_while_processing() -> None:
     assert (view.state, view.title) == ("processing", DESCRIPTION_ARGS["title"])
 
 
-def test_a_ready_document_keeps_the_extracted_title() -> None:
+def test_a_processed_document_keeps_the_extracted_title() -> None:
     w = World()
     w.upload(pdf(SENTENCE))
     [view] = w.documents.list_documents(UserId("ada"))
-    assert (view.state, view.title) == ("ready", DESCRIPTION_ARGS["title"])
+    assert (view.state, view.title) == ("awaiting_subjects", DESCRIPTION_ARGS["title"])
 
 
 @pytest.mark.parametrize(
@@ -109,7 +109,7 @@ def test_an_invalid_description_stores_nothing_and_processing_continues(reply: A
     assert (c.title, c.summary, c.summary_embedding, c.work_key) == (None, None, None, None)
     assert (c.authors, c.proposed_subject_names) == ([], [])
     [view] = w.documents.list_documents(UserId("ada"))
-    assert (view.state, view.title) == ("ready", "1706.03762v7.pdf")
+    assert (view.state, view.title) == ("awaiting_subjects", "1706.03762v7.pdf")
 
 
 def test_an_invalid_doi_is_dropped_but_the_title_is_stored() -> None:

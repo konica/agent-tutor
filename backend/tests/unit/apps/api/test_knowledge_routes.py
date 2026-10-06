@@ -18,7 +18,7 @@ from smart_tutor.knowledge.application import DocumentService, IngestionService,
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.domain.principal import Principal
-from smart_tutor.subjects.application import GENERAL_SUBJECT_ID, SubjectNames
+from smart_tutor.subjects.application import SubjectNames
 
 AUTH = {"Authorization": "Bearer ada-token"}
 
@@ -58,14 +58,14 @@ def test_the_new_document_is_listed_as_processing(client: TestClient) -> None:
     assert doc["created_at"].startswith("2026-10-04T09:00:00")
 
 
-def test_a_ready_document_lists_its_subject_with_the_resolved_name(client: TestClient) -> None:
+def test_a_processed_document_waits_for_subjects(client: TestClient) -> None:
     started = client.post("/uploads", json={"file_name": "paper.pdf"}, headers=AUTH).json()
     key = started["fields"]["key"]
     client.app.state.objects.objects[key] = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()  # type: ignore[attr-defined]
     client.app.state.ingestion.ingest_upload(key)  # type: ignore[attr-defined]
     [doc] = client.get("/documents", headers=AUTH).json()
-    assert doc["state"] == "ready"
-    assert doc["subjects"] == [{"subject_id": str(GENERAL_SUBJECT_ID), "name": "General"}]
+    assert doc["state"] == "awaiting_subjects"
+    assert doc["subjects"] == []
 
 
 def test_a_processing_document_has_no_subjects(client: TestClient) -> None:

@@ -19,6 +19,7 @@ from smart_tutor.knowledge.domain.errors import (
     DocumentStateError,
     InvalidChunkError,
     InvalidFileNameError,
+    InvalidSubjectsError,
 )
 from smart_tutor.knowledge.domain.upload import Upload, parse_upload_key, upload_key
 from smart_tutor.shared.domain.ids import ContentId, DocumentId, SubjectId, UploadId, UserId
@@ -207,24 +208,42 @@ def linked_document() -> Document:
     return doc
 
 
-def test_document_ready_takes_its_subjects() -> None:
+def test_a_processed_document_waits_for_subjects() -> None:
     doc = linked_document()
-    doc.ready([GENERAL_SUBJECT_ID])
-    assert doc.state is DocumentState.READY
-    assert doc.subject_ids == [GENERAL_SUBJECT_ID]
+    doc.await_subjects()
+    assert doc.state is DocumentState.AWAITING_SUBJECTS and doc.subject_ids == []
 
 
-def test_document_ready_refuses_bad_states_and_subjects() -> None:
-    general = [GENERAL_SUBJECT_ID]
+def test_choosing_1_to_3_distinct_subjects_makes_it_ready() -> None:
+    doc = linked_document()
+    doc.await_subjects()
+    doc.choose_subjects([SubjectId("s1"), SubjectId("s2")])
+    assert (doc.state, doc.subject_ids) == (DocumentState.READY, ["s1", "s2"])
+    doc.choose_subjects([SubjectId("s3")])  # a ready document accepts a new choice
+    assert doc.subject_ids == ["s3"]
+
+
+@pytest.mark.parametrize("ids", [[], ["s1", "s2", "s3", "s4"], ["s1", "s1"]])
+def test_zero_more_than_three_or_duplicate_subjects_are_rejected(ids: list[str]) -> None:
+    doc = linked_document()
+    doc.await_subjects()
+    with pytest.raises(InvalidSubjectsError):
+        doc.choose_subjects([SubjectId(i) for i in ids])
+    assert doc.state is DocumentState.AWAITING_SUBJECTS
+
+
+def test_only_a_processed_document_accepts_subjects() -> None:
+    doc = linked_document()  # still processing
     with pytest.raises(DocumentStateError):
-        new_document().ready(general)  # no content
-    for bad in ([], [SubjectId(str(i)) for i in range(4)], [GENERAL_SUBJECT_ID, GENERAL_SUBJECT_ID]):
-        with pytest.raises(DocumentStateError):
-            linked_document().ready(bad)
-    failed = linked_document()
-    failed.fail("x")
+        doc.choose_subjects([SubjectId("s1")])
+    doc.fail("x")
     with pytest.raises(DocumentStateError):
-        failed.ready(general)
+        doc.choose_subjects([SubjectId("s1")])
+
+
+def test_only_a_processing_document_with_content_can_wait_for_subjects() -> None:
+    with pytest.raises(DocumentStateError):
+        new_document().await_subjects()
 
 
 def test_too_many_pages_reason_names_both_counts() -> None:

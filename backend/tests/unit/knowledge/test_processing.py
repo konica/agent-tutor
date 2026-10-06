@@ -19,7 +19,6 @@ from smart_tutor.knowledge.application import (
 from smart_tutor.knowledge.domain.content import NO_TEXT_LAYER, UNREADABLE_PDF, pages_key, too_many_pages
 from smart_tutor.knowledge.domain.errors import InvalidChunkError
 from smart_tutor.shared.domain.ids import ContentId, UserId
-from smart_tutor.subjects.application import GENERAL_SUBJECT_ID
 
 SENTENCE = "A sentence about attention mechanisms. " * 5  # 190 characters: two 100-character fake chunks
 
@@ -67,7 +66,7 @@ def test_a_stored_pdf_becomes_chunks_pages_json_and_a_ready_document() -> None:
     assert w.objects.content_types[pages_key(content.sha256)] == "application/json"
 
     document = w.library.state.documents[document_id]
-    assert (document.state, document.subject_ids) == ("ready", [GENERAL_SUBJECT_ID])
+    assert (document.state, document.subject_ids) == ("awaiting_subjects", [])
 
 
 def test_blank_pages_make_no_chunks_and_pages_keep_physical_numbers() -> None:
@@ -149,7 +148,7 @@ def test_redelivery_reprocesses_a_stored_content_that_is_still_processing() -> N
     assert key not in w.objects.objects  # the upload copy was already removed
 
     assert w.ingestion.ingest_upload(key) is None  # SQS redelivers the same message
-    assert w.library.state.documents[started.document_id].state == "ready"
+    assert w.library.state.documents[started.document_id].state == "awaiting_subjects"
     assert w.library.state.contents[w.content_id()].state is ContentState.READY
 
 

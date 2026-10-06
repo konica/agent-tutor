@@ -11,6 +11,14 @@ class DocumentStateError(DomainError):
     """The document isn't in a state that allows this change (PRD §9.5)."""
 
 
+class InvalidSubjectsError(DomainError):
+    """The chosen subjects aren't 1 to 3 different subjects (PRD §9.4)."""
+
+
+class DocumentNotFoundError(DomainError):
+    """No document of the caller's has this id; another learner's document looks the same (PRD §9.3)."""
+
+
 class ContentStateError(DomainError):
     """The content isn't in a state that allows this change (PRD §9.5)."""
 

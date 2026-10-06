@@ -40,7 +40,7 @@ def test_a_new_file_is_stored_once_under_its_hash_and_the_upload_copy_removed() 
         "ada",
     )
     doc = w.doc(a)
-    assert (doc.content_id, doc.state) == (content.content_id, "ready")
+    assert (doc.content_id, doc.state) == (content.content_id, "awaiting_subjects")
     upload = w.library.state.uploads[a.upload_id]
     assert (upload.size, upload.outcome) == (len(PDF), UploadOutcome.STORED)
 
@@ -82,7 +82,7 @@ def test_redelivery_after_success_changes_nothing() -> None:
     w.ingestion.ingest_upload(a.fields["key"])
     w.objects.objects[a.fields["key"]] = PDF  # S3 event redelivered; say the delete hadn't happened
     assert w.ingestion.ingest_upload(a.fields["key"]) is None
-    assert w.doc(a).state == "ready" and w.doc(a).content_id is not None
+    assert w.doc(a).state == "awaiting_subjects" and w.doc(a).content_id is not None
     assert a.fields["key"] not in w.objects.objects
     w.ingestion.ingest_upload(b.fields["key"])
     assert w.ingestion.ingest_upload(b.fields["key"]) is None

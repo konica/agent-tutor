@@ -215,7 +215,8 @@ def test_ready_document_round_trips_its_subjects(engine: Engine) -> None:
         loaded = tx.documents.get_by_upload_for_update(doc.upload_id)
         assert loaded is not None
         assert loaded.subject_ids == []
-        loaded.ready([GENERAL])
+        loaded.await_subjects()
+        loaded.choose_subjects([GENERAL])
         tx.documents.save(loaded)
         tx.documents.save(loaded)  # saving twice replaces the rows
         tx.commit()
@@ -224,6 +225,40 @@ def test_ready_document_round_trips_its_subjects(engine: Engine) -> None:
         locked = tx.documents.get_by_upload_for_update(doc.upload_id)
     assert (listed.state, listed.subject_ids) == ("ready", [GENERAL])
     assert locked is not None and locked.subject_ids == [GENERAL]
+
+
+def test_get_readable_is_owner_only_and_skips_archived(engine: Engine) -> None:
+    owner, other = f"ada-{uid()}", f"bob-{uid()}"
+    doc = start(engine, owner)
+    with SqlLibraryUnitOfWork(engine) as tx:
+        found = tx.documents.get_readable(UserId(owner), doc.document_id)
+        locked = tx.documents.get_readable(UserId(owner), doc.document_id, for_update=True)
+        assert tx.documents.get_readable(UserId(other), doc.document_id) is None
+    assert found is not None and found.document_id == doc.document_id
+    assert locked is not None and locked.document_id == doc.document_id
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE documents SET archived = true WHERE document_id = :d"), {"d": doc.document_id})
+    with SqlLibraryUnitOfWork(engine) as tx:
+        assert tx.documents.get_readable(UserId(owner), doc.document_id) is None
+
+
+def test_subject_ids_readable_by_counts_only_ready_documents(engine: Engine) -> None:
+    owner, other = f"ada-{uid()}", f"bob-{uid()}"
+    waiting, chosen, theirs = start(engine, owner), start(engine, owner), start(engine, other)
+    for d in (waiting, chosen, theirs):
+        link(engine, d, stored_content(engine, d.owner_id))
+    with SqlLibraryUnitOfWork(engine) as tx:
+        for d, pick in ((waiting, None), (chosen, GENERAL), (theirs, GENERAL)):
+            loaded = tx.documents.get_by_upload_for_update(d.upload_id)
+            assert loaded is not None
+            loaded.await_subjects()
+            if pick:
+                loaded.choose_subjects([pick])
+            tx.documents.save(loaded)
+        tx.commit()
+    with SqlLibraryUnitOfWork(engine) as tx:
+        assert tx.documents.subject_ids_readable_by(UserId(owner)) == {GENERAL}
+        assert tx.documents.subject_ids_readable_by(UserId(f"nobody-{uid()}")) == set()
 
 
 def test_list_processing_for_content_excludes_ready_and_failed(engine: Engine) -> None:
@@ -236,7 +271,8 @@ def test_list_processing_for_content_excludes_ready_and_failed(engine: Engine) -
         ready = tx.documents.get_by_upload_for_update(docs[1].upload_id)
         failed = tx.documents.get_by_upload_for_update(docs[2].upload_id)
         assert ready is not None and failed is not None
-        ready.ready([GENERAL])
+        ready.await_subjects()
+        ready.choose_subjects([GENERAL])
         failed.fail("nope")
         tx.documents.save(ready)
         tx.documents.save(failed)

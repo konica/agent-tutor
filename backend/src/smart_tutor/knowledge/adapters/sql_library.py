@@ -188,6 +188,28 @@ class _Documents(DocumentRepository):
         ).scalar()
         return DocumentId(str(found)) if found else None
 
+    def get_readable(self, user_id: UserId, document_id: DocumentId, *, for_update: bool = False) -> Document | None:
+        stmt = (
+            select(documents, contents.c.title.label("content_title"))
+            .select_from(documents.outerjoin(contents, documents.c.content_id == contents.c.content_id))
+            .where(documents.c.document_id == document_id, readable_by(user_id), documents.c.archived.is_(False))
+        )
+        if for_update:
+            stmt = stmt.with_for_update(of=documents)  # the outer join to contents stays unlocked
+        row = self._conn.execute(stmt).first()
+        return self._load([row])[0] if row else None
+
+    def subject_ids_readable_by(self, user_id: UserId) -> set[SubjectId]:
+        rows = self._conn.execute(
+            select(document_subjects.c.subject_id)
+            .distinct()
+            .select_from(document_subjects.join(documents, document_subjects.c.document_id == documents.c.document_id))
+            .where(
+                readable_by(user_id), documents.c.archived.is_(False), documents.c.state == DocumentState.READY.value
+            )
+        )
+        return {SubjectId(str(r.subject_id)) for r in rows}
+
     def _load(self, rows: list[Any]) -> list[Document]:
         """Documents with their subject ids in one extra query. Postgres keeps no insertion order, so by id."""
         by_document: dict[str, list[SubjectId]] = {}
