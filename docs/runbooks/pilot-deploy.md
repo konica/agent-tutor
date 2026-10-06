@@ -148,4 +148,4 @@ ECR images are deleted with their repositories. From #57 on, RDS keeps a final s
 
 ## 10. Costs
 
-About **$250–300 a month** while idle. The budget is **$400 a month**, with alerts.
+About **$250–300 a month** while idle. During the testing phase the budget is **$20 a month** (`smart-tutor:budget-monthly-usd` in `infra/cdk.json`), with alerts. That is below the idle cost, so expect the 80% alert email within the first days the environment runs. Raise the value and run `npx aws-cdk@latest deploy SmartTutor-prod-Budgets` from `infra/` when the pilot starts.

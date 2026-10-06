@@ -127,7 +127,7 @@ def test_budget_alerts_at_80_percent_actual_and_100_percent_forecast() -> None:
                 "BudgetName": "smart-tutor-prod-monthly",
                 "BudgetType": "COST",
                 "TimeUnit": "MONTHLY",
-                "BudgetLimit": {"Amount": 400, "Unit": "USD"},
+                "BudgetLimit": {"Amount": 20, "Unit": "USD"},
             },
             "NotificationsWithSubscribers": [
                 {
