@@ -1,5 +1,5 @@
 """The public entry point (ADR 0009): CloudFront on its default *.cloudfront.net domain reaches an internal ALB
-through a VPC origin. Path routing: `/` → web now; `/api/*` and `/auth/*` arrive with their slices (#57, #58).
+through a VPC origin. Path routing: `/` → web, `/auth/*` → Keycloak (#57); `/api/*` arrives with #58.
 
 CDK owns the ALB, its listener, and one target group per service. In the cluster, the AWS Load Balancer Controller
 only registers pod IPs into a target group, through a TargetGroupBinding that names it. So one `cdk deploy` builds the
@@ -15,7 +15,7 @@ from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_elasticloadbalancingv2 as elbv2
 from constructs import Construct
 
-WEB_PORT = 8080
+POD_PORT = 8080  # web and Keycloak both listen here, so one ALB → pod rule covers both
 
 
 class EdgeStack(cdk.Stack):
@@ -41,7 +41,7 @@ class EdgeStack(cdk.Stack):
         )
         alb_sg.add_ingress_rule(ec2.Peer.ipv4(vpc.vpc_cidr_block), ec2.Port.tcp(80), "CloudFront VPC origin")
         alb_sg.add_egress_rule(
-            ec2.Peer.security_group_id(cluster_security_group_id), ec2.Port.tcp(WEB_PORT), "web pods"
+            ec2.Peer.security_group_id(cluster_security_group_id), ec2.Port.tcp(POD_PORT), "web and Keycloak pods"
         )
         # Pods use the EKS cluster security group; the rule lives here to keep ClusterStack free of edge concerns.
         ec2.CfnSecurityGroupIngress(
@@ -49,10 +49,10 @@ class EdgeStack(cdk.Stack):
             "WebPodsFromLoadBalancer",
             group_id=cluster_security_group_id,
             ip_protocol="tcp",
-            from_port=WEB_PORT,
-            to_port=WEB_PORT,
+            from_port=POD_PORT,
+            to_port=POD_PORT,
             source_security_group_id=alb_sg.security_group_id,
-            description="Internal ALB to web pods",
+            description="Internal ALB to web and Keycloak pods",
         )
 
         load_balancer = elbv2.ApplicationLoadBalancer(
@@ -70,14 +70,35 @@ class EdgeStack(cdk.Stack):
             "WebTargets",
             target_group_name=web_target_group_name,
             vpc=vpc,
-            port=WEB_PORT,
+            port=POD_PORT,
             protocol=elbv2.ApplicationProtocol.HTTP,
             target_type=elbv2.TargetType.IP,
             health_check=elbv2.HealthCheck(path="/", healthy_http_codes="200"),
             deregistration_delay=cdk.Duration.seconds(30),
         )
-        load_balancer.add_listener(
+        keycloak_target_group_name = f"{name_prefix}-keycloak"
+        keycloak_targets = elbv2.ApplicationTargetGroup(
+            self,
+            "KeycloakTargets",
+            target_group_name=keycloak_target_group_name,
+            vpc=vpc,
+            port=POD_PORT,
+            protocol=elbv2.ApplicationProtocol.HTTP,
+            target_type=elbv2.TargetType.IP,
+            # Healthy only once the production realm is imported, the first thing every sign-in needs.
+            health_check=elbv2.HealthCheck(
+                path="/auth/realms/smart-tutor/.well-known/openid-configuration", healthy_http_codes="200"
+            ),
+            deregistration_delay=cdk.Duration.seconds(30),
+        )
+        listener = load_balancer.add_listener(
             "Http", port=80, protocol=elbv2.ApplicationProtocol.HTTP, open=False, default_target_groups=[web_targets]
+        )
+        listener.add_target_groups(
+            "Keycloak",
+            priority=10,
+            conditions=[elbv2.ListenerCondition.path_patterns(["/auth/*"])],
+            target_groups=[keycloak_targets],
         )
 
         # No domain means no certificate for the ALB, so the CloudFront → ALB hop is HTTP. It stays on AWS's network
@@ -87,11 +108,14 @@ class EdgeStack(cdk.Stack):
             http_port=80,
             protocol_policy=cloudfront.OriginProtocolPolicy.HTTP_ONLY,
             vpc_origin_name=name_prefix,
+            # The ALB sets X-Forwarded-Proto: http, so Keycloak would mark its session cookies non-Secure. CloudFront
+            # overwrites any viewer-sent Forwarded header, so Keycloak can trust this one (KC_PROXY_HEADERS=forwarded).
+            custom_headers={"Forwarded": "proto=https"},
         )
         distribution = cloudfront.Distribution(
             self,
             "Distribution",
-            comment=f"{name_prefix}: web (later /api, /auth)",
+            comment=f"{name_prefix}: web, /auth (later /api)",
             price_class=cloudfront.PriceClass.PRICE_CLASS_100,
             default_behavior=cloudfront.BehaviorOptions(
                 origin=origin,
@@ -99,8 +123,18 @@ class EdgeStack(cdk.Stack):
                 cache_policy=cloudfront.CachePolicy.USE_ORIGIN_CACHE_CONTROL_HEADERS,  # nginx sets Cache-Control
                 response_headers_policy=cloudfront.ResponseHeadersPolicy.SECURITY_HEADERS,
             ),
+            additional_behaviors={
+                "/auth/*": cloudfront.BehaviorOptions(
+                    origin=origin,
+                    viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                    allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,  # login form POST, admin REST PUT/DELETE
+                    cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
+                    origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+                ),
+            },
         )
 
         cdk.CfnOutput(self, "CloudFrontUrl", value=f"https://{distribution.distribution_domain_name}")
         cdk.CfnOutput(self, "DistributionId", value=distribution.distribution_id)
         cdk.CfnOutput(self, "WebTargetGroupName", value=web_target_group_name)
+        cdk.CfnOutput(self, "KeycloakTargetGroupName", value=keycloak_target_group_name)

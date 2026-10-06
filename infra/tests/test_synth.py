@@ -277,6 +277,74 @@ def test_web_target_group_takes_pod_ips_on_8080() -> None:
     t.has_output("WebTargetGroupName", {"Value": "smart-tutor-prod-web"})
 
 
+def test_keycloak_target_group_takes_auth_paths_on_8080() -> None:
+    t = template(make_app(), "Edge")
+
+    t.has_resource_properties(
+        "AWS::ElasticLoadBalancingV2::TargetGroup",
+        {
+            "Name": "smart-tutor-prod-keycloak",
+            "TargetType": "ip",
+            "Port": 8080,
+            "Protocol": "HTTP",
+            "HealthCheckPath": "/auth/realms/smart-tutor/.well-known/openid-configuration",
+        },
+    )
+    t.has_resource_properties(
+        "AWS::ElasticLoadBalancingV2::ListenerRule",
+        {
+            "Priority": 10,
+            "Conditions": [{"Field": "path-pattern", "PathPatternConfig": {"Values": ["/auth/*"]}}],
+        },
+    )
+    t.has_output("KeycloakTargetGroupName", {"Value": "smart-tutor-prod-keycloak"})
+
+
+def test_cloudfront_sends_auth_to_keycloak_uncached_with_every_method() -> None:
+    t = template(make_app(), "Edge")
+
+    t.has_resource_properties(
+        "AWS::CloudFront::Distribution",
+        {
+            "DistributionConfig": Match.object_like(
+                {
+                    "CacheBehaviors": [
+                        Match.object_like(
+                            {
+                                "PathPattern": "/auth/*",
+                                "ViewerProtocolPolicy": "redirect-to-https",
+                                "AllowedMethods": ["GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"],
+                                "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",  # CachingDisabled
+                                # AllViewerExceptHostHeader: cookies, query strings, and Authorization reach Keycloak
+                                "OriginRequestPolicyId": "b689b0a8-53d0-40ab-baf2-68738e2966ac",
+                            }
+                        )
+                    ],
+                }
+            )
+        },
+    )
+
+
+def test_origin_tells_keycloak_the_viewer_used_https() -> None:
+    t = template(make_app(), "Edge")
+
+    t.has_resource_properties(
+        "AWS::CloudFront::Distribution",
+        {
+            "DistributionConfig": Match.object_like(
+                {
+                    "Origins": [
+                        Match.object_like(
+                            {"OriginCustomHeaders": [{"HeaderName": "Forwarded", "HeaderValue": "proto=https"}]}
+                        )
+                    ]
+                }
+            )
+        },
+    )
+
+
 def test_cloudfront_serves_https_through_a_vpc_origin() -> None:
     t = template(make_app(), "Edge")
 
