@@ -37,9 +37,18 @@ def build_app(app: cdk.App, env_name: str = "prod") -> list[cdk.Stack]:
     )
     # The cluster's access entry names the deploy role by ARN string, so CloudFormation cannot infer the order.
     cluster.add_stack_dependency(deploy)
+    # The cluster security group id makes Data deploy after Cluster; only pods reach the database.
+    data = DataStack(
+        app,
+        f"{prefix}-Data",
+        env=env,
+        vpc=network.vpc,
+        cluster_security_group_id=cluster.cluster_security_group_id,
+        name_prefix=name,
+    )
     stacks: list[cdk.Stack] = [
         network,
-        DataStack(app, f"{prefix}-Data", env=env),
+        data,
         StorageStack(app, f"{prefix}-Storage", env=env),
         cluster,
         RegistryStack(app, f"{prefix}-Registry", env=env),
