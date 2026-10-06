@@ -180,4 +180,4 @@ To roll back, run `helm upgrade` with an earlier commit SHA as the image tag (th
 
 ## Cost
 
-About **$250–300 a month** while idle (EKS control plane, 2 nodes, NAT gateway, RDS, internal load balancer, CloudFront). The budget is **$400 a month**, with email alerts to the owner at 80% of actual and 100% of forecasted spend.
+About **$250–300 a month** while idle (EKS control plane, 2 nodes, NAT gateway, RDS, internal load balancer, CloudFront). During the testing phase the budget is **$20 a month**, with email alerts to the owner at 80% of actual and 100% of forecasted spend. That is below the idle cost, so the alerts fire within days; raise it in `infra/cdk.json` when the pilot starts.
