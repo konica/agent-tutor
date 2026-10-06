@@ -237,8 +237,8 @@
     { id: 'notes', label: 'Notes', icon: 'note', href: '#/notes-active' },
     /* reserved: Quizzes, Reports (R3) */
     { id: 'subjects', label: 'Subjects', icon: 'tag', href: '#/subjects-list' },
-    { id: 'usage', label: 'Usage', icon: 'usage', href: '#/usage-overview' },
-    { id: 'settings', label: 'Settings', icon: 'settings', href: '#/settings-default' }
+    { id: 'usage', label: 'Usage', icon: 'usage', href: '#/usage-overview' }
+    /* Settings removed in v0.5 (PRD Q45) */
   ];
   ST.NAV_LATER = { map: { label: 'Research map', icon: 'map', after: 'library', href: '#/r2-map' }, quizzes: { label: 'Quizzes', icon: 'quiz', after: 'notes', href: '#/r3-quizzes-list' }, reports: { label: 'Reports', icon: 'report', after: 'quizzes', href: '#/r3-reports' } };
 

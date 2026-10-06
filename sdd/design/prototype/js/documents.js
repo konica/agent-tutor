@@ -1,4 +1,4 @@
-/* Smart Tutor v0.5 — documents: sign-in theme, terms, shared list pattern, Library, uploads,
+/* Smart Tutor v0.6 — documents: sign-in theme, shared list pattern, Library, uploads,
    subject picker (§6.4), document details (§6.5), Subjects (§6.9). */
 (function () {
   const ST = window.ST;
@@ -44,42 +44,8 @@
     <div class="kc2-alert" role="status">${ic('info', 'sm')}<span>You need to verify your email address to activate your account.</span></div>
     <p>An email with instructions to verify your email address has been sent to your address mai.nguyen@example.com.</p>
     <p class="kc2-small">Haven't received a verification code in your email? <a href="#/auth-verify-email" data-action="resend">Click here</a> to re-send the email.</p>
-    <p class="review-note kc2-small"><a href="#/terms-first-run">Prototype: continue as if the link in the email was opened →</a></p>`);
+    <p class="review-note kc2-small"><a href="#/library-empty">Prototype: continue as if the link in the email was opened →</a></p>`);
   ST.actions.resend = () => ST.toast('Verification email sent again.');
-
-  ST.T = { accepted: false };
-  const firstRunTop = () => `<header class="fr-top"><span class="brand" style="padding:0">${ST.logo()}<span class="word">Smart Tutor</span></span>
-    <span class="od-row small muted"><span class="avatar" aria-hidden="true">${ST.USER.initials}</span>${esc(ST.USER.name)}</span></header>`;
-  ST.termsView = () => `<div class="first-run">${firstRunTop()}
-    <main class="fr-main" id="main-content" tabindex="-1" style="width:min(760px,100%)">
-      <div><p class="steps">Welcome, ${esc(ST.USER.first)}. One step before your library.</p>
-        <h1>Terms of use</h1>
-        <p class="lede">The short version is below. The full terms of use apply.</p></div>
-      <ul class="terms-list">
-        <li>${ic('lock')}<span><strong>Your documents, conversations and notes are private to you.</strong> Nobody else can see them.</span></li>
-        <li>${ic('tag')}<span><strong>Subject names are shared.</strong> Anyone using Smart Tutor can see the subject names you create, so don't put personal information in them.</span></li>
-        <li>${ic('shield')}<span><strong>Only upload documents you have the right to use</strong>, such as papers you can access or notes you wrote.</span></li>
-        <li>${ic('info')}<span><strong>Answers come only from your documents</strong> and can still contain mistakes. Check the cited page when it matters.</span></li>
-      </ul>
-      <p><button class="btn btn-ghost" type="button" data-action="full-terms" style="padding:0">${ic('doc', 'sm')}Read the full terms of use</button></p>
-      <label class="consent"><input type="checkbox" data-change="terms-accept" ${ST.T.accepted ? 'checked' : ''} data-fk="terms-cb" aria-describedby="terms-help">
-        <span>I confirm I have the right to upload the documents I add to Smart Tutor, and I accept the terms of use.</span></label>
-      <div class="fr-foot">
-        <span class="helper" id="terms-help" aria-live="polite">${ST.T.accepted ? 'Thanks. You can continue.' : 'Accept the terms to continue.'}</span>
-        <button class="btn btn-primary btn-lg" type="button" data-action="go" data-href="#/library-empty" ${ST.T.accepted ? '' : 'disabled'}>Continue${ic('arrowRight', 'sm')}</button>
-      </div>
-    </main></div>`;
-  ST.actions['terms-accept'] = (el) => { ST.T.accepted = el.checked; ST.render(); };
-  ST.actions['full-terms'] = () => ST.openDialog({
-    title: 'Terms of use',
-    wide: true,
-    body: `<p class="small">Version 1.0 · effective 1 October 2026</p>
-      <h3 style="font-size:18px;color:var(--text)">1. Your content</h3><p>You keep all rights to the documents you upload. Smart Tutor processes them only to answer your questions, create your notes and suggest subjects.</p>
-      <h3 style="font-size:18px;color:var(--text)">2. Shared subject names</h3><p>Subject names you create join a shared catalog that other learners can see and choose. Don't include names, contact details or other personal information.</p>
-      <h3 style="font-size:18px;color:var(--text)">3. What you may upload</h3><p>Upload only documents you have the right to use. We may stop processing documents that break these terms.</p>
-      <h3 style="font-size:18px;color:var(--text)">4. Answers</h3><p>Answers are generated from your documents and can contain mistakes. Citations show where each answer came from.</p>`,
-    actions: [{ label: 'Close', cls: 'btn-primary', autofocus: true }]
-  });
 
   /* =========================================================
      Shared list pattern (Library, Conversations, Notes)
@@ -160,7 +126,7 @@
     const processingFirst = S.convs.length ? [] : all.filter((d) => !d.archived && ['uploading', 'processing'].includes(d.state));
     const subjOpts = [];
     all.forEach((d) => d.subjects.forEach((s) => { if (!subjOpts.includes(s)) subjOpts.push(s); }));
-    const uploadBtn = `<button class="btn btn-primary" type="button" data-action="upload" data-fk="upload-btn" ${S.uploadLimit ? 'disabled aria-describedby="limit-msg"' : ''}>${ic('upload', 'sm')}Upload</button>`;
+    const uploadBtn = `<button class="btn btn-primary" type="button" data-action="upload" data-fk="upload-btn" ${S.uploadLimit ? 'disabled aria-describedby="limit-msg upload-rights"' : 'aria-describedby="upload-rights"'}>${ic('upload', 'sm')}Upload</button>`;
     const limit = S.uploadLimit ? `<div class="banner banner-warn" style="margin-bottom:16px" id="limit-msg">${ic('clock')}<div class="b-body"><strong>Upload limit reached.</strong><span>You can upload up to 20 files per hour and 100 per day. You can upload again at 11:40 (${ST.TZ.short}).</span></div></div>` : '';
 
     let body;
@@ -169,7 +135,8 @@
         <span class="dz-icon">${ic('upload', 'lg')}</span>
         <h2>Upload your first document</h2>
         <p>PDFs up to 50 MB and 500 pages. Your documents stay private to you.</p>
-        <button class="btn btn-primary btn-lg" type="button" data-action="upload" data-autofocus data-fk="upload-big">${ic('upload', 'sm')}Choose PDFs</button>
+        <p class="dz-rights" id="dz-rights" data-od-id="upload-rights">${esc(ST.RIGHTS)}</p>
+        <button class="btn btn-primary btn-lg" type="button" data-action="upload" data-autofocus data-fk="upload-big" aria-describedby="dz-rights">${ic('upload', 'sm')}Choose PDFs</button>
         <p class="small">Or drop files anywhere on this page. You can add several at once.</p>
       </div>`;
     } else {
@@ -185,7 +152,7 @@
         <div id="list-panel" role="tabpanel" aria-labelledby="tab-${ST.L.tab}">${list}</div>`;
     }
     return ST.shell({ nav: 'library', content: `<div class="page" style="max-width:1200px">
-      <div class="page-head"><div><h1>Library</h1><p>Your documents. They're private to you, and the tutor answers only from them.</p></div>${all.length ? uploadBtn : ''}</div>
+      <div class="page-head"><div><h1>Library</h1><p>Your documents. They're private to you, and the tutor answers only from them.</p></div>${all.length ? `<div class="upload-area" data-od-id="library-upload-area">${uploadBtn}<p class="upload-rights" id="upload-rights">${esc(ST.RIGHTS)}</p></div>` : ''}</div>
       ${limit}
       ${!S.convs.length && all.some((d) => d.state === 'ready' && !d.archived) && ST.L.tab === 'active' ? `<div class="banner banner-success" style="margin-bottom:16px" role="status">${ic('checkCircle')}<div class="b-body"><strong>Your documents are ready.</strong><span>Ask anything about them. Answers cite the document and page.</span></div>
         <a class="btn btn-primary btn-sm" href="#/chat-new" data-fk="ask-first">${ic('message', 'sm')}Ask a question</a></div>` : ''}
@@ -311,7 +278,7 @@
   const onLibrary = () => ST.current && ST.current.id.startsWith('library');
   const showDrop = (on) => {
     let ov = document.getElementById('drop-ov');
-    if (on && !ov) { ov = document.createElement('div'); ov.id = 'drop-ov'; ov.className = 'drop-overlay'; ov.setAttribute('aria-hidden', 'true'); ov.innerHTML = `<div>${ic('upload', 'lg')}Drop PDFs to upload</div>`; document.body.appendChild(ov); }
+    if (on && !ov) { ov = document.createElement('div'); ov.id = 'drop-ov'; ov.className = 'drop-overlay'; ov.setAttribute('aria-hidden', 'true'); ov.innerHTML = `<div>${ic('upload', 'lg')}Drop PDFs to upload<span class="ov-rights">${esc(ST.RIGHTS)}</span></div>`; document.body.appendChild(ov); }
     if (!on && ov) ov.remove();
   };
   ST.showDrop = showDrop;

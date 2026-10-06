@@ -3,7 +3,7 @@
     "id": "index",
     "group": "Overview",
     "ref": "§5 · review flows",
-    "desc": "Round 4 overview: what changed in v0.5, the four review flows and every state.",
+    "desc": "Round 5 overview: what changed in v0.6, the four review flows and every state.",
     "release": 1,
     "stories": []
   },
@@ -19,7 +19,7 @@
   },
   {
     "id": "auth-sign-up",
-    "group": "Sign in, sign up, terms",
+    "group": "Sign in, sign up",
     "ref": "§6.2 · US-1",
     "desc": "Keycloak registration page: stock keycloak.v2 layout with the Smart Tutor logo, colours, font and name (low-detail reference).",
     "release": 1,
@@ -29,7 +29,7 @@
   },
   {
     "id": "auth-verify-email",
-    "group": "Sign in, sign up, terms",
+    "group": "Sign in, sign up",
     "ref": "§6.2 · US-1",
     "desc": "Keycloak email-verification page: stock keycloak.v2 layout (low-detail reference).",
     "release": 1,
@@ -39,29 +39,9 @@
   },
   {
     "id": "auth-sign-in",
-    "group": "Sign in, sign up, terms",
+    "group": "Sign in, sign up",
     "ref": "§6.2 · US-1",
     "desc": "Keycloak login page: stock keycloak.v2 layout (low-detail reference).",
-    "release": 1,
-    "stories": [
-      "US-1"
-    ]
-  },
-  {
-    "id": "terms-first-run",
-    "group": "Sign in, sign up, terms",
-    "ref": "§6.2 · US-1",
-    "desc": "Terms of use on first sign-in; Continue is disabled until accepted.",
-    "release": 1,
-    "stories": [
-      "US-1"
-    ]
-  },
-  {
-    "id": "terms-accepted",
-    "group": "Sign in, sign up, terms",
-    "ref": "§6.2 · US-1",
-    "desc": "Terms accepted; Continue leads to the empty Library.",
     "release": 1,
     "stories": [
       "US-1"
@@ -71,7 +51,7 @@
     "id": "library-default",
     "group": "Library",
     "ref": "§6.3 · US-2",
-    "desc": "Live Library: the home screen, with the sample documents (where navigation lands).",
+    "desc": "Live Library: the home screen, with the sample documents; the upload-rights line sits under “Upload” (where navigation lands).",
     "release": 1,
     "stories": [
       "US-2"
@@ -81,7 +61,7 @@
     "id": "library-empty",
     "group": "Library",
     "ref": "§6.3 · US-2",
-    "desc": "Empty, first run: “Upload your first document”.",
+    "desc": "Empty, first run: “Upload your first document”, with “Only upload documents you have the right to use.” under it.",
     "release": 1,
     "stories": [
       "US-2"
@@ -91,7 +71,7 @@
     "id": "library-drop-active",
     "group": "Library",
     "ref": "§6.3 · US-2",
-    "desc": "Files dragged over the page: the whole page accepts the drop.",
+    "desc": "Files dragged over the page: the whole page accepts the drop; the upload-rights line shows in the drop target.",
     "release": 1,
     "stories": [
       "US-2"
@@ -849,21 +829,13 @@
   },
   {
     "id": "usage-overview",
-    "group": "Usage & settings",
+    "group": "Usage",
     "ref": "§6.10 · US-9",
     "desc": "Today (the GMT+7 day) and all time; Conversations, Document processing, Background.",
     "release": 1,
     "stories": [
       "US-9"
     ]
-  },
-  {
-    "id": "settings-default",
-    "group": "Usage & settings",
-    "ref": "§6.11 · no user story",
-    "desc": "Time zone “GMT+7 (Ho Chi Minh City)”, read-only; the accepted terms version and date.",
-    "release": 1,
-    "stories": []
   },
   {
     "id": "r2-map",

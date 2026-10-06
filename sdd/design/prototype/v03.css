@@ -304,3 +304,14 @@ html.shot .review-note { display: none; }
 
 /* Programmatic focus on <main> after a route change is for screen readers; it needs no visible ring. */
 main[tabindex="-1"]:focus, main[tabindex="-1"]:focus-visible { outline: none; }
+
+/* v0.5 scope cut (PRD Q45): ids removed this round, listed on the overview */
+.removed-id { display: inline-flex; align-items: center; gap: 6px; }
+.removed-id code { font-family: var(--font-mono); font-size: 13px; color: var(--text-2); }
+
+/* ============ v0.6 additions (brief v0.6, round 5) ============ */
+/* G2 · upload-rights line: plain text, nothing to accept */
+.upload-area { display: grid; justify-items: end; gap: 6px; flex: none; }
+.page-head .upload-rights, .upload-rights { margin: 0; font-size: var(--fs-14); color: var(--text-2); max-width: none; white-space: nowrap; }
+.dz-rights { font-size: var(--fs-14); color: var(--text-2); }
+.drop-overlay .ov-rights { font-family: var(--font-body); font-size: var(--fs-16); font-weight: 500; }

@@ -44,7 +44,6 @@
     </main>
     <footer class="ld-foot" data-od-id="landing-footer">
       <span>© 2026 Smart Tutor</span>
-      <button class="ld-text-link" type="button" data-action="full-terms" data-od-id="landing-footer-terms">Terms of use</button>
     </footer>
   </div>`;
 })();

@@ -1,4 +1,4 @@
-/* Smart Tutor v0.5 — every named state <screen>-<state>@v0.5, plus the four review flows (§5).
+/* Smart Tutor v0.6 — every named state <screen>-<state>@v0.6, plus the four review flows (§5).
    Contract (§11 item 6): window.ST.STATES = [{ id, group, ref, desc }], one user story per ref,
    each state at index.html#/<state-id>, review chrome hidden with ?shot=1.
    "live" states are where the app's own navigation lands: they keep whatever the reviewer did.
@@ -14,7 +14,7 @@
     const src = ST.clone(ST.DOCS.find((d) => d.id === f.from));
     return Object.assign(src, { uploaded: ST.TODAY + 'T11:2' + i, state, suggestions: f.suggestions, subjects: state === 'ready' ? [f.suggestions[0].id] : [], dedup: false, tokens: state === 'ready' ? src.tokens : [5800, 410] });
   });
-  const newUser = (docState) => { fresh(); S.docs = docState ? j1Docs(docState) : []; S.convs = []; S.notes = []; ST.T.accepted = true; };
+  const newUser = (docState) => { fresh(); S.docs = docState ? j1Docs(docState) : []; S.convs = []; S.notes = []; };
 
   const lib = (us, desc, setup, extra = {}) => Object.assign({ group: 'Library', ref: '§6.3 · ' + us, desc, view: ST.libraryView, setup: () => { fresh(); ST.resetList(); if (setup) setup(); } }, extra);
   const pick = (us, desc, open, setup, extra = {}) => Object.assign({ group: 'Choose subjects', ref: '§6.4 · ' + us, desc, view: ST.libraryView, setup: () => { fresh(); ST.resetList(); if (setup) setup(); }, afterEnter: open }, extra);
@@ -23,23 +23,20 @@
   const j2 = (n, o) => { ST.conv('cv1').noteId = null; S.thread = ST.j2Thread(n, Object.assign({ noteId: null }, o || {})); return S.thread; };
 
   const defs = [
-    { id: 'index', group: 'Overview', ref: '§5 · review flows', desc: 'Round 4 overview: what changed in v0.5, the four review flows and every state.', view: ST.indexView, setup: () => { fresh(); } },
+    { id: 'index', group: 'Overview', ref: '§5 · review flows', desc: 'Round 5 overview: what changed in v0.6, the four review flows and every state.', view: ST.indexView, setup: () => { fresh(); } },
 
-    /* §6.2 */
     /* §6.0 */
     { id: 'landing-default', group: 'Landing page', ref: '§6.0 · US-1', desc: 'Public page at /: what Smart Tutor does, how it works, trust points, “Create an account” and “Sign in”. Text only, outside the app shell.', view: ST.landingView, setup: () => { ST.noTray = true; } },
 
     /* §6.2 */
-    { id: 'auth-sign-up', group: 'Sign in, sign up, terms', ref: '§6.2 · US-1', desc: 'Keycloak registration page: stock keycloak.v2 layout with the Smart Tutor logo, colours, font and name (low-detail reference).', view: ST.authSignUp },
-    { id: 'auth-verify-email', group: 'Sign in, sign up, terms', ref: '§6.2 · US-1', desc: 'Keycloak email-verification page: stock keycloak.v2 layout (low-detail reference).', view: ST.authVerify },
-    { id: 'auth-sign-in', group: 'Sign in, sign up, terms', ref: '§6.2 · US-1', desc: 'Keycloak login page: stock keycloak.v2 layout (low-detail reference).', view: ST.authSignIn },
-    { id: 'terms-first-run', group: 'Sign in, sign up, terms', ref: '§6.2 · US-1', desc: 'Terms of use on first sign-in; Continue is disabled until accepted.', view: ST.termsView, setup: () => { ST.T.accepted = false; } },
-    { id: 'terms-accepted', group: 'Sign in, sign up, terms', ref: '§6.2 · US-1', desc: 'Terms accepted; Continue leads to the empty Library.', view: ST.termsView, setup: () => { ST.T.accepted = true; } },
+    { id: 'auth-sign-up', group: 'Sign in, sign up', ref: '§6.2 · US-1', desc: 'Keycloak registration page: stock keycloak.v2 layout with the Smart Tutor logo, colours, font and name (low-detail reference).', view: ST.authSignUp },
+    { id: 'auth-verify-email', group: 'Sign in, sign up', ref: '§6.2 · US-1', desc: 'Keycloak email-verification page: stock keycloak.v2 layout (low-detail reference).', view: ST.authVerify },
+    { id: 'auth-sign-in', group: 'Sign in, sign up', ref: '§6.2 · US-1', desc: 'Keycloak login page: stock keycloak.v2 layout (low-detail reference).', view: ST.authSignIn },
 
     /* §6.3 */
-    lib('US-2', 'Live Library: the home screen, with the sample documents (where navigation lands).', null, { id: 'library-default', live: true, setup: () => { if (!ST.keepListFilters) ST.resetList(); ST.keepListFilters = false; } }),
-    lib('US-2', 'Empty, first run: “Upload your first document”.', () => { newUser(null); }, { id: 'library-empty' }),
-    lib('US-2', 'Files dragged over the page: the whole page accepts the drop.', () => { newUser(null); }, { id: 'library-drop-active', afterEnter: () => ST.showDrop(true) }),
+    lib('US-2', 'Live Library: the home screen, with the sample documents; the upload-rights line sits under “Upload” (where navigation lands).', null, { id: 'library-default', live: true, setup: () => { if (!ST.keepListFilters) ST.resetList(); ST.keepListFilters = false; } }),
+    lib('US-2', 'Empty, first run: “Upload your first document”, with “Only upload documents you have the right to use.” under it.', () => { newUser(null); }, { id: 'library-empty' }),
+    lib('US-2', 'Files dragged over the page: the whole page accepts the drop; the upload-rights line shows in the drop target.', () => { newUser(null); }, { id: 'library-drop-active', afterEnter: () => ST.showDrop(true) }),
     lib('US-2', 'Three PDFs uploading, each with a progress bar in the tray.', () => { newUser(null); }, { id: 'library-uploading', afterEnter: () => ST.simulateDrop() }),
     lib('US-2', 'Processing: titles appear first; no “Choose subjects” until processing finishes.', () => {
       newUser('processing'); S.tray = ST.J1_FILES.map((f, i) => ({ id: 'tp' + i, name: f.file, size: f.size, status: 'done', progress: 100, docId: f.from }));
@@ -181,9 +178,9 @@
     { id: 'subjects-rename-duplicate', group: 'Subjects', ref: '§6.9 · US-10b', desc: 'Rename clashes with another of the learner\'s own subject names (a shared name she doesn\'t have is allowed, D6).', setup: () => { fresh(); ST.SB = { editing: 'rag', draft: 'AI Agents' }; }, view: ST.subjectsView },
     { id: 'subjects-rename-rejected', group: 'Subjects', ref: '§6.9 · US-10b', desc: 'Same naming checks as the picker: personal information is rejected.', setup: () => { fresh(); ST.SB = { editing: 'rag', draft: 'Mai thesis chapter 2' }; }, view: ST.subjectsView },
 
-    /* §6.10–6.11 */
-    { id: 'usage-overview', live: true, group: 'Usage & settings', ref: '§6.10 · US-9', desc: 'Today (the GMT+7 day) and all time; Conversations, Document processing, Background.', setup: () => { ST.U = { key: 'last', dir: 'desc' }; }, view: ST.usageView },
-    { id: 'settings-default', live: true, group: 'Usage & settings', ref: '§6.11 · no user story', desc: 'Time zone “GMT+7 (Ho Chi Minh City)”, read-only; the accepted terms version and date.', view: ST.settingsView },
+    /* §6.10 */
+    { id: 'usage-overview', live: true, group: 'Usage', ref: '§6.10 · US-9', desc: 'Today (the GMT+7 day) and all time; Conversations, Document processing, Background.', setup: () => { ST.U = { key: 'last', dir: 'desc' }; }, view: ST.usageView },
+
 
     /* §7 */
     { id: 'r2-map', group: 'R2 research map (wireframes)', ref: '§7 · US-19', desc: 'Subject selector, timeline by year, citation links, works without a year.', release: 2, setup: () => { fresh(); ST.R2.subject = 'agents'; }, view: ST.r2Map },
@@ -221,11 +218,10 @@
 
   /* §5 review flows */
   ST.FLOWS = [
-    { id: 'J1', title: 'First run', summary: 'From the landing page, sign up, accept terms, upload 3 PDFs, accept subjects, get a first cited answer.', steps: [
+    { id: 'J1', title: 'First run', summary: 'From the landing page, sign up, land on the empty Library, upload 3 PDFs, accept subjects, get a first cited answer.', steps: [
       { state: 'landing-default', text: 'Landing page: “Create an account”' },
       { state: 'auth-sign-up', text: 'Sign up on the Keycloak page' },
       { state: 'auth-verify-email', text: 'Verify the email address' },
-      { state: 'terms-first-run', text: 'Accept the terms of use' },
       { state: 'library-empty', text: 'Land on the empty Library' },
       { state: 'library-uploading', text: 'Drop 3 PDFs: progress in the upload tray' },
       { state: 'library-first-processing', text: 'Watch processing: titles first, subjects later' },

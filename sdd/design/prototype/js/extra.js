@@ -1,4 +1,4 @@
-/* Smart Tutor v0.5 — overview with what changed and the flows, R2 research map and R3 learning loop
+/* Smart Tutor v0.6 — overview with what changed and the flows, R2 research map and R3 learning loop
    wireframes, components page (§10), decisions and questions for the brief owner (§11.5). */
 (function () {
   const ST = window.ST;
@@ -8,14 +8,14 @@
   /* =========================================================
      Overview
      ========================================================= */
-  /* §0 What changed in v0.5: change → states redone in this round. */
+  /* §0 What changed in v0.6: [source, change, states redone, states removed]. */
   ST.CHANGES = [
-    ['§6.0', 'New public landing page at /, text only', ['landing-default']],
-    ['§6.2', 'Keycloak pages use the stock keycloak.v2 layout', ['auth-sign-up', 'auth-sign-in', 'auth-verify-email']],
-    ['§5, §6.1', 'J1 starts on the landing page; sign-out returns to it', ['landing-default']],
-    ['E1, E2', 'Sample data fixes (already in the v0.4 prototype)', []]
+    ['G2', 'Upload-rights line in the Library upload area', ['library-empty', 'library-default', 'library-drop-active', 'components'], []],
+    ['G1, G4', 'J1 starts on the landing page; sign-out returns to it', ['landing-default'], []],
+    ['Q46', 'Landing page (no terms link) and stock Keycloak pages, kept from round 4', ['landing-default', 'auth-sign-up', 'auth-sign-in', 'auth-verify-email'], []],
+    ['Q45', 'No terms of use step, no Settings page: stay removed', [], ['terms-first-run', 'terms-accepted', 'settings-default']]
   ];
-  ST.NEW_IDS = ['landing-default'];
+  ST.NEW_IDS = [];
   const changed = () => { const set = new Set(); ST.CHANGES.forEach((c) => c[2].forEach((id) => set.add(id))); return set; };
   ST.indexView = () => {
     const groups = [];
@@ -24,24 +24,24 @@
     return `<main class="index-page" id="main-content" tabindex="-1">
       <section class="index-hero">
         <div><span class="brand" style="padding:0 0 24px">${ST.logo('logo', 'Smart Tutor logo')}<span class="word">Smart Tutor</span></span>
-          <h1>Round 4: a public front door</h1>
-          <p>Brief v0.5 adds a text-only landing page at <code class="mono">/</code> and reduces the Keycloak pages to their stock layout with our logo and colours. J1 now starts on the landing page, and signing out returns to it. Everything else is the v0.4 design. Review the changed states first, then walk the four flows. Every state is labelled <code class="mono">&lt;screen&gt;-&lt;state&gt;@v0.4</code> and opens at <code class="mono">index.html#/&lt;state-id&gt;</code>; add <code class="mono">?shot=1</code> to hide this review chrome.</p>
+          <h1>Round 5: one brief again</h1>
+          <p>Brief v0.6 joins the two v0.5 versions: the text-only landing page and stock Keycloak pages stay, the terms step and Settings stay removed, and J1 starts on the landing page again. New this round: the Library's upload area says “Only upload documents you have the right to use.” Everything else is the round 4 design. Review the changed states first, then walk the four flows. Every state is labelled <code class="mono">&lt;screen&gt;-&lt;state&gt;@v0.4</code> and opens at <code class="mono">index.html#/&lt;state-id&gt;</code>; add <code class="mono">?shot=1</code> to hide this review chrome.</p>
           <div class="od-cluster" style="margin-top:24px;--od-gap:12px">
             <button class="btn btn-primary btn-lg" type="button" data-action="start-flow" data-flow="J1">Start with J1 · First run${ic('arrowRight', 'sm')}</button>
             <a class="btn btn-secondary btn-lg" href="#/library-default">Open the Library</a>
             <a class="btn btn-ghost btn-lg" href="#/brief-questions">Questions for the brief</a>
           </div></div>
         <dl class="meta">
-          <div><dt>Brief</dt><dd>v0.5 · PRD v2.14</dd></div><div><dt>Owner</dt><dd>Thao Dinh</dd></div><div><dt>Date</dt><dd>6 Oct 2026</dd></div>
+          <div><dt>Brief</dt><dd>v0.6 · PRD v2.15</dd></div><div><dt>Owner</dt><dd>Thao Dinh</dd></div><div><dt>Date</dt><dd>6 Oct 2026</dd></div>
           <div><dt>Screens</dt><dd>Laptop, 1280–1920 px</dd></div><div><dt>Themes</dt><dd>Light and dark</dd></div><div><dt>States</dt><dd>${ST.STATES.length - 1}</dd></div>
           <div><dt>Round 1</dt><dd><a href="v0.2/index.html">v0.2 prototype</a></dd></div>
         </dl>
       </section>
 
-      <h2 class="section-title">What changed in v0.5</h2>
+      <h2 class="section-title">What changed in v0.6</h2>
       <div class="changes" role="table" aria-label="Decisions and the states they changed">
-        ${ST.CHANGES.map(([id, title, states]) => `<div class="change-row" role="row"><span class="qid" role="cell">${esc(id)}</span><span class="change-title" role="cell">${esc(title)}</span>
-          <span class="change-states" role="cell">${states.length ? '' : '<span class="small muted">No state changes</span>'}${states.map((sid) => `<a href="#/${sid}"><code>${sid}</code>${ST.NEW_IDS.includes(sid) ? '<span class="badge badge-note">New</span>' : ''}</a>`).join('')}</span></div>`).join('')}
+        ${ST.CHANGES.map(([id, title, states, removed]) => `<div class="change-row" role="row"><span class="qid" role="cell">${esc(id)}</span><span class="change-title" role="cell">${esc(title)}</span>
+          <span class="change-states" role="cell">${states.length ? '' : '<span class="small muted">No state changes</span>'}${states.map((sid) => `<a href="#/${sid}"><code>${sid}</code>${ST.NEW_IDS.includes(sid) ? '<span class="badge badge-note">New</span>' : ''}</a>`).join('')}${(removed || []).map((sid) => `<span class="removed-id"><del><code>${sid}</code></del><span class="badge badge-archived">Removed</span></span>`).join('')}</span></div>`).join('')}
         <div class="change-row" role="row"><span class="qid" role="cell">§11.6</span><span class="change-title" role="cell">Prototype contract</span><span class="change-states" role="cell"><span class="small muted">Every state: one user story in <code class="mono">ref</code>, <code class="mono">?shot=1</code> hides the review bar.</span></span></div>
       </div>
 
@@ -62,7 +62,7 @@
       <h2 class="section-title">All states</h2>
       <div class="index-groups">${groups.map((g) => `<section class="index-group ${g.items.length > 12 ? 'span2' : ''}" aria-labelledby="g-${g.items[0].id}">
         <h2 id="g-${g.items[0].id}">${esc(g.name)}<span class="ig-ref">${esc(g.ref)}</span></h2>
-        <ul>${g.items.map((s) => `<li><a href="#/${s.id}"><code>${s.id}@${ST.BRIEF}</code>${ST.NEW_IDS.includes(s.id) ? '<span class="badge badge-note">New in v0.5</span>' : ch.has(s.id) ? '<span class="badge">Changed in v0.5</span>' : ''}<span>${esc(s.desc)}</span></a></li>`).join('')}</ul></section>`).join('')}</div>
+        <ul>${g.items.map((s) => `<li><a href="#/${s.id}"><code>${s.id}@${ST.BRIEF}</code>${ST.NEW_IDS.includes(s.id) ? '<span class="badge badge-note">New in v0.6</span>' : ch.has(s.id) ? '<span class="badge">Changed in v0.6</span>' : ''}<span>${esc(s.desc)}</span></a></li>`).join('')}</ul></section>`).join('')}</div>
     </main>`;
   };
   ST.actions['start-flow-at'] = (el, e) => { ST.flow = el.dataset.flow; try { sessionStorage.setItem('st3_flow', ST.flow); } catch (x) {} };
@@ -191,7 +191,7 @@
   ST.componentsView = () => {
     const d = { id: 'dx', title: 'Toolformer: Language Models Can Teach Themselves to Use Tools', authors: 'Schick et al.', year: 2023, state: 'choose', subjects: [], attempts: 0 };
     return `<main class="index-page" id="main-content" tabindex="-1">
-    <div class="page-head" style="margin-bottom:48px"><div><h1 style="font-size:48px">Components</h1><p>The reusable set for v0.5. Tokens live once in <code class="mono">styles.css</code> and <code class="mono">v03.css</code>, for light and dark.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
+    <div class="page-head" style="margin-bottom:48px"><div><h1 style="font-size:48px">Components</h1><p>The reusable set for v0.6. Tokens live once in <code class="mono">styles.css</code> and <code class="mono">v03.css</code>, for light and dark.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
 
     <section class="cmp-section"><h2>Tokens</h2><p>The round 1 palette, plus an attention colour for “needs action” and one hue per subject. Chip text always uses the main text colour, so contrast holds whatever the hue.</p>
       <div class="cmp-grid">${tokenGrid('light')}${tokenGrid('dark')}</div></section>
@@ -201,7 +201,7 @@
         <li><span class="nav-link" aria-current="page">${ic('library')}<span>Library</span><span class="nav-count">2</span></span></li>
         <li><span class="nav-link">${ic('message')}<span>Chat</span></span></li><li><span class="nav-link">${ic('list')}<span>Conversations</span></span></li>
         <li><span class="nav-link">${ic('note')}<span>Notes</span></span></li><li><span class="nav-link">${ic('tag')}<span>Subjects</span></span></li>
-        <li><span class="nav-link">${ic('usage')}<span>Usage</span></span></li><li><span class="nav-link">${ic('settings')}<span>Settings</span></span></li></ul>`)}
+        <li><span class="nav-link">${ic('usage')}<span>Usage</span></span></li></ul>`)}
       ${spec('status line', `<div class="status-line" style="margin:0;max-width:none"><span class="tokens mono">Tokens: 12,480 in · 3,215 out</span><span>Enter to send · Shift + Enter for a new line</span></div>
         <p class="input-hint">${ic('clock', 'sm')}2 documents are still processing and can't be used yet.</p>`)}</div></section>
 
@@ -225,7 +225,9 @@
 
     <section class="cmp-section"><h2>Uploading</h2><p>A page-wide drop zone with a keyboard-accessible Upload button, and a tray that stays put while you keep working.</p>
       <div class="cmp-grid">
-        ${spec('drop zone', `<div class="dropzone" style="padding:32px"><span class="dz-icon">${ic('upload', 'lg')}</span><h2 style="font-size:24px">Upload your first document</h2><p>PDFs up to 50 MB and 500 pages. Your documents stay private to you.</p><button class="btn btn-primary" type="button">${ic('upload', 'sm')}Choose PDFs</button></div>`)}
+        ${spec('drop zone', `<div class="dropzone" style="padding:32px"><span class="dz-icon">${ic('upload', 'lg')}</span><h2 style="font-size:24px">Upload your first document</h2><p>PDFs up to 50 MB and 500 pages. Your documents stay private to you.</p><p class="dz-rights">${esc(ST.RIGHTS)}</p><button class="btn btn-primary" type="button">${ic('upload', 'sm')}Choose PDFs</button></div>
+          <div class="upload-area" style="margin-top:16px"><button class="btn btn-primary" type="button">${ic('upload', 'sm')}Upload</button><p class="upload-rights">${esc(ST.RIGHTS)}</p></div>
+          <p class="small muted">First-run drop zone, and the page header's Upload with the same line (G2). A plain line: no checkbox, nothing to accept.</p>`)}
         ${spec('upload tray items', `<section class="tray" style="position:static;width:auto;animation:none"><div class="tray-head"><strong>Uploading 1 file…</strong></div><ul class="tray-list">
           <li class="tray-item"><span class="ti-icon">${ic('doc')}</span><div class="od-stack" style="--od-gap:0"><span class="ti-name">lewis-rag-2020.pdf</span><span class="ti-status">Uploading · 0.9 MB</span><div class="bar"><span style="transform:scaleX(.6)"></span></div></div></li>
           <li class="tray-item ok"><span class="ti-icon">${ic('checkCircle')}</span><div class="od-stack" style="--od-gap:0"><span class="ti-name">react-yao-2022.pdf</span><span class="ti-status">Uploaded · processing</span></div></li>
@@ -269,32 +271,30 @@
      Brief v0.5 decisions and questions
      ========================================================= */
   const DECISIONS = [
-    ['§6.0', 'A public landing page at /', 'Text only, outside the app shell, copy from §9 verbatim. “Create an account” opens registration, “Sign in” the login page. Signed-in visitors see the same page.', ['landing-default']],
-    ['§6.2', 'Keycloak keeps its stock layout', 'keycloak.v2 layout, fields and messages; only the logo, accent and background colours, font and display name change. Shown as low-detail references.', ['auth-sign-up', 'auth-sign-in', 'auth-verify-email']],
-    ['§5, §6.1', 'J1 starts on the landing page', 'The flow opens on landing-default; “Sign out” in the user menu returns there.', ['landing-default']],
-    ['E1', 'Scanned-PDF reason in §9', '“No text layer (scanned PDFs are not supported yet)” for lecture-03-scan.pdf.', ['library-failed', 'details-failed']],
-    ['E2', 'No subject while processing', 'Agentic Design Patterns shows “Not chosen yet” while it is processing.', ['library-default', 'details-processing']],
-    ['E9', 'User stories per state', 'Corrected against the PRD by the owner; every ref kept as is.', []]
+    ['G1', 'One brief, v0.6', 'Landing page, stock Keycloak pages and J1 on the landing page are kept; the terms step and Settings stay removed.', ['landing-default', 'auth-sign-up']],
+    ['G2', 'Upload-rights line', '“Only upload documents you have the right to use.” under the first-run drop zone, under the page header\'s Upload in every Library state, in the drop target while files are dragged, and on the components page. No checkbox.', ['library-empty', 'library-default', 'library-drop-active', 'components']],
+    ['G3', 'Theme and citations default', 'Noted; nothing changed.', []],
+    ['G4', 'Sign-out', 'Returns to the landing page.', ['landing-default']]
   ];
   const QUESTIONS = [
-    ['E4', 'Open', 'When can the “another subject” decline happen?', 'With fewer than 3 subjects the conversation grows; at 3, a fourth subject is refused (J3).', 'Shown when the conversation\'s documents had nothing and another of the learner\'s subjects does. Confirm the trigger, or drop chat-decline-other-subject.'],
-    ['E6', 'Open', 'The declined question is not kept after “Upload a document”', 'The new document needs processing and subjects before it can answer.', 'Keep as is (ask again later), or remember the question and offer “Ask again” when the document is ready.'],
-    ['E7', 'Open', 'Subjects added to an archived document', 'They don\'t appear in Subjects or as chat subjects until the document is restored.', 'Keep it that way; the picker already says so.'],
-    ['E8', 'Open', 'When do the daily limits reset?', '100 uploads and 500 messages per day.', 'Midnight GMT+7, shown as “You can send again at 00:00 (GMT+7)”.'],
-    ['E3', 'Open', 'Which decline id is which', 'chat-decline is the no-subject case; chat-decline-other-subject is the other.', 'Keep, unless you want them swapped.'],
+    ['H1', 'Question', 'Upload-rights line next to a disabled Upload', 'When the upload limit is reached (library-rate-limited) the line still shows under the disabled button.', 'Keep it: it describes the upload area, not the action.'],
+    ['H2', 'Proposal', 'The line repeats in the empty state of an empty Active tab', 'If every document is archived, the Active tab\'s empty state offers Upload again while the header already shows the line.', 'Keep the line only in the header there, as built.'],
+    ['E4', 'Open', 'When can the “another subject” decline happen?', 'With fewer than 3 subjects the conversation grows; at 3, a fourth subject is refused (J3).', 'Confirm the trigger, or drop chat-decline-other-subject.'],
+    ['E6', 'Open', 'The declined question is not kept after “Upload a document”', 'The new document needs processing and subjects first.', 'Keep as is, or offer “Ask again” when the document is ready.'],
+    ['E7', 'Open', 'Subjects added to an archived document', 'They don\'t appear in Subjects until the document is restored.', 'Keep it that way.'],
+    ['E8', 'Open', 'When do the daily limits reset?', '100 uploads and 500 messages per day.', 'Midnight GMT+7: “You can send again at 00:00 (GMT+7)”.'],
+    ['E3', 'Open', 'Which decline id is which', 'chat-decline is the no-subject case; chat-decline-other-subject the other.', 'Keep, unless you want them swapped.'],
     ['E5', 'Proposal', 'Chat hint counts documents waiting for subjects as “processing”', 'Under Q7 they have finished processing but can\'t be used yet.', '“2 documents can\'t be used yet: 1 is processing, 1 needs subjects.”'],
     ['E10', 'Open', 'A separate state for D6', 'Renaming to a shared name the learner doesn\'t have shows no message.', 'No separate state unless you want one.'],
-    ['F1', 'Proposal', 'Stock registration asks for a username', 'keycloak.v2 shows Username, Email, First name and Last name unless the realm uses email as username.', 'Turn on “Email as username” in the realm. It is configuration, not theming, and removes one field.'],
-    ['F2', 'Question', '“Sign in” for a visitor who is already signed in', 'The page is the same for signed-in visitors, so the header and hero still say “Sign in” and go straight to the Library.', 'Keep it (as the brief says), or label it “Open your Library” when a session exists.'],
-    ['F3', 'Question', 'Where does “Terms of use” in the landing footer go?', 'Visitors aren\'t signed in, but the terms live in the app.', 'In the prototype it opens the same terms (version 1.0) as in Settings. In the product, a public /terms page with the same text.'],
-    ['F4', 'Question', 'Remember me and Forgot Password? on the login page', 'Both are stock and controlled by realm settings, not the theme.', 'Keep both on for the pilot.'],
-    ['Q4–Q8', 'Defaults kept', 'Still open in §12', 'Q4 the citations switch also covers notes · Q5 several files at once · Q6 terms in the app · Q8 first suggestion pre-selected.', 'All shown as designed.']
+    ['F1', 'Proposal', 'Stock registration asks for a username', 'keycloak.v2 shows a Username field unless the realm uses email as username.', 'Turn on “Email as username” in the realm.'],
+    ['F2', 'Question', '“Sign in” for a visitor who is already signed in', 'The landing page is the same for signed-in visitors.', 'Keep it, or label it “Open your Library” when a session exists.'],
+    ['Q4, Q5, Q8', 'Defaults kept', 'Still open in §12', 'Q4 the citations switch also covers notes · Q5 several files at once · Q8 first suggestion pre-selected.', 'All shown as designed.']
   ];
   ST.questionsView = () => `<main class="index-page" id="main-content" tabindex="-1">
-    <div class="page-head" style="margin-bottom:32px"><div><h1 style="font-size:48px">Decisions &amp; questions</h1><p>For brief v0.5, round 4. First what this round applied, then the questions still open from round 3 and new ones for the next version.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
-    <h2 class="section-title" style="margin-top:0">Applied in v0.5</h2>
+    <div class="page-head" style="margin-bottom:32px"><div><h1 style="font-size:48px">Decisions &amp; questions</h1><p>For brief v0.6, round 5. First the owner's answers to G1–G4 and where they are applied, then open questions: the new ones first, then those still open from rounds 3 and 4.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
+    <h2 class="section-title" style="margin-top:0">Answered and applied in v0.6</h2>
     <ol class="qa-list">${DECISIONS.map(([id, title, what, states]) => `<li class="qa-item"><span class="qid">${esc(id)}</span>
-      <div><h3>${esc(title)}</h3><p>${esc(what)}</p><p class="proposal"><strong>Applied in:</strong> ${states.length ? '' : 'sample data and state metadata only'}${states.map((sid) => `<a href="#/${sid}"><code class="mono">${sid}</code></a>`).join(', ')}</p></div>
+      <div><h3>${esc(title)}</h3><p>${esc(what)}</p><p class="proposal"><strong>Applied in:</strong> ${states.length ? '' : 'nothing to change'}${states.map((sid) => `<a href="#/${sid}"><code class="mono">${sid}</code></a>`).join(', ')}</p></div>
       <span class="badge qtype badge-ready-q">${ic('check')}Applied</span></li>`).join('')}</ol>
     <h2 class="section-title" style="margin-top:48px">Open questions and proposals</h2>
     <ol class="qa-list">${QUESTIONS.map(([id, type, title, ctx, prop]) => `<li class="qa-item"><span class="qid">${esc(id)}</span>
