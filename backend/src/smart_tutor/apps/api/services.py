@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from smart_tutor.knowledge.adapters.s3_object_store import S3ObjectStore
 from smart_tutor.knowledge.adapters.sql_library import SqlLibraryUnitOfWork
-from smart_tutor.knowledge.application import DocumentService, UploadService, load_file_limits
+from smart_tutor.knowledge.application import DocumentService, UploadService, load_file_limits, load_max_attempts
 from smart_tutor.shared.adapters.aws.clients import s3_client, ssm_client
 from smart_tutor.shared.adapters.aws.ssm_parameters import SsmParameterStore
 from smart_tutor.shared.adapters.clock import SystemClock
@@ -28,11 +28,11 @@ def build_services(settings: Settings) -> ApiServices:
         return SqlLibraryUnitOfWork(engine)
 
     objects = S3ObjectStore(s3_client(settings), settings.documents_bucket)
-    limits = load_file_limits(
-        SsmParameterStore(ssm_client(settings)), settings.max_upload_mb_param, settings.max_pages_param
-    )
+    params = SsmParameterStore(ssm_client(settings))
+    limits = load_file_limits(params, settings.max_upload_mb_param, settings.max_pages_param)
+    max_attempts = load_max_attempts(params, settings.max_processing_attempts_param)
     return ApiServices(
         uploads=UploadService(library, objects, SystemClock(), limits),
-        documents=DocumentService(library),
+        documents=DocumentService(library, max_attempts),
         subjects=SubjectNames(SqlSubjectRepository(engine)),
     )

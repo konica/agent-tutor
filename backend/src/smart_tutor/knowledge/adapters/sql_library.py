@@ -65,6 +65,7 @@ def _document(row: Any, subject_ids: list[SubjectId]) -> Document:
         failure_reason=row.failure_reason,
         title_override=row.title_override,
         content_title=getattr(row, "content_title", None),  # only listings join contents (FOR UPDATE can't)
+        content_attempts=getattr(row, "content_attempts", None),
         subject_ids=subject_ids,
     )
 
@@ -109,6 +110,7 @@ class _Contents(ContentRepository):
             .where(contents.c.content_id == content.content_id)
             .values(
                 state=content.state.value,
+                attempts=content.attempts,
                 failure_reason=content.failure_reason,
                 pages=content.pages,
                 text_key=content.text_key,
@@ -169,9 +171,28 @@ class _Documents(DocumentRepository):
         ).all()
         return self._load(list(rows))
 
+    def get_for_update(self, document_id: DocumentId) -> Document | None:
+        row = self._conn.execute(
+            select(documents).where(documents.c.document_id == document_id).with_for_update()
+        ).first()
+        return self._load([row])[0] if row else None
+
+    def list_failed_for_content_for_update(self, content_id: ContentId) -> list[Document]:
+        rows = self._conn.execute(
+            select(documents)
+            .where(documents.c.content_id == content_id, documents.c.state == DocumentState.FAILED.value)
+            .order_by(documents.c.document_id)  # a stable lock order
+            .with_for_update()
+        ).all()
+        return self._load(list(rows))
+
     def list_readable_by(self, user_id: UserId) -> list[Document]:
         rows = self._conn.execute(
-            select(documents, contents.c.title.label("content_title"))
+            select(
+                documents,
+                contents.c.title.label("content_title"),
+                contents.c.attempts.label("content_attempts"),
+            )
             .select_from(documents.outerjoin(contents, documents.c.content_id == contents.c.content_id))
             .where(readable_by(user_id), documents.c.archived.is_(False))
             .order_by(documents.c.created_at.desc(), documents.c.document_id)

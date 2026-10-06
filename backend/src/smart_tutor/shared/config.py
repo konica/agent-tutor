@@ -67,6 +67,8 @@ class Settings(BaseSettings):
     # File limits (PRD §11), read once at startup by the API (presigned POST, GET /uploads/limits) and the worker.
     max_upload_mb_param: str = "/smart-tutor/max-upload-mb"
     max_pages_param: str = "/smart-tutor/max-pages"
+    # Processing attempts per content (PRD §9.5), read once at startup by the API.
+    max_processing_attempts_param: str = "/smart-tutor/max-processing-attempts"
     rate_limit_per_minute: int = 20
     models: ModelsConfig = ModelsConfig()
     chunking: ChunkingConfig = ChunkingConfig()

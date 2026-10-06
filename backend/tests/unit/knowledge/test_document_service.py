@@ -13,9 +13,9 @@ def test_lists_only_the_callers_documents_newest_first() -> None:
     uploads.start_upload(UserId("ada"), "second.pdf")
     uploads.start_upload(UserId("bob"), "bobs.pdf")
 
-    docs = DocumentService(library.unit_of_work).list_documents(UserId("ada"))
+    docs = DocumentService(library.unit_of_work, max_attempts=3).list_documents(UserId("ada"))
 
     assert [d.title for d in docs] == ["second.pdf", "first.pdf"]
     assert {d.state for d in docs} == {"processing"}
     assert all(d.failure_reason is None for d in docs)
-    assert DocumentService(library.unit_of_work).list_documents(UserId("carol")) == []
+    assert DocumentService(library.unit_of_work, max_attempts=3).list_documents(UserId("carol")) == []

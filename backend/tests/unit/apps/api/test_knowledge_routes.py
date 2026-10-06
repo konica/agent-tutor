@@ -28,7 +28,7 @@ def client() -> TestClient:
     library, objects = InMemoryLibrary(), FakeObjectStore()
     services = ApiServices(
         uploads=UploadService(library.unit_of_work, objects, FixedClock(), TEST_LIMITS),
-        documents=DocumentService(library.unit_of_work),
+        documents=DocumentService(library.unit_of_work, max_attempts=3),
         subjects=SubjectNames(InMemorySubjects()),
     )
     app = create_app(Settings(), verifier=verifier, services=services)

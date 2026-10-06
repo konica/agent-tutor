@@ -16,7 +16,7 @@ from smart_tutor.knowledge.ports.library import (
     UploadRepository,
 )
 from smart_tutor.knowledge.ports.object_store import ObjectNotFoundError, ObjectStore, PresignedPost
-from smart_tutor.shared.domain.ids import ContentId, UploadId, UserId
+from smart_tutor.shared.domain.ids import ContentId, DocumentId, UploadId, UserId
 
 
 class _State:
@@ -31,14 +31,15 @@ class InMemoryLibrary:
     def __init__(self) -> None:
         self.state = _State()
         self.commits = 0
+        self.locked_contents: list[str] = []  # ids read with get_for_update, in order
 
     def unit_of_work(self) -> "FakeLibraryUnitOfWork":
         return FakeLibraryUnitOfWork(self)
 
 
 class _Contents(ContentRepository):
-    def __init__(self, state: _State) -> None:
-        self._s = state
+    def __init__(self, state: _State, library: InMemoryLibrary) -> None:
+        self._s, self._library = state, library
 
     def insert_or_get(self, content: Content) -> tuple[Content, bool]:
         for existing in self._s.contents.values():
@@ -52,6 +53,7 @@ class _Contents(ContentRepository):
         return copy.deepcopy(found) if found else None
 
     def get_for_update(self, content_id: ContentId) -> Content | None:
+        self._library.locked_contents.append(content_id)
         return self.get(content_id)
 
     def save(self, content: Content) -> None:
@@ -79,6 +81,17 @@ class _Documents(DocumentRepository):
             raise AssertionError("unique (owner_id, content_id) violated")
         self._s.documents[document.document_id] = copy.deepcopy(document)
 
+    def get_for_update(self, document_id: DocumentId) -> Document | None:
+        found = self._s.documents.get(document_id)
+        return copy.deepcopy(found) if found else None
+
+    def list_failed_for_content_for_update(self, content_id: ContentId) -> list[Document]:
+        return [
+            copy.deepcopy(d)
+            for d in self._s.documents.values()
+            if d.content_id == content_id and d.state is DocumentState.FAILED
+        ]
+
     def list_processing_for_content_for_update(self, content_id: ContentId) -> list[Document]:
         return [
             copy.deepcopy(d)
@@ -91,6 +104,7 @@ class _Documents(DocumentRepository):
         for d in mine:
             content = self._s.contents.get(d.content_id) if d.content_id is not None else None
             d.content_title = content.title if content else None
+            d.content_attempts = content.attempts if content else None
         return sorted(mine, key=lambda d: d.created_at, reverse=True)
 
 
@@ -118,7 +132,7 @@ class FakeLibraryUnitOfWork(LibraryUnitOfWork):
     def __init__(self, library: InMemoryLibrary) -> None:
         self._library = library
         self._staged = copy.deepcopy(library.state)
-        self.contents = _Contents(self._staged)
+        self.contents = _Contents(self._staged, library)
         self.documents = _Documents(self._staged)
         self.uploads = _Uploads(self._staged)
         self.chunks = _Chunks(self._staged)
