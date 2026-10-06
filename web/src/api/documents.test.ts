@@ -2,7 +2,16 @@ import { describe, expect, it, vi } from "vitest";
 
 import { SessionExpiredError } from "../auth/authClient";
 import { configureApiClient } from "./client";
-import { findInLibrary, loadDocuments, loadUploadLimits, rejectionReason, sha256Hex, uploadPdf } from "./documents";
+import {
+  findInLibrary,
+  loadDocuments,
+  loadSubjectSuggestions,
+  loadUploadLimits,
+  rejectionReason,
+  saveSubjects,
+  sha256Hex,
+  uploadPdf,
+} from "./documents";
 import { createClient, createConfig } from "./generated/client";
 
 function api(handler: (request: Request) => Response) {
@@ -137,5 +146,59 @@ describe("findInLibrary", () => {
   it("throws on other failures", async () => {
     const { apiClient } = api(() => json({ detail: "boom" }, 500));
     await expect(findInLibrary(file, apiClient)).rejects.toThrow("500");
+  });
+});
+
+describe("loadSubjectSuggestions", () => {
+  const suggestions = {
+    document_id: "d1",
+    title: "a.pdf",
+    summary: null,
+    suggestions: [{ subject_id: "s1", name: "LLMs", origin: "shared" }],
+  };
+
+  it("returns the suggestions for the document", async () => {
+    const { apiClient, fetch } = api(() => json(suggestions));
+    await expect(loadSubjectSuggestions("d1", apiClient)).resolves.toEqual(suggestions);
+    expect((fetch.mock.calls[0]![0] as Request).url).toBe("http://api.test/documents/d1/subject-suggestions");
+  });
+
+  it("rejects with SessionExpiredError on 401", async () => {
+    const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
+    await expect(loadSubjectSuggestions("d1", apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+
+  it("rejects with the server's detail on 404", async () => {
+    const { apiClient } = api(() => json({ detail: "Document not found" }, 404));
+    await expect(loadSubjectSuggestions("d1", apiClient)).rejects.toThrow("Document not found");
+  });
+});
+
+describe("saveSubjects", () => {
+  const choice = { subject_ids: ["s1"], new_names: ["Tool Use"] };
+
+  it("puts the choice and returns the document", async () => {
+    const doc = { document_id: "d1", title: "a.pdf", state: "ready", failure_reason: null, created_at: "2026-10-04T09:00:00Z", subjects: [] };
+    const { apiClient, fetch } = api(() => json(doc));
+    await expect(saveSubjects("d1", choice, apiClient)).resolves.toEqual(doc);
+    const request = fetch.mock.calls[0]![0] as Request;
+    expect(request.method).toBe("PUT");
+    expect(request.url).toBe("http://api.test/documents/d1/subjects");
+    expect(await request.json()).toEqual(choice);
+  });
+
+  it("rejects with SessionExpiredError on 401", async () => {
+    const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
+    await expect(saveSubjects("d1", choice, apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+
+  it("rejects with the server's message on 422", async () => {
+    const { apiClient } = api(() => json({ detail: [{ msg: "Choose 1 to 3 subjects" }] }, 422));
+    await expect(saveSubjects("d1", choice, apiClient)).rejects.toThrow("Choose 1 to 3 subjects");
+  });
+
+  it("rejects with the server's detail on 409", async () => {
+    const { apiClient } = api(() => json({ detail: "Document is not ready for subjects" }, 409));
+    await expect(saveSubjects("d1", choice, apiClient)).rejects.toThrow("Document is not ready for subjects");
   });
 });

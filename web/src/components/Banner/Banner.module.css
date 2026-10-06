@@ -1,0 +1,9 @@
+.banner {
+  display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md); border: 1px solid transparent; font-size: var(--fs-14); color: var(--text);
+}
+.icon { width: 18px; height: 18px; flex: none; }
+.body { flex: 1 1 0; min-width: 0; }
+.body strong { display: block; }
+.success { background: var(--success-soft); }
+.success .icon { color: var(--success); }

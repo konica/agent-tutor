@@ -1,0 +1,61 @@
+import { X } from "lucide-react";
+import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from "react";
+
+import styles from "./Dialog.module.css";
+
+const FOCUSABLE = 'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
+
+type Props = { title: string; kicker?: string; onClose: () => void; children: ReactNode; footer: ReactNode };
+
+// A modal over the page (DESIGN.md → Accessibility): focus moves in, Tab stays in, Escape closes, focus goes back.
+export function Dialog({ title, kicker, onClose, children, footer }: Props) {
+  const titleId = useId();
+  const panel = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    const root = panel.current!;
+    (root.querySelector<HTMLElement>("[data-autofocus]") ?? root.querySelector<HTMLElement>(FOCUSABLE))?.focus();
+    return () => previous?.focus();
+  }, []);
+
+  function onKeyDown(event: KeyboardEvent) {
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      onClose();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const items = Array.from(panel.current!.querySelectorAll<HTMLElement>(FOCUSABLE));
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (!first || !last) return;
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  return (
+    <div className={styles.scrim}>
+      <div ref={panel} className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby={titleId} onKeyDown={onKeyDown}>
+        <header className={styles.header}>
+          <div>
+            {kicker && <p className={styles.kicker}>{kicker}</p>}
+            <h2 id={titleId} className={styles.title}>
+              {title}
+            </h2>
+          </div>
+          <button type="button" className={styles.close} aria-label="Close" onClick={onClose}>
+            <X className={styles.closeIcon} strokeWidth={1.5} aria-hidden="true" />
+          </button>
+        </header>
+        <div className={styles.body}>{children}</div>
+        <footer className={styles.footer}>{footer}</footer>
+      </div>
+    </div>
+  );
+}

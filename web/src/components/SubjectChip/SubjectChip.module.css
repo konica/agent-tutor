@@ -1,0 +1,13 @@
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border-strong); border-radius: var(--r-pill);
+  background: var(--surface); color: var(--text); font-size: var(--fs-14); font-weight: 600; white-space: nowrap;
+  transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+.md { min-height: 32px; padding: 0 var(--sp-3); }
+.sm { min-height: 24px; padding: 0 var(--sp-2); font-size: var(--fs-12); }
+.dot { width: 8px; height: 8px; border-radius: var(--r-pill); flex: none; }
+.check { width: 14px; height: 14px; flex: none; }
+.origin { color: var(--text-2); font-size: var(--fs-12); font-weight: 500; }
+button.chip:hover:enabled { background: var(--surface-2); }
+button.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+button.chip:disabled { background: var(--surface-2); color: var(--text-3); border-color: var(--border); }
