@@ -35,7 +35,7 @@ describe("app shell routes", () => {
   it("lists the Release 1 nav items in brief order", () => {
     renderAt("/library");
     const labels = nav().getAllByRole("link").map((a) => a.getAttribute("aria-label") ?? a.textContent?.trim());
-    expect(labels).toEqual(["Smart Tutor, Library", "Library", "Chat", "Conversations", "Notes", "Subjects", "Usage", "Settings"]);
+    expect(labels).toEqual(["Smart Tutor, Library", "Library", "Chat", "Conversations", "Notes", "Subjects", "Usage"]);
   });
 
   it("nav items are links", () => {
