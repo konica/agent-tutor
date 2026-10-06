@@ -6,6 +6,7 @@ from fakes import (
     DESCRIPTION_ARGS,
     TEST_LIMITS,
     FakeObjectStore,
+    FakeQueue,
     FakeTokenVerifier,
     FixedClock,
     InMemoryLibrary,
@@ -14,7 +15,7 @@ from fakes import (
 )
 from smart_tutor.apps.api.main import create_app
 from smart_tutor.apps.api.services import ApiServices
-from smart_tutor.knowledge.application import DocumentService, IngestionService, UploadService
+from smart_tutor.knowledge.application import DocumentService, IngestionService, RetryService, UploadService
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.domain.principal import Principal
@@ -33,6 +34,7 @@ def setup() -> tuple[TestClient, FakeObjectStore, IngestionService]:
         uploads=UploadService(library.unit_of_work, objects, FixedClock(), TEST_LIMITS),
         documents=DocumentService(library.unit_of_work, max_attempts=3),
         subjects=SubjectNames(InMemorySubjects()),
+        retries=RetryService(library.unit_of_work, FakeQueue(), max_attempts=3),
     )
     client = TestClient(create_app(Settings(), verifier=verifier, services=services))
     return client, objects, IngestionService(library.unit_of_work, objects, fake_tools(), TEST_LIMITS)
@@ -72,3 +74,16 @@ def test_b_cannot_get_a_presigned_post_for_a_key() -> None:
     own = client.post("/uploads", json={"file_name": "x.pdf"}, headers=B, params={"user_id": "learner-a"}).json()
     assert own["fields"]["key"].startswith("uploads/learner-b/")
     assert all(key.startswith("uploads/learner-b/") for key, *_ in objects.presigned)
+
+
+def test_b_cannot_retry_a_documents_processing() -> None:
+    client, objects, ingestion = setup()
+    started = client.post("/uploads", json={"file_name": "scan.pdf"}, headers=A).json()
+    objects.objects[started["fields"]["key"]] = b"%PDF-1.7 tiny"
+    ingestion.ingest_upload(started["fields"]["key"])
+
+    response = client.post(f"/documents/{started['document_id']}/retry", headers=B)
+
+    assert response.status_code == 404  # the same answer as for a document that doesn't exist
+    [doc] = client.get("/documents", headers=A).json()
+    assert (doc["state"], doc["attempt"]) == ("failed", 1)

@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetMeData, GetMeResponses, GetUploadLimitsData, GetUploadLimitsResponses, ListDocumentsData, ListDocumentsResponses, StartUploadData, StartUploadErrors, StartUploadResponses } from './types.gen';
+import type { GetMeData, GetMeResponses, GetUploadLimitsData, GetUploadLimitsResponses, ListDocumentsData, ListDocumentsResponses, RetryDocumentData, RetryDocumentErrors, RetryDocumentResponses, StartUploadData, StartUploadErrors, StartUploadResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -24,6 +24,17 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 export const listDocuments = <ThrowOnError extends boolean = false>(options?: Options<ListDocumentsData, ThrowOnError>): RequestResult<ListDocumentsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListDocumentsResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/documents',
+    ...options
+});
+
+/**
+ * Retry Document
+ *
+ * Process a failed document's stored file again (PRD §9.5); a document that isn't failed is left as it is.
+ */
+export const retryDocument = <ThrowOnError extends boolean = false>(options: Options<RetryDocumentData, ThrowOnError>): RequestResult<RetryDocumentResponses, RetryDocumentErrors, ThrowOnError> => (options.client ?? client).post<RetryDocumentResponses, RetryDocumentErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/documents/{document_id}/retry',
     ...options
 });
 

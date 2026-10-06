@@ -37,5 +37,7 @@ awslocal ssm put-parameter --name /smart-tutor/learning-record-idle-minutes --ty
 # Per-file limits (PRD §11): the API presigns and serves them, the worker checks pages.
 awslocal ssm put-parameter --name /smart-tutor/max-upload-mb --type String --value 50 --overwrite
 awslocal ssm put-parameter --name /smart-tutor/max-pages --type String --value 500 --overwrite
+# Processing attempts per content (PRD §9.5): the API refuses a Retry after this many.
+awslocal ssm put-parameter --name /smart-tutor/max-processing-attempts --type String --value 3 --overwrite
 
 echo "smart-tutor LocalStack resources ready"

@@ -1,4 +1,4 @@
-"""SSM parameters (per-file limits, learning-record idle minutes) and Secrets Manager entries (M0)."""
+"""SSM parameters (per-file limits, processing attempts, learning-record idle minutes) and Secrets Manager entries (M0)."""
 
 from typing import Any
 
@@ -11,6 +11,6 @@ class ConfigStack(cdk.Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs: Any) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # Per-file limits (PRD §11), read at startup by the API and the worker; change them here, not in code.
-        for name, value in (("max-upload-mb", "50"), ("max-pages", "500")):
+        # Per-file limits and processing attempts (PRD §11, §9.5), read at startup by the API and the worker; change them here, not in code.
+        for name, value in (("max-upload-mb", "50"), ("max-pages", "500"), ("max-processing-attempts", "3")):
             ssm.StringParameter(self, f"Param-{name}", parameter_name=f"/smart-tutor/{name}", string_value=value)

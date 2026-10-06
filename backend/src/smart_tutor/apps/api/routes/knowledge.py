@@ -1,13 +1,15 @@
-"""Library routes (knowledge module): start an upload, list the caller's documents."""
+"""Library routes (knowledge module): start an upload, list the caller's documents, retry a failed one."""
 
 from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from smart_tutor.apps.api.deps import CurrentPrincipal, Documents, Subjects, Uploads
-from smart_tutor.knowledge.application import InvalidFileNameError
+from smart_tutor.apps.api.deps import CurrentPrincipal, Documents, Retries, Subjects, Uploads
+from smart_tutor.knowledge.application import DocumentNotFoundError, InvalidFileNameError, RetryLimitError
+from smart_tutor.shared.domain.ids import DocumentId
 
 router = APIRouter(tags=["knowledge"])
 
@@ -40,6 +42,9 @@ class DocumentResponse(BaseModel):
     title: str
     state: Literal["processing", "awaiting_subjects", "ready", "failed"]
     failure_reason: str | None
+    attempt: int | None  # processing attempts of the shared content so far; null until the upload is hashed
+    max_attempts: int
+    can_retry: bool
     created_at: datetime
     subjects: list[SubjectResponse]
 
@@ -71,8 +76,22 @@ def list_documents(principal: CurrentPrincipal, documents: Documents, subjects: 
             title=d.title,
             state=d.state,
             failure_reason=d.failure_reason,
+            attempt=d.attempt,
+            max_attempts=d.max_attempts,
+            can_retry=d.can_retry,
             created_at=d.created_at,
             subjects=[SubjectResponse(subject_id=s, name=names[s]) for s in d.subject_ids if s in names],
         )
         for d in views
     ]
+
+
+@router.post("/documents/{document_id}/retry", operation_id="retry_document", status_code=status.HTTP_204_NO_CONTENT)
+def retry_document(document_id: UUID, principal: CurrentPrincipal, retries: Retries) -> None:
+    """Process a failed document's stored file again (PRD §9.5); a document that isn't failed is left as it is."""
+    try:
+        retries.retry(principal.user_id, DocumentId(str(document_id)))
+    except DocumentNotFoundError:
+        raise HTTPException(404, "Document not found") from None
+    except RetryLimitError as e:
+        raise HTTPException(409, str(e)) from None
