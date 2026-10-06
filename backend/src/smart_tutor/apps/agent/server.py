@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
 
 SIGN_IN_AGAIN = "Please sign in again"
 UNAVAILABLE = "The tutor couldn't answer right now. Try again in a moment."
+# Proxies must pass each event on as it comes, and nothing may cache the answer.
+SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 STREAM_MODES: list[Literal["messages", "updates"]] = ["messages", "updates"]
 
 
@@ -114,7 +116,9 @@ def create_app(
 
     @app.post("/ask", dependencies=[Depends(current_principal)])
     async def ask(body: AskRequest, request: Request, token: BearerToken) -> StreamingResponse:
-        return StreamingResponse(answer_events(request.app.state.graph, body, token), media_type="text/event-stream")
+        return StreamingResponse(
+            answer_events(request.app.state.graph, body, token), media_type="text/event-stream", headers=SSE_HEADERS
+        )
 
     return app
 

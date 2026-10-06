@@ -1,16 +1,27 @@
 """POST /threads: start a thread, forward the same token to the agent, relay its SSE stream."""
 
 import json
+import logging
 from collections.abc import AsyncIterator, Callable
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
-from fakes import FakeTokenVerifier, InMemoryLibrary, InMemoryThreads, api_services, fake_agent, ingest_ready
+from fakes import (
+    FakeTokenVerifier,
+    InMemoryLibrary,
+    InMemorySubjects,
+    InMemoryThreads,
+    api_services,
+    fake_agent,
+    ingest_ready,
+)
 from smart_tutor.apps.api.main import create_app
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.domain.principal import Principal
+from smart_tutor.subjects.application import SubjectNames
 
 AUTH = {"Authorization": "Bearer t-ada"}
 QUESTION = {"question": "What is attention?"}
@@ -19,7 +30,7 @@ UNAVAILABLE = "The tutor is unavailable. Try again in a moment."
 AGENT_SSE = (
     b'event: delta\ndata: {"text": "It weighs "}\n\n'
     b'event: delta\ndata: {"text": "tokens [1]."}\n\n'
-    b'event: citations\ndata: {"citations": [{"chunk_id": "c1", "document_title": "a.pdf", "page": 3}]}\n\n'
+    b'event: citations\ndata: {"citations": [{"n": 1, "chunk_id": "c1", "document_title": "a.pdf", "page": 3}]}\n\n'
     b"event: done\ndata: {}\n\n"
 )
 
@@ -57,6 +68,7 @@ def test_starts_a_thread_and_relays_the_agents_stream_after_a_thread_event() -> 
     response = client.post("/threads", json=QUESTION, headers=AUTH)
 
     assert response.status_code == 200 and response.headers["content-type"].startswith("text/event-stream")
+    assert response.headers["cache-control"] == "no-cache" and response.headers["x-accel-buffering"] == "no"
     [thread] = threads.threads.values()
     assert thread.user_id == "ada"
     first, rest = response.text.split("\n\n", 1)
@@ -74,6 +86,26 @@ def test_starts_a_thread_and_relays_the_agents_stream_after_a_thread_event() -> 
         "subjects": [{"subject_id": "00000000-0000-4000-8000-000000000001", "name": "General"}],
     }
     assert "t-ada" not in request.content.decode()  # never in the body
+
+
+def test_a_subject_without_a_name_is_sent_with_a_placeholder_and_logged(caplog: pytest.LogCaptureFixture) -> None:
+    seen: list[httpx.Request] = []
+    verifier = FakeTokenVerifier()
+    verifier.add("t-ada", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
+    library = InMemoryLibrary()
+    ingest_ready(library, "ada", "Attention weighs tokens.")
+    services = api_services(library, subjects=SubjectNames(InMemorySubjects({})), agent=fake_agent(recording(seen)))
+    client = TestClient(create_app(Settings(), verifier=verifier, services=services))
+    caplog.set_level(logging.DEBUG)
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    assert response.status_code == 200
+    unnamed = [{"subject_id": "00000000-0000-4000-8000-000000000001", "name": "Unnamed subject"}]
+    assert json.loads(seen[0].content)["subjects"] == unnamed
+    [record] = [r for r in caplog.records if "placeholder" in r.getMessage()]
+    assert record.levelno == logging.WARNING and "00000000-0000-4000-8000-000000000001" in record.getMessage()
+    assert "t-ada" not in caplog.text
 
 
 def test_no_token_is_401_and_the_agent_is_never_called() -> None:

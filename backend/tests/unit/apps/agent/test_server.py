@@ -41,6 +41,7 @@ def test_streams_deltas_then_citations_then_done() -> None:
     response = c.post("/ask", json=BODY, headers=AUTH)
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
+    assert response.headers["cache-control"] == "no-cache" and response.headers["x-accel-buffering"] == "no"
     got = events(response.text)
     assert "".join(d["text"] for e, d in got if e == "delta") == "It weighs tokens [1]."
     assert len([e for e, _ in got if e == "delta"]) > 1  # streamed, not one block

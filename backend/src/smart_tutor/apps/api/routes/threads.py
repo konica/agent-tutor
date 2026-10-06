@@ -1,6 +1,7 @@
 """Thread routes (tutoring module): ask the first question of a new thread, answered as SSE (PRD §9.2)."""
 
 import json
+import logging
 from collections.abc import AsyncIterator
 from typing import Annotated
 
@@ -15,9 +16,13 @@ from smart_tutor.apps.api.deps import Agent, BearerToken, Conversations, Current
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.tutoring.application import DetectionUnavailableError, NoDocumentsError
 
+logger = logging.getLogger(__name__)
 router = APIRouter(tags=["tutoring"])
 
 UNAVAILABLE = "The tutor is unavailable. Try again in a moment."
+UNNAMED_SUBJECT = "Unnamed subject"  # the agent refuses an empty name
+# Proxies must pass each event on as it comes, and nothing may cache the answer.
+SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 SSE_RESPONSE: dict[int | str, dict[str, object]] = {
     200: {
         "description": "Server-sent events: thread, then delta*, citations, done (or error).",
@@ -78,7 +83,11 @@ async def ask_in_new_thread(
     except (NoDocumentsError, DetectionUnavailableError) as e:
         raise HTTPException(409, str(e)) from None
     names = await run_in_threadpool(subjects.names_for, principal.user_id, thread.subject_ids)
-    named: list[tuple[str, str]] = [(s, names.get(s, "")) for s in thread.subject_ids]
+    named: list[tuple[str, str]] = []
+    for s in thread.subject_ids:
+        if not names.get(s):
+            logger.warning("subject %s has no name; using a placeholder", s)
+        named.append((s, names.get(s) or UNNAMED_SUBJECT))
     try:
         answer = await agent.open_answer(token, body.question, named)
     except UnauthenticatedError:
@@ -88,4 +97,4 @@ async def ask_in_new_thread(
     first = _sse(
         "thread", {"thread_id": thread.thread_id, "subjects": [{"subject_id": s, "name": n} for s, n in named]}
     )
-    return StreamingResponse(_relay(first, answer), media_type="text/event-stream")
+    return StreamingResponse(_relay(first, answer), media_type="text/event-stream", headers=SSE_HEADERS)
