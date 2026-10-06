@@ -48,7 +48,7 @@ export function DocumentTable({ documents, onRetry, retrying }: Props) {
       </thead>
       <tbody>
         {documents.map((doc) => (
-          <tr key={doc.document_id}>
+          <tr key={doc.document_id} id={`document-${doc.document_id}`}>
             <td>
               <span className={styles.doc}>
                 <span className={styles.fileIcon}>

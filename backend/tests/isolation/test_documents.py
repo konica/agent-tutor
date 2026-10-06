@@ -1,4 +1,9 @@
-"""US-12: a learner never sees another learner's documents, and can't get a presigned POST for their key."""
+"""US-12: a learner never sees another learner's documents, and can't get a presigned POST for their key.
+
+The browser hash check (D19) answers only from the caller's own library and links nothing.
+"""
+
+import hashlib
 
 from fastapi.testclient import TestClient
 
@@ -8,18 +13,15 @@ from fakes import (
     FakeObjectStore,
     FakeQueue,
     FakeTokenVerifier,
-    FixedClock,
     InMemoryLibrary,
-    InMemorySubjects,
+    api_services,
     fake_tools,
 )
 from smart_tutor.apps.api.main import create_app
-from smart_tutor.apps.api.services import ApiServices
-from smart_tutor.knowledge.application import DocumentService, IngestionService, RetryService, UploadService
+from smart_tutor.knowledge.application import IngestionService
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.domain.principal import Principal
-from smart_tutor.subjects.application import SubjectNames
 
 A = {"Authorization": "Bearer token-a"}
 B = {"Authorization": "Bearer token-b"}
@@ -30,12 +32,7 @@ def setup() -> tuple[TestClient, FakeObjectStore, IngestionService]:
     verifier.add("token-a", Principal(UserId("learner-a"), "A", frozenset({"learner"})))
     verifier.add("token-b", Principal(UserId("learner-b"), "B", frozenset({"learner"})))
     library, objects = InMemoryLibrary(), FakeObjectStore()
-    services = ApiServices(
-        uploads=UploadService(library.unit_of_work, objects, FixedClock(), TEST_LIMITS),
-        documents=DocumentService(library.unit_of_work, max_attempts=3),
-        subjects=SubjectNames(InMemorySubjects()),
-        retries=RetryService(library.unit_of_work, FakeQueue(), max_attempts=3),
-    )
+    services = api_services(library, objects, queue=FakeQueue())
     client = TestClient(create_app(Settings(), verifier=verifier, services=services))
     return client, objects, IngestionService(library.unit_of_work, objects, fake_tools(), TEST_LIMITS)
 
@@ -87,3 +84,18 @@ def test_b_cannot_retry_a_documents_processing() -> None:
     assert response.status_code == 404  # the same answer as for a document that doesn't exist
     [doc] = client.get("/documents", headers=A).json()
     assert (doc["state"], doc["attempt"]) == ("failed", 1)
+
+
+def test_b_checking_as_file_hash_finds_nothing() -> None:
+    client, objects, ingestion = setup()
+    pdf = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
+    stored = client.post("/uploads", json={"file_name": "a1.pdf"}, headers=A).json()
+    objects.objects[stored["fields"]["key"]] = pdf
+    ingestion.ingest_upload(stored["fields"]["key"])
+    sha = hashlib.sha256(pdf).hexdigest()
+
+    assert client.post("/documents/duplicate-check", json={"sha256": sha}, headers=A).json() == {
+        "document_id": stored["document_id"]
+    }
+    assert client.post("/documents/duplicate-check", json={"sha256": sha}, headers=B).json() == {"document_id": None}
+    assert client.get("/documents", headers=B).json() == []  # the check linked nothing

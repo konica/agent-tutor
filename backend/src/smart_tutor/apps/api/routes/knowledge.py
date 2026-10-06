@@ -1,4 +1,5 @@
-"""Library routes (knowledge module): start an upload, list the caller's documents, retry a failed one."""
+"""Library routes (knowledge module): start an upload, list the caller's documents, check a file hash against them,
+retry a failed one."""
 
 from datetime import datetime
 from typing import Literal
@@ -30,6 +31,16 @@ class StartUploadResponse(BaseModel):
 class UploadLimitsResponse(BaseModel):
     max_bytes: int
     max_pages: int
+
+
+class DuplicateCheckRequest(BaseModel):
+    # Only the hash: the library searched is the caller's, from the token (PRD D19).
+    model_config = ConfigDict(extra="forbid")
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class DuplicateCheckResponse(BaseModel):
+    document_id: str | None
 
 
 class SubjectResponse(BaseModel):
@@ -64,6 +75,17 @@ def start_upload(body: StartUploadRequest, principal: CurrentPrincipal, uploads:
 def get_upload_limits(uploads: Uploads) -> UploadLimitsResponse:
     """The per-file limits, so the browser can refuse a file before uploading it (PRD §8 US-2)."""
     return UploadLimitsResponse(max_bytes=uploads.limits.max_bytes, max_pages=uploads.limits.max_pages)
+
+
+@router.post("/documents/duplicate-check", operation_id="check_duplicate")
+def check_duplicate(
+    body: DuplicateCheckRequest, principal: CurrentPrincipal, documents: Documents
+) -> DuplicateCheckResponse:
+    """Whether the caller's own library already holds this file, so the browser can skip the upload (PRD §8 US-2).
+
+    Another learner's copy is never reported or linked; the server-side hash decides after upload (D19).
+    """
+    return DuplicateCheckResponse(document_id=documents.find_in_library(principal.user_id, body.sha256))
 
 
 @router.get("/documents", operation_id="list_documents")

@@ -5,6 +5,16 @@ export type ClientOptions = {
 };
 
 /**
+ * AskRequest
+ */
+export type AskRequest = {
+    /**
+     * Question
+     */
+    question: string;
+};
+
+/**
  * DocumentResponse
  */
 export type DocumentResponse = {
@@ -44,6 +54,26 @@ export type DocumentResponse = {
      * Title
      */
     title: string;
+};
+
+/**
+ * DuplicateCheckRequest
+ */
+export type DuplicateCheckRequest = {
+    /**
+     * Sha256
+     */
+    sha256: string;
+};
+
+/**
+ * DuplicateCheckResponse
+ */
+export type DuplicateCheckResponse = {
+    /**
+     * Document Id
+     */
+    document_id: string | null;
 };
 
 /**
@@ -182,6 +212,31 @@ export type ListDocumentsResponses = {
 
 export type ListDocumentsResponse = ListDocumentsResponses[keyof ListDocumentsResponses];
 
+export type CheckDuplicateData = {
+    body: DuplicateCheckRequest;
+    path?: never;
+    query?: never;
+    url: '/documents/duplicate-check';
+};
+
+export type CheckDuplicateErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CheckDuplicateError = CheckDuplicateErrors[keyof CheckDuplicateErrors];
+
+export type CheckDuplicateResponses = {
+    /**
+     * Successful Response
+     */
+    200: DuplicateCheckResponse;
+};
+
+export type CheckDuplicateResponse = CheckDuplicateResponses[keyof CheckDuplicateResponses];
+
 export type RetryDocumentData = {
     body?: never;
     path: {
@@ -227,6 +282,35 @@ export type GetMeResponses = {
 };
 
 export type GetMeResponse = GetMeResponses[keyof GetMeResponses];
+
+export type AskInNewThreadData = {
+    body: AskRequest;
+    path?: never;
+    query?: never;
+    url: '/threads';
+};
+
+export type AskInNewThreadErrors = {
+    /**
+     * The learner has no ready documents.
+     */
+    409: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AskInNewThreadError = AskInNewThreadErrors[keyof AskInNewThreadErrors];
+
+export type AskInNewThreadResponses = {
+    /**
+     * Server-sent events: thread, then delta*, citations, done (or error).
+     */
+    200: string;
+};
+
+export type AskInNewThreadResponse = AskInNewThreadResponses[keyof AskInNewThreadResponses];
 
 export type StartUploadData = {
     body: StartUploadRequest;

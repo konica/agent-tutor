@@ -6,8 +6,8 @@
 name: smart-tutor
 
 # The api talks only to LocalStack, so it gets its dummy credentials, never your real ones.
-# The worker also calls Bedrock: it mounts your AWS config read-only and signs S3/SQS with dummy keys
-# (SMART_TUTOR_LOCALSTACK), so your real keys never reach LocalStack.
+# The worker, agent (chat model) and mcp (query embeddings) call Bedrock: they mount your AWS config read-only.
+# The worker also signs S3/SQS with dummy keys (SMART_TUTOR_LOCALSTACK), so your real keys never reach LocalStack.
 # .env may set AWS_PROFILE to a developer profile that doesn't exist in the container, and boto3 then
 # raises ProfileNotFound even with the keys set (an empty AWS_PROFILE fails the same way), so the api
 # points AWS_CONFIG_FILE at a file that defines the profile it uses instead.
@@ -113,6 +113,7 @@ services:
       SMART_TUTOR_INGEST_QUEUE_URL: http://localstack:4566/000000000000/smart-tutor-ingest
       AWS_ENDPOINT_URL_SQS: http://localstack:4566
       SMART_TUTOR_S3_PATH_STYLE: "true"
+      SMART_TUTOR_AGENT_URL: http://agent:8080
       <<: *localstack-aws
     configs: [{source: localstack-aws-config, target: /etc/smart-tutor/aws-config}]
     ports: ["10450:8080"]
@@ -133,6 +134,9 @@ services:
       SMART_TUTOR_KEYCLOAK_CLIENT_ID: smart-tutor-api
       SMART_TUTOR_KEYCLOAK_CLIENT_SECRET: local-api-secret
       SMART_TUTOR_MCP_URL: http://mcp:8000/mcp
+      # Bedrock (chat model) with your AWS profile: same setup as the worker below.
+      HOME: /home/app
+    volumes: ["~/.aws:/home/app/.aws:ro"]
     ports: ["10451:8080"]
     depends_on: [postgres, mcp]
 
@@ -148,6 +152,11 @@ services:
       SMART_TUTOR_KEYCLOAK_CLIENT_SECRET: local-mcp-secret
       SMART_TUTOR_KEYCLOAK_AUDIENCE: rag-mcp
       SMART_TUTOR_MCP_PORT: "8000"  # .env sets the host port (10452)
+      # The resource server URL in the MCP auth metadata: the address the agent calls, not .env's host URL.
+      SMART_TUTOR_MCP_URL: http://mcp:8000/mcp
+      # Bedrock (query embeddings) with your AWS profile: same setup as the worker below.
+      HOME: /home/app
+    volumes: ["~/.aws:/home/app/.aws:ro"]
     ports: ["10452:8000"]
     depends_on: [postgres]
 

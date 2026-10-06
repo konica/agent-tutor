@@ -1,6 +1,6 @@
 apiVersion: v2
 name: keycloak
-description: "Keycloak; M4 adds the upstream chart as a dependency and points it at RDS."
+description: "Keycloak at /auth behind CloudFront, on the RDS database keycloak (#57)."
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

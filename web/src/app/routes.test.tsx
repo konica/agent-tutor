@@ -35,7 +35,7 @@ describe("app shell routes", () => {
   it("lists the Release 1 nav items in brief order", () => {
     renderAt("/library");
     const labels = nav().getAllByRole("link").map((a) => a.getAttribute("aria-label") ?? a.textContent?.trim());
-    expect(labels).toEqual(["Smart Tutor, Library", "Library", "Chat", "Conversations", "Notes", "Subjects", "Usage", "Settings"]);
+    expect(labels).toEqual(["Smart Tutor, Library", "Library", "Chat", "Conversations", "Notes", "Subjects", "Usage"]);
   });
 
   it("nav items are links", () => {
@@ -63,6 +63,12 @@ describe("app shell routes", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Notes" })).toBeInTheDocument();
     expect(nav().getByRole("link", { name: "Notes" })).toHaveAttribute("aria-current", "page");
     expect(nav().getByRole("link", { name: "Library" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("renders the Chat page with a question box", () => {
+    renderAt("/chat");
+    expect(screen.getByRole("heading", { level: 1, name: "Chat" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Your question" })).toBeEnabled();
   });
 
   it("moves to a page and marks it current when a nav item is clicked", async () => {

@@ -35,6 +35,20 @@ class DocumentService:
             documents = tx.documents.list_readable_by(user_id)
         return [self._view(d) for d in documents]
 
+    def learner_subjects(self, user_id: UserId) -> frozenset[SubjectId]:
+        """My subjects: those of the learner's ready, non-archived documents (PRD §9.4)."""
+        with self._uow() as tx:
+            documents = tx.documents.list_readable_by(user_id)
+        return frozenset(s for d in documents if d.state is DocumentState.READY for s in d.subject_ids)
+
+    def find_in_library(self, user_id: UserId, sha256: str) -> DocumentId | None:
+        """The caller's document holding this file, so the browser can skip uploading it (US-2, D19).
+
+        Answers only from the caller's own documents; it never links content.
+        """
+        with self._uow() as tx:
+            return tx.documents.find_readable_by_sha256(user_id, sha256)
+
     def _view(self, d: Document) -> DocumentView:
         attempts = d.content_attempts
         failed = d.state is DocumentState.FAILED and attempts is not None

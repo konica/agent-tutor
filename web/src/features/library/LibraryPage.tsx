@@ -1,7 +1,8 @@
-import { AlertCircle, Upload } from "lucide-react";
+import { AlertCircle, Info, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 
-import { loadDocuments, loadUploadLimits, megabytes, rejectionReason, RetriesUsedUpError, retryProcessing, uploadPdf, type DocumentResponse, type UploadLimits } from "../../api/documents";
+import { SessionExpiredError } from "../../auth/authClient";
+import { findInLibrary, loadDocuments, loadUploadLimits, megabytes, rejectionReason, RetriesUsedUpError, retryProcessing, uploadPdf, type DocumentResponse, type UploadLimits } from "../../api/documents";
 import { Button } from "../../components/Button/Button";
 import { EmptyState } from "../../components/EmptyState/EmptyState";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
@@ -14,6 +15,7 @@ type Props = {
   upload?: (file: File) => Promise<void>;
   retry?: (documentId: string) => Promise<void>;
   loadLimits?: () => Promise<UploadLimits>;
+  check?: (file: File) => Promise<string | null>;
   pollMs?: number;
 };
 
@@ -27,9 +29,10 @@ function announceChange(doc: DocumentResponse): string | null {
 const defaultUpload = (file: File) => uploadPdf(file);
 const defaultRetry = (id: string) => retryProcessing(id);
 const defaultLoadLimits = () => loadUploadLimits();
+const defaultCheck = (file: File) => findInLibrary(file);
 
 // Library with a plain file picker (US-2 first slice). Drop zone, upload tray, tabs and filters come later.
-export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retry = defaultRetry, loadLimits = defaultLoadLimits, pollMs = 2000 }: Props) {
+export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retry = defaultRetry, loadLimits = defaultLoadLimits, check = defaultCheck, pollMs = 2000 }: Props) {
   const { documents, unavailable, refresh } = useDocuments(load, pollMs);
   const input = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState("");
@@ -37,6 +40,7 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
   const [retrying, setRetrying] = useState<ReadonlySet<string>>(new Set());
   const [limits, setLimits] = useState<UploadLimits | null>(null);
   const [rejected, setRejected] = useState<{ name: string; reason: string }[]>([]);
+  const [alreadyIn, setAlreadyIn] = useState<{ name: string; documentId: string }[]>([]);
   const seen = useRef<Map<string, DocumentResponse["state"]> | null>(null);
 
   // One polite live region carries upload results and processing-state changes (DESIGN.md → Accessibility).
@@ -84,6 +88,7 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
     event.target.value = ""; // picking the same file again fires change again
     setFailed(null);
     setRejected([]);
+    setAlreadyIn([]);
     const current = limits ?? (await ensureLimits());
     // One combined message for the whole pick, so no file's result overwrites another's in the live region.
     const parts: string[] = [];
@@ -92,6 +97,21 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
       if (reason) {
         setRejected((list) => [...list, { name: file.name, reason }]);
         parts.push(`${file.name}: ${reason}`);
+        setStatus(parts.join(" "));
+        continue;
+      }
+      setStatus([...parts, `Checking ${file.name}…`].join(" "));
+      let existing: string | null = null;
+      try {
+        existing = await check(file);
+      } catch (error) {
+        if (error instanceof SessionExpiredError) return; // the session screen replaces this page
+        // Any other failure: upload anyway; the server-side hash decides (PRD D19).
+      }
+      if (existing) {
+        const documentId = existing;
+        setAlreadyIn((list) => [...list, { name: file.name, documentId }]);
+        parts.push(`${file.name}: Already in your library.`);
         setStatus(parts.join(" "));
         continue;
       }
@@ -163,6 +183,20 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
               <span>
                 <span className={styles.rejectedName}>{r.name}</span>
                 <span className={styles.rejectedReason}>{r.reason}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {alreadyIn.length > 0 && (
+        <ul className={styles.already} aria-label="Already in your library">
+          {alreadyIn.map((a, i) => (
+            <li key={`${a.documentId}-${i}`}>
+              <Info aria-hidden="true" strokeWidth={1.75} />
+              <span>
+                <span className={styles.rejectedName}>{a.name}</span>
+                <span className={styles.alreadyNote}>Already in your library</span>
+                <a className={styles.alreadyLink} href={`#document-${a.documentId}`}>Open document</a>
               </span>
             </li>
           ))}

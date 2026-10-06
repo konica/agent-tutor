@@ -3,15 +3,25 @@
     "id": "index",
     "group": "Overview",
     "ref": "§5 · review flows",
-    "desc": "Round 3 overview: what changed in v0.4, the four review flows and every state.",
+    "desc": "Round 6 overview: what changed in v0.7, the four review flows and every state.",
     "release": 1,
     "stories": []
   },
   {
+    "id": "landing-default",
+    "group": "Landing page",
+    "ref": "§6.0 · US-1",
+    "desc": "Public page at /: what Smart Tutor does, how it works, trust points, “Create an account” and “Sign in”. Text only, outside the app shell.",
+    "release": 1,
+    "stories": [
+      "US-1"
+    ]
+  },
+  {
     "id": "auth-sign-up",
-    "group": "Sign in, sign up, terms",
+    "group": "Sign in, sign up",
     "ref": "§6.2 · US-1",
-    "desc": "Keycloak registration page in the Smart Tutor theme.",
+    "desc": "Keycloak registration page: stock keycloak.v2 layout, email as username (no Username field), with the Smart Tutor logo, colours, font and name (low-detail reference).",
     "release": 1,
     "stories": [
       "US-1"
@@ -19,9 +29,9 @@
   },
   {
     "id": "auth-verify-email",
-    "group": "Sign in, sign up, terms",
+    "group": "Sign in, sign up",
     "ref": "§6.2 · US-1",
-    "desc": "Keycloak email-verification page.",
+    "desc": "Keycloak email-verification page: stock keycloak.v2 layout (low-detail reference).",
     "release": 1,
     "stories": [
       "US-1"
@@ -29,29 +39,9 @@
   },
   {
     "id": "auth-sign-in",
-    "group": "Sign in, sign up, terms",
+    "group": "Sign in, sign up",
     "ref": "§6.2 · US-1",
-    "desc": "Keycloak login page.",
-    "release": 1,
-    "stories": [
-      "US-1"
-    ]
-  },
-  {
-    "id": "terms-first-run",
-    "group": "Sign in, sign up, terms",
-    "ref": "§6.2 · US-1",
-    "desc": "Terms of use on first sign-in; Continue is disabled until accepted.",
-    "release": 1,
-    "stories": [
-      "US-1"
-    ]
-  },
-  {
-    "id": "terms-accepted",
-    "group": "Sign in, sign up, terms",
-    "ref": "§6.2 · US-1",
-    "desc": "Terms accepted; Continue leads to the empty Library.",
+    "desc": "Keycloak login page: stock keycloak.v2 layout (low-detail reference).",
     "release": 1,
     "stories": [
       "US-1"
@@ -61,7 +51,7 @@
     "id": "library-default",
     "group": "Library",
     "ref": "§6.3 · US-2",
-    "desc": "Live Library: the home screen, with the sample documents (where navigation lands).",
+    "desc": "Live Library: the home screen, with the sample documents; the upload-rights line sits under “Upload” (where navigation lands).",
     "release": 1,
     "stories": [
       "US-2"
@@ -71,7 +61,7 @@
     "id": "library-empty",
     "group": "Library",
     "ref": "§6.3 · US-2",
-    "desc": "Empty, first run: “Upload your first document”.",
+    "desc": "Empty, first run: “Upload your first document”, with “Only upload documents you have the right to use.” under it.",
     "release": 1,
     "stories": [
       "US-2"
@@ -81,7 +71,7 @@
     "id": "library-drop-active",
     "group": "Library",
     "ref": "§6.3 · US-2",
-    "desc": "Files dragged over the page: the whole page accepts the drop.",
+    "desc": "Files dragged over the page: the whole page accepts the drop; the upload-rights line shows in the drop target.",
     "release": 1,
     "stories": [
       "US-2"
@@ -181,7 +171,7 @@
     "id": "library-archived",
     "group": "Library",
     "ref": "§6.3 · US-10",
-    "desc": "Archived tab: Restore, what archiving means for answers, and “Change subjects” still available under More.",
+    "desc": "Archived tab: Restore, what archiving means for answers; no “Change subjects” on archived rows or in their More menu (E7).",
     "release": 1,
     "stories": [
       "US-10"
@@ -221,7 +211,7 @@
     "id": "library-rate-limited",
     "group": "Library",
     "ref": "§6.3 · US-2",
-    "desc": "Upload limit reached: “You can upload again at 11:40 (GMT+7)”; Upload disabled.",
+    "desc": "Upload limit reached: hourly “You can upload again at 11:40 (GMT+7)”, daily “You can upload again at 00:00 (GMT+7)”; Upload disabled.",
     "release": 1,
     "stories": [
       "US-2"
@@ -328,16 +318,6 @@
     ]
   },
   {
-    "id": "picker-change-subjects-archived",
-    "group": "Choose subjects",
-    "ref": "§6.4 · US-10",
-    "desc": "Change subjects of an archived document from the Archived tab (D7); it stays archived.",
-    "release": 1,
-    "stories": [
-      "US-10"
-    ]
-  },
-  {
     "id": "details-ready",
     "group": "Document details",
     "ref": "§6.5 · US-10",
@@ -381,7 +361,7 @@
     "id": "details-archived",
     "group": "Document details",
     "ref": "§6.5 · US-10",
-    "desc": "Archived document with Restore (J4); “Change subjects” stays available (D7).",
+    "desc": "Archived document with Restore (J4); no “Change subjects” until it is restored (E7).",
     "release": 1,
     "stories": [
       "US-10"
@@ -558,16 +538,6 @@
     ]
   },
   {
-    "id": "chat-decline-other-subject",
-    "group": "Chat",
-    "ref": "§6.6 · US-5",
-    "desc": "Decline, another of the learner's subjects fits: “New conversation” sends the question there right away.",
-    "release": 1,
-    "stories": [
-      "US-5"
-    ]
-  },
-  {
     "id": "chat-no-active-documents",
     "group": "Chat",
     "ref": "§6.6 · US-10",
@@ -631,7 +601,7 @@
     "id": "chat-rate-limited",
     "group": "Chat",
     "ref": "§6.6 · US-9",
-    "desc": "Rate limited: “You can send again at 11:25 (GMT+7)”; input disabled until then.",
+    "desc": "Rate limited: per minute “You can send again at 11:25 (GMT+7)”, daily “You can send again at 00:00 (GMT+7)”; input disabled until then.",
     "release": 1,
     "stories": [
       "US-9"
@@ -839,21 +809,13 @@
   },
   {
     "id": "usage-overview",
-    "group": "Usage & settings",
+    "group": "Usage",
     "ref": "§6.10 · US-9",
     "desc": "Today (the GMT+7 day) and all time; Conversations, Document processing, Background.",
     "release": 1,
     "stories": [
       "US-9"
     ]
-  },
-  {
-    "id": "settings-default",
-    "group": "Usage & settings",
-    "ref": "§6.11 · no user story",
-    "desc": "Time zone “GMT+7 (Ho Chi Minh City)”, read-only; the accepted terms version and date.",
-    "release": 1,
-    "stories": []
   },
   {
     "id": "r2-map",

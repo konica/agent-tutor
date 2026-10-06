@@ -17,3 +17,19 @@ def test_max_processing_attempts_is_an_ssm_parameter() -> None:
     template.has_resource_properties(
         "AWS::SSM::Parameter", {"Name": "/smart-tutor/max-processing-attempts", "Value": "3"}
     )
+
+
+def test_keycloak_admin_and_client_secrets_are_generated_not_written() -> None:
+    template = Template.from_stack(ConfigStack(cdk.App(), "Config"))
+
+    secrets = template.find_resources("AWS::SecretsManager::Secret")
+    by_name = {s["Properties"]["Name"]: s["Properties"] for s in secrets.values()}
+    assert set(by_name) == {
+        "smart-tutor/keycloak/admin",
+        "smart-tutor/keycloak/api-client",
+        "smart-tutor/keycloak/mcp-client",
+    }
+    assert all("SecretString" not in p and "GenerateSecretString" in p for p in by_name.values())
+    admin = by_name["smart-tutor/keycloak/admin"]["GenerateSecretString"]
+    assert admin["SecretStringTemplate"] == '{"username": "admin"}'
+    assert admin["GenerateStringKey"] == "password"

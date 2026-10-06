@@ -1,4 +1,4 @@
-"""Citation attached to an answer: document title and page."""
+"""Citation attached to an answer: document title and page, and the [n] marker that points at it."""
 
 from dataclasses import dataclass
 
@@ -7,5 +7,6 @@ from dataclasses import dataclass
 class Citation:
     chunk_id: str
     document_title: str
-    page: int
+    page: int | None  # None renders "page unavailable"
     archived: bool = False  # archived documents still resolve; the UI marks them
+    n: int | None = None  # the answer's [n] marker for this citation (its chunk's place in the prompt)

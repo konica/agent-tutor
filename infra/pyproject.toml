@@ -9,7 +9,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8.4"]
+dev = ["pytest>=8.4", "pyyaml>=6"]
 
 [tool.uv]
 package = false

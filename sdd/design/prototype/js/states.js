@@ -1,4 +1,4 @@
-/* Smart Tutor v0.4 — every named state <screen>-<state>@v0.4, plus the four review flows (§5).
+/* Smart Tutor v0.7 — every named state <screen>-<state>@v0.7, plus the four review flows (§5).
    Contract (§11 item 6): window.ST.STATES = [{ id, group, ref, desc }], one user story per ref,
    each state at index.html#/<state-id>, review chrome hidden with ?shot=1.
    "live" states are where the app's own navigation lands: they keep whatever the reviewer did.
@@ -14,7 +14,7 @@
     const src = ST.clone(ST.DOCS.find((d) => d.id === f.from));
     return Object.assign(src, { uploaded: ST.TODAY + 'T11:2' + i, state, suggestions: f.suggestions, subjects: state === 'ready' ? [f.suggestions[0].id] : [], dedup: false, tokens: state === 'ready' ? src.tokens : [5800, 410] });
   });
-  const newUser = (docState) => { fresh(); S.docs = docState ? j1Docs(docState) : []; S.convs = []; S.notes = []; ST.T.accepted = true; };
+  const newUser = (docState) => { fresh(); S.docs = docState ? j1Docs(docState) : []; S.convs = []; S.notes = []; };
 
   const lib = (us, desc, setup, extra = {}) => Object.assign({ group: 'Library', ref: '§6.3 · ' + us, desc, view: ST.libraryView, setup: () => { fresh(); ST.resetList(); if (setup) setup(); } }, extra);
   const pick = (us, desc, open, setup, extra = {}) => Object.assign({ group: 'Choose subjects', ref: '§6.4 · ' + us, desc, view: ST.libraryView, setup: () => { fresh(); ST.resetList(); if (setup) setup(); }, afterEnter: open }, extra);
@@ -23,19 +23,20 @@
   const j2 = (n, o) => { ST.conv('cv1').noteId = null; S.thread = ST.j2Thread(n, Object.assign({ noteId: null }, o || {})); return S.thread; };
 
   const defs = [
-    { id: 'index', group: 'Overview', ref: '§5 · review flows', desc: 'Round 3 overview: what changed in v0.4, the four review flows and every state.', view: ST.indexView, setup: () => { fresh(); } },
+    { id: 'index', group: 'Overview', ref: '§5 · review flows', desc: 'Round 6 overview: what changed in v0.7, the four review flows and every state.', view: ST.indexView, setup: () => { fresh(); } },
+
+    /* §6.0 */
+    { id: 'landing-default', group: 'Landing page', ref: '§6.0 · US-1', desc: 'Public page at /: what Smart Tutor does, how it works, trust points, “Create an account” and “Sign in”. Text only, outside the app shell.', view: ST.landingView, setup: () => { ST.noTray = true; } },
 
     /* §6.2 */
-    { id: 'auth-sign-up', group: 'Sign in, sign up, terms', ref: '§6.2 · US-1', desc: 'Keycloak registration page in the Smart Tutor theme.', view: ST.authSignUp },
-    { id: 'auth-verify-email', group: 'Sign in, sign up, terms', ref: '§6.2 · US-1', desc: 'Keycloak email-verification page.', view: ST.authVerify },
-    { id: 'auth-sign-in', group: 'Sign in, sign up, terms', ref: '§6.2 · US-1', desc: 'Keycloak login page.', view: ST.authSignIn },
-    { id: 'terms-first-run', group: 'Sign in, sign up, terms', ref: '§6.2 · US-1', desc: 'Terms of use on first sign-in; Continue is disabled until accepted.', view: ST.termsView, setup: () => { ST.T.accepted = false; } },
-    { id: 'terms-accepted', group: 'Sign in, sign up, terms', ref: '§6.2 · US-1', desc: 'Terms accepted; Continue leads to the empty Library.', view: ST.termsView, setup: () => { ST.T.accepted = true; } },
+    { id: 'auth-sign-up', group: 'Sign in, sign up', ref: '§6.2 · US-1', desc: 'Keycloak registration page: stock keycloak.v2 layout, email as username (no Username field), with the Smart Tutor logo, colours, font and name (low-detail reference).', view: ST.authSignUp },
+    { id: 'auth-verify-email', group: 'Sign in, sign up', ref: '§6.2 · US-1', desc: 'Keycloak email-verification page: stock keycloak.v2 layout (low-detail reference).', view: ST.authVerify },
+    { id: 'auth-sign-in', group: 'Sign in, sign up', ref: '§6.2 · US-1', desc: 'Keycloak login page: stock keycloak.v2 layout (low-detail reference).', view: ST.authSignIn },
 
     /* §6.3 */
-    lib('US-2', 'Live Library: the home screen, with the sample documents (where navigation lands).', null, { id: 'library-default', live: true, setup: () => { if (!ST.keepListFilters) ST.resetList(); ST.keepListFilters = false; } }),
-    lib('US-2', 'Empty, first run: “Upload your first document”.', () => { newUser(null); }, { id: 'library-empty' }),
-    lib('US-2', 'Files dragged over the page: the whole page accepts the drop.', () => { newUser(null); }, { id: 'library-drop-active', afterEnter: () => ST.showDrop(true) }),
+    lib('US-2', 'Live Library: the home screen, with the sample documents; the upload-rights line sits under “Upload” (where navigation lands).', null, { id: 'library-default', live: true, setup: () => { if (!ST.keepListFilters) ST.resetList(); ST.keepListFilters = false; } }),
+    lib('US-2', 'Empty, first run: “Upload your first document”, with “Only upload documents you have the right to use.” under it.', () => { newUser(null); }, { id: 'library-empty' }),
+    lib('US-2', 'Files dragged over the page: the whole page accepts the drop; the upload-rights line shows in the drop target.', () => { newUser(null); }, { id: 'library-drop-active', afterEnter: () => ST.showDrop(true) }),
     lib('US-2', 'Three PDFs uploading, each with a progress bar in the tray.', () => { newUser(null); }, { id: 'library-uploading', afterEnter: () => ST.simulateDrop() }),
     lib('US-2', 'Processing: titles appear first; no “Choose subjects” until processing finishes.', () => {
       newUser('processing'); S.tray = ST.J1_FILES.map((f, i) => ({ id: 'tp' + i, name: f.file, size: f.size, status: 'done', progress: 100, docId: f.from }));
@@ -59,11 +60,11 @@
       ST.L.state = 'failed';
     }, { id: 'library-failed' }),
     lib('US-2', 'After Retry: the document is processing again (attempt 2 of 3).', () => { const d = doc('d7'); d.state = 'processing'; d.attempts = 2; }, { id: 'library-retry-processing' }),
-    lib('US-10', 'Archived tab: Restore, what archiving means for answers, and “Change subjects” still available under More.', () => { ST.L.tab = 'archived'; S.rowMenu = 'd9'; }, { id: 'library-archived' }),
+    lib('US-10', 'Archived tab: Restore, what archiving means for answers; no “Change subjects” on archived rows or in their More menu (E7).', () => { ST.L.tab = 'archived'; S.rowMenu = 'd9'; }, { id: 'library-archived' }),
     lib('US-10', 'After archiving ReAct (J4): find it under Archived.', () => { doc('d3').archived = true; ST.L.tab = 'archived'; }, { id: 'library-archived-after-archive' }),
     lib('US-10', 'No results: “No documents match these filters” and Clear filters.', () => { Object.assign(ST.L, { subject: 'rl', from: '2026-10-01' }); }, { id: 'library-no-results' }),
     lib('US-10', 'Filtered by subject (matches any of a document\'s subjects).', () => { ST.L.subject = 'agents'; }, { id: 'library-filtered-by-subject' }),
-    lib('US-2', 'Upload limit reached: “You can upload again at 11:40 (GMT+7)”; Upload disabled.', () => { S.uploadLimit = true; }, { id: 'library-rate-limited' }),
+    lib('US-2', 'Upload limit reached: hourly “You can upload again at 11:40 (GMT+7)”, daily “You can upload again at 00:00 (GMT+7)”; Upload disabled.', () => { S.uploadLimit = true; }, { id: 'library-rate-limited' }),
 
     /* §6.4 */
     pick('US-2b', 'Toolformer: summary, 3 suggestions with origin, first pre-selected.', () => ST.openPicker(['d5']), null, { id: 'picker-default' }),
@@ -76,14 +77,14 @@
     pick('US-2b', 'Saved: “Subjects saved. Toolformer… is ready to use.” The document is Ready right away.', () => ST.openPicker(['d5'], { saved: true }), () => { const d = doc('d5'); d.subjects = ['agents', 'llm']; d.state = 'ready'; }, { id: 'picker-saved' }),
     pick('US-2b', 'Several documents waiting: step through them (“1 of 3”, Next, Skip).', () => ST.openPicker(S.docs.filter((d) => d.state === 'choose').map((d) => d.id)), () => { newUser('choose'); }, { id: 'picker-step-through' }),
     pick('US-10', 'Change subjects of a ready document (J4).', () => ST.openPicker(['d3'], { mode: 'change' }), () => { ST.L.subject = 'agents'; }, { id: 'picker-change-subjects' }),
-    pick('US-10', 'Change subjects of an archived document from the Archived tab (D7); it stays archived.', () => ST.openPicker(['d9'], { mode: 'change' }), () => { ST.L.tab = 'archived'; }, { id: 'picker-change-subjects-archived' }),
+
 
     /* §6.5 */
     det('US-10', 'Ready document: facts, summary, subjects, Archive. No download, no delete.', () => ST.openDetails('d3'), () => { ST.L.subject = 'agents'; }, { id: 'details-ready' }),
     det('US-10', 'Editing the display title, with “Reset to extracted title”.', () => ST.openDetails('d3', { editing: true, draft: 'ReAct (Yao et al.)' }), () => { ST.L.subject = 'agents'; }, { id: 'details-edit-title' }),
     det('US-10', 'Processing a 424-page book: up to 15 minutes; subjects can be chosen when processing finishes.', () => ST.openDetails('d6'), null, { id: 'details-processing' }),
     det('US-10', 'Failed: “No text layer (scanned PDFs are not supported yet)”, with Retry.', () => ST.openDetails('d7'), null, { id: 'details-failed' }),
-    det('US-10', 'Archived document with Restore (J4); “Change subjects” stays available (D7).', () => ST.openDetails('d3'), () => { doc('d3').archived = true; ST.L.tab = 'archived'; }, { id: 'details-archived' }),
+    det('US-10', 'Archived document with Restore (J4); no “Change subjects” until it is restored (E7).', () => ST.openDetails('d3'), () => { doc('d3').archived = true; ST.L.tab = 'archived'; }, { id: 'details-archived' }),
 
     /* §6.6 */
     chat('US-3', 'Live chat: a new conversation (where navigation lands).', () => {}, { id: 'chat-new', live: true,
@@ -131,18 +132,13 @@
       const t = j2(1); const q = "What's the best laptop for research?";
       t.messages.push(ST.M({ role: 'user', text: q }), ST.M({ role: 'tutor', kind: 'decline', question: q, topic: 'choosing a laptop' }));
     }, { id: 'chat-decline' }),
-    chat('US-5', 'Decline, another of the learner\'s subjects fits: “New conversation” sends the question there right away.', () => {
-      const t = j2(3); const q = 'How is an agent\'s policy updated during training?';
-      t.messages.push(ST.M({ role: 'user', text: q }), ST.M({ role: 'tutor', kind: 'decline', question: q, other: 'rl' }));
-      t.tokens = [13720, 3267];
-    }, { id: 'chat-decline-other-subject' }),
     chat('US-10', 'No active documents in these subjects: history readable, input disabled.', () => { doc('d8').archived = true; S.thread = ST.threadFromConv('cv5'); }, { id: 'chat-no-active-documents' }),
     chat('US-7', '“Summarize lesson” in progress.', () => { j2(2, { summarizing: true, summaryHold: true }); }, { id: 'chat-summarize-progress' }),
     chat('US-7', 'Note saved: confirmation with a link; the header now links the note.', () => { const t = j2(2); ST.makeNote(t, 'saved'); }, { id: 'chat-summarize-done' }),
     chat('US-7', 'A note exists and wasn\'t edited: “Update lesson note” replaces it directly.', () => { S.thread = ST.threadFromConv('cv1'); }, { id: 'chat-update-note' }),
     chat('US-7', 'The note was edited: “You\'ve edited this note. Replace it with a new summary?”', () => { S.thread = ST.threadFromConv('cv2'); }, { id: 'chat-update-edited-note', afterEnter: () => { ST.chatEnter(); ST.actions.summarize(); } }),
     chat('US-13', 'Archived conversation: banner with Restore, input disabled.', () => { S.thread = ST.threadFromConv('cv6'); }, { id: 'chat-archived' }),
-    chat('US-9', 'Rate limited: “You can send again at 11:25 (GMT+7)”; input disabled until then.', () => { j2(2, { rateLimit: 42 }); }, { id: 'chat-rate-limited', afterEnter: () => { ST.chatEnter(); ST.startRateLimit(42); } }),
+    chat('US-9', 'Rate limited: per minute “You can send again at 11:25 (GMT+7)”, daily “You can send again at 00:00 (GMT+7)”; input disabled until then.', () => { j2(2, { rateLimit: 42 }); }, { id: 'chat-rate-limited', afterEnter: () => { ST.chatEnter(); ST.startRateLimit(42); } }),
     chat('US-4', 'The answer failed: Retry.', () => { const t = j2(1); t.messages.push(ST.M({ role: 'user', text: ST.J2[1].q }), ST.M({ role: 'tutor', kind: 'error' })); }, { id: 'chat-error' }),
     chat('US-7', 'Started from a note: “Started from note: title” at the top.', () => {
       if (ST.pendingThread) { S.thread = ST.pendingThread; ST.pendingThread = null; return; }
@@ -177,9 +173,9 @@
     { id: 'subjects-rename-duplicate', group: 'Subjects', ref: '§6.9 · US-10b', desc: 'Rename clashes with another of the learner\'s own subject names (a shared name she doesn\'t have is allowed, D6).', setup: () => { fresh(); ST.SB = { editing: 'rag', draft: 'AI Agents' }; }, view: ST.subjectsView },
     { id: 'subjects-rename-rejected', group: 'Subjects', ref: '§6.9 · US-10b', desc: 'Same naming checks as the picker: personal information is rejected.', setup: () => { fresh(); ST.SB = { editing: 'rag', draft: 'Mai thesis chapter 2' }; }, view: ST.subjectsView },
 
-    /* §6.10–6.11 */
-    { id: 'usage-overview', live: true, group: 'Usage & settings', ref: '§6.10 · US-9', desc: 'Today (the GMT+7 day) and all time; Conversations, Document processing, Background.', setup: () => { ST.U = { key: 'last', dir: 'desc' }; }, view: ST.usageView },
-    { id: 'settings-default', live: true, group: 'Usage & settings', ref: '§6.11 · no user story', desc: 'Time zone “GMT+7 (Ho Chi Minh City)”, read-only; the accepted terms version and date.', view: ST.settingsView },
+    /* §6.10 */
+    { id: 'usage-overview', live: true, group: 'Usage', ref: '§6.10 · US-9', desc: 'Today (the GMT+7 day) and all time; Conversations, Document processing, Background.', setup: () => { ST.U = { key: 'last', dir: 'desc' }; }, view: ST.usageView },
+
 
     /* §7 */
     { id: 'r2-map', group: 'R2 research map (wireframes)', ref: '§7 · US-19', desc: 'Subject selector, timeline by year, citation links, works without a year.', release: 2, setup: () => { fresh(); ST.R2.subject = 'agents'; }, view: ST.r2Map },
@@ -217,10 +213,10 @@
 
   /* §5 review flows */
   ST.FLOWS = [
-    { id: 'J1', title: 'First run', summary: 'Sign up, accept terms, upload 3 PDFs, accept subjects, get a first cited answer.', steps: [
+    { id: 'J1', title: 'First run', summary: 'From the landing page, sign up, land on the empty Library, upload 3 PDFs, accept subjects, get a first cited answer.', steps: [
+      { state: 'landing-default', text: 'Landing page: “Create an account”' },
       { state: 'auth-sign-up', text: 'Sign up on the Keycloak page' },
       { state: 'auth-verify-email', text: 'Verify the email address' },
-      { state: 'terms-first-run', text: 'Accept the terms of use' },
       { state: 'library-empty', text: 'Land on the empty Library' },
       { state: 'library-uploading', text: 'Drop 3 PDFs: progress in the upload tray' },
       { state: 'library-first-processing', text: 'Watch processing: titles first, subjects later' },

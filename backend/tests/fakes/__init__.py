@@ -1,8 +1,11 @@
 """Fake adapters for unit tests: services get these through their constructors instead of real ones."""
 
+from fakes.api import api_services, fake_agent
 from fakes.auth import FakeTokenVerifier
 from fakes.clock import FixedClock
+from fakes.ingest import ingest_ready
 from fakes.knowledge import FakeObjectStore, InMemoryLibrary
+from fakes.mcp import in_process_mcp
 from fakes.models import (
     DESCRIPTION_ARGS,
     FakeChatModel,
@@ -16,24 +19,31 @@ from fakes.pdfs import make_pdf
 from fakes.processing import FakePdfExtractor, PageChunker, fake_tools
 from fakes.queue import FakeQueue
 from fakes.subjects import InMemorySubjects
+from fakes.tutoring import FakeRetriever, InMemoryThreads
 
 __all__ = [
+    "api_services",
+    "fake_agent",
     "DESCRIPTION_ARGS",
     "describe_reply",
     "describing_chat_model",
     "FakeChatModel",
+    "FakeRetriever",
     "fake_chat_model",
     "fake_embeddings",
     "FakeTokenVerifier",
     "FixedClock",
     "InMemoryLibrary",
     "InMemorySubjects",
+    "InMemoryThreads",
     "FakeObjectStore",
     "FakeQueue",
     "FakePdfExtractor",
     "PageChunker",
     "fake_tools",
     "make_pdf",
+    "ingest_ready",
+    "in_process_mcp",
     "FakeParameterStore",
     "TEST_LIMITS",
 ]

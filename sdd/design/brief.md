@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Brief version** | v0.4 |
-| **Based on** | `sdd/prd.md` Draft v2.7 |
-| **Status** | Draft, round 3 (owner decisions on the round 2 questions; targeted changes) |
+| **Brief version** | v0.7 |
+| **Based on** | `sdd/prd.md` Draft v2.16 |
+| **Status** | Draft, round 6 (owner answers to E4, E6, E7, E8, F1; targeted changes) |
 | **Owner** | Thao Dinh |
-| **Last updated** | 2026-10-04 |
+| **Last updated** | 2026-10-06 |
 | **Designer** | Open Design |
 
 > **For the designer:** this brief is the source of truth for the mockups. If the brief and the PRD disagree, follow the brief and flag the conflict. Name every deliverable with the brief version it answers (e.g. `chat-growth-notice@v0.3`). Read **§0 What changed** first on every new version. A ready-to-paste prompt for starting a round is in **Appendix A**.
@@ -15,21 +15,15 @@
 
 ## 0. What changed in this version
 
-**Targeted update.** Keep the v0.3 prototype (`design-v0.3`) and change only the states below. The owner answered the round 2 questions (Q7, D1–D8); PRD v2.7 records them. The v0.3 rewrite is summarized in the changelog (§13).
+**Targeted update.** Keep the round 5 prototype (v0.6: landing page, stock Keycloak pages, no terms or Settings, upload-rights line) and change only what is below. PRD v2.16 records the owner's answers to E4, E6, E7, E8, and F1 (Q48–Q52). The v0.6 changes are in the changelog (§13).
 
-| Change | States to redo |
+| Change | States |
 |---|---|
-| **Q7 — subjects are chosen only after processing finishes.** No "Choose subjects" while a document is processing; the picker no longer says "ready in a few minutes". After saving, the document is Ready and searchable. | `library-first-processing`, `library-first-choose`, `picker-saved`, `details-processing`; check the J1 flow |
-| **D2 — the carried question is sent right away** in the new conversation. | `chat-fourth-subject-refused` (hint text), `chat-new-from-refused` |
-| **D4 — a question that fits none of the learner's subjects:** decline and tell the learner to upload a document on the topic to continue, with **"Upload a document"**; no "New conversation". | `chat-decline` (and a variant for the no-subject case) |
-| **D6 — a personal name may equal another shared subject's name.** No warning; only the learner's own subject names must differ. | `subjects-rename-duplicate` |
-| **D7 — subjects of an archived document can be changed.** | `library-archived`, `details-archived`, `picker-change-subjects` (from an archived document) |
-| **D8 — one time zone, GMT+7, for everyone.** Limit messages show the end time in GMT+7; "Today" in Usage is the GMT+7 day; Settings shows the time zone read-only. | `library-rate-limited`, `chat-rate-limited`, `usage-overview`, `settings-default` |
-| **D1 — thumbs:** outline thumb icons with labels "Helpful" / "Not helpful" and a visible pressed state (accepted as proposed). | `chat-answer-citations`, `chat-feedback-reason`, components page |
-| **D3 — fourth-subject wording** (accepted as proposed, see §6.6). | `chat-fourth-subject-refused` |
-| **D5 — calmer Library rows:** one contextual button per row (Choose subjects, Retry, Restore, or Open) and the rest under "More" (accepted as proposed). | `library-default` and every Library state with rows |
-| **PRD v2.3 — scanned PDFs:** a PDF without a text layer fails with "No text layer (scanned PDFs are not supported yet)". Use it for `lecture-03-scan.pdf`. | `library-failed`, `details-failed` |
-| **Prototype contract** (§11 item 6): one specific user story per state in `ref`, `?shot=1` hides the review bar. | All states (metadata only) |
+| **E4 — a decline never offers "New conversation".** "New conversation" appears only in the fourth-subject refusal (3 subjects already). Every decline says a document on the topic is needed to continue, with "Upload a document" as the only action. | `chat-decline` (keep); **remove** `chat-decline-other-subject` |
+| **E6 — the declined question is not kept** after "Upload a document". No reminder or "ask again" prompt. | none (confirms `chat-decline`) |
+| **E7 — an archived document's subjects can't be changed** (reverses D7). No "Change subjects" on archived rows or in archived document details; "Restore" first. | `library-archived`, `details-archived`; **remove** `picker-change-subjects-archived` |
+| **E8 — daily limits reset at midnight GMT+7.** A daily-limit message says "You can upload again at 00:00 (GMT+7)" (or send again); hourly and per-minute limits keep showing their own end time. | `library-rate-limited`, `chat-rate-limited` |
+| **F1 — registration uses the email as the username.** Keycloak's stock registration page has no "Username" field: Email, First name, Last name, Password, Confirm password. | `auth-sign-up` |
 
 ---
 
@@ -77,13 +71,14 @@ Typical learner: a graduate student or self-taught engineer with dozens to hundr
 - Web search, notifications (email/push), languages other than English.
 - Restricting a conversation to selected documents.
 - Phone and tablet layouts; native mobile apps.
-- Keycloak's login and registration pages beyond a **theme** (Keycloak hosts them; we only restyle them).
+- Keycloak's login, registration, and email-verification pages beyond the **logo, colors, font, and display name** on Keycloak's stock layout (Keycloak hosts them).
+- On the landing page: pricing, testimonials, customer logos, blog, later-release features, product screenshots, stock "AI" imagery, mobile promises.
 
 ## 5. Key journeys (design these as clickable flows)
 
 Design the screens in §6, then link them into these four flows. They are how the mockups will be reviewed.
 
-**J1 First run (most important).** Sign up (Keycloak) → accept terms of use → empty Library ("Upload your first document") → drop 3 PDFs → watch processing → choose subjects for each (accept suggestions) → "Ready" → "Ask a question" → first cited answer.
+**J1 First run (most important).** Landing page → "Create an account" → sign up and verify email (Keycloak) → empty Library ("Upload your first document") → drop 3 PDFs → watch processing → choose subjects for each (accept suggestions) → "Ready" → "Ask a question" → first cited answer.
 
 **J2 Everyday question.** Open app → Chat → ask → subjects detected → cited answer → follow-up that **adds a second subject** → "Summarize lesson" → open the note.
 
@@ -95,22 +90,32 @@ Design the screens in §6, then link them into these four flows. They are how th
 
 Each screen lists the PRD user stories it implements. **Text in quotes is required wording**; refine everything else freely.
 
+### 6.0 Landing page — US-1
+The public page at `/` for anyone not signed in (and the same page for signed-in visitors). It answers "what is this?" for someone who opens the pilot link from an invitation. It sits **outside the app shell**: no left navigation, no upload tray. One short page, same tokens and fonts as the app (light required, dark supported).
+
+- **Header:** Smart Tutor logo and name on the left; a text link **"Sign in"** on the right.
+- **Hero:** headline, sub-line, **"Create an account"** (primary) and **"Sign in"** (secondary), and the line "Pilot · laptop browsers only." Text only: no product image or illustration.
+- **How it works:** three steps: upload your PDFs, ask a question, check the page it came from.
+- **Trust points:** four short points: only your documents; private to you; title and page cited; a pilot for laptop browsers.
+- **Closing:** the two buttons again; a plain footer (no terms of use link).
+- "Create an account" opens Keycloak's registration page, "Sign in" its login page; both return to the Library. A signed-in visitor who chooses "Sign in" goes straight to the Library.
+- Use the copy in §9 verbatim where it is quoted.
+
 ### 6.1 App shell
-- Left navigation, in this order: **Library** (home), **Chat** (starts a new conversation), **Conversations**, **Notes**, **Subjects**, **Usage**, **Settings**.
+- Left navigation, in this order: **Library** (home), **Chat** (starts a new conversation), **Conversations**, **Notes**, **Subjects**, **Usage**.
 - Reserve space for later items without showing them: **Research map** (R2, after Library), **Quizzes** and **Reports** (R3, after Notes).
 - **Library** shows a count badge when documents need the learner's action (choose subjects, or failed).
-- User menu: name, sign out.
+- User menu: name, sign out. Signing out returns to the landing page (§6.0).
 - A global, non-blocking **upload tray** (bottom right) shows uploads in progress on every screen, so the learner can keep working while files process.
 
-### 6.2 Sign in, sign up, terms — US-1
-- Theme for Keycloak's hosted login, registration, and email-verification pages: logo, colors, typography.
-- **Terms of use** step on first sign-in (in the app): short summary, link to the full terms, a checkbox confirming the learner has the right to upload their documents, and "Continue". The learner can't proceed without accepting.
-- Then land on the empty **Library**.
+### 6.2 Keycloak pages — US-1
+- Keycloak's hosted login, registration, and email-verification pages keep **Keycloak's stock layout** (`keycloak.v2`), fields, and messages. We change only the logo, the accent and background colors, the font, and the display name "Smart Tutor". Registration uses the email as the username, so it has no "Username" field (F1). Show them as low-detail references (`auth-*` states); keep focus rings visible and contrast AA.
+- After sign-up or first sign-in, land on the empty **Library**. There is no terms of use step (PRD Q45); the upload-rights line in the Library replaces its checkbox (§6.3).
 
 ### 6.3 Library — US-2, US-10, US-11
 The home screen and the hub for documents.
 
-**Layout:** page header with **"Upload"**, a drop zone (the whole page accepts dropped files), filter bar, Active / Archived tabs, document table.
+**Layout:** page header with **"Upload"**, a drop zone (the whole page accepts dropped files), filter bar, Active / Archived tabs, document table. Next to the drop zone and "Upload": "Only upload documents you have the right to use." (G2; no checkbox).
 
 **Table columns:** display title (with authors and year beneath), subjects (chips, by the learner's names), state, upload date. Row actions: one contextual button per row (**Choose subjects**, **Retry**, **Restore**, or **Open**), and the rest (change subjects, edit title, archive / restore) under **"More"** (D5).
 
@@ -120,7 +125,7 @@ The home screen and the hub for documents.
 
 | State | What the learner sees |
 |---|---|
-| **Empty (first run)** | Large drop zone: "Upload your first document". Explain in one line: PDFs up to 50 MB and 500 pages; documents stay private. |
+| **Empty (first run)** | Large drop zone: "Upload your first document". Explain in one line: PDFs up to 50 MB and 500 pages; documents stay private. Under it: "Only upload documents you have the right to use." |
 | **Rejected before upload** | Not a PDF, or over 50 MB: the file is not uploaded; inline message on its row in the upload tray with the reason. |
 | **Already in your library** | The browser recognized the file: nothing uploads. "Already in your library" with a link to the document, or **"Restore"** if it is archived. |
 | **Uploading** | Progress bar per file in the upload tray. |
@@ -128,14 +133,14 @@ The home screen and the hub for documents.
 | **Choose subjects** (needs action) | Processing has finished. Highlighted row and a call-to-action **"Choose subjects"**; opens the subject picker (§6.4). A banner at the top of the Library: "*N* documents need subjects". |
 | **Ready** | State "Ready". The document is searchable. |
 | **Failed** | State "Failed" with the reason in plain words (e.g. "This PDF has more than 500 pages", "We couldn't read this PDF", "No text layer (scanned PDFs are not supported yet)") and **"Retry"**. After 3 attempts: "This file could not be processed" and no Retry. |
-| **Archived tab** | Archived documents with **"Restore"**; their subjects can still be changed (D7). One line explaining archived documents are not used for answers but old citations still work. |
+| **Archived tab** | Archived documents with **"Restore"**; their subjects can't be changed until restored (E7). One line explaining archived documents are not used for answers but old citations still work. |
 | **No results** | Filters match nothing: "No documents match these filters" and "Clear filters". |
-| **Rate limited** | Upload limit reached (20 per hour, 100 per day): message with the time uploads are available again, in GMT+7, e.g. "You can upload again at 11:40" (D8). |
+| **Rate limited** | Upload limit reached (20 per hour, 100 per day): message with the time uploads are available again, in GMT+7: "You can upload again at 11:40" for the hourly limit, "You can upload again at 00:00 (GMT+7)" for the daily limit, which resets at midnight GMT+7 (D8, E8). |
 
 **Timing the designer should reflect:** the title appears within about 30 seconds of upload; subjects can be chosen when processing finishes, up to 5 minutes later (15 minutes for very long documents). A duplicate of a file Smart Tutor has already processed is ready within about 10 seconds — show it as a normal, fast Processing state; never say another user has the file.
 
 ### 6.4 Choose subjects (picker) — US-2b
-A dialog (or side panel) opened from a document that needs subjects (processing has finished, Q7), and reused for "Change subjects", including on archived documents (D7).
+A dialog (or side panel) opened from a document that needs subjects (processing has finished, Q7), and reused for "Change subjects" on active documents (not archived ones, E7).
 
 - Document header: display title, authors, year, and the two-sentence **summary** Smart Tutor extracted.
 - **Three suggestion chips**, each selectable. Mark where each came from, subtly: "Your subject", "Shared subject", or "New".
@@ -155,7 +160,7 @@ A side panel (drawer) opened from a Library row.
 
 - Display title (editable inline; "Reset to extracted title"), authors, year, DOI (if any), file name, pages, upload date, state.
 - Summary.
-- Subjects (chips) with **"Change subjects"** (opens §6.4), also when archived (D7).
+- Subjects (chips) with **"Change subjects"** (opens §6.4); not shown when archived (E7).
 - Actions: **Archive** / **Restore**; **Retry** when failed.
 - Note: there is **no download** and **no delete**.
 
@@ -175,11 +180,11 @@ The core screen. Structure: thread header (title, subject chips, citations switc
 | **Subject added** | An inline **system notice** between messages (not a chat bubble): "Added *Retrieval-Augmented Generation* to this conversation". The new chip appears in the header with a brief highlight. |
 | **Maximum reached** | Inline notice when the third subject is added: "This conversation now covers 3 subjects, the maximum. For other topics, start a new conversation." |
 | **Fourth subject refused** | The tutor doesn't answer: "This conversation already covers 3 subjects: *LLMs*, *AI Agents* and *Retrieval-Augmented Generation*. Your question is about *Reinforcement Learning*, so I haven't answered it here." (D3), then "A new conversation will answer it straight away." and **"New conversation"**, which opens a new conversation and **sends the question there right away** (D2). |
-| **Decline** | One or two friendly sentences saying the learner's documents don't cover this. It must not look like an error. Two variants: the question belongs to another of the learner's subjects → **"New conversation"** that carries and sends the question (as above); it fits none of their subjects → say that a document on the topic is needed to continue, with **"Upload a document"** as the only action (D4). |
+| **Decline** | One or two friendly sentences saying the learner's documents don't cover this. It must not look like an error. Say that a document on the topic is needed to continue, with **"Upload a document"** as the only action (D4). Never offer "New conversation" here (E4); the declined question is not kept (E6). |
 | **No active documents in these subjects** | All documents in the conversation's subjects were archived: "There are no active documents in this conversation's subjects." with a link to the Library (Archived tab). History stays readable. |
 | **Summarize lesson** | "Summarize lesson" in the header → progress → confirmation with a link to the note. If a note exists, the action reads "Update lesson note". **If the learner edited that note**, confirm first: "You've edited this note. Replace it with a new summary?" (Replace / Cancel). |
 | **Archived conversation** | Banner "This conversation is archived." with **"Restore"**; input disabled. |
-| **Rate limited** | Too many messages (20 per minute, 500 per day): inline message with the time the learner can send again, in GMT+7 (D8); input disabled until then. |
+| **Rate limited** | Too many messages (20 per minute, 500 per day): inline message with the time the learner can send again, in GMT+7; the daily limit resets at midnight GMT+7 (D8, E8); input disabled until then. |
 | **Error** | The answer failed: a short message and **"Retry"**. |
 | **Started from a note** | Top of the conversation: "Started from note: *Note title*" with a link. |
 
@@ -211,8 +216,7 @@ The core screen. Structure: thread header (title, subject chips, citations switc
 - No limits, credits, or upgrade prompts.
 
 ### 6.11 Settings
-- Time zone: "GMT+7 (Ho Chi Minh City)", read-only; it sets "today" and limit times for everyone in Release 1 (D8).
-- Terms of use (view the accepted version and date).
+Removed in v0.5: no Settings page in Release 1 (PRD Q45).
 
 ## 7. Release 2: research map (low-fidelity wireframes) — US-19, US-20
 
@@ -254,8 +258,8 @@ Use this realistic sample data, not lorem ipsum.
 - *ReAct: Synergizing Reasoning and Acting in Language Models* — Yao et al., 2022 — AI Agents — Ready
 - *Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks* — Lewis et al., 2020 — Retrieval-Augmented Generation — Ready
 - *Toolformer: Language Models Can Teach Themselves to Use Tools* — Schick et al., 2023 — AI Agents, LLMs — Choose subjects
-- *Agentic Design Patterns* (book, no year shown) — AI Agents — Processing
-- *lecture-03-scan.pdf* — Failed: "We couldn't read this PDF"
+- *Agentic Design Patterns* (book, no year shown) — no subjects yet — Processing
+- *lecture-03-scan.pdf* — Failed: "No text layer (scanned PDFs are not supported yet)"
 - *Proximal Policy Optimization Algorithms* — Schulman et al., 2017 — Reinforcement Learning — Ready
 
 **Suggestions for Toolformer:** AI Agents (Your subject), Large Language Models shown as "LLMs" (Your subject), Tool Use (New).
@@ -266,6 +270,13 @@ Use this realistic sample data, not lorem ipsum.
 3. "How does self-attention work?" → "Added LLMs to this conversation" + the maximum notice.
 4. "How does PPO clip the policy update?" → matches **Reinforcement Learning**, a fourth subject → not answered; **"New conversation"**.
 5. A decline example: "What's the best laptop for research?" → not covered by Mai's documents.
+
+**Landing page copy** (§6.0; quoted text is required):
+- Headline: "Ask your own documents. Get answers you can check."
+- Sub-line: "Upload your PDFs. Smart Tutor answers only from them and shows the title and page for every answer."
+- Buttons: "Create an account" (primary), "Sign in" (secondary). Below them: "Pilot · laptop browsers only."
+- How it works: "Upload your PDFs" · "Ask a question" · "Check the page it came from".
+- Trust points: "Only your documents: the tutor never answers from anything else." · "Private to you: no one else sees your documents, conversations, or notes." · "Every answer cites the document title and page." · "A pilot for laptop browsers."
 
 ## 10. Visual, interaction, and accessibility requirements
 
@@ -293,7 +304,6 @@ Use this realistic sample data, not lorem ipsum.
 |---|---|---|
 | Q4 | Should the citations switch also apply to Lesson Notes when citations are carried into notes (Release 3)? | Yes, the same remembered setting. |
 | Q5 | Can the learner upload several files at once? | Yes: multi-select and drag-and-drop of several PDFs, each with its own row; upload limits still apply. |
-| Q6 | Should terms of use be accepted in the app or on Keycloak's registration page? | In the app, on first sign-in (§6.2). |
 | Q8 | Should the first suggestion be pre-selected? | Yes (one-click accept); measured against the PRD target that ≥ 70% of documents keep a suggested subject. |
 
 **Answered**
@@ -322,6 +332,10 @@ Use this realistic sample data, not lorem ipsum.
 
 | Version | Date | PRD | Changes | Screens to redo |
 |---|---|---|---|---|
+| v0.7 | 2026-10-06 | v2.16 | Owner answers: declines never offer "New conversation" (E4); the declined question isn't kept (E6); archived documents' subjects can't be changed, reversing D7 (E7); daily limits reset at midnight GMT+7 (E8); registration without a username field (F1). | Remove `chat-decline-other-subject`, `picker-change-subjects-archived`; redo `library-archived`, `details-archived`, `library-rate-limited`, `chat-rate-limited`, `auth-sign-up` |
+| v0.6 | 2026-10-06 | v2.15 | Joins the two parallel v0.5 versions below; upload-rights line in the Library (G2); no terms link on the landing page; sign-out returns to the landing page (G4). | `library-empty`, `library-default` and other drop-zone states; `landing-default` footer |
+| v0.5 | 2026-10-06 | v2.14 | Scope cut by the owner: no terms of use step, no Settings page; Q6 dropped. | Remove `terms-first-run`, `terms-accepted`, `settings-default`; navigation without Settings |
+| v0.5 (PR #89) | 2026-10-06 | v2.14 (#89) | Public landing page at `/` (§6.0, copy in §9), text only; Keycloak pages reduced to stock layout with logo, colors, font, and display name (§6.2); J1 starts on the landing page; sign-out returns to it; §9 sample fixes (E1, E2). | New `landing-default`; reduce `auth-*`; J1. |
 | v0.4 | 2026-10-04 | v2.7 | Owner decisions on round 2: subjects chosen after processing (Q7); carried question sent right away (D2); no-subject decline asks for a document to continue (D4); rename may match another shared name (D6); subjects of archived documents can change (D7); GMT+7 for limits and "today" (D8); thumbs with labels (D1), fourth-subject wording (D3), and calmer Library rows (D5) accepted; scanned-PDF failure wording; prototype contract (§11 item 6). | Only the states in §0. |
 | v0.3 | 2026-10-03 | v2.1 | Rewrite for learner-uploaded documents: Library home, upload and processing states, subject picker (3 suggestions, keep 1–3, shared names), document details, Subjects (personal rename), multi-subject chat with growth notices and a 3-subject maximum, processing usage; enrollment and "Change subject" removed; R2 research map wireframes; learning loop moved to R3; four review flows; new sample data. | All. New: Library, Choose subjects, Document details, Subjects, Terms. Removed: Subject enrollment. |
 | v0.2 | 2026-10-02 | v1.6 | Laptop only; citations switch (on by default); token usage in the chat status line. | Chat (all states); all screens drop phone variants |
@@ -335,7 +349,13 @@ Use this realistic sample data, not lorem ipsum.
 | 1 (owner) | v0.2 | PRD v2.1 changed the product (own documents, shared subjects, multi-subject threads, new release order). | Rewrite the brief. | v0.3 |
 | 2 (owner) | v0.3 | Round 2 accepted as `design-v0.3`. Checked against PRD v2.2 (architecture only) and v2.3 (`pypdf`, no OCR). One user-facing gap: a scanned PDF without a text layer fails with "No text layer (scanned PDFs are not supported yet)", not "We couldn't read this PDF" (`library-failed`, `details-failed`). | Accept v0.3; code follows the PRD wording. Designer's Q7 and D1–D12 stay open for the PO; story tickets list them where they apply. | v0.4 |
 | 2 (owner) | v0.3 | Answers to the designer's Q7 and D1–D8. D9–D12 were notes. | Q7 no; D2 yes; D4 decline and tell the learner to upload a document to continue, no "New conversation"; D6 allowed; D7 allowed; D8 GMT+7 for everyone. D1, D3, D5 accepted as proposed (recommended by Claude). The owner accepted the longer wait before choosing subjects (Q7) and GMT+7 for everyone (D8) as they are. PRD v2.7. | v0.4 |
-| 3 (designer) | v0.4 | Round 3 delivered: 101 states (new `chat-decline-other-subject`, `picker-change-subjects-archived`). Questions E1–E10 on the prototype's questions page: E1 §9 sample still says "We couldn't read this PDF" for the scan; E2 §9 shows a processing document with a subject; E3 which decline id is which; **E4 when the "another subject" decline can happen at all** (with < 3 subjects the thread grows, at 3 the fourth-subject refusal applies); E5 proposed chat hint "1 is processing, 1 needs subjects"; **E6 the declined question is not kept after "Upload a document"**; **E7 subjects added to an archived document don't show in Subjects until restore**; **E8 daily limits reset at midnight GMT+7?**; E9 user stories per state were guessed (Claude corrected 10 against the PRD); E10 a separate state for D6. | Open for the owner (bold ones change behavior). E1, E2: fix §9 sample data next version. | — |
+| 3 (designer) | v0.4 | Round 3 delivered: 101 states (new `chat-decline-other-subject`, `picker-change-subjects-archived`). Questions E1–E10 on the prototype's questions page: E1 §9 sample still says "We couldn't read this PDF" for the scan; E2 §9 shows a processing document with a subject; E3 which decline id is which; **E4 when the "another subject" decline can happen at all** (with < 3 subjects the thread grows, at 3 the fourth-subject refusal applies); E5 proposed chat hint "1 is processing, 1 needs subjects"; **E6 the declined question is not kept after "Upload a document"**; **E7 subjects added to an archived document don't show in Subjects until restore**; **E8 daily limits reset at midnight GMT+7?**; E9 user stories per state were guessed (Claude corrected 10 against the PRD); E10 a separate state for D6. | Open for the owner (bold ones change behavior). E1, E2: fix §9 sample data next version. | E1, E2: v0.5 |
+| 4 (owner) | v0.4 | A public landing page with an overview of Smart Tutor; as little Keycloak customization as possible. Discussed with PO and UX reviewers (`sdd/reviews/2026-10-06-landing-page-discussion.md`). | Landing page at `/`, text only, same page for signed-in visitors; Keycloak stock layout with logo, colors, font, display name; terms stay in the app (superseded by Q45). PRD v2.14 (#89). E4, E6, E7, E8 still open. | v0.5 |
+| 4 (owner) | v0.4 | Product owner removed the terms of use step and the Settings page from Release 1 (tickets #46, #49, #50). | Drop `terms-first-run`, `terms-accepted`, `settings-default` and the Settings navigation item; Q6 no longer applies. PRD v2.14 (Q45). | v0.5 |
+| 5 (designer) | v0.5 | Round 4 delivered: 102 states (new `landing-default`; `auth-*` reduced to Keycloak's stock layout). Claude removed a focus ring that framed the whole page after each route change (`main[tabindex="-1"]`). Questions: **F1** turn on Keycloak's "Email as username" so registration has no Username field (a realm setting, not theming); F2 keep "Sign in" for signed-in visitors on the landing page (decided: yes, Q46); **F3** the footer "Terms of use" link needs a public `/terms` page (moot in v0.6: no terms link); **F4** keep "Remember me" and "Forgot password?" on the Keycloak login? | Open for the owner (bold ones change behavior or Keycloak settings). | — |
+| 5 (designer) | v0.5 | Round 4 applied the scope cut on top of the landing page. G1 two different v0.5 briefs; G2 the terms checkbox held the upload-rights confirmation; G3 Settings held the theme and the citations default (both already elsewhere, note only); G4 where sign-out goes. F1 email as username; F2 "Sign in" for a signed-in visitor. | G1 merged into v0.6; G2 one line "Only upload documents you have the right to use." under the drop zone, nothing to accept; G3 noted; G4 the landing page (keep). F1, F4 and E4, E6, E7, E8 still open; F3 moot. PRD v2.15 (Q46, Q47). | v0.6 |
+| 6 (owner) | v0.6 | Answers to E4, E6, E7, E8, F1, F2. | E4: "New conversation" only at 3 subjects, never on a decline; E6: don't keep the declined question; E7: no changing subjects of archived documents (low business value; reverses D7); E8: daily limits reset at midnight GMT+7; F1: email as username; F2: confirmed. F4 still open. PRD v2.16 (Q48–Q52). | v0.7 |
+| 7 (designer) | v0.7 | Round 6 delivered: 97 states (removed `chat-decline-other-subject`, `picker-change-subjects-archived`); E4, E7, E8, F1 applied. Questions: **I1** each limit state shows both the hourly and the daily message, though only one applies at a time: keep one state each, or add `library-rate-limited-daily` and `chat-rate-limited-daily`?; I2 fixing an archived document's subject means restoring it, which makes it count for answers again (accepted; revisit after the pilot); H1 the upload-rights line stays under the disabled "Upload" at the limit; E5 chat hint "2 documents can't be used yet: 1 is processing, 1 needs subjects"; E10 a separate D6 state (optional). F4 still open. | Owner: round accepted as `design-v0.7`. F4: follow the designer, "Remember me" and "Forgot password?" on (PRD v2.17, Q53). I1: deferred, low priority; the limit states stay as they are. I2 accepted. H1, E5, E10: not pursued. | v0.7 (accepted) |
 
 ---
 
@@ -343,4 +363,4 @@ Use this realistic sample data, not lorem ipsum.
 
 Paste this, together with this file, to start or continue a round:
 
-> You are designing **Smart Tutor**, a laptop web app (1440 px, light mode) where learners upload their own PDFs and ask a tutor that answers only from them, with citations. Follow the attached design brief **v0.4** exactly; it is the source of truth. Start with **§0 What changed**: this round updates the existing prototype in this project, so change only the states listed there and keep everything else as it is. Keep (1) the four clickable flows in §5 working, (2) every Release 1 screen and state in §6, (3) the wireframes for §7 and §8, and (4) the components page (§10). Use the sample data in §9 and the quoted wording verbatim. Name each frame `<screen>-<state>@v0.4`. Do not design anything listed as out of scope in §4. Follow the prototype contract in §11 item 6: every state in `window.ST.STATES` with its specific user stories in `ref`, each state at `index.html#/<state-id>`, and review chrome hidden when the URL has `?shot=1`. End with a list of questions or proposed changes to the brief.
+> You are designing **Smart Tutor**, a laptop web app (1440 px, light mode) where learners upload their own PDFs and ask a tutor that answers only from them, with citations. Follow the attached design brief **v0.7** exactly; it is the source of truth. Start with **§0 What changed**: this round updates the existing prototype in this project, so change only what is listed there and keep everything else as it is. Keep (1) the four clickable flows in §5 working, (2) every Release 1 screen and state in §6, (3) the wireframes for §7 and §8, and (4) the components page (§10). Use the sample data in §9 and the quoted wording verbatim. Name each frame `<screen>-<state>@v0.7`. Do not design anything listed as out of scope in §4. Follow the prototype contract in §11 item 6: every state in `window.ST.STATES` with its specific user stories in `ref`, each state at `index.html#/<state-id>`, and review chrome hidden when the URL has `?shot=1`. End with a list of questions or proposed changes to the brief.

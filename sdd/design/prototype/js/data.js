@@ -1,8 +1,10 @@
-/* Smart Tutor — sample data for round 3 (brief v0.4, §9). Dates relative to 3 Oct 2026. */
+/* Smart Tutor — sample data for round 6 (brief v0.7, §9). Dates relative to 3 Oct 2026. */
 window.ST = window.ST || {};
 
 ST.TODAY = '2026-10-03';
-ST.BRIEF = 'v0.4';
+ST.BRIEF = 'v0.7';
+/* G2: shown in the Library's upload area; a plain line, nothing to accept. */
+ST.RIGHTS = 'Only upload documents you have the right to use.';
 /* D8: one time zone for everyone in Release 1. */
 ST.TZ = { short: 'GMT+7', long: 'GMT+7 (Ho Chi Minh City)' };
 ST.USER = { name: 'Mai Nguyen', first: 'Mai', email: 'mai.nguyen@example.com', initials: 'MN', tz: 'Asia/Ho_Chi_Minh' };

@@ -1,7 +1,7 @@
 import { SessionExpiredError } from "../auth/authClient";
 import type { Client } from "./generated/client";
 import { client } from "./generated/client.gen";
-import { getUploadLimits, listDocuments, retryDocument, startUpload } from "./generated/sdk.gen";
+import { checkDuplicate, getUploadLimits, listDocuments, retryDocument, startUpload } from "./generated/sdk.gen";
 import type { DocumentResponse, UploadLimitsResponse } from "./generated/types.gen";
 
 export type { DocumentResponse };
@@ -57,6 +57,21 @@ export function rejectionReason(file: File, limits: UploadLimits | null): string
   if (limits && file.size > limits.max_bytes)
     return `Not uploaded. This file is ${megabytes(file.size)} MB; the limit is ${megabytes(limits.max_bytes)} MB.`;
   return null;
+}
+
+// crypto.subtle hashes natively off the main thread, so a 50 MB file doesn't freeze the page.
+export async function sha256Hex(file: Blob): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Only the caller's own library is searched (PRD D19): another learner's copy reads as "not in your library".
+export async function findInLibrary(file: File, apiClient: Client = client): Promise<string | null> {
+  const sha256 = await sha256Hex(file);
+  const { data, error, response } = await checkDuplicate({ client: apiClient, body: { sha256 }, throwOnError: false });
+  if (sessionOver(error, response)) throw new SessionExpiredError();
+  if (!data) throw new Error(`POST /documents/duplicate-check failed (${response?.status ?? "no response"})`);
+  return data.document_id ?? null;
 }
 
 // The API presigns a POST for this learner's key; the browser then sends the file straight to S3 (PRD §9.3). Callers check the file first with rejectionReason.

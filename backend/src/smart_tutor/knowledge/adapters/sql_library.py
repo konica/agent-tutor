@@ -1,16 +1,18 @@
 """PostgreSQL library: one connection and transaction per unit of work."""
 
 import uuid
+from collections.abc import Collection
 from types import TracebackType
 from typing import Any, Self
 
-from sqlalchemy import ColumnElement, Connection, Engine, delete, func, select, update
+from sqlalchemy import ColumnElement, Connection, Engine, delete, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 
 from smart_tutor.knowledge.adapters.sql_tables import chunks, contents, document_subjects, documents, uploads
 from smart_tutor.knowledge.domain.chunk import Chunk
 from smart_tutor.knowledge.domain.content import Content, ContentState
 from smart_tutor.knowledge.domain.document import Document, DocumentState
+from smart_tutor.knowledge.domain.search import ChunkHit
 from smart_tutor.knowledge.domain.upload import Upload, UploadOutcome
 from smart_tutor.knowledge.ports.library import (
     ChunkRepository,
@@ -67,6 +69,7 @@ def _document(row: Any, subject_ids: list[SubjectId]) -> Document:
         content_title=getattr(row, "content_title", None),  # only listings join contents (FOR UPDATE can't)
         content_attempts=getattr(row, "content_attempts", None),
         subject_ids=subject_ids,
+        archived=row.archived,
     )
 
 
@@ -197,6 +200,16 @@ class _Documents(DocumentRepository):
         )
         return self._load(list(rows))
 
+    def find_readable_by_sha256(self, user_id: UserId, sha256: str) -> DocumentId | None:
+        found = self._conn.execute(
+            select(documents.c.document_id)
+            .select_from(documents.join(contents, documents.c.content_id == contents.c.content_id))
+            .where(readable_by(user_id), documents.c.archived.is_(False), contents.c.sha256 == sha256)
+            .order_by(documents.c.created_at, documents.c.document_id)
+            .limit(1)
+        ).scalar()
+        return DocumentId(str(found)) if found else None
+
     def _load(self, rows: list[Any]) -> list[Document]:
         """Documents with their subject ids in one extra query. Postgres keeps no insertion order, so by id."""
         by_document: dict[str, list[SubjectId]] = {}
@@ -247,6 +260,46 @@ class _Chunks(ChunkRepository):
                     for c in new_chunks
                 ],
             )
+
+    def search(
+        self, user_id: UserId, embedding: list[float], subject_ids: Collection[SubjectId], k: int
+    ) -> list[ChunkHit]:
+        # Exact search (#31): with index scans off, Postgres can't use HNSW and drop filtered-out rows after the scan.
+        self._conn.execute(text("SET LOCAL enable_indexscan = off"))
+        distance = chunks.c.embedding.cosine_distance(embedding)
+        in_subjects = (
+            select(document_subjects.c.document_id)
+            .where(
+                document_subjects.c.document_id == documents.c.document_id,
+                document_subjects.c.subject_id.in_(list(subject_ids)),
+            )
+            .exists()
+        )
+        rows = self._conn.execute(
+            select(
+                chunks.c.chunk_id,
+                chunks.c.page,
+                chunks.c.text,
+                documents.c.document_id,
+                # The display title, as Document.title computes it (PRD §9.4).
+                func.coalesce(documents.c.title_override, contents.c.title, documents.c.file_name).label("title"),
+                (1 - distance).label("score"),
+            )
+            .join(documents, documents.c.content_id == chunks.c.content_id)
+            .join(contents, contents.c.content_id == chunks.c.content_id)
+            .where(
+                readable_by(user_id),
+                documents.c.state == DocumentState.READY.value,
+                documents.c.archived.is_(False),
+                in_subjects,
+            )
+            .order_by(distance, chunks.c.chunk_id)
+            .limit(k)
+        )
+        return [
+            ChunkHit(str(r.chunk_id), DocumentId(str(r.document_id)), r.title, r.page, r.text, float(r.score))
+            for r in rows
+        ]
 
 
 class SqlLibraryUnitOfWork(LibraryUnitOfWork):

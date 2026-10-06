@@ -2,6 +2,9 @@
 
 from dataclasses import dataclass
 
+import httpx
+
+from smart_tutor.apps.api.agent_client import AgentClient
 from smart_tutor.knowledge.adapters.s3_object_store import S3ObjectStore
 from smart_tutor.knowledge.adapters.sql_library import SqlLibraryUnitOfWork
 from smart_tutor.knowledge.application import (
@@ -19,6 +22,8 @@ from smart_tutor.shared.adapters.postgres.engine import create_db_engine
 from smart_tutor.shared.config import Settings
 from smart_tutor.subjects.adapters.sql_subjects import SqlSubjectRepository
 from smart_tutor.subjects.application import SubjectNames
+from smart_tutor.tutoring.adapters.sql_threads import SqlThreadRepository
+from smart_tutor.tutoring.application import ConversationService
 
 
 @dataclass(frozen=True)
@@ -27,6 +32,8 @@ class ApiServices:
     documents: DocumentService
     subjects: SubjectNames
     retries: RetryService
+    conversations: ConversationService
+    agent: AgentClient
 
 
 def build_services(settings: Settings) -> ApiServices:
@@ -40,9 +47,13 @@ def build_services(settings: Settings) -> ApiServices:
     limits = load_file_limits(params, settings.max_upload_mb_param, settings.max_pages_param)
     max_attempts = load_max_attempts(params, settings.max_processing_attempts_param)
     queue = SqsMessageQueue(sqs_client(settings), settings.ingest_queue_url)
+    documents = DocumentService(library, max_attempts)
     return ApiServices(
         uploads=UploadService(library, objects, SystemClock(), limits),
-        documents=DocumentService(library, max_attempts),
+        documents=documents,
         subjects=SubjectNames(SqlSubjectRepository(engine)),
         retries=RetryService(library, queue, max_attempts),
+        conversations=ConversationService(SqlThreadRepository(engine), documents, SystemClock()),
+        # Answers stream for a while: a long read timeout between SSE events, a short one to connect.
+        agent=AgentClient(settings.agent_url, httpx.AsyncClient(timeout=httpx.Timeout(10, read=120))),
     )

@@ -1,3 +1,5 @@
+import hashlib
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -6,24 +8,16 @@ from fakes import (
     FakeObjectStore,
     FakeQueue,
     FakeTokenVerifier,
-    FixedClock,
     InMemoryLibrary,
-    InMemorySubjects,
+    api_services,
     fake_tools,
 )
 from smart_tutor.apps.api.main import create_app
-from smart_tutor.apps.api.services import ApiServices
-from smart_tutor.knowledge.application import (
-    DocumentService,
-    IngestionService,
-    RetryService,
-    UploadService,
-    retried_content,
-)
+from smart_tutor.knowledge.application import IngestionService, retried_content
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.domain.principal import Principal
-from smart_tutor.subjects.application import GENERAL_SUBJECT_ID, SubjectNames
+from smart_tutor.subjects.application import GENERAL_SUBJECT_ID
 
 AUTH = {"Authorization": "Bearer ada-token"}
 
@@ -33,12 +27,7 @@ def client() -> TestClient:
     verifier = FakeTokenVerifier()
     verifier.add("ada-token", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
     library, objects, queue = InMemoryLibrary(), FakeObjectStore(), FakeQueue()
-    services = ApiServices(
-        uploads=UploadService(library.unit_of_work, objects, FixedClock(), TEST_LIMITS),
-        documents=DocumentService(library.unit_of_work, max_attempts=3),
-        subjects=SubjectNames(InMemorySubjects()),
-        retries=RetryService(library.unit_of_work, queue, max_attempts=3),
-    )
+    services = api_services(library, objects, queue=queue)
     app = create_app(Settings(), verifier=verifier, services=services)
     app.state.queue = queue
     app.state.objects, app.state.ingestion = (
@@ -90,6 +79,7 @@ def test_openapi_names_the_operations(client: TestClient) -> None:
     paths = client.get("/openapi.json").json()["paths"]
     assert paths["/uploads"]["post"]["operationId"] == "start_upload"
     assert paths["/documents"]["get"]["operationId"] == "list_documents"
+    assert paths["/documents/duplicate-check"]["post"]["operationId"] == "check_duplicate"
     assert paths["/documents/{document_id}/retry"]["post"]["operationId"] == "retry_document"
 
 
@@ -153,3 +143,26 @@ def test_retry_of_an_unknown_or_malformed_id(client: TestClient) -> None:
     assert client.post("/documents/00000000-0000-4000-8000-00000000dead/retry", headers=AUTH).status_code == 404
     assert client.post("/documents/not-a-uuid/retry", headers=AUTH).status_code == 422
     assert client.post("/documents/00000000-0000-4000-8000-00000000dead/retry").status_code == 401
+
+
+def test_duplicate_check_finds_the_callers_document(client: TestClient) -> None:
+    pdf = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
+    started = client.post("/uploads", json={"file_name": "a.pdf"}, headers=AUTH).json()
+    client.app.state.objects.objects[started["fields"]["key"]] = pdf  # type: ignore[attr-defined]
+    client.app.state.ingestion.ingest_upload(started["fields"]["key"])  # type: ignore[attr-defined]
+
+    sha = hashlib.sha256(pdf).hexdigest()
+    found = client.post("/documents/duplicate-check", json={"sha256": sha}, headers=AUTH)
+    assert found.status_code == 200
+    assert found.json() == {"document_id": started["document_id"]}
+    missing = client.post("/documents/duplicate-check", json={"sha256": "0" * 64}, headers=AUTH)
+    assert missing.json() == {"document_id": None}
+
+
+@pytest.mark.parametrize("body", [{"sha256": "A" * 64}, {"sha256": "0" * 63}, {"sha256": "0" * 64, "user_id": "x"}, {}])
+def test_duplicate_check_refuses_a_malformed_request(client: TestClient, body: dict[str, str]) -> None:
+    assert client.post("/documents/duplicate-check", json=body, headers=AUTH).status_code == 422
+
+
+def test_duplicate_check_needs_a_token(client: TestClient) -> None:
+    assert client.post("/documents/duplicate-check", json={"sha256": "0" * 64}).status_code == 401
