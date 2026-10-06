@@ -251,3 +251,67 @@ html.shot .review-bar { display: none; }
 .index-group a .badge { justify-self: start; margin: 2px 0; font-size: var(--fs-12); }
 .index-group a .badge-note { color: var(--accent-text); }
 .badge-ready-q { background: var(--success-soft); color: var(--success); border-color: transparent; }
+
+/* ============ v0.5 additions (brief v0.5, round 4) ============ */
+/* Design-review notes inside a screen; gone with ?shot=1. */
+html.shot .review-note { display: none; }
+
+/* §6.0 · public landing page: outside the app shell, text only */
+.landing { min-height: calc(100dvh - var(--review-h)); display: grid; grid-template-rows: auto 1fr auto; background: var(--bg); color: var(--text); }
+.ld-head, .ld-main, .ld-foot { width: min(1120px, 100% - 2 * var(--sp-8)); margin-inline: auto; }
+.ld-head { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-6) 0; }
+.ld-head .brand { padding: 0; }
+.ld-text-link { display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--sp-2); background: none; border: 0; border-radius: var(--r-sm); color: var(--accent-text); font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; }
+.ld-text-link:hover { text-decoration: underline; color: var(--accent-text); }
+.ld-hero { padding: var(--sp-16) 0 var(--sp-16); border-bottom: 1px solid var(--border); }
+.ld-hero h1 { font-size: 64px; line-height: 1.08; letter-spacing: -.02em; max-width: 28ch; text-wrap: balance; }
+.ld-hero h1 span { display: block; }
+.ld-hero h1 span + span { color: var(--accent-text); }
+.ld-sub { margin-top: var(--sp-6); font-size: var(--fs-20); line-height: 1.55; color: var(--text-2); max-width: 54ch; }
+.ld-ctas { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-top: var(--sp-8); }
+.ld-pilot { margin-top: var(--sp-4); font-size: var(--fs-14); color: var(--text-2); }
+.ld-section { padding: var(--sp-12) 0; border-bottom: 1px solid var(--border); }
+.ld-kicker { font-family: var(--font-body); font-size: var(--fs-12); font-weight: 650; text-transform: uppercase; letter-spacing: .08em; color: var(--text-2); margin-bottom: var(--sp-6); }
+.ld-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-8); }
+.ld-steps li { display: grid; gap: var(--sp-3); align-content: start; }
+.ld-num { font-family: var(--font-mono); font-size: var(--fs-14); color: var(--accent-text); }
+.ld-step { font-family: var(--font-display); font-size: var(--fs-24); font-weight: 600; line-height: 1.25; letter-spacing: -.01em; }
+.ld-trust { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-8); }
+.ld-trust li { padding-top: var(--sp-4); border-top: 2px solid var(--text); font-size: var(--fs-16); line-height: 1.55; color: var(--text-2); }
+.ld-trust strong { color: var(--text); font-weight: 650; }
+.ld-close { padding: var(--sp-16) 0; }
+.ld-close h2 { font-size: var(--fs-40); }
+.ld-close .ld-ctas { margin-top: var(--sp-6); }
+.ld-foot { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-4) 0 var(--sp-6); border-top: 1px solid var(--border); font-size: var(--fs-14); color: var(--text-2); }
+
+/* §6.2 · Keycloak stock keycloak.v2 layout, themed with logo, colours, font, display name only */
+.kc2 { min-height: calc(100dvh - var(--review-h)); background: var(--bg); }
+.kc2-main { display: grid; justify-items: center; align-content: start; gap: var(--sp-6); padding: var(--sp-16) var(--sp-6); }
+.kc2-header { display: flex; align-items: center; gap: var(--sp-3); }
+.kc2-header .logo { width: 36px; height: 36px; }
+.kc2-name { font-size: var(--fs-24); font-weight: 600; }
+.kc2-card { width: min(480px, 100%); display: grid; gap: var(--sp-5); padding: var(--sp-8); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sm); box-shadow: var(--shadow-sm); }
+.kc2-card h1 { font-family: var(--font-body); font-size: var(--fs-24); font-weight: 600; letter-spacing: 0; }
+.kc2-form { display: grid; gap: var(--sp-4); }
+.kc2-req { color: var(--danger); }
+.kc2-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); font-size: var(--fs-14); }
+.kc2-submit { width: 100%; }
+.kc2-alt { text-align: center; font-size: var(--fs-14); color: var(--text-2); }
+.kc2-small { font-size: var(--fs-14); color: var(--text-2); }
+.kc2-alert { display: flex; gap: var(--sp-2); align-items: flex-start; padding: var(--sp-3); background: var(--info-soft); border-radius: var(--r-sm); font-size: var(--fs-14); }
+.kc2-alert .icon { color: var(--info); margin-top: 2px; }
+.kc2-ref { display: flex; gap: var(--sp-2); align-items: flex-start; width: min(480px, 100%); font-size: var(--fs-12); color: var(--text-2); }
+
+/* Programmatic focus on <main> after a route change is for screen readers; it needs no visible ring. */
+main[tabindex="-1"]:focus, main[tabindex="-1"]:focus-visible { outline: none; }
+
+/* v0.5 scope cut (PRD Q45): ids removed this round, listed on the overview */
+.removed-id { display: inline-flex; align-items: center; gap: 6px; }
+.removed-id code { font-family: var(--font-mono); font-size: 13px; color: var(--text-2); }
+
+/* ============ v0.6 additions (brief v0.6, round 5) ============ */
+/* G2 · upload-rights line: plain text, nothing to accept */
+.upload-area { display: grid; justify-items: end; gap: 6px; flex: none; }
+.page-head .upload-rights, .upload-rights { margin: 0; font-size: var(--fs-14); color: var(--text-2); max-width: none; white-space: nowrap; }
+.dz-rights { font-size: var(--fs-14); color: var(--text-2); }
+.drop-overlay .ov-rights { font-family: var(--font-body); font-size: var(--fs-16); font-weight: 500; }
