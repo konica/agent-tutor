@@ -5,10 +5,10 @@ import styles from "./Dialog.module.css";
 
 const FOCUSABLE = 'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
 
-type Props = { title: string; kicker?: string; onClose: () => void; children: ReactNode; footer: ReactNode };
+type Props = { title: string; kicker?: string; wide?: boolean; onClose: () => void; children: ReactNode; footer: ReactNode };
 
 // A modal over the page (DESIGN.md → Accessibility): focus moves in, Tab stays in, Escape closes, focus goes back.
-export function Dialog({ title, kicker, onClose, children, footer }: Props) {
+export function Dialog({ title, kicker, wide, onClose, children, footer }: Props) {
   const titleId = useId();
   const panel = useRef<HTMLDivElement>(null);
 
@@ -41,7 +41,7 @@ export function Dialog({ title, kicker, onClose, children, footer }: Props) {
 
   return (
     <div className={styles.scrim}>
-      <div ref={panel} className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby={titleId} onKeyDown={onKeyDown}>
+      <div ref={panel} className={wide ? `${styles.dialog} ${styles.wide}` : styles.dialog} role="dialog" aria-modal="true" aria-labelledby={titleId} onKeyDown={onKeyDown}>
         <header className={styles.header}>
           <div>
             {kicker && <p className={styles.kicker}>{kicker}</p>}

@@ -1,4 +1,5 @@
 import { Check } from "lucide-react";
+import type { CSSProperties } from "react";
 
 import styles from "./SubjectChip.module.css";
 
@@ -15,7 +16,7 @@ export function subjectHue(hueKey: string): SubjectHue {
 type Props = {
   name: string;
   hueKey: string;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg"; // lg is the picker's 40px touch size
   origin?: string;
   pressed?: boolean;
   disabled?: boolean;
@@ -24,18 +25,19 @@ type Props = {
 
 // The colour marks the dot only; the text keeps the main text colour (DESIGN.md → Tokens).
 export function SubjectChip({ name, hueKey, size = "md", origin, pressed = false, disabled, onToggle }: Props) {
-  const className = `${styles.chip} ${styles[size]}`;
-  const dot = <span className={styles.dot} style={{ background: `var(--subj-${subjectHue(hueKey)})` }} aria-hidden="true" />;
+  const className = size === "md" ? styles.chip : `${styles.chip} ${styles[size]}`;
+  const hue = { "--h": `var(--subj-${subjectHue(hueKey)})` } as CSSProperties;
+  const dot = <span className={styles.dot} aria-hidden="true" />;
   if (!onToggle) {
     return (
-      <span className={className}>
+      <span className={className} style={hue}>
         {dot}
         {name}
       </span>
     );
   }
   return (
-    <button type="button" className={className} aria-pressed={pressed} disabled={disabled} onClick={onToggle}>
+    <button type="button" className={className} style={hue} aria-pressed={pressed} disabled={disabled} onClick={onToggle}>
       {pressed && <Check className={styles.check} strokeWidth={1.5} aria-hidden="true" />}
       {dot}
       {name}

@@ -24,6 +24,18 @@ describe("SubjectChip", () => {
     expect(onToggle).toHaveBeenCalledOnce();
   });
 
+  it("shows the check icon only when pressed", () => {
+    const { container, rerender } = render(<SubjectChip name="LLMs" hueKey="s1" onToggle={() => {}} />);
+    expect(container.querySelector("svg")).toBeNull();
+    rerender(<SubjectChip name="LLMs" hueKey="s1" pressed onToggle={() => {}} />);
+    expect(container.querySelector("svg")).not.toBeNull();
+  });
+
+  it("sets its hue from the key", () => {
+    render(<SubjectChip name="LLMs" hueKey="s1" />);
+    expect(screen.getByText("LLMs").style.getPropertyValue("--h")).toBe(`var(--subj-${subjectHue("s1")})`);
+  });
+
   it("does not call onToggle when disabled", () => {
     const onToggle = vi.fn();
     render(<SubjectChip name="LLMs" hueKey="s1" disabled onToggle={onToggle} />);
