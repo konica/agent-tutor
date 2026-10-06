@@ -24,6 +24,8 @@ from smart_tutor.shared.adapters.model_factory import ChatRole, ModelFactory
 from smart_tutor.shared.adapters.postgres.engine import create_db_engine
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.ports.message_queue import MessageQueue
+from smart_tutor.subjects.adapters.sql_subjects import SqlSubjectRepository
+from smart_tutor.subjects.application import SubjectCatalogService
 
 logger = logging.getLogger(__name__)
 
@@ -63,15 +65,18 @@ def main() -> None:
     chunker, chunker_id = build_chunker(settings.chunking)
     models = ModelFactory(settings)
     embedding = settings.models.embedding
+    embeddings = models.embedding()
     tools = ProcessingTools(
         extractor=PypdfExtractor(),
         describer=DocumentDescriber(models.chat(ChatRole.AGENT)),  # PRD §9.13: document description
         chunker=chunker,
         chunker_id=chunker_id,
-        embeddings=models.embedding(),
+        embeddings=embeddings,
         embedding_model=embedding.model_id,
         embedding_dim=embedding_dimension(embedding.params),
     )
+    backfilled = SubjectCatalogService(SqlSubjectRepository(engine), embeddings).embed_missing_names()
+    logger.info("embedded %d subject names", backfilled)
     limits = load_file_limits(
         SsmParameterStore(ssm_client(settings)), settings.max_upload_mb_param, settings.max_pages_param
     )

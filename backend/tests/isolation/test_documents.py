@@ -15,15 +15,16 @@ from fakes import (
     FixedClock,
     InMemoryLibrary,
     InMemorySubjects,
+    fake_embeddings,
     fake_tools,
 )
 from smart_tutor.apps.api.main import create_app
 from smart_tutor.apps.api.services import ApiServices
-from smart_tutor.knowledge.application import DocumentService, IngestionService, UploadService
+from smart_tutor.knowledge.application import DocumentService, IngestionService, SubjectChoiceService, UploadService
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.domain.principal import Principal
-from smart_tutor.subjects.application import SubjectNames
+from smart_tutor.subjects.application import SubjectCatalogService, SubjectNames, SubjectSuggester
 
 A = {"Authorization": "Bearer token-a"}
 B = {"Authorization": "Bearer token-b"}
@@ -33,11 +34,16 @@ def setup() -> tuple[TestClient, FakeObjectStore, IngestionService]:
     verifier = FakeTokenVerifier()
     verifier.add("token-a", Principal(UserId("learner-a"), "A", frozenset({"learner"})))
     verifier.add("token-b", Principal(UserId("learner-b"), "B", frozenset({"learner"})))
-    library, objects = InMemoryLibrary(), FakeObjectStore()
+    library, objects, subjects = InMemoryLibrary(), FakeObjectStore(), InMemorySubjects()
     services = ApiServices(
         uploads=UploadService(library.unit_of_work, objects, FixedClock(), TEST_LIMITS),
         documents=DocumentService(library.unit_of_work),
-        subjects=SubjectNames(InMemorySubjects()),
+        subjects=SubjectNames(subjects),
+        subject_choice=SubjectChoiceService(
+            library.unit_of_work,
+            SubjectSuggester(subjects, SubjectNames(subjects)),
+            SubjectCatalogService(subjects, fake_embeddings(8)),
+        ),
     )
     client = TestClient(create_app(Settings(), verifier=verifier, services=services))
     return client, objects, IngestionService(library.unit_of_work, objects, fake_tools(), TEST_LIMITS)
@@ -61,10 +67,29 @@ def test_b_never_sees_the_subjects_of_a_document() -> None:
     objects.objects[stored["fields"]["key"]] = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
     ingestion.ingest_upload(stored["fields"]["key"])
 
-    assert [(d["state"], d["subjects"]) for d in client.get("/documents", headers=A).json()] == [
-        ("awaiting_subjects", [])
+    general = "00000000-0000-4000-8000-000000000001"
+    chosen = client.put(f"/documents/{stored['document_id']}/subjects", json={"subject_ids": [general]}, headers=A)
+
+    assert chosen.status_code == 200
+    assert [(d["state"], [s["name"] for s in d["subjects"]]) for d in client.get("/documents", headers=A).json()] == [
+        ("ready", ["General"])
     ]
     assert client.get("/documents", headers=B).json() == []
+
+
+def test_b_cannot_read_a_suggestions_or_set_a_subjects() -> None:
+    client, objects, ingestion = setup()
+    stored = client.post("/uploads", json={"file_name": "a1.pdf"}, headers=A).json()
+    objects.objects[stored["fields"]["key"]] = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
+    ingestion.ingest_upload(stored["fields"]["key"])
+    doc = stored["document_id"]
+
+    assert client.get(f"/documents/{doc}/subject-suggestions", headers=B).status_code == 404
+    put = client.put(f"/documents/{doc}/subjects", json={"new_names": ["Deep Learning"]}, headers=B)
+    assert put.status_code == 404
+    [mine] = client.get("/documents", headers=A).json()
+    assert (mine["state"], mine["subjects"]) == ("awaiting_subjects", [])
+    assert client.get(f"/documents/{doc}/subject-suggestions", headers=A).status_code == 200
 
 
 def test_b_cannot_get_a_presigned_post_for_a_key() -> None:

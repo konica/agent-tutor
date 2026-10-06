@@ -5,6 +5,20 @@ export type ClientOptions = {
 };
 
 /**
+ * ChooseSubjectsRequest
+ */
+export type ChooseSubjectsRequest = {
+    /**
+     * New Names
+     */
+    new_names?: Array<string>;
+    /**
+     * Subject Ids
+     */
+    subject_ids?: Array<string>;
+};
+
+/**
  * DocumentResponse
  */
 export type DocumentResponse = {
@@ -131,6 +145,46 @@ export type SubjectResponse = {
 };
 
 /**
+ * SubjectSuggestionsResponse
+ */
+export type SubjectSuggestionsResponse = {
+    /**
+     * Document Id
+     */
+    document_id: string;
+    /**
+     * Suggestions
+     */
+    suggestions: Array<SuggestionResponse>;
+    /**
+     * Summary
+     */
+    summary: string | null;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * SuggestionResponse
+ */
+export type SuggestionResponse = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Origin
+     */
+    origin: 'shared' | 'yours' | 'new';
+    /**
+     * Subject Id
+     */
+    subject_id: string | null;
+};
+
+/**
  * UploadLimitsResponse
  */
 export type UploadLimitsResponse = {
@@ -214,6 +268,66 @@ export type CheckDuplicateResponses = {
 };
 
 export type CheckDuplicateResponse = CheckDuplicateResponses[keyof CheckDuplicateResponses];
+
+export type GetSubjectSuggestionsData = {
+    body?: never;
+    path: {
+        /**
+         * Document Id
+         */
+        document_id: string;
+    };
+    query?: never;
+    url: '/documents/{document_id}/subject-suggestions';
+};
+
+export type GetSubjectSuggestionsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetSubjectSuggestionsError = GetSubjectSuggestionsErrors[keyof GetSubjectSuggestionsErrors];
+
+export type GetSubjectSuggestionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: SubjectSuggestionsResponse;
+};
+
+export type GetSubjectSuggestionsResponse = GetSubjectSuggestionsResponses[keyof GetSubjectSuggestionsResponses];
+
+export type ChooseSubjectsData = {
+    body: ChooseSubjectsRequest;
+    path: {
+        /**
+         * Document Id
+         */
+        document_id: string;
+    };
+    query?: never;
+    url: '/documents/{document_id}/subjects';
+};
+
+export type ChooseSubjectsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ChooseSubjectsError = ChooseSubjectsErrors[keyof ChooseSubjectsErrors];
+
+export type ChooseSubjectsResponses = {
+    /**
+     * Successful Response
+     */
+    200: DocumentResponse;
+};
+
+export type ChooseSubjectsResponse = ChooseSubjectsResponses[keyof ChooseSubjectsResponses];
 
 export type GetMeData = {
     body?: never;

@@ -10,15 +10,16 @@ from fakes import (
     FixedClock,
     InMemoryLibrary,
     InMemorySubjects,
+    fake_embeddings,
     fake_tools,
 )
 from smart_tutor.apps.api.main import create_app
 from smart_tutor.apps.api.services import ApiServices
-from smart_tutor.knowledge.application import DocumentService, IngestionService, UploadService
+from smart_tutor.knowledge.application import DocumentService, IngestionService, SubjectChoiceService, UploadService
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.domain.principal import Principal
-from smart_tutor.subjects.application import SubjectNames
+from smart_tutor.subjects.application import SubjectCatalogService, SubjectNames, SubjectSuggester
 
 AUTH = {"Authorization": "Bearer ada-token"}
 
@@ -27,11 +28,16 @@ AUTH = {"Authorization": "Bearer ada-token"}
 def client() -> TestClient:
     verifier = FakeTokenVerifier()
     verifier.add("ada-token", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
-    library, objects = InMemoryLibrary(), FakeObjectStore()
+    library, objects, subjects = InMemoryLibrary(), FakeObjectStore(), InMemorySubjects()
     services = ApiServices(
         uploads=UploadService(library.unit_of_work, objects, FixedClock(), TEST_LIMITS),
         documents=DocumentService(library.unit_of_work),
-        subjects=SubjectNames(InMemorySubjects()),
+        subjects=SubjectNames(subjects),
+        subject_choice=SubjectChoiceService(
+            library.unit_of_work,
+            SubjectSuggester(subjects, SubjectNames(subjects)),
+            SubjectCatalogService(subjects, fake_embeddings(8)),
+        ),
     )
     app = create_app(Settings(), verifier=verifier, services=services)
     app.state.objects, app.state.ingestion = (
@@ -118,3 +124,96 @@ def test_duplicate_check_refuses_a_malformed_request(client: TestClient, body: d
 
 def test_duplicate_check_needs_a_token(client: TestClient) -> None:
     assert client.post("/documents/duplicate-check", json={"sha256": "0" * 64}).status_code == 401
+
+
+def awaiting_document(client: TestClient) -> str:
+    started = client.post("/uploads", json={"file_name": "paper.pdf"}, headers=AUTH).json()
+    key = started["fields"]["key"]
+    client.app.state.objects.objects[key] = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()  # type: ignore[attr-defined]
+    client.app.state.ingestion.ingest_upload(key)  # type: ignore[attr-defined]
+    return str(started["document_id"])
+
+
+def test_suggestions_for_an_awaiting_document(client: TestClient) -> None:
+    doc = awaiting_document(client)
+
+    r = client.get(f"/documents/{doc}/subject-suggestions", headers=AUTH)
+
+    assert r.status_code == 200
+    body = r.json()
+    assert body["document_id"] == doc
+    assert body["summary"]
+    assert len(body["suggestions"]) == 3
+    assert {s["origin"] for s in body["suggestions"]} <= {"shared", "yours", "new"}
+    assert all(s["name"] for s in body["suggestions"])
+
+
+def test_choosing_a_suggestion_makes_the_document_ready(client: TestClient) -> None:
+    doc = awaiting_document(client)
+    [first, *_] = client.get(f"/documents/{doc}/subject-suggestions", headers=AUTH).json()["suggestions"]
+
+    r = client.put(f"/documents/{doc}/subjects", json={"new_names": [first["name"]]}, headers=AUTH)
+
+    assert r.status_code == 200
+    assert r.json()["state"] == "ready"
+    assert [s["name"] for s in r.json()["subjects"]] == [first["name"]]
+    [listed] = client.get("/documents", headers=AUTH).json()
+    assert (listed["state"], [s["name"] for s in listed["subjects"]]) == ("ready", [first["name"]])
+
+
+def test_choosing_an_existing_subject_by_id(client: TestClient) -> None:
+    doc = awaiting_document(client)
+    general = "00000000-0000-4000-8000-000000000001"
+
+    r = client.put(f"/documents/{doc}/subjects", json={"subject_ids": [general]}, headers=AUTH)
+
+    assert r.status_code == 200
+    assert r.json()["subjects"] == [{"subject_id": general, "name": "General"}]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"subject_ids": [], "new_names": []},
+        {"subject_ids": [f"00000000-0000-4000-8000-00000000000{n}" for n in range(1, 5)]},
+        {"subject_ids": ["00000000-0000-4000-8000-000000000001"] * 2},
+        {"subject_ids": ["00000000-0000-4000-8000-0000000000ff"]},
+        {"subject_ids": ["abc"]},
+        {"new_names": [""]},
+        {"new_names": ["x" * 61]},
+        {"subject_ids": ["00000000-0000-4000-8000-000000000001"], "user_id": "x"},
+    ],
+)
+def test_choosing_refuses_an_invalid_request(client: TestClient, body: dict[str, object]) -> None:
+    doc = awaiting_document(client)
+
+    assert client.put(f"/documents/{doc}/subjects", json=body, headers=AUTH).status_code == 422
+    [listed] = client.get("/documents", headers=AUTH).json()
+    assert listed["state"] == "awaiting_subjects"
+
+
+def test_a_malformed_document_id_is_422(client: TestClient) -> None:
+    assert client.put("/documents/abc/subjects", json={"new_names": ["X"]}, headers=AUTH).status_code == 422
+    assert client.get("/documents/abc/subject-suggestions", headers=AUTH).status_code == 422
+
+
+def test_a_processing_document_is_409(client: TestClient) -> None:
+    doc = client.post("/uploads", json={"file_name": "paper.pdf"}, headers=AUTH).json()["document_id"]
+
+    assert client.get(f"/documents/{doc}/subject-suggestions", headers=AUTH).status_code == 409
+    put = client.put(f"/documents/{doc}/subjects", json={"new_names": ["X"]}, headers=AUTH)
+    assert put.status_code == 409
+
+
+def test_an_unknown_document_is_404(client: TestClient) -> None:
+    doc = "00000000-0000-4000-8000-0000000000aa"
+
+    assert client.get(f"/documents/{doc}/subject-suggestions", headers=AUTH).status_code == 404
+    assert client.put(f"/documents/{doc}/subjects", json={"new_names": ["X"]}, headers=AUTH).status_code == 404
+
+
+def test_the_subject_routes_need_a_token(client: TestClient) -> None:
+    doc = "00000000-0000-4000-8000-0000000000aa"
+
+    assert client.get(f"/documents/{doc}/subject-suggestions").status_code == 401
+    assert client.put(f"/documents/{doc}/subjects", json={"new_names": ["X"]}).status_code == 401

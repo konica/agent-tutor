@@ -7,7 +7,7 @@ from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from smart_tutor.apps.api.services import ApiServices
-from smart_tutor.knowledge.application import DocumentService, UploadService
+from smart_tutor.knowledge.application import DocumentService, SubjectChoiceService, UploadService
 from smart_tutor.shared.domain.errors import IntrospectionUnavailableError, UnauthenticatedError
 from smart_tutor.shared.domain.principal import Principal
 from smart_tutor.shared.ports.token_verifier import TokenVerifier
@@ -56,6 +56,10 @@ def _documents(request: Request) -> DocumentService:
     return _services(request).documents
 
 
+def _subject_choice(request: Request) -> SubjectChoiceService:
+    return _services(request).subject_choice
+
+
 def _subject_names(request: Request) -> SubjectNames:
     return _services(request).subjects
 
@@ -63,3 +67,4 @@ def _subject_names(request: Request) -> SubjectNames:
 Uploads = Annotated[UploadService, Depends(_uploads)]
 Documents = Annotated[DocumentService, Depends(_documents)]
 Subjects = Annotated[SubjectNames, Depends(_subject_names)]
+SubjectChoice = Annotated[SubjectChoiceService, Depends(_subject_choice)]
