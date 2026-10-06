@@ -44,8 +44,18 @@ def test_streams_deltas_then_citations_then_done() -> None:
     got = events(response.text)
     assert "".join(d["text"] for e, d in got if e == "delta") == "It weighs tokens [1]."
     assert len([e for e, _ in got if e == "delta"]) > 1  # streamed, not one block
-    assert got[-2] == ("citations", {"citations": [{"chunk_id": "c1", "document_title": "a.pdf", "page": 3}]})
+    assert got[-2] == ("citations", {"citations": [{"n": 1, "chunk_id": "c1", "document_title": "a.pdf", "page": 3}]})
     assert got[-1] == ("done", {})
+
+
+def test_citations_carry_the_marker_number_the_answer_uses() -> None:
+    other = RetrievedChunk("c2", "b.pdf", None, "Other text.", 0.8)
+    c, _ = client(FakeRetriever([CHUNK, other]), reply="Only the second [2].")
+    got = events(c.post("/ask", json=BODY, headers=AUTH).text)
+    assert got[-2] == (
+        "citations",
+        {"citations": [{"n": 2, "chunk_id": "c2", "document_title": "b.pdf", "page": None}]},
+    )
 
 
 def test_no_chunks_streams_the_fixed_answer() -> None:

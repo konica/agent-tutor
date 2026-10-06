@@ -1,6 +1,7 @@
 """Agent HTTP server (internal ClusterIP): POST /ask streams one answer as SSE (PRD §9.2, ADR 0007).
 
-Events, each ``event: <name>\\ndata: <json>\\n\\n``: ``delta`` {"text"} in order, then ``citations`` once, then
+Events, each ``event: <name>\\ndata: <json>\\n\\n``: ``delta`` {"text"} in order, then ``citations`` once
+({"citations": [{"n", "chunk_id", "document_title", "page"}]}, ``n`` being the answer's ``[n]`` marker), then
 ``done``; or ``error`` {"code": "unauthenticated" | "unavailable", "message"}, which ends the stream.
 """
 
@@ -68,7 +69,7 @@ async def answer_events(graph: AskGraph, body: AskRequest, token: str) -> AsyncI
                 if not streamed:  # the fixed no-chunks answer never went through the model
                     yield sse("delta", {"text": update["answer"]})
                 citations = [
-                    {"chunk_id": c.chunk_id, "document_title": c.document_title, "page": c.page}
+                    {"n": c.n, "chunk_id": c.chunk_id, "document_title": c.document_title, "page": c.page}
                     for c in update["citations"]
                 ]
                 yield sse("citations", {"citations": citations})
