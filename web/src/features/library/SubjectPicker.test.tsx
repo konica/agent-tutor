@@ -71,14 +71,17 @@ describe("SubjectPicker", () => {
   });
 
   it("saves ids and new names, then confirms and closes on Done", async () => {
-    const props = setup();
+    const resolved: DocumentResponse = { ...saved, subjects: [{ subject_id: "s-agents", name: "AI Agents" }, { subject_id: "s-existing", name: "Tools" }] };
+    const props = setup({ save: vi.fn(async () => resolved) });
     await userEvent.click(await chip(/Tool Use/));
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(props.save).toHaveBeenCalledWith("d1", { subject_ids: ["s-agents"], new_names: ["Tool Use"] });
     expect(await screen.findByText("Subjects saved.")).toBeVisible();
+    expect(screen.getByText("Tools")).toBeVisible(); // the server's name, not the suggestion's
+    expect(screen.queryByText("Tool Use")).not.toBeInTheDocument();
     expect(screen.getByText("is ready to use.", { exact: false })).toHaveTextContent("Toolformer is ready to use.");
     expect(props.onSaved).toHaveBeenCalledTimes(1);
-    expect(props.onSaved).toHaveBeenCalledWith(saved);
+    expect(props.onSaved).toHaveBeenCalledWith(resolved);
     const done = screen.getByRole("button", { name: "Done" });
     expect(done).toHaveFocus();
     await userEvent.click(done);
@@ -99,11 +102,18 @@ describe("SubjectPicker", () => {
     expect(props.onSaved).not.toHaveBeenCalled();
   });
 
+  it("shows only the generic message when the error has no server detail", async () => {
+    setup({ save: vi.fn(async () => { throw new Error(""); }) });
+    await userEvent.click(await screen.findByRole("button", { name: "Save" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("Couldn't save subjects. Try again.");
+  });
+
   it("disables Save while saving", async () => {
     let finish!: (d: DocumentResponse) => void;
     const save = vi.fn(() => new Promise<DocumentResponse>((r) => (finish = r)));
     setup({ save });
-    await userEvent.click(await screen.findByRole("button", { name: "Save" }));
+    await chip(/AI Agents/);
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     finish(saved);
     expect(await screen.findByText("Subjects saved.")).toBeVisible();

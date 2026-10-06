@@ -23,7 +23,7 @@ type Props = {
 const defaultLoad = (id: string) => loadSubjectSuggestions(id);
 const defaultSave = (id: string, choice: Choice) => saveSubjects(id, choice);
 
-// The learner picks 1-3 of three ranked suggestions for a document (PRD §8 US-4). The first is pre-selected.
+// The learner picks 1-3 of three ranked suggestions for a document (PRD §8 US-2b). The first is pre-selected.
 export function SubjectPicker({ document, load = defaultLoad, save = defaultSave, onClose, onSaved }: Props) {
   const [loaded, setLoaded] = useState<SubjectSuggestions | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -110,8 +110,8 @@ export function SubjectPicker({ document, load = defaultLoad, save = defaultSave
           </Banner>
         </div>
         <div className={styles.chips}>
-          {chosen.map((s) => (
-            <SubjectChip key={s.subject_id ?? s.name} name={s.name} hueKey={s.subject_id ?? s.name} />
+          {savedDoc.subjects.map((s) => (
+            <SubjectChip key={s.subject_id} name={s.name} hueKey={s.subject_id} />
           ))}
         </div>
       </Dialog>

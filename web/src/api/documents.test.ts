@@ -197,6 +197,12 @@ describe("saveSubjects", () => {
     await expect(saveSubjects("d1", choice, apiClient)).rejects.toThrow("Choose 1 to 3 subjects");
   });
 
+  it("rejects with an empty message on a 500 without detail", async () => {
+    const { apiClient } = api(() => json({}, 500));
+    await expect(saveSubjects("d1", choice, apiClient)).rejects.toThrow(new Error(""));
+    await expect(saveSubjects("d1", choice, apiClient)).rejects.toHaveProperty("message", "");
+  });
+
   it("rejects with the server's detail on 409", async () => {
     const { apiClient } = api(() => json({ detail: "Document is not ready for subjects" }, 409));
     await expect(saveSubjects("d1", choice, apiClient)).rejects.toThrow("Document is not ready for subjects");

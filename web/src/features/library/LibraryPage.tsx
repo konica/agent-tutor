@@ -45,6 +45,7 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, load
   const [rejected, setRejected] = useState<{ name: string; reason: string }[]>([]);
   const [alreadyIn, setAlreadyIn] = useState<{ name: string; documentId: string }[]>([]);
   const seen = useRef<Map<string, DocumentResponse["state"]> | null>(null);
+  const justSaved = useRef(new Set<string>()); // saved here, so the poll must not announce "is ready." over "Subjects saved."
   const [picking, setPicking] = useState<DocumentResponse | null>(null);
   const statusRegion = useRef<HTMLParagraphElement>(null);
   const wasPicking = useRef(false);
@@ -59,7 +60,8 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, load
   }, [picking]);
 
   async function onSaved(doc: DocumentResponse) {
-    seen.current?.set(doc.document_id, "ready"); // the poll must not announce "is ready." again
+    justSaved.current.add(doc.document_id);
+    seen.current?.set(doc.document_id, "ready");
     setStatus(`Subjects saved. ${doc.title} is ready to use.`);
     await refresh();
   }
@@ -71,9 +73,10 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, load
     seen.current = new Map(documents.map((d) => [d.document_id, d.state]));
     if (!before) return; // the first load is not a change
     const changes = documents
-      .filter((d) => before.has(d.document_id) && before.get(d.document_id) !== d.state)
+      .filter((d) => before.has(d.document_id) && before.get(d.document_id) !== d.state && !justSaved.current.has(d.document_id))
       .map(announceChange)
       .filter((message): message is string => message !== null);
+    for (const d of documents) if (d.state === "ready") justSaved.current.delete(d.document_id);
     if (changes.length) setStatus(changes.join(" "));
   }, [documents]);
 
