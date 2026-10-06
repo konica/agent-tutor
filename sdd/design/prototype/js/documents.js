@@ -1,4 +1,4 @@
-/* Smart Tutor v0.4 — documents: sign-in theme, terms, shared list pattern, Library, uploads,
+/* Smart Tutor v0.7 — documents: sign-in theme, shared list pattern, Library, uploads,
    subject picker (§6.4), document details (§6.5), Subjects (§6.9). */
 (function () {
   const ST = window.ST;
@@ -6,90 +6,45 @@
   const esc = ST.esc, ic = ST.ic;
 
   /* =========================================================
-     §6.2 Keycloak theme + terms
+     §6.2 Keycloak pages: stock keycloak.v2 layout, fields and messages.
+     The theme changes only the logo, accent and background colours, font and display name.
+     Low-detail references, not designed layouts.
      ========================================================= */
-  function kcAside() {
-    return `<aside class="kc-aside">
-      <span class="brand">${ST.logo()}<span class="word">Smart Tutor</span></span>
-      <div><blockquote>Ask your own papers. See the page every answer came from.</blockquote>
-        <ul class="kc-points">
-          <li>${ic('upload')}Upload your PDFs; they stay private</li>
-          <li>${ic('doc')}Every answer cites the document and page</li>
-          <li>${ic('note')}Turn conversations into lesson notes</li>
-        </ul></div>
-      <small>© 2026 Smart Tutor</small>
-      <svg class="lines" viewBox="0 0 200 200" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1"><path d="M20 180V60c30-10 60-6 80 8v120c-20-14-50-18-80-8zM180 180V60c-30-10-60-6-80 8v120c20-14 50-18 80-8z"/><path d="M30 80c22-6 44-4 62 6M30 100c22-6 44-4 62 6M30 120c22-6 44-4 62 6M108 86c18-10 40-12 62-6M108 106c18-10 40-12 62-6"/></svg>
-    </aside>`;
-  }
-  const kc = (card) => `<div class="kc">${kcAside()}<main class="kc-main" id="main-content" tabindex="-1"><div class="kc-card">${card}</div></main></div>`;
-
-  ST.authSignIn = () => kc(`
-    <div><h1>Sign in</h1><p class="kc-sub">Welcome back to your library.</p></div>
-    <form class="od-stack" style="--od-gap:16px" novalidate onsubmit="return false">
-      <div class="field"><label for="kc-user">Email or username</label><input class="input" id="kc-user" type="email" autocomplete="username" value="mai.nguyen@example.com" data-autofocus></div>
-      <div class="field"><label for="kc-pass">Password</label><input class="input" id="kc-pass" type="password" autocomplete="current-password" value="attention2017"></div>
-      <div class="kc-row"><label class="check"><input type="checkbox" checked> Remember me</label><a href="#/auth-sign-in">Forgot password?</a></div>
-      <button class="btn btn-primary btn-lg" type="button" data-action="go" data-href="#/library-default">Sign in</button>
-    </form>
-    <p class="kc-alt">New to Smart Tutor? <a href="#/auth-sign-up">Create an account</a></p>`);
-
-  ST.authSignUp = () => kc(`
-    <div><h1>Create your account</h1><p class="kc-sub">Bring your papers. Start asking in a few minutes.</p></div>
-    <form class="od-stack" style="--od-gap:16px" novalidate onsubmit="return false">
-      <div class="kc-names">
-        <div class="field"><label for="kc-fn">First name</label><input class="input" id="kc-fn" autocomplete="given-name" value="Mai" data-autofocus></div>
-        <div class="field"><label for="kc-ln">Last name</label><input class="input" id="kc-ln" autocomplete="family-name" value="Nguyen"></div>
-      </div>
-      <div class="field"><label for="kc-em">Email</label><input class="input" id="kc-em" type="email" autocomplete="email" value="mai.nguyen@example.com"></div>
-      <div class="field"><label for="kc-pw">Password</label><input class="input" id="kc-pw" type="password" autocomplete="new-password" aria-describedby="kc-pw-h" value="attention2017"><span class="helper" id="kc-pw-h">At least 8 characters.</span></div>
-      <div class="field"><label for="kc-pw2">Confirm password</label><input class="input" id="kc-pw2" type="password" autocomplete="new-password" value="attention2017"></div>
-      <button class="btn btn-primary btn-lg" type="button" data-action="go" data-href="#/auth-verify-email">Create account</button>
-    </form>
-    <p class="kc-alt">Already have an account? <a href="#/auth-sign-in">Sign in</a></p>`);
-
-  ST.authVerify = () => kc(`
-    <span class="mail-art">${ic('mail', 'lg')}</span>
-    <div><h1>Check your email</h1><p class="kc-sub">We sent a verification link to <strong>mai.nguyen@example.com</strong>. Open it to finish creating your account.</p></div>
-    <div class="od-stack" style="--od-gap:12px">
-      <button class="btn btn-secondary btn-lg" type="button" data-action="resend" data-autofocus>${ic('retry', 'sm')}Resend email</button>
-      <button class="btn btn-ghost" type="button" data-action="go" data-href="#/terms-first-run">I've verified my email — continue</button>
-    </div>
-    <p class="kc-alt">Wrong address? <a href="#/auth-sign-up">Use a different email</a></p>`);
-  ST.actions.resend = () => ST.toast('Verification email sent again.');
-
-  ST.T = { accepted: false };
-  const firstRunTop = () => `<header class="fr-top"><span class="brand" style="padding:0">${ST.logo()}<span class="word">Smart Tutor</span></span>
-    <span class="od-row small muted"><span class="avatar" aria-hidden="true">${ST.USER.initials}</span>${esc(ST.USER.name)}</span></header>`;
-  ST.termsView = () => `<div class="first-run">${firstRunTop()}
-    <main class="fr-main" id="main-content" tabindex="-1" style="width:min(760px,100%)">
-      <div><p class="steps">Welcome, ${esc(ST.USER.first)}. One step before your library.</p>
-        <h1>Terms of use</h1>
-        <p class="lede">The short version is below. The full terms of use apply.</p></div>
-      <ul class="terms-list">
-        <li>${ic('lock')}<span><strong>Your documents, conversations and notes are private to you.</strong> Nobody else can see them.</span></li>
-        <li>${ic('tag')}<span><strong>Subject names are shared.</strong> Anyone using Smart Tutor can see the subject names you create, so don't put personal information in them.</span></li>
-        <li>${ic('shield')}<span><strong>Only upload documents you have the right to use</strong>, such as papers you can access or notes you wrote.</span></li>
-        <li>${ic('info')}<span><strong>Answers come only from your documents</strong> and can still contain mistakes. Check the cited page when it matters.</span></li>
-      </ul>
-      <p><button class="btn btn-ghost" type="button" data-action="full-terms" style="padding:0">${ic('doc', 'sm')}Read the full terms of use</button></p>
-      <label class="consent"><input type="checkbox" data-change="terms-accept" ${ST.T.accepted ? 'checked' : ''} data-fk="terms-cb" aria-describedby="terms-help">
-        <span>I confirm I have the right to upload the documents I add to Smart Tutor, and I accept the terms of use.</span></label>
-      <div class="fr-foot">
-        <span class="helper" id="terms-help" aria-live="polite">${ST.T.accepted ? 'Thanks. You can continue.' : 'Accept the terms to continue.'}</span>
-        <button class="btn btn-primary btn-lg" type="button" data-action="go" data-href="#/library-empty" ${ST.T.accepted ? '' : 'disabled'}>Continue${ic('arrowRight', 'sm')}</button>
-      </div>
+  const kc = (title, body) => `<div class="kc2">
+    <main class="kc2-main" id="main-content" tabindex="-1">
+      <header class="kc2-header" data-od-id="kc-header">${ST.logo()}<span class="kc2-name">Smart Tutor</span></header>
+      <div class="kc2-card" data-od-id="kc-card"><h1>${title}</h1>${body}</div>
+      <p class="kc2-ref review-note">${ic('info', 'sm')}<span>Reference only: Keycloak's stock <code class="mono">keycloak.v2</code> layout, fields and messages. Our theme sets the logo, accent and background colours, font and the display name “Smart Tutor”.</span></p>
     </main></div>`;
-  ST.actions['terms-accept'] = (el) => { ST.T.accepted = el.checked; ST.render(); };
-  ST.actions['full-terms'] = () => ST.openDialog({
-    title: 'Terms of use',
-    wide: true,
-    body: `<p class="small">Version 1.0 · effective 1 October 2026</p>
-      <h3 style="font-size:18px;color:var(--text)">1. Your content</h3><p>You keep all rights to the documents you upload. Smart Tutor processes them only to answer your questions, create your notes and suggest subjects.</p>
-      <h3 style="font-size:18px;color:var(--text)">2. Shared subject names</h3><p>Subject names you create join a shared catalog that other learners can see and choose. Don't include names, contact details or other personal information.</p>
-      <h3 style="font-size:18px;color:var(--text)">3. What you may upload</h3><p>Upload only documents you have the right to use. We may stop processing documents that break these terms.</p>
-      <h3 style="font-size:18px;color:var(--text)">4. Answers</h3><p>Answers are generated from your documents and can contain mistakes. Citations show where each answer came from.</p>`,
-    actions: [{ label: 'Close', cls: 'btn-primary', autofocus: true }]
-  });
+  const kf = (id, label, type = 'text', value = '', extra = '') => `<div class="field"><label for="${id}">${label} <span class="kc2-req" aria-hidden="true">*</span></label><input class="input" id="${id}" type="${type}" value="${esc(value)}" required ${extra}></div>`;
+
+  ST.authSignIn = () => kc('Sign in to your account', `
+    <form class="kc2-form" novalidate onsubmit="return false">
+      ${kf('kc-user', 'Username or email', 'text', 'mai.nguyen@example.com', 'autocomplete="username" data-autofocus')}
+      ${kf('kc-pass', 'Password', 'password', 'attention2017', 'autocomplete="current-password"')}
+      <div class="kc2-row"><label class="check"><input type="checkbox"> Remember me</label><a href="#/auth-sign-in">Forgot Password?</a></div>
+      <button class="btn btn-primary kc2-submit" type="button" data-action="go" data-href="#/library-default" data-od-id="kc-sign-in">Sign In</button>
+    </form>
+    <p class="kc2-alt">New user? <a href="#/auth-sign-up">Register</a></p>`);
+
+  ST.authSignUp = () => kc('Register', `
+    <form class="kc2-form" novalidate onsubmit="return false">
+      ${kf('kc-em', 'Email', 'email', 'mai.nguyen@example.com', 'autocomplete="email" data-autofocus')}
+      ${kf('kc-fn', 'First name', 'text', 'Mai', 'autocomplete="given-name"')}
+      ${kf('kc-ln', 'Last name', 'text', 'Nguyen', 'autocomplete="family-name"')}
+      ${kf('kc-pw', 'Password', 'password', 'attention2017', 'autocomplete="new-password"')}
+      ${kf('kc-pw2', 'Confirm password', 'password', 'attention2017', 'autocomplete="new-password"')}
+      <p class="kc2-small"><span aria-hidden="true">*</span> Required fields</p>
+      <div class="kc2-row"><a href="#/auth-sign-in">« Back to Login</a>
+        <button class="btn btn-primary" type="button" data-action="go" data-href="#/auth-verify-email" data-od-id="kc-register">Register</button></div>
+    </form>`);
+
+  ST.authVerify = () => kc('Email verification', `
+    <div class="kc2-alert" role="status">${ic('info', 'sm')}<span>You need to verify your email address to activate your account.</span></div>
+    <p>An email with instructions to verify your email address has been sent to your address mai.nguyen@example.com.</p>
+    <p class="kc2-small">Haven't received a verification code in your email? <a href="#/auth-verify-email" data-action="resend">Click here</a> to re-send the email.</p>
+    <p class="review-note kc2-small"><a href="#/library-empty">Prototype: continue as if the link in the email was opened →</a></p>`);
+  ST.actions.resend = () => ST.toast('Verification email sent again.');
 
   /* =========================================================
      Shared list pattern (Library, Conversations, Notes)
@@ -170,8 +125,8 @@
     const processingFirst = S.convs.length ? [] : all.filter((d) => !d.archived && ['uploading', 'processing'].includes(d.state));
     const subjOpts = [];
     all.forEach((d) => d.subjects.forEach((s) => { if (!subjOpts.includes(s)) subjOpts.push(s); }));
-    const uploadBtn = `<button class="btn btn-primary" type="button" data-action="upload" data-fk="upload-btn" ${S.uploadLimit ? 'disabled aria-describedby="limit-msg"' : ''}>${ic('upload', 'sm')}Upload</button>`;
-    const limit = S.uploadLimit ? `<div class="banner banner-warn" style="margin-bottom:16px" id="limit-msg">${ic('clock')}<div class="b-body"><strong>Upload limit reached.</strong><span>You can upload up to 20 files per hour and 100 per day. You can upload again at 11:40 (${ST.TZ.short}).</span></div></div>` : '';
+    const uploadBtn = `<button class="btn btn-primary" type="button" data-action="upload" data-fk="upload-btn" ${S.uploadLimit ? 'disabled aria-describedby="limit-msg upload-rights"' : 'aria-describedby="upload-rights"'}>${ic('upload', 'sm')}Upload</button>`;
+    const limit = S.uploadLimit ? `<div class="banner banner-warn" style="margin-bottom:16px" id="limit-msg">${ic('clock')}<div class="b-body"><strong>Upload limit reached.</strong><span>You can upload up to 20 files per hour and 100 per day. You can upload again at 11:40 (${ST.TZ.short}).</span><span class="b-variant">If it's the daily limit (100 per day): You can upload again at 00:00 (${ST.TZ.short}).</span></div></div>` : '';
 
     let body;
     if (all.length === 0) {
@@ -179,7 +134,8 @@
         <span class="dz-icon">${ic('upload', 'lg')}</span>
         <h2>Upload your first document</h2>
         <p>PDFs up to 50 MB and 500 pages. Your documents stay private to you.</p>
-        <button class="btn btn-primary btn-lg" type="button" data-action="upload" data-autofocus data-fk="upload-big">${ic('upload', 'sm')}Choose PDFs</button>
+        <p class="dz-rights" id="dz-rights" data-od-id="upload-rights">${esc(ST.RIGHTS)}</p>
+        <button class="btn btn-primary btn-lg" type="button" data-action="upload" data-autofocus data-fk="upload-big" aria-describedby="dz-rights">${ic('upload', 'sm')}Choose PDFs</button>
         <p class="small">Or drop files anywhere on this page. You can add several at once.</p>
       </div>`;
     } else {
@@ -190,12 +146,12 @@
         <div class="lib-head" role="row"><span role="columnheader">Document</span><span role="columnheader">Subjects</span><span role="columnheader">State</span><span role="columnheader">Uploaded</span><span role="columnheader"><span class="vh">Actions</span></span></div>
         ${rows.map(libRow).join('')}</div>`;
       body = `${ST.tabsHtml(counts)}
-        ${ST.L.tab === 'archived' ? `<p class="legend-line">${ic('info', 'sm')}Archived documents aren't used for answers, but citations to them in past conversations still work. You can still change their subjects.</p>` : ''}
+        ${ST.L.tab === 'archived' ? `<p class="legend-line">${ic('info', 'sm')}Archived documents aren't used for answers, but citations to them in past conversations still work. Restore a document to change its subjects.</p>` : ''}
         ${ST.filterBar({ count: rows.length, noun: 'document', subjects: subjOpts, states: ST.L.tab === 'active' })}
         <div id="list-panel" role="tabpanel" aria-labelledby="tab-${ST.L.tab}">${list}</div>`;
     }
     return ST.shell({ nav: 'library', content: `<div class="page" style="max-width:1200px">
-      <div class="page-head"><div><h1>Library</h1><p>Your documents. They're private to you, and the tutor answers only from them.</p></div>${all.length ? uploadBtn : ''}</div>
+      <div class="page-head"><div><h1>Library</h1><p>Your documents. They're private to you, and the tutor answers only from them.</p></div>${all.length ? `<div class="upload-area" data-od-id="library-upload-area">${uploadBtn}<p class="upload-rights" id="upload-rights">${esc(ST.RIGHTS)}</p></div>` : ''}</div>
       ${limit}
       ${!S.convs.length && all.some((d) => d.state === 'ready' && !d.archived) && ST.L.tab === 'active' ? `<div class="banner banner-success" style="margin-bottom:16px" role="status">${ic('checkCircle')}<div class="b-body"><strong>Your documents are ready.</strong><span>Ask anything about them. Answers cite the document and page.</span></div>
         <a class="btn btn-primary btn-sm" href="#/chat-new" data-fk="ask-first">${ic('message', 'sm')}Ask a question</a></div>` : ''}
@@ -214,7 +170,7 @@
     else if (d.state === 'failed' && (d.attempts || 0) < 3) primary = `<button class="btn btn-secondary btn-sm" type="button" data-action="doc-retry" data-id="${d.id}" data-fk="retry-${d.id}" aria-label="Retry ${esc(d.title)}">${ic('retry', 'sm')}Retry</button>`;
     else primary = `<button class="btn btn-quiet btn-sm" type="button" data-action="open-doc" data-id="${d.id}" aria-label="Open ${esc(d.title)}">Open</button>`;
     const open = S.rowMenu === d.id;
-    const canChange = d.subjects.length && (d.archived || d.state === 'ready');
+    const canChange = d.subjects.length && !d.archived && d.state === 'ready'; // E7: archived → Restore first
     const menu = open ? `<div class="row-menu" role="menu" aria-label="Actions for ${esc(d.title)}">
       <button class="menu-item" role="menuitem" type="button" data-action="open-doc" data-id="${d.id}">${ic('doc')}Open details</button>
       ${canChange ? `<button class="menu-item" role="menuitem" type="button" data-action="change-subjects" data-id="${d.id}">${ic('tag')}Change subjects</button>` : ''}
@@ -321,7 +277,7 @@
   const onLibrary = () => ST.current && ST.current.id.startsWith('library');
   const showDrop = (on) => {
     let ov = document.getElementById('drop-ov');
-    if (on && !ov) { ov = document.createElement('div'); ov.id = 'drop-ov'; ov.className = 'drop-overlay'; ov.setAttribute('aria-hidden', 'true'); ov.innerHTML = `<div>${ic('upload', 'lg')}Drop PDFs to upload</div>`; document.body.appendChild(ov); }
+    if (on && !ov) { ov = document.createElement('div'); ov.id = 'drop-ov'; ov.className = 'drop-overlay'; ov.setAttribute('aria-hidden', 'true'); ov.innerHTML = `<div>${ic('upload', 'lg')}Drop PDFs to upload<span class="ov-rights">${esc(ST.RIGHTS)}</span></div>`; document.body.appendChild(ov); }
     if (!on && ov) ov.remove();
   };
   ST.showDrop = showDrop;
@@ -370,12 +326,12 @@
   function pickerView() {
     const P = ST.PK; const d = ST.doc(P.queue[P.i]);
     const multi = P.queue.length > 1;
-    const head = `<header><div><p class="sp-kicker" style="font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2)">${multi ? `Document ${P.i + 1} of ${P.queue.length}` : d.archived ? 'Archived document' : P.mode === 'change' ? 'Ready document' : 'Processing finished'}</p>
+    const head = `<header><div><p class="sp-kicker" style="font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2)">${multi ? `Document ${P.i + 1} of ${P.queue.length}` : P.mode === 'change' ? 'Ready document' : 'Processing finished'}</p>
       <h2 id="pk-title">${P.mode === 'change' ? 'Change subjects' : 'Choose subjects'}</h2></div>
       <button class="icon-btn sm" type="button" data-action="pk-close" aria-label="Close">${ic('x')}</button></header>`;
     if (P.saved) {
       const msg = P.mode === 'change'
-        ? (d.archived ? `<em>${esc(d.title)}</em> stays archived. Its new subjects apply if you restore it.` : `<em>${esc(d.title)}</em> now uses ${d.subjects.map((s) => esc(ST.sname(s))).join(', ')}.`)
+        ? `<em>${esc(d.title)}</em> now uses ${d.subjects.map((s) => esc(ST.sname(s))).join(', ')}.`
         : `<em>${esc(d.title)}</em> is ready to use.`;
       return `<div class="dialog-scrim" data-scrim><div class="dialog picker" role="dialog" aria-modal="true" aria-labelledby="pk-title">${head}
         <div class="d-body" role="status"><div class="banner banner-success">${ic('checkCircle')}<div class="b-body"><strong>Subjects saved.</strong><span>${msg}</span></div></div>
@@ -400,7 +356,6 @@
       <div class="d-body" style="gap:20px;color:var(--text)" data-keep-scroll="pk">
         <div class="picker-doc"><span class="pd-title">${esc(d.title)}</span><span class="small muted">${docMeta(d)}</span>
           ${d.summary ? `<p class="pd-sum">${esc(d.summary)}</p>` : ''}</div>
-        ${d.archived ? `<p class="field-note info">${ic('archive')}<span>This document is archived and stays archived. It isn't used for answers; its new subjects apply if you restore it.</span></p>` : ''}
         <fieldset style="border:0;margin:0;padding:0;display:grid;gap:12px">
           <legend class="od-row" style="width:100%;justify-content:space-between;margin-bottom:12px"><span class="label">Suggested subjects</span>
             <span class="counter ${n === 3 ? 'max' : ''}" aria-live="polite">${n === 3 ? '3 of 3 selected · the maximum' : `${n} of 3 selected`}</span></legend>
@@ -500,7 +455,7 @@
     const failed = d.state === 'failed' && !d.archived
       ? `<div class="banner banner-danger">${ic('alert')}<div class="b-body"><strong>${d.attempts >= 3 ? 'This file could not be processed' : 'Processing failed'}</strong><span>${d.attempts >= 3 ? 'We tried 3 times. Try exporting the PDF again, or uploading a text-based copy.' : `${esc(d.failReason)}. Attempt ${d.attempts} of 3.${d.scanned ? ' A copy with selectable text will work.' : ''}`}</span></div>
           ${d.attempts < 3 ? `<button class="btn btn-secondary btn-sm" type="button" data-action="doc-retry" data-id="${d.id}">${ic('retry', 'sm')}Retry</button>` : ''}</div>` : '';
-    const archived = d.archived ? `<div class="banner">${ic('archive')}<div class="b-body"><strong>Archived</strong><span>Not used for answers. Citations to it in past conversations still open here. You can still change its subjects.</span></div></div>` : '';
+    const archived = d.archived ? `<div class="banner">${ic('archive')}<div class="b-body"><strong>Archived</strong><span>Not used for answers. Citations to it in past conversations still open here. Restore it to change its subjects.</span></div></div>` : '';
     const processing = d.state === 'processing' && !d.archived ? `<div class="banner banner-info" role="status"><span class="spinner" aria-hidden="true" style="margin-top:3px"></span><div class="b-body"><strong>Processing all ${d.pages} pages</strong><span>${d.pages > 300 ? 'Very long documents can take up to 15 minutes.' : 'This can take up to 5 minutes.'} You can choose subjects when processing finishes.</span></div></div>` : '';
     const cited = P.cited ? `<div class="banner banner-info">${ic('quote')}<div class="b-body"><strong>Cited ${P.cited.page ? `on page ${P.cited.page}` : '· page unavailable'}</strong><span>From an answer in your conversation.</span></div></div>` : '';
     const facts = [['Authors', d.authors || '—'], ['Year', d.year || (d.book ? 'Not shown' : '—')], ['DOI', d.doi || '—'], ['File name', d.file], ['Pages', d.pages], ['Uploaded', ST.fmtLong(d.uploaded)]];
@@ -516,7 +471,7 @@
           <section class="sp-section" aria-labelledby="dp-sub"><h3 id="dp-sub">Subjects</h3>
             ${d.subjects.length ? ST.chips(d.subjects) : `<p class="small muted">${d.state === 'choose' ? 'Processing has finished and suggestions are ready.' : d.state === 'processing' ? 'You can choose subjects when processing finishes.' : 'No subjects yet.'}</p>`}
             ${!d.archived && d.state === 'choose' ? `<button class="btn btn-primary btn-sm" type="button" data-action="dp-change" style="justify-self:start">Choose subjects</button>` : ''}
-            ${d.subjects.length && (d.archived || d.state === 'ready') ? `<button class="btn btn-secondary btn-sm" type="button" data-action="dp-change" data-fk="dp-change" style="justify-self:start">${ic('tag', 'sm')}Change subjects</button>` : ''}
+            ${d.subjects.length && !d.archived && d.state === 'ready' ? `<button class="btn btn-secondary btn-sm" type="button" data-action="dp-change" data-fk="dp-change" style="justify-self:start">${ic('tag', 'sm')}Change subjects</button>` : ''}
           </section>
         </div>
         <footer>${d.archived ? `<button class="btn btn-primary" type="button" data-action="dp-restore">${ic('restore', 'sm')}Restore</button>`

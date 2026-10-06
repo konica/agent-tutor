@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0  # sign-in stays up during an upgrade; pods share caches through the database (JDBC_PING)
+  selector:
+    matchLabels:
+      {{- include "keycloak.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "keycloak.labels" . | nindent 8 }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: keycloak
+          image: {{ include "keycloak.image" . }}
+          args: [start, --optimized, --import-realm]
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 9000
+          env:
+            {{- with .Values.global.publicUrl }}
+            # Without it Keycloak refuses to start, rather than issue tokens for a wrong address.
+            - name: KC_HOSTNAME
+              value: {{ printf "%s/auth" (trimSuffix "/" .) | quote }}
+            {{- end }}
+            - name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC
+              value: "true"  # the API introspects in-cluster (ADR 0007)
+            - name: KC_HTTP_ENABLED
+              value: "true"  # TLS ends at CloudFront (ADR 0009)
+            # CloudFront adds `Forwarded: proto=https` (EdgeStack), so session cookies are Secure behind the HTTP ALB.
+            - name: KC_PROXY_HEADERS
+              value: forwarded
+            - name: KC_DB_POOL_MAX_SIZE
+              value: "20"  # db.t4g.micro allows about 80 (DBInstanceClassMemory/9531392); 20 per pod leaves room for a rollout surge (2 pods) plus the API
+            - name: KC_DB_URL
+              valueFrom: {secretKeyRef: {name: keycloak-db, key: url}}
+            - name: KC_DB_USERNAME
+              valueFrom: {secretKeyRef: {name: keycloak-db, key: username}}
+            - name: KC_DB_PASSWORD
+              valueFrom: {secretKeyRef: {name: keycloak-db, key: password}}
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom: {secretKeyRef: {name: keycloak-admin, key: username}}
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom: {secretKeyRef: {name: keycloak-admin, key: password}}
+            # Read by the realm import (files/realm-smart-tutor.json).
+            - name: SMART_TUTOR_PUBLIC_URL
+              value: {{ trimSuffix "/" (.Values.global.publicUrl | default "") | quote }}
+            - name: SMART_TUTOR_API_CLIENT_SECRET
+              valueFrom: {secretKeyRef: {name: keycloak-clients, key: api-client-secret}}
+            - name: SMART_TUTOR_MCP_CLIENT_SECRET
+              valueFrom: {secretKeyRef: {name: keycloak-clients, key: mcp-client-secret}}
+          startupProbe:
+            httpGet:
+              path: /auth/health/started
+              port: management
+            periodSeconds: 5
+            failureThreshold: 60  # first start creates the schema and imports the realm
+          readinessProbe:
+            httpGet:
+              path: /auth/health/ready
+              port: management
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /auth/health/live
+              port: management
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: data
+              mountPath: /opt/keycloak/data  # transaction logs; read-only stalls startup
+            - name: realm
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: data
+          emptyDir: {}
+        - name: realm
+          configMap:
+            name: keycloak-realm

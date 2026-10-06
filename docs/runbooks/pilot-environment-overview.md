@@ -81,6 +81,7 @@ flowchart LR
       API["api<br/>FastAPI"]
       KC["keycloak<br/>realm smart-tutor"]
       MIG["migrate<br/>Helm hook Job"]
+      BOOT["db-bootstrap<br/>Helm hook Job"]
       ESO["External Secrets"]
       LATER["agent · mcp · worker<br/>disabled until their slices"]
     end
@@ -97,8 +98,9 @@ flowchart LR
   API -->|"token introspection<br/>(in-cluster URL)"| KC
   API --> RDS
   MIG -->|"alembic upgrade"| RDS
+  BOOT -->|"roles + databases"| RDS
   KC --> RDS
-  SM -->|"Pod Identity"| ESO -->|"Kubernetes Secrets"| API & KC & MIG
+  SM -->|"Pod Identity"| ESO -->|"Kubernetes Secrets"| API & KC & MIG & BOOT
   K8S -.->|"outbound only"| NAT
 ```
 
@@ -106,7 +108,7 @@ flowchart LR
 |---|---|---|
 | `/` | web | Static app shell. Built with the API at `/api` and Keycloak at `/auth` on the same origin. |
 | `/api/*` | api | Every call needs a valid bearer token; otherwise 401 with `WWW-Authenticate: Bearer`. |
-| `/auth/*` | keycloak | Issuer `https://<id>.cloudfront.net/auth/realms/smart-tutor`. Self-registration is off until #47; the admin creates accounts. |
+| `/auth/*` | keycloak | Issuer `https://<id>.cloudfront.net/auth/realms/smart-tutor`. CloudFront adds `Forwarded: proto=https`, so Keycloak sets `Secure` cookies. Self-registration is off until #47; the admin creates accounts. |
 
 ## 3. Sign-in and an API call
 
@@ -173,7 +175,7 @@ To roll back, run `helm upgrade` with an earlier commit SHA as the image tag (th
 |---|---|---|---|
 | CDK bootstrap, OIDC provider, deploy role, GitHub environment `pilot`, quota checks, budget decision | #55 | Human (admin) runs one script, once | CDK `GitHubDeployStack`; `pilot-aws-prerequisites.ps1` for bootstrap and the GitHub environment |
 | VPC, NAT, EKS + node group, Pod Identity, ECR, add-ons (load balancer controller, External Secrets, metrics-server), internal load balancer, CloudFront with VPC origin, `web`, budget alarm, ADR + PRD update | #56 | Agent; human runs the first deploy | CDK `NetworkStack`, `ClusterStack`, `RegistryStack`, `EdgeStack`, `BudgetsStack`; `deploy/helm/addons/`; chart `web` |
-| RDS (DB app, DB keycloak), Secrets Manager entries, `keycloak` at `/auth`, production realm | #57 | Agent; human creates the client's account | CDK `DataStack`, `ConfigStack`; chart `keycloak` |
+| RDS (DB app, DB keycloak), Secrets Manager entries, `keycloak` at `/auth`, production realm | #57 | Agent; human creates the client's account | CDK `DataStack`, `ConfigStack`; chart `keycloak`; `deploy/keycloak/Dockerfile`; the `db-bootstrap` hook; ADR 0010 |
 | `api` at `/api`, `migrate` hook Job, same-origin web build, probes | #58 | Agent; human runs the demo and hands over access | chart `api`, `values-prod.yaml` |
 | Deploy-on-merge workflow, smoke test, rollback runbook | #59 | Agent; human merges and approves | `.github/workflows/` |
 | S3 documents bucket, SQS, agent, MCP server, worker, Bedrock access | Later slices | — | `StorageStack`; charts stay disabled for now |

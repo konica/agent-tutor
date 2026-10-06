@@ -1,0 +1,11 @@
+# The production realm: placeholders such as ${SMART_TUTOR_PUBLIC_URL} resolve from the pod's environment on import.
+# Keycloak imports it only when the realm doesn't exist yet; later realm changes go through the admin console.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realm
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+data:
+  realm-smart-tutor.json: |
+    {{- .Files.Get "files/realm-smart-tutor.json" | nindent 4 }}

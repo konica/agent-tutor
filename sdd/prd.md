@@ -2,7 +2,10 @@
 
 | | |
 |---|---|
-| **Status** | Draft v2.14 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Status** | Draft v2.17 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Changes from v2.16** | Keycloak's login page offers "Remember me" and "Forgot password?" (design F4, Q53; US-1). |
+| **Changes from v2.15** | Product owner answers to design questions E4, E6, E7, E8, F1 (Q48–Q52): "New conversation" is offered only when a conversation already has 3 subjects, so a decline only asks for a document (US-5); a declined question is not kept after "Upload a document"; **subjects of an archived document can't be changed** (reverses Q42; US-10); daily caps reset at midnight GMT+7 (D27); registration uses the email as the username (US-1). |
+| **Changes from v2.14** | A public landing page at `/` explains Smart Tutor and leads to sign-up and sign-in; every other page requires sign-in (US-1). Keycloak's hosted pages keep their stock layout with the Smart Tutor logo, colors, and font only (Q46; `sdd/reviews/2026-10-06-landing-page-discussion.md`). With no terms step (Q45), the Library's upload area says "Only upload documents you have the right to use." (US-2, Q47). |
 | **Changes from v2.13** | Product owner decision (Q45): Release 1 has no terms of use step and no Settings page. Sign-up ends on **My library** (US-1); the `learners` profile moves to Release 3 and keeps only `time_zone` for reports (D13, §9.4); the time zone stays one app setting (D27). The upload-warranty mitigation for copyright moves to Release 4 (§9.10). |
 | **Changes from v2.12** | The first-pages `describe_document` payload is validated in code; a reply without one valid call stores no metadata, and processing continues with the file name as title; an invalid optional DOI or year is dropped without losing the rest, and a DOI not printed in the pages is dropped too. `contents` gains the description columns (title, authors, year, DOI, summary, summary embedding, proposed subject names, work key). The first pages are read by `PdfExtractor.extract_pages(..., first=2)` (§9.2 step 4; §9.15 ports). |
 | **Changes from v2.11** | Pilot hosting: served from the AWS-generated CloudFront address with path routing (`/`, `/api/*`, `/auth/*`) through a VPC origin to an internal ALB; no custom domain, DNS, or ACM certificate for now (§9.12, Appendix A item 4; ADR 0009). No product behavior changes. |
@@ -131,12 +134,13 @@ Learners and researchers work through many documents on a topic but lack the bac
 | D24 | **No limit on the number of documents** per learner. Per-file limits (PDF, ≤ 50 MB, ≤ 500 pages), upload rate limits, and daily caps apply. | Researchers accumulate papers; archive-only must not trap them. |
 | D25 | **Traces are deleted after 180 days; threads are kept** for the account's lifetime, so notes and learning records keep their links. | Long-term learning history with bounded trace storage. |
 | D26 | Release 1 extracts text **page by page with `pypdf`** into LangChain `Document`s (page number in metadata), chunked with LangChain's `RecursiveCharacterTextSplitter` (≤ 1,000 characters, overlap 200, one page per chunk; ADR 0008): no layout model, no OCR. A PDF without extractable text fails with a reason. | Smaller, faster worker (no PyTorch); Release 1 needs only page text for chunks and citations. Structured extraction waits until a feature needs it (ADR 0005). |
-| D27 | Release 1 uses **one time zone, GMT+7 (`Asia/Ho_Chi_Minh`)**, for daily caps, "today" in usage totals, and the times shown when a limit ends ("You can upload again at 11:40"). It is a setting (`app-time-zone`), not chosen per learner. | The pilot's learners share one time zone; per-learner time zones wait for Release 3 reports (D13). |
+| D27 | Release 1 uses **one time zone, GMT+7 (`Asia/Ho_Chi_Minh`)**, for daily caps (reset at midnight GMT+7), "today" in usage totals, and the times shown when a limit ends ("You can upload again at 11:40"). It is a setting (`app-time-zone`), not chosen per learner. | The pilot's learners share one time zone; per-learner time zones wait for Release 3 reports (D13). |
 
 ## 7. Scope
 
 ### Release 1: core tutor on your own documents
-- Registration, login, logout via **Keycloak's hosted pages**. No terms of use step and no Settings page (Q45).
+- A public **landing page** (what Smart Tutor does, "Create an account", "Sign in"); no pricing, testimonials, or later-release features.
+- Registration, login, logout via **Keycloak's hosted pages** (stock layout with the Smart Tutor logo, colors, and font). No terms of use step and no Settings page (Q45).
 - **Upload** PDFs with a client-side duplicate check and server-side SHA-256; per-document state.
 - **Subject suggestion** (3 choices, keep 1–3) and the **shared subject catalog**; personal subject names (rename, reset).
 - Ingestion once per unique content: fast first-pages step (metadata, suggestions), page text extraction with `pypdf` (saved), work key, chunking, embedding.
@@ -178,7 +182,8 @@ Learners and researchers work through many documents on a topic but lack the bac
 Story IDs are stable. Release 1: US-1 to US-13b. Release 2: US-19, US-20. Release 3: US-14 to US-16. Release 4: US-17. Release 5: US-18.
 
 **US-1 Register and sign in**
-- *Given* a new visitor, *when* they choose "Sign up", *then* they register on Keycloak's hosted page (with email verification), get the `learner` role, and land on **My library**, which prompts "Upload your first document" when empty.
+- *Given* a visitor who isn't signed in, *when* they open Smart Tutor, *then* they see the **landing page**: what Smart Tutor does, that it answers only from their own documents, that documents are private, that it is a pilot for laptop browsers, and **"Create an account"** and **"Sign in"**. Both go to Keycloak and return to **My library**; signing out returns to the landing page. Every other page requires sign-in.
+- *Given* a new visitor, *when* they choose "Sign up", *then* they register on Keycloak's hosted page with their email as the username (no separate username field) and email verification, get the `learner` role, and land on **My library**, which prompts "Upload your first document" when empty. Keycloak's login page offers "Remember me" and "Forgot password?" (a reset link by email).
 - Unauthenticated calls to the API, agent, or MCP server return `401`.
 
 **US-2 Upload a document**
@@ -186,6 +191,7 @@ Story IDs are stable. Release 1: US-1 to US-13b. Release 2: US-19, US-20. Releas
 - **Checked before upload:** file type (PDF) and size (≤ 50 MB). **Checked after upload:** page count (≤ 500), whether the PDF can be parsed, and whether it has extractable text (scanned PDFs without a text layer are not supported yet); failures put the document in *failed* with the reason.
 - Each document shows its state: *processing → choose subjects → ready*, or *failed* with the reason and **Retry** (§9.5).
 - There is no limit on the number of documents; uploads are rate-limited (§11).
+- The upload area (the Library's drop zone and its first-run card) says "Only upload documents you have the right to use." (Q47).
 
 **US-2b Choose subjects**
 - The learner chooses subjects **only after processing has finished**. Until then the document shows *processing* (with its extracted title once the first pages are read) and there is no "Choose subjects" action. When processing finishes, the learner sees **3 suggested subjects**: matching shared subjects first, then their own subjects, then new names proposed from the first 1–2 pages. The suggestions are computed early (p95 ≤ 30 s from upload completion) and shown when the document reaches *choose subjects*.
@@ -208,9 +214,8 @@ Story IDs are stable. Release 1: US-1 to US-13b. Release 2: US-19, US-20. Releas
 - *Given* a thread with subjects *S1..Sn*, *when* the learner asks a question, *then* the search step retrieves chunks **only from contents of the learner's own ready, non-archived documents in any of S1..Sn**, never from another learner's documents in the same shared subjects, and a streamed answer lists ≥ 1 citation (document display title; page, or "page unavailable").
 
 **US-5 Decline what the documents don't cover**
-- *When* a question matches none of the learner's subjects, or their documents don't support an answer, *then* the tutor declines in one or two friendly sentences, without answering from its own knowledge.
-  - When the question clearly matches another of the learner's subjects, it offers **"New conversation"**, which carries the question over and sends it (as in US-3b).
-  - When it matches none of the learner's subjects, it tells the learner to upload a document on the topic to continue, with an **"Upload a document"** action, and offers nothing else.
+- *When* a question matches none of the learner's subjects, or their documents don't support an answer, *then* the tutor declines in one or two friendly sentences, without answering from its own knowledge, and tells the learner to upload a document on the topic to continue, with **"Upload a document"** as the only action. The declined question is not kept; the learner asks again once the document is ready.
+- A decline never offers "New conversation". That is offered only when a conversation already has 3 subjects and the question clearly matches a fourth (US-3b); with fewer than 3, a question that clearly matches another of the learner's subjects adds that subject instead.
 - Each decline is written to the decline log (§9.6).
 
 **US-6 Prompt-injection resistance**
@@ -229,11 +234,11 @@ Story IDs are stable. Release 1: US-1 to US-13b. Release 2: US-19, US-20. Releas
 **US-9 Token usage**
 - The learner sees input/output tokens per thread, for **document processing** they triggered (first processing of a new content: metadata, suggestions, embeddings), and in total; daily totals across all usage rows match Bedrock's reported usage. Linking to existing content (D18) costs the learner nothing.
 - Exceeding a rate limit or daily cap returns `429` with a retry-after message; the UI shows the time it ends in GMT+7 (D27).
-- "Today" in usage totals and the daily caps follow GMT+7 (D27).
+- "Today" in usage totals and the daily caps follow GMT+7: daily caps reset at midnight GMT+7 (D27). Shorter limits (per hour, per minute) are rolling windows.
 
 **US-10 Manage documents**
 - The learner lists their documents (display title, subjects, upload date, state, authors, year) and filters by **subject** (any of the document's subjects), **date range**, and **state**, combined.
-- They can **change a document's subjects** (1–3; metadata only, no re-embedding), **edit its display title** (their library only), and **archive** or **restore** it. Archived documents are excluded from search, still resolve in old citations, and are restorable. There is no delete. A document's subjects can be changed while it is archived too; they apply when it is restored.
+- They can **change a document's subjects** (1–3; metadata only, no re-embedding), **edit its display title** (their library only), and **archive** or **restore** it. Archived documents are excluded from search, still resolve in old citations, and are restorable. There is no delete. An archived document's subjects can't be changed until it is restored.
 - *Given* a thread whose subjects have no ready, non-archived documents left, *then* the thread stays readable, and new questions are answered with "There are no active documents in this conversation's subjects".
 
 **US-10b Rename a subject**
@@ -299,7 +304,7 @@ Story IDs are stable. Release 1: US-1 to US-13b. Release 2: US-19, US-20. Releas
 | **RAG MCP Server** | `search(query, subject_ids, k)` over streamable HTTP: validates the forwarded JWT, resolves the learner's **readable, ready, non-archived documents** in any of those subjects (`can_read`), searches their contents' chunks only, returns chunks with scores and citation metadata. `get_chunk(chunk_id)` resolves old citations (only through a document the caller can read). |
 | **Smart Tutor agent** | Ask, summarize, idle-record paths (§9.2); checkpointer and long-term memory in PostgreSQL; token usage per call. |
 | **Scheduled jobs** (Kubernetes CronJobs) | Learning-record sweeper (every minute); Glacier tagger (daily); trace and decline-log retention (daily); *R3:* learner reports (hourly). |
-| **Web App** | Keycloak login, library and upload, subject choice and rename, chat, conversations, notes, usage; *R2:* research map; *R3:* quizzes, reports; *R4:* sharing, imports. |
+| **Web App** | Public landing page, Keycloak login, library and upload, subject choice and rename, chat, conversations, notes, usage; *R2:* research map; *R3:* quizzes, reports; *R4:* sharing, imports. |
 
 ### 9.2 Agent flow
 
@@ -455,7 +460,7 @@ Every decline (relevance gate, growth check, or `decline` tool) writes `subject_
 | **Wrong subjects detected.** | Thresholds and margins tuned on labeled data; "ask when unsure"; detection and growth evals. |
 | **Poor metadata (scanned or unusual PDFs).** Missing year or title weakens the research map. | Fields optional; display title editable; works without a year listed separately; extraction accuracy measured. |
 | **Tool calling in streamed answers; cross-region routing; token cost; long streams on Kubernetes; EKS operations; judge bias.** | Streamed text + tool calls verified in M0 through `ChatBedrockConverse` (ADR 0006; `make bedrock-check`); the `us.` inference profile keeps requests in US regions; capped history and chunks, prompt caching, budget alerts; `preStop` hooks, grace periods, and PodDisruptionBudgets for streaming pods; managed node group with a small add-on set; judges use a different model family (Qwen) calibrated against human feedback. |
-| **Copyright of published or imported documents** *(R4)*. | Terms of use with an upload warranty when sharing opens (R4; not in R1, Q45); publishing terms, takedown per document visibility, imports limited to open-access sources. |
+| **Copyright of published or imported documents** *(R4)*. | In R1, the upload area reminds learners to upload only documents they have the right to use (Q47); terms of use with an upload warranty when sharing opens (R4, Q45); publishing terms, takedown per document visibility, imports limited to open-access sources. |
 
 ### 9.11 Hosting
 
@@ -624,10 +629,18 @@ Measured over the pilot unless stated; minimum sample 100 events per metric.
 | Q39 | Carried question in a new conversation (design D2) | Sent right away; the learner doesn't resend it (US-3b). |
 | Q40 | Question that fits none of the learner's subjects (design D4) | Decline and tell the learner to upload a document on the topic to continue ("Upload a document"); no "New conversation" (US-5). |
 | Q41 | Personal name equal to another shared subject's name (design D6) | Allowed; everything links by `subject_id` (US-10b). |
-| Q42 | Changing subjects of an archived document (design D7) | Allowed; applies on restore (US-10). |
+| Q42 | Changing subjects of an archived document (design D7) | ~~Allowed; applies on restore.~~ Reversed by Q50: not allowed (US-10). |
 | Q43 | Time zone for "today", daily caps, and limit times (design D8) | GMT+7 for all learners in Release 1 (D27). |
 | Q44 | Pilot address | The AWS-generated CloudFront domain with path routing; no custom domain until needed (ADR 0009). |
 | Q45 | Terms of use and Settings in Release 1 | Removed (product owner, 2026-10-06): no terms step on first sign-in and no Settings page; no screen shows the time zone setting, which stays GMT+7 for limits and "today" (D27). Tickets #46, #49, #50 closed. |
+| Q46 | Landing page and Keycloak pages | Public landing page at `/`, text only (no product image) for the pilot; signed-in visitors see the same page and "Sign in" returns them to My library through single sign-on. Keycloak keeps its stock `keycloak.v2` layout with the Smart Tutor logo, colors, font, and display name; no custom templates. No terms of use step (Q45). |
+| Q47 | Upload rights without a terms step (design G2) | The Library's upload area says "Only upload documents you have the right to use." No checkbox or acceptance is stored (US-2). |
+| Q48 | "New conversation" on a decline (design E4) | Never on a decline; only when a conversation already has 3 subjects and the question matches a fourth (US-3b, US-5). |
+| Q49 | Keeping a declined question after "Upload a document" (design E6) | Not kept; the learner asks again once the document is ready (US-5). |
+| Q50 | Changing subjects of an archived document (design E7) | Not allowed: low business value. Reverses Q42 (US-10). |
+| Q51 | When daily caps reset (design E8) | At midnight GMT+7; shorter limits are rolling windows (D27, US-9). |
+| Q52 | Username on registration (design F1) | The email is the username; Keycloak's "Email as username" is on, so registration has no username field (US-1). |
+| Q53 | "Remember me" and "Forgot password?" on login (design F4) | Both on, as the designer proposed: realm settings `rememberMe` and `resetPasswordAllowed` (US-1). |
 
 ## 14. Roadmap: releases and milestones
 

@@ -1,4 +1,4 @@
-/* Smart Tutor v0.4 — overview with what changed and the flows, R2 research map and R3 learning loop
+/* Smart Tutor v0.7 — overview with what changed and the flows, R2 research map and R3 learning loop
    wireframes, components page (§10), decisions and questions for the brief owner (§11.5). */
 (function () {
   const ST = window.ST;
@@ -8,20 +8,15 @@
   /* =========================================================
      Overview
      ========================================================= */
-  /* §0 What changed in v0.4: decision → states redone in this round. */
+  /* §0 What changed in v0.7: [source, change, states redone, states removed]. */
   ST.CHANGES = [
-    ['Q7', 'Subjects are chosen after processing finishes', ['library-first-processing', 'library-first-choose', 'picker-saved', 'details-processing']],
-    ['D2', 'The carried question is sent right away', ['chat-fourth-subject-refused', 'chat-new-from-refused']],
-    ['D4', 'No subject fits: ask for a document', ['chat-decline', 'chat-decline-other-subject']],
-    ['D6', 'A personal name may match a shared one', ['subjects-rename-duplicate']],
-    ['D7', 'Archived documents can change subjects', ['library-archived', 'details-archived', 'picker-change-subjects-archived']],
-    ['D8', 'One time zone, GMT+7', ['library-rate-limited', 'chat-rate-limited', 'usage-overview', 'settings-default']],
-    ['D1', 'Labelled thumbs with a pressed state', ['chat-answer-citations', 'chat-feedback-reason', 'components']],
-    ['D3', 'Fourth-subject wording', ['chat-fourth-subject-refused']],
-    ['D5', 'One contextual button per Library row', ['library-default']],
-    ['PRD v2.3', 'Scanned PDFs fail with “No text layer”', ['library-failed', 'details-failed']]
+    ['E4', 'A decline never offers “New conversation”', ['chat-decline'], ['chat-decline-other-subject']],
+    ['E6', 'The declined question is not kept', [], []],
+    ['E7', 'No changing subjects of archived documents; Restore first', ['library-archived', 'details-archived'], ['picker-change-subjects-archived']],
+    ['E8', 'Daily limits reset at 00:00 (GMT+7)', ['library-rate-limited', 'chat-rate-limited'], []],
+    ['F1', 'Registration uses the email as the username', ['auth-sign-up'], []]
   ];
-  ST.NEW_IDS = ['chat-decline-other-subject', 'picker-change-subjects-archived'];
+  ST.NEW_IDS = [];
   const changed = () => { const set = new Set(); ST.CHANGES.forEach((c) => c[2].forEach((id) => set.add(id))); return set; };
   ST.indexView = () => {
     const groups = [];
@@ -30,24 +25,24 @@
     return `<main class="index-page" id="main-content" tabindex="-1">
       <section class="index-hero">
         <div><span class="brand" style="padding:0 0 24px">${ST.logo('logo', 'Smart Tutor logo')}<span class="word">Smart Tutor</span></span>
-          <h1>Round 3: the owner's decisions</h1>
-          <p>Brief v0.4 answers the round 2 questions. This round changes only the states listed in §0; everything else is the accepted v0.3 design. Review the changed states first, then walk the four flows. Every state is labelled <code class="mono">&lt;screen&gt;-&lt;state&gt;@v0.4</code> and opens at <code class="mono">index.html#/&lt;state-id&gt;</code>; add <code class="mono">?shot=1</code> to hide this review chrome.</p>
+          <h1>Round 6: the owner's answers</h1>
+          <p>Brief v0.7 settles E4, E6, E7, E8 and F1. Declines only ask for a document, archived documents must be restored before their subjects change, daily limits end at 00:00 (GMT+7), and registration has no Username field. Two states are gone. Everything else is the round 5 design. Review the changed states first, then walk the four flows. Every state is labelled <code class="mono">&lt;screen&gt;-&lt;state&gt;@v0.4</code> and opens at <code class="mono">index.html#/&lt;state-id&gt;</code>; add <code class="mono">?shot=1</code> to hide this review chrome.</p>
           <div class="od-cluster" style="margin-top:24px;--od-gap:12px">
             <button class="btn btn-primary btn-lg" type="button" data-action="start-flow" data-flow="J1">Start with J1 · First run${ic('arrowRight', 'sm')}</button>
             <a class="btn btn-secondary btn-lg" href="#/library-default">Open the Library</a>
             <a class="btn btn-ghost btn-lg" href="#/brief-questions">Questions for the brief</a>
           </div></div>
         <dl class="meta">
-          <div><dt>Brief</dt><dd>v0.4 · PRD v2.7</dd></div><div><dt>Owner</dt><dd>Thao Dinh</dd></div><div><dt>Date</dt><dd>4 Oct 2026</dd></div>
+          <div><dt>Brief</dt><dd>v0.7 · PRD v2.16</dd></div><div><dt>Owner</dt><dd>Thao Dinh</dd></div><div><dt>Date</dt><dd>6 Oct 2026</dd></div>
           <div><dt>Screens</dt><dd>Laptop, 1280–1920 px</dd></div><div><dt>Themes</dt><dd>Light and dark</dd></div><div><dt>States</dt><dd>${ST.STATES.length - 1}</dd></div>
           <div><dt>Round 1</dt><dd><a href="v0.2/index.html">v0.2 prototype</a></dd></div>
         </dl>
       </section>
 
-      <h2 class="section-title">What changed in v0.4</h2>
+      <h2 class="section-title">What changed in v0.7</h2>
       <div class="changes" role="table" aria-label="Decisions and the states they changed">
-        ${ST.CHANGES.map(([id, title, states]) => `<div class="change-row" role="row"><span class="qid" role="cell">${esc(id)}</span><span class="change-title" role="cell">${esc(title)}</span>
-          <span class="change-states" role="cell">${states.map((sid) => `<a href="#/${sid}"><code>${sid}</code>${ST.NEW_IDS.includes(sid) ? '<span class="badge badge-note">New</span>' : ''}</a>`).join('')}</span></div>`).join('')}
+        ${ST.CHANGES.map(([id, title, states, removed]) => `<div class="change-row" role="row"><span class="qid" role="cell">${esc(id)}</span><span class="change-title" role="cell">${esc(title)}</span>
+          <span class="change-states" role="cell">${states.length ? '' : '<span class="small muted">No state changes</span>'}${states.map((sid) => `<a href="#/${sid}"><code>${sid}</code>${ST.NEW_IDS.includes(sid) ? '<span class="badge badge-note">New</span>' : ''}</a>`).join('')}${(removed || []).map((sid) => `<span class="removed-id"><del><code>${sid}</code></del><span class="badge badge-archived">Removed</span></span>`).join('')}</span></div>`).join('')}
         <div class="change-row" role="row"><span class="qid" role="cell">§11.6</span><span class="change-title" role="cell">Prototype contract</span><span class="change-states" role="cell"><span class="small muted">Every state: one user story in <code class="mono">ref</code>, <code class="mono">?shot=1</code> hides the review bar.</span></span></div>
       </div>
 
@@ -68,7 +63,7 @@
       <h2 class="section-title">All states</h2>
       <div class="index-groups">${groups.map((g) => `<section class="index-group ${g.items.length > 12 ? 'span2' : ''}" aria-labelledby="g-${g.items[0].id}">
         <h2 id="g-${g.items[0].id}">${esc(g.name)}<span class="ig-ref">${esc(g.ref)}</span></h2>
-        <ul>${g.items.map((s) => `<li><a href="#/${s.id}"><code>${s.id}@${ST.BRIEF}</code>${ST.NEW_IDS.includes(s.id) ? '<span class="badge badge-note">New in v0.4</span>' : ch.has(s.id) ? '<span class="badge">Changed in v0.4</span>' : ''}<span>${esc(s.desc)}</span></a></li>`).join('')}</ul></section>`).join('')}</div>
+        <ul>${g.items.map((s) => `<li><a href="#/${s.id}"><code>${s.id}@${ST.BRIEF}</code>${ST.NEW_IDS.includes(s.id) ? '<span class="badge badge-note">New in v0.7</span>' : ch.has(s.id) ? '<span class="badge">Changed in v0.7</span>' : ''}<span>${esc(s.desc)}</span></a></li>`).join('')}</ul></section>`).join('')}</div>
     </main>`;
   };
   ST.actions['start-flow-at'] = (el, e) => { ST.flow = el.dataset.flow; try { sessionStorage.setItem('st3_flow', ST.flow); } catch (x) {} };
@@ -197,7 +192,7 @@
   ST.componentsView = () => {
     const d = { id: 'dx', title: 'Toolformer: Language Models Can Teach Themselves to Use Tools', authors: 'Schick et al.', year: 2023, state: 'choose', subjects: [], attempts: 0 };
     return `<main class="index-page" id="main-content" tabindex="-1">
-    <div class="page-head" style="margin-bottom:48px"><div><h1 style="font-size:48px">Components</h1><p>The reusable set for v0.4. Tokens live once in <code class="mono">styles.css</code> and <code class="mono">v03.css</code>, for light and dark.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
+    <div class="page-head" style="margin-bottom:48px"><div><h1 style="font-size:48px">Components</h1><p>The reusable set for v0.7. Tokens live once in <code class="mono">styles.css</code> and <code class="mono">v03.css</code>, for light and dark.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
 
     <section class="cmp-section"><h2>Tokens</h2><p>The round 1 palette, plus an attention colour for “needs action” and one hue per subject. Chip text always uses the main text colour, so contrast holds whatever the hue.</p>
       <div class="cmp-grid">${tokenGrid('light')}${tokenGrid('dark')}</div></section>
@@ -207,7 +202,7 @@
         <li><span class="nav-link" aria-current="page">${ic('library')}<span>Library</span><span class="nav-count">2</span></span></li>
         <li><span class="nav-link">${ic('message')}<span>Chat</span></span></li><li><span class="nav-link">${ic('list')}<span>Conversations</span></span></li>
         <li><span class="nav-link">${ic('note')}<span>Notes</span></span></li><li><span class="nav-link">${ic('tag')}<span>Subjects</span></span></li>
-        <li><span class="nav-link">${ic('usage')}<span>Usage</span></span></li><li><span class="nav-link">${ic('settings')}<span>Settings</span></span></li></ul>`)}
+        <li><span class="nav-link">${ic('usage')}<span>Usage</span></span></li></ul>`)}
       ${spec('status line', `<div class="status-line" style="margin:0;max-width:none"><span class="tokens mono">Tokens: 12,480 in · 3,215 out</span><span>Enter to send · Shift + Enter for a new line</span></div>
         <p class="input-hint">${ic('clock', 'sm')}2 documents are still processing and can't be used yet.</p>`)}</div></section>
 
@@ -231,7 +226,9 @@
 
     <section class="cmp-section"><h2>Uploading</h2><p>A page-wide drop zone with a keyboard-accessible Upload button, and a tray that stays put while you keep working.</p>
       <div class="cmp-grid">
-        ${spec('drop zone', `<div class="dropzone" style="padding:32px"><span class="dz-icon">${ic('upload', 'lg')}</span><h2 style="font-size:24px">Upload your first document</h2><p>PDFs up to 50 MB and 500 pages. Your documents stay private to you.</p><button class="btn btn-primary" type="button">${ic('upload', 'sm')}Choose PDFs</button></div>`)}
+        ${spec('drop zone', `<div class="dropzone" style="padding:32px"><span class="dz-icon">${ic('upload', 'lg')}</span><h2 style="font-size:24px">Upload your first document</h2><p>PDFs up to 50 MB and 500 pages. Your documents stay private to you.</p><p class="dz-rights">${esc(ST.RIGHTS)}</p><button class="btn btn-primary" type="button">${ic('upload', 'sm')}Choose PDFs</button></div>
+          <div class="upload-area" style="margin-top:16px"><button class="btn btn-primary" type="button">${ic('upload', 'sm')}Upload</button><p class="upload-rights">${esc(ST.RIGHTS)}</p></div>
+          <p class="small muted">First-run drop zone, and the page header's Upload with the same line (G2). A plain line: no checkbox, nothing to accept.</p>`)}
         ${spec('upload tray items', `<section class="tray" style="position:static;width:auto;animation:none"><div class="tray-head"><strong>Uploading 1 file…</strong></div><ul class="tray-list">
           <li class="tray-item"><span class="ti-icon">${ic('doc')}</span><div class="od-stack" style="--od-gap:0"><span class="ti-name">lewis-rag-2020.pdf</span><span class="ti-status">Uploading · 0.9 MB</span><div class="bar"><span style="transform:scaleX(.6)"></span></div></div></li>
           <li class="tray-item ok"><span class="ti-icon">${ic('checkCircle')}</span><div class="od-stack" style="--od-gap:0"><span class="ti-name">react-yao-2022.pdf</span><span class="ti-status">Uploaded · processing</span></div></li>
@@ -272,42 +269,33 @@
   };
 
   /* =========================================================
-     Brief v0.4 decisions and new questions
+     Brief v0.5 decisions and questions
      ========================================================= */
   const DECISIONS = [
-    ['Q7', 'Subjects are chosen once processing has finished', 'No “Choose subjects” while a document is processing; the hint reads “You can choose subjects when processing finishes.” Saving makes the document Ready and searchable at once.', ['library-first-processing', 'library-first-choose', 'picker-saved', 'details-processing']],
-    ['D1', 'Labelled thumbs (accepted)', 'Outline thumb icons labelled “Helpful” and “Not helpful”, with a visible pressed state.', ['chat-answer-citations', 'chat-feedback-reason', 'components']],
-    ['D2', 'The carried question is sent right away', '“New conversation” opens a new conversation and sends the question there; a line at the top links back to where it came from.', ['chat-fourth-subject-refused', 'chat-new-from-refused']],
-    ['D3', 'Fourth-subject wording (accepted)', 'Used verbatim from §6.6, followed by “A new conversation will answer it straight away.”', ['chat-fourth-subject-refused']],
-    ['D4', 'No subject fits: a document is needed', 'The tutor says a document on the topic is needed to continue. “Upload a document” is the only action; it opens the file picker on the Library.', ['chat-decline', 'chat-decline-other-subject']],
-    ['D5', 'Calmer Library rows (accepted)', 'One contextual button per row (Choose subjects, Retry, Restore or Open); the rest under “More”.', ['library-default']],
-    ['D6', 'A personal name may match a shared name', 'No warning. Only the learner\'s own subject names must differ from each other.', ['subjects-rename-duplicate']],
-    ['D7', 'Archived documents can change subjects', '“Change subjects” stays in the row menu and the details panel; the document stays archived.', ['library-archived', 'details-archived', 'picker-change-subjects-archived']],
-    ['D8', 'One time zone, GMT+7', 'Limit messages give the end time in GMT+7, “Today” in Usage is the GMT+7 day, and Settings shows the time zone read-only.', ['library-rate-limited', 'chat-rate-limited', 'usage-overview', 'settings-default']],
-    ['PRD v2.3', 'Scanned PDFs', '“No text layer (scanned PDFs are not supported yet)” for lecture-03-scan.pdf.', ['library-failed', 'details-failed']]
+    ['E4', 'A decline never offers “New conversation”', 'Every decline says a document on the topic is needed to continue, with “Upload a document” as the only action. “New conversation” stays only in the fourth-subject refusal. chat-decline-other-subject is removed.', ['chat-decline', 'chat-fourth-subject-refused']],
+    ['E6', 'The declined question is not kept', 'No reminder or “ask again” prompt after “Upload a document”; the prototype already behaved this way.', []],
+    ['E7', 'Archived documents: Restore first', 'No “Change subjects” on archived rows, in their More menu or in archived document details (reverses D7). picker-change-subjects-archived is removed.', ['library-archived', 'details-archived']],
+    ['E8', 'Daily limits reset at midnight GMT+7', '“You can upload again at 00:00 (GMT+7)” and “You can send again at 00:00 (GMT+7)” for the daily limits; the hourly and per-minute messages keep their own end time.', ['library-rate-limited', 'chat-rate-limited']],
+    ['F1', 'Sign up with an email address', 'Stock registration asks for the email, first and last name, and a new secret twice; there is no separate sign-in name.', ['auth-sign-up']],
+    ['F2, E3', 'Confirmed / settled', '“Sign in” stays for signed-in visitors. With one decline left, E3 (which decline id is which) no longer applies.', ['landing-default']]
   ];
   const QUESTIONS = [
-    ['N1', 'Conflict', '§9 and §0 disagree on lecture-03-scan.pdf', '§9 still gives “We couldn\'t read this PDF”; §0 asks for the scanned-PDF wording.', 'Followed §0. Update the §9 sample row.'],
-    ['N2', 'Conflict', 'Agentic Design Patterns is “Processing” with a subject in §9', 'Under Q7 a document being processed for the first time has no subjects yet.', 'Shown as Processing with “Not chosen yet”. Update §9, or say it is being processed again.'],
-    ['N3', 'Question', 'Which id is which decline variant?', '§0 asks for “chat-decline (and a variant for the no-subject case)”, but v0.3\'s chat-decline already was the no-subject case (the §9 laptop question).', 'Kept chat-decline as the no-subject case (D4) and added chat-decline-other-subject. Say if you want the ids swapped.'],
-    ['N4', 'Question', 'When does the “another subject” decline appear?', 'With fewer than 3 subjects the conversation grows instead; at 3, a question detected as a fourth subject is refused (J3).', 'Shown when the question was matched to one of the conversation\'s subjects, its documents had nothing, and another of the learner\'s subjects does. Please confirm the trigger in the PRD, or drop this variant.'],
-    ['N5', 'Proposal', 'The processing hint in chat also counts documents waiting for subjects', 'Under Q7 those documents have finished processing but still can\'t be used, so “2 documents are still processing” is slightly wrong.', '“2 documents can\'t be used yet: 1 is processing, 1 needs subjects.” Not applied, since chat-documents-processing isn\'t in §0.'],
-    ['N6', 'Question', 'After “Upload a document”, what happens to the declined question?', 'The new document needs processing and subjects before it can answer.', 'Nothing is kept: the learner asks again once the document is ready. Alternative: remember the question and offer “Ask again” when the document is ready.'],
-    ['N7', 'Question', 'Subjects added to an archived document', '“My subjects” counts only ready, active documents, so a new subject on an archived document doesn\'t appear in Subjects or as a chat subject until it is restored.', 'Keep it that way; the picker says the new subjects apply if the document is restored.'],
-    ['N8', 'Question', 'When do the daily limits reset?', 'D8 fixes GMT+7 but not the reset time for 100 uploads and 500 messages per day.', 'Midnight GMT+7, shown as “You can send again at 00:00 (GMT+7)”.'],
-    ['N9', 'Check', 'One user story per state is inferred', 'PRD v2.7 wasn\'t attached, so each ref is inferred from the §6 lists: US-3 asking, US-3b subjects in a conversation, US-4 citations, US-5 declines, US-6 feedback, US-7 lesson notes, US-9 usage, US-10 managing documents, US-11 filters, US-13 conversations, US-13b notes. Settings has no story (“§6.11 · no user story”).', 'Please correct any that differ from the PRD.'],
-    ['N10', 'Question', 'Should D6 have its own state?', 'subjects-rename-duplicate shows the rule that remains (own names must differ). Renaming to a shared name the learner doesn\'t have, e.g. “Information Retrieval”, simply shows no message.', 'No separate state unless you want one.'],
-    ['Q4–Q8', 'Defaults kept', 'Still open in §12', 'Q4 the citations switch also covers notes · Q5 several files at once · Q6 terms in the app · Q8 first suggestion pre-selected.', 'All shown as designed.']
+    ['I1', 'Question', 'One state shows two limit messages', 'library-rate-limited and chat-rate-limited show the hourly or per-minute message with the daily one as a secondary line. In the product only one applies at a time.', 'Keep it as one state, or add library-rate-limited-daily and chat-rate-limited-daily so each message can be checked alone.'],
+    ['I2', 'Question', 'Restoring an archived document to change its subjects', 'With E7, a learner who only wants to fix a subject must restore the document, which makes it count for answers again.', 'Accept, as the owner decided. If it comes up in the pilot, allow the change without restoring.'],
+    ['F4', 'Open', 'Remember me and Forgot Password? on the login page', 'Both are stock and controlled by realm settings, not the theme.', 'Keep both on for the pilot.'],
+    ['H1', 'Open', 'Upload-rights line next to a disabled Upload', 'When the upload limit is reached the line still shows under the disabled button.', 'Keep it: it describes the upload area, not the action.'],
+    ['E5', 'Proposal', 'Chat hint counts documents waiting for subjects as “processing”', 'Under Q7 they have finished processing but can\'t be used yet.', '“2 documents can\'t be used yet: 1 is processing, 1 needs subjects.”'],
+    ['E10', 'Open', 'A separate state for D6', 'Renaming to a shared name the learner doesn\'t have shows no message.', 'No separate state unless you want one.'],
+    ['Q4, Q5, Q8', 'Defaults kept', 'Still open in §12', 'Q4 the citations switch also covers notes · Q5 several files at once · Q8 first suggestion pre-selected.', 'All shown as designed.']
   ];
   ST.questionsView = () => `<main class="index-page" id="main-content" tabindex="-1">
-    <div class="page-head" style="margin-bottom:32px"><div><h1 style="font-size:48px">Decisions &amp; questions</h1><p>For brief v0.4, round 3. First the owner's answers to round 2 and where they are applied, then new questions for the next version.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
-    <h2 class="section-title" style="margin-top:0">Decided in v0.4</h2>
+    <div class="page-head" style="margin-bottom:32px"><div><h1 style="font-size:48px">Decisions &amp; questions</h1><p>For brief v0.7, round 6. First the owner's answers to E4, E6, E7, E8, F1 and F2 and where they are applied, then open questions: the new ones first, then those still open.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
+    <h2 class="section-title" style="margin-top:0">Answered and applied in v0.7</h2>
     <ol class="qa-list">${DECISIONS.map(([id, title, what, states]) => `<li class="qa-item"><span class="qid">${esc(id)}</span>
-      <div><h3>${esc(title)}</h3><p>${esc(what)}</p><p class="proposal"><strong>Applied in:</strong> ${states.map((sid) => `<a href="#/${sid}"><code class="mono">${sid}</code></a>`).join(', ')}</p></div>
-      <span class="badge qtype badge-ready-q">${ic('check')}Decided</span></li>`).join('')}</ol>
-    <p class="legend-line">${ic('info', 'sm')}D9–D12 from round 2 were notes; nothing changed for them.</p>
-    <h2 class="section-title" style="margin-top:48px">New questions for the brief</h2>
+      <div><h3>${esc(title)}</h3><p>${esc(what)}</p><p class="proposal"><strong>Applied in:</strong> ${states.length ? '' : 'no change needed'}${states.map((sid) => `<a href="#/${sid}"><code class="mono">${sid}</code></a>`).join(', ')}</p></div>
+      <span class="badge qtype badge-ready-q">${ic('check')}Applied</span></li>`).join('')}</ol>
+    <h2 class="section-title" style="margin-top:48px">Open questions and proposals</h2>
     <ol class="qa-list">${QUESTIONS.map(([id, type, title, ctx, prop]) => `<li class="qa-item"><span class="qid">${esc(id)}</span>
       <div><h3>${esc(title)}</h3><p>${esc(ctx)}</p><p class="proposal"><strong>Proposed:</strong> ${esc(prop)}</p></div>
-      <span class="badge qtype ${/Question|Conflict/.test(type) ? 'badge-archived' : type === 'Proposal' ? 'badge-note' : ''}">${type}</span></li>`).join('')}</ol></main>`;
+      <span class="badge qtype ${/Open|Question/.test(type) ? 'badge-archived' : type === 'Proposal' ? 'badge-note' : ''}">${type}</span></li>`).join('')}</ol></main>`;
 })();

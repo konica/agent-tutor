@@ -277,6 +277,74 @@ def test_web_target_group_takes_pod_ips_on_8080() -> None:
     t.has_output("WebTargetGroupName", {"Value": "smart-tutor-prod-web"})
 
 
+def test_keycloak_target_group_takes_auth_paths_on_8080() -> None:
+    t = template(make_app(), "Edge")
+
+    t.has_resource_properties(
+        "AWS::ElasticLoadBalancingV2::TargetGroup",
+        {
+            "Name": "smart-tutor-prod-keycloak",
+            "TargetType": "ip",
+            "Port": 8080,
+            "Protocol": "HTTP",
+            "HealthCheckPath": "/auth/realms/smart-tutor/.well-known/openid-configuration",
+        },
+    )
+    t.has_resource_properties(
+        "AWS::ElasticLoadBalancingV2::ListenerRule",
+        {
+            "Priority": 10,
+            "Conditions": [{"Field": "path-pattern", "PathPatternConfig": {"Values": ["/auth/*"]}}],
+        },
+    )
+    t.has_output("KeycloakTargetGroupName", {"Value": "smart-tutor-prod-keycloak"})
+
+
+def test_cloudfront_sends_auth_to_keycloak_uncached_with_every_method() -> None:
+    t = template(make_app(), "Edge")
+
+    t.has_resource_properties(
+        "AWS::CloudFront::Distribution",
+        {
+            "DistributionConfig": Match.object_like(
+                {
+                    "CacheBehaviors": [
+                        Match.object_like(
+                            {
+                                "PathPattern": "/auth/*",
+                                "ViewerProtocolPolicy": "redirect-to-https",
+                                "AllowedMethods": ["GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"],
+                                "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",  # CachingDisabled
+                                # AllViewer: cookies, query strings, Authorization, and the viewer Host reach Keycloak
+                                "OriginRequestPolicyId": "216adef6-5c7f-47e4-b989-5492eafa07d3",
+                            }
+                        )
+                    ],
+                }
+            )
+        },
+    )
+
+
+def test_origin_tells_keycloak_the_viewer_used_https() -> None:
+    t = template(make_app(), "Edge")
+
+    t.has_resource_properties(
+        "AWS::CloudFront::Distribution",
+        {
+            "DistributionConfig": Match.object_like(
+                {
+                    "Origins": [
+                        Match.object_like(
+                            {"OriginCustomHeaders": [{"HeaderName": "Forwarded", "HeaderValue": "proto=https"}]}
+                        )
+                    ]
+                }
+            )
+        },
+    )
+
+
 def test_cloudfront_serves_https_through_a_vpc_origin() -> None:
     t = template(make_app(), "Edge")
 
@@ -302,3 +370,67 @@ def test_cloudfront_serves_https_through_a_vpc_origin() -> None:
     )
     t.has_output("CloudFrontUrl", {})
     t.has_output("DistributionId", {})
+
+
+def test_database_is_private_encrypted_and_kept_as_a_snapshot() -> None:
+    t = template(make_app(), "Data")
+
+    t.resource_count_is("AWS::RDS::DBInstance", 1)
+    t.has_resource(
+        "AWS::RDS::DBInstance",
+        {
+            "DeletionPolicy": "Snapshot",  # documents and threads are never deleted; teardown keeps a snapshot
+            "Properties": Match.object_like(
+                {
+                    "DBInstanceIdentifier": "smart-tutor-prod",
+                    "Engine": "postgres",
+                    "EngineVersion": "17",
+                    "DBInstanceClass": "db.t4g.micro",
+                    "StorageEncrypted": True,
+                    "PubliclyAccessible": False,
+                    "MultiAZ": False,
+                    "BackupRetentionPeriod": 7,
+                    "DeletionProtection": False,  # cdk destroy must work
+                }
+            ),
+        },
+    )
+    t.has_resource_properties("AWS::SecretsManager::Secret", {"Name": "smart-tutor/rds/master"})
+    t.has_output("DatabaseEndpoint", {})
+
+
+def test_database_accepts_postgres_only_from_eks_pods() -> None:
+    t = template(make_app(), "Data")
+
+    rendered = json.dumps(t.to_json())
+    assert "0.0.0.0/0" not in rendered.replace('"CidrIp": "255.255.255.255/32"', "")
+    groups = t.find_resources("AWS::EC2::SecurityGroup")
+    ingress = [rule for g in groups.values() for rule in g["Properties"].get("SecurityGroupIngress", [])]
+    assert len(ingress) == 1
+    assert ingress[0]["FromPort"] == 5432 and ingress[0]["ToPort"] == 5432
+    assert "SourceSecurityGroupId" in ingress[0]
+
+
+def test_app_and_keycloak_get_their_own_generated_database_secrets() -> None:
+    t = template(make_app(), "Data")
+
+    for name, user in (("smart-tutor/db/app", "smart_tutor"), ("smart-tutor/db/keycloak", "keycloak")):
+        secret = next(
+            s for s in t.find_resources("AWS::SecretsManager::Secret").values() if s["Properties"]["Name"] == name
+        )
+        generate = secret["Properties"]["GenerateSecretString"]
+        assert generate["GenerateStringKey"] == "password"
+        assert generate["ExcludePunctuation"] is True
+        assert generate["PasswordLength"] == 32
+        template_text = json.dumps(generate["SecretStringTemplate"])
+        assert f'\\"username\\":\\"{user}\\"' in template_text
+        assert f'\\"dbname\\":\\"{user}\\"' in template_text
+        assert "Endpoint.Address" in template_text  # host comes from the instance
+
+
+def test_data_deploys_after_the_cluster_whose_pods_it_admits() -> None:
+    app = make_app()
+    stacks = {s.stack_name: s for s in build_app(app)}
+    app.synth()  # cross-stack references add their stack dependencies while synthesizing
+
+    assert stacks["SmartTutor-prod-Cluster"] in stacks["SmartTutor-prod-Data"].dependencies

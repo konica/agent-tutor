@@ -1,4 +1,4 @@
-/* Smart Tutor v0.4 — Conversations (§6.7), Notes (§6.8), Usage (§6.10), Settings (§6.11). */
+/* Smart Tutor v0.5 — Conversations (§6.7), Notes (§6.8), Usage (§6.10). Settings removed in v0.5 (PRD Q45). */
 (function () {
   const ST = window.ST;
   const S = ST.S;
@@ -144,24 +144,4 @@
   };
   ST.actions.sort = (el) => { const key = el.dataset.key; if (ST.U.key === key) ST.U.dir = ST.U.dir === 'asc' ? 'desc' : 'asc'; else { ST.U.key = key; ST.U.dir = key === 'title' ? 'asc' : 'desc'; } ST.render(); };
 
-  /* ---------- §6.11 Settings ---------- */
-  ST.settingsView = () => {
-    return ST.shell({ nav: 'settings', content: `<div class="page"><div class="page-head"><div><h1>Settings</h1></div></div>
-      <div class="settings-grid">
-        <section class="card" aria-labelledby="set-tz"><h2 id="set-tz">Time zone</h2>
-          <dl class="facts"><dt>Time zone</dt><dd><span class="od-row" style="--od-gap:6px">${ic('lock', 'sm')}${esc(ST.TZ.long)}</span></dd></dl>
-          <p class="helper">Smart Tutor uses one time zone for everyone. It sets “today” in Usage and the times shown when an upload or message limit ends. It can't be changed.</p></section>
-        <section class="card" aria-labelledby="set-terms"><h2 id="set-terms">Terms of use</h2>
-          <dl class="facts"><dt>Version</dt><dd>1.0 · effective 1 Oct 2026</dd><dt>Accepted</dt><dd>3 Oct 2026, 08:12</dd></dl>
-          <div class="card-actions"><button class="btn btn-secondary" type="button" data-action="full-terms">${ic('doc', 'sm')}View the terms you accepted</button></div></section>
-        <section class="card" aria-labelledby="set-app"><h2 id="set-app">Appearance</h2>
-          <div class="seg" role="radiogroup" aria-labelledby="set-app">
-            <button type="button" role="radio" aria-checked="${S.theme === 'light'}" data-action="set-theme" data-t="light" data-fk="th-light">${ic('sun', 'sm')}Light</button>
-            <button type="button" role="radio" aria-checked="${S.theme === 'dark'}" data-action="set-theme" data-t="dark" data-fk="th-dark">${ic('moon', 'sm')}Dark</button></div>
-          <div class="od-row" style="justify-content:space-between;border-top:1px solid var(--border);padding-top:16px">
-            <div class="od-field"><span class="label" id="cit-l">Show citations</span><span class="helper">Show sources under every answer. You can also change this in any conversation.</span></div>
-            <button class="switch od-fixed" type="button" role="switch" aria-checked="${S.citations}" aria-labelledby="cit-l" data-action="toggle-citations" data-fk="cit-set"><span class="track" aria-hidden="true"></span><span class="state" aria-hidden="true">${S.citations ? 'On' : 'Off'}</span></button></div></section>
-      </div></div>` });
-  };
-  ST.actions['set-theme'] = (el) => { ST.setTheme(el.dataset.t); ST.render(); };
 })();
