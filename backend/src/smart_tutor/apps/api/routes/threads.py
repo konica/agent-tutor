@@ -2,12 +2,13 @@
 
 import json
 from collections.abc import AsyncIterator
+from typing import Annotated
 
 import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from smart_tutor.apps.api.agent_client import AgentAnswer, AgentUnavailableError
 from smart_tutor.apps.api.deps import Agent, BearerToken, Conversations, CurrentPrincipal, Subjects
@@ -29,20 +30,36 @@ SSE_RESPONSE: dict[int | str, dict[str, object]] = {
 class AskRequest(BaseModel):
     # No user id: the thread's owner comes from the token (PRD §9.3). Unknown fields are refused.
     model_config = ConfigDict(extra="forbid")
-    question: str = Field(min_length=1, max_length=4000)
+    # Stripped before the length check, so a blank question is a 422; the agent gets the stripped text.
+    question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)]
 
 
 def _sse(event: str, data: object) -> bytes:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n".encode()
 
 
+_EVENT_END = b"\n\n"
+_UNAVAILABLE_EVENT = _sse("error", {"code": "unavailable", "message": UNAVAILABLE})
+
+
 async def _relay(first: bytes, answer: AgentAnswer) -> AsyncIterator[bytes]:
+    """The thread event, then the agent's events unchanged, forwarded only once complete.
+
+    Network reads can end inside an event; if the stream drops there, the partial event is dropped so the
+    error event that follows stays a well-formed event of its own.
+    """
     yield first
+    pending = b""
     try:
         async for chunk in answer.chunks():
-            yield chunk
+            pending += chunk
+            complete, separator, pending = pending.rpartition(_EVENT_END)
+            if separator:
+                yield complete + separator
+        if pending.strip():  # the agent's stream ended inside an event
+            yield _UNAVAILABLE_EVENT
     except httpx.HTTPError:
-        yield _sse("error", {"code": "unavailable", "message": UNAVAILABLE})
+        yield _UNAVAILABLE_EVENT
     finally:
         await answer.aclose()
 

@@ -154,6 +154,90 @@ def test_an_empty_question_is_422() -> None:
     assert client.post("/threads", json={"question": ""}, headers=AUTH).status_code == 422
 
 
+def test_a_whitespace_only_question_is_422_before_any_thread_or_agent_call() -> None:
+    seen: list[httpx.Request] = []
+    client, threads, _ = setup(recording(seen))
+
+    response = client.post("/threads", json={"question": "   \n\t "}, headers=AUTH)
+
+    assert response.status_code == 422
+    assert threads.threads == {} and seen == []
+
+
+def test_the_question_is_forwarded_stripped() -> None:
+    seen: list[httpx.Request] = []
+    client, _, _ = setup(recording(seen))
+
+    client.post("/threads", json={"question": "  What is attention?\n"}, headers=AUTH)
+
+    [request] = seen
+    assert json.loads(request.content)["question"] == "What is attention?"
+
+
+class _Chunks(httpx.AsyncByteStream):
+    """Yields the given network reads, then raises `error` if one is given."""
+
+    def __init__(self, *reads: bytes, error: Exception | None = None) -> None:
+        self._reads = reads
+        self._error = error
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        for read in self._reads:
+            yield read
+        if self._error is not None:
+            raise self._error
+
+
+def streaming(stream: httpx.AsyncByteStream) -> Handler:
+    return lambda request: httpx.Response(200, stream=stream, headers={"content-type": "text/event-stream"})
+
+
+def test_events_split_across_reads_are_relayed_byte_identical() -> None:
+    reads = [AGENT_SSE[i : i + 7] for i in range(0, len(AGENT_SSE), 7)]  # reads cut events anywhere
+    client, _, _ = setup(streaming(_Chunks(*reads)))
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    assert response.text.split("\n\n", 1)[1] == AGENT_SSE.decode()
+
+
+def test_a_stream_dropped_inside_an_event_ends_with_a_well_formed_error_event() -> None:
+    client, _, _ = setup(
+        streaming(
+            _Chunks(
+                b'event: delta\ndata: {"text": "It weighs "}\n\n',
+                b'event: delta\ndata: {"text": "half',  # half an event, then the connection drops
+                error=httpx.ReadError("connection reset"),
+            )
+        )
+    )
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    assert response.status_code == 200
+    events = response.text.split("\n\n")
+    assert events[-1] == ""  # the body ends on an event boundary
+    thread, delta, error = events[:-1]
+    assert thread.startswith("event: thread\n")
+    assert delta == 'event: delta\ndata: {"text": "It weighs "}'  # the partial event is dropped
+    event, data = error.split("\n")
+    assert event == "event: error"
+    assert json.loads(data.removeprefix("data: ")) == {"code": "unavailable", "message": UNAVAILABLE}
+    assert "half" not in response.text
+
+
+def test_a_stream_that_ends_inside_an_event_ends_with_an_error_event_instead() -> None:
+    complete_then_half = b'event: delta\ndata: {"text": "It weighs "}\n\nevent: delta\ndata: {"text": "half'
+    client, _, _ = setup(streaming(_Chunks(complete_then_half)))
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    *_, delta, error, end = response.text.split("\n\n")
+    assert end == "" and delta == 'event: delta\ndata: {"text": "It weighs "}'
+    assert error.startswith("event: error\n") and '"code": "unavailable"' in error
+    assert "half" not in response.text
+
+
 class _BreaksMidAnswer(httpx.AsyncByteStream):
     async def __aiter__(self) -> AsyncIterator[bytes]:
         yield b'event: delta\ndata: {"text": "It weighs "}\n\n'
