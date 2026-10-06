@@ -3,6 +3,9 @@
 The worker is woken by a message on the ingest queue. It is sent before the commit, while this transaction holds
 the content's row lock; the worker's first read locks the content too, so it waits for the commit. If the commit
 fails, the worker finds the content still failed and drops the message; nothing was used up.
+
+Locks are taken in the worker's order (the content, then its documents in id order), so two learners retrying the
+same shared content cannot deadlock. The caller's document is first read without a lock.
 """
 
 import json
@@ -42,7 +45,7 @@ class RetryService:
         A document that isn't failed, or has no content, is left alone.
         """
         with self._uow() as tx:
-            document = tx.documents.get_for_update(document_id)
+            document = tx.documents.get(document_id)
             if document is None or not document.can_be_read_by(user_id):
                 raise DocumentNotFoundError("Document not found")
             if document.state is not DocumentState.FAILED or document.content_id is None:
@@ -50,9 +53,12 @@ class RetryService:
             content = tx.contents.get_for_update(document.content_id)
             if content is None or content.state is not ContentState.FAILED:
                 return
+            failed = tx.documents.list_failed_for_content_for_update(content.content_id)
+            if document_id not in {d.document_id for d in failed}:
+                return  # it changed between the read and the locks
             content.retry(self._max_attempts)
             tx.contents.save(content)
-            for linked in tx.documents.list_failed_for_content_for_update(content.content_id):
+            for linked in failed:
                 linked.retry()
                 tx.documents.save(linked)
             self._queue.send(retry_message(content.content_id))

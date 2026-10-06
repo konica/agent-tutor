@@ -48,8 +48,8 @@ class DocumentRepository(ABC):
         """Every processing document linked to this content, locked until the unit of work ends."""
 
     @abstractmethod
-    def get_for_update(self, document_id: DocumentId) -> Document | None:
-        """The document, locked until the unit of work ends (no access check: callers apply `can_read`)."""
+    def get(self, document_id: DocumentId) -> Document | None:
+        """The document, not locked (no access check: callers apply `can_read`)."""
 
     @abstractmethod
     def list_failed_for_content_for_update(self, content_id: ContentId) -> list[Document]:

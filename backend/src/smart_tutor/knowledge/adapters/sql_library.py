@@ -171,10 +171,8 @@ class _Documents(DocumentRepository):
         ).all()
         return self._load(list(rows))
 
-    def get_for_update(self, document_id: DocumentId) -> Document | None:
-        row = self._conn.execute(
-            select(documents).where(documents.c.document_id == document_id).with_for_update()
-        ).first()
+    def get(self, document_id: DocumentId) -> Document | None:
+        row = self._conn.execute(select(documents).where(documents.c.document_id == document_id)).first()
         return self._load([row])[0] if row else None
 
     def list_failed_for_content_for_update(self, content_id: ContentId) -> list[Document]:

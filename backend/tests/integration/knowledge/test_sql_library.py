@@ -343,8 +343,8 @@ def test_retry_attempts_and_failed_document_locks_round_trip(engine: Engine) -> 
         by_id = {d.document_id: d for d in tx.documents.list_readable_by(UserId(owner))}
         assert by_id[failed.document_id].content_attempts == 1
         assert by_id[other.document_id].content_attempts is None
-        assert tx.documents.get_for_update(DocumentId(uid())) is None
-        found = tx.documents.get_for_update(failed.document_id)
+        assert tx.documents.get(DocumentId(uid())) is None
+        found = tx.documents.get(failed.document_id)
         assert found is not None and found.document_id == failed.document_id
         assert [d.document_id for d in tx.documents.list_failed_for_content_for_update(content.content_id)] == [
             failed.document_id

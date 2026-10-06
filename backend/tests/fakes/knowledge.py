@@ -81,7 +81,7 @@ class _Documents(DocumentRepository):
             raise AssertionError("unique (owner_id, content_id) violated")
         self._s.documents[document.document_id] = copy.deepcopy(document)
 
-    def get_for_update(self, document_id: DocumentId) -> Document | None:
+    def get(self, document_id: DocumentId) -> Document | None:
         found = self._s.documents.get(document_id)
         return copy.deepcopy(found) if found else None
 

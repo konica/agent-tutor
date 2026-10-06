@@ -121,7 +121,8 @@ def test_retry_messages_round_trip_and_reject_anything_else() -> None:
 
 def test_processing_waits_for_a_retry_commit_by_locking_the_content() -> None:
     library, _, ingestion, doc_id = failed_upload()
-    RetryService(library.unit_of_work, FakeQueue(), max_attempts=3).retry(ADA, doc_id)
+    content_id = library.state.documents[doc_id].content_id
+    assert content_id is not None
     library.locked_contents.clear()
-    ingestion.process_content(library.state.documents[doc_id].content_id)  # type: ignore[arg-type]
-    assert library.locked_contents  # the first read is get_for_update, so it waits for the API's commit
+    assert ingestion.process_content(content_id) is None  # still failed: stops at the first read
+    assert library.locked_contents == [content_id]  # that read is get_for_update, so it waits for the API's commit
