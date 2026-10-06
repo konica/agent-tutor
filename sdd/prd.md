@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Draft v2.13 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Status** | Draft v2.14 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Changes from v2.13** | A public landing page at `/` explains Smart Tutor and leads to sign-up and sign-in; every other page requires sign-in (US-1). Keycloak's hosted pages keep their stock layout with the Smart Tutor logo, colors, and font only (Q45; `sdd/reviews/2026-10-06-landing-page-discussion.md`). |
 | **Changes from v2.12** | The first-pages `describe_document` payload is validated in code; a reply without one valid call stores no metadata, and processing continues with the file name as title; an invalid optional DOI or year is dropped without losing the rest, and a DOI not printed in the pages is dropped too. `contents` gains the description columns (title, authors, year, DOI, summary, summary embedding, proposed subject names, work key). The first pages are read by `PdfExtractor.extract_pages(..., first=2)` (§9.2 step 4; §9.15 ports). |
 | **Changes from v2.11** | Pilot hosting: served from the AWS-generated CloudFront address with path routing (`/`, `/api/*`, `/auth/*`) through a VPC origin to an internal ALB; no custom domain, DNS, or ACM certificate for now (§9.12, Appendix A item 4; ADR 0009). No product behavior changes. |
 | **Changes from v2.10** | The per-file limits are SSM parameters `/smart-tutor/max-upload-mb` (50, MiB) and `/smart-tutor/max-pages` (500), read once at startup by the API and worker (a missing or invalid value stops startup); `GET /uploads/limits` serves them to the browser, which refuses a non-PDF, empty, or oversized file before uploading ("Not uploaded. …"). New failure reason: "This PDF has N pages; the limit is 500", checked before the text is read (§9.5). The API and worker roles need `ssm:GetParameter` on `/smart-tutor/*` (§9.4 settings; Appendix A). |
@@ -135,7 +136,8 @@ Learners and researchers work through many documents on a topic but lack the bac
 ## 7. Scope
 
 ### Release 1: core tutor on your own documents
-- Registration, login, logout via **Keycloak's hosted pages**, with terms of use accepted at sign-up (upload warranty).
+- A public **landing page** (what Smart Tutor does, "Create an account", "Sign in"); no pricing, testimonials, or later-release features.
+- Registration, login, logout via **Keycloak's hosted pages** (stock layout with the Smart Tutor logo, colors, and font), with terms of use accepted in the app on first sign-in (upload warranty).
 - **Upload** PDFs with a client-side duplicate check and server-side SHA-256; per-document state.
 - **Subject suggestion** (3 choices, keep 1–3) and the **shared subject catalog**; personal subject names (rename, reset).
 - Ingestion once per unique content: fast first-pages step (metadata, suggestions), page text extraction with `pypdf` (saved), work key, chunking, embedding.
@@ -177,6 +179,7 @@ Learners and researchers work through many documents on a topic but lack the bac
 Story IDs are stable. Release 1: US-1 to US-13b. Release 2: US-19, US-20. Release 3: US-14 to US-16. Release 4: US-17. Release 5: US-18.
 
 **US-1 Register and sign in**
+- *Given* a visitor who isn't signed in, *when* they open Smart Tutor, *then* they see the **landing page**: what Smart Tutor does, that it answers only from their own documents, that documents are private, that it is a pilot for laptop browsers, and **"Create an account"** and **"Sign in"**. Both go to Keycloak and return to **My library**; signing out returns to the landing page. Every other page requires sign-in.
 - *Given* a new visitor, *when* they choose "Sign up", *then* they register on Keycloak's hosted page (with email verification), accept the terms of use, get the `learner` role, and land on **My library**, which prompts "Upload your first document" when empty.
 - Unauthenticated calls to the API, agent, or MCP server return `401`.
 
@@ -298,7 +301,7 @@ Story IDs are stable. Release 1: US-1 to US-13b. Release 2: US-19, US-20. Releas
 | **RAG MCP Server** | `search(query, subject_ids, k)` over streamable HTTP: validates the forwarded JWT, resolves the learner's **readable, ready, non-archived documents** in any of those subjects (`can_read`), searches their contents' chunks only, returns chunks with scores and citation metadata. `get_chunk(chunk_id)` resolves old citations (only through a document the caller can read). |
 | **Smart Tutor agent** | Ask, summarize, idle-record paths (§9.2); checkpointer and long-term memory in PostgreSQL; token usage per call. |
 | **Scheduled jobs** (Kubernetes CronJobs) | Learning-record sweeper (every minute); Glacier tagger (daily); trace and decline-log retention (daily); *R3:* learner reports (hourly). |
-| **Web App** | Keycloak login, library and upload, subject choice and rename, chat, conversations, notes, usage; *R2:* research map; *R3:* quizzes, reports; *R4:* sharing, imports. |
+| **Web App** | Public landing page, Keycloak login, library and upload, subject choice and rename, chat, conversations, notes, usage; *R2:* research map; *R3:* quizzes, reports; *R4:* sharing, imports. |
 
 ### 9.2 Agent flow
 
@@ -626,6 +629,7 @@ Measured over the pilot unless stated; minimum sample 100 events per metric.
 | Q42 | Changing subjects of an archived document (design D7) | Allowed; applies on restore (US-10). |
 | Q43 | Time zone for "today", daily caps, and limit times (design D8) | GMT+7 for all learners in Release 1 (D27). |
 | Q44 | Pilot address | The AWS-generated CloudFront domain with path routing; no custom domain until needed (ADR 0009). |
+| Q45 | Landing page and Keycloak pages | Public landing page at `/`, text only (no product image) for the pilot; signed-in visitors see the same page and "Sign in" returns them to My library through single sign-on. Keycloak keeps its stock `keycloak.v2` layout with the Smart Tutor logo, colors, font, and display name; no custom templates. Terms stay in the app (US-1). |
 
 ## 14. Roadmap: releases and milestones
 
