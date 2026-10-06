@@ -1,7 +1,7 @@
 import { SessionExpiredError } from "../auth/authClient";
 import type { Client } from "./generated/client";
 import { client } from "./generated/client.gen";
-import { getUploadLimits, listDocuments, startUpload } from "./generated/sdk.gen";
+import { getUploadLimits, listDocuments, retryDocument, startUpload } from "./generated/sdk.gen";
 import type { DocumentResponse, UploadLimitsResponse } from "./generated/types.gen";
 
 export type { DocumentResponse };
@@ -16,6 +16,13 @@ export async function loadDocuments(apiClient: Client = client): Promise<Documen
   if (sessionOver(error, response)) throw new SessionExpiredError();
   if (!data) throw new Error(`GET /documents failed (${response?.status ?? "no response"})`);
   return data;
+}
+
+// Reprocesses a failed document's stored file (PRD §9.5). 409: the attempts are used up; the list then says so.
+export async function retryProcessing(documentId: string, apiClient: Client = client): Promise<void> {
+  const { error, response } = await retryDocument({ client: apiClient, path: { document_id: documentId }, throwOnError: false });
+  if (sessionOver(error, response)) throw new SessionExpiredError();
+  if (!response?.ok) throw new Error(`POST /documents/${documentId}/retry failed (${response?.status ?? "no response"})`);
 }
 
 export async function loadUploadLimits(apiClient: Client = client): Promise<UploadLimits> {

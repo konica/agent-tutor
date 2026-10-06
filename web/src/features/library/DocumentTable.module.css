@@ -20,3 +20,4 @@
 .hint, .reason { margin: var(--sp-1) 0 0; font-size: var(--fs-12); max-width: 22ch; }
 .hint { color: var(--text-2); }
 .reason { color: var(--danger); }
+.actions { text-align: right; white-space: nowrap; }

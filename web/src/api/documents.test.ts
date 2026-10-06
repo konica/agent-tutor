@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { SessionExpiredError } from "../auth/authClient";
 import { configureApiClient } from "./client";
-import { loadDocuments, loadUploadLimits, rejectionReason, uploadPdf } from "./documents";
+import { loadDocuments, loadUploadLimits, rejectionReason, retryProcessing, uploadPdf } from "./documents";
 import { createClient, createConfig } from "./generated/client";
 
 function api(handler: (request: Request) => Response) {
@@ -17,7 +17,7 @@ const json = (body: unknown, status = 200) =>
 
 describe("loadDocuments", () => {
   it("returns the caller's documents", async () => {
-    const doc = { document_id: "d1", title: "a.pdf", state: "processing", failure_reason: null, created_at: "2026-10-04T09:00:00Z", subjects: [] };
+    const doc = { document_id: "d1", title: "a.pdf", state: "processing", failure_reason: null, created_at: "2026-10-04T09:00:00Z", subjects: [], attempt: null, max_attempts: 3, can_retry: false };
     const { apiClient } = api(() => json([doc]));
     await expect(loadDocuments(apiClient)).resolves.toEqual([doc]);
   });
@@ -102,5 +102,25 @@ describe("loadUploadLimits", () => {
   it("rejects with SessionExpiredError on 401", async () => {
     const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
     await expect(loadUploadLimits(apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+});
+
+describe("retryProcessing", () => {
+  it("POSTs to the document's retry path and resolves on 204", async () => {
+    const { apiClient, fetch } = api(() => new Response(null, { status: 204 }));
+    await expect(retryProcessing("d3", apiClient)).resolves.toBeUndefined();
+    const request = fetch.mock.calls[0]![0] as Request;
+    expect(request.method).toBe("POST");
+    expect(request.url).toBe("http://api.test/documents/d3/retry");
+  });
+
+  it("rejects with SessionExpiredError on 401", async () => {
+    const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
+    await expect(retryProcessing("d3", apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+
+  it.each([409, 500])("rejects with an Error on %i", async (status) => {
+    const { apiClient } = api(() => json({ detail: "no" }, status));
+    await expect(retryProcessing("d3", apiClient)).rejects.toThrow(String(status));
   });
 });
