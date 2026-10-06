@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Draft v2.17 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Status** | Draft v2.18 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Changes from v2.17** | US-2b first slice (#77): when its content becomes ready, a document goes to *choose subjects* (`awaiting_subjects`) with 3 suggestions; the interim "General" step is removed (documents that already have "General" keep it). |
 | **Changes from v2.16** | Keycloak's login page offers "Remember me" and "Forgot password?" (design F4, Q53; US-1). |
 | **Changes from v2.15** | Product owner answers to design questions E4, E6, E7, E8, F1 (Q48–Q52): "New conversation" is offered only when a conversation already has 3 subjects, so a decline only asks for a document (US-5); a declined question is not kept after "Upload a document"; **subjects of an archived document can't be changed** (reverses Q42; US-10); daily caps reset at midnight GMT+7 (D27); registration uses the email as the username (US-1). |
 | **Changes from v2.14** | A public landing page at `/` explains Smart Tutor and leads to sign-up and sign-in; every other page requires sign-in (US-1). Keycloak's hosted pages keep their stock layout with the Smart Tutor logo, colors, and font only (Q46; `sdd/reviews/2026-10-06-landing-page-discussion.md`). With no terms step (Q45), the Library's upload area says "Only upload documents you have the right to use." (US-2, Q47). |
@@ -399,7 +400,6 @@ Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow onl
 - (none) → `processing` when the upload starts (`content_id` null until hashed).
 - `processing` → `awaiting_subjects` when the content is `ready` (or linked to a ready content); suggestions are shown.
 - `awaiting_subjects` → `ready` when 1–3 subjects are chosen.
-- Interim until US-2b (#10): when its content becomes `ready`, a `processing` document gets the subject "General" and goes straight to `ready`, with no `awaiting_subjects` step.
 - `processing` → `failed` when its content fails or validation fails; **Retry** returns it to `processing`.
 - Open gap: a document whose upload never arrives (the browser's POST to S3 failed or was abandoned) stays `processing`; a follow-up will fail it once the presign/upload lifecycle expires.
 - `archived` is a separate flag on any state: archive hides the document from search and lists; restore clears the flag.
