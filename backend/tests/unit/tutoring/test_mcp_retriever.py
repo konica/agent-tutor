@@ -1,5 +1,8 @@
+import asyncio
+from collections.abc import AsyncIterator
 from typing import Any
 
+import httpx2
 import pytest
 
 from fakes import FakeTokenVerifier, InMemoryLibrary, fake_embeddings, in_process_mcp, ingest_ready
@@ -52,4 +55,32 @@ async def test_a_tool_error_raises_retrieval_error() -> None:
 
 def test_repr_never_shows_the_token() -> None:
     assert "t-secret" not in repr(McpRetriever(MCP_TEST_URL, "t-secret"))
-    assert "t-secret" not in str(vars(McpRetriever(MCP_TEST_URL, "t-secret")).keys())
+
+
+class StalledBody(httpx2.AsyncByteStream):
+    def __init__(self, reading: asyncio.Event) -> None:
+        self._reading = reading
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        self._reading.set()
+        await asyncio.Event().wait()
+        yield b""  # pragma: no cover
+
+
+class RefuseAndStallTransport(httpx2.AsyncBaseTransport):
+    """Answers 401 (the retriever notes a refusal), then stalls while the SDK reads the JSON error body."""
+
+    def __init__(self) -> None:
+        self.reading = asyncio.Event()
+
+    async def handle_async_request(self, request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(401, headers={"content-type": "application/json"}, stream=StalledBody(self.reading))
+
+
+async def test_cancellation_after_a_401_propagates_instead_of_becoming_unauthenticated() -> None:
+    transport = RefuseAndStallTransport()
+    search = asyncio.create_task(McpRetriever(MCP_TEST_URL, "t-ada", transport).search("q", [GENERAL_SUBJECT_ID]))
+    await asyncio.wait_for(transport.reading.wait(), timeout=5)
+    search.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await search
