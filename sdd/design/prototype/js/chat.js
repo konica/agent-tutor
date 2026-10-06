@@ -1,4 +1,4 @@
-/* Smart Tutor v0.4 — chat (§6.6): multi-subject conversations that grow to 3, simulated tutor, every state. */
+/* Smart Tutor v0.7 — chat (§6.6): multi-subject conversations that grow to 3, simulated tutor, every state. */
 (function () {
   const ST = window.ST;
   const S = ST.S;
@@ -124,12 +124,6 @@
         <p class="small muted">A new conversation will answer it straight away.</p>
         <div class="tc-actions"><button class="btn btn-primary" type="button" data-action="carry-over" data-mid="${m.id}" data-fk="carry">${ic('plus', 'sm')}New conversation</button></div></div>`);
     }
-    if (m.kind === 'decline' && m.other) {
-      return tutorWrap(m, `<div class="tutor-card decline">
-        <p>The documents in this conversation's subjects don't cover this. It belongs to <em>${esc(ST.sname(m.other))}</em>, another of your subjects.</p>
-        <p class="small muted">A new conversation will answer it straight away.</p>
-        <div class="tc-actions"><button class="btn btn-secondary" type="button" data-action="carry-over" data-mid="${m.id}" data-fk="carry">${ic('plus', 'sm')}New conversation</button></div></div>`);
-    }
     if (m.kind === 'decline') {
       return tutorWrap(m, `<div class="tutor-card decline">
         <p>Your documents don't cover this. I answer only from your Library, and none of your subjects is about ${esc(m.topic || 'this topic')}.</p>
@@ -186,7 +180,7 @@
       banner = `<div class="banner">${ic('archive')}<div class="b-body"><strong>There are no active documents in this conversation's subjects.</strong><span>The history stays readable. Restore a document to keep asking.</span></div><a class="btn btn-secondary btn-sm" href="#/library-archived">Open archived documents</a></div>`;
     } else if (t.rateLimit > 0) {
       disabled = true; placeholder = 'Sending is paused for a moment';
-      banner = `<div class="banner banner-warn">${ic('clock')}<div class="b-body"><strong>You've sent 20 messages in the last minute.</strong><span>You can send again at 11:25 (${ST.TZ.short}), in <span id="rl-count" class="mono">${t.rateLimit}</span> seconds.</span></div></div>`;
+      banner = `<div class="banner banner-warn">${ic('clock')}<div class="b-body"><strong>You've sent 20 messages in the last minute.</strong><span>You can send again at 11:25 (${ST.TZ.short}), in <span id="rl-count" class="mono">${t.rateLimit}</span> seconds.</span><span class="b-variant">If it's the daily limit (500 per day): You can send again at 00:00 (${ST.TZ.short}).</span></div></div>`;
     }
     const processing = ST.stillProcessing();
     const hint = !disabled && processing ? `<p class="input-hint">${ic('clock', 'sm')}${ST.plural(processing, 'document')} ${processing === 1 ? 'is' : 'are'} still processing and can't be used yet.</p>` : '';
@@ -332,7 +326,7 @@
       m.done = true; t.subjects = m.picks.slice(); ensureConv(m.question); ST.conv(t.convId).subjects = t.subjects;
       ST.streamAnswer(ST.pickAnswer(m.question, t.subjects));
     },
-    'carry-over': (el) => { const m = findMsg(el); ST.pendingAsk = { q: m.question, subjects: [m.other || m.subject].filter(Boolean) }; ST.pendingThread = ST.newThread({ carriedFrom: T().convId }); ST.goto('chat-new'); },
+    'carry-over': (el) => { const m = findMsg(el); ST.pendingAsk = { q: m.question, subjects: [m.subject].filter(Boolean) }; /* only the fourth-subject refusal carries a question (E4) */ ST.pendingThread = ST.newThread({ carriedFrom: T().convId }); ST.goto('chat-new'); },
     'decline-upload': () => { ST.goto('library-default'); if (!S.uploadLimit) document.getElementById('file-input').click(); },
     retry: (el) => { const t = T(); t.messages = t.messages.filter((m) => m.id !== el.dataset.mid); const q = [...t.messages].reverse().find((m) => m.role === 'user'); ST.streamAnswer(ST.pickAnswer(q.text, t.subjects)); },
     summarize: () => {

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "fileName": "index.html",
-  "currentVersionId": "bd2b0f3f-fcae-497f-b28e-c1989c4e8b2a",
+  "currentVersionId": "6dc3d683-fb5e-4f43-b754-b2613abf34fb",
   "entries": [
     {
       "id": "f36e6729-f195-4945-9c3c-52c32a4f64eb",
@@ -60,7 +60,22 @@
       "mime": "text/html; charset=utf-8",
       "kind": "html",
       "contentPath": "0004-bd2b0f3f-fcae-497f-b28e-c1989c4e8b2a.html",
-      "contentDigest": "4dc2042aea3f8c13497dba12449be3c119e3dbff8a0f5e258ab86e3bf7675530",
+      "promptSource": "message",
+      "contentDigest": "4dc2042aea3f8c13497dba12449be3c119e3dbff8a0f5e258ab86e3bf7675530"
+    },
+    {
+      "id": "6dc3d683-fb5e-4f43-b754-b2613abf34fb",
+      "fileName": "index.html",
+      "version": 5,
+      "label": "Version 5",
+      "createdAt": 1791271371049,
+      "source": "ai",
+      "prompt": "You are designing **Smart Tutor**, a laptop web app (1440 px, light mode) where learners upload their own PDFs and ask a tutor that answers only from them, with citations. Follow the design brief **v0.7** in this project (`brief-v0.7.md`; it is the only brief now) exactly; it is the source of truth. Start with **§0 What changed**: this round updates the existing prototype in this project (round 5, brief v0.6), so change only what §0 lists and keep everything else as it is. Keep the four clickable flows in §5 working, every Release 1 screen and state in §6, the wireframes for §7 and §8, and the components page (§10). Use the sample data in §9 and the quoted wording verbatim. Set `ST.BRIEF = 'v0.7'` and update the page title, the overview, and the questions page for brief v0.7. Follow the prototype contract in §11 item 6: every state in `window.ST.STATES` with one specific user story in `ref`, each state at `index.html#/<state-id>`, review chrome hidden with `?shot=1`.\n\nRules for this round:\n- Keep the Smart Tutor brand and tokens; no other design system.\n- Do not edit `brief-v0.7.md`, `history/`, `.file-versions/`, `.od-frames/`, `.od-skills/`, or `v0.2/`.\n- Keep every other state id and its `ref` unchanged.\n- **Remove** the states `chat-decline-other-subject` and `picker-change-subjects-archived` everywhere (state list, index, review-bar list, flows, overview), and any \"New conversation\" offer on a decline (E4). \"New conversation\" stays only in `chat-fourth-subject-refused` / `chat-new-from-refused`.\n- E7: no \"Change subjects\" for archived documents (Archived tab rows, `details-archived`, row \"More\" menus); show \"Restore\" instead.\n- E8: daily-limit messages say \"You can upload again at 00:00 (GMT+7)\" / \"You can send again at 00:00 (GMT+7)\"; the hourly/per-minute ones keep their own times. Show the daily case in `library-rate-limited` and `chat-rate-limited` (a short secondary line is fine).\n- F1: `auth-sign-up` has no Username field (Email, First name, Last name, Password, Confirm password), still Keycloak's stock layout.\n- Keep the `main[tabindex=\"-1\"]` focus rule at the end of `v03.css`.\n\nEnd with a list of the states you changed, any removed state ids, and questions or proposed changes to the brief.",
+      "size": 3203,
+      "mime": "text/html; charset=utf-8",
+      "kind": "html",
+      "contentPath": "0005-6dc3d683-fb5e-4f43-b754-b2613abf34fb.html",
+      "contentDigest": "d0840ce778fad0aed1ca11a9e6f860d3d5c3d363e91fd9cc50cb4c8b0b701f7f",
       "promptSource": "message"
     }
   ]

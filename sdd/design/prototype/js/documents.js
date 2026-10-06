@@ -1,4 +1,4 @@
-/* Smart Tutor v0.6 — documents: sign-in theme, shared list pattern, Library, uploads,
+/* Smart Tutor v0.7 — documents: sign-in theme, shared list pattern, Library, uploads,
    subject picker (§6.4), document details (§6.5), Subjects (§6.9). */
 (function () {
   const ST = window.ST;
@@ -29,8 +29,7 @@
 
   ST.authSignUp = () => kc('Register', `
     <form class="kc2-form" novalidate onsubmit="return false">
-      ${kf('kc-un', 'Username', 'text', 'mai.nguyen', 'autocomplete="username" data-autofocus')}
-      ${kf('kc-em', 'Email', 'email', 'mai.nguyen@example.com', 'autocomplete="email"')}
+      ${kf('kc-em', 'Email', 'email', 'mai.nguyen@example.com', 'autocomplete="email" data-autofocus')}
       ${kf('kc-fn', 'First name', 'text', 'Mai', 'autocomplete="given-name"')}
       ${kf('kc-ln', 'Last name', 'text', 'Nguyen', 'autocomplete="family-name"')}
       ${kf('kc-pw', 'Password', 'password', 'attention2017', 'autocomplete="new-password"')}
@@ -127,7 +126,7 @@
     const subjOpts = [];
     all.forEach((d) => d.subjects.forEach((s) => { if (!subjOpts.includes(s)) subjOpts.push(s); }));
     const uploadBtn = `<button class="btn btn-primary" type="button" data-action="upload" data-fk="upload-btn" ${S.uploadLimit ? 'disabled aria-describedby="limit-msg upload-rights"' : 'aria-describedby="upload-rights"'}>${ic('upload', 'sm')}Upload</button>`;
-    const limit = S.uploadLimit ? `<div class="banner banner-warn" style="margin-bottom:16px" id="limit-msg">${ic('clock')}<div class="b-body"><strong>Upload limit reached.</strong><span>You can upload up to 20 files per hour and 100 per day. You can upload again at 11:40 (${ST.TZ.short}).</span></div></div>` : '';
+    const limit = S.uploadLimit ? `<div class="banner banner-warn" style="margin-bottom:16px" id="limit-msg">${ic('clock')}<div class="b-body"><strong>Upload limit reached.</strong><span>You can upload up to 20 files per hour and 100 per day. You can upload again at 11:40 (${ST.TZ.short}).</span><span class="b-variant">If it's the daily limit (100 per day): You can upload again at 00:00 (${ST.TZ.short}).</span></div></div>` : '';
 
     let body;
     if (all.length === 0) {
@@ -147,7 +146,7 @@
         <div class="lib-head" role="row"><span role="columnheader">Document</span><span role="columnheader">Subjects</span><span role="columnheader">State</span><span role="columnheader">Uploaded</span><span role="columnheader"><span class="vh">Actions</span></span></div>
         ${rows.map(libRow).join('')}</div>`;
       body = `${ST.tabsHtml(counts)}
-        ${ST.L.tab === 'archived' ? `<p class="legend-line">${ic('info', 'sm')}Archived documents aren't used for answers, but citations to them in past conversations still work. You can still change their subjects.</p>` : ''}
+        ${ST.L.tab === 'archived' ? `<p class="legend-line">${ic('info', 'sm')}Archived documents aren't used for answers, but citations to them in past conversations still work. Restore a document to change its subjects.</p>` : ''}
         ${ST.filterBar({ count: rows.length, noun: 'document', subjects: subjOpts, states: ST.L.tab === 'active' })}
         <div id="list-panel" role="tabpanel" aria-labelledby="tab-${ST.L.tab}">${list}</div>`;
     }
@@ -171,7 +170,7 @@
     else if (d.state === 'failed' && (d.attempts || 0) < 3) primary = `<button class="btn btn-secondary btn-sm" type="button" data-action="doc-retry" data-id="${d.id}" data-fk="retry-${d.id}" aria-label="Retry ${esc(d.title)}">${ic('retry', 'sm')}Retry</button>`;
     else primary = `<button class="btn btn-quiet btn-sm" type="button" data-action="open-doc" data-id="${d.id}" aria-label="Open ${esc(d.title)}">Open</button>`;
     const open = S.rowMenu === d.id;
-    const canChange = d.subjects.length && (d.archived || d.state === 'ready');
+    const canChange = d.subjects.length && !d.archived && d.state === 'ready'; // E7: archived → Restore first
     const menu = open ? `<div class="row-menu" role="menu" aria-label="Actions for ${esc(d.title)}">
       <button class="menu-item" role="menuitem" type="button" data-action="open-doc" data-id="${d.id}">${ic('doc')}Open details</button>
       ${canChange ? `<button class="menu-item" role="menuitem" type="button" data-action="change-subjects" data-id="${d.id}">${ic('tag')}Change subjects</button>` : ''}
@@ -327,12 +326,12 @@
   function pickerView() {
     const P = ST.PK; const d = ST.doc(P.queue[P.i]);
     const multi = P.queue.length > 1;
-    const head = `<header><div><p class="sp-kicker" style="font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2)">${multi ? `Document ${P.i + 1} of ${P.queue.length}` : d.archived ? 'Archived document' : P.mode === 'change' ? 'Ready document' : 'Processing finished'}</p>
+    const head = `<header><div><p class="sp-kicker" style="font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2)">${multi ? `Document ${P.i + 1} of ${P.queue.length}` : P.mode === 'change' ? 'Ready document' : 'Processing finished'}</p>
       <h2 id="pk-title">${P.mode === 'change' ? 'Change subjects' : 'Choose subjects'}</h2></div>
       <button class="icon-btn sm" type="button" data-action="pk-close" aria-label="Close">${ic('x')}</button></header>`;
     if (P.saved) {
       const msg = P.mode === 'change'
-        ? (d.archived ? `<em>${esc(d.title)}</em> stays archived. Its new subjects apply if you restore it.` : `<em>${esc(d.title)}</em> now uses ${d.subjects.map((s) => esc(ST.sname(s))).join(', ')}.`)
+        ? `<em>${esc(d.title)}</em> now uses ${d.subjects.map((s) => esc(ST.sname(s))).join(', ')}.`
         : `<em>${esc(d.title)}</em> is ready to use.`;
       return `<div class="dialog-scrim" data-scrim><div class="dialog picker" role="dialog" aria-modal="true" aria-labelledby="pk-title">${head}
         <div class="d-body" role="status"><div class="banner banner-success">${ic('checkCircle')}<div class="b-body"><strong>Subjects saved.</strong><span>${msg}</span></div></div>
@@ -357,7 +356,6 @@
       <div class="d-body" style="gap:20px;color:var(--text)" data-keep-scroll="pk">
         <div class="picker-doc"><span class="pd-title">${esc(d.title)}</span><span class="small muted">${docMeta(d)}</span>
           ${d.summary ? `<p class="pd-sum">${esc(d.summary)}</p>` : ''}</div>
-        ${d.archived ? `<p class="field-note info">${ic('archive')}<span>This document is archived and stays archived. It isn't used for answers; its new subjects apply if you restore it.</span></p>` : ''}
         <fieldset style="border:0;margin:0;padding:0;display:grid;gap:12px">
           <legend class="od-row" style="width:100%;justify-content:space-between;margin-bottom:12px"><span class="label">Suggested subjects</span>
             <span class="counter ${n === 3 ? 'max' : ''}" aria-live="polite">${n === 3 ? '3 of 3 selected · the maximum' : `${n} of 3 selected`}</span></legend>
@@ -457,7 +455,7 @@
     const failed = d.state === 'failed' && !d.archived
       ? `<div class="banner banner-danger">${ic('alert')}<div class="b-body"><strong>${d.attempts >= 3 ? 'This file could not be processed' : 'Processing failed'}</strong><span>${d.attempts >= 3 ? 'We tried 3 times. Try exporting the PDF again, or uploading a text-based copy.' : `${esc(d.failReason)}. Attempt ${d.attempts} of 3.${d.scanned ? ' A copy with selectable text will work.' : ''}`}</span></div>
           ${d.attempts < 3 ? `<button class="btn btn-secondary btn-sm" type="button" data-action="doc-retry" data-id="${d.id}">${ic('retry', 'sm')}Retry</button>` : ''}</div>` : '';
-    const archived = d.archived ? `<div class="banner">${ic('archive')}<div class="b-body"><strong>Archived</strong><span>Not used for answers. Citations to it in past conversations still open here. You can still change its subjects.</span></div></div>` : '';
+    const archived = d.archived ? `<div class="banner">${ic('archive')}<div class="b-body"><strong>Archived</strong><span>Not used for answers. Citations to it in past conversations still open here. Restore it to change its subjects.</span></div></div>` : '';
     const processing = d.state === 'processing' && !d.archived ? `<div class="banner banner-info" role="status"><span class="spinner" aria-hidden="true" style="margin-top:3px"></span><div class="b-body"><strong>Processing all ${d.pages} pages</strong><span>${d.pages > 300 ? 'Very long documents can take up to 15 minutes.' : 'This can take up to 5 minutes.'} You can choose subjects when processing finishes.</span></div></div>` : '';
     const cited = P.cited ? `<div class="banner banner-info">${ic('quote')}<div class="b-body"><strong>Cited ${P.cited.page ? `on page ${P.cited.page}` : '· page unavailable'}</strong><span>From an answer in your conversation.</span></div></div>` : '';
     const facts = [['Authors', d.authors || '—'], ['Year', d.year || (d.book ? 'Not shown' : '—')], ['DOI', d.doi || '—'], ['File name', d.file], ['Pages', d.pages], ['Uploaded', ST.fmtLong(d.uploaded)]];
@@ -473,7 +471,7 @@
           <section class="sp-section" aria-labelledby="dp-sub"><h3 id="dp-sub">Subjects</h3>
             ${d.subjects.length ? ST.chips(d.subjects) : `<p class="small muted">${d.state === 'choose' ? 'Processing has finished and suggestions are ready.' : d.state === 'processing' ? 'You can choose subjects when processing finishes.' : 'No subjects yet.'}</p>`}
             ${!d.archived && d.state === 'choose' ? `<button class="btn btn-primary btn-sm" type="button" data-action="dp-change" style="justify-self:start">Choose subjects</button>` : ''}
-            ${d.subjects.length && (d.archived || d.state === 'ready') ? `<button class="btn btn-secondary btn-sm" type="button" data-action="dp-change" data-fk="dp-change" style="justify-self:start">${ic('tag', 'sm')}Change subjects</button>` : ''}
+            ${d.subjects.length && !d.archived && d.state === 'ready' ? `<button class="btn btn-secondary btn-sm" type="button" data-action="dp-change" data-fk="dp-change" style="justify-self:start">${ic('tag', 'sm')}Change subjects</button>` : ''}
           </section>
         </div>
         <footer>${d.archived ? `<button class="btn btn-primary" type="button" data-action="dp-restore">${ic('restore', 'sm')}Restore</button>`
