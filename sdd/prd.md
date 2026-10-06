@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Draft v2.16 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Status** | Draft v2.17 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Changes from v2.16** | Keycloak's login page offers "Remember me" and "Forgot password?" (design F4, Q53; US-1). |
 | **Changes from v2.15** | Product owner answers to design questions E4, E6, E7, E8, F1 (Q48–Q52): "New conversation" is offered only when a conversation already has 3 subjects, so a decline only asks for a document (US-5); a declined question is not kept after "Upload a document"; **subjects of an archived document can't be changed** (reverses Q42; US-10); daily caps reset at midnight GMT+7 (D27); registration uses the email as the username (US-1). |
 | **Changes from v2.14** | A public landing page at `/` explains Smart Tutor and leads to sign-up and sign-in; every other page requires sign-in (US-1). Keycloak's hosted pages keep their stock layout with the Smart Tutor logo, colors, and font only (Q46; `sdd/reviews/2026-10-06-landing-page-discussion.md`). With no terms step (Q45), the Library's upload area says "Only upload documents you have the right to use." (US-2, Q47). |
 | **Changes from v2.13** | Product owner decision (Q45): Release 1 has no terms of use step and no Settings page. Sign-up ends on **My library** (US-1); the `learners` profile moves to Release 3 and keeps only `time_zone` for reports (D13, §9.4); the time zone stays one app setting (D27). The upload-warranty mitigation for copyright moves to Release 4 (§9.10). |
@@ -182,7 +183,7 @@ Story IDs are stable. Release 1: US-1 to US-13b. Release 2: US-19, US-20. Releas
 
 **US-1 Register and sign in**
 - *Given* a visitor who isn't signed in, *when* they open Smart Tutor, *then* they see the **landing page**: what Smart Tutor does, that it answers only from their own documents, that documents are private, that it is a pilot for laptop browsers, and **"Create an account"** and **"Sign in"**. Both go to Keycloak and return to **My library**; signing out returns to the landing page. Every other page requires sign-in.
-- *Given* a new visitor, *when* they choose "Sign up", *then* they register on Keycloak's hosted page with their email as the username (no separate username field) and email verification, get the `learner` role, and land on **My library**, which prompts "Upload your first document" when empty.
+- *Given* a new visitor, *when* they choose "Sign up", *then* they register on Keycloak's hosted page with their email as the username (no separate username field) and email verification, get the `learner` role, and land on **My library**, which prompts "Upload your first document" when empty. Keycloak's login page offers "Remember me" and "Forgot password?" (a reset link by email).
 - Unauthenticated calls to the API, agent, or MCP server return `401`.
 
 **US-2 Upload a document**
@@ -639,6 +640,7 @@ Measured over the pilot unless stated; minimum sample 100 events per metric.
 | Q50 | Changing subjects of an archived document (design E7) | Not allowed: low business value. Reverses Q42 (US-10). |
 | Q51 | When daily caps reset (design E8) | At midnight GMT+7; shorter limits are rolling windows (D27, US-9). |
 | Q52 | Username on registration (design F1) | The email is the username; Keycloak's "Email as username" is on, so registration has no username field (US-1). |
+| Q53 | "Remember me" and "Forgot password?" on login (design F4) | Both on, as the designer proposed: realm settings `rememberMe` and `resetPasswordAllowed` (US-1). |
 
 ## 14. Roadmap: releases and milestones
 
