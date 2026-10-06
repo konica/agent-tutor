@@ -75,3 +75,7 @@ The PO's risk "learners confuse Keycloak's email with the terms" does not apply:
 1. **Hero image:** text only for the pilot (fastest, no design round for imagery), or a static render of the app (a Library and a cited answer, made from the prototype)? *Recommendation: text only now; add the render after the pilot if sign-ups need it.*
 2. **Signed-in visitor at `/`:** same landing page, where "Sign in" returns them to the Library through single sign-on (simplest), or a signed-in variant with "Open your library" (needs `check-sso` and one more state)? *Recommendation: the simplest.*
 3. **PRD form:** extend US-1 (recommended), or a new story for the landing page?
+
+## Update (2026-10-06, later)
+
+The product owner then removed the terms of use step and the Settings page (#46, #49, #50; PRD v2.14 Q45). The "Terms" row above and the footer link no longer apply: the landing page has no terms link, and the Library's upload area says "Only upload documents you have the right to use." instead (PRD v2.15 Q47, brief v0.6).

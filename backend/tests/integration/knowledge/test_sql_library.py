@@ -313,3 +313,26 @@ def test_listing_shows_the_content_title_and_the_override_wins(engine: Engine) -
             text("update documents set title_override = 'My notes' where document_id = :d"), {"d": titled.document_id}
         )
     assert titles()[titled.document_id] == "My notes"
+
+
+def test_find_by_sha256_is_owner_only_and_skips_unlinked_and_archived(engine: Engine) -> None:
+    ada, bob, carol = f"ada-{uid()}", f"bob-{uid()}", f"carol-{uid()}"
+    content = stored_content(engine, ada)
+    sha = content.sha256
+    mine, bobs = start(engine, ada), start(engine, bob)
+    start(engine, ada)  # still processing: never matches
+    link(engine, mine, content)
+    link(engine, bobs, content)
+
+    def find(user: str, digest: str = sha) -> DocumentId | None:
+        with SqlLibraryUnitOfWork(engine) as tx:
+            return tx.documents.find_readable_by_sha256(UserId(user), digest)
+
+    assert find(ada) == mine.document_id
+    assert find(bob) == bobs.document_id
+    assert find(carol) is None
+    assert find(ada, "0" * 64) is None
+
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE documents SET archived = true WHERE document_id = :d"), {"d": mine.document_id})
+    assert find(ada) is None

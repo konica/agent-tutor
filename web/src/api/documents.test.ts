@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { SessionExpiredError } from "../auth/authClient";
 import { configureApiClient } from "./client";
-import { loadDocuments, loadUploadLimits, rejectionReason, uploadPdf } from "./documents";
+import { findInLibrary, loadDocuments, loadUploadLimits, rejectionReason, sha256Hex, uploadPdf } from "./documents";
 import { createClient, createConfig } from "./generated/client";
 
 function api(handler: (request: Request) => Response) {
@@ -102,5 +102,40 @@ describe("loadUploadLimits", () => {
   it("rejects with SessionExpiredError on 401", async () => {
     const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
     await expect(loadUploadLimits(apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+});
+
+const ABC_SHA = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+
+describe("sha256Hex", () => {
+  it("hashes the file's bytes as lowercase hex", async () => {
+    expect(await sha256Hex(new File(["abc"], "a.pdf"))).toBe(ABC_SHA);
+  });
+});
+
+describe("findInLibrary", () => {
+  const file = new File(["abc"], "a.pdf", { type: "application/pdf" });
+
+  it("posts the hash and returns the caller's document id", async () => {
+    const { apiClient, fetch } = api(() => json({ document_id: "d1" }));
+    await expect(findInLibrary(file, apiClient)).resolves.toBe("d1");
+    const request = fetch.mock.calls[0]![0] as Request;
+    expect(request.url).toBe("http://api.test/documents/duplicate-check");
+    expect(await request.json()).toEqual({ sha256: ABC_SHA });
+  });
+
+  it("returns null when the file isn't in the library", async () => {
+    const { apiClient } = api(() => json({ document_id: null }));
+    await expect(findInLibrary(file, apiClient)).resolves.toBeNull();
+  });
+
+  it("throws SessionExpiredError on 401", async () => {
+    const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
+    await expect(findInLibrary(file, apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+
+  it("throws on other failures", async () => {
+    const { apiClient } = api(() => json({ detail: "boom" }, 500));
+    await expect(findInLibrary(file, apiClient)).rejects.toThrow("500");
   });
 });

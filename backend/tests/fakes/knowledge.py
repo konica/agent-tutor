@@ -16,7 +16,7 @@ from smart_tutor.knowledge.ports.library import (
     UploadRepository,
 )
 from smart_tutor.knowledge.ports.object_store import ObjectNotFoundError, ObjectStore, PresignedPost
-from smart_tutor.shared.domain.ids import ContentId, UploadId, UserId
+from smart_tutor.shared.domain.ids import ContentId, DocumentId, UploadId, UserId
 
 
 class _State:
@@ -92,6 +92,19 @@ class _Documents(DocumentRepository):
             content = self._s.contents.get(d.content_id) if d.content_id is not None else None
             d.content_title = content.title if content else None
         return sorted(mine, key=lambda d: d.created_at, reverse=True)
+
+    def find_readable_by_sha256(self, user_id: UserId, sha256: str) -> DocumentId | None:
+        mine = sorted(
+            (
+                d
+                for d in self._s.documents.values()
+                if d.can_be_read_by(user_id)
+                and d.content_id is not None
+                and self._s.contents[d.content_id].sha256 == sha256
+            ),
+            key=lambda d: d.created_at,
+        )
+        return mine[0].document_id if mine else None
 
 
 class _Uploads(UploadRepository):
