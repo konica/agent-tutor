@@ -1,4 +1,4 @@
-/* Smart Tutor v0.4 — every named state <screen>-<state>@v0.4, plus the four review flows (§5).
+/* Smart Tutor v0.5 — every named state <screen>-<state>@v0.5, plus the four review flows (§5).
    Contract (§11 item 6): window.ST.STATES = [{ id, group, ref, desc }], one user story per ref,
    each state at index.html#/<state-id>, review chrome hidden with ?shot=1.
    "live" states are where the app's own navigation lands: they keep whatever the reviewer did.
@@ -23,12 +23,16 @@
   const j2 = (n, o) => { ST.conv('cv1').noteId = null; S.thread = ST.j2Thread(n, Object.assign({ noteId: null }, o || {})); return S.thread; };
 
   const defs = [
-    { id: 'index', group: 'Overview', ref: '§5 · review flows', desc: 'Round 3 overview: what changed in v0.4, the four review flows and every state.', view: ST.indexView, setup: () => { fresh(); } },
+    { id: 'index', group: 'Overview', ref: '§5 · review flows', desc: 'Round 4 overview: what changed in v0.5, the four review flows and every state.', view: ST.indexView, setup: () => { fresh(); } },
 
     /* §6.2 */
-    { id: 'auth-sign-up', group: 'Sign in, sign up, terms', ref: '§6.2 · US-1', desc: 'Keycloak registration page in the Smart Tutor theme.', view: ST.authSignUp },
-    { id: 'auth-verify-email', group: 'Sign in, sign up, terms', ref: '§6.2 · US-1', desc: 'Keycloak email-verification page.', view: ST.authVerify },
-    { id: 'auth-sign-in', group: 'Sign in, sign up, terms', ref: '§6.2 · US-1', desc: 'Keycloak login page.', view: ST.authSignIn },
+    /* §6.0 */
+    { id: 'landing-default', group: 'Landing page', ref: '§6.0 · US-1', desc: 'Public page at /: what Smart Tutor does, how it works, trust points, “Create an account” and “Sign in”. Text only, outside the app shell.', view: ST.landingView, setup: () => { ST.noTray = true; } },
+
+    /* §6.2 */
+    { id: 'auth-sign-up', group: 'Sign in, sign up, terms', ref: '§6.2 · US-1', desc: 'Keycloak registration page: stock keycloak.v2 layout with the Smart Tutor logo, colours, font and name (low-detail reference).', view: ST.authSignUp },
+    { id: 'auth-verify-email', group: 'Sign in, sign up, terms', ref: '§6.2 · US-1', desc: 'Keycloak email-verification page: stock keycloak.v2 layout (low-detail reference).', view: ST.authVerify },
+    { id: 'auth-sign-in', group: 'Sign in, sign up, terms', ref: '§6.2 · US-1', desc: 'Keycloak login page: stock keycloak.v2 layout (low-detail reference).', view: ST.authSignIn },
     { id: 'terms-first-run', group: 'Sign in, sign up, terms', ref: '§6.2 · US-1', desc: 'Terms of use on first sign-in; Continue is disabled until accepted.', view: ST.termsView, setup: () => { ST.T.accepted = false; } },
     { id: 'terms-accepted', group: 'Sign in, sign up, terms', ref: '§6.2 · US-1', desc: 'Terms accepted; Continue leads to the empty Library.', view: ST.termsView, setup: () => { ST.T.accepted = true; } },
 
@@ -217,7 +221,8 @@
 
   /* §5 review flows */
   ST.FLOWS = [
-    { id: 'J1', title: 'First run', summary: 'Sign up, accept terms, upload 3 PDFs, accept subjects, get a first cited answer.', steps: [
+    { id: 'J1', title: 'First run', summary: 'From the landing page, sign up, accept terms, upload 3 PDFs, accept subjects, get a first cited answer.', steps: [
+      { state: 'landing-default', text: 'Landing page: “Create an account”' },
       { state: 'auth-sign-up', text: 'Sign up on the Keycloak page' },
       { state: 'auth-verify-email', text: 'Verify the email address' },
       { state: 'terms-first-run', text: 'Accept the terms of use' },

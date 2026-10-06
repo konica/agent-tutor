@@ -1,4 +1,4 @@
-/* Smart Tutor v0.4 — core: helpers, icons, store, shell, overlays, upload tray, router, review chrome. */
+/* Smart Tutor v0.5 — core: helpers, icons, store, shell, overlays, upload tray, router, review chrome. */
 (function () {
   const ST = window.ST;
 
@@ -344,7 +344,7 @@
   Object.assign(ST.actions, {
     'user-menu': () => { ST.S.userMenu = !ST.S.userMenu; ST.render(); if (ST.S.userMenu) { const m = document.querySelector('#user-menu .menu-item'); if (m) m.focus(); } },
     'theme-toggle': () => { ST.setTheme(ST.S.theme === 'dark' ? 'light' : 'dark'); ST.S.userMenu = false; ST.render(); },
-    'sign-out': () => { ST.S.userMenu = false; location.hash = '#/auth-sign-in'; },
+    'sign-out': () => { ST.S.userMenu = false; location.hash = '#/landing-default'; }, // §6.1: sign-out returns to the landing page
     'rb-theme': () => { ST.setTheme(ST.S.theme === 'dark' ? 'light' : 'dark'); ST.render(); ST.redrawOverlay(); },
     go: (el) => { location.hash = el.dataset.href; }
   });

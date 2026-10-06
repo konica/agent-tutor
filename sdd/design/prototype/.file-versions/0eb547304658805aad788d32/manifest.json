@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "fileName": "index.html",
-  "currentVersionId": "5bc99885-edc2-4801-af7b-b526603c3fb1",
+  "currentVersionId": "bd2b0f3f-fcae-497f-b28e-c1989c4e8b2a",
   "entries": [
     {
       "id": "f36e6729-f195-4945-9c3c-52c32a4f64eb",
@@ -45,7 +45,22 @@
       "mime": "text/html; charset=utf-8",
       "kind": "html",
       "contentPath": "0003-5bc99885-edc2-4801-af7b-b526603c3fb1.html",
-      "contentDigest": "7979ee7e0d50afbbd822264a1c3aed142e5583f5ce26cf045cc0367b263cc2e6",
+      "promptSource": "message",
+      "contentDigest": "7979ee7e0d50afbbd822264a1c3aed142e5583f5ce26cf045cc0367b263cc2e6"
+    },
+    {
+      "id": "bd2b0f3f-fcae-497f-b28e-c1989c4e8b2a",
+      "fileName": "index.html",
+      "version": 4,
+      "label": "Version 4",
+      "createdAt": 1791252990952,
+      "source": "ai",
+      "prompt": "You are designing **Smart Tutor**, a laptop web app (1440 px, light mode) where learners upload their own PDFs and ask a tutor that answers only from them, with citations. Follow the design brief **v0.5** in this project (`brief-v0.5.md`) exactly; it is the source of truth. Start with **§0 What changed**: this round updates the existing prototype in this project (round v0.4: `index.html`, `styles.css`, `v03.css`, `js/*.js`), so change only what §0 lists and keep everything else as it is. Keep (1) the four clickable flows in §5 working, (2) every Release 1 screen and state in §6, (3) the wireframes for §7 and §8, and (4) the components page (§10). Use the sample data in §9 and the quoted wording verbatim. Name each state `<screen>-<state>@v0.5` (set `ST.BRIEF = 'v0.5'` and update the page title, the overview, and the questions page for brief v0.5). Do not design anything listed as out of scope in §4. Follow the prototype contract in §11 item 6: every state in `window.ST.STATES` with one specific user story in `ref` (`landing-default` is `§6.0 · US-1`), each state at `index.html#/<state-id>`, and review chrome hidden when the URL has `?shot=1`.\n\nRules for this round:\n- Keep the Smart Tutor brand and tokens (smart-tutor-ds, light and dark). Do not apply any other design system.\n- Do not edit `brief-v0.5.md`, `history/`, `.file-versions/`, `.od-frames/`, `.od-skills/`, or the old round in `v0.2/`.\n- Keep every existing state id and its `ref` (they were checked against the PRD). Add only `landing-default`.\n- The landing page (§6.0) sits outside the app shell: no left navigation, no upload tray. Text only: no product image, screenshot, or illustration. Use the §9 landing copy verbatim.\n- The `auth-*` states show Keycloak's stock `keycloak.v2` layout with only the Smart Tutor logo, accent and background colors, font, and display name (§6.2): low detail, no custom layout.\n- J1 starts on `landing-default` (\"Create an account\"); signing out from the user menu goes to `landing-default`.\n- Apply the §9 sample-data fixes: `lecture-03-scan.pdf` fails with \"No text layer (scanned PDFs are not supported yet)\"; *Agentic Design Patterns* has no subjects while processing.\n\nEnd with a list of the states you changed, any new or removed state ids, and questions or proposed changes to the brief.",
+      "size": 3248,
+      "mime": "text/html; charset=utf-8",
+      "kind": "html",
+      "contentPath": "0004-bd2b0f3f-fcae-497f-b28e-c1989c4e8b2a.html",
+      "contentDigest": "4dc2042aea3f8c13497dba12449be3c119e3dbff8a0f5e258ab86e3bf7675530",
       "promptSource": "message"
     }
   ]

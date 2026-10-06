@@ -1,4 +1,4 @@
-/* Smart Tutor v0.4 — documents: sign-in theme, terms, shared list pattern, Library, uploads,
+/* Smart Tutor v0.5 — documents: sign-in theme, terms, shared list pattern, Library, uploads,
    subject picker (§6.4), document details (§6.5), Subjects (§6.9). */
 (function () {
   const ST = window.ST;
@@ -6,55 +6,45 @@
   const esc = ST.esc, ic = ST.ic;
 
   /* =========================================================
-     §6.2 Keycloak theme + terms
+     §6.2 Keycloak pages: stock keycloak.v2 layout, fields and messages.
+     The theme changes only the logo, accent and background colours, font and display name.
+     Low-detail references, not designed layouts.
      ========================================================= */
-  function kcAside() {
-    return `<aside class="kc-aside">
-      <span class="brand">${ST.logo()}<span class="word">Smart Tutor</span></span>
-      <div><blockquote>Ask your own papers. See the page every answer came from.</blockquote>
-        <ul class="kc-points">
-          <li>${ic('upload')}Upload your PDFs; they stay private</li>
-          <li>${ic('doc')}Every answer cites the document and page</li>
-          <li>${ic('note')}Turn conversations into lesson notes</li>
-        </ul></div>
-      <small>© 2026 Smart Tutor</small>
-      <svg class="lines" viewBox="0 0 200 200" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1"><path d="M20 180V60c30-10 60-6 80 8v120c-20-14-50-18-80-8zM180 180V60c-30-10-60-6-80 8v120c20-14 50-18 80-8z"/><path d="M30 80c22-6 44-4 62 6M30 100c22-6 44-4 62 6M30 120c22-6 44-4 62 6M108 86c18-10 40-12 62-6M108 106c18-10 40-12 62-6"/></svg>
-    </aside>`;
-  }
-  const kc = (card) => `<div class="kc">${kcAside()}<main class="kc-main" id="main-content" tabindex="-1"><div class="kc-card">${card}</div></main></div>`;
+  const kc = (title, body) => `<div class="kc2">
+    <main class="kc2-main" id="main-content" tabindex="-1">
+      <header class="kc2-header" data-od-id="kc-header">${ST.logo()}<span class="kc2-name">Smart Tutor</span></header>
+      <div class="kc2-card" data-od-id="kc-card"><h1>${title}</h1>${body}</div>
+      <p class="kc2-ref review-note">${ic('info', 'sm')}<span>Reference only: Keycloak's stock <code class="mono">keycloak.v2</code> layout, fields and messages. Our theme sets the logo, accent and background colours, font and the display name “Smart Tutor”.</span></p>
+    </main></div>`;
+  const kf = (id, label, type = 'text', value = '', extra = '') => `<div class="field"><label for="${id}">${label} <span class="kc2-req" aria-hidden="true">*</span></label><input class="input" id="${id}" type="${type}" value="${esc(value)}" required ${extra}></div>`;
 
-  ST.authSignIn = () => kc(`
-    <div><h1>Sign in</h1><p class="kc-sub">Welcome back to your library.</p></div>
-    <form class="od-stack" style="--od-gap:16px" novalidate onsubmit="return false">
-      <div class="field"><label for="kc-user">Email or username</label><input class="input" id="kc-user" type="email" autocomplete="username" value="mai.nguyen@example.com" data-autofocus></div>
-      <div class="field"><label for="kc-pass">Password</label><input class="input" id="kc-pass" type="password" autocomplete="current-password" value="attention2017"></div>
-      <div class="kc-row"><label class="check"><input type="checkbox" checked> Remember me</label><a href="#/auth-sign-in">Forgot password?</a></div>
-      <button class="btn btn-primary btn-lg" type="button" data-action="go" data-href="#/library-default">Sign in</button>
+  ST.authSignIn = () => kc('Sign in to your account', `
+    <form class="kc2-form" novalidate onsubmit="return false">
+      ${kf('kc-user', 'Username or email', 'text', 'mai.nguyen@example.com', 'autocomplete="username" data-autofocus')}
+      ${kf('kc-pass', 'Password', 'password', 'attention2017', 'autocomplete="current-password"')}
+      <div class="kc2-row"><label class="check"><input type="checkbox"> Remember me</label><a href="#/auth-sign-in">Forgot Password?</a></div>
+      <button class="btn btn-primary kc2-submit" type="button" data-action="go" data-href="#/library-default" data-od-id="kc-sign-in">Sign In</button>
     </form>
-    <p class="kc-alt">New to Smart Tutor? <a href="#/auth-sign-up">Create an account</a></p>`);
+    <p class="kc2-alt">New user? <a href="#/auth-sign-up">Register</a></p>`);
 
-  ST.authSignUp = () => kc(`
-    <div><h1>Create your account</h1><p class="kc-sub">Bring your papers. Start asking in a few minutes.</p></div>
-    <form class="od-stack" style="--od-gap:16px" novalidate onsubmit="return false">
-      <div class="kc-names">
-        <div class="field"><label for="kc-fn">First name</label><input class="input" id="kc-fn" autocomplete="given-name" value="Mai" data-autofocus></div>
-        <div class="field"><label for="kc-ln">Last name</label><input class="input" id="kc-ln" autocomplete="family-name" value="Nguyen"></div>
-      </div>
-      <div class="field"><label for="kc-em">Email</label><input class="input" id="kc-em" type="email" autocomplete="email" value="mai.nguyen@example.com"></div>
-      <div class="field"><label for="kc-pw">Password</label><input class="input" id="kc-pw" type="password" autocomplete="new-password" aria-describedby="kc-pw-h" value="attention2017"><span class="helper" id="kc-pw-h">At least 8 characters.</span></div>
-      <div class="field"><label for="kc-pw2">Confirm password</label><input class="input" id="kc-pw2" type="password" autocomplete="new-password" value="attention2017"></div>
-      <button class="btn btn-primary btn-lg" type="button" data-action="go" data-href="#/auth-verify-email">Create account</button>
-    </form>
-    <p class="kc-alt">Already have an account? <a href="#/auth-sign-in">Sign in</a></p>`);
+  ST.authSignUp = () => kc('Register', `
+    <form class="kc2-form" novalidate onsubmit="return false">
+      ${kf('kc-un', 'Username', 'text', 'mai.nguyen', 'autocomplete="username" data-autofocus')}
+      ${kf('kc-em', 'Email', 'email', 'mai.nguyen@example.com', 'autocomplete="email"')}
+      ${kf('kc-fn', 'First name', 'text', 'Mai', 'autocomplete="given-name"')}
+      ${kf('kc-ln', 'Last name', 'text', 'Nguyen', 'autocomplete="family-name"')}
+      ${kf('kc-pw', 'Password', 'password', 'attention2017', 'autocomplete="new-password"')}
+      ${kf('kc-pw2', 'Confirm password', 'password', 'attention2017', 'autocomplete="new-password"')}
+      <p class="kc2-small"><span aria-hidden="true">*</span> Required fields</p>
+      <div class="kc2-row"><a href="#/auth-sign-in">« Back to Login</a>
+        <button class="btn btn-primary" type="button" data-action="go" data-href="#/auth-verify-email" data-od-id="kc-register">Register</button></div>
+    </form>`);
 
-  ST.authVerify = () => kc(`
-    <span class="mail-art">${ic('mail', 'lg')}</span>
-    <div><h1>Check your email</h1><p class="kc-sub">We sent a verification link to <strong>mai.nguyen@example.com</strong>. Open it to finish creating your account.</p></div>
-    <div class="od-stack" style="--od-gap:12px">
-      <button class="btn btn-secondary btn-lg" type="button" data-action="resend" data-autofocus>${ic('retry', 'sm')}Resend email</button>
-      <button class="btn btn-ghost" type="button" data-action="go" data-href="#/terms-first-run">I've verified my email — continue</button>
-    </div>
-    <p class="kc-alt">Wrong address? <a href="#/auth-sign-up">Use a different email</a></p>`);
+  ST.authVerify = () => kc('Email verification', `
+    <div class="kc2-alert" role="status">${ic('info', 'sm')}<span>You need to verify your email address to activate your account.</span></div>
+    <p>An email with instructions to verify your email address has been sent to your address mai.nguyen@example.com.</p>
+    <p class="kc2-small">Haven't received a verification code in your email? <a href="#/auth-verify-email" data-action="resend">Click here</a> to re-send the email.</p>
+    <p class="review-note kc2-small"><a href="#/terms-first-run">Prototype: continue as if the link in the email was opened →</a></p>`);
   ST.actions.resend = () => ST.toast('Verification email sent again.');
 
   ST.T = { accepted: false };
