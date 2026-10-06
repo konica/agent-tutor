@@ -12,6 +12,7 @@ from mcp.server import MCPServer
 from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.provider import AccessToken
 from mcp.server.auth.settings import AuthSettings
+from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import AnyHttpUrl, BaseModel
 
 from smart_tutor.knowledge.adapters.sql_library import SqlLibraryUnitOfWork
@@ -71,13 +72,13 @@ def build_server(settings: Settings, verifier: TokenVerifier, search: SearchServ
         """Chunks of the caller's ready documents in any of these subjects, nearest first."""
         token = get_access_token()
         if token is None or not token.subject:
-            raise ValueError("not authenticated")
+            raise ToolError("not authenticated")
         try:
             hits = await asyncio.to_thread(
                 search.search, UserId(token.subject), query, [SubjectId(s) for s in subject_ids], k
             )
         except InvalidSearchError as e:
-            raise ValueError(str(e)) from None
+            raise ToolError(str(e)) from None
         return SearchResponse(
             chunks=[
                 ChunkResult(

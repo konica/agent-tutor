@@ -68,12 +68,15 @@ async def test_a_revoked_token_is_401() -> None:
     assert await raw_post(build(InMemoryLibrary(), verifier), {"Authorization": "Bearer t-ada"}) == 401
 
 
-@pytest.mark.parametrize(("query", "subject_ids"), [(" ", [GENERAL]), ("q", ["not-a-uuid"])])
-async def test_invalid_arguments_are_a_tool_error(query: str, subject_ids: list[str]) -> None:
+@pytest.mark.parametrize(("query", "subject_ids", "reason"), [(" ", [GENERAL], "query"), ("q", ["not-a-uuid"], "UUID")])
+async def test_invalid_arguments_are_a_tool_error_with_the_reason(
+    query: str, subject_ids: list[str], reason: str
+) -> None:
     result = await call_search(
         build(InMemoryLibrary(), verifier_with("t", "ada")), "t", query=query, subject_ids=subject_ids
     )
     assert result.is_error
+    assert reason in result.content[0].text
 
 
 async def test_the_tool_takes_no_user_id() -> None:

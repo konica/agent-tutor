@@ -55,6 +55,7 @@ async def test_a_user_id_argument_changes_nothing() -> None:
     result = await search_as(
         library, verifier, "token-b", query=A_TEXT, subject_ids=[str(GENERAL_SUBJECT_ID)], user_id="learner-a"
     )
-    chunks = [] if result.is_error else result.structured_content["chunks"]
-    assert all(c["text"] == B_TEXT for c in chunks)
+    assert not result.is_error
+    chunks = result.structured_content["chunks"]
+    assert chunks and all(c["text"] == B_TEXT for c in chunks)
     assert A_TEXT not in json.dumps(chunks) and a_doc not in json.dumps(chunks)
