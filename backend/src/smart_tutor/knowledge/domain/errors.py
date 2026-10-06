@@ -21,3 +21,11 @@ class InvalidChunkError(DomainError):
 
 class InvalidDescriptionError(DomainError):
     """A describe_document payload failed validation; the message names the field, never its value (PRD §9.9)."""
+
+
+class RetryLimitError(DomainError):
+    """The content used all its processing attempts (PRD §9.5)."""
+
+
+class DocumentNotFoundError(DomainError):
+    """No such document for this learner; entrypoints answer 404 whether it is missing or someone else's."""
