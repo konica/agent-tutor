@@ -59,8 +59,8 @@ cd web && npm ci && cd ..             # web dependencies (first time)
 make api                              # http://localhost:10450/docs
 make worker                           # processes uploads from the LocalStack queue
 make web                              # http://localhost:10453 — sign in as learner@example.com / learner
-make agent                            # optional until the tutor lands (M2)
-make mcp                              # optional until the tutor lands (M2)
+make agent                            # the tutor; Chat needs it
+make mcp                              # search for the agent; Chat needs it
 ```
 
 Without `make` (PowerShell, from the repository root):
@@ -73,10 +73,11 @@ cd backend; uv run --env-file ../.env uvicorn smart_tutor.apps.api.main:app --re
 cd backend; uv run --env-file ../.env --extra ingest python -m smart_tutor.apps.worker.main
 cd web; npm ci; npm run dev
 cd backend; uv run --env-file ../.env uvicorn smart_tutor.apps.agent.server:app --reload --port 10451
-cd backend; uv run --env-file ../.env python -m smart_tutor.apps.mcp_server.server
+cd backend; $env:SMART_TUTOR_KEYCLOAK_CLIENT_ID="rag-mcp"; $env:SMART_TUTOR_KEYCLOAK_CLIENT_SECRET="local-mcp-secret"; $env:SMART_TUTOR_KEYCLOAK_AUDIENCE="rag-mcp"; uv run --env-file ../.env python -m smart_tutor.apps.mcp_server.server
 ```
 
 - Always start backend processes with `--env-file ../.env`. Settings read `.env` only from the working directory (`backend/`), and boto3 reads the `AWS_ENDPOINT_URL_*` variables only from the environment. Without that file, uploads would go to real AWS instead of LocalStack.
+- The MCP server checks tokens as Keycloak's `rag-mcp` client (ADR 0007), while `.env` names the API's client. `make mcp`, `make mcp-debug`, the VS Code **MCP server** config, and the commands here set `SMART_TUTOR_KEYCLOAK_CLIENT_ID=rag-mcp`, `SMART_TUTOR_KEYCLOAK_CLIENT_SECRET=local-mcp-secret`, and `SMART_TUTOR_KEYCLOAK_AUDIENCE=rag-mcp` in the environment, which wins over `--env-file`. In PowerShell, run the MCP server in its own terminal: the `$env:` values stay set there.
 - The MCP server listens on `SMART_TUTOR_MCP_PORT`: 10452 on the host from `.env`, and 8000 inside its container. If your `.env` was copied before this setting existed, add `SMART_TUTOR_MCP_PORT=10452` to it.
 - The web app's defaults already point at the API (:10450) and Keycloak (:10401), and Keycloak's `smart-tutor-web` client allows only http://localhost:10453. Keep Vite on that port; `strictPort` makes it fail rather than move to another one.
 - Back to Option A: stop the host processes, then run `make up-app`.
@@ -111,7 +112,7 @@ cd backend; uv run --env-file ../.env --extra ingest python -m debugpy --listen 
 # Agent: app at :10451, debugger at :10461
 cd backend; uv run --env-file ../.env python -m debugpy --listen 127.0.0.1:10461 -m uvicorn smart_tutor.apps.agent.server:app --port 10451
 # MCP server: app at :10452/mcp, debugger at :10462
-cd backend; uv run --env-file ../.env python -m debugpy --listen 127.0.0.1:10462 -m smart_tutor.apps.mcp_server.server
+cd backend; $env:SMART_TUTOR_KEYCLOAK_CLIENT_ID="rag-mcp"; $env:SMART_TUTOR_KEYCLOAK_CLIENT_SECRET="local-mcp-secret"; $env:SMART_TUTOR_KEYCLOAK_AUDIENCE="rag-mcp"; uv run --env-file ../.env python -m debugpy --listen 127.0.0.1:10462 -m smart_tutor.apps.mcp_server.server
 ```
 
 Then attach with **Attach: API** (or another service). With VS Code alone, you don't need these commands: pick a launch config after the first-time step.
