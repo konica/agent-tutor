@@ -1,4 +1,20 @@
-# Keycloak; M4 adds the upstream chart as a dependency and points it at RDS.
-port: 8080
+# Keycloak at /auth behind CloudFront (ADR 0009, ADR 0010) on the RDS database `keycloak`.
+# Image: deploy/keycloak/Dockerfile. The production realm (files/realm-smart-tutor.json) is imported on first start.
 replicaCount: 1
-# Owns its NetworkPolicy and ExternalSecret (spec §8).
+image:
+  repository: smart-tutor/keycloak
+  tag: ""  # defaults to global.imageTag
+# ALB target group to register pods in (TargetGroupBinding). Empty renders no binding.
+targetGroupName: ""
+# Secrets Manager entries (CDK DataStack and ConfigStack), read through global.secretStore.
+secrets:
+  database: smart-tutor/db/keycloak
+  admin: smart-tutor/keycloak/admin
+  apiClient: smart-tutor/keycloak/api-client
+  mcpClient: smart-tutor/keycloak/mcp-client
+resources:
+  requests:
+    cpu: 250m
+    memory: 1Gi
+  limits:
+    memory: 1536Mi

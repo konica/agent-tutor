@@ -1,5 +1,6 @@
 # Production overrides (us-east-1). The deploy sets global.imageRegistry and global.imageTag
 # (helm upgrade --set global.imageRegistry=<RegistryUri> --set global.imageTag=<commit sha>).
+# It also sets global.publicUrl (--set global.publicUrl=<Edge output CloudFrontUrl>).
 # The pilot (#54) runs only the US-1 services; each is enabled by its slice.
 global:
   secretStore: aws-secrets-manager
@@ -9,7 +10,8 @@ web:
   replicaCount: 2
   targetGroupName: smart-tutor-prod-web  # SmartTutor-prod-Edge output WebTargetGroupName
 keycloak:
-  enabled: false  # #57
+  enabled: true
+  targetGroupName: smart-tutor-prod-keycloak  # SmartTutor-prod-Edge output KeycloakTargetGroupName
 api:
   enabled: false  # #58
   replicaCount: 2
