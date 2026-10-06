@@ -51,7 +51,7 @@ def test_best_first_and_at_most_k() -> None:
         ("  ", [GENERAL_SUBJECT_ID], 5),
         ("x" * 4001, [GENERAL_SUBJECT_ID], 5),
         ("q", [], 5),
-        ("q", [SubjectId(str(i)) for i in range(4)], 5),
+        ("q", [SubjectId(f"00000000-0000-4000-8000-{i:012d}") for i in range(4)], 5),
         ("q", [GENERAL_SUBJECT_ID], 0),
         ("q", [GENERAL_SUBJECT_ID], 21),
     ],
@@ -59,3 +59,8 @@ def test_best_first_and_at_most_k() -> None:
 def test_rejects_invalid_requests(query: str, subjects: list[SubjectId], k: int) -> None:
     with pytest.raises(InvalidSearchError):
         service(InMemoryLibrary()).search(UserId("ada"), query, subjects, k)
+
+
+def test_rejects_a_subject_id_that_is_not_a_uuid() -> None:
+    with pytest.raises(InvalidSearchError):
+        service(InMemoryLibrary()).search(UserId("ada"), "q", [SubjectId("not-a-uuid")])

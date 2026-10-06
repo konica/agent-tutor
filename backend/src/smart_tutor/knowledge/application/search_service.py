@@ -1,5 +1,6 @@
 """Search the learner's chunks (PRD §9.2 step 2, §9.3). Every result passes `can_read`."""
 
+import uuid
 from collections.abc import Callable, Sequence
 
 from langchain_core.embeddings import Embeddings
@@ -25,6 +26,11 @@ class SearchService:
             raise InvalidSearchError(f"A query has 1 to {MAX_QUERY_CHARS} characters")
         if not 1 <= len(subject_ids) <= MAX_SUBJECTS:
             raise InvalidSearchError("Search 1 to 3 subjects")
+        for subject_id in subject_ids:
+            try:
+                uuid.UUID(subject_id)
+            except ValueError:
+                raise InvalidSearchError("A subject id is a UUID") from None
         if not 1 <= k <= MAX_K:
             raise InvalidSearchError(f"k is 1 to {MAX_K}")
         embedding = self._embeddings.embed_query(query)  # outside the transaction
