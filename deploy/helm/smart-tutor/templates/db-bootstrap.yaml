@@ -1,0 +1,100 @@
+{{- if .Values.dbBootstrap.enabled }}
+{{- $hook := dict "helm.sh/hook" "pre-install,pre-upgrade" "helm.sh/hook-delete-policy" "before-hook-creation,hook-succeeded" }}
+# Creates the app and Keycloak roles and databases on RDS (files/db-bootstrap.sql) before anything that uses them
+# starts. The master credentials exist in the cluster only while the hooks run: Helm deletes the ExternalSecret once
+# the Job succeeds, and External Secrets deletes the Secret it owns.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: db-bootstrap
+  annotations:
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "-10") $hook) | nindent 4 }}
+spec:
+  refreshInterval: "0"
+  secretStoreRef:
+    name: {{ required "dbBootstrap needs global.secretStore" .Values.global.secretStore }}
+    kind: SecretStore
+  target:
+    name: db-bootstrap
+    creationPolicy: Owner
+  data:
+    {{- range $env, $ref := dict
+        "PGHOST" (list "smart-tutor/rds/master" "host")
+        "PGUSER" (list "smart-tutor/rds/master" "username")
+        "PGPASSWORD" (list "smart-tutor/rds/master" "password")
+        "APP_USER" (list "smart-tutor/db/app" "username")
+        "APP_PASSWORD" (list "smart-tutor/db/app" "password")
+        "APP_DB" (list "smart-tutor/db/app" "dbname")
+        "KEYCLOAK_USER" (list "smart-tutor/db/keycloak" "username")
+        "KEYCLOAK_PASSWORD" (list "smart-tutor/db/keycloak" "password")
+        "KEYCLOAK_DB" (list "smart-tutor/db/keycloak" "dbname") }}
+    - secretKey: {{ $env }}
+      remoteRef:
+        key: {{ index $ref 0 }}
+        property: {{ index $ref 1 }}
+    {{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-bootstrap
+  annotations:
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "-10") $hook) | nindent 4 }}
+data:
+  db-bootstrap.sql: |
+    {{- .Files.Get "files/db-bootstrap.sql" | nindent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-bootstrap
+  annotations:
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "0") $hook) | nindent 4 }}
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 600
+  template:
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70  # postgres in the alpine image
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: psql
+          image: {{ .Values.dbBootstrap.image }}
+          envFrom:
+            - secretRef:
+                name: db-bootstrap
+          env:
+            - name: PGDATABASE
+              value: postgres
+            - name: PGSSLMODE
+              value: require  # RDS PostgreSQL 17 forces TLS
+            - name: HOME
+              value: /tmp
+          command:
+            - sh
+            - -c
+            - >-
+              exec psql -v app_user="$APP_USER" -v app_password="$APP_PASSWORD" -v app_db="$APP_DB"
+              -v keycloak_user="$KEYCLOAK_USER" -v keycloak_password="$KEYCLOAK_PASSWORD"
+              -v keycloak_db="$KEYCLOAK_DB" -f /sql/db-bootstrap.sql
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: sql
+              mountPath: /sql
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: sql
+          configMap:
+            name: db-bootstrap
+        - name: tmp
+          emptyDir: {}
+{{- end }}

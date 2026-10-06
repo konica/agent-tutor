@@ -1,0 +1,76 @@
+{
+  "realm": "smart-tutor",
+  "enabled": true,
+  "registrationAllowed": false,
+  "registrationEmailAsUsername": true,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": true,
+  "sslRequired": "external",
+  "bruteForceProtected": true,
+  "passwordPolicy": "length(12) and notUsername and notEmail",
+  "accessTokenLifespan": 900,
+  "roles": {
+    "realm": [
+      { "name": "offline_access", "description": "${role_offline-access}" },
+      { "name": "uma_authorization", "description": "${role_uma_authorization}" },
+      { "name": "learner", "description": "Default role for self-registered users" },
+      { "name": "admin", "description": "Operations only (budgets, evaluation annotation); no product admin functions yet" },
+      {
+        "name": "default-roles-smart-tutor",
+        "composite": true,
+        "composites": { "realm": ["offline_access", "uma_authorization", "learner"] }
+      }
+    ]
+  },
+  "defaultRole": { "name": "default-roles-smart-tutor" },
+  "clients": [
+    {
+      "clientId": "smart-tutor-web",
+      "name": "Smart Tutor web app",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["${SMART_TUTOR_PUBLIC_URL}/*"],
+      "webOrigins": ["${SMART_TUTOR_PUBLIC_URL}"],
+      "attributes": { "pkce.code.challenge.method": "S256", "post.logout.redirect.uris": "${SMART_TUTOR_PUBLIC_URL}/*" },
+      "protocolMappers": [
+        {
+          "name": "audience-smart-tutor-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": { "included.client.audience": "smart-tutor-api", "access.token.claim": "true", "id.token.claim": "false" }
+        },
+        {
+          "name": "audience-rag-mcp",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": { "included.client.audience": "rag-mcp", "access.token.claim": "true", "id.token.claim": "false" }
+        }
+      ]
+    },
+    {
+      "clientId": "smart-tutor-api",
+      "name": "Smart Tutor API and agent (token introspection)",
+      "publicClient": false,
+      "bearerOnly": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${SMART_TUTOR_API_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false
+    },
+    {
+      "clientId": "rag-mcp",
+      "name": "RAG MCP server (token introspection)",
+      "publicClient": false,
+      "bearerOnly": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${SMART_TUTOR_MCP_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false
+    }
+  ]
+}

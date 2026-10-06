@@ -2,6 +2,18 @@
 global:
   imageRegistry: ""  # ECR registry, set per environment
   imageTag: latest
+  # Address the browser uses, e.g. https://d111.cloudfront.net (SmartTutor-prod-Edge output CloudFrontUrl).
+  # Set at deploy time with --set global.publicUrl=...; Keycloak won't start without it.
+  publicUrl: ""
+  # SecretStore that ExternalSecrets read from (AWS Secrets Manager); empty renders no SecretStore or ExternalSecrets.
+  secretStore: ""
+
+awsRegion: us-east-1
+
+# Creates the app and Keycloak roles and databases on RDS before each install and upgrade (files/db-bootstrap.sql).
+dbBootstrap:
+  enabled: false
+  image: postgres:17-alpine
 
 api:
   enabled: true
