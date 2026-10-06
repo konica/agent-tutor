@@ -1,0 +1,48 @@
+.column { max-width: var(--chat-w); margin: 0 auto; }
+
+.exchange { margin: var(--sp-6) 0 var(--sp-4); }
+/* The learner's words: a right-aligned bubble, apart from the tutor's prose. */
+.question {
+  margin-left: auto; max-width: 80%; width: fit-content;
+  padding: var(--sp-3) var(--sp-4); border-radius: var(--r-md);
+  background: var(--accent-soft); color: var(--text);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.subjects { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: var(--sp-3) 0 0; padding: 0; list-style: none; }
+.subject {
+  padding: var(--sp-1) var(--sp-3); border-radius: var(--r-pill);
+  background: var(--surface-2); color: var(--text-2); font-size: var(--fs-12);
+}
+
+.answerRegion { display: grid; gap: var(--sp-4); }
+/* The tutor's words: plain prose on the page surface. */
+.answer {
+  padding: var(--sp-4) var(--sp-5); border-radius: var(--r-md);
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+/* Cited material is set apart from the tutor's prose (DESIGN.md → Chat). */
+.citations {
+  padding: var(--sp-3) var(--sp-4); border-left: 3px solid var(--accent);
+  background: var(--surface-2); border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  color: var(--text-2); font-size: var(--fs-14);
+}
+.citationsTitle { margin: 0 0 var(--sp-2); font-family: var(--font-body); font-size: var(--fs-14); color: var(--text); }
+.citations ol { margin: 0; padding-left: var(--sp-6); }
+.citations li { overflow-wrap: anywhere; }
+
+.problem {
+  padding: var(--sp-3) var(--sp-4); border-radius: var(--r-md);
+  background: var(--danger-soft); color: var(--danger);
+}
+
+.thinking { margin: var(--sp-3) 0 0; color: var(--text-2); font-size: var(--fs-14); }
+
+.form { display: flex; align-items: flex-end; gap: var(--sp-3); margin-top: var(--sp-6); }
+.input {
+  flex: 1; resize: vertical; min-height: 3lh;
+  padding: var(--sp-3) var(--sp-4); border: 1px solid var(--border-strong); border-radius: var(--r-md);
+  background: var(--surface); color: var(--text); line-height: var(--lh-body);
+}
+.input::placeholder { color: var(--text-3); }
+.input:disabled { background: var(--surface-2); color: var(--text-2); }
