@@ -9,6 +9,7 @@ from fakes.pdfs import make_pdf
 from fakes.processing import FakePdfExtractor, PageChunker, fake_tools
 from fakes.queue import FakeQueue
 from fakes.subjects import InMemorySubjects
+from fakes.tutoring import InMemoryThreads
 
 __all__ = [
     "FakeChatModel",
@@ -18,6 +19,7 @@ __all__ = [
     "FixedClock",
     "InMemoryLibrary",
     "InMemorySubjects",
+    "InMemoryThreads",
     "FakeObjectStore",
     "FakeQueue",
     "FakePdfExtractor",
