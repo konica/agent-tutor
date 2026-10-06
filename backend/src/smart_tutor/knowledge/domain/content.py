@@ -1,11 +1,15 @@
 """A unique file, keyed by the SHA-256 the server computed from its bytes (PRD §9.4, §9.5; ADR 0002). No owner."""
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from smart_tutor.knowledge.domain.errors import ContentStateError
 from smart_tutor.shared.domain.ids import ContentId, UserId
+
+if TYPE_CHECKING:
+    from smart_tutor.knowledge.domain.description import DocumentDescription
 
 UNREADABLE_PDF = "This file isn't a readable PDF"
 NO_TEXT_LAYER = "No text layer (scanned PDFs are not supported yet)"
@@ -51,6 +55,15 @@ class Content:
     chunker: str | None = None
     embedding_model: str | None = None
     embedding_dim: int | None = None
+    # First-pages step (PRD §9.2 step 4); empty until described, and stay empty if the payload was invalid.
+    title: str | None = None
+    authors: list[str] = field(default_factory=list)
+    year: int | None = None
+    doi: str | None = None
+    summary: str | None = None
+    summary_embedding: list[float] | None = None
+    proposed_subject_names: list[str] = field(default_factory=list)
+    work_key: str | None = None
 
     @classmethod
     def first_upload(cls, content_id: ContentId, sha256: str, size: int, uploader: UserId) -> "Content":
@@ -74,3 +87,17 @@ class Content:
     def _require_processing(self, action: str) -> None:
         if self.state is not ContentState.PROCESSING:
             raise ContentStateError(f"Only processing content can {action}")
+
+    @property
+    def described(self) -> bool:
+        """The first-pages step stored a description (a valid payload always has a title)."""
+        return self.title is not None
+
+    def describe(self, description: "DocumentDescription", summary_embedding: list[float]) -> None:
+        """Store the first-pages metadata while processing, so the Library can show the title before it ends."""
+        self._require_processing("be described")
+        self.title, self.authors = description.title, list(description.authors)
+        self.year, self.doi, self.summary = description.year, description.doi, description.summary
+        self.summary_embedding = list(summary_embedding)
+        self.proposed_subject_names = list(description.proposed_subject_names)
+        self.work_key = description.work_key

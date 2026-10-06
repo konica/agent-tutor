@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Brief version** | v0.4 |
-| **Based on** | `sdd/prd.md` Draft v2.7 |
-| **Status** | Draft, round 3 (owner decisions on the round 2 questions; targeted changes) |
+| **Brief version** | v0.5 |
+| **Based on** | `sdd/prd.md` Draft v2.14 |
+| **Status** | Draft, round 4 (scope cut: no terms of use step, no Settings page) |
 | **Owner** | Thao Dinh |
-| **Last updated** | 2026-10-04 |
+| **Last updated** | 2026-10-06 |
 | **Designer** | Open Design |
 
 > **For the designer:** this brief is the source of truth for the mockups. If the brief and the PRD disagree, follow the brief and flag the conflict. Name every deliverable with the brief version it answers (e.g. `chat-growth-notice@v0.3`). Read **§0 What changed** first on every new version. A ready-to-paste prompt for starting a round is in **Appendix A**.
@@ -15,21 +15,12 @@
 
 ## 0. What changed in this version
 
-**Targeted update.** Keep the v0.3 prototype (`design-v0.3`) and change only the states below. The owner answered the round 2 questions (Q7, D1–D8); PRD v2.7 records them. The v0.3 rewrite is summarized in the changelog (§13).
+**Scope cut.** The product owner removed the terms of use step and the Settings page from Release 1 (PRD v2.14 Q45). Keep the round 3 prototype and only drop what depended on them. The v0.4 changes are summarized in the changelog (§13).
 
 | Change | States to redo |
 |---|---|
-| **Q7 — subjects are chosen only after processing finishes.** No "Choose subjects" while a document is processing; the picker no longer says "ready in a few minutes". After saving, the document is Ready and searchable. | `library-first-processing`, `library-first-choose`, `picker-saved`, `details-processing`; check the J1 flow |
-| **D2 — the carried question is sent right away** in the new conversation. | `chat-fourth-subject-refused` (hint text), `chat-new-from-refused` |
-| **D4 — a question that fits none of the learner's subjects:** decline and tell the learner to upload a document on the topic to continue, with **"Upload a document"**; no "New conversation". | `chat-decline` (and a variant for the no-subject case) |
-| **D6 — a personal name may equal another shared subject's name.** No warning; only the learner's own subject names must differ. | `subjects-rename-duplicate` |
-| **D7 — subjects of an archived document can be changed.** | `library-archived`, `details-archived`, `picker-change-subjects` (from an archived document) |
-| **D8 — one time zone, GMT+7, for everyone.** Limit messages show the end time in GMT+7; "Today" in Usage is the GMT+7 day; Settings shows the time zone read-only. | `library-rate-limited`, `chat-rate-limited`, `usage-overview`, `settings-default` |
-| **D1 — thumbs:** outline thumb icons with labels "Helpful" / "Not helpful" and a visible pressed state (accepted as proposed). | `chat-answer-citations`, `chat-feedback-reason`, components page |
-| **D3 — fourth-subject wording** (accepted as proposed, see §6.6). | `chat-fourth-subject-refused` |
-| **D5 — calmer Library rows:** one contextual button per row (Choose subjects, Retry, Restore, or Open) and the rest under "More" (accepted as proposed). | `library-default` and every Library state with rows |
-| **PRD v2.3 — scanned PDFs:** a PDF without a text layer fails with "No text layer (scanned PDFs are not supported yet)". Use it for `lecture-03-scan.pdf`. | `library-failed`, `details-failed` |
-| **Prototype contract** (§11 item 6): one specific user story per state in `ref`, `?shot=1` hides the review bar. | All states (metadata only) |
+| **No terms of use step.** Sign-up lands straight on the empty Library. | Remove `terms-first-run`, `terms-accepted`; check the J1 flow |
+| **No Settings page.** The left navigation ends at Usage. GMT+7 still applies to limit times and "today" (D8); no screen shows it as a setting. | Remove `settings-default`; app shell navigation in every state |
 
 ---
 
@@ -83,7 +74,7 @@ Typical learner: a graduate student or self-taught engineer with dozens to hundr
 
 Design the screens in §6, then link them into these four flows. They are how the mockups will be reviewed.
 
-**J1 First run (most important).** Sign up (Keycloak) → accept terms of use → empty Library ("Upload your first document") → drop 3 PDFs → watch processing → choose subjects for each (accept suggestions) → "Ready" → "Ask a question" → first cited answer.
+**J1 First run (most important).** Sign up (Keycloak) → empty Library ("Upload your first document") → drop 3 PDFs → watch processing → choose subjects for each (accept suggestions) → "Ready" → "Ask a question" → first cited answer.
 
 **J2 Everyday question.** Open app → Chat → ask → subjects detected → cited answer → follow-up that **adds a second subject** → "Summarize lesson" → open the note.
 
@@ -96,16 +87,15 @@ Design the screens in §6, then link them into these four flows. They are how th
 Each screen lists the PRD user stories it implements. **Text in quotes is required wording**; refine everything else freely.
 
 ### 6.1 App shell
-- Left navigation, in this order: **Library** (home), **Chat** (starts a new conversation), **Conversations**, **Notes**, **Subjects**, **Usage**, **Settings**.
+- Left navigation, in this order: **Library** (home), **Chat** (starts a new conversation), **Conversations**, **Notes**, **Subjects**, **Usage**.
 - Reserve space for later items without showing them: **Research map** (R2, after Library), **Quizzes** and **Reports** (R3, after Notes).
 - **Library** shows a count badge when documents need the learner's action (choose subjects, or failed).
 - User menu: name, sign out.
 - A global, non-blocking **upload tray** (bottom right) shows uploads in progress on every screen, so the learner can keep working while files process.
 
-### 6.2 Sign in, sign up, terms — US-1
+### 6.2 Sign in, sign up — US-1
 - Theme for Keycloak's hosted login, registration, and email-verification pages: logo, colors, typography.
-- **Terms of use** step on first sign-in (in the app): short summary, link to the full terms, a checkbox confirming the learner has the right to upload their documents, and "Continue". The learner can't proceed without accepting.
-- Then land on the empty **Library**.
+- After sign-up or first sign-in, land on the empty **Library**. No terms of use step (removed in v0.5).
 
 ### 6.3 Library — US-2, US-10, US-11
 The home screen and the hub for documents.
@@ -211,8 +201,7 @@ The core screen. Structure: thread header (title, subject chips, citations switc
 - No limits, credits, or upgrade prompts.
 
 ### 6.11 Settings
-- Time zone: "GMT+7 (Ho Chi Minh City)", read-only; it sets "today" and limit times for everyone in Release 1 (D8).
-- Terms of use (view the accepted version and date).
+Removed in v0.5: no Settings page in Release 1 (PRD Q45).
 
 ## 7. Release 2: research map (low-fidelity wireframes) — US-19, US-20
 
@@ -293,7 +282,6 @@ Use this realistic sample data, not lorem ipsum.
 |---|---|---|
 | Q4 | Should the citations switch also apply to Lesson Notes when citations are carried into notes (Release 3)? | Yes, the same remembered setting. |
 | Q5 | Can the learner upload several files at once? | Yes: multi-select and drag-and-drop of several PDFs, each with its own row; upload limits still apply. |
-| Q6 | Should terms of use be accepted in the app or on Keycloak's registration page? | In the app, on first sign-in (§6.2). |
 | Q8 | Should the first suggestion be pre-selected? | Yes (one-click accept); measured against the PRD target that ≥ 70% of documents keep a suggested subject. |
 
 **Answered**
@@ -322,6 +310,7 @@ Use this realistic sample data, not lorem ipsum.
 
 | Version | Date | PRD | Changes | Screens to redo |
 |---|---|---|---|---|
+| v0.5 | 2026-10-06 | v2.14 | Scope cut by the owner: no terms of use step, no Settings page; Q6 dropped. | Remove `terms-first-run`, `terms-accepted`, `settings-default`; navigation without Settings |
 | v0.4 | 2026-10-04 | v2.7 | Owner decisions on round 2: subjects chosen after processing (Q7); carried question sent right away (D2); no-subject decline asks for a document to continue (D4); rename may match another shared name (D6); subjects of archived documents can change (D7); GMT+7 for limits and "today" (D8); thumbs with labels (D1), fourth-subject wording (D3), and calmer Library rows (D5) accepted; scanned-PDF failure wording; prototype contract (§11 item 6). | Only the states in §0. |
 | v0.3 | 2026-10-03 | v2.1 | Rewrite for learner-uploaded documents: Library home, upload and processing states, subject picker (3 suggestions, keep 1–3, shared names), document details, Subjects (personal rename), multi-subject chat with growth notices and a 3-subject maximum, processing usage; enrollment and "Change subject" removed; R2 research map wireframes; learning loop moved to R3; four review flows; new sample data. | All. New: Library, Choose subjects, Document details, Subjects, Terms. Removed: Subject enrollment. |
 | v0.2 | 2026-10-02 | v1.6 | Laptop only; citations switch (on by default); token usage in the chat status line. | Chat (all states); all screens drop phone variants |
@@ -336,6 +325,7 @@ Use this realistic sample data, not lorem ipsum.
 | 2 (owner) | v0.3 | Round 2 accepted as `design-v0.3`. Checked against PRD v2.2 (architecture only) and v2.3 (`pypdf`, no OCR). One user-facing gap: a scanned PDF without a text layer fails with "No text layer (scanned PDFs are not supported yet)", not "We couldn't read this PDF" (`library-failed`, `details-failed`). | Accept v0.3; code follows the PRD wording. Designer's Q7 and D1–D12 stay open for the PO; story tickets list them where they apply. | v0.4 |
 | 2 (owner) | v0.3 | Answers to the designer's Q7 and D1–D8. D9–D12 were notes. | Q7 no; D2 yes; D4 decline and tell the learner to upload a document to continue, no "New conversation"; D6 allowed; D7 allowed; D8 GMT+7 for everyone. D1, D3, D5 accepted as proposed (recommended by Claude). The owner accepted the longer wait before choosing subjects (Q7) and GMT+7 for everyone (D8) as they are. PRD v2.7. | v0.4 |
 | 3 (designer) | v0.4 | Round 3 delivered: 101 states (new `chat-decline-other-subject`, `picker-change-subjects-archived`). Questions E1–E10 on the prototype's questions page: E1 §9 sample still says "We couldn't read this PDF" for the scan; E2 §9 shows a processing document with a subject; E3 which decline id is which; **E4 when the "another subject" decline can happen at all** (with < 3 subjects the thread grows, at 3 the fourth-subject refusal applies); E5 proposed chat hint "1 is processing, 1 needs subjects"; **E6 the declined question is not kept after "Upload a document"**; **E7 subjects added to an archived document don't show in Subjects until restore**; **E8 daily limits reset at midnight GMT+7?**; E9 user stories per state were guessed (Claude corrected 10 against the PRD); E10 a separate state for D6. | Open for the owner (bold ones change behavior). E1, E2: fix §9 sample data next version. | — |
+| 4 (owner) | v0.4 | Product owner removed the terms of use step and the Settings page from Release 1 (tickets #46, #49, #50). | Drop `terms-first-run`, `terms-accepted`, `settings-default` and the Settings navigation item; Q6 no longer applies. PRD v2.14 (Q45). | v0.5 |
 
 ---
 
@@ -343,4 +333,4 @@ Use this realistic sample data, not lorem ipsum.
 
 Paste this, together with this file, to start or continue a round:
 
-> You are designing **Smart Tutor**, a laptop web app (1440 px, light mode) where learners upload their own PDFs and ask a tutor that answers only from them, with citations. Follow the attached design brief **v0.4** exactly; it is the source of truth. Start with **§0 What changed**: this round updates the existing prototype in this project, so change only the states listed there and keep everything else as it is. Keep (1) the four clickable flows in §5 working, (2) every Release 1 screen and state in §6, (3) the wireframes for §7 and §8, and (4) the components page (§10). Use the sample data in §9 and the quoted wording verbatim. Name each frame `<screen>-<state>@v0.4`. Do not design anything listed as out of scope in §4. Follow the prototype contract in §11 item 6: every state in `window.ST.STATES` with its specific user stories in `ref`, each state at `index.html#/<state-id>`, and review chrome hidden when the URL has `?shot=1`. End with a list of questions or proposed changes to the brief.
+> You are designing **Smart Tutor**, a laptop web app (1440 px, light mode) where learners upload their own PDFs and ask a tutor that answers only from them, with citations. Follow the attached design brief **v0.5** exactly; it is the source of truth. Start with **§0 What changed**: this round updates the existing prototype in this project, so change only the states listed there and keep everything else as it is. Keep (1) the four clickable flows in §5 working, (2) every Release 1 screen and state in §6, (3) the wireframes for §7 and §8, and (4) the components page (§10). Use the sample data in §9 and the quoted wording verbatim. Name each frame `<screen>-<state>@v0.5`. Do not design anything listed as out of scope in §4. Follow the prototype contract in §11 item 6: every state in `window.ST.STATES` with its specific user stories in `ref`, each state at `index.html#/<state-id>`, and review chrome hidden when the URL has `?shot=1`. End with a list of questions or proposed changes to the brief.

@@ -245,3 +245,12 @@ def test_document_ready_refuses_bad_states_and_subjects() -> None:
 
 def test_too_many_pages_reason_names_both_counts() -> None:
     assert too_many_pages(501, 500) == "This PDF has 501 pages; the limit is 500"
+
+
+def test_display_title_prefers_override_then_content_title_then_file_name() -> None:
+    d = new_document("file.pdf")
+    assert d.title == "file.pdf"
+    d.content_title = "Extracted"
+    assert d.title == "Extracted"
+    d.title_override = "Mine"
+    assert d.title == "Mine"

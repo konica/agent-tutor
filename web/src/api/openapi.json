@@ -72,6 +72,41 @@
         "title": "DocumentResponse",
         "type": "object"
       },
+      "DuplicateCheckRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sha256"
+        ],
+        "title": "DuplicateCheckRequest",
+        "type": "object"
+      },
+      "DuplicateCheckResponse": {
+        "properties": {
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          }
+        },
+        "required": [
+          "document_id"
+        ],
+        "title": "DuplicateCheckResponse",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -273,6 +308,53 @@
           }
         ],
         "summary": "List Documents",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/documents/duplicate-check": {
+      "post": {
+        "description": "Whether the caller's own library already holds this file, so the browser can skip the upload (PRD \u00a78 US-2).\n\nAnother learner's copy is never reported or linked; the server-side hash decides after upload (D19).",
+        "operationId": "check_duplicate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DuplicateCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DuplicateCheckResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Check Duplicate",
         "tags": [
           "knowledge"
         ]

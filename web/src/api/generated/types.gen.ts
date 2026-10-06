@@ -45,6 +45,26 @@ export type DocumentResponse = {
 };
 
 /**
+ * DuplicateCheckRequest
+ */
+export type DuplicateCheckRequest = {
+    /**
+     * Sha256
+     */
+    sha256: string;
+};
+
+/**
+ * DuplicateCheckResponse
+ */
+export type DuplicateCheckResponse = {
+    /**
+     * Document Id
+     */
+    document_id: string | null;
+};
+
+/**
  * HTTPValidationError
  */
 export type HttpValidationError = {
@@ -179,6 +199,31 @@ export type ListDocumentsResponses = {
 };
 
 export type ListDocumentsResponse = ListDocumentsResponses[keyof ListDocumentsResponses];
+
+export type CheckDuplicateData = {
+    body: DuplicateCheckRequest;
+    path?: never;
+    query?: never;
+    url: '/documents/duplicate-check';
+};
+
+export type CheckDuplicateErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CheckDuplicateError = CheckDuplicateErrors[keyof CheckDuplicateErrors];
+
+export type CheckDuplicateResponses = {
+    /**
+     * Successful Response
+     */
+    200: DuplicateCheckResponse;
+};
+
+export type CheckDuplicateResponse = CheckDuplicateResponses[keyof CheckDuplicateResponses];
 
 export type GetMeData = {
     body?: never;

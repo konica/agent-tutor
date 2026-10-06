@@ -2,7 +2,9 @@
 
 | | |
 |---|---|
-| **Status** | Draft v2.12 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Status** | Draft v2.14 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Changes from v2.13** | Product owner decision (Q45): Release 1 has no terms of use step and no Settings page. Sign-up ends on **My library** (US-1); the `learners` profile moves to Release 3 and keeps only `time_zone` for reports (D13, §9.4); the time zone stays one app setting (D27). The upload-warranty mitigation for copyright moves to Release 4 (§9.10). |
+| **Changes from v2.12** | The first-pages `describe_document` payload is validated in code; a reply without one valid call stores no metadata, and processing continues with the file name as title; an invalid optional DOI or year is dropped without losing the rest, and a DOI not printed in the pages is dropped too. `contents` gains the description columns (title, authors, year, DOI, summary, summary embedding, proposed subject names, work key). The first pages are read by `PdfExtractor.extract_pages(..., first=2)` (§9.2 step 4; §9.15 ports). |
 | **Changes from v2.11** | Pilot hosting: served from the AWS-generated CloudFront address with path routing (`/`, `/api/*`, `/auth/*`) through a VPC origin to an internal ALB; no custom domain, DNS, or ACM certificate for now (§9.12, Appendix A item 4; ADR 0009). No product behavior changes. |
 | **Changes from v2.10** | The per-file limits are SSM parameters `/smart-tutor/max-upload-mb` (50, MiB) and `/smart-tutor/max-pages` (500), read once at startup by the API and worker (a missing or invalid value stops startup); `GET /uploads/limits` serves them to the browser, which refuses a non-PDF, empty, or oversized file before uploading ("Not uploaded. …"). New failure reason: "This PDF has N pages; the limit is 500", checked before the text is read (§9.5). The API and worker roles need `ssm:GetParameter` on `/smart-tutor/*` (§9.4 settings; Appendix A). |
 | **Changes from v2.9** | Interim behavior only, until US-2b (#10): when a document's content becomes `ready`, the document gets the subject "General" and goes straight to `ready` (§9.5). `contents.text_key` holds `contents/<sha256>.pages.json` (§9.4). Failure reasons: "This file isn't a readable PDF", "No text layer (scanned PDFs are not supported yet)". |
@@ -134,7 +136,7 @@ Learners and researchers work through many documents on a topic but lack the bac
 ## 7. Scope
 
 ### Release 1: core tutor on your own documents
-- Registration, login, logout via **Keycloak's hosted pages**, with terms of use accepted at sign-up (upload warranty).
+- Registration, login, logout via **Keycloak's hosted pages**. No terms of use step and no Settings page (Q45).
 - **Upload** PDFs with a client-side duplicate check and server-side SHA-256; per-document state.
 - **Subject suggestion** (3 choices, keep 1–3) and the **shared subject catalog**; personal subject names (rename, reset).
 - Ingestion once per unique content: fast first-pages step (metadata, suggestions), page text extraction with `pypdf` (saved), work key, chunking, embedding.
@@ -161,7 +163,7 @@ Learners and researchers work through many documents on a topic but lack the bac
 - Carry an answer's citations into the Lesson Note (low priority).
 
 ### Release 4: sharing and imports
-- **Share** a document with users or groups; **publish** to everyone; "Add to my library" without uploading; public document browser; publishing terms and takedown.
+- **Share** a document with users or groups; **publish** to everyone; "Add to my library" without uploading; public document browser; terms of use with an upload warranty, publishing terms, and takedown.
 - **Import by DOI or arXiv ID** (open-access PDFs fetched by the system, deduplicated like uploads).
 - Team workspaces; citation export (BibTeX, Zotero).
 
@@ -176,7 +178,7 @@ Learners and researchers work through many documents on a topic but lack the bac
 Story IDs are stable. Release 1: US-1 to US-13b. Release 2: US-19, US-20. Release 3: US-14 to US-16. Release 4: US-17. Release 5: US-18.
 
 **US-1 Register and sign in**
-- *Given* a new visitor, *when* they choose "Sign up", *then* they register on Keycloak's hosted page (with email verification), accept the terms of use, get the `learner` role, and land on **My library**, which prompts "Upload your first document" when empty.
+- *Given* a new visitor, *when* they choose "Sign up", *then* they register on Keycloak's hosted page (with email verification), get the `learner` role, and land on **My library**, which prompts "Upload your first document" when empty.
 - Unauthenticated calls to the API, agent, or MCP server return `401`.
 
 **US-2 Upload a document**
@@ -324,7 +326,7 @@ Thresholds (`detect_threshold`, `detect_margin`, `multi_margin`, `answer_floor`)
 1. Validate type, size, page count, parseability, and that the PDF has extractable text; compute SHA-256 of the uploaded bytes.
 2. **Insert-or-get the content by hash.** Existing content → delete the uploaded copy, link the learner's document to it; if the content is `ready`, compute this learner's suggestions (step 5) and stop; if `processing`, the document waits; if `failed`, re-queue it (counts as a retry).
 3. **New content:** move the file to `contents/<sha256>.pdf`.
-4. **First-pages step (fast, one model call, `describe_document` tool call)** on text extracted from pages 1–2: title, authors, year, DOI, a two-sentence summary, and 3 proposed subject names; an embedding of the summary is stored on the content.
+4. **First-pages step (fast, one model call, `describe_document` tool call)** on text extracted from pages 1–2: title, authors, year, DOI, a two-sentence summary, and 3 proposed subject names; an embedding of the summary is stored on the content. The payload is validated in code; a reply without one valid call stores no metadata, and processing continues with the file name as title; an invalid DOI or year is dropped without losing the rest.
 5. **Suggestions for this learner (code):** rank shared subjects by similarity between the summary embedding and subject name embeddings, boosting subjects the learner already has and matching their personal names; fill the remaining of 3 slots with the model's proposed names that don't match an existing subject.
 6. **Full extraction:** `pypdf` reads the text page by page into LangChain `Document`s → save `contents/<sha256>.pages.json` → **work key** (DOI, else normalized title + year) in code from the first-pages metadata → split each page with `RecursiveCharacterTextSplitter` (separators `\n\n`, `\n`, `. `, space; ≤ 1,000 characters, overlap 200) into chunks that keep their page number, after light cleanup (NFKC, joined line-end hyphens, no control characters); reference lists and front matter are kept; pages without text yield no chunks → embed (chunk writes idempotent per content, ordered by `seq`; `contents.chunker` records the method and settings). Runs before the learner can choose subjects (US-2b). A PDF whose pages average fewer than 50 non-whitespace characters fails with "No text layer (scanned PDFs are not supported yet)".
 
@@ -367,7 +369,7 @@ Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow onl
 | Lesson Note | PostgreSQL `lesson_notes` | `thread_id` (unique) | `user_id`, `subject_ids[]`, `markdown`, `status` (`active` / `archived`), `edited_since_generated` (bool), `archived_at`, `source_note_id` (the note a "Discuss this note" thread started from), `updated_at`. |
 | Learning record | LangGraph store, namespace `("learning", user_id)` | `thread_id` | `subject_ids[]`, `topics[]`, `key_points[]`, `note_id`, `trigger`, `learned_at`, `updated_at`. |
 | Decline log | PostgreSQL `declines` | `decline_id` | `subject_ids[]`, scrubbed question text, best score, `reason`, timestamp. **No user id.** Deleted after 90 days. |
-| Learner profile | PostgreSQL `learners` | `user_id` | `time_zone`, `terms_accepted_at`. |
+| Learner profile *(R3)* | PostgreSQL `learners` | `user_id` | `time_zone`, for reports (D13). Not created in Release 1: the time zone is the `app-time-zone` setting (D27). |
 | Usage | PostgreSQL `token_usage` | `usage_id` | `user_id` (null for system work such as re-embedding), `source` (`chat` / `document_processing` / `background` / `system`), `ref_id` (thread or content id), input/output tokens, `created_at`. |
 | Upload | PostgreSQL `uploads` | `upload_id` | `user_id`, `bytes`, `created_at`, `outcome` — for rate limits and daily caps. |
 | Settings | SSM Parameter Store | `/smart-tutor/*` | `learning-record-idle-minutes` (10), file limits (`max-upload-mb` 50, `max-pages` 500), rate limits and daily caps, `app-time-zone` (`Asia/Ho_Chi_Minh`, D27), detection thresholds, retry attempts (3). |
@@ -453,7 +455,7 @@ Every decline (relevance gate, growth check, or `decline` tool) writes `subject_
 | **Wrong subjects detected.** | Thresholds and margins tuned on labeled data; "ask when unsure"; detection and growth evals. |
 | **Poor metadata (scanned or unusual PDFs).** Missing year or title weakens the research map. | Fields optional; display title editable; works without a year listed separately; extraction accuracy measured. |
 | **Tool calling in streamed answers; cross-region routing; token cost; long streams on Kubernetes; EKS operations; judge bias.** | Streamed text + tool calls verified in M0 through `ChatBedrockConverse` (ADR 0006; `make bedrock-check`); the `us.` inference profile keeps requests in US regions; capped history and chunks, prompt caching, budget alerts; `preStop` hooks, grace periods, and PodDisruptionBudgets for streaming pods; managed node group with a small add-on set; judges use a different model family (Qwen) calibrated against human feedback. |
-| **Copyright of published or imported documents** *(R4)*. | Terms of use with upload warranty from R1; publishing terms, takedown per document visibility, imports limited to open-access sources. |
+| **Copyright of published or imported documents** *(R4)*. | Terms of use with an upload warranty when sharing opens (R4; not in R1, Q45); publishing terms, takedown per document visibility, imports limited to open-access sources. |
 
 ### 9.11 Hosting
 
@@ -497,7 +499,7 @@ One Python package organized **by module first**, with `domain`, `application`, 
 | `subjects` | **Shared subject catalog**: subjects with stable ids, personal names (rename, reset), suggestion ranking, name checks (ADR 0003, 0004) |
 | `tutoring` | Threads (1–3 subjects, growth), detection among the learner's subjects (asks `knowledge.application`; names from `subjects.application`), relevance gate, growth check, ask path, conversations |
 | `learning` | Lesson Notes (edit-aware overwrite), learning records |
-| `accounts` | Learner profile and terms, rate limits and daily caps, token usage |
+| `accounts` | Rate limits and daily caps, token usage; learner profile from Release 3 |
 | `insights` | Decline log (scrubbed, 90-day retention) and quality monitoring queries |
 | `graph` | **Release 2:** research map (work links, timeline, reading order, reading paths). **Release 5:** model-labeled relationships, concept history |
 | `catalog`, `quizzes`, `recommendations`, `reports` | Release 3 |
@@ -506,7 +508,7 @@ One Python package organized **by module first**, with `domain`, `application`, 
 |---|---|---|
 | `domain` | Entities and rules, no I/O: `Content` (state transitions, `retry()`), `Document` (state transitions, `archive()`, `restore()`, `set_subjects()` 1–3, `can_be_read_by(user)`), `Subject`, `PersonalSubjectName`, `Thread` (`add_subject()` refuses beyond 3, never removes), `LessonNote` (`needs_overwrite_confirmation()`), `LearningRecord`, `Chunk`, `Citation`, `TokenUsage` | nothing |
 | `application` | One service per use case: `UploadService`, `DeduplicationService`, `IngestionService`, `SubjectSuggester`, `SubjectCatalogService`, `DocumentService`, `SearchService`, `SubjectDetector`, `AskService`, `NoteService`, `LearningRecordService`, `ConversationService`, `UsageService`, `DeclineLogService` | `domain`, `ports` |
-| `ports` | ABCs: `Retriever`, `PdfExtractor`, `FirstPagesReader`, `ObjectStore`, repositories, `LearningMemory`, `Clock` | `domain` |
+| `ports` | ABCs: `Retriever`, `PdfExtractor` (`extract_pages(..., first=2)` reads the first pages), `ObjectStore`, repositories, `LearningMemory`, `Clock` | `domain` |
 | `adapters` | Bedrock, PostgreSQL, MCP client, LangGraph store, S3/SQS, PDF loader | `ports`, vendor SDKs |
 | `entrypoints` (`apps/`) | FastAPI routes, LangGraph graph, MCP tools, SQS worker, CronJobs | `application` (and `adapters`, for wiring) |
 
@@ -625,6 +627,7 @@ Measured over the pilot unless stated; minimum sample 100 events per metric.
 | Q42 | Changing subjects of an archived document (design D7) | Allowed; applies on restore (US-10). |
 | Q43 | Time zone for "today", daily caps, and limit times (design D8) | GMT+7 for all learners in Release 1 (D27). |
 | Q44 | Pilot address | The AWS-generated CloudFront domain with path routing; no custom domain until needed (ADR 0009). |
+| Q45 | Terms of use and Settings in Release 1 | Removed (product owner, 2026-10-06): no terms step on first sign-in and no Settings page; no screen shows the time zone setting, which stays GMT+7 for limits and "today" (D27). Tickets #46, #49, #50 closed. |
 
 ## 14. Roadmap: releases and milestones
 
@@ -646,7 +649,7 @@ M4 Production launch (R1)
 | M0 Foundations | Repo, CI, Compose stack, CDK and Helm skeletons, Keycloak realm, LangSmith project, package skeleton with ports and `ModelFactory` *(scaffold done)*; Bedrock models reachable *(done: `ModelFactory` on LangChain and `make bedrock-check`, ADR 0006)*; forwarded JWT agent → MCP in Compose *(done: prototype #29 with introspection on every hop, ADR 0007)*; page-text extraction with `pypdf` checked on sample arXiv PDFs *(done: probe on 6 papers in #30, ADR 0008; a scanned PDF for the "No text layer" rule is tested in US-2)*. |
 | M1 Library and ingestion | Presigned upload, browser duplicate check, server SHA-256 dedupe with insert-or-get, content and document state machines with retry, first-pages step, page text with saved output, work key, chunks and embeddings, subject suggestions and shared catalog (1–3 per document, name check), personal names, archive/restore, Glacier tagger (tag/untag test), MCP search with `can_read` and iterative scans; suggestion, name-check, metadata, retrieval, filtered-recall, and dedupe/isolation tests passing on the seed corpus. |
 | M2 Tutor agent | First-turn multi-subject detection, growth to 3 with notices and warning, search, relevance gate, answer with document-as-data prompting, decline log, summarize path with edit-aware overwrite, idle sweeper, learning records; Release 1 evals passing on the smoke split, including adversarial PDFs. |
-| M3 App (API + Web) | Auth and terms, library and upload UX, subject choice and rename, chat streaming with subject notices, conversation and note management, usage view, rate limits and daily caps; isolation tests passing. |
+| M3 App (API + Web) | Auth, library and upload UX, subject choice and rename, chat streaming with subject notices, conversation and note management, usage view, rate limits and daily caps; isolation tests passing. |
 | M4 Production launch (R1) | CDK stacks and Helm releases in prod via CI/CD; worker isolation; trace and decline retention jobs; online evaluation, annotation queue, dashboards and alerts; **data-erasure obligations reviewed** (known gap); release gate passed; **pilot starts**. |
 
 ### Release 2 — research map

@@ -1,5 +1,6 @@
 """knowledge.application: Use-case services. This package is the module's public API for other modules."""
 
+from smart_tutor.knowledge.application.describer import FIRST_PAGES, Described, DocumentDescriber
 from smart_tutor.knowledge.application.document_service import DocumentService, DocumentView
 from smart_tutor.knowledge.application.ingestion_service import IngestionService, ProcessingTools
 from smart_tutor.knowledge.application.limits import load_file_limits
@@ -19,9 +20,12 @@ from smart_tutor.knowledge.ports.object_store import ObjectStore
 from smart_tutor.knowledge.ports.pdf_extractor import PdfExtractor, TooManyPagesError, UnreadablePdfError
 
 __all__ = [
+    "FIRST_PAGES",
     "PDF_CONTENT_TYPE",
     "ChunkHit",
     "ContentState",
+    "Described",
+    "DocumentDescriber",
     "DocumentService",
     "DocumentView",
     "FileLimits",

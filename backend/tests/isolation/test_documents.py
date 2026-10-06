@@ -1,8 +1,14 @@
-"""US-12: a learner never sees another learner's documents, and can't get a presigned POST for their key."""
+"""US-12: a learner never sees another learner's documents, and can't get a presigned POST for their key.
+
+The browser hash check (D19) answers only from the caller's own library and links nothing.
+"""
+
+import hashlib
 
 from fastapi.testclient import TestClient
 
 from fakes import (
+    DESCRIPTION_ARGS,
     TEST_LIMITS,
     FakeObjectStore,
     FakeTokenVerifier,
@@ -39,7 +45,7 @@ def test_b_never_sees_documents_in_any_state() -> None:
 
     assert client.get("/documents", headers=B).json() == []
     assert client.get("/documents", headers=B, params={"user_id": "learner-a"}).json() == []
-    assert {d["title"] for d in client.get("/documents", headers=A).json()} == {"a1.pdf", "a2.pdf"}
+    assert {d["title"] for d in client.get("/documents", headers=A).json()} == {DESCRIPTION_ARGS["title"], "a2.pdf"}
 
 
 def test_b_never_sees_the_subjects_of_a_document() -> None:
@@ -64,3 +70,18 @@ def test_b_cannot_get_a_presigned_post_for_a_key() -> None:
     own = client.post("/uploads", json={"file_name": "x.pdf"}, headers=B, params={"user_id": "learner-a"}).json()
     assert own["fields"]["key"].startswith("uploads/learner-b/")
     assert all(key.startswith("uploads/learner-b/") for key, *_ in objects.presigned)
+
+
+def test_b_checking_as_file_hash_finds_nothing() -> None:
+    client, objects, ingestion = setup()
+    pdf = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
+    stored = client.post("/uploads", json={"file_name": "a1.pdf"}, headers=A).json()
+    objects.objects[stored["fields"]["key"]] = pdf
+    ingestion.ingest_upload(stored["fields"]["key"])
+    sha = hashlib.sha256(pdf).hexdigest()
+
+    assert client.post("/documents/duplicate-check", json={"sha256": sha}, headers=A).json() == {
+        "document_id": stored["document_id"]
+    }
+    assert client.post("/documents/duplicate-check", json={"sha256": sha}, headers=B).json() == {"document_id": None}
+    assert client.get("/documents", headers=B).json() == []  # the check linked nothing

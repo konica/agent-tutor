@@ -1,3 +1,5 @@
+import hashlib
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -75,6 +77,7 @@ def test_openapi_names_the_operations(client: TestClient) -> None:
     paths = client.get("/openapi.json").json()["paths"]
     assert paths["/uploads"]["post"]["operationId"] == "start_upload"
     assert paths["/documents"]["get"]["operationId"] == "list_documents"
+    assert paths["/documents/duplicate-check"]["post"]["operationId"] == "check_duplicate"
 
 
 def test_upload_limits_come_from_the_upload_service(client: TestClient) -> None:
@@ -86,3 +89,26 @@ def test_upload_limits_come_from_the_upload_service(client: TestClient) -> None:
 
 def test_upload_limits_need_a_token(client: TestClient) -> None:
     assert client.get("/uploads/limits").status_code == 401
+
+
+def test_duplicate_check_finds_the_callers_document(client: TestClient) -> None:
+    pdf = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
+    started = client.post("/uploads", json={"file_name": "a.pdf"}, headers=AUTH).json()
+    client.app.state.objects.objects[started["fields"]["key"]] = pdf  # type: ignore[attr-defined]
+    client.app.state.ingestion.ingest_upload(started["fields"]["key"])  # type: ignore[attr-defined]
+
+    sha = hashlib.sha256(pdf).hexdigest()
+    found = client.post("/documents/duplicate-check", json={"sha256": sha}, headers=AUTH)
+    assert found.status_code == 200
+    assert found.json() == {"document_id": started["document_id"]}
+    missing = client.post("/documents/duplicate-check", json={"sha256": "0" * 64}, headers=AUTH)
+    assert missing.json() == {"document_id": None}
+
+
+@pytest.mark.parametrize("body", [{"sha256": "A" * 64}, {"sha256": "0" * 63}, {"sha256": "0" * 64, "user_id": "x"}, {}])
+def test_duplicate_check_refuses_a_malformed_request(client: TestClient, body: dict[str, str]) -> None:
+    assert client.post("/documents/duplicate-check", json=body, headers=AUTH).status_code == 422
+
+
+def test_duplicate_check_needs_a_token(client: TestClient) -> None:
+    assert client.post("/documents/duplicate-check", json={"sha256": "0" * 64}).status_code == 401

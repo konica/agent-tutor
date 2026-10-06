@@ -39,3 +39,11 @@ class DocumentService:
         with self._uow() as tx:
             documents = tx.documents.list_readable_by(user_id)
         return frozenset(s for d in documents if d.state is DocumentState.READY for s in d.subject_ids)
+
+    def find_in_library(self, user_id: UserId, sha256: str) -> DocumentId | None:
+        """The caller's document holding this file, so the browser can skip uploading it (US-2, D19).
+
+        Answers only from the caller's own documents; it never links content.
+        """
+        with self._uow() as tx:
+            return tx.documents.find_readable_by_sha256(user_id, sha256)

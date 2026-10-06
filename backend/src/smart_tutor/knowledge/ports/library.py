@@ -10,7 +10,7 @@ from smart_tutor.knowledge.domain.content import Content
 from smart_tutor.knowledge.domain.document import Document
 from smart_tutor.knowledge.domain.search import ChunkHit
 from smart_tutor.knowledge.domain.upload import Upload, UploadOutcome
-from smart_tutor.shared.domain.ids import ContentId, SubjectId, UploadId, UserId
+from smart_tutor.shared.domain.ids import ContentId, DocumentId, SubjectId, UploadId, UserId
 
 
 class ContentRepository(ABC):
@@ -52,6 +52,10 @@ class DocumentRepository(ABC):
     @abstractmethod
     def list_readable_by(self, user_id: UserId) -> list[Document]:
         """`can_read` in storage: the caller's non-archived documents, newest first."""
+
+    @abstractmethod
+    def find_readable_by_sha256(self, user_id: UserId, sha256: str) -> DocumentId | None:
+        """`can_read` in storage: the caller's oldest non-archived document whose content has this hash (PRD D19)."""
 
 
 class UploadRepository(ABC):

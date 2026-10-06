@@ -12,6 +12,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from langchain_core.tools import tool
 from pydantic import BaseModel
 
+from smart_tutor.knowledge.application import DocumentDescriber
 from smart_tutor.shared.adapters.model_factory import ChatRole, ModelFactory
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.token_usage import TokenUsage
@@ -123,3 +124,25 @@ async def test_cached_system_prompt_counts_as_input(factory: ModelFactory) -> No
         cached = details.get("cache_read", 0) + details.get("cache_creation", 0)
         assert cached > 1000
         assert TokenUsage.from_usage_metadata(reply.usage_metadata).input_tokens > cached
+
+
+def test_nova_describes_an_arxiv_title_page(factory: ModelFactory) -> None:
+    pages = [
+        "Attention Is All You Need\n"
+        "Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, "
+        "Lukasz Kaiser, Illia Polosukhin\n"
+        "arXiv:1706.03762v7 [cs.CL] 2 Aug 2023\n"
+        "Abstract\n"
+        "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks "
+        "that include an encoder and a decoder. We propose a new simple network architecture, the Transformer, "
+        "based solely on attention mechanisms, dispensing with recurrence and convolutions entirely. Experiments "
+        "on two machine translation tasks show these models to be superior in quality.",
+        "1 Introduction\nRecurrent neural networks, long short-term memory and gated recurrent neural networks "
+        "have been firmly established as state of the art approaches in sequence modeling and transduction problems.",
+    ]
+
+    described = DocumentDescriber(factory.chat(ChatRole.AGENT)).describe(pages)
+
+    assert described.description is not None
+    assert described.description.title.strip()
+    assert len(described.description.proposed_subject_names) == 3

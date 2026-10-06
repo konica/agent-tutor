@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponse, AskInNewThreadResponses, GetMeData, GetMeResponses, GetUploadLimitsData, GetUploadLimitsResponses, ListDocumentsData, ListDocumentsResponses, StartUploadData, StartUploadErrors, StartUploadResponses } from './types.gen';
+import type { AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponse, AskInNewThreadResponses, CheckDuplicateData, CheckDuplicateErrors, CheckDuplicateResponses, GetMeData, GetMeResponses, GetUploadLimitsData, GetUploadLimitsResponses, ListDocumentsData, ListDocumentsResponses, StartUploadData, StartUploadErrors, StartUploadResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -25,6 +25,23 @@ export const listDocuments = <ThrowOnError extends boolean = false>(options?: Op
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/documents',
     ...options
+});
+
+/**
+ * Check Duplicate
+ *
+ * Whether the caller's own library already holds this file, so the browser can skip the upload (PRD §8 US-2).
+ *
+ * Another learner's copy is never reported or linked; the server-side hash decides after upload (D19).
+ */
+export const checkDuplicate = <ThrowOnError extends boolean = false>(options: Options<CheckDuplicateData, ThrowOnError>): RequestResult<CheckDuplicateResponses, CheckDuplicateErrors, ThrowOnError> => (options.client ?? client).post<CheckDuplicateResponses, CheckDuplicateErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/documents/duplicate-check',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**

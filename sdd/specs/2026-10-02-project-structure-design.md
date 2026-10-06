@@ -87,7 +87,7 @@ backend/src/smart_tutor/
 ├── subjects/          # shared subject catalog, personal names, suggestion ranking, name checks
 ├── tutoring/          # threads (1–3 subjects, growth), subject detection, ask
 ├── learning/          # Lesson Notes, learning records
-├── accounts/          # learner profile and terms, rate limits and daily caps, token usage
+├── accounts/          # rate limits and daily caps, token usage (learner profile from R3)
 ├── insights/          # decline log (scrubbed, 90-day retention), quality monitoring queries
 ├── graph/             # (R2) research map: work links, timeline, reading order; (R5) deep graph
 ├── catalog/           # (R3) topic catalog from section headings (extracted from R2)
@@ -118,11 +118,11 @@ Every module has the same shape:
 
 | Module | Owns (PRD) | Key classes | Depends on (application of) |
 |---|---|---|---|
-| `knowledge` | Library (PRD §9.2 document processing, §9.3–§9.5, US-2, US-2b, US-10, US-11): contents deduplicated by SHA-256 (states, shared retry), documents (library entries, 1–3 subjects, states, archive flag, visibility, grants), the single `can_read` rule, upload flow, ingestion (first pages, saved page text, work key), chunks, search | `Content`, `Document` (`set_subjects()`, `can_be_read_by()`), `Chunk`; `UploadService`, `DeduplicationService`, `IngestionService`, `DocumentService`, `SearchService`; ports `PdfExtractor`, `FirstPagesReader`, `ObjectStore`, `ContentRepository`, `DocumentRepository`, `ChunkRepository` | `subjects` (suggestions, get-or-create), `accounts` (rate limits, processing usage) |
+| `knowledge` | Library (PRD §9.2 document processing, §9.3–§9.5, US-2, US-2b, US-10, US-11): contents deduplicated by SHA-256 (states, shared retry), documents (library entries, 1–3 subjects, states, archive flag, visibility, grants), the single `can_read` rule, upload flow, ingestion (first pages, saved page text, work key), chunks, search | `Content`, `Document` (`set_subjects()`, `can_be_read_by()`), `Chunk`; `UploadService`, `DeduplicationService`, `IngestionService`, `DocumentService`, `SearchService`; ports `PdfExtractor` (`extract_pages(..., first=2)` reads the first pages), `ObjectStore`, `ContentRepository`, `DocumentRepository`, `ChunkRepository` | `subjects` (suggestions, get-or-create), `accounts` (rate limits, processing usage) |
 | `subjects` | Shared subject catalog (PRD D1, D20, D21, US-2b, US-10b; ADR 0003, 0004): stable `subject_id`s, canonical names, personal names (rename, reset), suggestion ranking, name checks | `Subject`, `SubjectName`, `PersonalSubjectName`; `SubjectCatalogService`, `SubjectSuggester`, `SubjectNameChecker`; ports `SubjectRepository`, `PersonalNameRepository` | — |
 | `tutoring` | Threads (1–3 subjects, growth with notices), subject detection, relevance gate, growth check, ask path (§9.2, US-3–US-6, US-3b, US-13) | `Thread` (`add_subject()`), `DetectionPolicy`, `RelevanceGate`, `GrowthPolicy`; `SubjectDetector`, `AskService`, `ConversationService`; ports `Retriever`, `ThreadRepository` | `knowledge` (the learner's subjects), `subjects` (names), `accounts`, `insights` (log declines) |
 | `learning` | Lesson Notes, learning records, idle sweep (§9.4, US-7, US-8, US-13b) | `LessonNote`, `LearningRecord`; `NoteService`, `LearningRecordService`; ports `NoteRepository`, `LearningMemory` | `tutoring` (thread content) |
-| `accounts` | Learner profile, time zone, and terms; rate limits and daily caps; token usage (chat, document processing, background, system) (US-1, US-9) | `Learner`, `RateLimits`; `UsageService`, `LearnerService` | — |
+| `accounts` | Rate limits and daily caps; token usage (chat, document processing, background, system) (US-9); learner profile with time zone from Release 3 (D13) | `Learner`, `RateLimits`; `UsageService`, `LearnerService` | — |
 | `insights` | Anonymized decline log (scrubbed, 90-day retention) and quality monitoring queries (§9.6) | `Decline`; `DeclineLogService` | — |
 | `catalog` (R3) | Topic catalog (§9.7) | `TopicEntry`; `CatalogService` | `knowledge` |
 | `quizzes` (R3) | Quiz generation and grading (US-14) | `Quiz` (`grade(answers)`); `QuizService` | `learning` |

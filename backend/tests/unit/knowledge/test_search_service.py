@@ -21,6 +21,22 @@ def test_returns_the_callers_matching_chunk_with_citation_fields() -> None:
     assert hit.score == pytest.approx(1.0)
 
 
+def test_a_hit_carries_the_display_title_content_title_then_override() -> None:
+    library = InMemoryLibrary()
+    doc_id = ingest_ready(library, "ada", "Attention is all you need.")
+    document = library.state.documents[doc_id]
+    assert document.content_id is not None
+    library.state.contents[document.content_id].title = "Attention Is All You Need"
+
+    def title() -> str:
+        [hit] = service(library).search(UserId("ada"), "Attention is all you need.", [GENERAL_SUBJECT_ID])
+        return hit.document_title
+
+    assert title() == "Attention Is All You Need"
+    document.title_override = "My notes"
+    assert title() == "My notes"
+
+
 def test_never_returns_another_learners_chunks_even_for_the_same_text() -> None:
     library = InMemoryLibrary()
     ingest_ready(library, "ada", "Attention is all you need.")

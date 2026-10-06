@@ -1,7 +1,8 @@
+import hashlib
 from datetime import timedelta
 
-from fakes import TEST_LIMITS, FakeObjectStore, FixedClock, InMemoryLibrary, ingest_ready
-from smart_tutor.knowledge.application import DocumentService, UploadService
+from fakes import TEST_LIMITS, FakeObjectStore, FixedClock, InMemoryLibrary, fake_tools, ingest_ready
+from smart_tutor.knowledge.application import DocumentService, IngestionService, UploadService
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.subjects.application import GENERAL_SUBJECT_ID
 
@@ -36,3 +37,40 @@ def test_learner_subjects_are_those_of_ready_unarchived_documents_only() -> None
     library.state.documents[ada_doc].archived = True
     assert docs.learner_subjects(UserId("ada")) == frozenset()
     assert docs.learner_subjects(UserId("bob")) == frozenset({GENERAL_SUBJECT_ID})
+
+
+PDF = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
+SHA = hashlib.sha256(PDF).hexdigest()
+
+
+def _ingested(library: InMemoryLibrary, objects: FakeObjectStore, owner: str) -> str:
+    uploads = UploadService(library.unit_of_work, objects, FixedClock(), TEST_LIMITS)
+    started = uploads.start_upload(UserId(owner), "paper.pdf")
+    objects.objects[started.fields["key"]] = PDF
+    IngestionService(library.unit_of_work, objects, fake_tools(), TEST_LIMITS).ingest_upload(started.fields["key"])
+    return started.document_id
+
+
+def test_finds_the_callers_document_by_hash() -> None:
+    library, objects = InMemoryLibrary(), FakeObjectStore()
+    document_id = _ingested(library, objects, "ada")
+    service = DocumentService(library.unit_of_work)
+    assert service.find_in_library(UserId("ada"), SHA) == document_id
+    assert service.find_in_library(UserId("ada"), "0" * 64) is None
+
+
+def test_another_learners_file_is_not_in_your_library() -> None:
+    library, objects = InMemoryLibrary(), FakeObjectStore()
+    _ingested(library, objects, "ada")
+    assert DocumentService(library.unit_of_work).find_in_library(UserId("bob"), SHA) is None
+
+
+def test_an_unlinked_or_duplicate_failed_document_never_matches() -> None:
+    library, objects = InMemoryLibrary(), FakeObjectStore()
+    first = _ingested(library, objects, "ada")
+    _ingested(library, objects, "ada")  # fails as a duplicate; its content_id stays null
+    uploads = UploadService(library.unit_of_work, objects, FixedClock(), TEST_LIMITS)
+    uploads.start_upload(UserId("carol"), "paper.pdf")  # still processing: no content yet
+    service = DocumentService(library.unit_of_work)
+    assert service.find_in_library(UserId("ada"), SHA) == first
+    assert service.find_in_library(UserId("carol"), SHA) is None

@@ -6,7 +6,14 @@ from fakes.clock import FixedClock
 from fakes.ingest import ingest_ready
 from fakes.knowledge import FakeObjectStore, InMemoryLibrary
 from fakes.mcp import in_process_mcp
-from fakes.models import FakeChatModel, fake_chat_model, fake_embeddings
+from fakes.models import (
+    DESCRIPTION_ARGS,
+    FakeChatModel,
+    describe_reply,
+    describing_chat_model,
+    fake_chat_model,
+    fake_embeddings,
+)
 from fakes.parameters import TEST_LIMITS, FakeParameterStore
 from fakes.pdfs import make_pdf
 from fakes.processing import FakePdfExtractor, PageChunker, fake_tools
@@ -17,6 +24,9 @@ from fakes.tutoring import FakeRetriever, InMemoryThreads
 __all__ = [
     "api_services",
     "fake_agent",
+    "DESCRIPTION_ARGS",
+    "describe_reply",
+    "describing_chat_model",
     "FakeChatModel",
     "FakeRetriever",
     "fake_chat_model",

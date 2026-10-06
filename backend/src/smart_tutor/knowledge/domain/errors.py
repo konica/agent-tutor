@@ -21,3 +21,7 @@ class InvalidChunkError(DomainError):
 
 class InvalidSearchError(DomainError):
     """The search request is malformed (query, subjects, or k out of range)."""
+
+
+class InvalidDescriptionError(DomainError):
+    """A describe_document payload failed validation; the message names the field, never its value (PRD §9.9)."""

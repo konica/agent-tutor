@@ -1,4 +1,4 @@
-"""Threads in Postgres. The table schema lives in migration 0004."""
+"""Threads in Postgres. The table schema lives in migration 0005."""
 
 from typing import Any
 

@@ -1,8 +1,8 @@
 # `accounts` module (Release 1)
 
-**Owns** (US-9, §9.4 learner profile): Learner profile (time zone), upload limits, token usage (chat, document processing, background), rate-limit policy.
+**Owns** (US-9, §9.4): upload limits, token usage (chat, document processing, background), rate-limit policy. The learner profile (time zone for reports) arrives in Release 3; Release 1 has no terms of use step (PRD Q45).
 
-**Key classes:** `Learner`, `UploadLimits`; services `LearnerService`, `UsageService`.
+**Key classes:** `UploadLimits`; service `UsageService`. Release 3 adds `Learner` and `LearnerService`.
 
 **May use (application layer only):** none. Everyone may use `shared`.
 

@@ -17,8 +17,9 @@ class TooManyPagesError(Exception):
 
 class PdfExtractor(ABC):
     @abstractmethod
-    def extract_pages(self, data: bytes, max_pages: int) -> list[str]:
+    def extract_pages(self, data: bytes, max_pages: int, first: int | None = None) -> list[str]:
         """Raw text per page (index = page number - 1; blank pages are "").
 
         Raises TooManyPagesError over `max_pages` (before reading text) and UnreadablePdfError.
+        With `first`, only the first `first` pages are read (the limit is still checked).
         """
