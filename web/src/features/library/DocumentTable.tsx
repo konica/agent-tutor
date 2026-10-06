@@ -1,6 +1,7 @@
 import { FileText } from "lucide-react";
 
 import type { DocumentResponse } from "../../api/documents";
+import { Button } from "../../components/Button/Button";
 import { StateBadge } from "../../components/StateBadge/StateBadge";
 import styles from "./DocumentTable.module.css";
 
@@ -20,7 +21,7 @@ function StateCell({ doc }: { doc: DocumentResponse }) {
   );
 }
 
-export function DocumentTable({ documents }: { documents: DocumentResponse[] }) {
+export function DocumentTable({ documents, onChooseSubjects }: { documents: DocumentResponse[]; onChooseSubjects?: (doc: DocumentResponse) => void }) {
   return (
     <table className={styles.table}>
       <thead>
@@ -29,6 +30,9 @@ export function DocumentTable({ documents }: { documents: DocumentResponse[] }) 
           <th scope="col">Subjects</th>
           <th scope="col">State</th>
           <th scope="col">Uploaded</th>
+          <th scope="col">
+            <span className="visually-hidden">Actions</span>
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -47,6 +51,13 @@ export function DocumentTable({ documents }: { documents: DocumentResponse[] }) 
               <StateCell doc={doc} />
             </td>
             <td className={styles.muted}>{uploadedOn(doc.created_at)}</td>
+            <td className={styles.actions}>
+              {doc.state === "awaiting_subjects" && onChooseSubjects && (
+                <Button size="sm" variant="primary" aria-label={`Choose subjects for ${doc.title}`} onClick={() => onChooseSubjects(doc)}>
+                  Choose subjects
+                </Button>
+              )}
+            </td>
           </tr>
         ))}
       </tbody>
