@@ -28,7 +28,8 @@
   color: var(--text-2); font-size: var(--fs-14);
 }
 .citationsTitle { margin: 0 0 var(--sp-2); font-family: var(--font-body); font-size: var(--fs-14); color: var(--text); }
-.citations ol { margin: 0; padding-left: var(--sp-6); }
+.citations ul { margin: 0; padding: 0; list-style: none; }
+.marker { color: var(--text); font-variant-numeric: tabular-nums; }
 .citations li { overflow-wrap: anywhere; }
 
 .problem {

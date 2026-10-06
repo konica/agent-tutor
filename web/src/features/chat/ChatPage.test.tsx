@@ -1,10 +1,10 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { NoDocumentsError, type ChatEvent } from "../../api/chat";
+import { AskRefusedError, NoDocumentsError, type ChatEvent } from "../../api/chat";
 import { sessionExpiry } from "../../auth/authClient";
 import { ChatPage } from "./ChatPage";
 
@@ -53,8 +53,8 @@ describe("ChatPage", () => {
         {
           type: "citations",
           citations: [
-            { chunk_id: "c1", document_title: "a.pdf", page: 3 },
-            { chunk_id: "c2", document_title: "b.pdf", page: null },
+            { n: 1, chunk_id: "c1", document_title: "a.pdf", page: 3 },
+            { n: 2, chunk_id: "c2", document_title: "b.pdf", page: null },
           ],
         },
         { type: "done" },
@@ -69,6 +69,35 @@ describe("ChatPage", () => {
     expect(screen.getByText("General")).toBeInTheDocument();
     expect(screen.getByText("a.pdf, p. 3")).toBeInTheDocument();
     expect(screen.getByText("b.pdf, page unavailable")).toBeInTheDocument();
+  });
+
+  it("numbers each citation with the marker the answer uses for it", async () => {
+    const ask = vi.fn(() =>
+      events(
+        { type: "thread", thread_id: "t1", subjects: [] },
+        { type: "delta", text: "Only the second chunk [2]." },
+        { type: "citations", citations: [{ n: 2, chunk_id: "c2", document_title: "b.pdf", page: 4 }] },
+        { type: "done" },
+      ),
+    );
+    show(<ChatPage ask={ask} />);
+    await userEvent.type(question(), "What is attention?");
+    await userEvent.click(askButton());
+    const citations = await screen.findByRole("region", { name: "Citations" });
+    const [item] = within(citations).getAllByRole("listitem");
+    expect(item).toHaveTextContent(/^\[2\] b\.pdf, p\. 4$/);
+    expect(within(citations).queryByText("[1]")).not.toBeInTheDocument();
+  });
+
+  it("shows another refusal's message without pointing to the Library", async () => {
+    const ask = vi.fn(() => {
+      throw new AskRefusedError("Subject detection isn't available yet");
+    });
+    show(<ChatPage ask={ask} />);
+    await userEvent.type(question(), "What is attention?");
+    await userEvent.click(askButton());
+    expect(await screen.findByText("Subject detection isn't available yet")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /library/i })).not.toBeInTheDocument();
   });
 
   it("does not ask an empty or blank question", async () => {

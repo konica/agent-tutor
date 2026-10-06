@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { SessionExpiredError } from "../auth/authClient";
-import { askInNewThread, formatCitation, NoDocumentsError, type ChatEvent } from "./chat";
+import { askInNewThread, AskRefusedError, formatCitation, NoDocumentsError, type ChatEvent } from "./chat";
 import { configureApiClient } from "./client";
 import { createClient, createConfig } from "./generated/client";
 
@@ -36,7 +36,7 @@ const answer = [
   'event: thread\ndata: {"thread_id": "t1", "subjects": [{"subject_id": "s1", "name": "General"}]}\n\n',
   'event: delta\ndata: {"text": "It weighs "}\n\n',
   'event: delta\ndata: {"text": "tokens [1]."}\n\n',
-  'event: citations\ndata: {"citations": [{"chunk_id": "c1", "document_title": "a.pdf", "page": 3}]}\n\n',
+  'event: citations\ndata: {"citations": [{"n": 1, "chunk_id": "c1", "document_title": "a.pdf", "page": 3}]}\n\n',
   "event: done\ndata: {}\n\n",
 ].join("");
 
@@ -50,7 +50,7 @@ describe("askInNewThread", () => {
       { type: "thread", thread_id: "t1", subjects: [{ subject_id: "s1", name: "General" }] },
       { type: "delta", text: "It weighs " },
       { type: "delta", text: "tokens [1]." },
-      { type: "citations", citations: [{ chunk_id: "c1", document_title: "a.pdf", page: 3 }] },
+      { type: "citations", citations: [{ n: 1, chunk_id: "c1", document_title: "a.pdf", page: 3 }] },
       { type: "done" },
     ]);
     const request = fetch.mock.calls[0]![0] as Request;
@@ -82,6 +82,30 @@ describe("askInNewThread", () => {
     await expect(failure).rejects.toThrow("Upload a document first");
   });
 
+  it("rejects with AskRefusedError carrying the detail on any other 409", async () => {
+    const { apiClient } = api(() => json({ detail: "Subject detection isn't available yet" }, 409));
+    const failure = collect(askInNewThread("q", apiClient));
+    await expect(failure).rejects.toBeInstanceOf(AskRefusedError);
+    await expect(failure).rejects.toThrow("Subject detection isn't available yet");
+    await expect(failure).rejects.not.toBeInstanceOf(NoDocumentsError);
+  });
+
+  it("parses the marker number of each citation", async () => {
+    const { apiClient } = api(() =>
+      eventStream(
+        'event: citations\ndata: {"citations": [{"n": 2, "chunk_id": "c2", "document_title": "b.pdf", "page": null}]}\n\n',
+      ),
+    );
+    expect(await collect(askInNewThread("q", apiClient))).toEqual([
+      { type: "citations", citations: [{ n: 2, chunk_id: "c2", document_title: "b.pdf", page: null }] },
+    ]);
+  });
+
+  it("skips an unknown event even when its data is not JSON", async () => {
+    const { apiClient } = api(() => eventStream('event: ping\ndata: ok\n\nevent: delta\ndata: {"text": "Hi"}\n\n'));
+    expect(await collect(askInNewThread("q", apiClient))).toEqual([{ type: "delta", text: "Hi" }]);
+  });
+
   it("rejects with a plain Error on 503", async () => {
     const { apiClient } = api(() => json({ detail: "The tutor is unavailable. Try again in a moment." }, 503));
     const failure = collect(askInNewThread("q", apiClient));
@@ -92,7 +116,7 @@ describe("askInNewThread", () => {
 
 describe("formatCitation", () => {
   it("shows the title and page, or says the page is unavailable", () => {
-    expect(formatCitation({ chunk_id: "c1", document_title: "a.pdf", page: 3 })).toBe("a.pdf, p. 3");
-    expect(formatCitation({ chunk_id: "c2", document_title: "a.pdf", page: null })).toBe("a.pdf, page unavailable");
+    expect(formatCitation({ n: 1, chunk_id: "c1", document_title: "a.pdf", page: 3 })).toBe("a.pdf, p. 3");
+    expect(formatCitation({ n: 1, chunk_id: "c2", document_title: "a.pdf", page: null })).toBe("a.pdf, page unavailable");
   });
 });

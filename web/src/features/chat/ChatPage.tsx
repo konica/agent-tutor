@@ -2,7 +2,14 @@ import { Send } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { Link } from "react-router";
 
-import { askInNewThread, formatCitation, NoDocumentsError, type ChatCitation, type ChatEvent } from "../../api/chat";
+import {
+  askInNewThread,
+  AskRefusedError,
+  formatCitation,
+  NoDocumentsError,
+  type ChatCitation,
+  type ChatEvent,
+} from "../../api/chat";
 import { SessionExpiredError, sessionExpiry } from "../../auth/authClient";
 import { Button } from "../../components/Button/Button";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
@@ -71,6 +78,7 @@ export function ChatPage({ ask = defaultAsk }: Props) {
     } catch (error) {
       if (!alive.current) return;
       if (error instanceof NoDocumentsError) setProblem({ kind: "no-documents", message: error.message });
+      else if (error instanceof AskRefusedError) setProblem({ kind: "message", message: error.message });
       // A SessionExpiredError was already reported by the API client; the session screen replaces this page.
       else if (!(error instanceof SessionExpiredError)) setProblem({ kind: "message", message: GENERIC_FAILURE });
     } finally {
@@ -120,11 +128,14 @@ export function ChatPage({ ask = defaultAsk }: Props) {
         {exchange && exchange.citations.length > 0 && (
           <section className={styles.citations} aria-label="Citations">
             <h2 className={styles.citationsTitle}>Citations</h2>
-            <ol>
+            {/* Each citation shows the [n] the answer's text uses for it; an answer may cite [2] without [1]. */}
+            <ul>
               {exchange.citations.map((c) => (
-                <li key={c.chunk_id}>{formatCitation(c)}</li>
+                <li key={c.chunk_id}>
+                  <span className={styles.marker}>[{c.n}]</span> <span>{formatCitation(c)}</span>
+                </li>
               ))}
-            </ol>
+            </ul>
           </section>
         )}
         {problem?.kind === "no-documents" && (
