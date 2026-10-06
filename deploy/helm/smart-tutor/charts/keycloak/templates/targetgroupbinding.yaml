@@ -1,0 +1,15 @@
+{{- if .Values.targetGroupName }}
+# The AWS Load Balancer Controller registers the Keycloak pods' IPs in the CDK-made target group (EdgeStack).
+apiVersion: elbv2.k8s.aws/v1beta1
+kind: TargetGroupBinding
+metadata:
+  name: keycloak
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+spec:
+  serviceRef:
+    name: keycloak
+    port: 80
+  targetGroupName: {{ .Values.targetGroupName }}
+  targetType: ip
+{{- end }}
