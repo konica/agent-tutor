@@ -11,10 +11,11 @@ from fakes.pdfs import make_pdf
 from fakes.processing import FakePdfExtractor, PageChunker, fake_tools
 from fakes.queue import FakeQueue
 from fakes.subjects import InMemorySubjects
-from fakes.tutoring import InMemoryThreads
+from fakes.tutoring import FakeRetriever, InMemoryThreads
 
 __all__ = [
     "FakeChatModel",
+    "FakeRetriever",
     "fake_chat_model",
     "fake_embeddings",
     "FakeTokenVerifier",
