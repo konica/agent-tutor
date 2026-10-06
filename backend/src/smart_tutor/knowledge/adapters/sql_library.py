@@ -178,6 +178,16 @@ class _Documents(DocumentRepository):
         )
         return self._load(list(rows))
 
+    def find_readable_by_sha256(self, user_id: UserId, sha256: str) -> DocumentId | None:
+        found = self._conn.execute(
+            select(documents.c.document_id)
+            .select_from(documents.join(contents, documents.c.content_id == contents.c.content_id))
+            .where(readable_by(user_id), documents.c.archived.is_(False), contents.c.sha256 == sha256)
+            .order_by(documents.c.created_at, documents.c.document_id)
+            .limit(1)
+        ).scalar()
+        return DocumentId(str(found)) if found else None
+
     def _load(self, rows: list[Any]) -> list[Document]:
         """Documents with their subject ids in one extra query. Postgres keeps no insertion order, so by id."""
         by_document: dict[str, list[SubjectId]] = {}
