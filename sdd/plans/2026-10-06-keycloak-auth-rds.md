@@ -21,7 +21,7 @@
 - Names: RDS instance `smart-tutor-prod`; secrets `smart-tutor/rds/master` (CDK-generated master, user `postgres`), `smart-tutor/db/app` (role and database `smart_tutor`), `smart-tutor/db/keycloak` (role and database `keycloak`), `smart-tutor/keycloak/admin` (JSON `username` = `admin`, `password`), `smart-tutor/keycloak/api-client` and `smart-tutor/keycloak/mcp-client` (plain strings). External Secrets may read only `secret:smart-tutor/*` (ClusterStack, unchanged).
 - DB secrets are JSON with `username`, `password`, `dbname`, `host`, `port`; passwords are generated, 32 characters, no punctuation.
 - RDS: PostgreSQL 17, `db.t4g.micro`, 20 GiB gp3 (autoscaling to 100), encrypted, single-AZ, not public, private-with-egress subnets, backups 7 days, `DeletionPolicy: Snapshot`, no deletion protection (teardown must work). Ingress 5432 only from the EKS cluster security group. RDS PostgreSQL 17 forces TLS, so clients use `sslmode=require`.
-- Edge: target group `smart-tutor-prod-keycloak` (IP, HTTP 8080, health check `/auth/realms/smart-tutor/.well-known/openid-configuration`); listener rule priority 10 for `/auth/*`; CloudFront behavior `/auth/*` with managed *CachingDisabled* (`4135ea2d-6df8-44a3-9df3-4b5a84be39ad`), managed *AllViewerExceptHostHeader* (`b689b0a8-53d0-40ab-baf2-68738e2966ac`, also forwards `Authorization` when caching is off), all methods, redirect to HTTPS. Origin custom header `Forwarded: proto=https`. Keycloak and web both listen on 8080, so the existing ALB → pod rule covers both.
+- Edge: target group `smart-tutor-prod-keycloak` (IP, HTTP 8080, health check `/auth/realms/smart-tutor/.well-known/openid-configuration`); listener rule priority 10 for `/auth/*`; CloudFront behavior `/auth/*` with managed *CachingDisabled* (`4135ea2d-6df8-44a3-9df3-4b5a84be39ad`), managed *AllViewer* (`216adef6-5c7f-47e4-b989-5492eafa07d3`, also forwards `Authorization` when caching is off, and the viewer Host, so discovery's backchannel URLs are public), all methods, redirect to HTTPS. Origin custom header `Forwarded: proto=https`. Keycloak and web both listen on 8080, so the existing ALB → pod rule covers both.
 - Keycloak: image `smart-tutor/keycloak` from `deploy/keycloak/Dockerfile` (base `quay.io/keycloak/keycloak:26.3`, as in `compose.yaml`); `start --optimized --import-realm`; `KC_HOSTNAME=<publicUrl>/auth`, `KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true`, `KC_HTTP_ENABLED=true`, `KC_PROXY_HEADERS=forwarded`, `KC_DB_POOL_MAX_SIZE=20`; health on the management port 9000 under `/auth/health/*`.
 - `global.publicUrl` (e.g. `https://d111.cloudfront.net`, the Edge output `CloudFrontUrl`) is set at deploy time with `--set`; it is never committed. With it empty, `KC_HOSTNAME` is not rendered and Keycloak refuses to start (loud, not a wrong issuer). `helm lint deploy/helm/smart-tutor` with default values must keep passing (CI runs exactly that).
 - No secret value in Git, Helm values, rendered manifests, or CI logs: manifests only reference Kubernetes Secrets that External Secrets creates.
@@ -333,8 +333,8 @@ def test_cloudfront_sends_auth_to_keycloak_uncached_with_every_method() -> None:
                                 "ViewerProtocolPolicy": "redirect-to-https",
                                 "AllowedMethods": ["GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"],
                                 "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",  # CachingDisabled
-                                # AllViewerExceptHostHeader: cookies, query strings, and Authorization reach Keycloak
-                                "OriginRequestPolicyId": "b689b0a8-53d0-40ab-baf2-68738e2966ac",
+                                # AllViewer: cookies, query strings, Authorization, and the viewer Host reach Keycloak
+                                "OriginRequestPolicyId": "216adef6-5c7f-47e4-b989-5492eafa07d3",
                             }
                         )
                     ],
@@ -420,7 +420,9 @@ def test_origin_tells_keycloak_the_viewer_used_https() -> None:
                     viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                     allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,  # login form POST, admin REST PUT/DELETE
                     cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
-                    origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+                    # AllViewer forwards the viewer's Host: Keycloak builds the backchannel URLs in its discovery
+                    # document (token_endpoint, jwks_uri) from the request Host, and the ALB routes by path only.
+                    origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER,
                 ),
             },
         )
