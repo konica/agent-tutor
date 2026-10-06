@@ -4,12 +4,23 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
+from smart_tutor.apps.api.agent_client import AgentClient
 from smart_tutor.apps.api.services import ApiServices
 from smart_tutor.knowledge.application import DocumentService, UploadService
 from smart_tutor.shared.adapters.auth.bearer import BearerToken, CurrentPrincipal, current_principal
 from smart_tutor.subjects.application import SubjectNames
+from smart_tutor.tutoring.application import ConversationService
 
-__all__ = ["BearerToken", "CurrentPrincipal", "Documents", "Subjects", "Uploads", "current_principal"]
+__all__ = [
+    "Agent",
+    "BearerToken",
+    "Conversations",
+    "CurrentPrincipal",
+    "Documents",
+    "Subjects",
+    "Uploads",
+    "current_principal",
+]
 
 
 def _services(request: Request) -> ApiServices:
@@ -29,6 +40,16 @@ def _subject_names(request: Request) -> SubjectNames:
     return _services(request).subjects
 
 
+def _conversations(request: Request) -> ConversationService:
+    return _services(request).conversations
+
+
+def _agent(request: Request) -> AgentClient:
+    return _services(request).agent
+
+
 Uploads = Annotated[UploadService, Depends(_uploads)]
 Documents = Annotated[DocumentService, Depends(_documents)]
 Subjects = Annotated[SubjectNames, Depends(_subject_names)]
+Conversations = Annotated[ConversationService, Depends(_conversations)]
+Agent = Annotated[AgentClient, Depends(_agent)]

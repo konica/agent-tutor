@@ -110,6 +110,7 @@ services:
       # SSM is read by the API itself, so it uses the in-network endpoint.
       AWS_ENDPOINT_URL_SSM: http://localstack:4566
       SMART_TUTOR_S3_PATH_STYLE: "true"
+      SMART_TUTOR_AGENT_URL: http://agent:8080
       <<: *localstack-aws
     configs: [{source: localstack-aws-config, target: /etc/smart-tutor/aws-config}]
     ports: ["10450:8080"]

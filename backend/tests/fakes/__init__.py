@@ -1,5 +1,6 @@
 """Fake adapters for unit tests: services get these through their constructors instead of real ones."""
 
+from fakes.api import api_services, fake_agent
 from fakes.auth import FakeTokenVerifier
 from fakes.clock import FixedClock
 from fakes.ingest import ingest_ready
@@ -14,6 +15,8 @@ from fakes.subjects import InMemorySubjects
 from fakes.tutoring import FakeRetriever, InMemoryThreads
 
 __all__ = [
+    "api_services",
+    "fake_agent",
     "FakeChatModel",
     "FakeRetriever",
     "fake_chat_model",
