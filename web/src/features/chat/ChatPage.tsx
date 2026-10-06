@@ -51,9 +51,12 @@ export function ChatPage({ ask = defaultAsk }: Props) {
     setProblem(null);
     setExchange({ question: trimmed, subjects: [], answer: "", citations: [] });
     setQuestion("");
+    // The protocol always ends with done or error; a stream that just stops (dropped connection) failed.
+    let ended = false;
     try {
       for await (const event of ask(trimmed)) {
         if (!alive.current) break; // leaving the page stops reading, which closes the stream
+        if (event.type === "done" || event.type === "error") ended = true;
         if (event.type === "thread") setExchange((e) => e && { ...e, subjects: event.subjects });
         else if (event.type === "delta") setExchange((e) => e && { ...e, answer: e.answer + event.text });
         else if (event.type === "citations") setExchange((e) => e && { ...e, citations: event.citations });
@@ -63,6 +66,8 @@ export function ChatPage({ ask = defaultAsk }: Props) {
           else setProblem({ kind: "message", message: event.message });
         }
       }
+      // Any partial answer stays visible above the message.
+      if (alive.current && !ended) setProblem({ kind: "message", message: GENERIC_FAILURE });
     } catch (error) {
       if (!alive.current) return;
       if (error instanceof NoDocumentsError) setProblem({ kind: "no-documents", message: error.message });

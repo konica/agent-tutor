@@ -143,6 +143,17 @@ describe("ChatPage", () => {
     await waitFor(() => expect(notify).toHaveBeenCalledOnce());
   });
 
+  it("shows a generic message when the stream ends without done or error, keeping the partial answer", async () => {
+    const ask = vi.fn(() =>
+      events({ type: "thread", thread_id: "t1", subjects: [] }, { type: "delta", text: "It weighs" }),
+    );
+    show(<ChatPage ask={ask} />);
+    await userEvent.type(question(), "What is attention?");
+    await userEvent.click(askButton());
+    expect(await screen.findByText("The tutor couldn't answer right now. Try again in a moment.")).toBeInTheDocument();
+    expect(screen.getByText("It weighs")).toBeInTheDocument();
+  });
+
   it("shows a generic message when asking fails", async () => {
     const ask = vi.fn(async function* (): AsyncGenerator<ChatEvent> {
       throw new Error("POST /threads failed (500)");
