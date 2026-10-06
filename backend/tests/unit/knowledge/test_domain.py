@@ -92,6 +92,22 @@ def test_only_the_owner_can_read_a_document() -> None:
     assert not doc.can_be_read_by(UserId("bob"))
 
 
+def test_searchable_only_by_its_owner_when_ready_unarchived_and_in_a_requested_subject() -> None:
+    doc = linked_document()
+    doc.ready([GENERAL_SUBJECT_ID])
+    other = SubjectId("00000000-0000-4000-8000-000000000099")
+    assert doc.searchable_by(UserId("ada"), [GENERAL_SUBJECT_ID])
+    assert doc.searchable_by(UserId("ada"), [other, GENERAL_SUBJECT_ID])  # any of the subjects
+    assert not doc.searchable_by(UserId("bob"), [GENERAL_SUBJECT_ID])
+    assert not doc.searchable_by(UserId("ada"), [other])
+    doc.archived = True
+    assert not doc.searchable_by(UserId("ada"), [GENERAL_SUBJECT_ID])
+
+
+def test_a_processing_document_is_not_searchable() -> None:
+    assert not new_document().searchable_by(UserId("ada"), [GENERAL_SUBJECT_ID])
+
+
 def test_title_override_wins() -> None:
     doc = new_document()
     doc.title_override = "RAG for knowledge-intensive NLP"

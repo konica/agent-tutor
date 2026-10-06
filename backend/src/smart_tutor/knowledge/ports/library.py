@@ -1,14 +1,16 @@
 """Persistence of contents, documents, and uploads, committed together (one unit of work per use case)."""
 
 from abc import ABC, abstractmethod
+from collections.abc import Collection
 from types import TracebackType
 from typing import Self
 
 from smart_tutor.knowledge.domain.chunk import Chunk
 from smart_tutor.knowledge.domain.content import Content
 from smart_tutor.knowledge.domain.document import Document
+from smart_tutor.knowledge.domain.search import ChunkHit
 from smart_tutor.knowledge.domain.upload import Upload, UploadOutcome
-from smart_tutor.shared.domain.ids import ContentId, DocumentId, UploadId, UserId
+from smart_tutor.shared.domain.ids import ContentId, DocumentId, SubjectId, UploadId, UserId
 
 
 class ContentRepository(ABC):
@@ -68,6 +70,12 @@ class ChunkRepository(ABC):
     @abstractmethod
     def replace(self, content_id: ContentId, chunks: list[Chunk]) -> None:
         """Make these the content's only chunks (idempotent: processing twice never duplicates)."""
+
+    @abstractmethod
+    def search(
+        self, user_id: UserId, embedding: list[float], subject_ids: Collection[SubjectId], k: int
+    ) -> list[ChunkHit]:
+        """`can_read` in SQL: chunks of the caller's ready, non-archived documents in any of these subjects."""
 
 
 class LibraryUnitOfWork(ABC):

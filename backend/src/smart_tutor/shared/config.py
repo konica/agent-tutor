@@ -61,6 +61,8 @@ class Settings(BaseSettings):
     localstack: bool = False
     ingest_queue_url: str = "http://localhost:10402/000000000000/smart-tutor-ingest"
     mcp_url: str = "http://localhost:10452/mcp"
+    # Where the API reaches the agent's POST /ask: http://agent:8080 in Compose.
+    agent_url: str = "http://localhost:10451"
     # Port the MCP server listens on: 8000 in containers, 10452 when run on the host (.env).
     mcp_port: int = 8000
     learning_record_idle_minutes_param: str = "/smart-tutor/learning-record-idle-minutes"

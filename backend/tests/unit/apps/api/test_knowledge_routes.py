@@ -7,18 +7,16 @@ from fakes import (
     TEST_LIMITS,
     FakeObjectStore,
     FakeTokenVerifier,
-    FixedClock,
     InMemoryLibrary,
-    InMemorySubjects,
+    api_services,
     fake_tools,
 )
 from smart_tutor.apps.api.main import create_app
-from smart_tutor.apps.api.services import ApiServices
-from smart_tutor.knowledge.application import DocumentService, IngestionService, UploadService
+from smart_tutor.knowledge.application import IngestionService
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.domain.principal import Principal
-from smart_tutor.subjects.application import GENERAL_SUBJECT_ID, SubjectNames
+from smart_tutor.subjects.application import GENERAL_SUBJECT_ID
 
 AUTH = {"Authorization": "Bearer ada-token"}
 
@@ -28,11 +26,7 @@ def client() -> TestClient:
     verifier = FakeTokenVerifier()
     verifier.add("ada-token", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
     library, objects = InMemoryLibrary(), FakeObjectStore()
-    services = ApiServices(
-        uploads=UploadService(library.unit_of_work, objects, FixedClock(), TEST_LIMITS),
-        documents=DocumentService(library.unit_of_work),
-        subjects=SubjectNames(InMemorySubjects()),
-    )
+    services = api_services(library, objects)
     app = create_app(Settings(), verifier=verifier, services=services)
     app.state.objects, app.state.ingestion = (
         objects,

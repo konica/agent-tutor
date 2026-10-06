@@ -43,6 +43,12 @@
       "module": "smart_tutor.apps.mcp_server.server",
       "cwd": "${workspaceFolder}/backend",
       "envFile": "${workspaceFolder}/.env",
+      // The MCP server introspects as the rag-mcp client (ADR 0007); env wins over the API client in .env.
+      "env": {
+        "SMART_TUTOR_KEYCLOAK_CLIENT_ID": "rag-mcp",
+        "SMART_TUTOR_KEYCLOAK_CLIENT_SECRET": "local-mcp-secret",
+        "SMART_TUTOR_KEYCLOAK_AUDIENCE": "rag-mcp"
+      },
       "python": "${workspaceFolder}/backend/.venv/bin/python",
       "windows": { "python": "${workspaceFolder}/backend/.venv/Scripts/python.exe" }
     },

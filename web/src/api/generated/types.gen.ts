@@ -5,6 +5,16 @@ export type ClientOptions = {
 };
 
 /**
+ * AskRequest
+ */
+export type AskRequest = {
+    /**
+     * Question
+     */
+    question: string;
+};
+
+/**
  * DocumentResponse
  */
 export type DocumentResponse = {
@@ -230,6 +240,35 @@ export type GetMeResponses = {
 };
 
 export type GetMeResponse = GetMeResponses[keyof GetMeResponses];
+
+export type AskInNewThreadData = {
+    body: AskRequest;
+    path?: never;
+    query?: never;
+    url: '/threads';
+};
+
+export type AskInNewThreadErrors = {
+    /**
+     * The learner has no ready documents.
+     */
+    409: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AskInNewThreadError = AskInNewThreadErrors[keyof AskInNewThreadErrors];
+
+export type AskInNewThreadResponses = {
+    /**
+     * Server-sent events: thread, then delta*, citations, done (or error).
+     */
+    200: string;
+};
+
+export type AskInNewThreadResponse = AskInNewThreadResponses[keyof AskInNewThreadResponses];
 
 export type StartUploadData = {
     body: StartUploadRequest;

@@ -65,6 +65,12 @@ describe("app shell routes", () => {
     expect(nav().getByRole("link", { name: "Library" })).not.toHaveAttribute("aria-current");
   });
 
+  it("renders the Chat page with a question box", () => {
+    renderAt("/chat");
+    expect(screen.getByRole("heading", { level: 1, name: "Chat" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Your question" })).toBeEnabled();
+  });
+
   it("moves to a page and marks it current when a nav item is clicked", async () => {
     renderAt("/library");
     await userEvent.click(nav().getByRole("link", { name: "Usage" }));
