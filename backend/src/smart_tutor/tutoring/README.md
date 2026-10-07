@@ -4,9 +4,9 @@
 
 **Key classes:** `Thread` (`add_subject()` refuses beyond 3, never removes), `DetectionPolicy`, `RelevanceGate`, `GrowthPolicy`; services `SubjectDetector`, `AskService`, `ConversationService`; ports `Retriever`, `ThreadRepository`.
 
-**Built so far:** `Thread` and `ThreadRepository` (`SqlThreadRepository`); `ConversationService.start_thread`; `Retriever` with its MCP client adapter `McpRetriever`; `answer_messages` / `cited_chunks` (the quoted answer prompt and its citations). `DetectionPolicy` (pure; thresholds from SSM via `load_detection_policy`). The rest above is still to come.
+**Built so far:** `Thread` and `ThreadRepository` (`SqlThreadRepository`); `DetectionPolicy`, `SubjectDetector` (one search, k = 20, over all of the learner's subjects; unsure falls back to the best subject until the learner is asked), `ConversationService.subjects_for_new_thread` / `start_thread(user_id, subject_ids)` (refuses subjects that aren't the learner's); `Retriever` with its MCP client adapter `McpRetriever`; `answer_messages` / `cited_chunks` (the quoted answer prompt and its citations). Detection thresholds come from SSM (`load_detection_policy`). The rest above is still to come.
 
-**Interim rule until subject detection lands (US-2b, #31):** a learner with exactly one subject starts a thread with it; several subjects raise `DetectionUnavailableError`; no ready documents raise `NoDocumentsError` ("Upload a document first").
+**Interim rule until the learner is asked (US-3 criterion 3):** an unsure detection starts the thread with the best-scoring subject.
 
 **May use (application layer only):** `knowledge` (the learner's subjects from their documents), `subjects` (names), `accounts`, `insights` (log declines). Everyone may use `shared`.
 

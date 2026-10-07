@@ -3,9 +3,9 @@
 from smart_tutor.tutoring.application.answer import NO_CHUNKS_ANSWER, answer_messages, cited_chunks
 from smart_tutor.tutoring.application.conversation_service import ConversationService
 from smart_tutor.tutoring.application.detection_settings import load_detection_policy
+from smart_tutor.tutoring.application.subject_detector import DETECTION_K, SubjectDetector
 from smart_tutor.tutoring.domain.detection import Detection, DetectionPolicy
 from smart_tutor.tutoring.domain.errors import (
-    DetectionUnavailableError,
     NoDocumentsError,
     RetrievalError,
     ThreadSubjectsError,
@@ -16,15 +16,16 @@ from smart_tutor.tutoring.ports.retriever import Retriever
 from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
 
 __all__ = [
+    "DETECTION_K",
     "NO_CHUNKS_ANSWER",
     "ConversationService",
     "Detection",
     "DetectionPolicy",
-    "DetectionUnavailableError",
     "NoDocumentsError",
     "RetrievalError",
     "RetrievedChunk",
     "Retriever",
+    "SubjectDetector",
     "Thread",
     "ThreadRepository",
     "ThreadSubjectsError",

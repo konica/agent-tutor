@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, StringConstraints
 from smart_tutor.apps.api.agent_client import AgentAnswer, AgentUnavailableError
 from smart_tutor.apps.api.deps import Agent, BearerToken, Conversations, CurrentPrincipal, Subjects
 from smart_tutor.shared.domain.errors import UnauthenticatedError
-from smart_tutor.tutoring.application import DetectionUnavailableError, NoDocumentsError
+from smart_tutor.tutoring.application import NoDocumentsError
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["tutoring"])
@@ -79,8 +79,10 @@ async def ask_in_new_thread(
     agent: Agent,
 ) -> StreamingResponse:
     try:
-        thread = await run_in_threadpool(conversations.start_thread, principal.user_id)
-    except (NoDocumentsError, DetectionUnavailableError) as e:
+        # Interim: Task 6 starts the thread with the detected subjects.
+        learner_subjects = await run_in_threadpool(conversations.subjects_for_new_thread, principal.user_id)
+        thread = await run_in_threadpool(conversations.start_thread, principal.user_id, learner_subjects[:1])
+    except NoDocumentsError as e:
         raise HTTPException(409, str(e)) from None
     names = await run_in_threadpool(subjects.names_for, principal.user_id, thread.subject_ids)
     named: list[tuple[str, str]] = []
