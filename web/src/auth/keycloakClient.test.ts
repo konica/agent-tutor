@@ -70,4 +70,29 @@ describe("keycloak client", () => {
     await createKeycloakClient(config).signOut();
     expect(kc.logout).toHaveBeenCalledWith({ redirectUri: `${window.location.origin}/` });
   });
+
+  it("signs in from a page that never initialised Keycloak, without onLoad", async () => {
+    await createKeycloakClient(config).signIn({ redirectTo: "/library" });
+    expect(kc.init).toHaveBeenCalledWith({ pkceMethod: "S256", checkLoginIframe: false });
+    expect(kc.login).toHaveBeenCalledWith({ redirectUri: `${window.location.origin}/library` });
+  });
+
+  it("opens the registration page for a new account", async () => {
+    await createKeycloakClient(config).signIn({ register: true, redirectTo: "/library" });
+    expect(kc.login).toHaveBeenCalledWith({ action: "register", redirectUri: `${window.location.origin}/library` });
+  });
+
+  it("signs in again to the current page after a session ends", async () => {
+    const auth = createKeycloakClient(config);
+    await auth.init();
+    await auth.signIn();
+    expect(kc.init).toHaveBeenCalledOnce(); // reuses the login-required init
+    expect(kc.login).toHaveBeenCalledWith({});
+  });
+
+  it("initialises Keycloak once when sign-in is chosen twice", async () => {
+    const auth = createKeycloakClient(config);
+    await Promise.all([auth.signIn(), auth.signIn({ register: true })]);
+    expect(kc.init).toHaveBeenCalledOnce();
+  });
 });

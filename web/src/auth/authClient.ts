@@ -1,10 +1,18 @@
+export type SignInOptions = {
+  /** Open Keycloak's registration page instead of its login page. */
+  register?: boolean;
+  /** App path to return to after Keycloak, e.g. "/library". Default: the current page. */
+  redirectTo?: string;
+};
+
 // The sign-in boundary the app depends on; keycloakClient.ts implements it, tests fake it.
 export type AuthClient = {
   /** Resolves once the learner is signed in (redirects to Keycloak first if needed). */
   init(): Promise<void>;
   /** A token valid for at least 60 more seconds; rejects when the session can't be refreshed. */
   getToken(): Promise<string>;
-  signIn(): Promise<void>;
+  /** Opens Keycloak's login (or registration) page; works before init(). */
+  signIn(options?: SignInOptions): Promise<void>;
   signOut(): Promise<void>;
 };
 
