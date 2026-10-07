@@ -118,4 +118,33 @@ describe("usePageDrop", () => {
     expect(fireEvent.drop(document.body, withFiles([new File(["%PDF"], "a.pdf")]))).toBe(true);
     expect(onFiles).not.toHaveBeenCalled();
   });
+
+  it("starts the next drag fresh after a timed-out one", () => {
+    vi.useFakeTimers();
+    try {
+      render(<Page onFiles={vi.fn()} />);
+      const child = screen.getByText("Library");
+      // First drag: unbalanced leave + timeout
+      fireEvent.dragEnter(document.body, withFiles());
+      fireEvent.dragEnter(child, withFiles());
+      expect(screen.getByText("Drop PDFs to upload")).toBeInTheDocument();
+      fireEvent.dragLeave(child, withFiles());
+      // Overlay still showing, depth is stuck at 1
+      expect(screen.getByText("Drop PDFs to upload")).toBeInTheDocument();
+      // Timeout fires, overlay disappears
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(screen.queryByText("Drop PDFs to upload")).toBeNull();
+
+      // Second drag: should work normally (balanced enter/leave)
+      fireEvent.dragEnter(document.body, withFiles());
+      expect(screen.getByText("Drop PDFs to upload")).toBeInTheDocument();
+      fireEvent.dragLeave(document.body, withFiles());
+      // Overlay should disappear immediately (no need to wait for timer)
+      expect(screen.queryByText("Drop PDFs to upload")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

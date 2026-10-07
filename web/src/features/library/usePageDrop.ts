@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 const carriesFiles = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes("Files");
 const DRAG_IDLE_MS = 1000;
@@ -8,31 +8,27 @@ const DRAG_IDLE_MS = 1000;
 // DRAG_IDLE_MS, the drag ended elsewhere (cancelled or left the window). Drags without files are left alone.
 export function usePageDrop(onFiles: (files: File[]) => void): boolean {
   const [active, setActive] = useState(false);
-  const onFilesRef = useRef(onFiles);
-  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    onFilesRef.current = onFiles;
-  }, [onFiles]);
-
-  const clearIdleTimer = () => {
-    if (idleTimerRef.current) {
-      clearTimeout(idleTimerRef.current);
-      idleTimerRef.current = null;
-    }
-  };
-
-  const resetIdleTimer = () => {
-    clearIdleTimer();
-    idleTimerRef.current = setTimeout(() => {
-      idleTimerRef.current = null;
-      // No dragover for DRAG_IDLE_MS means the drag ended
-      setActive(false);
-    }, DRAG_IDLE_MS);
-  };
 
   useEffect(() => {
     let depth = 0;
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const clearIdleTimer = () => {
+      if (idleTimer) {
+        clearTimeout(idleTimer);
+        idleTimer = null;
+      }
+    };
+
+    const resetIdleTimer = () => {
+      clearIdleTimer();
+      idleTimer = setTimeout(() => {
+        // No dragover for DRAG_IDLE_MS means the drag ended elsewhere; reset completely
+        depth = 0;
+        setActive(false);
+      }, DRAG_IDLE_MS);
+    };
+
     const enter = (event: DragEvent) => {
       if (!carriesFiles(event)) return;
       event.preventDefault();
@@ -60,7 +56,7 @@ export function usePageDrop(onFiles: (files: File[]) => void): boolean {
       setActive(false);
       clearIdleTimer();
       const files = Array.from(event.dataTransfer?.files ?? []);
-      if (files.length) onFilesRef.current(files);
+      if (files.length) onFiles(files);
     };
     document.addEventListener("dragenter", enter);
     document.addEventListener("dragover", over);
@@ -73,7 +69,7 @@ export function usePageDrop(onFiles: (files: File[]) => void): boolean {
       document.removeEventListener("drop", drop);
       clearIdleTimer();
     };
-  }, []);
+  }, [onFiles]);
 
   return active;
 }
