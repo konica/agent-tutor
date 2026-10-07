@@ -176,20 +176,21 @@ export function ChatPage({ ask = defaultAsk, loadSubjects = defaultLoadSubjects,
   return (
     <div className={styles.column}>
       {exchange ? (
-        <header className={styles.threadHeader}>
-          <h1 className={styles.threadTitle} title={exchange.question}>
-            {exchange.question}
-          </h1>
-          {exchange.subjects.length > 0 && (
-            <ul className={styles.chips} aria-label="Subjects">
-              {exchange.subjects.map((s) => (
-                <li key={s.subject_id}>
-                  <SubjectChip name={s.name} hueKey={s.subject_id} size="sm" />
-                </li>
-              ))}
-            </ul>
-          )}
-        </header>
+        <PageHeader
+          title={exchange.question}
+          titleClassName={styles.clampedTitle}
+          below={
+            exchange.subjects.length > 0 && (
+              <ul className={`${styles.chips} ${styles.headerChips}`} aria-label="Subjects">
+                {exchange.subjects.map((s) => (
+                  <li key={s.subject_id}>
+                    <SubjectChip name={s.name} hueKey={s.subject_id} size="sm" />
+                  </li>
+                ))}
+              </ul>
+            )
+          }
+        />
       ) : (
         <>
           <PageHeader title="New conversation" description="Subjects appear after your first question." />

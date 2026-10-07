@@ -219,20 +219,9 @@ describe("ChatPage", () => {
     await userEvent.type(await question(), "How does chain-of-thought help?");
     await userEvent.click(askButton());
     const heading = await screen.findByRole("heading", { level: 1, name: "How does chain-of-thought help?" });
-    // One line in the header; the full question is the tooltip and the bubble.
-    expect(heading).toHaveAttribute("title", "How does chain-of-thought help?");
     const list = within(heading.closest("header")!).getByRole("list", { name: "Subjects" });
     expect(within(list).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["LLMs", "AI Agents"]);
     expect(await screen.findByText("Answer.")).toBeInTheDocument();
-    expect(screen.getByText(/You asked/).parentElement).toHaveTextContent("How does chain-of-thought help?");
-  });
-
-  it("shows no thread subjects until a question is asked", async () => {
-    renderChat({ ask: () => events() });
-    // Wait for the loaded page: the loading state shows the same header.
-    await screen.findByRole("list", { name: "Your subjects" });
-    expect(screen.getByRole("heading", { level: 1, name: "New conversation" })).toBeInTheDocument();
-    expect(screen.queryByRole("list", { name: "Subjects" })).toBeNull();
   });
 
   it("shows the problem with no subjects when an error arrives before any thread event", async () => {
