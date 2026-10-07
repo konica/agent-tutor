@@ -17,6 +17,7 @@ class AskState(TypedDict, total=False):
     learner_subjects: dict[str, str]  # all of the learner's subjects (id → their name); detection picks from them
     subject_ids: list[str]  # the thread's 1–3 subjects, set by resolve_subjects
     subject_names: list[str]  # the learner's names for the thread's subjects, for the system prompt
+    choices: list[str]  # subject ids offered to the learner when detection is unsure (all of theirs, in order)
     chunks: list[RetrievedChunk]
     answer: str
     citations: list[Citation]

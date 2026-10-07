@@ -9,7 +9,10 @@ from typing import Any
 
 import langsmith
 from langchain_core.messages import AIMessage
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tracers import LangChainTracer
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.types import Command
 
 from fakes import FakeRetriever, fake_chat_model
 from smart_tutor.apps.agent.graph import build_graph
@@ -75,6 +78,36 @@ async def test_the_token_never_reaches_traces_when_detection_searches() -> None:
     assert "What is attention?" in traces
     assert TOKEN not in traces
     assert TOKEN not in out
+
+
+async def test_the_token_never_reaches_checkpoints_while_paused_for_the_pick() -> None:
+    unsure_chunks = [
+        RetrievedChunk("c1", "a.pdf", 3, "Attention weighs tokens.", 0.6, (SubjectId("s1"),)),
+        RetrievedChunk("c2", "b.pdf", 1, "Agents call tools.", 0.58, (SubjectId("s2"),)),
+    ]
+    saver = InMemorySaver()
+    recorder = RecordingClient()
+    tracer = LangChainTracer(client=recorder, project_name="test")
+    graph = build_graph(
+        lambda token: FakeRetriever(unsure_chunks),
+        fake_chat_model(AIMessage("It weighs tokens [1].")),
+        DetectionPolicy(0.5, 0.125, 0.0),
+        saver,
+    )
+    config: RunnableConfig = {"configurable": {"thread_id": "ada/t1"}, "callbacks": [tracer]}
+    with langsmith.tracing_context(enabled=True):
+        first = await graph.ainvoke(TWO_SUBJECTS, config=config, context=AgentContext(access_token=TOKEN))
+        assert first["__interrupt__"]  # paused for the pick
+        await graph.ainvoke(
+            Command(resume={"subject_ids": ["s1"]}), config=config, context=AgentContext(access_token=TOKEN)
+        )
+    tracer.wait_for_futures()
+    checkpoints = json.dumps([c async for c in saver.alist(None)], default=str)
+    traces = json.dumps(recorder.payloads, default=str)
+    assert "What is attention?" in checkpoints  # the question waits in the checkpoint
+    assert "choose_subjects" in traces
+    assert TOKEN not in checkpoints
+    assert TOKEN not in traces
 
 
 async def test_positive_control_a_token_in_the_question_is_caught() -> None:

@@ -1,10 +1,15 @@
 from typing import Any
 
+import pytest
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.types import Command
 
 from fakes import FakeRetriever, fake_chat_model
 from smart_tutor.apps.agent.graph import build_graph
+from smart_tutor.apps.agent.nodes.choose_subjects import InvalidPickError
 from smart_tutor.apps.agent.state import AgentContext
 from smart_tutor.tutoring.application import NO_CHUNKS_ANSWER, DetectionPolicy, Retriever
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
@@ -73,3 +78,52 @@ async def test_detects_the_subjects_then_searches_only_those() -> None:
     )
     assert retriever.calls == [("What is attention?", ["s1", "s2"], 20), ("What is attention?", ["s2"], 5)]
     assert out["subject_ids"] == ["s2"] and out["subject_names"] == ["LLMs"]
+
+
+UNSURE_CHUNKS = [
+    RetrievedChunk("c1", "a.pdf", 3, "Attention weighs tokens.", 0.6, ("s1",)),
+    RetrievedChunk("c2", "b.pdf", 1, "Agents call tools.", 0.58, ("s2",)),
+]
+UNSURE_INPUT = {"question": "What is attention?", "learner_subjects": {"s1": "A", "s2": "B"}}
+UNSURE_POLICY = DetectionPolicy(0.5, 0.125, 0.0)
+CONFIG: RunnableConfig = {"configurable": {"thread_id": "ada/t1"}}
+
+
+async def test_unsure_pauses_for_the_learners_pick_then_answers_the_original_question() -> None:
+    retriever = FakeRetriever(UNSURE_CHUNKS)
+    graph = build_graph(
+        lambda token: retriever, fake_chat_model(AIMessage("Answer [1].")), UNSURE_POLICY, InMemorySaver()
+    )
+    ctx = AgentContext(access_token="t")
+
+    first = await graph.ainvoke(UNSURE_INPUT, config=CONFIG, context=ctx)
+    [pause] = first["__interrupt__"]
+    assert pause.value == {"subject_ids": ["s1", "s2"]}
+    searches_before = len(retriever.calls)
+
+    out = await graph.ainvoke(Command(resume={"subject_ids": ["s2"]}), config=CONFIG, context=ctx)
+    assert out["subject_ids"] == ["s2"] and out["subject_names"] == ["B"]
+    assert out["answer"] == "Answer [1]."
+    # Resuming searched only the picked subject for the answer; detection did not run again.
+    assert retriever.calls[searches_before:] == [(UNSURE_INPUT["question"], ["s2"], 5)]
+
+
+@pytest.mark.parametrize("picked", [[], ["s1", "s2", "s3", "s4"], ["zz"], ["s1", "s1"], "s1", None])
+async def test_a_pick_outside_the_choices_is_refused(picked: object) -> None:
+    graph = build_graph(
+        lambda token: FakeRetriever(UNSURE_CHUNKS), fake_chat_model(AIMessage("x")), UNSURE_POLICY, InMemorySaver()
+    )
+    ctx = AgentContext(access_token="t")
+    await graph.ainvoke(UNSURE_INPUT, config=CONFIG, context=ctx)
+    with pytest.raises(InvalidPickError):
+        await graph.ainvoke(Command(resume={"subject_ids": picked}), config=CONFIG, context=ctx)
+    assert (await graph.aget_state(CONFIG)).interrupts  # still waiting
+
+
+async def test_a_bound_detection_never_interrupts_even_with_a_checkpointer() -> None:
+    chunks = [RetrievedChunk("c1", "a.pdf", 3, "Attention weighs tokens.", 0.9, ("s1",))]
+    graph = build_graph(
+        lambda token: FakeRetriever(chunks), fake_chat_model(AIMessage("ok [1]")), UNSURE_POLICY, InMemorySaver()
+    )
+    out = await graph.ainvoke(UNSURE_INPUT, config=CONFIG, context=AgentContext(access_token="t"))
+    assert "__interrupt__" not in out and out["subject_ids"] == ["s1"]

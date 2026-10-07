@@ -19,6 +19,8 @@ def resolve_subjects_node(retriever_for: Callable[[str], Retriever], policy: Det
         learner = state["learner_subjects"]
         detector = SubjectDetector(retriever_for(runtime.context.access_token), policy)
         detection = await detector.detect(state["question"], [SubjectId(s) for s in learner])
+        if detection.unsure:
+            return {"subject_ids": [], "subject_names": [], "choices": list(learner)}
         subject_ids = [str(s) for s in detection.subject_ids]
         return {"subject_ids": subject_ids, "subject_names": [learner[s] for s in subject_ids]}
 

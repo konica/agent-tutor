@@ -13,12 +13,13 @@ from smart_tutor.tutoring.domain.errors import (
     ThreadSubjectsError,
 )
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
-from smart_tutor.tutoring.domain.thread import Thread
+from smart_tutor.tutoring.domain.thread import MAX_SUBJECTS, Thread
 from smart_tutor.tutoring.ports.retriever import Retriever
 from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
 
 __all__ = [
     "DETECTION_K",
+    "MAX_SUBJECTS",
     "NO_CHUNKS_ANSWER",
     "ConversationService",
     "Detection",
