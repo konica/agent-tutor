@@ -4,7 +4,7 @@
 
 **Key classes:** `Subject`, `SubjectName` (normalization), `PersonalSubjectName`; services `SubjectCatalogService` (get-or-create by normalized name, resolve names for a learner), `SubjectSearch` (catalog search for the picker's type-ahead: the learner's subjects first by their names, then shared subjects by canonical name), `SubjectSuggester` (rank 3 suggestions from a summary embedding, the learner's subjects, and proposed names), `SubjectNameChecker`; ports `SubjectRepository`, `PersonalNameRepository`.
 
-**Present now:** `Subject`, name cleaning and normalization, `rank_suggestions` (domain); `SubjectCatalogService` (get-or-create by normalized name, unknown ids, backfill of name embeddings); `SubjectSuggester` (3 ranked suggestions); `GENERAL_SUBJECT_ID` (the "General" subject, seeded by migration 0002; now only the last-resort suggestion); `SubjectNames` (application: resolves canonical names now, personal names later); port `SubjectRepository` with the SQL adapter `sql_subjects`.
+**Present now:** `Subject`, name cleaning and normalization, `rank_suggestions` (domain); `SubjectCatalogService` (get-or-create by normalized name, unknown ids, backfill of name embeddings); `SubjectSuggester` (3 ranked suggestions); `SubjectSearch` (type-ahead: the learner's subjects first, then shared ones); `GENERAL_SUBJECT_ID` (the "General" subject, seeded by migration 0002; now only the last-resort suggestion); `SubjectNames` (application: resolves canonical names now, personal names later); port `SubjectRepository` with the SQL adapter `sql_subjects`.
 
 **May use (application layer only):** none. `SubjectCatalogService` takes LangChain `Embeddings` (from `ModelFactory`). Everyone may use `shared`.
 

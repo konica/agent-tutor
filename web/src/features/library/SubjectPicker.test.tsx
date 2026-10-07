@@ -210,6 +210,63 @@ describe("SubjectPicker", () => {
     expect(screen.queryByRole("button", { name: /Retrieval-Augmented Generation/ })).not.toBeInTheDocument();
   });
 
+  it("saves a typed name that wasn't added yet", async () => {
+    const props = setup({ search: vi.fn(async () => []) });
+    await chip(/AI Agents/);
+    await userEvent.type(input(), "Tool Calling");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(props.save).toHaveBeenCalledWith("d1", { subject_ids: ["s-agents"], new_names: ["Tool Calling"] });
+  });
+
+  it("saves a typed catalog match by its id", async () => {
+    const props = setup();
+    await chip(/AI Agents/);
+    await userEvent.type(input(), "information retrieval");
+    await screen.findByRole("listbox");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(props.save).toHaveBeenCalledWith("d1", { subject_ids: ["s-agents", "s-ir"], new_names: [] });
+  });
+
+  it("doesn't send a typed name twice when it equals a selected chip", async () => {
+    const props = setup({ search: vi.fn(async () => []) });
+    await userEvent.click(await chip(/Tool Use/));
+    await userEvent.type(input(), "tool  USE");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(props.save).toHaveBeenCalledWith("d1", { subject_ids: ["s-agents"], new_names: ["Tool Use"] });
+  });
+
+  it("blocks Save when typed text would be a fourth subject", async () => {
+    const props = setup({ search: vi.fn(async () => []) });
+    await chip(/AI Agents/);
+    await userEvent.type(input(), "Tool Calling");
+    await userEvent.click(screen.getByRole("button", { name: /LLMs/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Tool Use/ }));
+    expect(input()).toBeDisabled();
+    const save = screen.getByRole("button", { name: "Save" });
+    expect(save).toBeDisabled();
+    expect(save).toHaveAccessibleDescription("You've chosen 3 subjects, the maximum. Remove one to add another.");
+    await userEvent.click(save);
+    expect(props.save).not.toHaveBeenCalled();
+  });
+
+  it("saves three chosen subjects with an empty field", async () => {
+    const props = setup({ search: vi.fn(async () => []) });
+    await userEvent.click(await chip(/LLMs/));
+    await userEvent.click(screen.getByRole("button", { name: /Tool Use/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(props.save).toHaveBeenCalledWith("d1", { subject_ids: ["s-agents", "s-llm"], new_names: ["Tool Use"] });
+  });
+
+  it("doesn't reopen the list after the input loses focus", async () => {
+    const props = setup();
+    await chip(/AI Agents/);
+    await userEvent.type(input(), "retriev");
+    await userEvent.tab();
+    await waitFor(() => expect(props.search).toHaveBeenCalledWith("retriev"));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
+
   it("ignores a slower, older search response", async () => {
     let resolveOld: (m: typeof matches) => void = () => {};
     const search = vi.fn((q: string) =>

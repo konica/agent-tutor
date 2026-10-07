@@ -93,6 +93,19 @@ export function SubjectPicker({ document, load = defaultLoad, save = defaultSave
   const options: Option[] = [...results.map((match): Option => ({ kind: "match", match })), ...(exact ? [] : [{ kind: "create" } as const])];
   const listShown = open && searchable && options.length > 0;
 
+  // Text still in the field is part of Save: it resolves like Add, and an equal chip is not sent twice.
+  const typedChoice: Suggestion | null =
+    typed && !tooLong ? (exact ? { subject_id: exact.subject_id, name: exact.name, origin: exact.origin } : { subject_id: null, name: typed, origin: "new" }) : null;
+  const typedIndex = typedChoice ? chipIndexOf(typedChoice) : -1;
+  const typedAdds = typedChoice !== null && !selected.has(typedIndex);
+  const toSave = typedAdds ? [...chosen, typedIndex >= 0 ? chips[typedIndex]! : typedChoice] : chosen;
+  const overMax = toSave.length > MAX_SUBJECTS;
+
+  function chipIndexOf(item: Suggestion) {
+    const key = normalize(item.name);
+    return chips.findIndex((c) => (item.subject_id !== null && c.subject_id === item.subject_id) || normalize(c.name) === key);
+  }
+
   // Type-ahead is optional: a failed search shows no matches, and Add still works.
   useEffect(() => {
     const request = ++requestRef.current;
@@ -106,7 +119,8 @@ export function SubjectPicker({ document, load = defaultLoad, save = defaultSave
         if (!alive.current || request !== requestRef.current) return; // a newer query is on its way
         setResults(found);
         setActive(-1);
-        setOpen(true);
+        const input = inputRef.current;
+        if (input && input === input.ownerDocument.activeElement) setOpen(true); // not after the learner left the field
       };
       searchRef.current(typed).then(apply, () => apply([]));
     }, SEARCH_DELAY_MS);
@@ -115,8 +129,7 @@ export function SubjectPicker({ document, load = defaultLoad, save = defaultSave
 
   // Selects an equal chip (same subject, or the same name) rather than adding a duplicate.
   function addChoice(item: Suggestion) {
-    const key = normalize(item.name);
-    const existing = chips.findIndex((c) => (item.subject_id !== null && c.subject_id === item.subject_id) || normalize(c.name) === key);
+    const existing = chipIndexOf(item);
     const index = existing >= 0 ? existing : chips.length;
     if (existing < 0) setAdded((current) => [...current, item]);
     setSelected((current) => new Set(current).add(index));
@@ -172,8 +185,8 @@ export function SubjectPicker({ document, load = defaultLoad, save = defaultSave
     setSaving(true);
     setSaveError(null);
     const choice: Choice = {
-      subject_ids: chosen.flatMap((s) => (s.subject_id ? [s.subject_id] : [])),
-      new_names: chosen.filter((s) => s.origin === "new").map((s) => s.name),
+      subject_ids: toSave.flatMap((s) => (s.subject_id ? [s.subject_id] : [])),
+      new_names: toSave.filter((s) => s.origin === "new").map((s) => s.name),
     };
     try {
       const updated = await save(document.document_id, choice);
@@ -217,7 +230,7 @@ export function SubjectPicker({ document, load = defaultLoad, save = defaultSave
     );
   }
 
-  const saveDescribedBy = [selected.size === 0 && "picker-save-hint", tooLong && "picker-add-error"].filter(Boolean).join(" ");
+  const saveDescribedBy = [toSave.length === 0 && "picker-save-hint", tooLong && "picker-add-error", overMax && "picker-max-help"].filter(Boolean).join(" ");
 
   return (
     <Dialog
@@ -230,7 +243,7 @@ export function SubjectPicker({ document, load = defaultLoad, save = defaultSave
           <Button onClick={onClose}>Cancel</Button>
           <Button
             variant="primary"
-            disabled={!loaded || saving || selected.size === 0 || tooLong}
+            disabled={!loaded || saving || toSave.length === 0 || tooLong || overMax}
             aria-describedby={saveDescribedBy || undefined}
             onClick={() => void onSave()}
           >
@@ -275,7 +288,7 @@ export function SubjectPicker({ document, load = defaultLoad, save = defaultSave
               />
             ))}
           </div>
-          {atMax && <p className={styles.helper}>You've chosen 3 subjects, the maximum. Remove one to add another.</p>}
+          {atMax && <p id="picker-max-help" className={styles.helper}>You've chosen 3 subjects, the maximum. Remove one to add another.</p>}
         </fieldset>
       )}
       {loaded && (
