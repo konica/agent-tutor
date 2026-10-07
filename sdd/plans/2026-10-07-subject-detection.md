@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.13, FastAPI, LangGraph, MCP 2.x, SQLAlchemy + pgvector, pytest; React + TypeScript + Vite, Vitest; AWS CDK (Python).
 
-**Spec:** Ticket #84 (`gh issue view 84`), PRD `sdd/prd.md` §8 US-3 criterion 2, §9.2 Ask path step 1, §9.3; design round v0.4 states `chat-subjects-detected`, `chat-subjects-detected-multi`.
+**Spec:** Ticket #84 (`gh issue view 84`), PRD `sdd/prd.md` §8 US-3 criterion 2, §9.2 Ask path step 1, §9.3; design round v0.7 (tag `design-v0.7`) states `chat-subjects-detected`, `chat-subjects-detected-multi`.
 
 ## Global Constraints
 
@@ -950,7 +950,7 @@ Update the module docstring ("…ask the first question of a new thread; the age
 - Consumes: the `thread` event `{ type: "thread", thread_id, subjects: {subject_id, name}[] }` (unchanged, from `web/src/api/chat.ts`); `SubjectChip` (`web/src/components/SubjectChip/SubjectChip.tsx`: props `name`, `hueKey`, `size?: "sm" | "md" | "lg"`).
 - Produces: UI only.
 
-Read `DESIGN.md` (app shell, chat, chips, accessibility) and look at `.design-shots/v0.4/chat-subjects-detected{,-multi}.{light,dark}.png` (render with `cd web && npm run design:shots -- --states "chat-subjects-detected,chat-subjects-detected-multi" --round v0.4 --theme both`). The mockup: once a thread exists, the top of the page is a thread header — the first question as the title (one line, ellipsis when long) and below it the thread's subjects as small chips (dot coloured by subject, text in the main text colour). The citations toggle, Summarize, archive, token counter, and processing hint in the mockup belong to other tickets: leave them out.
+Read `DESIGN.md` (app shell, chat, chips, accessibility) and look at `.design-shots/v0.7/chat-subjects-detected{,-multi}.{light,dark}.png` (render with `cd web && npm run design:shots -- --states "chat-subjects-detected,chat-subjects-detected-multi" --round v0.7 --theme both`). The mockup: once a thread exists, the top of the page is a thread header — the first question as the title (one line, ellipsis when long) and below it the thread's subjects as small chips (dot coloured by subject, text in the main text colour). The citations toggle, Summarize, archive, token counter, and processing hint in the mockup belong to other tickets: leave them out.
 
 - [ ] **Step 1: Failing tests** in `ChatPage.test.tsx` (reuse its fake `ask` helpers):
 
