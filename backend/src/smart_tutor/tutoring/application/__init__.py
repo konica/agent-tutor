@@ -8,6 +8,8 @@ from smart_tutor.tutoring.domain.detection import Detection, DetectionPolicy
 from smart_tutor.tutoring.domain.errors import (
     NoDocumentsError,
     RetrievalError,
+    ThreadNotFoundError,
+    ThreadNotPendingError,
     ThreadSubjectsError,
 )
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
@@ -27,6 +29,8 @@ __all__ = [
     "Retriever",
     "SubjectDetector",
     "Thread",
+    "ThreadNotFoundError",
+    "ThreadNotPendingError",
     "ThreadRepository",
     "ThreadSubjectsError",
     "answer_messages",

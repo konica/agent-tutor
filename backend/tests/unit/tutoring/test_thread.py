@@ -40,3 +40,14 @@ def test_subjects_are_only_added_up_to_three() -> None:
 
 def test_a_thread_has_no_way_to_remove_a_subject() -> None:
     assert not [name for name in dir(Thread) if "remove" in name or "discard" in name]
+
+
+def test_a_pending_thread_has_no_subjects_until_bound() -> None:
+    t = Thread.pending(ThreadId("t1"), UserId("ada"), "How do these methods handle long documents?", NOW)
+    assert t.subject_ids == () and t.awaiting_subjects and t.title is not None and t.title.startswith("How do")
+    assert t.last_learner_message_at == NOW
+
+
+def test_start_keeps_the_title() -> None:
+    t = Thread.start(ThreadId("t1"), UserId("ada"), [SubjectId("s1")], NOW, title="Q?")
+    assert t.title == "Q?" and not t.awaiting_subjects

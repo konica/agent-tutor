@@ -21,6 +21,13 @@ class InMemoryThreads(ThreadRepository):
         found = self.threads.get(thread_id)
         return copy.deepcopy(found) if found and found.is_owned_by(user_id) else None
 
+    def bind_subjects(self, thread_id: ThreadId, user_id: UserId, subject_ids: Sequence[SubjectId]) -> bool:
+        found = self.threads.get(thread_id)
+        if found is None or not found.is_owned_by(user_id) or found.subject_ids:
+            return False
+        found.subject_ids = tuple(subject_ids)
+        return True
+
 
 class FakeRetriever(Retriever):
     def __init__(self, chunks: list[RetrievedChunk] | None = None, error: Exception | None = None) -> None:

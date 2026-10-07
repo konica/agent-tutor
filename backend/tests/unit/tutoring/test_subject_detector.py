@@ -36,15 +36,16 @@ async def test_binds_several_close_subjects() -> None:
     assert detection.subject_ids == (A, B) and not detection.unsure
 
 
-async def test_unsure_falls_back_to_the_best_subject() -> None:
+async def test_unsure_binds_nothing() -> None:
     retriever = FakeRetriever([chunk(0.75, B), chunk(0.65625, A)])  # A: outside multi_margin, inside detect_margin
     detection = await SubjectDetector(retriever, POLICY).detect("q", [A, B])
-    assert detection.subject_ids == (B,) and detection.unsure
+    assert detection.subject_ids == () and detection.unsure
+    assert detection.scores == {B: 0.75, A: 0.65625}
 
 
-async def test_no_hits_falls_back_to_the_first_subject() -> None:
+async def test_no_hits_binds_nothing() -> None:
     detection = await SubjectDetector(FakeRetriever([]), POLICY).detect("q", [B, A])
-    assert detection.subject_ids == (B,) and detection.unsure and detection.scores == {}
+    assert detection.subject_ids == () and detection.unsure and detection.scores == {}
 
 
 async def test_no_subjects_is_a_programming_error() -> None:

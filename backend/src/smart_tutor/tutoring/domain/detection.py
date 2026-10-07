@@ -51,7 +51,7 @@ class DetectionPolicy:
 
 @dataclass(frozen=True)
 class Detection:
-    """The subjects a new thread starts with; `unsure` when the policy bound none and the best was taken."""
+    """The subjects a new thread starts with; `unsure`: none bound; the learner picks."""
 
     subject_ids: tuple[SubjectId, ...]
     unsure: bool

@@ -24,6 +24,4 @@ class SubjectDetector:
         bound = self._policy.bind(scores)
         if bound is not None:
             return Detection(bound, unsure=False, scores=scores)
-        # Unsure: until the learner is asked to pick (next slice of US-3), take the best subject.
-        ranked = self._policy.ranked(scores)
-        return Detection((ranked[0] if ranked else learner_subjects[0],), unsure=True, scores=scores)
+        return Detection((), unsure=True, scores=scores)  # the learner picks

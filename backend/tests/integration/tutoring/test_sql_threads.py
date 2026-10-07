@@ -41,3 +41,15 @@ def test_the_table_refuses_more_than_three_subjects(engine: Engine) -> None:
             text("insert into threads (thread_id, user_id, subject_ids) values (:t, 'ada', cast(:s as uuid[]))"),
             {"t": str(uuid.uuid4()), "s": four},
         )
+
+
+def test_a_pending_thread_is_bound_once_and_only_by_its_owner(engine: Engine) -> None:
+    repo = SqlThreadRepository(engine)
+    owner = UserId(f"ada-{uuid.uuid4()}")
+    thread = Thread.pending(ThreadId(str(uuid.uuid4())), owner, "Which one?", datetime.now(UTC))
+    repo.add(thread)
+    assert repo.bind_subjects(thread.thread_id, UserId("bob"), [GENERAL_SUBJECT_ID]) is False
+    assert repo.bind_subjects(thread.thread_id, owner, [GENERAL_SUBJECT_ID]) is True
+    assert repo.bind_subjects(thread.thread_id, owner, [GENERAL_SUBJECT_ID]) is False
+    bound = repo.get_owned(thread.thread_id, owner)
+    assert bound is not None and bound.subject_ids == (GENERAL_SUBJECT_ID,)

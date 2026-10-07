@@ -27,11 +27,27 @@ class Thread:
     last_learner_message_at: datetime | None = None
 
     @classmethod
-    def start(cls, thread_id: ThreadId, user_id: UserId, subject_ids: Sequence[SubjectId], now: datetime) -> "Thread":
+    def start(
+        cls,
+        thread_id: ThreadId,
+        user_id: UserId,
+        subject_ids: Sequence[SubjectId],
+        now: datetime,
+        title: str | None = None,
+    ) -> "Thread":
         """A new thread with its first question asked now."""
         if not 1 <= len(subject_ids) <= MAX_SUBJECTS or len(set(subject_ids)) != len(subject_ids):
             raise ThreadSubjectsError("A thread starts with 1 to 3 distinct subjects")
-        return cls(thread_id, user_id, tuple(subject_ids), now, last_learner_message_at=now)
+        return cls(thread_id, user_id, tuple(subject_ids), now, title=title, last_learner_message_at=now)
+
+    @classmethod
+    def pending(cls, thread_id: ThreadId, user_id: UserId, title: str, now: datetime) -> "Thread":
+        """A new thread whose first question waits for the learner to pick its subjects (detection was unsure)."""
+        return cls(thread_id, user_id, (), now, title=title, last_learner_message_at=now)
+
+    @property
+    def awaiting_subjects(self) -> bool:
+        return not self.subject_ids
 
     def add_subject(self, subject_id: SubjectId) -> bool:
         """Add a subject; False when the thread already has it. Never more than 3, never removed."""

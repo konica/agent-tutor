@@ -1,8 +1,9 @@
-"""Threads in Postgres. The table schema lives in migration 0005."""
+"""Threads in Postgres. The table schema lives in migrations 0005 and 0007."""
 
+from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import Column, DateTime, Engine, MetaData, Table, Text, Uuid, select
+from sqlalchemy import Column, DateTime, Engine, MetaData, Table, Text, Uuid, func, select
 from sqlalchemy.dialects.postgresql import ARRAY
 
 from smart_tutor.shared.domain.ids import SubjectId, ThreadId, UserId
@@ -58,3 +59,18 @@ class SqlThreadRepository(ThreadRepository):
                 select(threads).where(threads.c.thread_id == thread_id, threads.c.user_id == user_id)
             ).first()
         return _thread(row) if row else None
+
+    def bind_subjects(self, thread_id: ThreadId, user_id: UserId, subject_ids: Sequence[SubjectId]) -> bool:
+        # One conditional statement, so two concurrent resumes cannot both bind. cardinality(), not array_length():
+        # the latter is NULL for an empty array.
+        with self._engine.begin() as conn:
+            result = conn.execute(
+                threads.update()
+                .where(
+                    threads.c.thread_id == thread_id,
+                    threads.c.user_id == user_id,
+                    func.cardinality(threads.c.subject_ids) == 0,
+                )
+                .values(subject_ids=list(subject_ids))
+            )
+        return result.rowcount == 1

@@ -3,6 +3,7 @@ API starts it. Answered as SSE (PRD §9.2)."""
 
 import json
 import logging
+import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
 from typing import Annotated
 
@@ -16,7 +17,7 @@ from smart_tutor.apps.api.agent_client import AgentAnswer, AgentUnavailableError
 from smart_tutor.apps.api.deps import Agent, BearerToken, Conversations, CurrentPrincipal, Subjects
 from smart_tutor.apps.api.routes.subjects import UNNAMED_SUBJECT
 from smart_tutor.shared.domain.errors import UnauthenticatedError
-from smart_tutor.shared.domain.ids import SubjectId
+from smart_tutor.shared.domain.ids import SubjectId, ThreadId
 from smart_tutor.tutoring.application import NoDocumentsError, ThreadSubjectsError
 
 logger = logging.getLogger(__name__)
@@ -154,7 +155,11 @@ async def ask_in_new_thread(
     async def start(subject_ids: list[str]) -> bytes | None:
         try:
             thread = await run_in_threadpool(
-                conversations.start_thread, principal.user_id, [SubjectId(s) for s in subject_ids]
+                conversations.start_thread,
+                principal.user_id,
+                [SubjectId(s) for s in subject_ids],
+                ThreadId(str(uuid.uuid4())),
+                body.question,
             )
         except (ThreadSubjectsError, NoDocumentsError) as e:
             # Ids and the reason only: never the question or the token.
