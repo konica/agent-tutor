@@ -16,6 +16,9 @@ vi.mock("../api/documents", async (importOriginal) => ({
   uploadPdf: vi.fn(),
 }));
 
+// The Chat page lists the learner's subjects first.
+vi.mock("../api/subjects", () => ({ loadMySubjects: async () => [{ subject_id: "s1", name: "LLMs" }] }));
+
 const signOut = vi.fn();
 
 function renderAt(path: string, { strict = false } = {}) {
@@ -65,10 +68,10 @@ describe("app shell routes", () => {
     expect(nav().getByRole("link", { name: "Library" })).not.toHaveAttribute("aria-current");
   });
 
-  it("renders the Chat page with a question box", () => {
+  it("renders the Chat page with a question box", async () => {
     renderAt("/chat");
-    expect(screen.getByRole("heading", { level: 1, name: "Chat" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Your question" })).toBeEnabled();
+    expect(await screen.findByRole("textbox", { name: "Your question" })).toBeEnabled();
+    expect(screen.getByRole("heading", { level: 1, name: "New conversation" })).toBeInTheDocument();
   });
 
   it("moves to a page and marks it current when a nav item is clicked", async () => {

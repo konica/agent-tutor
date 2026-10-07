@@ -45,6 +45,22 @@ class InMemorySubjects(SubjectRepository):
         self.embeddings[subject.subject_id] = list(name_embedding)
         return subject
 
+    def search(self, normalized_query: str, exclude: Collection[SubjectId], limit: int) -> list[Subject]:
+        skip = set(exclude)
+        found = [
+            Subject(sid, name)
+            for sid, name in self.names.items()
+            if sid not in skip and normalized_query in normalize_subject_name(name)
+        ]
+        found.sort(
+            key=lambda s: (
+                not normalize_subject_name(s.canonical_name).startswith(normalized_query),
+                len(s.canonical_name),
+                s.canonical_name,
+            )
+        )
+        return found[:limit]
+
     def missing_name_embeddings(self, limit: int) -> list[Subject]:
         return [Subject(sid, name) for sid, name in self.names.items() if sid not in self.embeddings][:limit]
 

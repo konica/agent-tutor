@@ -26,6 +26,11 @@ class SubjectRepository(ABC):
         """Insert unless the normalized name exists; concurrent callers get one row. Returns the stored subject."""
 
     @abstractmethod
+    def search(self, normalized_query: str, exclude: Collection[SubjectId], limit: int) -> list[Subject]:
+        """Subjects whose normalized name contains the query (matched literally): prefix matches first, then shorter
+        names, then by name. Ids in `exclude` are left out."""
+
+    @abstractmethod
     def missing_name_embeddings(self, limit: int) -> list[Subject]:
         """Subjects that have no name embedding yet (the seeded General row)."""
 

@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from smart_tutor.apps.api.agent_client import AgentAnswer, AgentUnavailableError
 from smart_tutor.apps.api.deps import Agent, BearerToken, Conversations, CurrentPrincipal, Subjects
+from smart_tutor.apps.api.routes.subjects import UNNAMED_SUBJECT
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.domain.ids import SubjectId
 from smart_tutor.tutoring.application import NoDocumentsError, ThreadSubjectsError
@@ -22,7 +23,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["tutoring"])
 
 UNAVAILABLE = "The tutor is unavailable. Try again in a moment."
-UNNAMED_SUBJECT = "Unnamed subject"  # the agent refuses an empty name
 # Proxies must pass each event on as it comes, and nothing may cache the answer.
 SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 SSE_RESPONSE: dict[int | str, dict[str, object]] = {

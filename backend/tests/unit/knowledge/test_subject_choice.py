@@ -28,6 +28,7 @@ from smart_tutor.subjects.application import (
     GENERAL_SUBJECT_ID,
     SubjectCatalogService,
     SubjectNames,
+    SubjectSearch,
     SubjectSuggester,
     SuggestionOrigin,
 )
@@ -51,7 +52,10 @@ class World:
         )
         self.catalog = SubjectCatalogService(self.subjects, fake_embeddings(8))
         suggester = SubjectSuggester(self.subjects, SubjectNames(self.subjects))
-        self.choice = SubjectChoiceService(self.library.unit_of_work, suggester, self.catalog, max_attempts=3)
+        search = SubjectSearch(self.subjects, SubjectNames(self.subjects))
+        self.choice = SubjectChoiceService(
+            self.library.unit_of_work, suggester, self.catalog, search=search, max_attempts=3
+        )
         self.documents = DocumentService(self.library.unit_of_work, max_attempts=3)
 
     def upload(self, user_id: UserId = ADA, text: str = SENTENCE, *, ingest: bool = True) -> DocumentId:
@@ -113,16 +117,41 @@ def test_unknown_ids_are_rejected_and_nothing_changes() -> None:
     assert w.state() == [("awaiting_subjects", ())]
 
 
-def test_a_name_that_was_not_suggested_is_rejected() -> None:
-    w = World()
-    document_id = w.upload()
-    before = dict(w.subjects.names)
+def test_a_typed_name_creates_a_shared_subject() -> None:
+    world = World()
+    doc = world.upload()
+    world.choice.choose(ADA, doc, [], ["  Tool   Use  "])
+    [(state, (sid,))] = world.state()
+    assert state == "ready" and world.subjects.names[sid] == "Tool Use"
 
-    with pytest.raises(InvalidSubjectsError, match="Choose from the suggestions"):
-        w.choice.choose(ADA, document_id, [], ["Cooking"])
 
-    assert w.subjects.names == before
-    assert w.state() == [("awaiting_subjects", ())]
+def test_a_typed_name_equal_to_an_existing_subject_after_normalization_reuses_it() -> None:
+    world = World()
+    existing = world.catalog.get_or_create("Information Retrieval")
+    doc = world.upload()
+    world.choice.choose(ADA, doc, [], ["ＩＮＦＯＲＭＡＴＩＯＮ  retrieval "])  # NFKC full-width, case, spaces
+    assert world.state() == [("ready", (existing,))]
+
+
+def test_a_typed_name_over_60_characters_is_rejected_and_nothing_changes() -> None:
+    world = World()
+    doc = world.upload()
+    with pytest.raises(InvalidSubjectsError, match="60"):
+        world.choice.choose(ADA, doc, [], ["x" * 61])
+    assert world.state() == [("awaiting_subjects", ())]
+
+
+def test_search_puts_the_learners_subjects_first() -> None:
+    world = World()
+    mine = world.catalog.get_or_create("Retrieval-Augmented Generation")
+    shared = world.catalog.get_or_create("Information Retrieval")
+    doc = world.upload()
+    world.choice.choose(ADA, doc, [mine], [])
+    assert [(m.subject_id, m.origin) for m in world.choice.search(ADA, "retriev")] == [
+        (mine, SuggestionOrigin.YOURS),
+        (shared, SuggestionOrigin.SHARED),
+    ]
+    assert [m.origin for m in world.choice.search(BOB, "retriev")] == [SuggestionOrigin.SHARED] * 2
 
 
 @pytest.mark.parametrize(

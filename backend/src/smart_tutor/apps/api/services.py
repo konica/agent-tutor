@@ -23,7 +23,7 @@ from smart_tutor.shared.adapters.model_factory import ModelFactory
 from smart_tutor.shared.adapters.postgres.engine import create_db_engine
 from smart_tutor.shared.config import Settings
 from smart_tutor.subjects.adapters.sql_subjects import SqlSubjectRepository
-from smart_tutor.subjects.application import SubjectCatalogService, SubjectNames, SubjectSuggester
+from smart_tutor.subjects.application import SubjectCatalogService, SubjectNames, SubjectSearch, SubjectSuggester
 from smart_tutor.tutoring.adapters.sql_threads import SqlThreadRepository
 from smart_tutor.tutoring.application import ConversationService
 
@@ -62,6 +62,7 @@ def build_services(settings: Settings) -> ApiServices:
             library,
             SubjectSuggester(subject_repo, names),
             SubjectCatalogService(subject_repo, ModelFactory(settings).embedding()),
+            SubjectSearch(subject_repo, names),
             max_attempts,
         ),
         conversations=ConversationService(SqlThreadRepository(engine), documents, SystemClock()),
