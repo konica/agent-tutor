@@ -241,6 +241,33 @@
         "title": "StartUploadResponse",
         "type": "object"
       },
+      "SubjectMatchResponse": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "origin": {
+            "enum": [
+              "yours",
+              "shared"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "subject_id": {
+            "title": "Subject Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject_id",
+          "name",
+          "origin"
+        ],
+        "title": "SubjectMatchResponse",
+        "type": "object"
+      },
       "SubjectResponse": {
         "properties": {
           "name": {
@@ -654,6 +681,60 @@
         "summary": "Get Me",
         "tags": [
           "accounts"
+        ]
+      }
+    },
+    "/subjects/search": {
+      "get": {
+        "description": "The caller's subjects matching `q` (by their names), then other shared subjects (canonical names).",
+        "operationId": "search_subjects",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SubjectMatchResponse"
+                  },
+                  "title": "Response Search Subjects",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Search Subjects",
+        "tags": [
+          "subjects"
         ]
       }
     },

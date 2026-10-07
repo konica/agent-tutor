@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponse, AskInNewThreadResponses, CheckDuplicateData, CheckDuplicateErrors, CheckDuplicateResponses, ChooseSubjectsData, ChooseSubjectsErrors, ChooseSubjectsResponses, GetMeData, GetMeResponses, GetSubjectSuggestionsData, GetSubjectSuggestionsErrors, GetSubjectSuggestionsResponses, GetUploadLimitsData, GetUploadLimitsResponses, ListDocumentsData, ListDocumentsResponses, RetryDocumentData, RetryDocumentErrors, RetryDocumentResponses, StartUploadData, StartUploadErrors, StartUploadResponses } from './types.gen';
+import type { AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponse, AskInNewThreadResponses, CheckDuplicateData, CheckDuplicateErrors, CheckDuplicateResponses, ChooseSubjectsData, ChooseSubjectsErrors, ChooseSubjectsResponses, GetMeData, GetMeResponses, GetSubjectSuggestionsData, GetSubjectSuggestionsErrors, GetSubjectSuggestionsResponses, GetUploadLimitsData, GetUploadLimitsResponses, ListDocumentsData, ListDocumentsResponses, RetryDocumentData, RetryDocumentErrors, RetryDocumentResponses, SearchSubjectsData, SearchSubjectsErrors, SearchSubjectsResponses, StartUploadData, StartUploadErrors, StartUploadResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -87,6 +87,17 @@ export const chooseSubjects = <ThrowOnError extends boolean = false>(options: Op
 export const getMe = <ThrowOnError extends boolean = false>(options?: Options<GetMeData, ThrowOnError>): RequestResult<GetMeResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetMeResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/me',
+    ...options
+});
+
+/**
+ * Search Subjects
+ *
+ * The caller's subjects matching `q` (by their names), then other shared subjects (canonical names).
+ */
+export const searchSubjects = <ThrowOnError extends boolean = false>(options: Options<SearchSubjectsData, ThrowOnError>): RequestResult<SearchSubjectsResponses, SearchSubjectsErrors, ThrowOnError> => (options.client ?? client).get<SearchSubjectsResponses, SearchSubjectsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/subjects/search',
     ...options
 });
 

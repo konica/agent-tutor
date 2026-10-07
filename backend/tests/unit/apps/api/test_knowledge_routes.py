@@ -78,6 +78,7 @@ def test_openapi_names_the_operations(client: TestClient) -> None:
     paths = client.get("/openapi.json").json()["paths"]
     assert paths["/uploads"]["post"]["operationId"] == "start_upload"
     assert paths["/documents"]["get"]["operationId"] == "list_documents"
+    assert paths["/subjects/search"]["get"]["operationId"] == "search_subjects"
     assert paths["/documents/duplicate-check"]["post"]["operationId"] == "check_duplicate"
     assert paths["/documents/{document_id}/retry"]["post"]["operationId"] == "retry_document"
 
@@ -212,6 +213,16 @@ def test_choosing_an_existing_subject_by_id(client: TestClient) -> None:
     assert r.json()["subjects"] == [{"subject_id": general, "name": "General"}]
 
 
+def test_a_typed_name_is_trimmed_and_may_be_60_characters_with_padding(client: TestClient) -> None:
+    doc = awaiting_document(client)
+    name = "y" * 60
+
+    r = client.put(f"/documents/{doc}/subjects", json={"new_names": [f"  {name}  "]}, headers=AUTH)
+
+    assert r.status_code == 200
+    assert [s["name"] for s in r.json()["subjects"]] == [name]
+
+
 @pytest.mark.parametrize(
     "body",
     [
@@ -222,6 +233,7 @@ def test_choosing_an_existing_subject_by_id(client: TestClient) -> None:
         {"subject_ids": ["abc"]},
         {"new_names": [""]},
         {"new_names": ["x" * 61]},
+        {"new_names": ["   "]},
         {"subject_ids": ["00000000-0000-4000-8000-000000000001"], "user_id": "x"},
     ],
 )

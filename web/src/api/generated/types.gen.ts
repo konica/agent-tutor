@@ -153,6 +153,24 @@ export type StartUploadResponse = {
 };
 
 /**
+ * SubjectMatchResponse
+ */
+export type SubjectMatchResponse = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Origin
+     */
+    origin: 'yours' | 'shared';
+    /**
+     * Subject Id
+     */
+    subject_id: string;
+};
+
+/**
  * SubjectResponse
  */
 export type SubjectResponse = {
@@ -396,6 +414,38 @@ export type GetMeResponses = {
 };
 
 export type GetMeResponse = GetMeResponses[keyof GetMeResponses];
+
+export type SearchSubjectsData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Q
+         */
+        q: string;
+    };
+    url: '/subjects/search';
+};
+
+export type SearchSubjectsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SearchSubjectsError = SearchSubjectsErrors[keyof SearchSubjectsErrors];
+
+export type SearchSubjectsResponses = {
+    /**
+     * Response Search Subjects
+     *
+     * Successful Response
+     */
+    200: Array<SubjectMatchResponse>;
+};
+
+export type SearchSubjectsResponse = SearchSubjectsResponses[keyof SearchSubjectsResponses];
 
 export type AskInNewThreadData = {
     body: AskRequest;
