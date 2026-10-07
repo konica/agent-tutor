@@ -16,7 +16,7 @@ from typing import Any, Literal
 import httpx
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from smart_tutor.apps.agent.graph import AskGraph, build_graph
 from smart_tutor.apps.agent.state import AgentContext, AskState
@@ -50,6 +50,14 @@ class AskRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     question: str = Field(min_length=1, max_length=4000)
     learner_subjects: list[SubjectIn] = Field(min_length=1, max_length=MAX_SEARCH_SUBJECTS)
+
+    @field_validator("learner_subjects")
+    @classmethod
+    def _distinct(cls, subjects: list[SubjectIn]) -> list[SubjectIn]:
+        # The state keys subjects by id, so a repeat would silently keep only one of its names.
+        if len({s.subject_id for s in subjects}) != len(subjects):
+            raise ValueError("each subject appears once")
+        return subjects
 
 
 def sse(event: str, data: dict[str, Any]) -> str:
