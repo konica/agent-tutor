@@ -14,10 +14,12 @@ from langchain_core.tracers import LangChainTracer
 from fakes import FakeRetriever, fake_chat_model
 from smart_tutor.apps.agent.graph import build_graph
 from smart_tutor.apps.agent.state import AgentContext
+from smart_tutor.tutoring.application import DetectionPolicy
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 
 TOKEN = "eyJhbGciOi.token-under-test.signature-xyz"
-INPUT = {"question": "What is attention?", "subject_ids": ["s1"], "subject_names": ["General"]}
+INPUT = {"question": "What is attention?", "learner_subjects": {"s1": "General"}}
+POLICY = DetectionPolicy(0.5, 0.125, 0.0625)
 CHUNKS = [RetrievedChunk("c1", "a.pdf", 3, "Attention weighs tokens.", 0.9)]
 
 
@@ -39,7 +41,9 @@ async def traced_run(state: dict[str, Any]) -> tuple[str, str]:
     """Run the graph with the token in context; return (dumped trace payloads, dumped output state)."""
     recorder = RecordingClient()
     tracer = LangChainTracer(client=recorder, project_name="test")
-    graph = build_graph(lambda token: FakeRetriever(CHUNKS), fake_chat_model(AIMessage("It weighs tokens [1].")))
+    graph = build_graph(
+        lambda token: FakeRetriever(CHUNKS), fake_chat_model(AIMessage("It weighs tokens [1].")), POLICY
+    )
     with langsmith.tracing_context(enabled=True):
         out = await graph.ainvoke(state, context=AgentContext(access_token=TOKEN), config={"callbacks": [tracer]})
     tracer.wait_for_futures()

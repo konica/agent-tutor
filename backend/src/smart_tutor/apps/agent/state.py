@@ -14,7 +14,8 @@ class AgentContext:
 
 class AskState(TypedDict, total=False):
     question: str
-    subject_ids: list[str]
+    learner_subjects: dict[str, str]  # all of the learner's subjects (id → their name); detection picks from them
+    subject_ids: list[str]  # the thread's 1–3 subjects, set by resolve_subjects
     subject_names: list[str]  # the learner's names for the thread's subjects, for the system prompt
     chunks: list[RetrievedChunk]
     answer: str

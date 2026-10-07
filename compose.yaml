@@ -6,7 +6,7 @@
 name: smart-tutor
 
 # The api (subject-name embeddings), worker, agent (chat model) and mcp (query embeddings) call Bedrock: they
-# mount your AWS config read-only. The api and worker sign S3/SSM/SQS with dummy keys (SMART_TUTOR_LOCALSTACK),
+# mount your AWS config read-only. The api, agent and worker sign S3/SSM/SQS with dummy keys (SMART_TUTOR_LOCALSTACK),
 # so your real keys never reach LocalStack.
 
 services:
@@ -124,11 +124,18 @@ services:
       SMART_TUTOR_KEYCLOAK_CLIENT_ID: smart-tutor-api
       SMART_TUTOR_KEYCLOAK_CLIENT_SECRET: local-api-secret
       SMART_TUTOR_MCP_URL: http://mcp:8000/mcp
+      # The agent reads the detection thresholds from SSM at startup, so it uses the in-network endpoint.
+      AWS_ENDPOINT_URL_SSM: http://localstack:4566
+      # It signs SSM with dummy keys (SMART_TUTOR_LOCALSTACK), so your real keys never reach LocalStack.
+      SMART_TUTOR_LOCALSTACK: "true"
       # Bedrock (chat model) with your AWS profile: same setup as the worker below.
       HOME: /home/app
     volumes: ["~/.aws:/home/app/.aws:ro"]
     ports: ["10451:8080"]
-    depends_on: [postgres, mcp]
+    depends_on:
+      postgres: {condition: service_started}
+      mcp: {condition: service_started}
+      localstack: {condition: service_healthy}
 
   mcp:
     profiles: [app]
