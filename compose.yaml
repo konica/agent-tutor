@@ -55,10 +55,10 @@ services:
     ports: ["10402:4566"]
     volumes:
       - ./local/localstack/init/ready.d:/etc/localstack/init/ready.d:ro
-    # Healthy only once the ready.d init script has seeded settings (it sets max-pages last, or at least by the end);
-    # the api and worker read SSM at startup and exit when a parameter is missing.
+    # Healthy only once the ready.d init script has seeded settings (it sets multi-margin last);
+    # the api, worker, and agent read SSM at startup and exit when a parameter is missing.
     healthcheck:
-      test: ["CMD", "awslocal", "ssm", "get-parameter", "--name", "/smart-tutor/max-pages"]
+      test: ["CMD", "awslocal", "ssm", "get-parameter", "--name", "/smart-tutor/multi-margin"]
       interval: 3s
       timeout: 10s
       retries: 40
