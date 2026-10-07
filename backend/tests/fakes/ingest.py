@@ -1,6 +1,7 @@
 """Make a ready document with embedded chunks, for tests of search and everything built on it."""
 
 import hashlib
+from collections.abc import Sequence
 
 from fakes.clock import FixedClock
 from fakes.knowledge import FakeObjectStore, InMemoryLibrary
@@ -9,12 +10,16 @@ from fakes.parameters import TEST_LIMITS
 from smart_tutor.knowledge.application import UploadService
 from smart_tutor.knowledge.domain.chunk import Chunk
 from smart_tutor.knowledge.domain.content import Content
-from smart_tutor.shared.domain.ids import ContentId, DocumentId, UserId
+from smart_tutor.shared.domain.ids import ContentId, DocumentId, SubjectId, UserId
 from smart_tutor.subjects.application import GENERAL_SUBJECT_ID
 
 
-def ingest_ready(library: InMemoryLibrary, owner: str, text: str) -> DocumentId:
-    """A document of `owner` that is ready in General, with one page-1 chunk of `text` embedded by `fake_embeddings()`.
+def ingest_ready(
+    library: InMemoryLibrary, owner: str, text: str, subject_ids: Sequence[SubjectId] = (GENERAL_SUBJECT_ID,)
+) -> DocumentId:
+    """A document of `owner` that is ready in `subject_ids` (General by default).
+
+    It has one page-1 chunk of `text`, embedded by `fake_embeddings()`.
 
     Built through the domain (not `IngestionService`) because ingestion rejects pages too short to be a text layer.
     """
@@ -38,7 +43,7 @@ def ingest_ready(library: InMemoryLibrary, owner: str, text: str) -> DocumentId:
         assert document is not None
         document.link_content(content.content_id)
         document.await_subjects()
-        document.choose_subjects([GENERAL_SUBJECT_ID])
+        document.choose_subjects(list(subject_ids))
         tx.documents.save(document)
         tx.commit()
     return started.document_id

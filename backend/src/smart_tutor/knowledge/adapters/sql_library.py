@@ -289,11 +289,20 @@ class _Chunks(ChunkRepository):
         # Exact search (#31): with index scans off, Postgres can't use HNSW and drop filtered-out rows after the scan.
         self._conn.execute(text("SET LOCAL enable_indexscan = off"))
         distance = chunks.c.embedding.cosine_distance(embedding)
+        requested = list(subject_ids)
+        hit_subjects = (
+            select(func.array_agg(document_subjects.c.subject_id))
+            .where(
+                document_subjects.c.document_id == documents.c.document_id,
+                document_subjects.c.subject_id.in_(requested),
+            )
+            .scalar_subquery()
+        )
         in_subjects = (
             select(document_subjects.c.document_id)
             .where(
                 document_subjects.c.document_id == documents.c.document_id,
-                document_subjects.c.subject_id.in_(list(subject_ids)),
+                document_subjects.c.subject_id.in_(requested),
             )
             .exists()
         )
@@ -306,6 +315,7 @@ class _Chunks(ChunkRepository):
                 # The display title, as Document.title computes it (PRD §9.4).
                 func.coalesce(documents.c.title_override, contents.c.title, documents.c.file_name).label("title"),
                 (1 - distance).label("score"),
+                hit_subjects.label("subject_ids"),
             )
             .join(documents, documents.c.content_id == chunks.c.content_id)
             .join(contents, contents.c.content_id == chunks.c.content_id)
@@ -319,7 +329,15 @@ class _Chunks(ChunkRepository):
             .limit(k)
         )
         return [
-            ChunkHit(str(r.chunk_id), DocumentId(str(r.document_id)), r.title, r.page, r.text, float(r.score))
+            ChunkHit(
+                str(r.chunk_id),
+                DocumentId(str(r.document_id)),
+                r.title,
+                r.page,
+                r.text,
+                float(r.score),
+                tuple(sorted(SubjectId(str(s)) for s in r.subject_ids)),
+            )
             for r in rows
         ]
 

@@ -320,6 +320,28 @@ def test_search_returns_the_owners_chunk_with_title_page_and_score(engine: Engin
     assert hit.score == pytest.approx(1.0)
 
 
+def test_a_hit_names_the_requested_subjects_its_document_has(engine: Engine) -> None:
+    owner = f"ada-{uid()}"
+    s1, s2 = sorted([SubjectId(uid()), SubjectId(uid())])
+    doc = searchable_document(engine, owner, [12])
+    with engine.begin() as conn:
+        for s in (s1, s2):
+            conn.execute(
+                text("INSERT INTO subjects (subject_id, canonical_name, normalized_name) VALUES (:id, :n, :n)"),
+                {"id": s, "n": f"subject {s}"},
+            )
+    with SqlLibraryUnitOfWork(engine) as tx:
+        loaded = tx.documents.get_by_upload_for_update(doc.upload_id)
+        assert loaded is not None
+        loaded.choose_subjects([s1, s2])
+        tx.documents.save(loaded)
+        tx.commit()
+    [only_s2] = search(engine, owner, 12, [s2])
+    [both] = search(engine, owner, 12, [s2, s1])
+    assert only_s2.subject_ids == (s2,)
+    assert both.subject_ids == (s1, s2)
+
+
 def test_search_never_returns_another_learners_chunks(engine: Engine) -> None:
     owner = f"ada-{uid()}"
     searchable_document(engine, owner, [8])
