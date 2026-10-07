@@ -88,16 +88,37 @@ export async function findInLibrary(file: File, apiClient: Client = client): Pro
   return data.document_id ?? null;
 }
 
-// The API presigns a POST for this learner's key; the browser then sends the file straight to S3 (PRD §9.3). Callers check the file first with rejectionReason.
-export async function uploadPdf(file: File, apiClient: Client = client, post: typeof fetch = fetch): Promise<void> {
+export type UploadEvents = { onStarted?: (documentId: string) => void; onProgress?: (fraction: number) => void };
+export type PostForm = (url: string, form: FormData, onProgress: (fraction: number) => void) => Promise<number>;
+
+// fetch can't report upload progress; XMLHttpRequest can (the upload tray's bars). Resolves with the HTTP status.
+export function postForm(url: string, form: FormData, onProgress: (fraction: number) => void): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) onProgress(event.loaded / event.total);
+    };
+    xhr.onload = () => resolve(xhr.status);
+    xhr.onerror = () => reject(new Error("Upload to storage failed (network error)"));
+    xhr.onabort = () => reject(new Error("Upload to storage failed (aborted)"));
+    xhr.send(form);
+  });
+}
+
+// The API presigns a POST for this learner's key and creates the row; the browser then sends the file straight to S3 (PRD §9.3).
+// Callers check the file first with rejectionReason.
+export async function uploadPdf(file: File, events: UploadEvents = {}, apiClient: Client = client, post: PostForm = postForm): Promise<void> {
   const { data, error, response } = await startUpload({ client: apiClient, body: { file_name: file.name }, throwOnError: false });
   if (sessionOver(error, response)) throw new SessionExpiredError();
   if (!data) throw new Error(`POST /uploads failed (${response?.status ?? "no response"})`);
+  events.onStarted?.(data.document_id);
   const form = new FormData();
   for (const [name, value] of Object.entries(data.fields)) form.append(name, value);
   form.append("file", file); // S3 ignores fields after the file
-  const stored = await post(data.url, { method: "POST", body: form });
-  if (!stored.ok) throw new Error(`Upload to storage failed (${stored.status})`);
+  const status = await post(data.url, form, (fraction) => events.onProgress?.(fraction));
+  if (status < 200 || status >= 300) throw new Error(`Upload to storage failed (${status})`);
+  events.onProgress?.(1);
 }
 
 // Three ranked suggestions for a document waiting for subjects (PRD §8 US-2b).

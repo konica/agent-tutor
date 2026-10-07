@@ -1,0 +1,16 @@
+.overlay {
+  position: fixed; top: 0; right: 0; bottom: 0; left: var(--nav-w); z-index: 44;
+  display: grid; place-items: center; pointer-events: none;
+  background: color-mix(in oklab, var(--accent-soft) 88%, transparent); border: 3px dashed var(--accent);
+  animation: fade-in var(--dur-fast) var(--ease-out);
+}
+.label {
+  display: grid; justify-items: center; gap: var(--sp-2);
+  color: var(--accent-text); font-family: var(--font-display); font-size: var(--fs-32); font-weight: 600;
+}
+.icon { width: 28px; height: 28px; }
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

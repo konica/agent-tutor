@@ -2,18 +2,21 @@ import { AlertCircle, Info, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import { SessionExpiredError } from "../../auth/authClient";
-import { findInLibrary, loadDocuments, loadSubjectSuggestions, loadUploadLimits, megabytes, rejectionReason, RetriesUsedUpError, retryProcessing, saveSubjects as saveChosenSubjects, uploadPdf, type DocumentResponse, type SubjectSuggestions, type UploadLimits } from "../../api/documents";
+import { findInLibrary, loadDocuments, loadSubjectSuggestions, loadUploadLimits, megabytes, rejectionReason, RetriesUsedUpError, retryProcessing, saveSubjects as saveChosenSubjects, uploadPdf, type DocumentResponse, type SubjectSuggestions, type UploadEvents, type UploadLimits } from "../../api/documents";
 import { Button } from "../../components/Button/Button";
 import { EmptyState } from "../../components/EmptyState/EmptyState";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
+import { UploadTray, type TrayItem } from "../../components/UploadTray/UploadTray";
+import { DropOverlay } from "./DropOverlay";
 import { DocumentTable } from "./DocumentTable";
 import { SubjectPicker } from "./SubjectPicker";
 import styles from "./LibraryPage.module.css";
 import { useDocuments } from "./useDocuments";
+import { usePageDrop } from "./usePageDrop";
 
 type Props = {
   load?: () => Promise<DocumentResponse[]>;
-  upload?: (file: File) => Promise<void>;
+  upload?: (file: File, events: UploadEvents) => Promise<void>;
   retry?: (documentId: string) => Promise<void>;
   loadLimits?: () => Promise<UploadLimits>;
   check?: (file: File) => Promise<string | null>;
@@ -29,7 +32,9 @@ function announceChange(doc: DocumentResponse): string | null {
   return null;
 }
 
-const defaultUpload = (file: File) => uploadPdf(file);
+const MAX_PARALLEL_UPLOADS = 3; // each check hashes a whole file in memory, and presigned POSTs expire while queued behind the browser's connections
+
+const defaultUpload = (file: File, events: UploadEvents) => uploadPdf(file, events);
 const defaultRetry = (id: string) => retryProcessing(id);
 const defaultLoadLimits = () => loadUploadLimits();
 const defaultCheck = (file: File) => findInLibrary(file);
@@ -37,12 +42,18 @@ const defaultCheck = (file: File) => findInLibrary(file);
 const defaultLoadSuggestions = (id: string) => loadSubjectSuggestions(id);
 const defaultSaveSubjects = (id: string, choice: { subject_ids: string[]; new_names: string[] }) => saveChosenSubjects(id, choice);
 
-// Library with a plain file picker (US-2 first slice). Drop zone, upload tray, tabs and filters come later.
+// Library: upload by picking or dropping PDFs (US-2), the upload tray, and the document list. Tabs and filters come later.
 export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retry = defaultRetry, loadLimits = defaultLoadLimits, check = defaultCheck, loadSuggestions = defaultLoadSuggestions, saveSubjects = defaultSaveSubjects, pollMs = 2000 }: Props) {
   const { documents, unavailable, refresh } = useDocuments(load, pollMs);
   const input = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState("");
-  const [failed, setFailed] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string[]>([]);
+  const [tray, setTray] = useState<TrayItem[]>([]);
+  const [uploading, setUploading] = useState<ReadonlySet<string>>(new Set()); // document ids whose file is still being sent
+  const traySeq = useRef(0);
+  const parts = useRef<string[]>([]); // one slot per file, shared by overlapping batches, so none overwrites another in the live region
+  const inFlight = useRef(0); // batches still running
+  const slots = useRef({ free: MAX_PARALLEL_UPLOADS, waiting: [] as (() => void)[] }); // upload slots shared by every batch
   const [retrying, setRetrying] = useState<ReadonlySet<string>>(new Set());
   const [limits, setLimits] = useState<UploadLimits | null>(null);
   const [rejected, setRejected] = useState<{ name: string; reason: string }[]>([]);
@@ -95,6 +106,19 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
     };
   }, []);
 
+  const acquireSlot = () => {
+    if (slots.current.free > 0) {
+      slots.current.free--;
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => slots.current.waiting.push(resolve));
+  };
+  const releaseSlot = () => {
+    const next = slots.current.waiting.shift();
+    if (next) next(); // the slot passes straight to the next file in line
+    else slots.current.free++;
+  };
+
   // Failure leaves the limits null: the pick handler retries, and never uploads without a size check.
   const ensureLimits = useCallback(async (): Promise<UploadLimits | null> => {
     try {
@@ -110,52 +134,109 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
     void ensureLimits();
   }, [ensureLimits]);
 
-  async function onPick(event: ChangeEvent<HTMLInputElement>) {
+  const updateTray = (id: string, patch: Partial<TrayItem>) => setTray((items) => items.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+  const setSending = (documentId: string, sending: boolean) =>
+    setUploading((ids) => {
+      const next = new Set(ids);
+      if (sending) next.add(documentId);
+      else next.delete(documentId);
+      return next;
+    });
+
+  // Files of a pick or drop run MAX_PARALLEL_UPLOADS at a time, across overlapping batches. One combined message in pick order; a batch that starts while another runs adds to it instead of resetting it.
+  async function addFiles(files: File[]) {
+    if (inFlight.current === 0) {
+      parts.current = [];
+      setFailed([]);
+      setRejected([]);
+      setAlreadyIn([]);
+    }
+    inFlight.current++;
+    try {
+      const current = limits ?? (await ensureLimits());
+      const slots = files.map(() => parts.current.push("") - 1);
+      const say = () => setStatus(parts.current.filter(Boolean).join(" "));
+      await Promise.all(files.map((file, n) => one(file, slots[n], current, say)));
+    } finally {
+      inFlight.current--;
+    }
+  }
+
+  async function one(file: File, i: number, current: UploadLimits | null, say: () => void) {
+    const reason = rejectionReason(file, current);
+    if (reason) {
+      setRejected((list) => [...list, { name: file.name, reason }]);
+      parts.current[i] = `${file.name}: ${reason}`;
+      say();
+      return;
+    }
+    parts.current[i] = `Checking ${file.name}…`;
+    say();
+    const id = `upload-${++traySeq.current}`;
+    setTray((items) => [{ id, name: file.name, size: `${megabytes(file.size)} MB`, status: "uploading", progress: 0 }, ...items]);
+    await acquireSlot();
+    try {
+      await send(file, i, id, current, say);
+    } finally {
+      releaseSlot();
+    }
+  }
+
+  async function send(file: File, i: number, id: string, current: UploadLimits | null, say: () => void) {
+    let existing: string | null = null;
+    try {
+      existing = await check(file);
+    } catch (error) {
+      if (error instanceof SessionExpiredError) return; // the session screen replaces this page
+      // Any other failure: upload anyway; the server-side hash decides (PRD D19).
+    }
+    if (existing) {
+      const documentId = existing;
+      setTray((items) => items.filter((t) => t.id !== id));
+      setAlreadyIn((list) => [...list, { name: file.name, documentId }]);
+      parts.current[i] = `${file.name}: Already in your library.`;
+      say();
+      return;
+    }
+    parts.current[i] = `Uploading ${file.name}…`;
+    say();
+    const started: { documentId?: string } = {};
+    try {
+      if (!current) throw new Error("Upload limits unavailable");
+      await upload(file, {
+        onStarted: (documentId) => {
+          started.documentId = documentId;
+          setSending(documentId, true);
+          void refresh();
+        },
+        onProgress: (progress) => updateTray(id, { progress }),
+      });
+      updateTray(id, { status: "uploaded", progress: 1 });
+      parts.current[i] = `Uploaded ${file.name}. Processing.`;
+    } catch {
+      // A 401 is handled by the API client: the session screen replaces this page.
+      updateTray(id, { status: "failed" });
+      parts.current[i] = `Upload failed: ${file.name}.`;
+      setFailed((names) => [...names, file.name]);
+    }
+    if (started.documentId) setSending(started.documentId, false);
+    say();
+    await refresh();
+  }
+
+  function onPick(event: ChangeEvent<HTMLInputElement>) {
     const files = [...(event.target.files ?? [])];
     event.target.value = ""; // picking the same file again fires change again
-    setFailed(null);
-    setRejected([]);
-    setAlreadyIn([]);
-    const current = limits ?? (await ensureLimits());
-    // One combined message for the whole pick, so no file's result overwrites another's in the live region.
-    const parts: string[] = [];
-    for (const file of files) {
-      const reason = rejectionReason(file, current);
-      if (reason) {
-        setRejected((list) => [...list, { name: file.name, reason }]);
-        parts.push(`${file.name}: ${reason}`);
-        setStatus(parts.join(" "));
-        continue;
-      }
-      setStatus([...parts, `Checking ${file.name}…`].join(" "));
-      let existing: string | null = null;
-      try {
-        existing = await check(file);
-      } catch (error) {
-        if (error instanceof SessionExpiredError) return; // the session screen replaces this page
-        // Any other failure: upload anyway; the server-side hash decides (PRD D19).
-      }
-      if (existing) {
-        const documentId = existing;
-        setAlreadyIn((list) => [...list, { name: file.name, documentId }]);
-        parts.push(`${file.name}: Already in your library.`);
-        setStatus(parts.join(" "));
-        continue;
-      }
-      setFailed(null);
-      setStatus([...parts, `Uploading ${file.name}…`].join(" "));
-      try {
-        if (!current) throw new Error("Upload limits unavailable");
-        await upload(file);
-        parts.push(`Uploaded ${file.name}. Processing.`);
-      } catch {
-        // A 401 is handled by the API client: the session screen replaces this page.
-        parts.push(`Upload failed: ${file.name}.`);
-        setFailed(file.name);
-      }
-      setStatus(parts.join(" "));
-      await refresh();
-    }
+    if (files.length) void addFiles(files);
+  }
+
+  const dragging = usePageDrop((files) => {
+    if (!picking) void addFiles(files); // the subject dialog is modal
+  });
+
+  function closeTray() {
+    setTray([]);
+    document.getElementById("main-content")?.focus(); // the Close button is gone
   }
 
   async function onRetry(doc: DocumentResponse) {
@@ -192,16 +273,16 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
         multiple
         hidden
         aria-label="Upload PDFs"
-        onChange={(e) => void onPick(e)}
+        onChange={onPick}
       />
       <p ref={statusRegion} tabIndex={-1} role="status" aria-live="polite" className={styles.status}>
         {status}
       </p>
-      {failed && (
-        <p className={styles.error}>
-          Couldn't upload {failed}. Try again.
+      {failed.map((name, i) => (
+        <p key={`${name}-${i}`} className={styles.error}>
+          Couldn't upload {name}. Try again.
         </p>
-      )}
+      ))}
       {rejected.length > 0 && (
         <ul className={styles.rejected} aria-label="Files not uploaded">
           {rejected.map((r, i) => (
@@ -239,7 +320,7 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
           variant="dropzone"
           icon={Upload}
           title="Upload your first document"
-          note="You can pick several PDFs at once."
+          note="Or drop files anywhere on this page. You can add several at once."
           actions={
             <Button variant="primary" size="lg" icon={Upload} onClick={pick}>
               Choose PDFs
@@ -255,8 +336,10 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
           )}
         </EmptyState>
       )}
-      {documents && documents.length > 0 && <DocumentTable documents={documents} onRetry={(d) => void onRetry(d)} retrying={retrying} onChooseSubjects={setPicking} />}
+      {documents && documents.length > 0 && <DocumentTable documents={documents} onRetry={(d) => void onRetry(d)} retrying={retrying} onChooseSubjects={setPicking} uploading={uploading} />}
       {picking && <SubjectPicker document={picking} load={loadSuggestions} save={saveSubjects} onClose={() => setPicking(null)} onSaved={(doc) => void onSaved(doc)} />}
+      {dragging && !picking && <DropOverlay />}
+      <UploadTray items={tray} onClose={closeTray} />
     </>
   );
 }

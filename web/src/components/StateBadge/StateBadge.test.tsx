@@ -5,6 +5,7 @@ import { StateBadge, type DocumentState } from "./StateBadge";
 
 describe("StateBadge", () => {
   it.each<[DocumentState, string]>([
+    ["uploading", "Uploading"],
     ["processing", "Processing"],
     ["awaiting_subjects", "Choose subjects"],
     ["ready", "Ready"],

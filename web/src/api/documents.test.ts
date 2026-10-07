@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SessionExpiredError } from "../auth/authClient";
 import { configureApiClient } from "./client";
@@ -7,6 +7,7 @@ import {
   loadDocuments,
   loadSubjectSuggestions,
   loadUploadLimits,
+  postForm,
   rejectionReason,
   RetriesUsedUpError,
   retryProcessing,
@@ -44,25 +45,84 @@ describe("uploadPdf", () => {
 
   it("asks for a presigned POST with the file name, then posts the fields and the file last", async () => {
     const { apiClient, fetch } = api(() => json(started, 201));
-    const post = vi.fn(async () => new Response(null, { status: 204 }));
+    const post = vi.fn(async () => 204);
     const file = new File(["%PDF"], "paper.pdf", { type: "application/pdf" });
 
-    await uploadPdf(file, apiClient, post);
+    await uploadPdf(file, {}, apiClient, post);
 
     const request = fetch.mock.calls[0]![0] as Request;
     expect(request.url).toBe("http://api.test/uploads");
     expect(await request.json()).toEqual({ file_name: "paper.pdf" });
-    const [url, init] = post.mock.calls[0]! as unknown as [string, RequestInit];
+    const [url, form] = post.mock.calls[0]! as unknown as [string, FormData];
     expect(url).toBe("http://s3.test/bucket");
-    const form = init.body as FormData;
     expect([...form.keys()]).toEqual(["key", "policy", "file"]);
     expect(form.get("file")).toBe(file);
   });
 
-  it("rejects when S3 refuses the file", async () => {
+  it("reports the new document id, then the progress, then 1 when storage accepts the file", async () => {
     const { apiClient } = api(() => json(started, 201));
-    const post = vi.fn(async () => new Response("<Error/>", { status: 403 }));
-    await expect(uploadPdf(new File(["x"], "x.pdf"), apiClient, post)).rejects.toThrow("403");
+    const seen: string[] = [];
+    const post = vi.fn(async (_url: string, _form: FormData, onProgress: (f: number) => void) => {
+      onProgress(0.5);
+      return 204;
+    });
+    await uploadPdf(new File(["%PDF"], "p.pdf"), { onStarted: (id) => seen.push(`started ${id}`), onProgress: (f) => seen.push(`progress ${f}`) }, apiClient, post);
+    expect(seen).toEqual(["started d1", "progress 0.5", "progress 1"]);
+  });
+
+  it("rejects when S3 refuses the file, and never reports 1", async () => {
+    const { apiClient } = api(() => json(started, 201));
+    const onProgress = vi.fn();
+    await expect(uploadPdf(new File(["x"], "x.pdf"), { onProgress }, apiClient, async () => 403)).rejects.toThrow("403");
+    expect(onProgress).not.toHaveBeenCalledWith(1);
+  });
+});
+
+describe("postForm", () => {
+  class FakeXhr {
+    static last: FakeXhr;
+    upload: { onprogress: ((e: { lengthComputable: boolean; loaded: number; total: number }) => void) | null } = { onprogress: null };
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    onabort: (() => void) | null = null;
+    status = 0;
+    method = "";
+    url = "";
+    body: unknown = null;
+    constructor() {
+      FakeXhr.last = this;
+    }
+    open(method: string, url: string) {
+      this.method = method;
+      this.url = url;
+    }
+    send(body: unknown) {
+      this.body = body;
+    }
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("posts the form and reports the fraction sent, then resolves with the status", async () => {
+    vi.stubGlobal("XMLHttpRequest", FakeXhr);
+    const form = new FormData();
+    const onProgress = vi.fn();
+    const sent = postForm("http://s3.test/bucket", form, onProgress);
+    const xhr = FakeXhr.last;
+    expect([xhr.method, xhr.url, xhr.body]).toEqual(["POST", "http://s3.test/bucket", form]);
+    xhr.upload.onprogress!({ lengthComputable: true, loaded: 25, total: 100 });
+    xhr.upload.onprogress!({ lengthComputable: false, loaded: 0, total: 0 });
+    xhr.status = 204;
+    xhr.onload!();
+    await expect(sent).resolves.toBe(204);
+    expect(onProgress.mock.calls).toEqual([[0.25]]);
+  });
+
+  it("rejects on a network error", async () => {
+    vi.stubGlobal("XMLHttpRequest", FakeXhr);
+    const sent = postForm("http://s3.test/bucket", new FormData(), vi.fn());
+    FakeXhr.last.onerror!();
+    await expect(sent).rejects.toThrow("Upload to storage failed");
   });
 });
 
