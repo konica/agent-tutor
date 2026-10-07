@@ -14,11 +14,20 @@ from langchain_core.tracers import LangChainTracer
 from fakes import FakeRetriever, fake_chat_model
 from smart_tutor.apps.agent.graph import build_graph
 from smart_tutor.apps.agent.state import AgentContext
+from smart_tutor.shared.domain.ids import SubjectId
+from smart_tutor.tutoring.application import DetectionPolicy
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 
 TOKEN = "eyJhbGciOi.token-under-test.signature-xyz"
-INPUT = {"question": "What is attention?", "subject_ids": ["s1"], "subject_names": ["General"]}
+INPUT = {"question": "What is attention?", "learner_subjects": {"s1": "General"}}
+POLICY = DetectionPolicy(0.5, 0.125, 0.0625)
 CHUNKS = [RetrievedChunk("c1", "a.pdf", 3, "Attention weighs tokens.", 0.9)]
+# Two learner subjects make resolve_subjects run the detection search; the chunks say which subject they belong to.
+TWO_SUBJECTS = {"question": "What is attention?", "learner_subjects": {"s1": "A", "s2": "B"}}
+TAGGED_CHUNKS = [
+    RetrievedChunk("c1", "a.pdf", 3, "Attention weighs tokens.", 0.9, (SubjectId("s1"),)),
+    RetrievedChunk("c2", "b.pdf", 1, "Agents call tools.", 0.2, (SubjectId("s2"),)),
+]
 
 
 class RecordingClient(langsmith.Client):
@@ -35,11 +44,12 @@ class RecordingClient(langsmith.Client):
         self.payloads.append({"op": "update", "run_id": str(args[0]) if args else None, **kwargs})
 
 
-async def traced_run(state: dict[str, Any]) -> tuple[str, str]:
+async def traced_run(state: dict[str, Any], retriever: FakeRetriever | None = None) -> tuple[str, str]:
     """Run the graph with the token in context; return (dumped trace payloads, dumped output state)."""
     recorder = RecordingClient()
     tracer = LangChainTracer(client=recorder, project_name="test")
-    graph = build_graph(lambda token: FakeRetriever(CHUNKS), fake_chat_model(AIMessage("It weighs tokens [1].")))
+    retriever = retriever or FakeRetriever(CHUNKS)
+    graph = build_graph(lambda token: retriever, fake_chat_model(AIMessage("It weighs tokens [1].")), POLICY)
     with langsmith.tracing_context(enabled=True):
         out = await graph.ainvoke(state, context=AgentContext(access_token=TOKEN), config={"callbacks": [tracer]})
     tracer.wait_for_futures()
@@ -51,6 +61,18 @@ async def test_the_token_never_reaches_traces_or_state() -> None:
     traces, out = await traced_run(INPUT)
     assert "What is attention?" in traces  # the payloads hold the run's inputs
     assert "It weighs tokens [1]." in traces  # and the model's output
+    assert TOKEN not in traces
+    assert TOKEN not in out
+
+
+async def test_the_token_never_reaches_traces_when_detection_searches() -> None:
+    retriever = FakeRetriever(TAGGED_CHUNKS)
+    traces, out = await traced_run(TWO_SUBJECTS, retriever)
+    # The detection search ran over both subjects inside the traced resolve_subjects node.
+    assert ["s1", "s2"] in [subjects for _, subjects, _ in retriever.calls]
+    assert "resolve_subjects" in traces
+    assert json.loads(out)["subject_ids"] == ["s1"]
+    assert "What is attention?" in traces
     assert TOKEN not in traces
     assert TOKEN not in out
 

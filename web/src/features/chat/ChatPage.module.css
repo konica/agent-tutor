@@ -7,8 +7,12 @@
 .chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
 .headerChips { margin-top: var(--sp-3); }
 
-/* The header shows at most two lines of a long question; the full text is in the bubble. */
-.clampedTitle { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* The header shows at most two lines of a long question; the full text is in the bubble. The v0.7 mockup sets the
+   thread title in the body font, semibold, not the serif display font base.css gives every h1. */
+.clampedTitle {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  font-family: var(--font-body); font-weight: 600;
+}
 
 /* The learner's words: a right-aligned bubble, apart from the tutor's prose. */
 .question {

@@ -174,6 +174,7 @@ class _Chunks(ChunkRepository):
             content = self._s.contents.get(d.content_id) if d.content_id is not None else None
             return d.title_override or (content.title if content else None) or d.file_name
 
+        requested = set(subject_ids)
         hits = [
             ChunkHit(
                 str(uuid.uuid5(uuid.NAMESPACE_URL, f"{c.content_id}:{c.seq}")),
@@ -182,6 +183,7 @@ class _Chunks(ChunkRepository):
                 c.page,
                 c.text,
                 _cosine(embedding, c.embedding),
+                tuple(sorted(s for s in d.subject_ids if s in requested)),
             )
             for d in self._s.documents.values()
             if d.content_id is not None and d.searchable_by(user_id, subject_ids)

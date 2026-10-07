@@ -58,6 +58,7 @@ async def test_search_returns_the_callers_chunks_as_structured_content() -> None
     assert not result.is_error
     [chunk] = result.structured_content["chunks"]
     assert chunk["text"] == "Attention is all you need." and chunk["page"] == 1
+    assert chunk["subject_ids"] == ["00000000-0000-4000-8000-000000000001"]
 
 
 @pytest.mark.parametrize("headers", [{}, {"Authorization": "Bearer unknown"}, {"Authorization": "Basic x"}])

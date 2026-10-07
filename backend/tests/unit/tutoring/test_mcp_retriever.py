@@ -11,7 +11,7 @@ from smart_tutor.apps.mcp_server.server import build_server
 from smart_tutor.knowledge.application import SearchService
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.errors import UnauthenticatedError
-from smart_tutor.shared.domain.ids import UserId
+from smart_tutor.shared.domain.ids import SubjectId, UserId
 from smart_tutor.shared.domain.principal import Principal
 from smart_tutor.subjects.application import GENERAL_SUBJECT_ID
 from smart_tutor.tutoring.adapters.mcp_retriever import McpRetriever
@@ -37,6 +37,16 @@ async def test_returns_retrieved_chunks_for_the_tokens_learner() -> None:
     assert found.text == "Attention is all you need."
     assert found.page == 1
     assert found.document_title.endswith(".pdf")
+
+
+async def test_a_chunk_names_which_searched_subjects_it_belongs_to() -> None:
+    library = InMemoryLibrary()
+    other = SubjectId("00000000-0000-4000-8000-0000000000a2")
+    ingest_ready(library, "ada", "Attention is all you need.", subject_ids=[GENERAL_SUBJECT_ID, other])
+    async with in_process_mcp(build(library, verifier_for_ada())) as transport:
+        retriever = McpRetriever(MCP_TEST_URL, "t-ada", transport)
+        [found] = await retriever.search("Attention is all you need.", [other, GENERAL_SUBJECT_ID])
+    assert found.subject_ids == (GENERAL_SUBJECT_ID, other)
 
 
 async def test_a_refused_token_raises_unauthenticated() -> None:

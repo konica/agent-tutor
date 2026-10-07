@@ -5,6 +5,7 @@ from smart_tutor.knowledge.application.document_service import DocumentService, 
 from smart_tutor.knowledge.application.ingestion_service import IngestionService, ProcessingTools
 from smart_tutor.knowledge.application.limits import load_file_limits, load_max_attempts
 from smart_tutor.knowledge.application.retry_service import RetryService, retried_content, retry_message
+from smart_tutor.knowledge.application.search_service import MAX_SUBJECTS as MAX_SEARCH_SUBJECTS
 from smart_tutor.knowledge.application.search_service import SearchService
 from smart_tutor.knowledge.application.subject_choice import SubjectChoiceService, SubjectSuggestions
 from smart_tutor.knowledge.application.upload_service import (
@@ -30,6 +31,7 @@ from smart_tutor.knowledge.ports.pdf_extractor import PdfExtractor, TooManyPages
 
 __all__ = [
     "FIRST_PAGES",
+    "MAX_SEARCH_SUBJECTS",
     "PDF_CONTENT_TYPE",
     "ChunkHit",
     "ContentState",

@@ -11,7 +11,7 @@ from smart_tutor.knowledge.ports.library import LibraryUnitOfWork
 from smart_tutor.shared.domain.ids import SubjectId, UserId
 
 MAX_QUERY_CHARS = 4000
-MAX_SUBJECTS = 3
+MAX_SUBJECTS = 100  # all of a learner's subjects, for subject detection (PRD §9.2 step 1)
 MAX_K = 20
 
 
@@ -25,7 +25,7 @@ class SearchService:
         if not query or len(query) > MAX_QUERY_CHARS:
             raise InvalidSearchError(f"A query has 1 to {MAX_QUERY_CHARS} characters")
         if not 1 <= len(subject_ids) <= MAX_SUBJECTS:
-            raise InvalidSearchError("Search 1 to 3 subjects")
+            raise InvalidSearchError(f"Search 1 to {MAX_SUBJECTS} subjects")
         for subject_id in subject_ids:
             try:
                 uuid.UUID(subject_id)

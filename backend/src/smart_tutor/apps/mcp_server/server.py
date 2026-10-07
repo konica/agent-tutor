@@ -35,6 +35,7 @@ class ChunkResult(BaseModel):
     page: int | None
     text: str
     score: float
+    subject_ids: list[str]
 
 
 class SearchResponse(BaseModel):
@@ -73,7 +74,10 @@ def build_server(settings: Settings, verifier: TokenVerifier, search: SearchServ
 
     @mcp.tool(name="search")
     async def search_tool(query: str, subject_ids: list[str], k: int = 5) -> SearchResponse:
-        """Chunks of the caller's ready documents in any of these subjects, nearest first."""
+        """Chunks of the caller's ready documents in any of these subjects (1 to 100), nearest first.
+
+        Each chunk names which of the subjects it belongs to.
+        """
         token = get_access_token()
         if token is None or not token.subject:
             raise ToolError("not authenticated")
@@ -92,6 +96,7 @@ def build_server(settings: Settings, verifier: TokenVerifier, search: SearchServ
                     page=h.page,
                     text=h.text,
                     score=h.score,
+                    subject_ids=[str(s) for s in h.subject_ids],
                 )
                 for h in hits
             ]

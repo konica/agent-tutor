@@ -12,7 +12,7 @@ from fakes.mcp import MCP_TEST_URL
 from smart_tutor.apps.mcp_server import server
 from smart_tutor.knowledge.application import SearchService
 from smart_tutor.shared.config import Settings
-from smart_tutor.shared.domain.ids import UserId
+from smart_tutor.shared.domain.ids import SubjectId, UserId
 from smart_tutor.shared.domain.principal import Principal
 from smart_tutor.subjects.application import GENERAL_SUBJECT_ID
 
@@ -59,3 +59,14 @@ async def test_a_user_id_argument_changes_nothing() -> None:
     chunks = result.structured_content["chunks"]
     assert chunks and all(c["text"] == B_TEXT for c in chunks)
     assert A_TEXT not in json.dumps(chunks) and a_doc not in json.dumps(chunks)
+
+
+async def test_a_hit_names_only_the_subjects_asked_for() -> None:
+    library, verifier, _ = world()
+    other = SubjectId("00000000-0000-4000-8000-0000000000b2")
+    ingest_ready(library, "learner-a", "Attention scales with heads.", subject_ids=[GENERAL_SUBJECT_ID, other])
+    result = await search_as(
+        library, verifier, "token-a", query="Attention scales with heads.", subject_ids=[str(GENERAL_SUBJECT_ID)]
+    )
+    assert not result.is_error
+    assert all(c["subject_ids"] == [str(GENERAL_SUBJECT_ID)] for c in result.structured_content["chunks"])

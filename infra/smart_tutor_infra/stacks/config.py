@@ -13,8 +13,16 @@ class ConfigStack(cdk.Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs: Any) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # Per-file limits and processing attempts (PRD §11, §9.5), read at startup by the API and the worker; change them here, not in code.
-        for name, value in (("max-upload-mb", "50"), ("max-pages", "500"), ("max-processing-attempts", "3")):
+        # Per-file limits and processing attempts (PRD §11, §9.5), read at startup by the API and the worker, and the
+        # detection thresholds (PRD §9.2), read by the agent; change them here, not in code.
+        for name, value in (
+            ("max-upload-mb", "50"),
+            ("max-pages", "500"),
+            ("max-processing-attempts", "3"),
+            ("detect-threshold", "0.35"),
+            ("detect-margin", "0.05"),
+            ("multi-margin", "0.03"),
+        ):
             ssm.StringParameter(self, f"Param-{name}", parameter_name=f"/smart-tutor/{name}", string_value=value)
 
         # Keycloak (#57): the bootstrap admin, and the confidential clients' secrets that the realm import reads.

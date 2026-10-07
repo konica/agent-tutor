@@ -1,5 +1,7 @@
 """SearchService: chunks only from the caller's ready, non-archived documents in the requested subjects."""
 
+import uuid
+
 import pytest
 
 from fakes import InMemoryLibrary, fake_embeddings, ingest_ready
@@ -67,7 +69,7 @@ def test_best_first_and_at_most_k() -> None:
         ("  ", [GENERAL_SUBJECT_ID], 5),
         ("x" * 4001, [GENERAL_SUBJECT_ID], 5),
         ("q", [], 5),
-        ("q", [SubjectId(f"00000000-0000-4000-8000-{i:012d}") for i in range(4)], 5),
+        ("q", [SubjectId(f"00000000-0000-4000-8000-{i:012d}") for i in range(101)], 5),
         ("q", [GENERAL_SUBJECT_ID], 0),
         ("q", [GENERAL_SUBJECT_ID], 21),
     ],
@@ -80,3 +82,30 @@ def test_rejects_invalid_requests(query: str, subjects: list[SubjectId], k: int)
 def test_rejects_a_subject_id_that_is_not_a_uuid() -> None:
     with pytest.raises(InvalidSearchError):
         service(InMemoryLibrary()).search(UserId("ada"), "q", [SubjectId("not-a-uuid")])
+
+
+S1 = SubjectId("00000000-0000-4000-8000-0000000000a1")
+S2 = SubjectId("00000000-0000-4000-8000-0000000000a2")
+
+
+def test_a_hit_lists_only_the_requested_subjects_its_document_has() -> None:
+    library = InMemoryLibrary()
+    ingest_ready(library, "ada", "Attention weighs tokens.", subject_ids=[S1, S2])
+    search = service(library)
+
+    [only_s2] = search.search(UserId("ada"), "Attention weighs tokens.", [S2])
+    [both] = search.search(UserId("ada"), "Attention weighs tokens.", [S2, S1])
+
+    assert only_s2.subject_ids == (S2,)
+    assert both.subject_ids == (S1, S2)  # sorted
+
+
+def test_search_takes_up_to_100_subjects() -> None:
+    library = InMemoryLibrary()
+    ingest_ready(library, "ada", "Attention weighs tokens.")
+    search = service(library)
+    many = [SubjectId(str(uuid.UUID(int=i))) for i in range(1, 100)] + [GENERAL_SUBJECT_ID]
+
+    assert len(search.search(UserId("ada"), "Attention weighs tokens.", many)) == 1
+    with pytest.raises(InvalidSearchError, match="1 to 100 subjects"):
+        search.search(UserId("ada"), "q", [*many, SubjectId(str(uuid.UUID(int=101)))])

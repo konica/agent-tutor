@@ -52,6 +52,13 @@ class McpRetriever(Retriever):
         if result.is_error or not result.structured_content:
             raise RetrievalError("search returned an error")
         return [
-            RetrievedChunk(c["chunk_id"], c["document_title"], c["page"], c["text"], c["score"])
+            RetrievedChunk(
+                c["chunk_id"],
+                c["document_title"],
+                c["page"],
+                c["text"],
+                c["score"],
+                tuple(SubjectId(s) for s in c["subject_ids"]),
+            )
             for c in result.structured_content["chunks"]
         ]

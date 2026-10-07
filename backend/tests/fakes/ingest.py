@@ -17,8 +17,9 @@ from smart_tutor.subjects.application import GENERAL_SUBJECT_ID
 def ingest_ready(
     library: InMemoryLibrary, owner: str, text: str, subject_ids: Sequence[SubjectId] = (GENERAL_SUBJECT_ID,)
 ) -> DocumentId:
-    """A document of `owner` that is ready in `subject_ids` (General by default), with one page-1 chunk of `text`
-    embedded by `fake_embeddings()`.
+    """A document of `owner` that is ready in `subject_ids` (General by default).
+
+    It has one page-1 chunk of `text`, embedded by `fake_embeddings()`.
 
     Built through the domain (not `IngestionService`) because ingestion rejects pages too short to be a text layer.
     """
