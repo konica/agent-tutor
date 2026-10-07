@@ -11,6 +11,7 @@ from fakes import (
     DESCRIPTION_ARGS,
     TEST_LIMITS,
     FakeObjectStore,
+    FakeQueue,
     FakeTokenVerifier,
     InMemoryLibrary,
     api_services,
@@ -31,7 +32,7 @@ def setup() -> tuple[TestClient, FakeObjectStore, IngestionService]:
     verifier.add("token-a", Principal(UserId("learner-a"), "A", frozenset({"learner"})))
     verifier.add("token-b", Principal(UserId("learner-b"), "B", frozenset({"learner"})))
     library, objects = InMemoryLibrary(), FakeObjectStore()
-    services = api_services(library, objects)
+    services = api_services(library, objects, queue=FakeQueue())
     client = TestClient(create_app(Settings(), verifier=verifier, services=services))
     return client, objects, IngestionService(library.unit_of_work, objects, fake_tools(), TEST_LIMITS)
 
@@ -70,6 +71,19 @@ def test_b_cannot_get_a_presigned_post_for_a_key() -> None:
     own = client.post("/uploads", json={"file_name": "x.pdf"}, headers=B, params={"user_id": "learner-a"}).json()
     assert own["fields"]["key"].startswith("uploads/learner-b/")
     assert all(key.startswith("uploads/learner-b/") for key, *_ in objects.presigned)
+
+
+def test_b_cannot_retry_a_documents_processing() -> None:
+    client, objects, ingestion = setup()
+    started = client.post("/uploads", json={"file_name": "scan.pdf"}, headers=A).json()
+    objects.objects[started["fields"]["key"]] = b"%PDF-1.7 tiny"
+    ingestion.ingest_upload(started["fields"]["key"])
+
+    response = client.post(f"/documents/{started['document_id']}/retry", headers=B)
+
+    assert response.status_code == 404  # the same answer as for a document that doesn't exist
+    [doc] = client.get("/documents", headers=A).json()
+    assert (doc["state"], doc["attempt"]) == ("failed", 1)
 
 
 def test_b_checking_as_file_hash_finds_nothing() -> None:

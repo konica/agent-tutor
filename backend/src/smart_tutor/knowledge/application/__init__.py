@@ -3,7 +3,8 @@
 from smart_tutor.knowledge.application.describer import FIRST_PAGES, Described, DocumentDescriber
 from smart_tutor.knowledge.application.document_service import DocumentService, DocumentView
 from smart_tutor.knowledge.application.ingestion_service import IngestionService, ProcessingTools
-from smart_tutor.knowledge.application.limits import load_file_limits
+from smart_tutor.knowledge.application.limits import load_file_limits, load_max_attempts
+from smart_tutor.knowledge.application.retry_service import RetryService, retried_content, retry_message
 from smart_tutor.knowledge.application.search_service import SearchService
 from smart_tutor.knowledge.application.upload_service import (
     PDF_CONTENT_TYPE,
@@ -11,7 +12,12 @@ from smart_tutor.knowledge.application.upload_service import (
     UploadService,
 )
 from smart_tutor.knowledge.domain.content import ContentState
-from smart_tutor.knowledge.domain.errors import InvalidFileNameError, InvalidSearchError
+from smart_tutor.knowledge.domain.errors import (
+    DocumentNotFoundError,
+    InvalidFileNameError,
+    InvalidSearchError,
+    RetryLimitError,
+)
 from smart_tutor.knowledge.domain.limits import FileLimits
 from smart_tutor.knowledge.domain.search import ChunkHit
 from smart_tutor.knowledge.domain.upload import UploadOutcome
@@ -26,6 +32,7 @@ __all__ = [
     "ContentState",
     "Described",
     "DocumentDescriber",
+    "DocumentNotFoundError",
     "DocumentService",
     "DocumentView",
     "FileLimits",
@@ -36,6 +43,8 @@ __all__ = [
     "ObjectStore",
     "PdfExtractor",
     "ProcessingTools",
+    "RetryLimitError",
+    "RetryService",
     "SearchService",
     "StartedUpload",
     "TooManyPagesError",
@@ -43,4 +52,7 @@ __all__ = [
     "UploadOutcome",
     "UploadService",
     "load_file_limits",
+    "load_max_attempts",
+    "retried_content",
+    "retry_message",
 ]

@@ -11,6 +11,14 @@ def test_file_limits_are_ssm_parameters() -> None:
     template.has_resource_properties("AWS::SSM::Parameter", {"Name": "/smart-tutor/max-pages", "Value": "500"})
 
 
+def test_max_processing_attempts_is_an_ssm_parameter() -> None:
+    template = Template.from_stack(ConfigStack(cdk.App(), "Config"))
+
+    template.has_resource_properties(
+        "AWS::SSM::Parameter", {"Name": "/smart-tutor/max-processing-attempts", "Value": "3"}
+    )
+
+
 def test_keycloak_admin_and_client_secrets_are_generated_not_written() -> None:
     template = Template.from_stack(ConfigStack(cdk.App(), "Config"))
 

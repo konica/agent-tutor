@@ -1,7 +1,7 @@
 import pytest
 
 from fakes import FakeParameterStore
-from smart_tutor.knowledge.application import FileLimits, load_file_limits
+from smart_tutor.knowledge.application import FileLimits, load_file_limits, load_max_attempts
 from smart_tutor.knowledge.domain.limits import MIB
 from smart_tutor.shared.ports.parameter_store import ParameterNotFoundError
 
@@ -31,3 +31,10 @@ def test_a_missing_parameter_is_not_defaulted() -> None:
 def test_limits_must_be_positive(size: int, pages: int) -> None:
     with pytest.raises(ValueError):
         FileLimits(max_bytes=size, max_pages=pages)
+
+
+def test_max_attempts_comes_from_ssm_and_must_be_positive() -> None:
+    assert load_max_attempts(FakeParameterStore({"/a": "3"}), "/a") == 3
+    for bad in ("0", "-1", "three", ""):
+        with pytest.raises(ValueError):
+            load_max_attempts(FakeParameterStore({"/a": bad}), "/a")

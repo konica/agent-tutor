@@ -30,7 +30,7 @@ class ContentRepository(ABC):
 
     @abstractmethod
     def save(self, content: Content) -> None:
-        """Write back state, failure_reason, and how it was processed (pages, text_key, chunker, embedding)."""
+        """Write back state, failure_reason, attempts, and how it was processed (pages, text_key, chunker, ...)."""
 
 
 class DocumentRepository(ABC):
@@ -48,6 +48,14 @@ class DocumentRepository(ABC):
     @abstractmethod
     def list_processing_for_content_for_update(self, content_id: ContentId) -> list[Document]:
         """Every processing document linked to this content, locked until the unit of work ends."""
+
+    @abstractmethod
+    def get(self, document_id: DocumentId) -> Document | None:
+        """The document, not locked (no access check: callers apply `can_read`)."""
+
+    @abstractmethod
+    def list_failed_for_content_for_update(self, content_id: ContentId) -> list[Document]:
+        """Every failed document linked to this content, locked until the unit of work ends."""
 
     @abstractmethod
     def list_readable_by(self, user_id: UserId) -> list[Document]:

@@ -2,12 +2,12 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { DocumentResponse } from "../../api/documents";
+import { RetriesUsedUpError, type DocumentResponse } from "../../api/documents";
 import { LibraryPage } from "./LibraryPage";
 
 const today = new Date().toISOString();
-const processing: DocumentResponse = { document_id: "d1", title: "lewis-rag-2020.pdf", state: "processing", failure_reason: null, created_at: today, subjects: [] };
-const duplicate: DocumentResponse = { document_id: "d2", title: "copy.pdf", state: "failed", failure_reason: "Duplicate uploads aren't supported yet", created_at: today, subjects: [] };
+const processing: DocumentResponse = { document_id: "d1", title: "lewis-rag-2020.pdf", state: "processing", failure_reason: null, created_at: today, subjects: [], attempt: null, max_attempts: 3, can_retry: false };
+const duplicate: DocumentResponse = { document_id: "d2", title: "copy.pdf", state: "failed", failure_reason: "Duplicate uploads aren't supported yet", created_at: today, subjects: [], attempt: null, max_attempts: 3, can_retry: false };
 
 const notInLibrary = async () => null;
 const limits = async () => ({ max_bytes: 52_428_800, max_pages: 500 });
@@ -219,5 +219,56 @@ describe("LibraryPage", () => {
     await screen.findByText("Upload your first document");
     await userEvent.upload(screen.getByLabelText("Upload PDFs"), new File(["x"], "notes.docx", { type: "application/msword" }), { applyAccept: false });
     expect(check).not.toHaveBeenCalled();
+  });
+});
+
+const scan: DocumentResponse = { document_id: "d3", title: "scan.pdf", state: "failed", failure_reason: "No text layer (scanned PDFs are not supported yet)", created_at: today, subjects: [], attempt: 1, max_attempts: 3, can_retry: true };
+
+describe("LibraryPage retry", () => {
+  it("retries a failed document and refreshes the list", async () => {
+    const load = vi.fn().mockResolvedValueOnce([scan]).mockResolvedValue([{ ...scan, state: "processing", failure_reason: null, attempt: 2, can_retry: false }]);
+    const retry = vi.fn(async () => {});
+    render(<LibraryPage loadLimits={limits} load={load} upload={vi.fn()} retry={retry} />);
+    const row = (await screen.findByText("scan.pdf")).closest("tr")!;
+    await userEvent.click(within(row).getByRole("button", { name: "Retry scan.pdf" }));
+    expect(retry).toHaveBeenCalledWith("d3");
+    expect(await within(row).findByText("Attempt 2 of 3.")).toBeVisible();
+    expect(within(row).getByText("Processing")).toBeVisible();
+    expect(within(row).queryByRole("button", { name: /Retry/ })).toBeNull();
+  });
+
+  it("shows no Retry once the attempts are used up", async () => {
+    const usedUp = { ...scan, failure_reason: "This file could not be processed", attempt: 3, can_retry: false };
+    render(<LibraryPage loadLimits={limits} load={async () => [usedUp]} upload={vi.fn()} retry={vi.fn()} />);
+    const row = (await screen.findByText("scan.pdf")).closest("tr")!;
+    expect(within(row).getByText("This file could not be processed")).toBeVisible();
+    expect(within(row).queryByRole("button", { name: /Retry/ })).toBeNull();
+  });
+
+  it("shows no Retry for a failed document without a retry", async () => {
+    render(<LibraryPage loadLimits={limits} load={async () => [duplicate]} upload={vi.fn()} retry={vi.fn()} />);
+    const row = (await screen.findByText("copy.pdf")).closest("tr")!;
+    expect(within(row).queryByRole("button", { name: /Retry/ })).toBeNull();
+  });
+
+  it("says so when a retry fails", async () => {
+    const retry = vi.fn(async () => {
+      throw new Error("POST /documents/d3/retry failed (500)");
+    });
+    render(<LibraryPage loadLimits={limits} load={async () => [scan]} upload={vi.fn()} retry={retry} />);
+    const row = (await screen.findByText("scan.pdf")).closest("tr")!;
+    await userEvent.click(within(row).getByRole("button", { name: "Retry scan.pdf" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Couldn't retry scan.pdf. Try again.");
+    expect(within(row).getByRole("button", { name: "Retry scan.pdf" })).toBeEnabled();
+  });
+
+  it("says the document could not be processed when the attempts are used up", async () => {
+    const retry = vi.fn(async () => {
+      throw new RetriesUsedUpError();
+    });
+    render(<LibraryPage loadLimits={limits} load={async () => [scan]} upload={vi.fn()} retry={retry} />);
+    const row = (await screen.findByText("scan.pdf")).closest("tr")!;
+    await userEvent.click(within(row).getByRole("button", { name: "Retry scan.pdf" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("scan.pdf could not be processed.");
   });
 });

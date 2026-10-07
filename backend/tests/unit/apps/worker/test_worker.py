@@ -5,7 +5,7 @@ import pytest
 from fakes import TEST_LIMITS, FakeObjectStore, FakeQueue, FixedClock, InMemoryLibrary, fake_tools
 from smart_tutor.apps.worker.events import upload_keys
 from smart_tutor.apps.worker.main import embedding_dimension, run_once
-from smart_tutor.knowledge.application import IngestionService, UploadService
+from smart_tutor.knowledge.application import IngestionService, RetryService, UploadService
 from smart_tutor.shared.domain.ids import UserId
 
 PDF = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
@@ -89,3 +89,17 @@ def test_embedding_dimension_must_be_configured_and_match_the_column() -> None:
         embedding_dimension({})
     with pytest.raises(ValueError, match="1024"):
         embedding_dimension({"dimensions": 256})
+
+
+def test_a_retry_message_reprocesses_the_content_and_is_deleted() -> None:
+    library, objects, uploads, ingestion = world()
+    started = uploads.start_upload(UserId("ada"), "scan.pdf")
+    objects.objects[started.fields["key"]] = b"%PDF-1.7 tiny"
+    ingestion.ingest_upload(started.fields["key"])
+    queue = FakeQueue()
+    RetryService(library.unit_of_work, queue, max_attempts=3).retry(UserId("ada"), started.document_id)
+    objects.objects[library.state.contents[library.state.documents[started.document_id].content_id].s3_key] = PDF  # type: ignore[index]
+
+    assert run_once(queue, ingestion) == 1
+    assert queue.waiting == [] and len(queue.deleted) == 1
+    assert library.state.documents[started.document_id].state.value == "ready"

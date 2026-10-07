@@ -125,10 +125,11 @@ class IngestionService:
 
         None when the content is missing or no longer processing (someone else finished it). Extraction and
         embedding run with no transaction open, so no lock is held across slow calls; the final transaction
-        rechecks the state under lock.
+        rechecks the state under lock. The first read locks the content so a retry's message waits for the
+        retry to commit.
         """
         with self._uow() as tx:
-            content = tx.contents.get(content_id)
+            content = tx.contents.get_for_update(content_id)
         if content is None or content.state is not ContentState.PROCESSING:
             return None
         data = self._objects.read(content.s3_key)

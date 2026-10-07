@@ -1,4 +1,5 @@
-"""Ingestion worker: read S3 upload events from SQS, roughly in order, and hand each to IngestionService (PRD §9.5).
+"""Ingestion worker: read S3 upload events and Library retries from SQS, roughly in order, and hand each to
+IngestionService (PRD §9.5).
 
 One message at a time (plain FIFO, no per-learner fairness). A message is deleted only after it was handled;
 a failure leaves it to come back after the visibility timeout, and the queue's redrive policy moves it to the
@@ -16,7 +17,13 @@ from smart_tutor.knowledge.adapters.pypdf_extractor import PypdfExtractor
 from smart_tutor.knowledge.adapters.s3_object_store import S3ObjectStore
 from smart_tutor.knowledge.adapters.sql_library import SqlLibraryUnitOfWork
 from smart_tutor.knowledge.adapters.sql_tables import EMBEDDING_DIM
-from smart_tutor.knowledge.application import DocumentDescriber, IngestionService, ProcessingTools, load_file_limits
+from smart_tutor.knowledge.application import (
+    DocumentDescriber,
+    IngestionService,
+    ProcessingTools,
+    load_file_limits,
+    retried_content,
+)
 from smart_tutor.shared.adapters.aws.clients import s3_client, sqs_client, ssm_client
 from smart_tutor.shared.adapters.aws.sqs_queue import SqsMessageQueue
 from smart_tutor.shared.adapters.aws.ssm_parameters import SsmParameterStore
@@ -41,12 +48,15 @@ def embedding_dimension(params: dict[str, Any]) -> int:
 def run_once(queue: MessageQueue, ingestion: IngestionService) -> int:
     messages = queue.receive()
     for message in messages:
-        keys = upload_keys(message.body)
+        retried = retried_content(message.body)  # Retry from the Library (PRD §9.5)
+        keys = [] if retried else upload_keys(message.body)
         try:
+            if retried:
+                ingestion.process_content(retried)
             for key in keys:
                 ingestion.ingest_upload(key)
         except Exception:
-            logger.exception("ingestion failed for %s; the message will be redelivered", keys)
+            logger.exception("ingestion failed for %s; the message will be redelivered", retried or keys)
             continue
         queue.delete(message)
     return len(messages)
