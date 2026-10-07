@@ -19,7 +19,7 @@ from fakes import (
 )
 from smart_tutor.apps.api.main import create_app
 from smart_tutor.shared.config import Settings
-from smart_tutor.shared.domain.ids import UserId
+from smart_tutor.shared.domain.ids import SubjectId, UserId
 from smart_tutor.shared.domain.principal import Principal
 from smart_tutor.subjects.application import SubjectNames
 
@@ -27,12 +27,17 @@ AUTH = {"Authorization": "Bearer t-ada"}
 QUESTION = {"question": "What is attention?"}
 UNAVAILABLE = "The tutor is unavailable. Try again in a moment."
 
-AGENT_SSE = (
+GENERAL = "00000000-0000-4000-8000-000000000001"
+S2 = "00000000-0000-4000-8000-000000000002"
+
+SUBJECTS_EVENT = b'event: subjects\ndata: {"subject_ids": ["00000000-0000-4000-8000-000000000001"]}\n\n'
+AGENT_ANSWER = (
     b'event: delta\ndata: {"text": "It weighs "}\n\n'
     b'event: delta\ndata: {"text": "tokens [1]."}\n\n'
     b'event: citations\ndata: {"citations": [{"n": 1, "chunk_id": "c1", "document_title": "a.pdf", "page": 3}]}\n\n'
     b"event: done\ndata: {}\n\n"
 )
+AGENT_SSE = SUBJECTS_EVENT + AGENT_ANSWER
 
 Handler = Callable[[httpx.Request], httpx.Response]
 
@@ -61,7 +66,7 @@ def recording(seen: list[httpx.Request], handler: Handler = sse_ok) -> Handler:
     return record
 
 
-def test_starts_a_thread_and_relays_the_agents_stream_after_a_thread_event() -> None:
+def test_starts_a_thread_and_relays_the_agents_answer_after_a_thread_event() -> None:
     seen: list[httpx.Request] = []
     client, threads, _ = setup(recording(seen))
 
@@ -77,13 +82,13 @@ def test_starts_a_thread_and_relays_the_agents_stream_after_a_thread_event() -> 
         "thread_id": thread.thread_id,
         "subjects": [{"subject_id": "00000000-0000-4000-8000-000000000001", "name": "General"}],
     }
-    assert rest == AGENT_SSE.decode()
+    assert rest == AGENT_ANSWER.decode()  # the agent's subjects event is replaced by the thread event
     [request] = seen
     assert request.url == "http://agent.test/ask"
     assert request.headers["authorization"] == "Bearer t-ada"  # the same token, forwarded (ADR 0007)
     assert json.loads(request.content) == {
         "question": "What is attention?",
-        "subjects": [{"subject_id": "00000000-0000-4000-8000-000000000001", "name": "General"}],
+        "learner_subjects": [{"subject_id": "00000000-0000-4000-8000-000000000001", "name": "General"}],
     }
     assert "t-ada" not in request.content.decode()  # never in the body
 
@@ -102,10 +107,86 @@ def test_a_subject_without_a_name_is_sent_with_a_placeholder_and_logged(caplog: 
 
     assert response.status_code == 200
     unnamed = [{"subject_id": "00000000-0000-4000-8000-000000000001", "name": "Unnamed subject"}]
-    assert json.loads(seen[0].content)["subjects"] == unnamed
+    assert json.loads(seen[0].content)["learner_subjects"] == unnamed
     [record] = [r for r in caplog.records if "placeholder" in r.getMessage()]
     assert record.levelno == logging.WARNING and "00000000-0000-4000-8000-000000000001" in record.getMessage()
     assert "t-ada" not in caplog.text
+
+
+def event_stream(content: bytes) -> Handler:
+    return lambda request: httpx.Response(200, content=content, headers={"content-type": "text/event-stream"})
+
+
+def test_the_thread_starts_with_the_subjects_the_agent_detected() -> None:
+    # ada has General and S2; the agent gets both and detects both
+    seen: list[httpx.Request] = []
+    verifier = FakeTokenVerifier()
+    verifier.add("t-ada", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
+    library, threads = InMemoryLibrary(), InMemoryThreads()
+    ingest_ready(library, "ada", "Attention weighs tokens.")
+    ingest_ready(library, "ada", "Language models predict tokens.", subject_ids=(SubjectId(S2),))
+    catalog = InMemorySubjects({SubjectId(GENERAL): "General", SubjectId(S2): "LLMs"})
+    detected = f'event: subjects\ndata: {{"subject_ids": ["{S2}", "{GENERAL}"]}}\n\n'.encode()
+    agent = fake_agent(recording(seen, event_stream(detected + AGENT_ANSWER)))
+    services = api_services(library, threads=threads, catalog=catalog, agent=agent)
+    client = TestClient(create_app(Settings(), verifier=verifier, services=services))
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    [thread] = threads.threads.values()
+    assert thread.subject_ids == (S2, GENERAL)  # the order the agent sent
+    first, rest = response.text.split("\n\n", 1)
+    assert json.loads(first.split("data: ", 1)[1])["subjects"] == [
+        {"subject_id": S2, "name": "LLMs"},
+        {"subject_id": GENERAL, "name": "General"},
+    ]
+    assert rest == AGENT_ANSWER.decode()
+    assert json.loads(seen[0].content)["learner_subjects"] == [
+        {"subject_id": GENERAL, "name": "General"},
+        {"subject_id": S2, "name": "LLMs"},
+    ]
+
+
+def test_an_agent_error_before_subjects_is_relayed_and_starts_no_thread() -> None:
+    error = b'event: error\ndata: {"code": "unavailable", "message": "x"}\n\n'
+    client, threads, _ = setup(event_stream(error))
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    assert response.status_code == 200 and response.text == error.decode()
+    assert threads.threads == {}
+
+
+def test_a_subject_the_learner_does_not_have_starts_no_thread(caplog: pytest.LogCaptureFixture) -> None:
+    bad = b'event: subjects\ndata: {"subject_ids": ["00000000-0000-4000-8000-000000000099"]}\n\n' + AGENT_ANSWER
+    client, threads, _ = setup(event_stream(bad))
+    caplog.set_level(logging.DEBUG)
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    assert response.text == f"event: error\ndata: {json.dumps({'code': 'unavailable', 'message': UNAVAILABLE})}\n\n"
+    assert threads.threads == {}
+    assert "What is attention?" not in caplog.text and "t-ada" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "first",
+    [
+        b'event: delta\ndata: {"text": "hi"}\n\n',
+        b"event: subjects\ndata: nope\n\n",
+        b'event: subjects\ndata: {"subject_ids": "00000000-0000-4000-8000-000000000001"}\n\n',
+        b'event: subjects\ndata: {"subject_ids": [1]}\n\n',
+        b'event: subjects\ndata: {"subject_ids": []}\n\n',
+        b"",
+    ],
+)
+def test_a_stream_that_does_not_start_with_subjects_is_unavailable(first: bytes) -> None:
+    client, threads, _ = setup(event_stream(first))
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    assert response.text.endswith(f"data: {json.dumps({'code': 'unavailable', 'message': UNAVAILABLE})}\n\n")
+    assert "event: thread" not in response.text and threads.threads == {}
 
 
 def test_no_token_is_401_and_the_agent_is_never_called() -> None:
@@ -230,14 +311,26 @@ def test_events_split_across_reads_are_relayed_byte_identical() -> None:
 
     response = client.post("/threads", json=QUESTION, headers=AUTH)
 
-    assert response.text.split("\n\n", 1)[1] == AGENT_SSE.decode()
+    assert response.text.split("\n\n", 1)[1] == AGENT_ANSWER.decode()
+
+
+def test_a_subjects_event_split_across_reads_starts_the_thread() -> None:
+    cut = len(SUBJECTS_EVENT) // 2
+    client, threads, _ = setup(streaming(_Chunks(AGENT_SSE[:cut], AGENT_SSE[cut:])))
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    [thread] = threads.threads.values()
+    first, rest = response.text.split("\n\n", 1)
+    assert first.startswith("event: thread\n") and thread.thread_id in first
+    assert rest == AGENT_ANSWER.decode()
 
 
 def test_a_stream_dropped_inside_an_event_ends_with_a_well_formed_error_event() -> None:
     client, _, _ = setup(
         streaming(
             _Chunks(
-                b'event: delta\ndata: {"text": "It weighs "}\n\n',
+                SUBJECTS_EVENT + b'event: delta\ndata: {"text": "It weighs "}\n\n',
                 b'event: delta\ndata: {"text": "half',  # half an event, then the connection drops
                 error=httpx.ReadError("connection reset"),
             )
@@ -259,7 +352,9 @@ def test_a_stream_dropped_inside_an_event_ends_with_a_well_formed_error_event() 
 
 
 def test_a_stream_that_ends_inside_an_event_ends_with_an_error_event_instead() -> None:
-    complete_then_half = b'event: delta\ndata: {"text": "It weighs "}\n\nevent: delta\ndata: {"text": "half'
+    complete_then_half = (
+        SUBJECTS_EVENT + b'event: delta\ndata: {"text": "It weighs "}\n\nevent: delta\ndata: {"text": "half'
+    )
     client, _, _ = setup(streaming(_Chunks(complete_then_half)))
 
     response = client.post("/threads", json=QUESTION, headers=AUTH)
@@ -272,7 +367,7 @@ def test_a_stream_that_ends_inside_an_event_ends_with_an_error_event_instead() -
 
 class _BreaksMidAnswer(httpx.AsyncByteStream):
     async def __aiter__(self) -> AsyncIterator[bytes]:
-        yield b'event: delta\ndata: {"text": "It weighs "}\n\n'
+        yield SUBJECTS_EVENT + b'event: delta\ndata: {"text": "It weighs "}\n\n'
         raise httpx.ReadError("connection reset")
 
 
