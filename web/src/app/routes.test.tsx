@@ -1,12 +1,13 @@
 import { act, render, screen, within } from "@testing-library/react";
-import { StrictMode } from "react";
+import { StrictMode, type ReactNode } from "react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
-import { SessionContext } from "../auth/SessionProvider";
+import { SessionContext, SessionProvider } from "../auth/SessionProvider";
+import type { AuthClient } from "../auth/authClient";
 import { NAV } from "./nav";
-import { routes } from "./routes";
+import { createRoutes } from "./routes";
 
 // The Library loads documents from the API; these tests are about routing, so it sees an empty library.
 vi.mock("../api/documents", async (importOriginal) => ({
@@ -21,18 +22,81 @@ vi.mock("../api/subjects", () => ({ loadMySubjects: async () => [{ subject_id: "
 
 const signOut = vi.fn();
 
-function renderAt(path: string, { strict = false } = {}) {
-  const router = createMemoryRouter(routes, { initialEntries: [path] });
-  const app = (
-    <SessionContext.Provider value={{ name: "Ada Lovelace", signOut }}>
-      <RouterProvider router={router} />
-    </SessionContext.Provider>
-  );
+function fakeAuth(): AuthClient {
+  return {
+    init: vi.fn(async () => {}),
+    getToken: vi.fn(async () => "t"),
+    signIn: vi.fn(async () => {}),
+    signOut: vi.fn(async () => {}),
+  };
+}
+
+// Most tests are about the shell, so the guard hands it a signed-in learner straight away.
+function SignedIn({ children }: { children: ReactNode }) {
+  return <SessionContext.Provider value={{ name: "Ada Lovelace", signOut }}>{children}</SessionContext.Provider>;
+}
+
+function renderAt(path: string, { strict = false, auth = fakeAuth(), RequireSession = SignedIn } = {}) {
+  const router = createMemoryRouter(createRoutes({ auth, RequireSession }), { initialEntries: [path] });
+  const app = <RouterProvider router={router} />;
   render(strict ? <StrictMode>{app}</StrictMode> : app);
   return router;
 }
 
+// The real guard: SessionProvider over a fake Keycloak.
+function guardedBy(auth: AuthClient) {
+  return function RequireSession({ children }: { children: ReactNode }) {
+    return (
+      <SessionProvider auth={auth} loadMe={async () => ({ name: "Ada Lovelace" })}>
+        {children}
+      </SessionProvider>
+    );
+  };
+}
+
 const nav = () => within(screen.getByRole("navigation", { name: "Main" }));
+
+describe("public landing page", () => {
+  it("shows the landing page at /, outside the app shell", () => {
+    const router = renderAt("/");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Ask your own documents.");
+    expect(screen.queryByRole("navigation", { name: "Main" })).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/");
+  });
+
+  it("does not sign in on / (no request to Keycloak), even in StrictMode", async () => {
+    const auth = fakeAuth();
+    renderAt("/", { auth, RequireSession: guardedBy(auth), strict: true });
+    expect((await screen.findAllByRole("button", { name: "Create an account" }))[0]).toBeInTheDocument();
+    expect(auth.init).not.toHaveBeenCalled();
+    expect(auth.signIn).not.toHaveBeenCalled();
+  });
+
+  it("opens Keycloak registration from the landing page, returning to the Library", async () => {
+    const auth = fakeAuth();
+    renderAt("/", { auth });
+    await userEvent.click(screen.getAllByRole("button", { name: "Create an account" })[0]!);
+    expect(auth.signIn).toHaveBeenCalledWith({ register: true, redirectTo: "/library" });
+  });
+
+  it.each(["/library", "/chat", "/notes", "/nope"])("signs in before showing %s", async (path) => {
+    const auth = fakeAuth();
+    renderAt(path, { auth, RequireSession: guardedBy(auth) });
+    expect(screen.getByRole("status")).toHaveTextContent("Signing you in");
+    expect(await screen.findByRole("navigation", { name: "Main" })).toBeInTheDocument();
+    expect(auth.init).toHaveBeenCalled();
+  });
+
+  it("returns to the landing page on sign-out", async () => {
+    // keycloakClient signs out to origin + "/" (keycloakClient.test.ts); / must then render the landing page signed out.
+    const auth = fakeAuth();
+    renderAt("/library", { auth, RequireSession: guardedBy(auth) });
+    const menu = within(await screen.findByRole("navigation", { name: "Main" }));
+    await userEvent.click(menu.getByRole("button", { name: /Ada Lovelace/ }));
+    await userEvent.click(menu.getByRole("button", { name: "Sign out" }));
+    expect(auth.signOut).toHaveBeenCalledOnce();
+  });
+});
 
 describe("app shell routes", () => {
   it("lists the Release 1 nav items in brief order", () => {
@@ -49,12 +113,6 @@ describe("app shell routes", () => {
   });
 
   // <Navigate> redirects in an effect, so wait for the Library before reading the location.
-  it("redirects / to the Library", async () => {
-    const router = renderAt("/");
-    expect(await screen.findByRole("heading", { level: 1, name: "Library" })).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/library");
-  });
-
   it("redirects unknown paths to the Library", async () => {
     const router = renderAt("/nope");
     expect(await screen.findByRole("heading", { level: 1, name: "Library" })).toBeInTheDocument();
@@ -116,8 +174,8 @@ describe("app shell routes", () => {
     expect(screen.getByRole("main")).toHaveFocus();
   });
 
-  it("leaves focus alone when the app opens at / and redirects", async () => {
-    renderAt("/");
+  it("leaves focus alone when an unknown path redirects to the Library", async () => {
+    renderAt("/nope");
     await screen.findByRole("heading", { level: 1, name: "Library" });
     expect(screen.getByRole("main")).not.toHaveFocus();
   });

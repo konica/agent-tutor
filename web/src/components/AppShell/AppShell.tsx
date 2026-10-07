@@ -17,7 +17,7 @@ export function AppShell() {
     const label = NAV.find((item) => item.path === pathname)?.label;
     document.title = label ? `${label} · Smart Tutor` : "Smart Tutor";
     // Move focus only when the learner went to another page: not on first load (StrictMode
-    // runs this twice with the same path) and not on a redirect such as / → /library.
+    // runs this twice with the same path) and not on a redirect such as an unknown path → /library.
     const moved = settledPath.current !== null && settledPath.current !== pathname && navigationType !== "REPLACE";
     settledPath.current = pathname;
     if (moved) main.current?.focus();

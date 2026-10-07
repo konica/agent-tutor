@@ -34,7 +34,7 @@
   --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
 
   --fs-12: 12px; --fs-14: 14px; --fs-16: 16px; --fs-18: 18px;
-  --fs-20: 20px; --fs-24: 24px; --fs-32: 32px; --fs-40: 40px;
+  --fs-20: 20px; --fs-24: 24px; --fs-32: 32px; --fs-40: 40px; --fs-64: 64px;
   --lh-body: 1.55; --lh-head: 1.2;
 
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px;
