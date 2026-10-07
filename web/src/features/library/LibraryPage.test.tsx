@@ -1,8 +1,8 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { RetriesUsedUpError, type DocumentResponse } from "../../api/documents";
+import { RetriesUsedUpError, type DocumentResponse, type UploadEvents } from "../../api/documents";
 import { LibraryPage } from "./LibraryPage";
 
 const today = new Date().toISOString();
@@ -53,9 +53,9 @@ describe("LibraryPage", () => {
     await screen.findByText("Upload your first document");
     const file = new File(["%PDF"], "lewis-rag-2020.pdf", { type: "application/pdf" });
     await userEvent.upload(screen.getByLabelText("Upload PDFs"), file);
-    expect(upload).toHaveBeenCalledWith(file);
+    expect(upload).toHaveBeenCalledWith(file, expect.any(Object));
     expect(screen.getByRole("status")).toHaveTextContent(/Uploading lewis-rag-2020.pdf…|Uploaded lewis-rag-2020.pdf. Processing./);
-    expect(await screen.findByText("lewis-rag-2020.pdf")).toBeVisible();
+    expect(await screen.findByRole("cell", { name: /lewis-rag-2020\.pdf/ })).toBeVisible(); // the tray also lists the name
   });
 
   it("shows an error when the upload fails", async () => {
@@ -85,7 +85,7 @@ describe("LibraryPage", () => {
     expect(screen.getByText("reading-list.docx")).toBeVisible();
     expect(screen.getByText("Not uploaded. This file is 72 MB; the limit is 50 MB.")).toBeVisible();
     expect(upload).toHaveBeenCalledTimes(1);
-    expect(upload).toHaveBeenCalledWith(good);
+    expect(upload).toHaveBeenCalledWith(good, expect.any(Object));
   });
 
   it("announces every refusal reason and the upload in the one status region", async () => {
@@ -195,7 +195,7 @@ describe("LibraryPage", () => {
     const fresh = new File(["%PDF b"], "fresh.pdf", { type: "application/pdf" });
     await userEvent.upload(screen.getByLabelText("Upload PDFs"), [have, fresh]);
     await waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
-    expect(upload).toHaveBeenCalledWith(fresh);
+    expect(upload).toHaveBeenCalledWith(fresh, expect.any(Object));
     await waitFor(() =>
       expect(screen.getByRole("status")).toHaveTextContent("have.pdf: Already in your library. Uploaded fresh.pdf. Processing."),
     );
@@ -210,7 +210,7 @@ describe("LibraryPage", () => {
     await screen.findByText("Upload your first document");
     const file = new File(["%PDF"], "x.pdf", { type: "application/pdf" });
     await userEvent.upload(screen.getByLabelText("Upload PDFs"), file);
-    await waitFor(() => expect(upload).toHaveBeenCalledWith(file));
+    await waitFor(() => expect(upload).toHaveBeenCalledWith(file, expect.any(Object)));
   });
 
   it("does not check a rejected file", async () => {
@@ -219,6 +219,129 @@ describe("LibraryPage", () => {
     await screen.findByText("Upload your first document");
     await userEvent.upload(screen.getByLabelText("Upload PDFs"), new File(["x"], "notes.docx", { type: "application/msword" }), { applyAccept: false });
     expect(check).not.toHaveBeenCalled();
+  });
+});
+
+describe("LibraryPage drop zone and upload tray", () => {
+  const pdf = (name: string) => new File(["%PDF"], name, { type: "application/pdf" });
+  const drop = (files: File[]) => {
+    fireEvent.dragEnter(document.body, { dataTransfer: { types: ["Files"], files: [] } });
+    fireEvent.drop(document.body, { dataTransfer: { types: ["Files"], files } });
+  };
+
+  // An upload that waits until the test settles it, so the tray can be seen mid-flight.
+  function controlledUpload() {
+    const pending = new Map<string, { events: UploadEvents; resolve: () => void; reject: (e: Error) => void }>();
+    const upload = vi.fn(
+      (file: File, events: UploadEvents) =>
+        new Promise<void>((resolve, reject) => {
+          pending.set(file.name, { events, resolve, reject });
+        }),
+    );
+    return { upload, pending };
+  }
+
+  it("highlights the page on drag-over and clears it on drag-leave", async () => {
+    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => []} upload={vi.fn()} />);
+    await screen.findByText("Upload your first document");
+    fireEvent.dragEnter(document.body, { dataTransfer: { types: ["Files"], files: [] } });
+    expect(screen.getByText("Drop PDFs to upload")).toBeInTheDocument();
+    fireEvent.dragLeave(document.body, { dataTransfer: { types: ["Files"], files: [] } });
+    expect(screen.queryByText("Drop PDFs to upload")).toBeNull();
+  });
+
+  it("uploads three dropped PDFs in parallel, each with its own progress bar", async () => {
+    const { upload, pending } = controlledUpload();
+    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => []} upload={upload} />);
+    await screen.findByText("Upload your first document");
+    drop([pdf("a.pdf"), pdf("b.pdf"), pdf("c.pdf")]);
+    expect(screen.queryByText("Drop PDFs to upload")).toBeNull();
+    await waitFor(() => expect(upload).toHaveBeenCalledTimes(3)); // all three started before any finished
+    const tray = screen.getByRole("region", { name: "Uploading 3 files…" });
+    act(() => pending.get("b.pdf")!.events.onProgress!(0.5));
+    expect(within(tray).getByRole("progressbar", { name: "Upload progress for b.pdf" })).toHaveAttribute("aria-valuenow", "50");
+    expect(within(tray).getAllByRole("progressbar")).toHaveLength(3);
+    await act(async () => {
+      for (const p of pending.values()) p.resolve();
+    });
+    expect(await screen.findByRole("region", { name: "Uploads · 3 files" })).toBeVisible();
+    expect(within(screen.getByRole("region", { name: "Uploads · 3 files" })).getAllByText("Uploaded · processing")).toHaveLength(3);
+    expect(screen.getByRole("status")).toHaveTextContent("Uploaded a.pdf. Processing. Uploaded b.pdf. Processing. Uploaded c.pdf. Processing.");
+  });
+
+  it("refuses a dropped non-PDF the same way as a picked one", async () => {
+    const upload = vi.fn(async () => {});
+    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => []} upload={upload} />);
+    await screen.findByText("Upload your first document");
+    drop([new File(["x"], "reading-list.docx", { type: "application/msword" }), pdf("paper.pdf")]);
+    const list = await screen.findByRole("list", { name: "Files not uploaded" });
+    expect(within(list).getByText("Not uploaded. Only PDF files can be uploaded.")).toBeVisible();
+    await waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
+    expect((upload.mock.calls[0] as unknown as [File])[0].name).toBe("paper.pdf");
+  });
+
+  it("keeps the other uploads going when one fails", async () => {
+    const { upload, pending } = controlledUpload();
+    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => []} upload={upload} />);
+    await screen.findByText("Upload your first document");
+    drop([pdf("a.pdf"), pdf("b.pdf")]);
+    await waitFor(() => expect(upload).toHaveBeenCalledTimes(2));
+    await act(async () => pending.get("a.pdf")!.reject(new Error("Upload to storage failed (403)")));
+    const tray = screen.getByRole("region", { name: "Uploading 1 file…" });
+    expect(within(tray).getByText("Upload failed")).toBeVisible();
+    expect(within(tray).getByRole("progressbar", { name: "Upload progress for b.pdf" })).toBeVisible();
+    await act(async () => pending.get("b.pdf")!.resolve());
+    expect(await screen.findByText("Couldn't upload a.pdf. Try again.")).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("Upload failed: a.pdf. Uploaded b.pdf. Processing.");
+  });
+
+  it("adds a second drop to the same tray, newest first, and hides Close until all finish", async () => {
+    const { upload, pending } = controlledUpload();
+    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => []} upload={upload} />);
+    await screen.findByText("Upload your first document");
+    drop([pdf("first.pdf")]);
+    await waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
+    drop([pdf("second.pdf")]);
+    await waitFor(() => expect(upload).toHaveBeenCalledTimes(2));
+    const tray = screen.getByRole("region", { name: "Uploading 2 files…" });
+    expect(within(tray).getAllByRole("listitem").map((li) => li.textContent)).toEqual([expect.stringContaining("second.pdf"), expect.stringContaining("first.pdf")]);
+    await act(async () => pending.get("first.pdf")!.resolve());
+    expect(within(tray).queryByRole("button", { name: "Close uploads" })).toBeNull();
+    await act(async () => pending.get("second.pdf")!.resolve());
+    await userEvent.click(await screen.findByRole("button", { name: "Close uploads" }));
+    expect(screen.queryByRole("region", { name: /Uploads/ })).toBeNull();
+  });
+
+  it("shows the new row as Uploading until its file reaches storage, then Processing", async () => {
+    const { upload, pending } = controlledUpload();
+    const row: DocumentResponse = { ...processing, document_id: "d9", title: "a.pdf" };
+    const load = vi.fn().mockResolvedValueOnce([]).mockResolvedValue([row]);
+    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={load} upload={upload} />);
+    await screen.findByText("Upload your first document");
+    drop([pdf("a.pdf")]);
+    await waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
+    act(() => pending.get("a.pdf")!.events.onStarted!("d9"));
+    const tr = (await screen.findByRole("cell", { name: /a\.pdf/ })).closest("tr")!;
+    expect(within(tr).getByText("Uploading")).toBeVisible();
+    expect(within(tr).queryByText("You can choose subjects when processing finishes.")).toBeNull();
+    await act(async () => pending.get("a.pdf")!.resolve());
+    expect(await within(tr).findByText("Processing")).toBeVisible();
+  });
+
+  it("uploads by keyboard from the Upload button", async () => {
+    const upload = vi.fn(async () => {});
+    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => [processing]} upload={upload} />);
+    const button = await screen.findByRole("button", { name: "Upload" });
+    const input = screen.getByLabelText("Upload PDFs") as HTMLInputElement;
+    const click = vi.spyOn(input, "click");
+    button.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(click).toHaveBeenCalled();
+  });
+
+  it("tells the learner they can drop files in the first-run card", async () => {
+    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => []} upload={vi.fn()} />);
+    expect(await screen.findByText("Or drop files anywhere on this page. You can add several at once.")).toBeVisible();
   });
 });
 

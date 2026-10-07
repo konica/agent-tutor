@@ -2,18 +2,21 @@ import { AlertCircle, Info, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import { SessionExpiredError } from "../../auth/authClient";
-import { findInLibrary, loadDocuments, loadSubjectSuggestions, loadUploadLimits, megabytes, rejectionReason, RetriesUsedUpError, retryProcessing, saveSubjects as saveChosenSubjects, uploadPdf, type DocumentResponse, type SubjectSuggestions, type UploadLimits } from "../../api/documents";
+import { findInLibrary, loadDocuments, loadSubjectSuggestions, loadUploadLimits, megabytes, rejectionReason, RetriesUsedUpError, retryProcessing, saveSubjects as saveChosenSubjects, uploadPdf, type DocumentResponse, type SubjectSuggestions, type UploadEvents, type UploadLimits } from "../../api/documents";
 import { Button } from "../../components/Button/Button";
 import { EmptyState } from "../../components/EmptyState/EmptyState";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
+import { UploadTray, type TrayItem } from "../../components/UploadTray/UploadTray";
+import { DropOverlay } from "./DropOverlay";
 import { DocumentTable } from "./DocumentTable";
 import { SubjectPicker } from "./SubjectPicker";
 import styles from "./LibraryPage.module.css";
 import { useDocuments } from "./useDocuments";
+import { usePageDrop } from "./usePageDrop";
 
 type Props = {
   load?: () => Promise<DocumentResponse[]>;
-  upload?: (file: File) => Promise<void>;
+  upload?: (file: File, events: UploadEvents) => Promise<void>;
   retry?: (documentId: string) => Promise<void>;
   loadLimits?: () => Promise<UploadLimits>;
   check?: (file: File) => Promise<string | null>;
@@ -29,7 +32,7 @@ function announceChange(doc: DocumentResponse): string | null {
   return null;
 }
 
-const defaultUpload = (file: File) => uploadPdf(file);
+const defaultUpload = (file: File, events: UploadEvents) => uploadPdf(file, events);
 const defaultRetry = (id: string) => retryProcessing(id);
 const defaultLoadLimits = () => loadUploadLimits();
 const defaultCheck = (file: File) => findInLibrary(file);
@@ -37,12 +40,15 @@ const defaultCheck = (file: File) => findInLibrary(file);
 const defaultLoadSuggestions = (id: string) => loadSubjectSuggestions(id);
 const defaultSaveSubjects = (id: string, choice: { subject_ids: string[]; new_names: string[] }) => saveChosenSubjects(id, choice);
 
-// Library with a plain file picker (US-2 first slice). Drop zone, upload tray, tabs and filters come later.
+// Library: upload by picking or dropping PDFs (US-2), the upload tray, and the document list. Tabs and filters come later.
 export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retry = defaultRetry, loadLimits = defaultLoadLimits, check = defaultCheck, loadSuggestions = defaultLoadSuggestions, saveSubjects = defaultSaveSubjects, pollMs = 2000 }: Props) {
   const { documents, unavailable, refresh } = useDocuments(load, pollMs);
   const input = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState("");
-  const [failed, setFailed] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string[]>([]);
+  const [tray, setTray] = useState<TrayItem[]>([]);
+  const [uploading, setUploading] = useState<ReadonlySet<string>>(new Set()); // document ids whose file is still being sent
+  const traySeq = useRef(0);
   const [retrying, setRetrying] = useState<ReadonlySet<string>>(new Set());
   const [limits, setLimits] = useState<UploadLimits | null>(null);
   const [rejected, setRejected] = useState<{ name: string; reason: string }[]>([]);
@@ -110,24 +116,34 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
     void ensureLimits();
   }, [ensureLimits]);
 
-  async function onPick(event: ChangeEvent<HTMLInputElement>) {
-    const files = [...(event.target.files ?? [])];
-    event.target.value = ""; // picking the same file again fires change again
-    setFailed(null);
+  const updateTray = (id: string, patch: Partial<TrayItem>) => setTray((items) => items.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+  const setSending = (documentId: string, sending: boolean) =>
+    setUploading((ids) => {
+      const next = new Set(ids);
+      if (sending) next.add(documentId);
+      else next.delete(documentId);
+      return next;
+    });
+
+  // Every file of a pick or drop runs at once. One combined message in pick order, so no file's result overwrites another's in the live region.
+  async function addFiles(files: File[]) {
+    setFailed([]);
     setRejected([]);
     setAlreadyIn([]);
     const current = limits ?? (await ensureLimits());
-    // One combined message for the whole pick, so no file's result overwrites another's in the live region.
-    const parts: string[] = [];
-    for (const file of files) {
+    const parts: string[] = files.map(() => "");
+    const say = () => setStatus(parts.filter(Boolean).join(" "));
+
+    async function one(file: File, i: number) {
       const reason = rejectionReason(file, current);
       if (reason) {
         setRejected((list) => [...list, { name: file.name, reason }]);
-        parts.push(`${file.name}: ${reason}`);
-        setStatus(parts.join(" "));
-        continue;
+        parts[i] = `${file.name}: ${reason}`;
+        say();
+        return;
       }
-      setStatus([...parts, `Checking ${file.name}…`].join(" "));
+      parts[i] = `Checking ${file.name}…`;
+      say();
       let existing: string | null = null;
       try {
         existing = await check(file);
@@ -138,24 +154,52 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
       if (existing) {
         const documentId = existing;
         setAlreadyIn((list) => [...list, { name: file.name, documentId }]);
-        parts.push(`${file.name}: Already in your library.`);
-        setStatus(parts.join(" "));
-        continue;
+        parts[i] = `${file.name}: Already in your library.`;
+        say();
+        return;
       }
-      setFailed(null);
-      setStatus([...parts, `Uploading ${file.name}…`].join(" "));
+      parts[i] = `Uploading ${file.name}…`;
+      say();
+      const id = `upload-${++traySeq.current}`;
+      setTray((items) => [{ id, name: file.name, size: `${megabytes(file.size)} MB`, status: "uploading", progress: 0 }, ...items]);
+      const started: { documentId?: string } = {};
       try {
         if (!current) throw new Error("Upload limits unavailable");
-        await upload(file);
-        parts.push(`Uploaded ${file.name}. Processing.`);
+        await upload(file, {
+          onStarted: (documentId) => {
+            started.documentId = documentId;
+            setSending(documentId, true);
+            void refresh();
+          },
+          onProgress: (progress) => updateTray(id, { progress }),
+        });
+        updateTray(id, { status: "uploaded", progress: 1 });
+        parts[i] = `Uploaded ${file.name}. Processing.`;
       } catch {
         // A 401 is handled by the API client: the session screen replaces this page.
-        parts.push(`Upload failed: ${file.name}.`);
-        setFailed(file.name);
+        updateTray(id, { status: "failed" });
+        parts[i] = `Upload failed: ${file.name}.`;
+        setFailed((names) => [...names, file.name]);
       }
-      setStatus(parts.join(" "));
+      if (started.documentId) setSending(started.documentId, false);
+      say();
       await refresh();
     }
+
+    await Promise.all(files.map((file, i) => one(file, i)));
+  }
+
+  function onPick(event: ChangeEvent<HTMLInputElement>) {
+    const files = [...(event.target.files ?? [])];
+    event.target.value = ""; // picking the same file again fires change again
+    if (files.length) void addFiles(files);
+  }
+
+  const dragging = usePageDrop((files) => void addFiles(files));
+
+  function closeTray() {
+    setTray([]);
+    document.getElementById("main-content")?.focus(); // the Close button is gone
   }
 
   async function onRetry(doc: DocumentResponse) {
@@ -192,16 +236,16 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
         multiple
         hidden
         aria-label="Upload PDFs"
-        onChange={(e) => void onPick(e)}
+        onChange={onPick}
       />
       <p ref={statusRegion} tabIndex={-1} role="status" aria-live="polite" className={styles.status}>
         {status}
       </p>
-      {failed && (
-        <p className={styles.error}>
-          Couldn't upload {failed}. Try again.
+      {failed.map((name, i) => (
+        <p key={`${name}-${i}`} className={styles.error}>
+          Couldn't upload {name}. Try again.
         </p>
-      )}
+      ))}
       {rejected.length > 0 && (
         <ul className={styles.rejected} aria-label="Files not uploaded">
           {rejected.map((r, i) => (
@@ -239,7 +283,7 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
           variant="dropzone"
           icon={Upload}
           title="Upload your first document"
-          note="You can pick several PDFs at once."
+          note="Or drop files anywhere on this page. You can add several at once."
           actions={
             <Button variant="primary" size="lg" icon={Upload} onClick={pick}>
               Choose PDFs
@@ -255,8 +299,10 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
           )}
         </EmptyState>
       )}
-      {documents && documents.length > 0 && <DocumentTable documents={documents} onRetry={(d) => void onRetry(d)} retrying={retrying} onChooseSubjects={setPicking} />}
+      {documents && documents.length > 0 && <DocumentTable documents={documents} onRetry={(d) => void onRetry(d)} retrying={retrying} onChooseSubjects={setPicking} uploading={uploading} />}
       {picking && <SubjectPicker document={picking} load={loadSuggestions} save={saveSubjects} onClose={() => setPicking(null)} onSaved={(doc) => void onSaved(doc)} />}
+      {dragging && <DropOverlay />}
+      <UploadTray items={tray} onClose={closeTray} />
     </>
   );
 }
