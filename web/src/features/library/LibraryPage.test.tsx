@@ -312,6 +312,28 @@ describe("LibraryPage drop zone and upload tray", () => {
     expect(screen.queryByRole("region", { name: /Uploads/ })).toBeNull();
   });
 
+  it("announces both batches when a second drop starts before the first finishes", async () => {
+    const { upload, pending } = controlledUpload();
+    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => []} upload={upload} />);
+    await screen.findByText("Upload your first document");
+    drop([pdf("a.pdf")]);
+    await waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
+    drop([pdf("b.pdf")]);
+    await waitFor(() => expect(upload).toHaveBeenCalledTimes(2));
+    await act(async () => pending.get("a.pdf")!.reject(new Error("x")));
+    await act(async () => pending.get("b.pdf")!.resolve());
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Uploaded b.pdf. Processing."));
+    expect(screen.getByRole("status")).toHaveTextContent("Upload failed: a.pdf.");
+    expect(screen.getByText("Couldn't upload a.pdf. Try again.")).toBeVisible();
+
+    // A fresh batch after everything settled starts the messages over.
+    drop([pdf("c.pdf")]);
+    await waitFor(() => expect(upload).toHaveBeenCalledTimes(3));
+    expect(screen.getByRole("status")).not.toHaveTextContent("a.pdf");
+    expect(screen.queryByText("Couldn't upload a.pdf. Try again.")).toBeNull();
+    await act(async () => pending.get("c.pdf")!.resolve());
+  });
+
   it("shows the new row as Uploading until its file reaches storage, then Processing", async () => {
     const { upload, pending } = controlledUpload();
     const row: DocumentResponse = { ...processing, document_id: "d9", title: "a.pdf" };

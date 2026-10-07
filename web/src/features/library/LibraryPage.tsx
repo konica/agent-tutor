@@ -49,6 +49,8 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
   const [tray, setTray] = useState<TrayItem[]>([]);
   const [uploading, setUploading] = useState<ReadonlySet<string>>(new Set()); // document ids whose file is still being sent
   const traySeq = useRef(0);
+  const parts = useRef<string[]>([]); // one slot per file, shared by overlapping batches, so none overwrites another in the live region
+  const inFlight = useRef(0); // batches still running
   const [retrying, setRetrying] = useState<ReadonlySet<string>>(new Set());
   const [limits, setLimits] = useState<UploadLimits | null>(null);
   const [rejected, setRejected] = useState<{ name: string; reason: string }[]>([]);
@@ -125,69 +127,77 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
       return next;
     });
 
-  // Every file of a pick or drop runs at once. One combined message in pick order, so no file's result overwrites another's in the live region.
+  // Every file of a pick or drop runs at once. One combined message in pick order; a batch that starts while another runs adds to it instead of resetting it.
   async function addFiles(files: File[]) {
-    setFailed([]);
-    setRejected([]);
-    setAlreadyIn([]);
-    const current = limits ?? (await ensureLimits());
-    const parts: string[] = files.map(() => "");
-    const say = () => setStatus(parts.filter(Boolean).join(" "));
-
-    async function one(file: File, i: number) {
-      const reason = rejectionReason(file, current);
-      if (reason) {
-        setRejected((list) => [...list, { name: file.name, reason }]);
-        parts[i] = `${file.name}: ${reason}`;
-        say();
-        return;
-      }
-      parts[i] = `Checking ${file.name}…`;
-      say();
-      let existing: string | null = null;
-      try {
-        existing = await check(file);
-      } catch (error) {
-        if (error instanceof SessionExpiredError) return; // the session screen replaces this page
-        // Any other failure: upload anyway; the server-side hash decides (PRD D19).
-      }
-      if (existing) {
-        const documentId = existing;
-        setAlreadyIn((list) => [...list, { name: file.name, documentId }]);
-        parts[i] = `${file.name}: Already in your library.`;
-        say();
-        return;
-      }
-      parts[i] = `Uploading ${file.name}…`;
-      say();
-      const id = `upload-${++traySeq.current}`;
-      setTray((items) => [{ id, name: file.name, size: `${megabytes(file.size)} MB`, status: "uploading", progress: 0 }, ...items]);
-      const started: { documentId?: string } = {};
-      try {
-        if (!current) throw new Error("Upload limits unavailable");
-        await upload(file, {
-          onStarted: (documentId) => {
-            started.documentId = documentId;
-            setSending(documentId, true);
-            void refresh();
-          },
-          onProgress: (progress) => updateTray(id, { progress }),
-        });
-        updateTray(id, { status: "uploaded", progress: 1 });
-        parts[i] = `Uploaded ${file.name}. Processing.`;
-      } catch {
-        // A 401 is handled by the API client: the session screen replaces this page.
-        updateTray(id, { status: "failed" });
-        parts[i] = `Upload failed: ${file.name}.`;
-        setFailed((names) => [...names, file.name]);
-      }
-      if (started.documentId) setSending(started.documentId, false);
-      say();
-      await refresh();
+    if (inFlight.current === 0) {
+      parts.current = [];
+      setFailed([]);
+      setRejected([]);
+      setAlreadyIn([]);
     }
-
-    await Promise.all(files.map((file, i) => one(file, i)));
+    inFlight.current++;
+    try {
+      const current = limits ?? (await ensureLimits());
+      const slots = files.map(() => parts.current.push("") - 1);
+      const say = () => setStatus(parts.current.filter(Boolean).join(" "));
+      await Promise.all(files.map((file, n) => one(file, slots[n], current, say)));
+    } finally {
+      inFlight.current--;
+    }
   }
+
+  async function one(file: File, i: number, current: UploadLimits | null, say: () => void) {
+    const reason = rejectionReason(file, current);
+    if (reason) {
+      setRejected((list) => [...list, { name: file.name, reason }]);
+      parts.current[i] = `${file.name}: ${reason}`;
+      say();
+      return;
+    }
+    parts.current[i] = `Checking ${file.name}…`;
+    say();
+    let existing: string | null = null;
+    try {
+      existing = await check(file);
+    } catch (error) {
+      if (error instanceof SessionExpiredError) return; // the session screen replaces this page
+      // Any other failure: upload anyway; the server-side hash decides (PRD D19).
+    }
+    if (existing) {
+      const documentId = existing;
+      setAlreadyIn((list) => [...list, { name: file.name, documentId }]);
+      parts.current[i] = `${file.name}: Already in your library.`;
+      say();
+      return;
+    }
+    parts.current[i] = `Uploading ${file.name}…`;
+    say();
+    const id = `upload-${++traySeq.current}`;
+    setTray((items) => [{ id, name: file.name, size: `${megabytes(file.size)} MB`, status: "uploading", progress: 0 }, ...items]);
+    const started: { documentId?: string } = {};
+    try {
+      if (!current) throw new Error("Upload limits unavailable");
+      await upload(file, {
+        onStarted: (documentId) => {
+          started.documentId = documentId;
+          setSending(documentId, true);
+          void refresh();
+        },
+        onProgress: (progress) => updateTray(id, { progress }),
+      });
+      updateTray(id, { status: "uploaded", progress: 1 });
+      parts.current[i] = `Uploaded ${file.name}. Processing.`;
+    } catch {
+      // A 401 is handled by the API client: the session screen replaces this page.
+      updateTray(id, { status: "failed" });
+      parts.current[i] = `Upload failed: ${file.name}.`;
+      setFailed((names) => [...names, file.name]);
+    }
+    if (started.documentId) setSending(started.documentId, false);
+    say();
+    await refresh();
+  }
+
 
   function onPick(event: ChangeEvent<HTMLInputElement>) {
     const files = [...(event.target.files ?? [])];
