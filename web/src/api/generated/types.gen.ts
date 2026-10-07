@@ -415,6 +415,24 @@ export type GetMeResponses = {
 
 export type GetMeResponse = GetMeResponses[keyof GetMeResponses];
 
+export type ListMySubjectsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/me/subjects';
+};
+
+export type ListMySubjectsResponses = {
+    /**
+     * Response List My Subjects
+     *
+     * Successful Response
+     */
+    200: Array<SubjectResponse>;
+};
+
+export type ListMySubjectsResponse = ListMySubjectsResponses[keyof ListMySubjectsResponses];
+
 export type SearchSubjectsData = {
     body?: never;
     path?: never;

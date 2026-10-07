@@ -1,4 +1,4 @@
 .header { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--sp-6); margin-bottom: var(--sp-6); }
-.title { font-size: var(--fs-32); }
+.title { font-size: var(--fs-32); overflow-wrap: anywhere; }
 .description { color: var(--text-2); margin-top: var(--sp-2); max-width: 64ch; }
 .actions { display: flex; gap: var(--sp-3); flex: none; }
