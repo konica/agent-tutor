@@ -16,5 +16,260 @@
 #     cites: ["<id>", ...]                                     # true citation links within the corpus (R2 eval)
 #     adversarial: false                                       # true for PDFs with injected instructions
 #
-# Add entries in M1 after checking each document's license.
-documents: []
+# Licenses: each entry's arXiv license (OAI-PMH <license>) is CC BY 4.0, checked when the entry was added.
+# Subjects: Natural language processing, Computer vision, Reinforcement learning, Graph neural networks.
+# Not yet: preprint/published pairs and citation chains (cites: []); see #81.
+documents:
+  - id: zwennicker-2022
+    source: {type: arxiv, ref: "2212.06383v1"}
+    license: CC-BY-4.0
+    sha256: "904c2187bbe2a1ccf158e835e49480b52f1ab883a240b9180496525513e99162"
+    subjects: ["Natural language processing"]
+    metadata:
+      title: "Towards a general purpose machine translation system for Sranantongo"
+      authors: ["Just Zwennicker", "David Stap"]
+      year: 2022
+    work_key: "towardsageneralpurposemachinetranslationsystemforsranantongo-2022"
+    cites: []
+    adversarial: false
+  - id: fu-2021
+    source: {type: arxiv, ref: "2105.04616v1"}
+    license: CC-BY-4.0
+    sha256: "75e76c2bd6d3fa010ce7db6ffc07bacd36b620e1c6df1d1eeedadd07eaa8ca5a"
+    subjects: ["Natural language processing"]
+    metadata:
+      title: "Automatic Classification of Human Translation and Machine Translation: A Study from the Perspective of Lexical Diversity"
+      authors: ["Yingxue Fu", "Mark-Jan Nederhof"]
+      year: 2021
+    work_key: "automaticclassificationofhumantranslationandmachinetranslati-2021"
+    cites: []
+    adversarial: false
+  - id: chakravarthi-2020
+    source: {type: arxiv, ref: "2008.01391v1"}
+    license: CC-BY-4.0
+    sha256: "5861c8e65b9f7b1e24f05fc613b0f1ac615204490471c45e3f72d1149a924a54"
+    subjects: ["Natural language processing"]
+    metadata:
+      title: "A Survey of Orthographic Information in Machine Translation"
+      authors: ["Bharathi Raja Chakravarthi", "Priya Rani", "Mihael Arcan", "John P. McCrae"]
+      year: 2020
+      doi: "10.1007/s42979-021-00723-4"
+    work_key: "10.1007/s42979-021-00723-4"
+    cites: []
+    adversarial: false
+  - id: croce-2023
+    source: {type: arxiv, ref: "2306.12941v2"}
+    license: CC-BY-4.0
+    sha256: "a852b0fbc35c00919ed4f8d2bfa9566bf720120898604312b888e16d9847a1b7"
+    subjects: ["Computer vision"]
+    metadata:
+      title: "Towards Reliable Evaluation and Fast Training of Robust Semantic Segmentation Models"
+      authors: ["Francesco Croce", "Naman D Singh", "Matthias Hein"]
+      year: 2023
+    work_key: "towardsreliableevaluationandfasttrainingofrobustsemanticsegm-2023"
+    cites: []
+    adversarial: false
+  - id: cha-2021
+    source: {type: arxiv, ref: "2111.15181v2"}
+    license: CC-BY-4.0
+    sha256: "f51749087abc9e19ccc5bf1e9b01bd88e92abbf9c2d6edf78d0b187fbe06f1bc"
+    subjects: ["Computer vision"]
+    metadata:
+      title: "Zero-Shot Semantic Segmentation via Spatial and Multi-Scale Aware Visual Class Embedding"
+      authors: ["Sungguk Cha", "Yooseung Wang"]
+      year: 2021
+    work_key: "zeroshotsemanticsegmentationviaspatialandmultiscaleawarevisu-2021"
+    cites: []
+    adversarial: false
+  - id: pinkovich-2025
+    source: {type: arxiv, ref: "2505.08589v1"}
+    license: CC-BY-4.0
+    sha256: "37d6312184af8462fbad1fbefafb4e3339641213130ff64233bf228fcd5e0687"
+    subjects: ["Computer vision"]
+    metadata:
+      title: "MESSI: A Multi-Elevation Semantic Segmentation Image Dataset of an Urban Environment"
+      authors: ["Barak Pinkovich", "Boaz Matalon", "Ehud Rivlin", "Hector Rotstein"]
+      year: 2025
+    work_key: "messiamultielevationsemanticsegmentationimagedatasetofanurba-2025"
+    cites: []
+    adversarial: false
+  - id: liu-2024
+    source: {type: arxiv, ref: "2404.03372v2"}
+    license: CC-BY-4.0
+    sha256: "7d9d62fa3f677bf8831ee715062334a1c9397353a92f1af0c45ffe5ddc46a00c"
+    subjects: ["Reinforcement learning"]
+    metadata:
+      title: "Elementary Analysis of Policy Gradient Methods"
+      authors: ["Jiacai Liu", "Wenye Li", "Ke Wei"]
+      year: 2024
+    work_key: "elementaryanalysisofpolicygradientmethods-2024"
+    cites: []
+    adversarial: false
+  - id: wang-2025
+    source: {type: arxiv, ref: "2505.19247v1"}
+    license: CC-BY-4.0
+    sha256: "7ea960676d62ec0f541d6c629d2c3bfd9a0fdd6b2432f672740c5513919009f0"
+    subjects: ["Reinforcement learning"]
+    metadata:
+      title: "Improving Value Estimation Critically Enhances Vanilla Policy Gradient"
+      authors: ["Tao Wang", "Ruipeng Zhang", "Sicun Gao"]
+      year: 2025
+    work_key: "improvingvalueestimationcriticallyenhancesvanillapolicygradi-2025"
+    cites: []
+    adversarial: false
+  - id: vasilev-2021
+    source: {type: arxiv, ref: "2104.13446v2"}
+    license: CC-BY-4.0
+    sha256: "4096fe5e7fe73c27f2b5dd5651f37b07e18b63723c243c131dd23fac3235f22a"
+    subjects: ["Reinforcement learning"]
+    metadata:
+      title: "Semi-On-Policy Training for Sample Efficient Multi-Agent Policy Gradients"
+      authors: ["Bozhidar Vasilev", "Tarun Gupta", "Bei Peng", "Shimon Whiteson"]
+      year: 2021
+    work_key: "semionpolicytrainingforsampleefficientmultiagentpolicygradie-2021"
+    cites: []
+    adversarial: false
+  - id: pilva-2022
+    source: {type: arxiv, ref: "2204.07651v1"}
+    license: CC-BY-4.0
+    sha256: "dd6150ce59d518a44de5faccd9ef9fbabc15223f5ec01979af4bc9e4e1a99638"
+    subjects: ["Graph neural networks"]
+    metadata:
+      title: "Learning time-dependent PDE solver using Message Passing Graph Neural Networks"
+      authors: ["Pourya Pilva", "Ahmad Zareei"]
+      year: 2022
+    work_key: "learningtimedependentpdesolverusingmessagepassinggraphneural-2022"
+    cites: []
+    adversarial: false
+  - id: tolmachev-2021
+    source: {type: arxiv, ref: "2105.00134v1"}
+    license: CC-BY-4.0
+    sha256: "b1a90211a29cace559bc1ddd5737e1a764e9286970370b3490319ea17d93cde0"
+    subjects: ["Graph neural networks"]
+    metadata:
+      title: "Bermuda Triangles: GNNs Fail to Detect Simple Topological Structures"
+      authors: ["Arseny Tolmachev", "Akira Sakai", "Masaru Todoriki", "Koji Maruhashi"]
+      year: 2021
+    work_key: "bermudatrianglesgnnsfailtodetectsimpletopologicalstructures-2021"
+    cites: []
+    adversarial: false
+  - id: nachmani-2020
+    source: {type: arxiv, ref: "2002.00240v1"}
+    license: CC-BY-4.0
+    sha256: "707684e1771642eca91b744da7fc107c2b5a8ef23623d864be27f552d540bd21"
+    subjects: ["Graph neural networks"]
+    metadata:
+      title: "Molecule Property Prediction and Classification with Graph Hypernetworks"
+      authors: ["Eliya Nachmani", "Lior Wolf"]
+      year: 2020
+    work_key: "moleculepropertypredictionandclassificationwithgraphhypernet-2020"
+    cites: []
+    adversarial: false
+  - id: cordonnier-2023
+    source: {type: arxiv, ref: "2304.11140v4"}
+    license: CC-BY-4.0
+    sha256: "a164bdf777fa49ffc48977e39cf6e2775d152d13fb336807dff71fea60091be6"
+    subjects: ["Graph neural networks"]
+    metadata:
+      title: "Convergence of Message Passing Graph Neural Networks with Generic Aggregation On Large Random Graphs"
+      authors: ["Matthieu Cordonnier", "Nicolas Keriven", "Nicolas Tremblay", "Samuel Vaiter"]
+      year: 2023
+    work_key: "convergenceofmessagepassinggraphneuralnetworkswithgenericagg-2023"
+    cites: []
+    adversarial: false
+  - id: jin-2023
+    source: {type: arxiv, ref: "2306.15111v2"}
+    license: CC-BY-4.0
+    sha256: "e2ccd19f9c933379cc5dd50e5aea2aee977e032bd09734c376e98e3be702cf03"
+    subjects: ["Computer vision", "Natural language processing"]
+    metadata:
+      title: "Self-Supervised Image Captioning with CLIP"
+      authors: ["Chuanyang Jin"]
+      year: 2023
+    work_key: "selfsupervisedimagecaptioningwithclip-2023"
+    cites: []
+    adversarial: false
+  - id: fang-2021
+    source: {type: arxiv, ref: "2112.05230v2"}
+    license: CC-BY-4.0
+    sha256: "674d8f865e3dfb67d92f8df93d587dd595f91a1f7744e398fe83fc4053448053"
+    subjects: ["Computer vision", "Natural language processing"]
+    metadata:
+      title: "Injecting Semantic Concepts into End-to-End Image Captioning"
+      authors: ["Zhiyuan Fang", "Jianfeng Wang", "Xiaowei Hu", "Lin Liang", "Zhe Gan", "Lijuan Wang", "Yezhou Yang", "Zicheng Liu"]
+      year: 2021
+    work_key: "injectingsemanticconceptsintoendtoendimagecaptioning-2021"
+    cites: []
+    adversarial: false
+  - id: hirasawa-2020
+    source: {type: arxiv, ref: "2006.12799v1"}
+    license: CC-BY-4.0
+    sha256: "4d24946800d1ac1dafd417e4b7ff721f5d7be64bac7785c2d4367d7cc0900093"
+    subjects: ["Natural language processing", "Computer vision"]
+    metadata:
+      title: "Keyframe Segmentation and Positional Encoding for Video-guided Machine Translation Challenge 2020"
+      authors: ["Tosho Hirasawa", "Zhishen Yang", "Mamoru Komachi", "Naoaki Okazaki"]
+      year: 2020
+    work_key: "keyframesegmentationandpositionalencodingforvideoguidedmachi-2020"
+    cites: []
+    adversarial: false
+  - id: ting-2025
+    source: {type: arxiv, ref: "2505.17905v1"}
+    license: CC-BY-4.0
+    sha256: "ee9e5bcbc810c89a52362ab508984c1a78fb163fd1201f1de225235f8a842703"
+    subjects: ["Computer vision", "Reinforcement learning"]
+    metadata:
+      title: "Semantic segmentation with reward"
+      authors: ["Xie Ting", "Ye Huang", "Zhilin Liu", "Lixin Duan"]
+      year: 2025
+    work_key: "semanticsegmentationwithreward-2025"
+    cites: []
+    adversarial: false
+  - id: sidahmed-2024
+    source: {type: arxiv, ref: "2403.10704v2"}
+    license: CC-BY-4.0
+    sha256: "cdc2011f989c467d39e57172d92e8c48ff5e27bf26b2e56fcf1178b55e0ba8e1"
+    subjects: ["Natural language processing", "Reinforcement learning"]
+    metadata:
+      title: "Parameter Efficient Reinforcement Learning from Human Feedback"
+      authors: ["Hakim Sidahmed", "Samrat Phatale", "Alex Hutcheson", "Zhuonan Lin", "Zhang Chen", "Zac Yu", "Jarvis Jin", "Simral Chaudhary", "Roman Komarytsia", "Christiane Ahlheim", "Yonghao Zhu", "Bowen Li", "Saravanan Ganesh", "Bill Byrne", "Jessica Hoffmann", "Hassan Mansoor", "Wei Li", "Abhinav Rastogi", "Lucas Dixon"]
+      year: 2024
+    work_key: "parameterefficientreinforcementlearningfromhumanfeedback-2024"
+    cites: []
+    adversarial: false
+  - id: gooding-2023
+    source: {type: arxiv, ref: "2311.04919v1"}
+    license: CC-BY-4.0
+    sha256: "b55a0979a5f38fd7732469e1b4a92c7b319c2dfe39474c7ded68e52d752e697b"
+    subjects: ["Natural language processing", "Reinforcement learning"]
+    metadata:
+      title: "The Impact of Preference Agreement in Reinforcement Learning from Human Feedback: A Case Study in Summarization"
+      authors: ["Sian Gooding", "Hassan Mansoor"]
+      year: 2023
+    work_key: "theimpactofpreferenceagreementinreinforcementlearningfromhum-2023"
+    cites: []
+    adversarial: false
+  - id: jia-2026
+    source: {type: arxiv, ref: "2608.21305v1"}
+    license: CC-BY-4.0
+    sha256: "1454c9585c9ec28bbf5c8eed55d8907c62517e091abfd33cf47124e5800aa6ad"
+    subjects: ["Computer vision", "Natural language processing", "Reinforcement learning"]
+    metadata:
+      title: "Re$^3$Cap: Retrieval-Guided Refinement for Image Captioning Enhancement via Reinforcement Learning"
+      authors: ["Haonan Jia", "Shichao Dong", "Zenghui Sun", "Jiawen Zheng", "Ziqi Miao", "Gege Shi", "Qiuyu Zhao", "Jinsong Lan", "Xiaoyong Zhu", "Bo Zheng"]
+      year: 2026
+    work_key: "recapretrievalguidedrefinementforimagecaptioningenhancementv-2026"
+    cites: []
+    adversarial: false
+  - id: liu-2026
+    source: {type: arxiv, ref: "2606.07583v1"}
+    license: CC-BY-4.0
+    sha256: "e6a725716679fe735c95af9b53bfab6a9fbde60f50653f3a72600ab20aa03e63"
+    subjects: ["Graph neural networks", "Reinforcement learning"]
+    metadata:
+      title: "Outage Detection in Self-Healing Smart Grids Using Reinforcement Learning with Spectral Graph Neural Networks"
+      authors: ["Lihui Liu", "Mucun Sun", "Caisheng Wang"]
+      year: 2026
+    work_key: "outagedetectioninselfhealingsmartgridsusingreinforcementlear-2026"
+    cites: []
+    adversarial: false
