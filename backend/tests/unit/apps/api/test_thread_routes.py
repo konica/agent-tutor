@@ -22,6 +22,7 @@ from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import SubjectId, UserId
 from smart_tutor.shared.domain.principal import Principal
 from smart_tutor.subjects.application import SubjectNames
+from smart_tutor.tutoring.application import Thread
 
 AUTH = {"Authorization": "Bearer t-ada"}
 QUESTION = {"question": "What is attention?"}
@@ -369,6 +370,44 @@ class _BreaksMidAnswer(httpx.AsyncByteStream):
     async def __aiter__(self) -> AsyncIterator[bytes]:
         yield SUBJECTS_EVENT + b'event: delta\ndata: {"text": "It weighs "}\n\n'
         raise httpx.ReadError("connection reset")
+
+
+UNAVAILABLE_EVENT = f"event: error\ndata: {json.dumps({'code': 'unavailable', 'message': UNAVAILABLE})}\n\n"
+
+
+class _FailingThreads(InMemoryThreads):
+    def add(self, thread: Thread) -> None:
+        raise RuntimeError("database down")
+
+
+def test_a_failure_starting_the_thread_ends_the_stream_with_an_unavailable_error_event() -> None:
+    verifier = FakeTokenVerifier()
+    verifier.add("t-ada", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
+    library = InMemoryLibrary()
+    ingest_ready(library, "ada", "Attention weighs tokens.")
+    services = api_services(library, threads=_FailingThreads(), agent=fake_agent(sse_ok))
+    client = TestClient(create_app(Settings(), verifier=verifier, services=services))
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    assert response.status_code == 200 and response.text == UNAVAILABLE_EVENT
+
+
+def test_a_stream_that_ends_inside_the_subjects_event_is_unavailable() -> None:
+    client, threads, _ = setup(streaming(_Chunks(b'event: subjects\ndata: {"subj')))
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    assert response.text == UNAVAILABLE_EVENT and threads.threads == {}
+
+
+def test_a_stream_dropped_before_the_subjects_event_is_complete_is_unavailable() -> None:
+    dropped = _Chunks(b'event: subjects\ndata: {"subj', error=httpx.ReadError("connection reset"))
+    client, threads, _ = setup(streaming(dropped))
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    assert response.text == UNAVAILABLE_EVENT and threads.threads == {}
 
 
 def test_a_dropped_agent_stream_ends_with_an_unavailable_error_event() -> None:

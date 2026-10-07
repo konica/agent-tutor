@@ -160,6 +160,10 @@ async def ask_in_new_thread(
             # Ids and the reason only: never the question or the token.
             logger.warning("the agent's subjects %s were refused: %s", subject_ids, e)
             return None
+        except Exception:
+            # The 200 headers are already sent: end the stream with an error event rather than cut it off.
+            logger.exception("starting a thread with subjects %s failed", subject_ids)
+            return None
         return _sse(
             "thread",
             {
