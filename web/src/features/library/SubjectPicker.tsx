@@ -301,7 +301,10 @@ export function SubjectPicker({ document, load = defaultLoad, save = defaultSave
                 aria-describedby={tooLong ? "picker-add-hint picker-add-error" : "picker-add-hint"}
                 value={query}
                 disabled={atMax}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setActive(-1); // the highlighted option belongs to the old text; Enter now adds the typed name
+                }}
                 onKeyDown={onInputKeyDown}
                 onBlur={() => setOpen(false)}
               />

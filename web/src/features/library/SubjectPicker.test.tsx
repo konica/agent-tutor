@@ -196,6 +196,20 @@ describe("SubjectPicker", () => {
     expect(screen.getByRole("button", { name: /Retrieval-Augmented Generation/ })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("drops the highlighted option when the text changes, so Enter adds the typed name", async () => {
+    setup();
+    await chip(/AI Agents/);
+    await userEvent.type(input(), "retriev");
+    await screen.findByRole("listbox");
+    await userEvent.keyboard("{ArrowDown}");
+    expect(input()).toHaveAttribute("aria-activedescendant", "picker-option-0");
+    await userEvent.type(input(), " fusion");
+    expect(input()).not.toHaveAttribute("aria-activedescendant");
+    await userEvent.keyboard("{Enter}");
+    expect(screen.getByRole("button", { name: /retriev fusion/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("button", { name: /Retrieval-Augmented Generation/ })).not.toBeInTheDocument();
+  });
+
   it("ignores a slower, older search response", async () => {
     let resolveOld: (m: typeof matches) => void = () => {};
     const search = vi.fn((q: string) =>
