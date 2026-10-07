@@ -1,11 +1,12 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactElement } from "react";
+import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AskRefusedError, NoDocumentsError, type ChatEvent } from "../../api/chat";
-import { sessionExpiry } from "../../auth/authClient";
+import type { DocumentResponse } from "../../api/generated/types.gen";
+import { SessionExpiredError, sessionExpiry } from "../../auth/authClient";
 import { ChatPage } from "./ChatPage";
 
 async function* events(...list: ChatEvent[]) {
@@ -37,8 +38,21 @@ function controlledStream() {
   };
 }
 
-const show = (ui: ReactElement) => render(<MemoryRouter>{ui}</MemoryRouter>);
-const question = () => screen.getByRole("textbox", { name: /question/i });
+const SUBJECTS = [
+  { subject_id: "s1", name: "LLMs" },
+  { subject_id: "s2", name: "AI Agents" },
+];
+const doc = (state: string) => ({ state }) as DocumentResponse;
+
+// The page loads its subjects and documents first; tests that don't care get ready subjects and no processing documents.
+function renderChat(props: ComponentProps<typeof ChatPage> = {}) {
+  return render(
+    <MemoryRouter>
+      <ChatPage loadSubjects={async () => SUBJECTS} loadDocs={async () => []} {...props} />
+    </MemoryRouter>,
+  );
+}
+const question = () => screen.findByRole("textbox", { name: /question/i });
 const askButton = () => screen.getByRole("button", { name: /ask/i });
 
 afterEach(() => vi.restoreAllMocks());
@@ -60,8 +74,8 @@ describe("ChatPage", () => {
         { type: "done" },
       ),
     );
-    show(<ChatPage ask={ask} />);
-    await userEvent.type(question(), "What is attention?");
+    renderChat({ ask });
+    await userEvent.type(await question(), "What is attention?");
     await userEvent.click(askButton());
     expect(ask).toHaveBeenCalledWith("What is attention?");
     expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
@@ -80,8 +94,8 @@ describe("ChatPage", () => {
         { type: "done" },
       ),
     );
-    show(<ChatPage ask={ask} />);
-    await userEvent.type(question(), "What is attention?");
+    renderChat({ ask });
+    await userEvent.type(await question(), "What is attention?");
     await userEvent.click(askButton());
     const citations = await screen.findByRole("region", { name: "Citations" });
     const [item] = within(citations).getAllByRole("listitem");
@@ -93,8 +107,8 @@ describe("ChatPage", () => {
     const ask = vi.fn(() => {
       throw new AskRefusedError("Subject detection isn't available yet");
     });
-    show(<ChatPage ask={ask} />);
-    await userEvent.type(question(), "What is attention?");
+    renderChat({ ask });
+    await userEvent.type(await question(), "What is attention?");
     await userEvent.click(askButton());
     expect(await screen.findByText("Subject detection isn't available yet")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /library/i })).not.toBeInTheDocument();
@@ -102,19 +116,20 @@ describe("ChatPage", () => {
 
   it("does not ask an empty or blank question", async () => {
     const ask = vi.fn(() => events({ type: "done" }));
-    show(<ChatPage ask={ask} />);
+    renderChat({ ask });
+    await question();
     expect(askButton()).toBeDisabled();
-    await userEvent.type(question(), "   ");
+    await userEvent.type(await question(), "   ");
     expect(askButton()).toBeDisabled();
-    await userEvent.type(question(), "{Enter}");
+    await userEvent.type(await question(), "{Enter}");
     expect(ask).not.toHaveBeenCalled();
   });
 
   it("disables the question and the button while answering, marks the answer busy, then allows another question", async () => {
     const control = controlledStream();
     const ask = vi.fn(() => control.stream());
-    show(<ChatPage ask={ask} />);
-    await userEvent.type(question(), "What is attention?");
+    renderChat({ ask });
+    await userEvent.type(await question(), "What is attention?");
     await userEvent.click(askButton());
 
     control.push({ type: "thread", thread_id: "t1", subjects: [] });
@@ -123,26 +138,15 @@ describe("ChatPage", () => {
     const region = answer.closest("[aria-live]")!;
     expect(region).toHaveAttribute("aria-live", "polite");
     expect(region).toHaveAttribute("aria-busy", "true");
-    expect(question()).toBeDisabled();
+    expect(await question()).toBeDisabled();
     expect(askButton()).toBeDisabled();
 
     control.push({ type: "done" });
     control.push(null);
     await waitFor(() => expect(region).toHaveAttribute("aria-busy", "false"));
-    expect(question()).toBeEnabled();
-    await userEvent.type(question(), "Another?");
+    expect(await question()).toBeEnabled();
+    await userEvent.type(await question(), "Another?");
     expect(askButton()).toBeEnabled();
-  });
-
-  it("points to the Library when there are no documents", async () => {
-    const ask = vi.fn(() => {
-      throw new NoDocumentsError("Upload a document first");
-    });
-    show(<ChatPage ask={ask} />);
-    await userEvent.type(question(), "What is attention?");
-    await userEvent.click(askButton());
-    expect(await screen.findByText("Upload a document first")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /library/i })).toHaveAttribute("href", "/library");
   });
 
   it("shows the message of an unavailable error", async () => {
@@ -152,8 +156,8 @@ describe("ChatPage", () => {
         { type: "error", code: "unavailable", message: "The tutor is unavailable. Try again in a moment." },
       ),
     );
-    show(<ChatPage ask={ask} />);
-    await userEvent.type(question(), "What is attention?");
+    renderChat({ ask });
+    await userEvent.type(await question(), "What is attention?");
     await userEvent.click(askButton());
     expect(await screen.findByText("The tutor is unavailable. Try again in a moment.")).toBeInTheDocument();
   });
@@ -166,8 +170,8 @@ describe("ChatPage", () => {
         { type: "error", code: "unauthenticated", message: "Please sign in again." },
       ),
     );
-    show(<ChatPage ask={ask} />);
-    await userEvent.type(question(), "What is attention?");
+    renderChat({ ask });
+    await userEvent.type(await question(), "What is attention?");
     await userEvent.click(askButton());
     await waitFor(() => expect(notify).toHaveBeenCalledOnce());
   });
@@ -176,8 +180,8 @@ describe("ChatPage", () => {
     const ask = vi.fn(() =>
       events({ type: "thread", thread_id: "t1", subjects: [] }, { type: "delta", text: "It weighs" }),
     );
-    show(<ChatPage ask={ask} />);
-    await userEvent.type(question(), "What is attention?");
+    renderChat({ ask });
+    await userEvent.type(await question(), "What is attention?");
     await userEvent.click(askButton());
     expect(await screen.findByText("The tutor couldn't answer right now. Try again in a moment.")).toBeInTheDocument();
     expect(screen.getByText("It weighs")).toBeInTheDocument();
@@ -187,9 +191,90 @@ describe("ChatPage", () => {
     const ask = vi.fn(async function* (): AsyncGenerator<ChatEvent> {
       throw new Error("POST /threads failed (500)");
     });
-    show(<ChatPage ask={ask} />);
-    await userEvent.type(question(), "What is attention?");
+    renderChat({ ask });
+    await userEvent.type(await question(), "What is attention?");
     await userEvent.click(askButton());
     expect(await screen.findByText("The tutor couldn't answer right now. Try again in a moment.")).toBeInTheDocument();
+  });
+
+  it("starts with the new-conversation header, the welcome and the learner's subjects, without example questions", async () => {
+    renderChat();
+    const list = await screen.findByRole("list", { name: "Your subjects" });
+    expect(screen.getByRole("heading", { level: 1, name: "New conversation" })).toBeInTheDocument();
+    expect(screen.getByText("Subjects appear after your first question.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Ask about your documents" })).toBeInTheDocument();
+    expect(within(list).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["LLMs", "AI Agents"]);
+    expect(screen.queryByText(/try asking/i)).not.toBeInTheDocument();
+  });
+
+  it("asks for an upload first when the learner has no subjects", async () => {
+    renderChat({ loadSubjects: async () => [] });
+    expect(await screen.findByRole("heading", { name: "Upload a document first" })).toBeInTheDocument();
+    expect(screen.getByText(/The tutor answers only from your documents\. Add a PDF to your Library/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Upload" })).toHaveAttribute("href", "/library");
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "New conversation" })).not.toBeInTheDocument();
+  });
+
+  it("says how many documents are still processing", async () => {
+    renderChat({ loadDocs: async () => [doc("processing"), doc("processing"), doc("ready")] });
+    expect(await screen.findByText("2 documents are still processing and can't be used yet.")).toBeInTheDocument();
+  });
+
+  it("uses the singular for one processing document", async () => {
+    renderChat({ loadDocs: async () => [doc("processing"), doc("ready")] });
+    expect(await screen.findByText("1 document is still processing and can't be used yet.")).toBeInTheDocument();
+  });
+
+  it("shows no hint when nothing is processing", async () => {
+    renderChat({ loadDocs: async () => [doc("ready"), doc("awaiting_subjects"), doc("failed")] });
+    await question();
+    expect(screen.queryByText(/still processing/)).not.toBeInTheDocument();
+  });
+
+  it("titles the conversation with the question and shows the thread's subjects, keeping the hint", async () => {
+    const ask = vi.fn(() =>
+      events({ type: "thread", thread_id: "t1", subjects: [{ subject_id: "s2", name: "AI Agents" }] }, { type: "done" }),
+    );
+    renderChat({ ask, loadDocs: async () => [doc("processing")] });
+    await userEvent.type(await question(), "What is attention?");
+    await userEvent.click(askButton());
+    expect(await screen.findByRole("heading", { level: 1, name: "What is attention?" })).toBeInTheDocument();
+    const list = screen.getByRole("list", { name: "Subjects" });
+    expect(within(list).getByText("AI Agents")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Ask about your documents" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Subjects appear after your first question.")).not.toBeInTheDocument();
+    expect(screen.getByText("1 document is still processing and can't be used yet.")).toBeInTheDocument();
+  });
+
+  it("switches to the upload prompt when the ask finds no documents", async () => {
+    const ask = vi.fn(() => {
+      throw new NoDocumentsError("Upload a document first");
+    });
+    renderChat({ ask });
+    await userEvent.type(await question(), "What is attention?");
+    await userEvent.click(askButton());
+    expect(await screen.findByRole("heading", { name: "Upload a document first" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Upload" })).toHaveAttribute("href", "/library");
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  it("explains when the subjects can't be loaded, instead of a blank page or a false upload prompt", async () => {
+    renderChat({ loadSubjects: () => Promise.reject(new Error("GET /me/subjects failed (500)")) });
+    expect(await screen.findByText("Your subjects couldn't be loaded. Reload the page to try again.")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Upload a document first" })).not.toBeInTheDocument();
+  });
+
+  it("still lets the learner ask when only the document count can't be loaded", async () => {
+    renderChat({ loadDocs: () => Promise.reject(new Error("boom")) });
+    expect(await question()).toBeEnabled();
+    expect(screen.queryByText(/still processing/)).not.toBeInTheDocument();
+  });
+
+  it("shows nothing of its own when the session has ended", async () => {
+    renderChat({ loadSubjects: () => Promise.reject(new SessionExpiredError()) });
+    await waitFor(() => expect(screen.queryByText(/couldn't be loaded/)).not.toBeInTheDocument());
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });
 });

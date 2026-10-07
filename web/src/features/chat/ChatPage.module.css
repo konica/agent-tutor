@@ -1,18 +1,11 @@
 .column { max-width: var(--chat-w); margin: 0 auto; }
 
-.exchange { margin: var(--sp-6) 0 var(--sp-4); }
-/* The learner's words: a right-aligned bubble, apart from the tutor's prose. */
-.question {
-  margin-left: auto; max-width: 80%; width: fit-content;
-  padding: var(--sp-3) var(--sp-4); border-radius: var(--r-md);
-  background: var(--accent-soft); color: var(--text);
-  white-space: pre-wrap; overflow-wrap: anywhere;
-}
-.subjects { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: var(--sp-3) 0 0; padding: 0; list-style: none; }
-.subject {
-  padding: var(--sp-1) var(--sp-3); border-radius: var(--r-pill);
-  background: var(--surface-2); color: var(--text-2); font-size: var(--fs-12);
-}
+.welcome { display: grid; gap: var(--sp-4); margin: var(--sp-8) 0 var(--sp-6); }
+.welcomeTitle { font-size: var(--fs-40); }
+.welcomeText { color: var(--text-2); max-width: 64ch; }
+.yourSubjects { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); color: var(--text-2); font-size: var(--fs-14); }
+.chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
+.headerChips { margin-top: var(--sp-3); }
 
 .answerRegion { display: grid; gap: var(--sp-4); }
 /* The tutor's words: plain prose on the page surface. */
@@ -39,7 +32,12 @@
 
 .thinking { margin: var(--sp-3) 0 0; color: var(--text-2); font-size: var(--fs-14); }
 
+/* Quiet status line above the question box; the clock marks "wait", not "problem". */
+.hint { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-6) 0 0; color: var(--text-2); font-size: var(--fs-14); }
+.hintIcon { width: 16px; height: 16px; flex: none; }
+
 .form { display: flex; align-items: flex-end; gap: var(--sp-3); margin-top: var(--sp-6); }
+.hint + .form { margin-top: var(--sp-2); }
 .input {
   flex: 1; resize: vertical; min-height: 3lh;
   padding: var(--sp-3) var(--sp-4); border: 1px solid var(--border-strong); border-radius: var(--r-md);
