@@ -11,7 +11,11 @@ function uploadedOn(iso: string, now = new Date()): string {
   return date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
 
-function StateCell({ doc }: { doc: DocumentResponse }) {
+const NONE: ReadonlySet<string> = new Set();
+
+function StateCell({ doc, uploading }: { doc: DocumentResponse; uploading: boolean }) {
+  // The API creates the row when it presigns the upload; until the browser has sent the file it reads "Uploading".
+  if (uploading) return <StateBadge state="uploading" />;
   return (
     <>
       <StateBadge state={doc.state} />
@@ -31,9 +35,10 @@ type Props = {
   onRetry: (doc: DocumentResponse) => void;
   retrying: ReadonlySet<string>;
   onChooseSubjects?: (doc: DocumentResponse) => void;
+  uploading?: ReadonlySet<string>; // document ids whose file is still being sent
 };
 
-export function DocumentTable({ documents, onRetry, retrying, onChooseSubjects }: Props) {
+export function DocumentTable({ documents, onRetry, retrying, onChooseSubjects, uploading = NONE }: Props) {
   return (
     <table className={styles.table}>
       <thead>
@@ -60,7 +65,7 @@ export function DocumentTable({ documents, onRetry, retrying, onChooseSubjects }
             </td>
             <td className={doc.subjects.length ? undefined : styles.muted}>{doc.subjects.map((s) => s.name).join(", ") || "Not chosen yet"}</td>
             <td>
-              <StateCell doc={doc} />
+              <StateCell doc={doc} uploading={uploading.has(doc.document_id)} />
             </td>
             <td className={styles.muted}>{uploadedOn(doc.created_at)}</td>
             <td className={styles.actions}>
