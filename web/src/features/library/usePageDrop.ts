@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const carriesFiles = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes("Files");
 const DRAG_IDLE_MS = 1000;
@@ -8,6 +8,11 @@ const DRAG_IDLE_MS = 1000;
 // DRAG_IDLE_MS, the drag ended elsewhere (cancelled or left the window). Drags without files are left alone.
 export function usePageDrop(onFiles: (files: File[]) => void): boolean {
   const [active, setActive] = useState(false);
+  // Callers pass a new function every render; a ref keeps the listeners (and their drag state) mounted once
+  const onFilesRef = useRef(onFiles);
+  useEffect(() => {
+    onFilesRef.current = onFiles;
+  });
 
   useEffect(() => {
     let depth = 0;
@@ -56,7 +61,7 @@ export function usePageDrop(onFiles: (files: File[]) => void): boolean {
       setActive(false);
       clearIdleTimer();
       const files = Array.from(event.dataTransfer?.files ?? []);
-      if (files.length) onFiles(files);
+      if (files.length) onFilesRef.current(files);
     };
     document.addEventListener("dragenter", enter);
     document.addEventListener("dragover", over);
@@ -69,7 +74,7 @@ export function usePageDrop(onFiles: (files: File[]) => void): boolean {
       document.removeEventListener("drop", drop);
       clearIdleTimer();
     };
-  }, [onFiles]);
+  }, []);
 
   return active;
 }

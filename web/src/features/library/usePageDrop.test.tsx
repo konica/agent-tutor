@@ -14,6 +14,17 @@ function Page({ onFiles }: { onFiles: (files: File[]) => void }) {
   );
 }
 
+// Passes a new callback every render, like the Library page does, and re-renders when the overlay toggles
+function InlinePage({ onFiles }: { onFiles: (files: File[]) => void }) {
+  const active = usePageDrop((files) => onFiles(files));
+  return (
+    <div>
+      <p>Library</p>
+      {active && <DropOverlay />}
+    </div>
+  );
+}
+
 const withFiles = (files: File[] = []) => ({ dataTransfer: { types: ["Files"], files } });
 const textOnly = { dataTransfer: { types: ["text/plain"], files: [] } };
 
@@ -146,5 +157,25 @@ describe("usePageDrop", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("keeps tracking the drag when the drop callback changes on every render", () => {
+    const first = vi.fn();
+    const second = vi.fn();
+    const { rerender } = render(<InlinePage onFiles={first} />);
+    const child = screen.getByText("Library");
+    fireEvent.dragEnter(document.body, withFiles());
+    fireEvent.dragEnter(child, withFiles());
+    fireEvent.dragLeave(document.body, withFiles());
+    expect(screen.getByText("Drop PDFs to upload")).toBeInTheDocument();
+    fireEvent.dragLeave(child, withFiles());
+    expect(screen.queryByText("Drop PDFs to upload")).toBeNull();
+
+    // A drop calls the latest callback
+    rerender(<InlinePage onFiles={second} />);
+    const file = new File(["%PDF"], "a.pdf");
+    fireEvent.drop(document.body, withFiles([file]));
+    expect(second).toHaveBeenCalledWith([file]);
+    expect(first).not.toHaveBeenCalled();
   });
 });
