@@ -65,7 +65,7 @@ describe("ChatPage", () => {
     await userEvent.click(askButton());
     expect(ask).toHaveBeenCalledWith("What is attention?");
     expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
-    expect(screen.getByText("What is attention?")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "What is attention?" })).toBeInTheDocument();
     expect(screen.getByText("General")).toBeInTheDocument();
     expect(screen.getByText("a.pdf, p. 3")).toBeInTheDocument();
     expect(screen.getByText("b.pdf, page unavailable")).toBeInTheDocument();
@@ -191,5 +191,50 @@ describe("ChatPage", () => {
     await userEvent.type(question(), "What is attention?");
     await userEvent.click(askButton());
     expect(await screen.findByText("The tutor couldn't answer right now. Try again in a moment.")).toBeInTheDocument();
+  });
+
+  it("shows the thread's subjects as chips under the question in the header", async () => {
+    const ask = vi.fn(() =>
+      events(
+        {
+          type: "thread",
+          thread_id: "t1",
+          subjects: [
+            { subject_id: "s1", name: "LLMs" },
+            { subject_id: "s2", name: "AI Agents" },
+          ],
+        },
+        { type: "delta", text: "Answer." },
+        { type: "citations", citations: [] },
+        { type: "done" },
+      ),
+    );
+    show(<ChatPage ask={ask} />);
+    await userEvent.type(question(), "How does chain-of-thought help?");
+    await userEvent.click(askButton());
+    const heading = await screen.findByRole("heading", { level: 1, name: "How does chain-of-thought help?" });
+    const list = within(heading.closest("header")!).getByRole("list", { name: "Subjects" });
+    expect(within(list).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["LLMs", "AI Agents"]);
+    // The learner's own words stay as the bubble beside the answer.
+    expect(await screen.findByText("Answer.")).toBeInTheDocument();
+    expect(screen.getByText(/You asked/).parentElement).toHaveTextContent("How does chain-of-thought help?");
+  });
+
+  it("shows the Chat page header until a question is asked", () => {
+    show(<ChatPage ask={() => events()} />);
+    expect(screen.getByRole("heading", { level: 1, name: "Chat" })).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Subjects" })).toBeNull();
+  });
+
+  it("shows the problem with no subjects when an error arrives before any thread event", async () => {
+    const ask = vi.fn(() =>
+      events({ type: "error", code: "unavailable", message: "The tutor is unavailable. Try again in a moment." }),
+    );
+    show(<ChatPage ask={ask} />);
+    await userEvent.type(question(), "What is attention?");
+    await userEvent.click(askButton());
+    expect(await screen.findByText("The tutor is unavailable. Try again in a moment.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "What is attention?" })).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Subjects" })).toBeNull();
   });
 });

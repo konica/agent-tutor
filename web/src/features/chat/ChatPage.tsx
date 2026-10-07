@@ -13,6 +13,7 @@ import {
 import { SessionExpiredError, sessionExpiry } from "../../auth/authClient";
 import { Button } from "../../components/Button/Button";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
+import { SubjectChip } from "../../components/SubjectChip/SubjectChip";
 import styles from "./ChatPage.module.css";
 
 type Props = { ask?: (question: string) => AsyncIterable<ChatEvent> };
@@ -102,7 +103,24 @@ export function ChatPage({ ask = defaultAsk }: Props) {
 
   return (
     <div className={styles.column}>
-      <PageHeader title="Chat" description="Ask a question about your documents." />
+      {exchange ? (
+        <header className={styles.threadHeader}>
+          <h1 className={styles.threadTitle} title={exchange.question}>
+            {exchange.question}
+          </h1>
+          {exchange.subjects.length > 0 && (
+            <ul className={styles.subjects} aria-label="Subjects">
+              {exchange.subjects.map((s) => (
+                <li key={s.subject_id}>
+                  <SubjectChip name={s.name} hueKey={s.subject_id} size="sm" />
+                </li>
+              ))}
+            </ul>
+          )}
+        </header>
+      ) : (
+        <PageHeader title="Chat" description="Ask a question about your documents." />
+      )}
 
       {exchange && (
         <div className={styles.exchange}>
@@ -110,15 +128,6 @@ export function ChatPage({ ask = defaultAsk }: Props) {
             <span className="visually-hidden">You asked: </span>
             {exchange.question}
           </p>
-          {exchange.subjects.length > 0 && (
-            <ul className={styles.subjects} aria-label="Subjects">
-              {exchange.subjects.map((s) => (
-                <li key={s.subject_id} className={styles.subject}>
-                  {s.name}
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
       )}
 
