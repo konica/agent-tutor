@@ -65,6 +65,14 @@ class DocumentRepository(ABC):
     def find_readable_by_sha256(self, user_id: UserId, sha256: str) -> DocumentId | None:
         """`can_read` in storage: the caller's oldest non-archived document whose content has this hash (PRD D19)."""
 
+    @abstractmethod
+    def get_readable(self, user_id: UserId, document_id: DocumentId, *, for_update: bool = False) -> Document | None:
+        """`can_read` in storage: the caller's non-archived document with its content title; locked if `for_update`."""
+
+    @abstractmethod
+    def subject_ids_readable_by(self, user_id: UserId) -> set[SubjectId]:
+        """The distinct subjects of the caller's ready, non-archived documents (PRD §9.4 "Learner's subjects")."""
+
 
 class UploadRepository(ABC):
     @abstractmethod

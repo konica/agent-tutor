@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponse, AskInNewThreadResponses, CheckDuplicateData, CheckDuplicateErrors, CheckDuplicateResponses, GetMeData, GetMeResponses, GetUploadLimitsData, GetUploadLimitsResponses, ListDocumentsData, ListDocumentsResponses, RetryDocumentData, RetryDocumentErrors, RetryDocumentResponses, StartUploadData, StartUploadErrors, StartUploadResponses } from './types.gen';
+import type { AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponse, AskInNewThreadResponses, CheckDuplicateData, CheckDuplicateErrors, CheckDuplicateResponses, ChooseSubjectsData, ChooseSubjectsErrors, ChooseSubjectsResponses, GetMeData, GetMeResponses, GetSubjectSuggestionsData, GetSubjectSuggestionsErrors, GetSubjectSuggestionsResponses, GetUploadLimitsData, GetUploadLimitsResponses, ListDocumentsData, ListDocumentsResponses, RetryDocumentData, RetryDocumentErrors, RetryDocumentResponses, StartUploadData, StartUploadErrors, StartUploadResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -53,6 +53,32 @@ export const retryDocument = <ThrowOnError extends boolean = false>(options: Opt
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/documents/{document_id}/retry',
     ...options
+});
+
+/**
+ * Get Subject Suggestions
+ *
+ * Three ranked subjects for a processed document, for the learner to choose from (PRD §8 US-2b).
+ */
+export const getSubjectSuggestions = <ThrowOnError extends boolean = false>(options: Options<GetSubjectSuggestionsData, ThrowOnError>): RequestResult<GetSubjectSuggestionsResponses, GetSubjectSuggestionsErrors, ThrowOnError> => (options.client ?? client).get<GetSubjectSuggestionsResponses, GetSubjectSuggestionsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/documents/{document_id}/subject-suggestions',
+    ...options
+});
+
+/**
+ * Choose Subjects
+ *
+ * Save the learner's 1-3 subjects; the document becomes ready to use (PRD §8 US-2b).
+ */
+export const chooseSubjects = <ThrowOnError extends boolean = false>(options: Options<ChooseSubjectsData, ThrowOnError>): RequestResult<ChooseSubjectsResponses, ChooseSubjectsErrors, ThrowOnError> => (options.client ?? client).put<ChooseSubjectsResponses, ChooseSubjectsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/documents/{document_id}/subjects',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**

@@ -1,16 +1,23 @@
 """Library routes (knowledge module): start an upload, list the caller's documents, check a file hash against them,
-retry a failed one."""
+retry a failed one, suggest and save its subjects."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from smart_tutor.apps.api.deps import CurrentPrincipal, Documents, Retries, Subjects, Uploads
-from smart_tutor.knowledge.application import DocumentNotFoundError, InvalidFileNameError, RetryLimitError
-from smart_tutor.shared.domain.ids import DocumentId
+from smart_tutor.apps.api.deps import CurrentPrincipal, Documents, Retries, SubjectChoice, Subjects, Uploads
+from smart_tutor.knowledge.application import (
+    DocumentNotFoundError,
+    DocumentStateError,
+    DocumentView,
+    InvalidFileNameError,
+    InvalidSubjectsError,
+    RetryLimitError,
+)
+from smart_tutor.shared.domain.ids import DocumentId, SubjectId
 
 router = APIRouter(tags=["knowledge"])
 
@@ -60,6 +67,26 @@ class DocumentResponse(BaseModel):
     subjects: list[SubjectResponse]
 
 
+class SuggestionResponse(BaseModel):
+    subject_id: str | None
+    name: str
+    origin: Literal["shared", "yours", "new"]
+
+
+class SubjectSuggestionsResponse(BaseModel):
+    document_id: str
+    title: str
+    summary: str | None
+    suggestions: list[SuggestionResponse]
+
+
+class ChooseSubjectsRequest(BaseModel):
+    # Ids of existing subjects and names of new ones; both are checked against the suggestions (PRD D20).
+    model_config = ConfigDict(extra="forbid")
+    subject_ids: list[UUID] = Field(default_factory=list, max_length=3)
+    new_names: list[Annotated[str, Field(min_length=1, max_length=60)]] = Field(default_factory=list, max_length=3)
+
+
 @router.post("/uploads", operation_id="start_upload", status_code=status.HTTP_201_CREATED)
 def start_upload(body: StartUploadRequest, principal: CurrentPrincipal, uploads: Uploads) -> StartUploadResponse:
     try:
@@ -88,24 +115,71 @@ def check_duplicate(
     return DuplicateCheckResponse(document_id=documents.find_in_library(principal.user_id, body.sha256))
 
 
+def _document_response(view: DocumentView, names: dict[SubjectId, str]) -> DocumentResponse:
+    return DocumentResponse(
+        document_id=view.document_id,
+        title=view.title,
+        state=view.state,
+        failure_reason=view.failure_reason,
+        attempt=view.attempt,
+        max_attempts=view.max_attempts,
+        can_retry=view.can_retry,
+        created_at=view.created_at,
+        subjects=[SubjectResponse(subject_id=s, name=names[s]) for s in view.subject_ids if s in names],
+    )
+
+
 @router.get("/documents", operation_id="list_documents")
 def list_documents(principal: CurrentPrincipal, documents: Documents, subjects: Subjects) -> list[DocumentResponse]:
     views = documents.list_documents(principal.user_id)
     names = subjects.names_for(principal.user_id, {s for d in views for s in d.subject_ids})
-    return [
-        DocumentResponse(
-            document_id=d.document_id,
-            title=d.title,
-            state=d.state,
-            failure_reason=d.failure_reason,
-            attempt=d.attempt,
-            max_attempts=d.max_attempts,
-            can_retry=d.can_retry,
-            created_at=d.created_at,
-            subjects=[SubjectResponse(subject_id=s, name=names[s]) for s in d.subject_ids if s in names],
+    return [_document_response(d, names) for d in views]
+
+
+@router.get("/documents/{document_id}/subject-suggestions", operation_id="get_subject_suggestions")
+def get_subject_suggestions(
+    document_id: UUID, principal: CurrentPrincipal, choice: SubjectChoice
+) -> SubjectSuggestionsResponse:
+    """Three ranked subjects for a processed document, for the learner to choose from (PRD §8 US-2b)."""
+    try:
+        offered = choice.suggestions(principal.user_id, DocumentId(str(document_id)))
+    except DocumentNotFoundError as e:
+        raise HTTPException(404, str(e)) from None
+    except DocumentStateError as e:
+        raise HTTPException(409, str(e)) from None
+    return SubjectSuggestionsResponse(
+        document_id=offered.document_id,
+        title=offered.title,
+        summary=offered.summary,
+        suggestions=[
+            SuggestionResponse(subject_id=s.subject_id, name=s.name, origin=s.origin.value) for s in offered.suggestions
+        ],
+    )
+
+
+@router.put("/documents/{document_id}/subjects", operation_id="choose_subjects")
+def choose_subjects(
+    document_id: UUID,
+    body: ChooseSubjectsRequest,
+    principal: CurrentPrincipal,
+    choice: SubjectChoice,
+    subjects: Subjects,
+) -> DocumentResponse:
+    """Save the learner's 1-3 subjects; the document becomes ready to use (PRD §8 US-2b)."""
+    try:
+        view = choice.choose(
+            principal.user_id,
+            DocumentId(str(document_id)),
+            [SubjectId(str(s)) for s in body.subject_ids],
+            body.new_names,
         )
-        for d in views
-    ]
+    except DocumentNotFoundError as e:
+        raise HTTPException(404, str(e)) from None
+    except DocumentStateError as e:
+        raise HTTPException(409, str(e)) from None
+    except InvalidSubjectsError as e:
+        raise HTTPException(422, str(e)) from None
+    return _document_response(view, subjects.names_for(principal.user_id, set(view.subject_ids)))
 
 
 @router.post("/documents/{document_id}/retry", operation_id="retry_document", status_code=status.HTTP_204_NO_CONTENT)

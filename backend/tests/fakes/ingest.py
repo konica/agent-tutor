@@ -37,7 +37,8 @@ def ingest_ready(library: InMemoryLibrary, owner: str, text: str) -> DocumentId:
         document = tx.documents.get_by_upload_for_update(started.upload_id)
         assert document is not None
         document.link_content(content.content_id)
-        document.ready([GENERAL_SUBJECT_ID])
+        document.await_subjects()
+        document.choose_subjects([GENERAL_SUBJECT_ID])
         tx.documents.save(document)
         tx.commit()
     return started.document_id

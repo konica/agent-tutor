@@ -2,7 +2,7 @@
 
 Processing: describe the first pages (title, metadata, summary embedding, work key; committed at once so the
 Library shows the title), extract the page text, save it as JSON, chunk, embed, then make the content and the
-learner's document ready. Crashes (S3, Bedrock, database) are raised so SQS redelivers the message;
+learner's document wait for subjects. Crashes (S3, Bedrock, database) are raised so SQS redelivers the message;
 only a file over the page limit, one we can't read, or one with no text layer ends failed.
 """
 
@@ -35,7 +35,6 @@ from smart_tutor.knowledge.ports.library import LibraryUnitOfWork
 from smart_tutor.knowledge.ports.object_store import ObjectNotFoundError, ObjectStore
 from smart_tutor.knowledge.ports.pdf_extractor import PdfExtractor, TooManyPagesError, UnreadablePdfError
 from smart_tutor.shared.domain.ids import ContentId, UploadId, UserId
-from smart_tutor.subjects.application import GENERAL_SUBJECT_ID
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +120,7 @@ class IngestionService:
         return outcome, content.content_id if created else None
 
     def process_content(self, content_id: ContentId) -> ContentState | None:
-        """Turn a stored content into embedded chunks and make it, and the documents waiting on it, ready.
+        """Turn a stored content into embedded chunks and make it ready; the documents waiting on it wait for subjects.
 
         None when the content is missing or no longer processing (someone else finished it). Extraction and
         embedding run with no transaction open, so no lock is held across slow calls; the final transaction
@@ -165,7 +164,7 @@ class IngestionService:
             )
             tx.contents.save(locked)
             for document in tx.documents.list_processing_for_content_for_update(content_id):
-                document.ready([GENERAL_SUBJECT_ID])
+                document.await_subjects()
                 tx.documents.save(document)
             tx.commit()
         logger.info("content %s: ready with %d chunks", content_id, len(chunks))

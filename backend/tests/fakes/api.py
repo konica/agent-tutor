@@ -6,14 +6,15 @@ import httpx
 
 from fakes.clock import FixedClock
 from fakes.knowledge import FakeObjectStore, InMemoryLibrary
+from fakes.models import fake_embeddings
 from fakes.parameters import TEST_LIMITS
 from fakes.queue import FakeQueue
 from fakes.subjects import InMemorySubjects
 from fakes.tutoring import InMemoryThreads
 from smart_tutor.apps.api.agent_client import AgentClient
 from smart_tutor.apps.api.services import ApiServices
-from smart_tutor.knowledge.application import DocumentService, RetryService, UploadService
-from smart_tutor.subjects.application import SubjectNames
+from smart_tutor.knowledge.application import DocumentService, RetryService, SubjectChoiceService, UploadService
+from smart_tutor.subjects.application import SubjectCatalogService, SubjectNames, SubjectSuggester
 from smart_tutor.tutoring.application import ConversationService
 
 
@@ -30,22 +31,31 @@ def api_services(
     library: InMemoryLibrary | None = None,
     objects: FakeObjectStore | None = None,
     threads: InMemoryThreads | None = None,
+    catalog: InMemorySubjects | None = None,
     clock: FixedClock | None = None,
     queue: FakeQueue | None = None,
     **overrides: Any,
 ) -> ApiServices:
-    """ApiServices from fakes sharing `library`, `objects`, `threads`, `queue`; `overrides` replace fields."""
+    """ApiServices from fakes sharing `library`, `objects`, `threads`, `catalog`, `queue`; `overrides` replace
+    fields."""
     library = library or InMemoryLibrary()
     objects = objects or FakeObjectStore()
     threads = threads or InMemoryThreads()
+    catalog = catalog or InMemorySubjects()
     clock = clock or FixedClock()
     queue = queue or FakeQueue()
     documents = DocumentService(library.unit_of_work, max_attempts=3)
     fields: dict[str, Any] = {
         "uploads": UploadService(library.unit_of_work, objects, clock, TEST_LIMITS),
         "documents": documents,
-        "subjects": SubjectNames(InMemorySubjects()),
+        "subjects": SubjectNames(catalog),
         "retries": RetryService(library.unit_of_work, queue, max_attempts=3),
+        "subject_choice": SubjectChoiceService(
+            library.unit_of_work,
+            SubjectSuggester(catalog, SubjectNames(catalog)),
+            SubjectCatalogService(catalog, fake_embeddings(8)),
+            max_attempts=3,
+        ),
         "conversations": ConversationService(threads, documents, clock),
         "agent": fake_agent(),
     }

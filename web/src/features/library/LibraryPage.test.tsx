@@ -222,6 +222,63 @@ describe("LibraryPage", () => {
   });
 });
 
+describe("LibraryPage choose subjects", () => {
+  const waiting: DocumentResponse = { ...processing, title: "Toolformer", state: "awaiting_subjects" };
+  const suggestions = {
+    document_id: "d1",
+    title: "Toolformer",
+    summary: null,
+    suggestions: [{ subject_id: "s1", name: "AI Agents", origin: "yours" as const }],
+  };
+
+  // The picker's banner is also a status; the page's live region is the one in the document body.
+  const pageStatus = () => screen.getAllByRole("status").find((el) => el.tagName === "P")!;
+
+  it("offers the action only on a document waiting for subjects", async () => {
+    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => [waiting, duplicate, processing]} upload={vi.fn()} />);
+    const row = (await screen.findByText("Toolformer")).closest("tr")!;
+    expect(within(row).getAllByText("Choose subjects")).toHaveLength(2); // the badge and the button label
+    expect(within(row).getByRole("button", { name: "Choose subjects for Toolformer" })).toBeVisible();
+    expect(screen.getAllByRole("button", { name: /^Choose subjects for/ })).toHaveLength(1);
+  });
+
+  it("opens the picker, saves, announces it and reloads", async () => {
+    const ready: DocumentResponse = { ...waiting, state: "ready", subjects: [{ subject_id: "s1", name: "AI Agents" }] };
+    const load = vi.fn().mockResolvedValueOnce([waiting]).mockResolvedValue([ready]);
+    const loadSuggestions = vi.fn(async () => suggestions);
+    const saveSubjects = vi.fn(async () => ready);
+    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} loadSuggestions={loadSuggestions} saveSubjects={saveSubjects} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Choose subjects for Toolformer" }));
+    expect(screen.getByRole("dialog", { name: "Choose subjects" })).toBeVisible();
+    await userEvent.click(await screen.findByRole("button", { name: "Save" }));
+    expect(saveSubjects).toHaveBeenCalledWith("d1", { subject_ids: ["s1"], new_names: [] });
+    await waitFor(() => expect(pageStatus()).toHaveTextContent("Subjects saved. Toolformer is ready to use."));
+    expect(load).toHaveBeenCalledTimes(2);
+    await userEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(pageStatus()).toHaveFocus();
+    expect((await screen.findByText("Toolformer")).closest("tr")).toHaveTextContent("AI Agents");
+  });
+
+  it("keeps 'Subjects saved.' when a stale poll lands between the save and the reload", async () => {
+    const ready: DocumentResponse = { ...waiting, state: "ready", subjects: [{ subject_id: "s1", name: "AI Agents" }] };
+    let afterSave = 0; // the first load after the save is a poll that started before it
+    let didSave = false;
+    const load = vi.fn(async () => (didSave && afterSave++ > 0 ? [ready] : [waiting]));
+    const saveSubjects = async () => {
+      didSave = true;
+      return ready;
+    };
+    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} loadSuggestions={async () => suggestions} saveSubjects={saveSubjects} pollMs={50} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Choose subjects for Toolformer" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Save" }));
+    await waitFor(() => expect(load.mock.calls.length).toBeGreaterThan(2));
+    await waitFor(() => expect(afterSave).toBeGreaterThan(2));
+    expect(pageStatus()).toHaveTextContent("Subjects saved. Toolformer is ready to use.");
+    expect(pageStatus()).not.toHaveTextContent("Toolformer is ready.");
+  });
+});
+
 const scan: DocumentResponse = { document_id: "d3", title: "scan.pdf", state: "failed", failure_reason: "No text layer (scanned PDFs are not supported yet)", created_at: today, subjects: [], attempt: 1, max_attempts: 3, can_retry: true };
 
 describe("LibraryPage retry", () => {

@@ -102,4 +102,4 @@ def test_a_retry_message_reprocesses_the_content_and_is_deleted() -> None:
 
     assert run_once(queue, ingestion) == 1
     assert queue.waiting == [] and len(queue.deleted) == 1
-    assert library.state.documents[started.document_id].state.value == "ready"
+    assert library.state.documents[started.document_id].state.value == "awaiting_subjects"

@@ -26,6 +26,24 @@ class DocumentView:
     can_retry: bool
 
 
+def document_view(d: Document, max_attempts: int) -> DocumentView:
+    """How the learner sees a document; a failed one can be retried until its content used up `max_attempts`."""
+    attempts = d.content_attempts
+    failed = d.state is DocumentState.FAILED and attempts is not None
+    used_up = failed and attempts is not None and attempts >= max_attempts
+    return DocumentView(
+        d.document_id,
+        d.title,
+        d.state.value,
+        RETRIES_USED_UP if used_up else d.failure_reason,
+        d.created_at,
+        tuple(d.subject_ids),
+        attempts,
+        max_attempts,
+        failed and not used_up,
+    )
+
+
 class DocumentService:
     def __init__(self, uow: Callable[[], LibraryUnitOfWork], max_attempts: int) -> None:
         self._uow, self._max_attempts = uow, max_attempts
@@ -33,7 +51,7 @@ class DocumentService:
     def list_documents(self, user_id: UserId) -> list[DocumentView]:
         with self._uow() as tx:
             documents = tx.documents.list_readable_by(user_id)
-        return [self._view(d) for d in documents]
+        return [document_view(d, self._max_attempts) for d in documents]
 
     def learner_subjects(self, user_id: UserId) -> frozenset[SubjectId]:
         """My subjects: those of the learner's ready, non-archived documents (PRD §9.4)."""
@@ -48,19 +66,3 @@ class DocumentService:
         """
         with self._uow() as tx:
             return tx.documents.find_readable_by_sha256(user_id, sha256)
-
-    def _view(self, d: Document) -> DocumentView:
-        attempts = d.content_attempts
-        failed = d.state is DocumentState.FAILED and attempts is not None
-        used_up = failed and attempts is not None and attempts >= self._max_attempts
-        return DocumentView(
-            d.document_id,
-            d.title,
-            d.state.value,
-            RETRIES_USED_UP if used_up else d.failure_reason,
-            d.created_at,
-            tuple(d.subject_ids),
-            attempts,
-            self._max_attempts,
-            failed and not used_up,
-        )

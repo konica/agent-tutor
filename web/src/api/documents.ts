@@ -1,14 +1,28 @@
 import { SessionExpiredError } from "../auth/authClient";
 import type { Client } from "./generated/client";
 import { client } from "./generated/client.gen";
-import { checkDuplicate, getUploadLimits, listDocuments, retryDocument, startUpload } from "./generated/sdk.gen";
-import type { DocumentResponse, UploadLimitsResponse } from "./generated/types.gen";
+import { checkDuplicate, chooseSubjects, getSubjectSuggestions, getUploadLimits, listDocuments, retryDocument, startUpload } from "./generated/sdk.gen";
+import type { DocumentResponse, SubjectSuggestionsResponse, SuggestionResponse, UploadLimitsResponse } from "./generated/types.gen";
 
 export type { DocumentResponse };
 export type UploadLimits = UploadLimitsResponse;
+export type SubjectSuggestions = SubjectSuggestionsResponse;
+export type Suggestion = SuggestionResponse;
 
 function sessionOver(error: unknown, response: Response | undefined): boolean {
   return error instanceof SessionExpiredError || response?.status === 401;
+}
+
+// The server's `detail` is a string for 404/409 and a list of validation errors for 422.
+// Without one the message is empty, so the learner never sees developer text.
+function failure(error: unknown): Error {
+  const detail = (error as { detail?: unknown } | undefined)?.detail;
+  if (typeof detail === "string") return new Error(detail);
+  if (Array.isArray(detail)) {
+    const messages = detail.map((d) => (d as { msg?: unknown }).msg).filter((m): m is string => typeof m === "string");
+    if (messages.length) return new Error(messages.join("; "));
+  }
+  return new Error("");
 }
 
 export async function loadDocuments(apiClient: Client = client): Promise<DocumentResponse[]> {
@@ -84,4 +98,23 @@ export async function uploadPdf(file: File, apiClient: Client = client, post: ty
   form.append("file", file); // S3 ignores fields after the file
   const stored = await post(data.url, { method: "POST", body: form });
   if (!stored.ok) throw new Error(`Upload to storage failed (${stored.status})`);
+}
+
+// Three ranked suggestions for a document waiting for subjects (PRD §8 US-2b).
+export async function loadSubjectSuggestions(documentId: string, apiClient: Client = client): Promise<SubjectSuggestions> {
+  const { data, error, response } = await getSubjectSuggestions({ client: apiClient, path: { document_id: documentId }, throwOnError: false });
+  if (sessionOver(error, response)) throw new SessionExpiredError();
+  if (!data) throw failure(error);
+  return data;
+}
+
+export async function saveSubjects(
+  documentId: string,
+  choice: { subject_ids: string[]; new_names: string[] },
+  apiClient: Client = client,
+): Promise<DocumentResponse> {
+  const { data, error, response } = await chooseSubjects({ client: apiClient, path: { document_id: documentId }, body: choice, throwOnError: false });
+  if (sessionOver(error, response)) throw new SessionExpiredError();
+  if (!data) throw failure(error);
+  return data;
 }

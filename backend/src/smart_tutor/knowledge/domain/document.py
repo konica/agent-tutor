@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 
-from smart_tutor.knowledge.domain.errors import DocumentStateError, InvalidFileNameError
+from smart_tutor.knowledge.domain.errors import DocumentStateError, InvalidFileNameError, InvalidSubjectsError
 from smart_tutor.shared.domain.ids import ContentId, DocumentId, SubjectId, UploadId, UserId
 
 DUPLICATE_UPLOAD = "Duplicate uploads aren't supported yet"  # until US-11 links duplicates
@@ -87,12 +87,21 @@ class Document:
         self.state = DocumentState.FAILED
         self.failure_reason = reason
 
-    def ready(self, subject_ids: list[SubjectId]) -> None:
-        """processing → ready with 1-3 distinct subjects (interim: US-2b adds awaiting_subjects before this)."""
+    def await_subjects(self) -> None:
+        """processing → awaiting_subjects when its content is ready (PRD §9.5).
+
+        The learner then chooses 1-3 subjects.
+        """
         if self.state is not DocumentState.PROCESSING or self.content_id is None:
-            raise DocumentStateError("Only a processing document with content can become ready")
+            raise DocumentStateError("Only a processing document with content can wait for subjects")
+        self.state = DocumentState.AWAITING_SUBJECTS
+
+    def choose_subjects(self, subject_ids: list[SubjectId]) -> None:
+        """awaiting_subjects (or ready, to change them) → ready with 1-3 different subjects (PRD §9.4, US-2b)."""
+        if self.state not in (DocumentState.AWAITING_SUBJECTS, DocumentState.READY):
+            raise DocumentStateError("Subjects can be chosen once processing has finished")
         if not 1 <= len(subject_ids) <= MAX_SUBJECTS or len(set(subject_ids)) != len(subject_ids):
-            raise DocumentStateError("A document has 1 to 3 distinct subjects")
+            raise InvalidSubjectsError("Choose 1 to 3 different subjects")
         self.subject_ids = list(subject_ids)
         self.state = DocumentState.READY
 

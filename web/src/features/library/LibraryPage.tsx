@@ -2,11 +2,12 @@ import { AlertCircle, Info, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import { SessionExpiredError } from "../../auth/authClient";
-import { findInLibrary, loadDocuments, loadUploadLimits, megabytes, rejectionReason, RetriesUsedUpError, retryProcessing, uploadPdf, type DocumentResponse, type UploadLimits } from "../../api/documents";
+import { findInLibrary, loadDocuments, loadSubjectSuggestions, loadUploadLimits, megabytes, rejectionReason, RetriesUsedUpError, retryProcessing, saveSubjects as saveChosenSubjects, uploadPdf, type DocumentResponse, type SubjectSuggestions, type UploadLimits } from "../../api/documents";
 import { Button } from "../../components/Button/Button";
 import { EmptyState } from "../../components/EmptyState/EmptyState";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
 import { DocumentTable } from "./DocumentTable";
+import { SubjectPicker } from "./SubjectPicker";
 import styles from "./LibraryPage.module.css";
 import { useDocuments } from "./useDocuments";
 
@@ -16,6 +17,8 @@ type Props = {
   retry?: (documentId: string) => Promise<void>;
   loadLimits?: () => Promise<UploadLimits>;
   check?: (file: File) => Promise<string | null>;
+  loadSuggestions?: (documentId: string) => Promise<SubjectSuggestions>;
+  saveSubjects?: (documentId: string, choice: { subject_ids: string[]; new_names: string[] }) => Promise<DocumentResponse>;
   pollMs?: number;
 };
 
@@ -31,8 +34,11 @@ const defaultRetry = (id: string) => retryProcessing(id);
 const defaultLoadLimits = () => loadUploadLimits();
 const defaultCheck = (file: File) => findInLibrary(file);
 
+const defaultLoadSuggestions = (id: string) => loadSubjectSuggestions(id);
+const defaultSaveSubjects = (id: string, choice: { subject_ids: string[]; new_names: string[] }) => saveChosenSubjects(id, choice);
+
 // Library with a plain file picker (US-2 first slice). Drop zone, upload tray, tabs and filters come later.
-export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retry = defaultRetry, loadLimits = defaultLoadLimits, check = defaultCheck, pollMs = 2000 }: Props) {
+export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retry = defaultRetry, loadLimits = defaultLoadLimits, check = defaultCheck, loadSuggestions = defaultLoadSuggestions, saveSubjects = defaultSaveSubjects, pollMs = 2000 }: Props) {
   const { documents, unavailable, refresh } = useDocuments(load, pollMs);
   const input = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState("");
@@ -42,6 +48,26 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
   const [rejected, setRejected] = useState<{ name: string; reason: string }[]>([]);
   const [alreadyIn, setAlreadyIn] = useState<{ name: string; documentId: string }[]>([]);
   const seen = useRef<Map<string, DocumentResponse["state"]> | null>(null);
+  const justSaved = useRef(new Set<string>()); // saved here, so the poll must not announce "is ready." over "Subjects saved."
+  const [picking, setPicking] = useState<DocumentResponse | null>(null);
+  const statusRegion = useRef<HTMLParagraphElement>(null);
+  const wasPicking = useRef(false);
+
+  // The dialog gives focus back to the row button; after a save that button is gone, so the status region takes it.
+  useEffect(() => {
+    if (picking) wasPicking.current = true;
+    else if (wasPicking.current) {
+      wasPicking.current = false;
+      if (document.activeElement === document.body || document.activeElement === null) statusRegion.current?.focus();
+    }
+  }, [picking]);
+
+  async function onSaved(doc: DocumentResponse) {
+    justSaved.current.add(doc.document_id);
+    seen.current?.set(doc.document_id, "ready");
+    setStatus(`Subjects saved. ${doc.title} is ready to use.`);
+    await refresh();
+  }
 
   // One polite live region carries upload results and processing-state changes (DESIGN.md → Accessibility).
   useEffect(() => {
@@ -50,9 +76,10 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
     seen.current = new Map(documents.map((d) => [d.document_id, d.state]));
     if (!before) return; // the first load is not a change
     const changes = documents
-      .filter((d) => before.has(d.document_id) && before.get(d.document_id) !== d.state)
+      .filter((d) => before.has(d.document_id) && before.get(d.document_id) !== d.state && !justSaved.current.has(d.document_id))
       .map(announceChange)
       .filter((message): message is string => message !== null);
+    for (const d of documents) if (d.state === "ready") justSaved.current.delete(d.document_id);
     if (changes.length) setStatus(changes.join(" "));
   }, [documents]);
 
@@ -167,7 +194,7 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
         aria-label="Upload PDFs"
         onChange={(e) => void onPick(e)}
       />
-      <p role="status" aria-live="polite" className={styles.status}>
+      <p ref={statusRegion} tabIndex={-1} role="status" aria-live="polite" className={styles.status}>
         {status}
       </p>
       {failed && (
@@ -228,7 +255,8 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
           )}
         </EmptyState>
       )}
-      {documents && documents.length > 0 && <DocumentTable documents={documents} onRetry={(d) => void onRetry(d)} retrying={retrying} />}
+      {documents && documents.length > 0 && <DocumentTable documents={documents} onRetry={(d) => void onRetry(d)} retrying={retrying} onChooseSubjects={setPicking} />}
+      {picking && <SubjectPicker document={picking} load={loadSuggestions} save={saveSubjects} onClose={() => setPicking(null)} onSaved={(doc) => void onSaved(doc)} />}
     </>
   );
 }

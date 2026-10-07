@@ -5,25 +5,9 @@
 
 name: smart-tutor
 
-# The api talks only to LocalStack, so it gets its dummy credentials, never your real ones.
-# The worker, agent (chat model) and mcp (query embeddings) call Bedrock: they mount your AWS config read-only.
-# The worker also signs S3/SQS with dummy keys (SMART_TUTOR_LOCALSTACK), so your real keys never reach LocalStack.
-# .env may set AWS_PROFILE to a developer profile that doesn't exist in the container, and boto3 then
-# raises ProfileNotFound even with the keys set (an empty AWS_PROFILE fails the same way), so the api
-# points AWS_CONFIG_FILE at a file that defines the profile it uses instead.
-x-localstack-aws: &localstack-aws
-  AWS_PROFILE: localstack
-  AWS_CONFIG_FILE: /etc/smart-tutor/aws-config
-  AWS_SHARED_CREDENTIALS_FILE: /dev/null
-  AWS_ACCESS_KEY_ID: test
-  AWS_SECRET_ACCESS_KEY: test
-
-configs:
-  # Inline `content:` needs Docker Compose >= 2.23.1.
-  localstack-aws-config:
-    content: |
-      [profile localstack]
-      region = us-east-1
+# The api (subject-name embeddings), worker, agent (chat model) and mcp (query embeddings) call Bedrock: they
+# mount your AWS config read-only. The api and worker sign S3/SSM/SQS with dummy keys (SMART_TUTOR_LOCALSTACK),
+# so your real keys never reach LocalStack.
 
 services:
   postgres:
@@ -114,8 +98,14 @@ services:
       AWS_ENDPOINT_URL_SQS: http://localstack:4566
       SMART_TUTOR_S3_PATH_STYLE: "true"
       SMART_TUTOR_AGENT_URL: http://agent:8080
-      <<: *localstack-aws
-    configs: [{source: localstack-aws-config, target: /etc/smart-tutor/aws-config}]
+      SMART_TUTOR_LOCALSTACK: "true"
+      # The api signs S3/SSM with dummy keys (SMART_TUTOR_LOCALSTACK), so your real keys never reach LocalStack.
+      # It also calls Bedrock to embed subject names, with AWS_PROFILE and SMART_TUTOR_AWS_REGION from .env.
+      # botocore reads config, credentials and the SSO / `aws login` caches under $HOME/.aws; the image user
+      # (uid 10001) has no home, so give it one and mount your ~/.aws there. The mount is read-only, so SSO
+      # token refresh can't write its cache: run `aws sso login` / `aws login` on the host first.
+      HOME: /home/app
+    volumes: ["~/.aws:/home/app/.aws:ro"]
     ports: ["10450:8080"]
     depends_on:
       migrate: {condition: service_completed_successfully}

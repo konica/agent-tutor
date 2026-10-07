@@ -6,6 +6,7 @@ from smart_tutor.knowledge.application.ingestion_service import IngestionService
 from smart_tutor.knowledge.application.limits import load_file_limits, load_max_attempts
 from smart_tutor.knowledge.application.retry_service import RetryService, retried_content, retry_message
 from smart_tutor.knowledge.application.search_service import SearchService
+from smart_tutor.knowledge.application.subject_choice import SubjectChoiceService, SubjectSuggestions
 from smart_tutor.knowledge.application.upload_service import (
     PDF_CONTENT_TYPE,
     StartedUpload,
@@ -14,8 +15,10 @@ from smart_tutor.knowledge.application.upload_service import (
 from smart_tutor.knowledge.domain.content import ContentState
 from smart_tutor.knowledge.domain.errors import (
     DocumentNotFoundError,
+    DocumentStateError,
     InvalidFileNameError,
     InvalidSearchError,
+    InvalidSubjectsError,
     RetryLimitError,
 )
 from smart_tutor.knowledge.domain.limits import FileLimits
@@ -34,11 +37,13 @@ __all__ = [
     "DocumentDescriber",
     "DocumentNotFoundError",
     "DocumentService",
+    "DocumentStateError",
     "DocumentView",
     "FileLimits",
     "IngestionService",
     "InvalidFileNameError",
     "InvalidSearchError",
+    "InvalidSubjectsError",
     "LibraryUnitOfWork",
     "ObjectStore",
     "PdfExtractor",
@@ -47,6 +52,8 @@ __all__ = [
     "RetryService",
     "SearchService",
     "StartedUpload",
+    "SubjectChoiceService",
+    "SubjectSuggestions",
     "TooManyPagesError",
     "UnreadablePdfError",
     "UploadOutcome",

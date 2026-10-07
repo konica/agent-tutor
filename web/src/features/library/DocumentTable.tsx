@@ -30,9 +30,10 @@ type Props = {
   documents: DocumentResponse[];
   onRetry: (doc: DocumentResponse) => void;
   retrying: ReadonlySet<string>;
+  onChooseSubjects?: (doc: DocumentResponse) => void;
 };
 
-export function DocumentTable({ documents, onRetry, retrying }: Props) {
+export function DocumentTable({ documents, onRetry, retrying, onChooseSubjects }: Props) {
   return (
     <table className={styles.table}>
       <thead>
@@ -63,6 +64,11 @@ export function DocumentTable({ documents, onRetry, retrying }: Props) {
             </td>
             <td className={styles.muted}>{uploadedOn(doc.created_at)}</td>
             <td className={styles.actions}>
+              {doc.state === "awaiting_subjects" && onChooseSubjects && (
+                <Button size="sm" variant="primary" aria-label={`Choose subjects for ${doc.title}`} onClick={() => onChooseSubjects(doc)}>
+                  Choose subjects
+                </Button>
+              )}
               {doc.state === "failed" && doc.can_retry && (
                 <Button size="sm" icon={RefreshCw} aria-label={`Retry ${doc.title}`} disabled={retrying.has(doc.document_id)} onClick={() => onRetry(doc)}>
                   Retry

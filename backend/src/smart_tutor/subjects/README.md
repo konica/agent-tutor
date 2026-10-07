@@ -4,9 +4,9 @@
 
 **Key classes:** `Subject`, `SubjectName` (normalization), `PersonalSubjectName`; services `SubjectCatalogService` (get-or-create by normalized name, resolve names for a learner), `SubjectSuggester` (rank 3 suggestions from a summary embedding, the learner's subjects, and proposed names), `SubjectNameChecker`; ports `SubjectRepository`, `PersonalNameRepository`.
 
-**Present now:** `GENERAL_SUBJECT_ID` (the "General" subject, seeded by migration 0002; the interim subject of every ready document until US-2b); `SubjectNames` (application: resolves canonical names now, personal names later); port `SubjectRepository` with the SQL adapter `sql_subjects`.
+**Present now:** `Subject`, name cleaning and normalization, `rank_suggestions` (domain); `SubjectCatalogService` (get-or-create by normalized name, unknown ids, backfill of name embeddings); `SubjectSuggester` (3 ranked suggestions); `GENERAL_SUBJECT_ID` (the "General" subject, seeded by migration 0002; now only the last-resort suggestion); `SubjectNames` (application: resolves canonical names now, personal names later); port `SubjectRepository` with the SQL adapter `sql_subjects`.
 
-**May use (application layer only):** none (uses `shared` model ports for embeddings and the name check). Everyone may use `shared`.
+**May use (application layer only):** none. `SubjectCatalogService` takes LangChain `Embeddings` (from `ModelFactory`). Everyone may use `shared`.
 
 **Rules:** `subject_id` never changes and is never reused; there is no admin rename, merge, or hide. Personal names are per learner, unique among that learner's subjects, and never shown to others. No creator is stored in the shared view. Other modules store only `subject_id`s and ask this module for names at read time.
 
