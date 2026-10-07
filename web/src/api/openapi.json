@@ -657,6 +657,36 @@
         ]
       }
     },
+    "/me/subjects": {
+      "get": {
+        "operationId": "list_my_subjects",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SubjectResponse"
+                  },
+                  "title": "Response List My Subjects",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List My Subjects",
+        "tags": [
+          "subjects"
+        ]
+      }
+    },
     "/threads": {
       "post": {
         "operationId": "ask_in_new_thread",
