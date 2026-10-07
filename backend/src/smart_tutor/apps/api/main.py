@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRouter
 
 from smart_tutor.apps.api.deps import current_principal
-from smart_tutor.apps.api.routes import accounts, knowledge
+from smart_tutor.apps.api.routes import accounts, knowledge, threads
 from smart_tutor.apps.api.services import ApiServices, build_services
 from smart_tutor.shared.adapters.auth.keycloak_introspection import keycloak_verifier
 from smart_tutor.shared.config import Settings
@@ -60,6 +60,7 @@ def create_app(
 
     include_protected(app, accounts.router)
     include_protected(app, knowledge.router)
+    include_protected(app, threads.router)
     return app
 
 

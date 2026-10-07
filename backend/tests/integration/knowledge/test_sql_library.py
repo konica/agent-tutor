@@ -13,6 +13,7 @@ from smart_tutor.knowledge.domain.chunk import Chunk
 from smart_tutor.knowledge.domain.content import UNREADABLE_PDF, Content
 from smart_tutor.knowledge.domain.description import DocumentDescription, parse_description
 from smart_tutor.knowledge.domain.document import DUPLICATE_UPLOAD, Document
+from smart_tutor.knowledge.domain.search import ChunkHit
 from smart_tutor.knowledge.domain.upload import Upload, UploadOutcome
 from smart_tutor.shared.adapters.postgres.engine import create_db_engine
 from smart_tutor.shared.adapters.postgres.migrate import upgrade_to_head
@@ -280,6 +281,77 @@ def test_list_processing_for_content_excludes_ready_and_failed(engine: Engine) -
     with SqlLibraryUnitOfWork(engine) as tx:
         processing = tx.documents.list_processing_for_content_for_update(content.content_id)
     assert [d.document_id for d in processing] == [docs[0].document_id]
+
+
+def one_hot(i: int) -> list[float]:
+    vector = [0.0] * 1024
+    vector[i] = 1.0
+    return vector
+
+
+def searchable_document(engine: Engine, owner: str, hot: list[int], *, ready: bool = True) -> Document:
+    """A document of `owner` in General whose content has one chunk per index in `hot`, each a one-hot vector."""
+    doc = start(engine, owner, f"{uid()}.pdf")
+    content = stored_content(engine, owner)
+    link(engine, doc, content)
+    with SqlLibraryUnitOfWork(engine) as tx:
+        chunks = [Chunk(content.content_id, n, n + 1, f"chunk {i}", one_hot(i)) for n, i in enumerate(hot)]
+        tx.chunks.replace(content.content_id, chunks)
+        if ready:
+            loaded = tx.documents.get_by_upload_for_update(doc.upload_id)
+            assert loaded is not None
+            loaded.await_subjects()
+            loaded.choose_subjects([GENERAL])
+            tx.documents.save(loaded)
+        tx.commit()
+    return doc
+
+
+def search(engine: Engine, user: str, i: int, subjects: list[SubjectId] | None = None, k: int = 5) -> list[ChunkHit]:
+    with SqlLibraryUnitOfWork(engine) as tx:
+        return tx.chunks.search(UserId(user), one_hot(i), subjects or [GENERAL], k)
+
+
+def test_search_returns_the_owners_chunk_with_title_page_and_score(engine: Engine) -> None:
+    owner = f"ada-{uid()}"
+    doc = searchable_document(engine, owner, [7])
+    [hit] = search(engine, owner, 7)
+    assert (hit.document_id, hit.page, hit.text, hit.document_title) == (doc.document_id, 1, "chunk 7", doc.file_name)
+    assert hit.score == pytest.approx(1.0)
+
+
+def test_search_never_returns_another_learners_chunks(engine: Engine) -> None:
+    owner = f"ada-{uid()}"
+    searchable_document(engine, owner, [8])
+    assert search(engine, f"bob-{uid()}", 8) == []
+
+
+def test_search_ignores_documents_without_a_requested_subject(engine: Engine) -> None:
+    owner = f"ada-{uid()}"
+    searchable_document(engine, owner, [9])
+    assert search(engine, owner, 9, [SubjectId(uid())]) == []
+
+
+def test_search_skips_archived_documents(engine: Engine) -> None:
+    owner = f"ada-{uid()}"
+    doc = searchable_document(engine, owner, [10])
+    with engine.begin() as conn:
+        conn.execute(text("update documents set archived = true where document_id = :d"), {"d": doc.document_id})
+    assert search(engine, owner, 10) == []
+
+
+def test_search_skips_a_document_still_processing(engine: Engine) -> None:
+    owner = f"ada-{uid()}"
+    searchable_document(engine, owner, [11], ready=False)
+    assert search(engine, owner, 11) == []
+
+
+def test_search_orders_nearest_first_and_limits_to_k(engine: Engine) -> None:
+    owner = f"ada-{uid()}"
+    searchable_document(engine, owner, [20, 21, 22])
+    hits = search(engine, owner, 21, k=2)
+    assert len(hits) == 2 and hits[0].text == "chunk 21"
+    assert hits[0].score == pytest.approx(1.0) and hits[1].score == pytest.approx(0.0)
 
 
 def description() -> DocumentDescription:

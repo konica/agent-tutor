@@ -5,6 +5,10 @@
 
 name: smart-tutor
 
+# The api (subject-name embeddings), worker, agent (chat model) and mcp (query embeddings) call Bedrock: they
+# mount your AWS config read-only. The api and worker sign S3/SSM/SQS with dummy keys (SMART_TUTOR_LOCALSTACK),
+# so your real keys never reach LocalStack.
+
 services:
   postgres:
     image: pgvector/pgvector:pg17
@@ -90,6 +94,7 @@ services:
       # SSM is read by the API itself, so it uses the in-network endpoint.
       AWS_ENDPOINT_URL_SSM: http://localstack:4566
       SMART_TUTOR_S3_PATH_STYLE: "true"
+      SMART_TUTOR_AGENT_URL: http://agent:8080
       SMART_TUTOR_LOCALSTACK: "true"
       # The api signs S3/SSM with dummy keys (SMART_TUTOR_LOCALSTACK), so your real keys never reach LocalStack.
       # It also calls Bedrock to embed subject names, with AWS_PROFILE and SMART_TUTOR_AWS_REGION from .env.
@@ -116,6 +121,9 @@ services:
       SMART_TUTOR_KEYCLOAK_CLIENT_ID: smart-tutor-api
       SMART_TUTOR_KEYCLOAK_CLIENT_SECRET: local-api-secret
       SMART_TUTOR_MCP_URL: http://mcp:8000/mcp
+      # Bedrock (chat model) with your AWS profile: same setup as the worker below.
+      HOME: /home/app
+    volumes: ["~/.aws:/home/app/.aws:ro"]
     ports: ["10451:8080"]
     depends_on: [postgres, mcp]
 
@@ -131,6 +139,11 @@ services:
       SMART_TUTOR_KEYCLOAK_CLIENT_SECRET: local-mcp-secret
       SMART_TUTOR_KEYCLOAK_AUDIENCE: rag-mcp
       SMART_TUTOR_MCP_PORT: "8000"  # .env sets the host port (10452)
+      # The resource server URL in the MCP auth metadata: the address the agent calls, not .env's host URL.
+      SMART_TUTOR_MCP_URL: http://mcp:8000/mcp
+      # Bedrock (query embeddings) with your AWS profile: same setup as the worker below.
+      HOME: /home/app
+    volumes: ["~/.aws:/home/app/.aws:ro"]
     ports: ["10452:8000"]
     depends_on: [postgres]
 

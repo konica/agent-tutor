@@ -14,7 +14,7 @@ def test_upgrade_to_head_reaches_head_and_is_repeatable() -> None:
     upgrade_to_head(url)
     upgrade_to_head(url)  # running twice is a no-op
     with create_engine(url).connect() as conn:
-        assert conn.execute(text("select version_num from alembic_version")).scalar_one() == "0005"
+        assert conn.execute(text("select version_num from alembic_version")).scalar_one() == "0006"
 
 
 def test_general_subject_is_seeded() -> None:

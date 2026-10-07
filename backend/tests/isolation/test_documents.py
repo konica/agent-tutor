@@ -12,19 +12,15 @@ from fakes import (
     TEST_LIMITS,
     FakeObjectStore,
     FakeTokenVerifier,
-    FixedClock,
     InMemoryLibrary,
-    InMemorySubjects,
-    fake_embeddings,
+    api_services,
     fake_tools,
 )
 from smart_tutor.apps.api.main import create_app
-from smart_tutor.apps.api.services import ApiServices
-from smart_tutor.knowledge.application import DocumentService, IngestionService, SubjectChoiceService, UploadService
+from smart_tutor.knowledge.application import IngestionService
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.domain.principal import Principal
-from smart_tutor.subjects.application import SubjectCatalogService, SubjectNames, SubjectSuggester
 
 A = {"Authorization": "Bearer token-a"}
 B = {"Authorization": "Bearer token-b"}
@@ -34,17 +30,8 @@ def setup() -> tuple[TestClient, FakeObjectStore, IngestionService]:
     verifier = FakeTokenVerifier()
     verifier.add("token-a", Principal(UserId("learner-a"), "A", frozenset({"learner"})))
     verifier.add("token-b", Principal(UserId("learner-b"), "B", frozenset({"learner"})))
-    library, objects, subjects = InMemoryLibrary(), FakeObjectStore(), InMemorySubjects()
-    services = ApiServices(
-        uploads=UploadService(library.unit_of_work, objects, FixedClock(), TEST_LIMITS),
-        documents=DocumentService(library.unit_of_work),
-        subjects=SubjectNames(subjects),
-        subject_choice=SubjectChoiceService(
-            library.unit_of_work,
-            SubjectSuggester(subjects, SubjectNames(subjects)),
-            SubjectCatalogService(subjects, fake_embeddings(8)),
-        ),
-    )
+    library, objects = InMemoryLibrary(), FakeObjectStore()
+    services = api_services(library, objects)
     client = TestClient(create_app(Settings(), verifier=verifier, services=services))
     return client, objects, IngestionService(library.unit_of_work, objects, fake_tools(), TEST_LIMITS)
 

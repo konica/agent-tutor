@@ -6,6 +6,10 @@
 BACKEND := cd backend &&
 # Host processes load the root .env into the environment: boto3 reads AWS_ENDPOINT_URL_* (LocalStack) only from there.
 HOST := $(BACKEND) uv run --env-file ../.env
+# The MCP server introspects tokens as the rag-mcp client (ADR 0007), not the API client the root .env names.
+# Variables already in the environment win over --env-file, so these override .env for the MCP server only.
+MCP_HOST := $(BACKEND) SMART_TUTOR_KEYCLOAK_CLIENT_ID=rag-mcp SMART_TUTOR_KEYCLOAK_CLIENT_SECRET=local-mcp-secret \
+	SMART_TUTOR_KEYCLOAK_AUDIENCE=rag-mcp uv run --env-file ../.env
 export PYTHONUTF8 := 1
 
 help:
@@ -24,7 +28,7 @@ api:           ## API at :10450, reloads on change
 agent:         ## agent at :10451, reloads on change
 	$(HOST) uvicorn smart_tutor.apps.agent.server:app --reload --port 10451
 mcp:           ## RAG MCP server at :10452/mcp (SMART_TUTOR_MCP_PORT in .env)
-	$(HOST) python -m smart_tutor.apps.mcp_server.server
+	$(MCP_HOST) python -m smart_tutor.apps.mcp_server.server
 worker:        ## ingestion worker (no port); restart it after code changes
 	$(HOST) --extra ingest python -m smart_tutor.apps.worker.main
 
@@ -36,7 +40,7 @@ api-debug:     ## API at :10450, debugger at :10460
 agent-debug:   ## agent at :10451, debugger at :10461
 	$(DEBUG):10461 -m uvicorn smart_tutor.apps.agent.server:app --port 10451
 mcp-debug:     ## RAG MCP server at :10452/mcp, debugger at :10462
-	$(DEBUG):10462 -m smart_tutor.apps.mcp_server.server
+	$(MCP_HOST) python -m debugpy --listen 127.0.0.1:10462 -m smart_tutor.apps.mcp_server.server
 worker-debug:  ## ingestion worker, debugger at :10463
 	$(HOST) --extra ingest python -m debugpy --listen 127.0.0.1:10463 -m smart_tutor.apps.worker.main
 

@@ -1,6 +1,22 @@
 {
   "components": {
     "schemas": {
+      "AskRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "question": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "title": "AskRequest",
+        "type": "object"
+      },
       "ChooseSubjectsRequest": {
         "additionalProperties": false,
         "properties": {
@@ -574,6 +590,55 @@
         "summary": "Get Me",
         "tags": [
           "accounts"
+        ]
+      }
+    },
+    "/threads": {
+      "post": {
+        "operationId": "ask_in_new_thread",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Server-sent events: thread, then delta*, citations, done (or error)."
+          },
+          "409": {
+            "description": "The learner has no ready documents."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ask In New Thread",
+        "tags": [
+          "tutoring"
         ]
       }
     },

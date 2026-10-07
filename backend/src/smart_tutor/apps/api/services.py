@@ -2,6 +2,9 @@
 
 from dataclasses import dataclass
 
+import httpx
+
+from smart_tutor.apps.api.agent_client import AgentClient
 from smart_tutor.knowledge.adapters.s3_object_store import S3ObjectStore
 from smart_tutor.knowledge.adapters.sql_library import SqlLibraryUnitOfWork
 from smart_tutor.knowledge.application import DocumentService, SubjectChoiceService, UploadService, load_file_limits
@@ -13,6 +16,8 @@ from smart_tutor.shared.adapters.postgres.engine import create_db_engine
 from smart_tutor.shared.config import Settings
 from smart_tutor.subjects.adapters.sql_subjects import SqlSubjectRepository
 from smart_tutor.subjects.application import SubjectCatalogService, SubjectNames, SubjectSuggester
+from smart_tutor.tutoring.adapters.sql_threads import SqlThreadRepository
+from smart_tutor.tutoring.application import ConversationService
 
 
 @dataclass(frozen=True)
@@ -21,6 +26,8 @@ class ApiServices:
     documents: DocumentService
     subjects: SubjectNames
     subject_choice: SubjectChoiceService
+    conversations: ConversationService
+    agent: AgentClient
 
 
 def build_services(settings: Settings) -> ApiServices:
@@ -35,13 +42,17 @@ def build_services(settings: Settings) -> ApiServices:
     )
     subject_repo = SqlSubjectRepository(engine)
     names = SubjectNames(subject_repo)
+    documents = DocumentService(library)
     return ApiServices(
         uploads=UploadService(library, objects, SystemClock(), limits),
-        documents=DocumentService(library),
+        documents=documents,
         subjects=names,
         subject_choice=SubjectChoiceService(
             library,
             SubjectSuggester(subject_repo, names),
             SubjectCatalogService(subject_repo, ModelFactory(settings).embedding()),
         ),
+        conversations=ConversationService(SqlThreadRepository(engine), documents, SystemClock()),
+        # Answers stream for a while: a long read timeout between SSE events, a short one to connect.
+        agent=AgentClient(settings.agent_url, httpx.AsyncClient(timeout=httpx.Timeout(10, read=120))),
     )
