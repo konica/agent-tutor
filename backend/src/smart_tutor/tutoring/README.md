@@ -4,7 +4,7 @@
 
 **Key classes:** `Thread` (`add_subject()` refuses beyond 3, never removes), `DetectionPolicy`, `RelevanceGate`, `GrowthPolicy`; services `SubjectDetector`, `AskService`, `ConversationService`; ports `Retriever`, `ThreadRepository`.
 
-**Built so far:** `Thread` and `ThreadRepository` (`SqlThreadRepository`); `ConversationService.start_thread`; `Retriever` with its MCP client adapter `McpRetriever`; `answer_messages` / `cited_chunks` (the quoted answer prompt and its citations). The rest above is still to come.
+**Built so far:** `Thread` and `ThreadRepository` (`SqlThreadRepository`); `ConversationService.start_thread`; `Retriever` with its MCP client adapter `McpRetriever`; `answer_messages` / `cited_chunks` (the quoted answer prompt and its citations). `DetectionPolicy` (pure; thresholds from SSM via `load_detection_policy`). The rest above is still to come.
 
 **Interim rule until subject detection lands (US-2b, #31):** a learner with exactly one subject starts a thread with it; several subjects raise `DetectionUnavailableError`; no ready documents raise `NoDocumentsError` ("Upload a document first").
 

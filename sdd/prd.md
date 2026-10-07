@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Draft v2.18 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Status** | Draft v2.19 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; threads that grow to 3 subjects; SHA-256 dedupe; research map in Release 2) |
+| **Changes from v2.18** | Subject detection (§9.2 step 1) states that the runner-up is the best subject not bound, and that a subject with no chunk among the top 20 results has no score. Starting values in SSM: `detect-threshold` 0.35, `detect-margin` 0.05, `multi-margin` 0.03. No other behavior changes. |
 | **Changes from v2.17** | US-2b first slice (#77): when its content becomes ready, a document goes to *choose subjects* (`awaiting_subjects`) with 3 suggestions; the interim "General" step is removed (documents that already have "General" keep it). Suggestions are computed when the learner opens *choose subjects* (nothing is stored), and content without a description fills the picker with the learner's other subjects, then "General". The API and worker IAM roles gain Bedrock invoke on the embedding (and, for the worker, agent) models. |
 | **Changes from v2.16** | Keycloak's login page offers "Remember me" and "Forgot password?" (design F4, Q53; US-1). |
 | **Changes from v2.15** | Product owner answers to design questions E4, E6, E7, E8, F1 (Q48–Q52): "New conversation" is offered only when a conversation already has 3 subjects, so a decline only asks for a document (US-5); a declined question is not kept after "Upload a document"; **subjects of an archived document can't be changed** (reverses Q42; US-10); daily caps reset at midnight GMT+7 (D27); registration uses the email as the username (US-1). |
@@ -313,7 +314,7 @@ A plain **LangGraph** graph; retrieval is never a model decision. The graph stat
 
 **Ask path (every chat turn):**
 
-1. **Resolve subjects (first turn).** If `state.subject_ids` is empty: search across **all of the learner's subjects** and score each subject by its best chunk similarity. Bind the best subject if its score ≥ `detect_threshold` and it leads the runner-up by ≥ `detect_margin`; also bind any other subject whose score ≥ `detect_threshold` and is within `multi_margin` of the best (at most 3 in total). Otherwise ask "Which subjects is this about?" (pick 1–3), keep the question, and answer it after the pick. Learners with one subject skip detection.
+1. **Resolve subjects (first turn).** If `state.subject_ids` is empty: search across **all of the learner's subjects** and score each subject by its best chunk similarity. Bind the best subject if its score ≥ `detect_threshold`; also bind any other subject whose score ≥ `detect_threshold` and is within `multi_margin` of the best (at most 3 in total); the bound subjects must lead the **runner-up** — the best-scoring subject not bound — by ≥ `detect_margin`. Detection is one search of the top 20 chunks across those subjects; a subject with no chunk among them has no score. Otherwise ask "Which subjects is this about?" (pick 1–3), keep the question, and answer it after the pick. Learners with one subject skip detection.
 2. **Search (fixed step).** MCP `search` over the thread's subjects; top-k chunks (k = 5).
 3. **Relevance gate (code).** If the best score ≥ `answer_floor`, go to step 5.
 4. **Growth check (code).** Otherwise search the learner's **other** subjects:
@@ -378,7 +379,7 @@ Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow onl
 | Learner profile *(R3)* | PostgreSQL `learners` | `user_id` | `time_zone`, for reports (D13). Not created in Release 1: the time zone is the `app-time-zone` setting (D27). |
 | Usage | PostgreSQL `token_usage` | `usage_id` | `user_id` (null for system work such as re-embedding), `source` (`chat` / `document_processing` / `background` / `system`), `ref_id` (thread or content id), input/output tokens, `created_at`. |
 | Upload | PostgreSQL `uploads` | `upload_id` | `user_id`, `bytes`, `created_at`, `outcome` — for rate limits and daily caps. |
-| Settings | SSM Parameter Store | `/smart-tutor/*` | `learning-record-idle-minutes` (10), file limits (`max-upload-mb` 50, `max-pages` 500), rate limits and daily caps, `app-time-zone` (`Asia/Ho_Chi_Minh`, D27), detection thresholds, retry attempts (`max-processing-attempts` 3; the API refuses a Retry after this many). |
+| Settings | SSM Parameter Store | `/smart-tutor/*` | `learning-record-idle-minutes` (10), file limits (`max-upload-mb` 50, `max-pages` 500), rate limits and daily caps, `app-time-zone` (`Asia/Ho_Chi_Minh`, D27), detection thresholds (`detect-threshold` 0.35, `detect-margin` 0.05, `multi-margin` 0.03; starting values), retry attempts (`max-processing-attempts` 3; the API refuses a Retry after this many). |
 | Research map *(R2)* | PostgreSQL `work_links` | `(citing_work_key, cited_work_key)` | Evidence (`content_id`, `page`), match method (`doi` / `title_year`). Computed once per content and shared. |
 | Quiz *(R3)* | PostgreSQL `quizzes`, `quiz_questions`, `quiz_attempts` | `quiz_id` | Source `note_ids[]`, questions (`subject_id`, topic, options, correct index, explanation), attempts with answers, score, per-topic scores, `status`. |
 | Report *(R3)* | PostgreSQL `reports` | `report_id` | `user_id`, `period_type`, `period_start`, `summary`, `stats`, `recommendations[]`, `trigger`, `status`; unique on `(user_id, period_type, period_start)` for scheduled reports. |
