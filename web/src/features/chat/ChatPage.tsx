@@ -178,6 +178,7 @@ export function ChatPage({ ask = defaultAsk, loadSubjects = defaultLoadSubjects,
       {exchange ? (
         <PageHeader
           title={exchange.question}
+          titleClassName={styles.clampedTitle}
           below={
             exchange.subjects.length > 0 && (
               <ul className={`${styles.chips} ${styles.headerChips}`} aria-label="Subjects">
@@ -211,6 +212,13 @@ export function ChatPage({ ask = defaultAsk, loadSubjects = defaultLoadSubjects,
             </div>
           </section>
         </>
+      )}
+
+      {exchange && (
+        <p className={styles.question}>
+          <span className="visually-hidden">You asked: </span>
+          {exchange.question}
+        </p>
       )}
 
       {/* Announced once when the answer is complete, never word by word (DESIGN.md → Accessibility). */}

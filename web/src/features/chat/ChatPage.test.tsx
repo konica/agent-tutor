@@ -79,7 +79,9 @@ describe("ChatPage", () => {
     await userEvent.click(askButton());
     expect(ask).toHaveBeenCalledWith("What is attention?");
     expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
-    expect(screen.getByText("What is attention?")).toBeInTheDocument();
+    // The question is the header title and also the learner's bubble in the conversation.
+    expect(screen.getByRole("heading", { level: 1, name: "What is attention?" })).toBeInTheDocument();
+    expect(screen.getByText("You asked:").parentElement).toHaveTextContent("You asked: What is attention?");
     expect(screen.getByText("General")).toBeInTheDocument();
     expect(screen.getByText("a.pdf, p. 3")).toBeInTheDocument();
     expect(screen.getByText("b.pdf, page unavailable")).toBeInTheDocument();

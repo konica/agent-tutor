@@ -9,11 +9,12 @@
 .lg { min-height: 48px; padding: 0 var(--sp-6); font-size: var(--fs-16); }
 .icon { width: 16px; height: 16px; flex: none; }
 .primary { background: var(--accent); color: var(--on-accent); }
-.primary:hover:enabled { background: var(--accent-hover); }
+/* :not(:disabled) also matches links; each hover rule restates the colour so a:hover in base.css can't override it. */
+.primary:hover:not(:disabled) { background: var(--accent-hover); color: var(--on-accent); }
 .secondary { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
-.secondary:hover:enabled { background: var(--surface-2); border-color: var(--text-3); }
+.secondary:hover:not(:disabled) { background: var(--surface-2); border-color: var(--text-3); color: var(--text); }
 .ghost { background: transparent; color: var(--accent-text); }
-.ghost:hover:enabled { background: var(--accent-soft); }
+.ghost:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent-text); }
 .quiet { background: transparent; color: var(--text); }
-.quiet:hover:enabled { background: var(--surface-2); }
+.quiet:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
 .button:disabled { background: var(--surface-2); color: var(--text-3); border-color: var(--border); }

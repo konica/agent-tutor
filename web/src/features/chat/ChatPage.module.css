@@ -7,6 +7,17 @@
 .chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
 .headerChips { margin-top: var(--sp-3); }
 
+/* The header shows at most two lines of a long question; the full text is in the bubble. */
+.clampedTitle { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* The learner's words: a right-aligned bubble, apart from the tutor's prose. */
+.question {
+  margin: 0 0 var(--sp-4) auto; max-width: 80%; width: fit-content;
+  padding: var(--sp-3) var(--sp-4); border-radius: var(--r-md);
+  background: var(--accent-soft); color: var(--text);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+
 .answerRegion { display: grid; gap: var(--sp-4); }
 /* The tutor's words: plain prose on the page surface. */
 .answer {
