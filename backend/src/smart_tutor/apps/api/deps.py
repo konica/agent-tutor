@@ -6,7 +6,7 @@ from fastapi import Depends, Request
 
 from smart_tutor.apps.api.agent_client import AgentClient
 from smart_tutor.apps.api.services import ApiServices
-from smart_tutor.knowledge.application import DocumentService, SubjectChoiceService, UploadService
+from smart_tutor.knowledge.application import DocumentService, RetryService, SubjectChoiceService, UploadService
 from smart_tutor.shared.adapters.auth.bearer import BearerToken, CurrentPrincipal, current_principal
 from smart_tutor.subjects.application import SubjectNames
 from smart_tutor.tutoring.application import ConversationService
@@ -17,6 +17,7 @@ __all__ = [
     "Conversations",
     "CurrentPrincipal",
     "Documents",
+    "Retries",
     "SubjectChoice",
     "Subjects",
     "Uploads",
@@ -37,6 +38,10 @@ def _documents(request: Request) -> DocumentService:
     return _services(request).documents
 
 
+def _retries(request: Request) -> RetryService:
+    return _services(request).retries
+
+
 def _subject_choice(request: Request) -> SubjectChoiceService:
     return _services(request).subject_choice
 
@@ -55,6 +60,7 @@ def _agent(request: Request) -> AgentClient:
 
 Uploads = Annotated[UploadService, Depends(_uploads)]
 Documents = Annotated[DocumentService, Depends(_documents)]
+Retries = Annotated[RetryService, Depends(_retries)]
 Subjects = Annotated[SubjectNames, Depends(_subject_names)]
 SubjectChoice = Annotated[SubjectChoiceService, Depends(_subject_choice)]
 Conversations = Annotated[ConversationService, Depends(_conversations)]

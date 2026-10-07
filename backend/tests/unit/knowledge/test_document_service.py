@@ -15,17 +15,17 @@ def test_lists_only_the_callers_documents_newest_first() -> None:
     uploads.start_upload(UserId("ada"), "second.pdf")
     uploads.start_upload(UserId("bob"), "bobs.pdf")
 
-    docs = DocumentService(library.unit_of_work).list_documents(UserId("ada"))
+    docs = DocumentService(library.unit_of_work, max_attempts=3).list_documents(UserId("ada"))
 
     assert [d.title for d in docs] == ["second.pdf", "first.pdf"]
     assert {d.state for d in docs} == {"processing"}
     assert all(d.failure_reason is None for d in docs)
-    assert DocumentService(library.unit_of_work).list_documents(UserId("carol")) == []
+    assert DocumentService(library.unit_of_work, max_attempts=3).list_documents(UserId("carol")) == []
 
 
 def test_learner_subjects_are_those_of_ready_unarchived_documents_only() -> None:
     library = InMemoryLibrary()
-    docs = DocumentService(library.unit_of_work)
+    docs = DocumentService(library.unit_of_work, max_attempts=3)
     ada_doc = ingest_ready(library, "ada", "Attention is all you need.")
     ingest_ready(library, "bob", "Gradient descent.")
     UploadService(library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS).start_upload(
@@ -54,7 +54,7 @@ def _ingested(library: InMemoryLibrary, objects: FakeObjectStore, owner: str) ->
 def test_finds_the_callers_document_by_hash() -> None:
     library, objects = InMemoryLibrary(), FakeObjectStore()
     document_id = _ingested(library, objects, "ada")
-    service = DocumentService(library.unit_of_work)
+    service = DocumentService(library.unit_of_work, max_attempts=3)
     assert service.find_in_library(UserId("ada"), SHA) == document_id
     assert service.find_in_library(UserId("ada"), "0" * 64) is None
 
@@ -62,7 +62,7 @@ def test_finds_the_callers_document_by_hash() -> None:
 def test_another_learners_file_is_not_in_your_library() -> None:
     library, objects = InMemoryLibrary(), FakeObjectStore()
     _ingested(library, objects, "ada")
-    assert DocumentService(library.unit_of_work).find_in_library(UserId("bob"), SHA) is None
+    assert DocumentService(library.unit_of_work, max_attempts=3).find_in_library(UserId("bob"), SHA) is None
 
 
 def test_an_unlinked_or_duplicate_failed_document_never_matches() -> None:
@@ -71,6 +71,6 @@ def test_an_unlinked_or_duplicate_failed_document_never_matches() -> None:
     _ingested(library, objects, "ada")  # fails as a duplicate; its content_id stays null
     uploads = UploadService(library.unit_of_work, objects, FixedClock(), TEST_LIMITS)
     uploads.start_upload(UserId("carol"), "paper.pdf")  # still processing: no content yet
-    service = DocumentService(library.unit_of_work)
+    service = DocumentService(library.unit_of_work, max_attempts=3)
     assert service.find_in_library(UserId("ada"), SHA) == first
     assert service.find_in_library(UserId("carol"), SHA) is None

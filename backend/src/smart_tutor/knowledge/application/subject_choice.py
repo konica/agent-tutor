@@ -30,11 +30,16 @@ class SubjectSuggestions:
 
 class SubjectChoiceService:
     def __init__(
-        self, uow: Callable[[], LibraryUnitOfWork], suggester: SubjectSuggester, catalog: SubjectCatalogService
+        self,
+        uow: Callable[[], LibraryUnitOfWork],
+        suggester: SubjectSuggester,
+        catalog: SubjectCatalogService,
+        max_attempts: int,
     ) -> None:
         self._uow = uow
         self._suggester = suggester
         self._catalog = catalog
+        self._max_attempts = max_attempts  # shown in the returned view, like DocumentService.list_documents
 
     def suggestions(self, user_id: UserId, document_id: DocumentId) -> SubjectSuggestions:
         with self._uow() as tx:
@@ -79,7 +84,7 @@ class SubjectChoiceService:
             document.choose_subjects([*subject_ids, *created])  # rejects a new name that resolved to a chosen id
             tx.documents.save(document)
             tx.commit()
-        return document_view(document)
+        return document_view(document, self._max_attempts)
 
     @staticmethod
     def _choosable(

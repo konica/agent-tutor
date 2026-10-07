@@ -33,6 +33,14 @@ export type ChooseSubjectsRequest = {
  */
 export type DocumentResponse = {
     /**
+     * Attempt
+     */
+    attempt: number | null;
+    /**
+     * Can Retry
+     */
+    can_retry: boolean;
+    /**
      * Created At
      */
     created_at: string;
@@ -44,6 +52,10 @@ export type DocumentResponse = {
      * Failure Reason
      */
     failure_reason: string | null;
+    /**
+     * Max Attempts
+     */
+    max_attempts: number;
     /**
      * State
      */
@@ -278,6 +290,36 @@ export type CheckDuplicateResponses = {
 };
 
 export type CheckDuplicateResponse = CheckDuplicateResponses[keyof CheckDuplicateResponses];
+
+export type RetryDocumentData = {
+    body?: never;
+    path: {
+        /**
+         * Document Id
+         */
+        document_id: string;
+    };
+    query?: never;
+    url: '/documents/{document_id}/retry';
+};
+
+export type RetryDocumentErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RetryDocumentError = RetryDocumentErrors[keyof RetryDocumentErrors];
+
+export type RetryDocumentResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type RetryDocumentResponse = RetryDocumentResponses[keyof RetryDocumentResponses];
 
 export type GetSubjectSuggestionsData = {
     body?: never;

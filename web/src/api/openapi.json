@@ -45,6 +45,21 @@
       },
       "DocumentResponse": {
         "properties": {
+          "attempt": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt"
+          },
+          "can_retry": {
+            "title": "Can Retry",
+            "type": "boolean"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -64,6 +79,10 @@
               }
             ],
             "title": "Failure Reason"
+          },
+          "max_attempts": {
+            "title": "Max Attempts",
+            "type": "integer"
           },
           "state": {
             "enum": [
@@ -92,6 +111,9 @@
           "title",
           "state",
           "failure_reason",
+          "attempt",
+          "max_attempts",
+          "can_retry",
           "created_at",
           "subjects"
         ],
@@ -454,6 +476,48 @@
           }
         ],
         "summary": "Check Duplicate",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/documents/{document_id}/retry": {
+      "post": {
+        "description": "Process a failed document's stored file again (PRD \u00a79.5); a document that isn't failed is left as it is.",
+        "operationId": "retry_document",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Retry Document",
         "tags": [
           "knowledge"
         ]

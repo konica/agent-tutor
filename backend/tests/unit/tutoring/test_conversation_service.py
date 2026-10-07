@@ -12,7 +12,7 @@ from smart_tutor.tutoring.application import ConversationService, DetectionUnava
 
 
 def service(library: InMemoryLibrary, threads: InMemoryThreads, clock: FixedClock) -> ConversationService:
-    return ConversationService(threads, DocumentService(library.unit_of_work), clock)
+    return ConversationService(threads, DocumentService(library.unit_of_work, max_attempts=3), clock)
 
 
 def test_a_learner_with_one_subject_starts_a_thread_with_it() -> None:

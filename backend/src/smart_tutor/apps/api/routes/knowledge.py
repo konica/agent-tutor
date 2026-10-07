@@ -1,4 +1,5 @@
-"""Library routes (knowledge module): upload, list documents, check a file hash, suggest and save subjects."""
+"""Library routes (knowledge module): start an upload, list the caller's documents, check a file hash against them,
+retry a failed one, suggest and save its subjects."""
 
 from datetime import datetime
 from typing import Annotated, Literal
@@ -7,13 +8,14 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from smart_tutor.apps.api.deps import CurrentPrincipal, Documents, SubjectChoice, Subjects, Uploads
+from smart_tutor.apps.api.deps import CurrentPrincipal, Documents, Retries, SubjectChoice, Subjects, Uploads
 from smart_tutor.knowledge.application import (
     DocumentNotFoundError,
     DocumentStateError,
     DocumentView,
     InvalidFileNameError,
     InvalidSubjectsError,
+    RetryLimitError,
 )
 from smart_tutor.shared.domain.ids import DocumentId, SubjectId
 
@@ -58,6 +60,9 @@ class DocumentResponse(BaseModel):
     title: str
     state: Literal["processing", "awaiting_subjects", "ready", "failed"]
     failure_reason: str | None
+    attempt: int | None  # processing attempts of the shared content so far; null until the upload is hashed
+    max_attempts: int
+    can_retry: bool
     created_at: datetime
     subjects: list[SubjectResponse]
 
@@ -116,6 +121,9 @@ def _document_response(view: DocumentView, names: dict[SubjectId, str]) -> Docum
         title=view.title,
         state=view.state,
         failure_reason=view.failure_reason,
+        attempt=view.attempt,
+        max_attempts=view.max_attempts,
+        can_retry=view.can_retry,
         created_at=view.created_at,
         subjects=[SubjectResponse(subject_id=s, name=names[s]) for s in view.subject_ids if s in names],
     )
@@ -172,3 +180,14 @@ def choose_subjects(
     except InvalidSubjectsError as e:
         raise HTTPException(422, str(e)) from None
     return _document_response(view, subjects.names_for(principal.user_id, set(view.subject_ids)))
+
+
+@router.post("/documents/{document_id}/retry", operation_id="retry_document", status_code=status.HTTP_204_NO_CONTENT)
+def retry_document(document_id: UUID, principal: CurrentPrincipal, retries: Retries) -> None:
+    """Process a failed document's stored file again (PRD §9.5); a document that isn't failed is left as it is."""
+    try:
+        retries.retry(principal.user_id, DocumentId(str(document_id)))
+    except DocumentNotFoundError:
+        raise HTTPException(404, "Document not found") from None
+    except RetryLimitError as e:
+        raise HTTPException(409, str(e)) from None

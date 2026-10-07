@@ -16,4 +16,8 @@ class MessageQueue(ABC):
         """Wait briefly for messages, roughly oldest first; may return none."""
 
     @abstractmethod
+    def send(self, body: str) -> None:
+        """Add a message at the back of the queue."""
+
+    @abstractmethod
     def delete(self, message: QueueMessage) -> None: ...

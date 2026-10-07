@@ -16,5 +16,8 @@ class SqsMessageQueue(MessageQueue):
         response = self._client.receive_message(QueueUrl=self._url, MaxNumberOfMessages=1, WaitTimeSeconds=self._wait)
         return [QueueMessage(m["ReceiptHandle"], m["Body"]) for m in response.get("Messages", [])]
 
+    def send(self, body: str) -> None:
+        self._client.send_message(QueueUrl=self._url, MessageBody=body)
+
     def delete(self, message: QueueMessage) -> None:
         self._client.delete_message(QueueUrl=self._url, ReceiptHandle=message.receipt)

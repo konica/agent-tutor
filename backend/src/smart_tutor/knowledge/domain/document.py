@@ -43,6 +43,7 @@ class Document:
     failure_reason: str | None = None
     title_override: str | None = None
     content_title: str | None = None  # contents.title, filled when listing; never saved
+    content_attempts: int | None = None  # contents.attempts, filled when listing; never saved
     subject_ids: list[SubjectId] = field(default_factory=list)
     archived: bool = False
 
@@ -103,3 +104,9 @@ class Document:
             raise InvalidSubjectsError("Choose 1 to 3 different subjects")
         self.subject_ids = list(subject_ids)
         self.state = DocumentState.READY
+
+    def retry(self) -> None:
+        """failed → processing when its content is retried."""
+        if self.state is not DocumentState.FAILED or self.content_id is None:
+            raise DocumentStateError("Only a failed document with content can be retried")
+        self.state, self.failure_reason = DocumentState.PROCESSING, None

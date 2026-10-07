@@ -51,8 +51,8 @@ class World:
         )
         self.catalog = SubjectCatalogService(self.subjects, fake_embeddings(8))
         suggester = SubjectSuggester(self.subjects, SubjectNames(self.subjects))
-        self.choice = SubjectChoiceService(self.library.unit_of_work, suggester, self.catalog)
-        self.documents = DocumentService(self.library.unit_of_work)
+        self.choice = SubjectChoiceService(self.library.unit_of_work, suggester, self.catalog, max_attempts=3)
+        self.documents = DocumentService(self.library.unit_of_work, max_attempts=3)
 
     def upload(self, user_id: UserId = ADA, text: str = SENTENCE, *, ingest: bool = True) -> DocumentId:
         started = self.uploads.start_upload(user_id, "paper.pdf")

@@ -53,7 +53,7 @@ class World:
         self.ingestion = IngestionService(
             self.library.unit_of_work, self.objects, fake_tools(chat=chat, chunker=chunker), limits
         )
-        self.documents = DocumentService(self.library.unit_of_work)
+        self.documents = DocumentService(self.library.unit_of_work, max_attempts=3)
 
     def upload(self, data: bytes, name: str = "1706.03762v7.pdf") -> str:
         started = self.uploads.start_upload(UserId("ada"), name)

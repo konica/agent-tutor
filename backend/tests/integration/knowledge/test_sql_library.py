@@ -423,6 +423,52 @@ def test_listing_shows_the_content_title_and_the_override_wins(engine: Engine) -
     assert titles()[titled.document_id] == "My notes"
 
 
+def fail_content(engine: Engine, content: Content) -> None:
+    with SqlLibraryUnitOfWork(engine) as tx:
+        locked = tx.contents.get_for_update(content.content_id)
+        assert locked is not None
+        locked.fail(UNREADABLE_PDF)
+        tx.contents.save(locked)
+        tx.commit()
+
+
+def test_retry_attempts_and_failed_document_locks_round_trip(engine: Engine) -> None:
+    owner = f"ada-{uid()}"
+    content = stored_content(engine, owner)
+    failed, processing = start(engine, owner, "a.pdf"), start(engine, f"bob-{uid()}", "b.pdf")  # one per owner
+    other = start(engine, owner)
+    for doc in (failed, processing):
+        link(engine, doc, content)
+    with SqlLibraryUnitOfWork(engine) as tx:
+        loaded = tx.documents.get_by_upload_for_update(failed.upload_id)
+        assert loaded is not None
+        loaded.fail(UNREADABLE_PDF)
+        tx.documents.save(loaded)
+        tx.commit()
+    fail_content(engine, content)
+
+    with SqlLibraryUnitOfWork(engine) as tx:
+        by_id = {d.document_id: d for d in tx.documents.list_readable_by(UserId(owner))}
+        assert by_id[failed.document_id].content_attempts == 1
+        assert by_id[other.document_id].content_attempts is None
+        assert tx.documents.get(DocumentId(uid())) is None
+        found = tx.documents.get(failed.document_id)
+        assert found is not None and found.document_id == failed.document_id
+        assert [d.document_id for d in tx.documents.list_failed_for_content_for_update(content.content_id)] == [
+            failed.document_id
+        ]
+        locked = tx.contents.get_for_update(content.content_id)
+        assert locked is not None
+        locked.retry(3)
+        tx.contents.save(locked)
+        tx.commit()
+    with SqlLibraryUnitOfWork(engine) as tx:
+        again = tx.contents.get(content.content_id)
+        relisted = {d.document_id: d for d in tx.documents.list_readable_by(UserId(owner))}
+    assert again is not None and (again.state, again.attempts) == ("processing", 2)
+    assert relisted[failed.document_id].content_attempts == 2
+
+
 def test_find_by_sha256_is_owner_only_and_skips_unlinked_and_archived(engine: Engine) -> None:
     ada, bob, carol = f"ada-{uid()}", f"bob-{uid()}", f"carol-{uid()}"
     content = stored_content(engine, ada)

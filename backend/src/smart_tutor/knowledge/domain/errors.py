@@ -15,10 +15,6 @@ class InvalidSubjectsError(DomainError):
     """The chosen subjects aren't 1 to 3 different subjects (PRD §9.4)."""
 
 
-class DocumentNotFoundError(DomainError):
-    """No document of the caller's has this id; another learner's document looks the same (PRD §9.3)."""
-
-
 class ContentStateError(DomainError):
     """The content isn't in a state that allows this change (PRD §9.5)."""
 
@@ -33,3 +29,11 @@ class InvalidSearchError(DomainError):
 
 class InvalidDescriptionError(DomainError):
     """A describe_document payload failed validation; the message names the field, never its value (PRD §9.9)."""
+
+
+class RetryLimitError(DomainError):
+    """The content used all its processing attempts (PRD §9.5)."""
+
+
+class DocumentNotFoundError(DomainError):
+    """No such document for this learner; entrypoints answer 404 whether it is missing or someone else's."""

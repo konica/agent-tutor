@@ -1,4 +1,4 @@
-import { FileText } from "lucide-react";
+import { FileText, RefreshCw } from "lucide-react";
 
 import type { DocumentResponse } from "../../api/documents";
 import { Button } from "../../components/Button/Button";
@@ -15,13 +15,25 @@ function StateCell({ doc }: { doc: DocumentResponse }) {
   return (
     <>
       <StateBadge state={doc.state} />
+      {doc.state === "processing" && doc.attempt && doc.attempt > 1 && (
+        <p className={styles.hint}>
+          Attempt {doc.attempt} of {doc.max_attempts}.
+        </p>
+      )}
       {doc.state === "processing" && <p className={styles.hint}>You can choose subjects when processing finishes.</p>}
       {doc.state === "failed" && doc.failure_reason && <p className={styles.reason}>{doc.failure_reason}</p>}
     </>
   );
 }
 
-export function DocumentTable({ documents, onChooseSubjects }: { documents: DocumentResponse[]; onChooseSubjects?: (doc: DocumentResponse) => void }) {
+type Props = {
+  documents: DocumentResponse[];
+  onRetry: (doc: DocumentResponse) => void;
+  retrying: ReadonlySet<string>;
+  onChooseSubjects?: (doc: DocumentResponse) => void;
+};
+
+export function DocumentTable({ documents, onRetry, retrying, onChooseSubjects }: Props) {
   return (
     <table className={styles.table}>
       <thead>
@@ -55,6 +67,11 @@ export function DocumentTable({ documents, onChooseSubjects }: { documents: Docu
               {doc.state === "awaiting_subjects" && onChooseSubjects && (
                 <Button size="sm" variant="primary" aria-label={`Choose subjects for ${doc.title}`} onClick={() => onChooseSubjects(doc)}>
                   Choose subjects
+                </Button>
+              )}
+              {doc.state === "failed" && doc.can_retry && (
+                <Button size="sm" icon={RefreshCw} aria-label={`Retry ${doc.title}`} disabled={retrying.has(doc.document_id)} onClick={() => onRetry(doc)}>
+                  Retry
                 </Button>
               )}
             </td>

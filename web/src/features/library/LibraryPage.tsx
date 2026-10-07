@@ -2,7 +2,7 @@ import { AlertCircle, Info, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import { SessionExpiredError } from "../../auth/authClient";
-import { findInLibrary, loadDocuments, loadSubjectSuggestions, loadUploadLimits, megabytes, rejectionReason, saveSubjects as saveChosenSubjects, uploadPdf, type DocumentResponse, type SubjectSuggestions, type UploadLimits } from "../../api/documents";
+import { findInLibrary, loadDocuments, loadSubjectSuggestions, loadUploadLimits, megabytes, rejectionReason, RetriesUsedUpError, retryProcessing, saveSubjects as saveChosenSubjects, uploadPdf, type DocumentResponse, type SubjectSuggestions, type UploadLimits } from "../../api/documents";
 import { Button } from "../../components/Button/Button";
 import { EmptyState } from "../../components/EmptyState/EmptyState";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
@@ -14,6 +14,7 @@ import { useDocuments } from "./useDocuments";
 type Props = {
   load?: () => Promise<DocumentResponse[]>;
   upload?: (file: File) => Promise<void>;
+  retry?: (documentId: string) => Promise<void>;
   loadLimits?: () => Promise<UploadLimits>;
   check?: (file: File) => Promise<string | null>;
   loadSuggestions?: (documentId: string) => Promise<SubjectSuggestions>;
@@ -29,6 +30,7 @@ function announceChange(doc: DocumentResponse): string | null {
 }
 
 const defaultUpload = (file: File) => uploadPdf(file);
+const defaultRetry = (id: string) => retryProcessing(id);
 const defaultLoadLimits = () => loadUploadLimits();
 const defaultCheck = (file: File) => findInLibrary(file);
 
@@ -36,11 +38,12 @@ const defaultLoadSuggestions = (id: string) => loadSubjectSuggestions(id);
 const defaultSaveSubjects = (id: string, choice: { subject_ids: string[]; new_names: string[] }) => saveChosenSubjects(id, choice);
 
 // Library with a plain file picker (US-2 first slice). Drop zone, upload tray, tabs and filters come later.
-export function LibraryPage({ load = loadDocuments, upload = defaultUpload, loadLimits = defaultLoadLimits, check = defaultCheck, loadSuggestions = defaultLoadSuggestions, saveSubjects = defaultSaveSubjects, pollMs = 2000 }: Props) {
+export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retry = defaultRetry, loadLimits = defaultLoadLimits, check = defaultCheck, loadSuggestions = defaultLoadSuggestions, saveSubjects = defaultSaveSubjects, pollMs = 2000 }: Props) {
   const { documents, unavailable, refresh } = useDocuments(load, pollMs);
   const input = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState("");
   const [failed, setFailed] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState<ReadonlySet<string>>(new Set());
   const [limits, setLimits] = useState<UploadLimits | null>(null);
   const [rejected, setRejected] = useState<{ name: string; reason: string }[]>([]);
   const [alreadyIn, setAlreadyIn] = useState<{ name: string; documentId: string }[]>([]);
@@ -155,6 +158,24 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, load
     }
   }
 
+  async function onRetry(doc: DocumentResponse) {
+    setRetrying((s) => new Set(s).add(doc.document_id));
+    setStatus(`Retrying ${doc.title}…`);
+    try {
+      await retry(doc.document_id);
+      setStatus(`Retrying ${doc.title}. Processing again.`);
+    } catch (error) {
+      // A 401 is handled by the API client. A 409 means the attempts are used up; the refreshed row drops Retry.
+      setStatus(error instanceof RetriesUsedUpError ? `${doc.title} could not be processed.` : `Couldn't retry ${doc.title}. Try again.`);
+    }
+    await refresh();
+    setRetrying((s) => {
+      const next = new Set(s);
+      next.delete(doc.document_id);
+      return next;
+    });
+  }
+
   const pick = () => input.current?.click();
 
   return (
@@ -234,7 +255,7 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, load
           )}
         </EmptyState>
       )}
-      {documents && documents.length > 0 && <DocumentTable documents={documents} onChooseSubjects={setPicking} />}
+      {documents && documents.length > 0 && <DocumentTable documents={documents} onRetry={(d) => void onRetry(d)} retrying={retrying} onChooseSubjects={setPicking} />}
       {picking && <SubjectPicker document={picking} load={loadSuggestions} save={saveSubjects} onClose={() => setPicking(null)} onSaved={(doc) => void onSaved(doc)} />}
     </>
   );

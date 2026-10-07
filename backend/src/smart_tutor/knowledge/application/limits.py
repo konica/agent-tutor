@@ -15,3 +15,8 @@ def load_file_limits(store: ParameterStore, max_upload_mb_param: str, max_pages_
     return FileLimits(
         max_bytes=_positive(store, max_upload_mb_param) * MIB, max_pages=_positive(store, max_pages_param)
     )
+
+
+def load_max_attempts(store: ParameterStore, param: str) -> int:
+    """Processing attempts per content, Retry and re-upload included (PRD §9.5)."""
+    return _positive(store, param)

@@ -20,6 +20,7 @@ from smart_tutor.knowledge.domain.errors import (
     InvalidChunkError,
     InvalidFileNameError,
     InvalidSubjectsError,
+    RetryLimitError,
 )
 from smart_tutor.knowledge.domain.upload import Upload, parse_upload_key, upload_key
 from smart_tutor.shared.domain.ids import ContentId, DocumentId, SubjectId, UploadId, UserId
@@ -274,3 +275,46 @@ def test_display_title_prefers_override_then_content_title_then_file_name() -> N
     assert d.title == "Extracted"
     d.title_override = "Mine"
     assert d.title == "Mine"
+
+
+def test_retry_puts_failed_content_back_to_processing_and_counts_the_attempt() -> None:
+    content = Content.first_upload(ContentId("c1"), "a" * 64, 10, UserId("ada"))
+    content.fail("This file isn't a readable PDF")
+    content.retry(max_attempts=3)
+    assert (content.state, content.attempts, content.failure_reason) == (ContentState.PROCESSING, 2, None)
+
+
+def test_retry_is_refused_once_the_attempts_are_used_up() -> None:
+    content = Content.first_upload(ContentId("c1"), "a" * 64, 10, UserId("ada"))
+    for _ in range(2):
+        content.fail("x")
+        content.retry(max_attempts=3)
+    content.fail("x")
+    assert content.attempts == 3 and not content.can_retry(3)
+    with pytest.raises(RetryLimitError, match="This file could not be processed"):
+        content.retry(max_attempts=3)
+    assert content.state is ContentState.FAILED
+
+
+def test_only_failed_content_can_retry() -> None:
+    content = Content.first_upload(ContentId("c1"), "a" * 64, 10, UserId("ada"))
+    assert not content.can_retry(3)
+    with pytest.raises(ContentStateError):
+        content.retry(max_attempts=3)
+
+
+def test_document_retry_returns_a_failed_document_to_processing() -> None:
+    doc = Document.start_upload(DocumentId("d1"), UserId("ada"), UploadId("u1"), "a.pdf", NOW)
+    doc.link_content(ContentId("c1"))
+    doc.fail("This file isn't a readable PDF")
+    doc.retry()
+    assert (doc.state, doc.failure_reason) == (DocumentState.PROCESSING, None)
+
+
+def test_only_a_failed_document_with_content_can_retry() -> None:
+    doc = Document.start_upload(DocumentId("d1"), UserId("ada"), UploadId("u1"), "a.pdf", NOW)
+    with pytest.raises(DocumentStateError):
+        doc.retry()  # processing
+    doc.fail("Duplicate uploads aren't supported yet")  # failed, but no content
+    with pytest.raises(DocumentStateError):
+        doc.retry()

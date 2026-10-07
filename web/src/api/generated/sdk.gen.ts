@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponse, AskInNewThreadResponses, CheckDuplicateData, CheckDuplicateErrors, CheckDuplicateResponses, ChooseSubjectsData, ChooseSubjectsErrors, ChooseSubjectsResponses, GetMeData, GetMeResponses, GetSubjectSuggestionsData, GetSubjectSuggestionsErrors, GetSubjectSuggestionsResponses, GetUploadLimitsData, GetUploadLimitsResponses, ListDocumentsData, ListDocumentsResponses, StartUploadData, StartUploadErrors, StartUploadResponses } from './types.gen';
+import type { AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponse, AskInNewThreadResponses, CheckDuplicateData, CheckDuplicateErrors, CheckDuplicateResponses, ChooseSubjectsData, ChooseSubjectsErrors, ChooseSubjectsResponses, GetMeData, GetMeResponses, GetSubjectSuggestionsData, GetSubjectSuggestionsErrors, GetSubjectSuggestionsResponses, GetUploadLimitsData, GetUploadLimitsResponses, ListDocumentsData, ListDocumentsResponses, RetryDocumentData, RetryDocumentErrors, RetryDocumentResponses, StartUploadData, StartUploadErrors, StartUploadResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -42,6 +42,17 @@ export const checkDuplicate = <ThrowOnError extends boolean = false>(options: Op
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * Retry Document
+ *
+ * Process a failed document's stored file again (PRD §9.5); a document that isn't failed is left as it is.
+ */
+export const retryDocument = <ThrowOnError extends boolean = false>(options: Options<RetryDocumentData, ThrowOnError>): RequestResult<RetryDocumentResponses, RetryDocumentErrors, ThrowOnError> => (options.client ?? client).post<RetryDocumentResponses, RetryDocumentErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/documents/{document_id}/retry',
+    ...options
 });
 
 /**

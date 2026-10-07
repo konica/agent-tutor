@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
-from smart_tutor.knowledge.domain.errors import ContentStateError
+from smart_tutor.knowledge.domain.errors import ContentStateError, RetryLimitError
 from smart_tutor.shared.domain.ids import ContentId, UserId
 
 if TYPE_CHECKING:
@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 UNREADABLE_PDF = "This file isn't a readable PDF"
 NO_TEXT_LAYER = "No text layer (scanned PDFs are not supported yet)"
+RETRIES_USED_UP = "This file could not be processed"
 MIN_AVERAGE_CHARS = 50  # non-whitespace characters per page below which a PDF counts as scanned
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 
@@ -83,6 +84,18 @@ class Content:
         self._require_processing("fail")
         self.state = ContentState.FAILED
         self.failure_reason = reason
+
+    def can_retry(self, max_attempts: int) -> bool:
+        return self.state is ContentState.FAILED and self.attempts < max_attempts
+
+    def retry(self, max_attempts: int) -> None:
+        """failed → processing for another attempt (Retry or, with US-11, a re-upload).
+        At most `max_attempts` in all."""
+        if self.state is not ContentState.FAILED:
+            raise ContentStateError("Only failed content can be retried")
+        if self.attempts >= max_attempts:
+            raise RetryLimitError(RETRIES_USED_UP)
+        self.state, self.attempts, self.failure_reason = ContentState.PROCESSING, self.attempts + 1, None
 
     def _require_processing(self, action: str) -> None:
         if self.state is not ContentState.PROCESSING:
