@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from smart_tutor.apps.api.deps import CurrentPrincipal, Documents, Retries, SubjectChoice, Subjects, Uploads
 from smart_tutor.knowledge.application import (
@@ -81,10 +81,12 @@ class SubjectSuggestionsResponse(BaseModel):
 
 
 class ChooseSubjectsRequest(BaseModel):
-    # Ids of existing subjects and names of new ones; both are checked against the suggestions (PRD D20).
+    # Ids of existing subjects and typed or suggested names; a name equal to an existing subject reuses it (PRD D20).
     model_config = ConfigDict(extra="forbid")
     subject_ids: list[UUID] = Field(default_factory=list, max_length=3)
-    new_names: list[Annotated[str, Field(min_length=1, max_length=60)]] = Field(default_factory=list, max_length=3)
+    new_names: list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]] = Field(
+        default_factory=list, max_length=3
+    )
 
 
 @router.post("/uploads", operation_id="start_upload", status_code=status.HTTP_201_CREATED)

@@ -9,13 +9,13 @@ export type UploadLimits = UploadLimitsResponse;
 export type SubjectSuggestions = SubjectSuggestionsResponse;
 export type Suggestion = SuggestionResponse;
 
-function sessionOver(error: unknown, response: Response | undefined): boolean {
+export function sessionOver(error: unknown, response: Response | undefined): boolean {
   return error instanceof SessionExpiredError || response?.status === 401;
 }
 
 // The server's `detail` is a string for 404/409 and a list of validation errors for 422.
 // Without one the message is empty, so the learner never sees developer text.
-function failure(error: unknown): Error {
+export function failure(error: unknown): Error {
   const detail = (error as { detail?: unknown } | undefined)?.detail;
   if (typeof detail === "string") return new Error(detail);
   if (Array.isArray(detail)) {

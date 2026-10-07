@@ -3,7 +3,7 @@
 from collections.abc import Collection, Sequence
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Column, Engine, MetaData, Table, Text, Uuid, select, update
+from sqlalchemy import Column, Engine, MetaData, Table, Text, Uuid, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from smart_tutor.shared.domain.ids import SubjectId
@@ -35,6 +35,21 @@ class SqlSubjectRepository(SubjectRepository):
         )
         with self._engine.connect() as conn:
             return {SubjectId(row.subject_id): row.canonical_name for row in conn.execute(stmt)}
+
+    def search(self, normalized_query: str, exclude: Collection[SubjectId], limit: int) -> list[Subject]:
+        name = _subjects.c.normalized_name
+        stmt = select(_subjects.c.subject_id, _subjects.c.canonical_name).where(
+            name.contains(normalized_query, autoescape=True)
+        )
+        if exclude:
+            stmt = stmt.where(_subjects.c.subject_id.not_in(list(exclude)))
+        stmt = stmt.order_by(
+            name.startswith(normalized_query, autoescape=True).desc(),
+            func.length(_subjects.c.canonical_name),
+            _subjects.c.canonical_name,
+        ).limit(limit)
+        with self._engine.connect() as conn:
+            return [Subject(SubjectId(r.subject_id), r.canonical_name) for r in conn.execute(stmt)]
 
     def most_similar(self, embedding: Sequence[float], limit: int) -> list[Candidate]:
         distance = _subjects.c.name_embedding.cosine_distance(list(embedding))
