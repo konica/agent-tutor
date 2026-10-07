@@ -55,4 +55,26 @@ describe("UploadTray", () => {
     await userEvent.keyboard("{Enter}");
     expect(screen.getByText("react-yao-2022.pdf")).toBeVisible();
   });
+
+  it("moves focus to the toggle when a new upload removes the focused Close button", () => {
+    const { rerender } = render(<UploadTray items={[uploaded]} onClose={vi.fn()} />);
+    screen.getByRole("button", { name: "Close uploads" }).focus();
+    rerender(<UploadTray items={[uploading, uploaded]} onClose={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Collapse uploads" })).toHaveFocus();
+  });
+
+  it("leaves focus alone when Close was not focused", () => {
+    const { rerender } = render(<UploadTray items={[uploaded]} onClose={vi.fn()} />);
+    rerender(<UploadTray items={[uploading, uploaded]} onClose={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Collapse uploads" })).not.toHaveFocus();
+  });
+
+  it("reopens expanded after it was collapsed and closed", async () => {
+    const { rerender } = render(<UploadTray items={[uploaded]} onClose={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "Collapse uploads" }));
+    expect(screen.queryByText("react-yao-2022.pdf")).toBeNull();
+    rerender(<UploadTray items={[]} onClose={vi.fn()} />);
+    rerender(<UploadTray items={[uploading]} onClose={vi.fn()} />);
+    expect(screen.getByText("lewis-rag-2020.pdf")).toBeVisible();
+  });
 });

@@ -334,6 +334,43 @@ describe("LibraryPage drop zone and upload tray", () => {
     await act(async () => pending.get("c.pdf")!.resolve());
   });
 
+  it("uploads at most three files at a time", async () => {
+    const { upload, pending } = controlledUpload();
+    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => []} upload={upload} />);
+    await screen.findByText("Upload your first document");
+    drop(["a", "b", "c", "d", "e"].map((n) => pdf(`${n}.pdf`)));
+    await waitFor(() => expect(upload).toHaveBeenCalledTimes(3));
+    await act(async () => {});
+    expect(upload).toHaveBeenCalledTimes(3);
+    const tray = screen.getByRole("region", { name: "Uploading 5 files…" });
+    expect(within(tray).getAllByRole("listitem")).toHaveLength(5);
+    await act(async () => pending.get("a.pdf")!.resolve());
+    await waitFor(() => expect(upload).toHaveBeenCalledTimes(4));
+    await act(async () => {
+      for (const p of pending.values()) p.resolve();
+    });
+    await waitFor(() => expect(upload).toHaveBeenCalledTimes(5));
+    await act(async () => {
+      for (const p of pending.values()) p.resolve();
+    });
+    expect(await screen.findByRole("region", { name: "Uploads · 5 files" })).toBeVisible();
+  });
+
+  it("removes a queued file from the tray when it is already in the library", async () => {
+    const { upload, pending } = controlledUpload();
+    const check = vi.fn(async (f: File) => (f.name === "have.pdf" ? "d1" : null));
+    render(<LibraryPage check={check} loadLimits={limits} load={async () => []} upload={upload} />);
+    await screen.findByText("Upload your first document");
+    drop([pdf("have.pdf"), pdf("fresh.pdf")]);
+    await waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
+    const list = await screen.findByRole("list", { name: "Already in your library" });
+    expect(within(list).getByText("have.pdf")).toBeVisible();
+    const tray = screen.getByRole("region", { name: "Uploading 1 file…" });
+    expect(within(tray).queryByText("have.pdf")).toBeNull();
+    expect(within(tray).getByText("fresh.pdf")).toBeVisible();
+    await act(async () => pending.get("fresh.pdf")!.resolve());
+  });
+
   it("shows the new row as Uploading until its file reaches storage, then Processing", async () => {
     const { upload, pending } = controlledUpload();
     const row: DocumentResponse = { ...processing, document_id: "d9", title: "a.pdf" };
@@ -403,6 +440,19 @@ describe("LibraryPage choose subjects", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(pageStatus()).toHaveFocus();
     expect((await screen.findByText("Toolformer")).closest("tr")).toHaveTextContent("AI Agents");
+  });
+
+  it("ignores a file dropped while the picker is open", async () => {
+    const upload = vi.fn(async () => {});
+    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => [waiting]} upload={upload} loadSuggestions={async () => suggestions} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Choose subjects for Toolformer" }));
+    expect(screen.getByRole("dialog", { name: "Choose subjects" })).toBeVisible();
+    fireEvent.dragEnter(document.body, { dataTransfer: { types: ["Files"], files: [] } });
+    expect(screen.queryByText("Drop PDFs to upload")).toBeNull();
+    fireEvent.drop(document.body, { dataTransfer: { types: ["Files"], files: [new File(["%PDF"], "x.pdf", { type: "application/pdf" })] } });
+    await act(async () => {});
+    expect(upload).not.toHaveBeenCalled();
+    expect(screen.queryByRole("region", { name: /Upload/ })).toBeNull();
   });
 
   it("keeps 'Subjects saved.' when a stale poll lands between the save and the reload", async () => {

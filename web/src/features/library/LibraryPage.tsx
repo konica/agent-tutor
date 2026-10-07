@@ -32,6 +32,8 @@ function announceChange(doc: DocumentResponse): string | null {
   return null;
 }
 
+const MAX_PARALLEL_UPLOADS = 3; // each check hashes a whole file in memory, and presigned POSTs expire while queued behind the browser's connections
+
 const defaultUpload = (file: File, events: UploadEvents) => uploadPdf(file, events);
 const defaultRetry = (id: string) => retryProcessing(id);
 const defaultLoadLimits = () => loadUploadLimits();
@@ -51,6 +53,7 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
   const traySeq = useRef(0);
   const parts = useRef<string[]>([]); // one slot per file, shared by overlapping batches, so none overwrites another in the live region
   const inFlight = useRef(0); // batches still running
+  const slots = useRef({ free: MAX_PARALLEL_UPLOADS, waiting: [] as (() => void)[] }); // upload slots shared by every batch
   const [retrying, setRetrying] = useState<ReadonlySet<string>>(new Set());
   const [limits, setLimits] = useState<UploadLimits | null>(null);
   const [rejected, setRejected] = useState<{ name: string; reason: string }[]>([]);
@@ -103,6 +106,19 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
     };
   }, []);
 
+  const acquireSlot = () => {
+    if (slots.current.free > 0) {
+      slots.current.free--;
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => slots.current.waiting.push(resolve));
+  };
+  const releaseSlot = () => {
+    const next = slots.current.waiting.shift();
+    if (next) next(); // the slot passes straight to the next file in line
+    else slots.current.free++;
+  };
+
   // Failure leaves the limits null: the pick handler retries, and never uploads without a size check.
   const ensureLimits = useCallback(async (): Promise<UploadLimits | null> => {
     try {
@@ -127,7 +143,7 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
       return next;
     });
 
-  // Every file of a pick or drop runs at once. One combined message in pick order; a batch that starts while another runs adds to it instead of resetting it.
+  // Files of a pick or drop run MAX_PARALLEL_UPLOADS at a time, across overlapping batches. One combined message in pick order; a batch that starts while another runs adds to it instead of resetting it.
   async function addFiles(files: File[]) {
     if (inFlight.current === 0) {
       parts.current = [];
@@ -156,6 +172,17 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
     }
     parts.current[i] = `Checking ${file.name}…`;
     say();
+    const id = `upload-${++traySeq.current}`;
+    setTray((items) => [{ id, name: file.name, size: `${megabytes(file.size)} MB`, status: "uploading", progress: 0 }, ...items]);
+    await acquireSlot();
+    try {
+      await send(file, i, id, current, say);
+    } finally {
+      releaseSlot();
+    }
+  }
+
+  async function send(file: File, i: number, id: string, current: UploadLimits | null, say: () => void) {
     let existing: string | null = null;
     try {
       existing = await check(file);
@@ -165,6 +192,7 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
     }
     if (existing) {
       const documentId = existing;
+      setTray((items) => items.filter((t) => t.id !== id));
       setAlreadyIn((list) => [...list, { name: file.name, documentId }]);
       parts.current[i] = `${file.name}: Already in your library.`;
       say();
@@ -172,8 +200,6 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
     }
     parts.current[i] = `Uploading ${file.name}…`;
     say();
-    const id = `upload-${++traySeq.current}`;
-    setTray((items) => [{ id, name: file.name, size: `${megabytes(file.size)} MB`, status: "uploading", progress: 0 }, ...items]);
     const started: { documentId?: string } = {};
     try {
       if (!current) throw new Error("Upload limits unavailable");
@@ -198,14 +224,15 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
     await refresh();
   }
 
-
   function onPick(event: ChangeEvent<HTMLInputElement>) {
     const files = [...(event.target.files ?? [])];
     event.target.value = ""; // picking the same file again fires change again
     if (files.length) void addFiles(files);
   }
 
-  const dragging = usePageDrop((files) => void addFiles(files));
+  const dragging = usePageDrop((files) => {
+    if (!picking) void addFiles(files); // the subject dialog is modal
+  });
 
   function closeTray() {
     setTray([]);
@@ -311,7 +338,7 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
       )}
       {documents && documents.length > 0 && <DocumentTable documents={documents} onRetry={(d) => void onRetry(d)} retrying={retrying} onChooseSubjects={setPicking} uploading={uploading} />}
       {picking && <SubjectPicker document={picking} load={loadSuggestions} save={saveSubjects} onClose={() => setPicking(null)} onSaved={(doc) => void onSaved(doc)} />}
-      {dragging && <DropOverlay />}
+      {dragging && !picking && <DropOverlay />}
       <UploadTray items={tray} onClose={closeTray} />
     </>
   );
