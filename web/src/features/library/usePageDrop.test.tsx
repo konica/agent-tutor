@@ -37,6 +37,19 @@ describe("usePageDrop", () => {
     expect(screen.queryByText("Drop PDFs to upload")).toBeNull();
   });
 
+  it("clears the highlight after dragging out of all elements", () => {
+    render(<Page onFiles={vi.fn()} />);
+    const child = screen.getByText("Library");
+    fireEvent.dragEnter(document.body, withFiles());
+    fireEvent.dragEnter(child, withFiles());
+    expect(screen.getByText("Drop PDFs to upload")).toBeInTheDocument();
+    // Simulate drag leaving by firing balanced dragLeave events
+    fireEvent.dragLeave(child, withFiles());
+    expect(screen.getByText("Drop PDFs to upload")).toBeInTheDocument(); // still showing after leaving child
+    fireEvent.dragLeave(document.body, withFiles());
+    expect(screen.queryByText("Drop PDFs to upload")).toBeNull(); // now hidden after leaving body
+  });
+
   it("hands the dropped files over and clears the highlight", () => {
     const onFiles = vi.fn();
     render(<Page onFiles={onFiles} />);

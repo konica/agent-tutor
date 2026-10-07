@@ -24,8 +24,14 @@ export function usePageDrop(onFiles: (files: File[]) => void): boolean {
     };
     const leave = (event: DragEvent) => {
       if (!carriesFiles(event)) return;
-      depth = Math.max(0, depth - 1);
-      if (depth === 0) setActive(false);
+      // When relatedTarget is null, the drag left the window or was cancelled; reset immediately
+      if (event.relatedTarget === null) {
+        depth = 0;
+        setActive(false);
+      } else {
+        depth = Math.max(0, depth - 1);
+        if (depth === 0) setActive(false);
+      }
     };
     const drop = (event: DragEvent) => {
       if (!carriesFiles(event)) return;
