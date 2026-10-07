@@ -40,9 +40,9 @@ export function LandingPage({ signIn }: Props) {
     <div className={styles.landing}>
       <header className={styles.head}>
         <BrandMark />
-        <Button variant="ghost" onClick={logIn}>
+        <button type="button" className={styles.textLink} onClick={logIn}>
           Sign in
-        </Button>
+        </button>
       </header>
       <main className={styles.main} id="main-content">
         <section className={styles.hero} aria-labelledby="landing-title">

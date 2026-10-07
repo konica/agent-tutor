@@ -19,6 +19,8 @@ export function createKeycloakClient(config: AuthConfig = authConfig()): AuthCli
   // keycloak-js throws if init runs twice (StrictMode), so every caller shares one init.
   let initialized: Promise<void> | undefined;
 
+  // The init is shared and keeps the first caller's options: a lazy signIn init must always be followed by the
+  // Keycloak redirect, never by in-app navigation to a guarded route, which would skip login-required.
   const start = (options: KeycloakInitOptions) => {
     initialized ??= keycloak.init({ ...options, pkceMethod: "S256", checkLoginIframe: false }).then(
       () => undefined,

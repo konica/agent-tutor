@@ -26,7 +26,7 @@ Every color, font size, space, radius, shadow, and duration in feature code is a
 | Status | `--success`, `--warn`, `--danger`, `--info`, `--attn` (needs the learner's action), each with a `-soft` background |
 | Subjects | `--subj-*` hues, used only through the subject chip |
 | Focus | `--focus` (2px outline, 2px offset, on `:focus-visible`) |
-| Type | `--font-display` (serif: h1–h3, brand word), `--font-body` (system UI), `--font-mono` (numbers, ids, token counts; tabular figures); sizes `--fs-12` … `--fs-64`; `--lh-body` 1.55, `--lh-head` 1.2 |
+| Type | `--font-display` (serif: h1–h3, brand word), `--font-body` (system UI), `--font-mono` (numbers, ids, token counts; tabular figures); sizes `--fs-12` … `--fs-40`, plus `--fs-64` for the landing headline (only); `--lh-body` 1.55, `--lh-head` 1.2 |
 | Space and shape | `--sp-1` (4px) … `--sp-16` (64px); `--r-sm` 6px, `--r-md` 10px, `--r-pill` |
 | Motion | `--dur-fast`, `--dur-base`, `--dur-exit`, `--dur-spin`, `--ease-out`, `--ease-in`; everything stops under `prefers-reduced-motion: reduce` |
 | Layout | `--nav-w` 240px, `--page-w` 1120px, `--page-w-wide` 1200px (Library), `--chat-w` 760px, `--panel-w` 480px, `--tray-w` 384px |

@@ -3,6 +3,7 @@ import "./styles/base.css";
 
 import { StrictMode, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
+import { createBrowserRouter } from "react-router";
 
 import { App } from "./App";
 import { createRoutes } from "./app/routes";
@@ -26,10 +27,10 @@ function RequireSession({ children }: { children: ReactNode }) {
   );
 }
 
-const routes = createRoutes({ auth, RequireSession });
+const router = createBrowserRouter(createRoutes({ auth, RequireSession }));
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App routes={routes} />
+    <App router={router} />
   </StrictMode>,
 );
