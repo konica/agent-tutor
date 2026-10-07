@@ -89,3 +89,28 @@ def test_missing_name_embeddings_are_listed_and_set(engine: Engine) -> None:
     assert subject in repo.missing_name_embeddings(limit=1000)
     repo.set_name_embedding(subject.subject_id, vec(0.5))
     assert subject not in repo.missing_name_embeddings(limit=1000)
+
+
+def _subject(repo: SqlSubjectRepository, name: str) -> Subject:
+    subject = Subject(SubjectId(str(uuid.uuid4())), name)
+    return repo.insert_or_get(subject, normalize_subject_name(name), vec(1.0))
+
+
+def test_search_matches_contained_names_prefix_first_and_excludes(engine: Engine) -> None:
+    repo = SqlSubjectRepository(engine)
+    tag = uuid.uuid4().hex[:8]
+    inner = _subject(repo, f"Dense {tag} Retrieval")
+    prefix = _subject(repo, f"{tag} Retrieval")
+    skipped = _subject(repo, f"{tag} Skipped")
+    found = repo.search(tag, exclude=[skipped.subject_id], limit=10)
+    assert [s.subject_id for s in found] == [prefix.subject_id, inner.subject_id]
+
+
+def test_search_treats_like_wildcards_literally(engine: Engine) -> None:
+    repo = SqlSubjectRepository(engine)
+    tag = uuid.uuid4().hex[:8]
+    literal = _subject(repo, f"{tag} 100% _done\\")
+    _subject(repo, f"{tag} 100 x done")
+    assert [s.subject_id for s in repo.search(f"{tag} 100% _done\\", exclude=[], limit=10)] == [literal.subject_id]
+    assert repo.search(f"{tag}%", exclude=[], limit=10) == []  # as a wildcard it would match both
+    assert repo.search(f"{tag}_100", exclude=[], limit=10) == []
