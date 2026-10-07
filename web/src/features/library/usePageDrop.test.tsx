@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { DropOverlay } from "./DropOverlay";
@@ -37,17 +37,52 @@ describe("usePageDrop", () => {
     expect(screen.queryByText("Drop PDFs to upload")).toBeNull();
   });
 
-  it("clears the highlight after dragging out of all elements", () => {
-    render(<Page onFiles={vi.fn()} />);
-    const child = screen.getByText("Library");
-    fireEvent.dragEnter(document.body, withFiles());
-    fireEvent.dragEnter(child, withFiles());
-    expect(screen.getByText("Drop PDFs to upload")).toBeInTheDocument();
-    // Simulate drag leaving by firing balanced dragLeave events
-    fireEvent.dragLeave(child, withFiles());
-    expect(screen.getByText("Drop PDFs to upload")).toBeInTheDocument(); // still showing after leaving child
-    fireEvent.dragLeave(document.body, withFiles());
-    expect(screen.queryByText("Drop PDFs to upload")).toBeNull(); // now hidden after leaving body
+  it("clears the highlight when the drag is cancelled or leaves the window", () => {
+    vi.useFakeTimers();
+    try {
+      render(<Page onFiles={vi.fn()} />);
+      const child = screen.getByText("Library");
+      fireEvent.dragEnter(document.body, withFiles());
+      fireEvent.dragEnter(child, withFiles());
+      expect(screen.getByText("Drop PDFs to upload")).toBeInTheDocument();
+      // Simulate unbalanced dragleave: drag was cancelled or left the window
+      fireEvent.dragLeave(child, withFiles());
+      // Overlay still showing, but idle timer is ticking
+      expect(screen.getByText("Drop PDFs to upload")).toBeInTheDocument();
+      // Advance time past the idle threshold
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      // Now the overlay should be gone
+      expect(screen.queryByText("Drop PDFs to upload")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stays highlighted while dragover keeps arriving", () => {
+    vi.useFakeTimers();
+    try {
+      render(<Page onFiles={vi.fn()} />);
+      fireEvent.dragEnter(document.body, withFiles());
+      expect(screen.getByText("Drop PDFs to upload")).toBeInTheDocument();
+      // Advance time but stay below the idle threshold
+      act(() => {
+        vi.advanceTimersByTime(900);
+      });
+      // Send another dragover to reset the idle timer
+      fireEvent.dragOver(document.body, withFiles());
+      // Overlay still showing
+      expect(screen.getByText("Drop PDFs to upload")).toBeInTheDocument();
+      // Advance another 900ms (total 1800ms, but timer was reset)
+      act(() => {
+        vi.advanceTimersByTime(900);
+      });
+      // Overlay should still be showing because dragover keeps resetting the timer
+      expect(screen.getByText("Drop PDFs to upload")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("hands the dropped files over and clears the highlight", () => {
