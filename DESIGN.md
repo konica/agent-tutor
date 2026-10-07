@@ -26,7 +26,7 @@ Every color, font size, space, radius, shadow, and duration in feature code is a
 | Status | `--success`, `--warn`, `--danger`, `--info`, `--attn` (needs the learner's action), each with a `-soft` background |
 | Subjects | `--subj-*` hues, used only through the subject chip |
 | Focus | `--focus` (2px outline, 2px offset, on `:focus-visible`) |
-| Type | `--font-display` (serif: h1–h3, brand word), `--font-body` (system UI), `--font-mono` (numbers, ids, token counts; tabular figures); sizes `--fs-12` … `--fs-40`; `--lh-body` 1.55, `--lh-head` 1.2 |
+| Type | `--font-display` (serif: h1–h3, brand word), `--font-body` (system UI), `--font-mono` (numbers, ids, token counts; tabular figures); sizes `--fs-12` … `--fs-64`; `--lh-body` 1.55, `--lh-head` 1.2 |
 | Space and shape | `--sp-1` (4px) … `--sp-16` (64px); `--r-sm` 6px, `--r-md` 10px, `--r-pill` |
 | Motion | `--dur-fast`, `--dur-base`, `--dur-exit`, `--dur-spin`, `--ease-out`, `--ease-in`; everything stops under `prefers-reduced-motion: reduce` |
 | Layout | `--nav-w` 240px, `--page-w` 1120px, `--page-w-wide` 1200px (Library), `--chat-w` 760px, `--panel-w` 480px, `--tray-w` 384px |
@@ -44,6 +44,7 @@ Light is required, dark is supported: `tokens.css` defines both under `[data-the
 - **Page header:** h1 at `--fs-32` in the display font, an optional one-line description in `--text-2` (max 64ch), and the page's primary action on the right.
 - **Left nav,** in this order: Library (home), Chat (starts a new conversation), Conversations, Notes, Subjects, Usage, Settings. Later releases slot in without reordering: Research map after Library (R2), Quizzes and Reports after Notes (R3); they are not rendered in Release 1. The current item has `aria-current="page"` (`--accent-soft` fill, `--accent-text`). Library shows a count badge (`--attn-soft` / `--attn`) for documents needing the learner's action. The user menu sits at the bottom: avatar initials, name, and Sign out.
 - **Upload tray:** fixed bottom right (`--tray-w`), on every screen, non-blocking.
+- **Landing page** (`/`): public, outside the app shell, centered `--page-w` column with header, hero, how it works, trust points, closing, footer.
 
 ## Components
 
