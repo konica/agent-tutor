@@ -20,7 +20,7 @@
   padding-bottom: var(--sp-3); border-bottom: 1px solid var(--border);
 }
 .threadTitle {
-  margin: 0; font-size: var(--fs-16); font-weight: 600; color: var(--text);
+  margin: 0; font-family: var(--font-body); font-size: var(--fs-16); font-weight: 600; color: var(--text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
