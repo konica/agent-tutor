@@ -53,7 +53,7 @@
     } }),
     lib('US-2', 'Processing finished: highlighted rows, “Choose subjects”, and the toolbar chip “3 need subjects” (no banner, M10).', () => { newUser('choose'); }, { id: 'library-first-choose' }),
     lib('US-2', 'All three documents ready; “Ask a question” leads to the first answer.', () => { newUser('ready'); }, { id: 'library-first-ready' }),
-    lib('US-2', 'Needs action: Toolformer needs subjects; banner and Library badge.', null, { id: 'library-choose-subjects' }),
+    lib('US-2', 'Needs action: Toolformer needs subjects; the toolbar chip “1 needs subjects” and the Library badge (no banner).', null, { id: 'library-choose-subjects' }),
     lib('US-2', 'Rejected before upload: not a PDF, or over 50 MB.', () => {
       S.tray = [{ id: 'r1', name: 'reading-list.docx', size: '0.1 MB', status: 'rejected', reason: 'Only PDF files can be uploaded.' }, { id: 'r2', name: 'deep-learning-book-full.pdf', size: '72 MB', status: 'rejected', reason: 'This file is 72 MB; the limit is 50 MB.' }];
     }, { id: 'library-rejected' }),
@@ -215,7 +215,7 @@
 
     /* §10–11 */
     { id: 'components', group: 'Components & questions', ref: '§10 · components', desc: 'Every reusable component, in both themes.', view: ST.componentsView },
-    { id: 'brief-questions', group: 'Components & questions', ref: '§11 · questions', desc: 'Brief v0.4 decisions (Q7, D1–D8) and new questions.', view: ST.questionsView }
+    { id: 'brief-questions', group: 'Components & questions', ref: '§11 · questions', desc: 'Brief v0.10 decisions: what P1–P7 changed and where, then the open questions.', view: ST.questionsView }
   ];
 
   ST.STATES = defs.map((d) => {

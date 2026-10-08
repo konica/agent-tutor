@@ -131,7 +131,7 @@
     "id": "library-choose-subjects",
     "group": "Library",
     "ref": "§6.3 · US-2",
-    "desc": "Needs action: Toolformer needs subjects; banner and Library badge.",
+    "desc": "Needs action: Toolformer needs subjects; the toolbar chip “1 needs subjects” and the Library badge (no banner).",
     "release": 1,
     "stories": [
       "US-2"
@@ -1079,7 +1079,7 @@
     "id": "brief-questions",
     "group": "Components & questions",
     "ref": "§11 · questions",
-    "desc": "Brief v0.4 decisions (Q7, D1–D8) and new questions.",
+    "desc": "Brief v0.10 decisions: what P1–P7 changed and where, then the open questions.",
     "release": 1,
     "stories": []
   }

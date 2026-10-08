@@ -286,18 +286,21 @@
   DECISIONS.push(
     ['P4', 'Open in dialog', 'A maximize button before Close opens the same document at the same page and highlight in the large overlay, with a details strip (authors, year, pages, subjects, Archived). Close returns to the split view with focus on the button.', ['viewer-dialog']],
     ['P5', 'The conversation\'s documents', 'The panel\'s first section is Documents: documents used plus added ones, each with a remove button on hover and focus; “Add documents” opens a searchable picker; “Only search these documents” (off by default, disabled while empty) shows “Searching N documents · Change” above the composer and declines with “Add documents” / “Search all my documents”.', ['chat-documents-add', 'chat-scope-limited', 'chat-decline-limited']],
-    ['R1–R3', 'Answered', 'R1 no new state; R2 Show citations and Archive stay in the overflow too; R3 the panel can be re-opened in split view and the pane then fits the page to its width.', ['viewer-citation-highlight']]
+    ['P6', 'Chat header', 'Only the panel toggle (sidebar icon, “Hide panel” / “Show panel”) and the title, which is edited inline: Enter or clicking away saves, Esc cancels, 1–120 characters. No “⋯” overflow menu.', ['chat-title-editing', 'chat-panel-collapsed']],
+    ['P7', '“Chat” on ready rows', 'Every ready Library row shows “Chat”, which starts a conversation with that document listed; the row title opens the viewer; “More” keeps Details, Change subjects, Edit title, Archive, Delete.', ['library-default', 'library-more-menu']],
+    ['R1–R3', 'Answered', 'R1 no new state; R2 Show citations and Archive live in the panel\'s Actions (the header overflow was removed by P6); R3 the panel can be re-opened in split view and the pane then fits the page to its width.', ['viewer-citation-highlight']]
   );
   const QUESTIONS = [
-    ['S1', 'Question', 'Removing a document the answers already cited', 'Removing a used document takes it out of the list and the search scope, but its citations in earlier answers still open it.', 'Keep the citations working; removal only affects future answers.'],
-    ['S2', 'Question', '“Change” in the scope line', 'It opens the panel and focuses the switch, where the list can be edited.', 'Confirm, or open the Add documents picker directly.'],
-    ['S3', 'Question', 'Archived documents in the picker', 'The picker lists ready, active documents only.', 'Keep archived ones out; restoring stays in the Library.'],
-    ['N2', 'Open', 'Show citations hidden in a menu', 'Now also a switch in the panel, so it is visible whenever the panel is open.', 'Closed by P1.'],
+    ['S1', 'Answered', 'Removing a document the answers already cited', 'Removing a used document takes it out of the list and the search scope, but its citations in earlier answers still open it.', 'Answered: citations keep working; removal only affects future answers.'],
+    ['S2', 'Answered', '“Change” in the scope line', 'It opens the panel and focuses the switch, where the list can be edited.', 'Answered: “Change” opens the panel at the switch.'],
+    ['S3', 'Answered', 'Archived documents in the picker', 'The picker lists ready, active documents only.', 'Answered: ready, active documents only.'],
+    ['N2', 'Closed', 'Show citations hidden in a menu', 'Now also a switch in the panel, so it is visible whenever the panel is open.', 'Closed by P1.'],
+    ['L1, L2, N3', 'Answered', 'Owner answers', 'L1 a deleted document\'s subjects no longer count for conversations and notes · L2 the row title opens the viewer (P7) · N3 search covers titles only (“Search titles”).', 'PRD Q63.'],
     ['I1, F4, H1, E5, E10', 'Open', 'Smaller items', 'Unchanged.', 'Unchanged.'],
     ['Q4, Q5, Q8', 'Defaults kept', 'Still open in §12', 'Q4 the citations switch also covers notes · Q5 several files at once · Q8 first suggestion pre-selected.', 'All shown as designed.']
   ];
   ST.questionsView = () => `<main class="index-page" id="main-content" tabindex="-1">
-    <div class="page-head" style="margin-bottom:32px"><div><h1 style="font-size:48px">Decisions &amp; questions</h1><p>For brief v0.10, round 10 (chat only). First what P1–P3 changed and where, then open questions.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
+    <div class="page-head" style="margin-bottom:32px"><div><h1 style="font-size:48px">Decisions &amp; questions</h1><p>For brief v0.10, round 10 (chat only). First what P1–P7 changed and where, then open questions.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
     <h2 class="section-title" style="margin-top:0">Applied in v0.10</h2>
     <ol class="qa-list">${DECISIONS.map(([id, title, what, states]) => `<li class="qa-item"><span class="qid">${esc(id)}</span>
       <div><h3>${esc(title)}</h3><p>${esc(what)}</p><p class="proposal"><strong>Applied in:</strong> ${states.length ? '' : 'no change needed'}${states.map((sid) => `<a href="#/${sid}"><code class="mono">${sid}</code></a>`).join(', ')}</p></div>
