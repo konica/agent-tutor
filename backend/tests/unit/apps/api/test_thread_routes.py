@@ -441,13 +441,15 @@ CHOOSE = f'event: choose_subjects\ndata: {{"subject_ids": ["{GENERAL}", "{S2}"]}
 CATALOG = {SubjectId(GENERAL): "General", SubjectId(S2): "LLMs"}
 
 
-def two_subject_setup(handler: Handler) -> tuple[TestClient, InMemoryThreads, ApiServices]:
+def two_subject_setup(
+    handler: Handler, catalog: dict[SubjectId, str] = CATALOG
+) -> tuple[TestClient, InMemoryThreads, ApiServices]:
     verifier = FakeTokenVerifier()
     verifier.add("t-ada", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
     library, threads = InMemoryLibrary(), InMemoryThreads()
     ingest_ready(library, "ada", "Attention weighs tokens.")
     ingest_ready(library, "ada", "Language models predict tokens.", subject_ids=(SubjectId(S2),))
-    services = api_services(library, threads=threads, catalog=InMemorySubjects(CATALOG), agent=fake_agent(handler))
+    services = api_services(library, threads=threads, catalog=InMemorySubjects(catalog), agent=fake_agent(handler))
     return TestClient(create_app(Settings(), verifier=verifier, services=services)), threads, services
 
 
@@ -503,6 +505,17 @@ def test_a_choice_the_learner_does_not_have_is_left_out_and_logged(caplog: pytes
     assert S3 in caplog.text and "What is attention?" not in caplog.text
 
 
+def test_the_choices_are_listed_by_name_like_my_subjects() -> None:
+    # By id, GENERAL comes first; by name (case-insensitive), "algebra" does.
+    client, _, _ = two_subject_setup(event_stream(CHOOSE), {SubjectId(GENERAL): "Zoology", SubjectId(S2): "algebra"})
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    first = json.loads(response.text.split("\n\n", 1)[0].split("data: ", 1)[1])
+    assert first["subjects"] == [{"subject_id": S2, "name": "algebra"}, {"subject_id": GENERAL, "name": "Zoology"}]
+    assert [s["subject_id"] for s in client.get("/me/subjects", headers=AUTH).json()] == [S2, GENERAL]
+
+
 def test_resume_sends_the_pick_to_the_agent_binds_it_and_relays_the_answer() -> None:
     seen: list[httpx.Request] = []
     client, threads, _ = two_subject_setup(pick_handler(seen, event_stream(resume_sse(S2))))
@@ -548,9 +561,18 @@ def test_resume_of_an_unknown_thread_is_404_and_the_agent_is_not_called() -> Non
     seen: list[httpx.Request] = []
     client, _, _ = two_subject_setup(pick_handler(seen, event_stream(resume_sse(S2))))
 
-    response = client.post("/threads/nope/subjects", json={"subject_ids": [S2]}, headers=AUTH)
+    response = client.post(f"/threads/{S3}/subjects", json={"subject_ids": [S2]}, headers=AUTH)
 
     assert response.status_code == 404 and seen == []
+
+
+def test_resume_of_a_thread_id_that_is_not_a_uuid_is_422_and_the_agent_is_not_called() -> None:
+    seen: list[httpx.Request] = []
+    client, _, _ = two_subject_setup(pick_handler(seen, event_stream(resume_sse(S2))))
+
+    response = client.post("/threads/nope/subjects", json={"subject_ids": [S2]}, headers=AUTH)
+
+    assert response.status_code == 422 and seen == []
 
 
 def test_resume_of_a_bound_thread_is_409_and_the_agent_is_not_called() -> None:
@@ -565,7 +587,7 @@ def test_resume_of_a_bound_thread_is_409_and_the_agent_is_not_called() -> None:
     assert agent_paths(seen) == ["/ask"] and threads.threads[thread_id].subject_ids == (GENERAL,)
 
 
-def test_an_agent_with_nothing_waiting_is_409_and_the_thread_stays_pending() -> None:
+def test_an_agent_with_nothing_waiting_is_409_for_the_learner_and_the_thread_stays_pending() -> None:
     seen: list[httpx.Request] = []
     client, threads, _ = two_subject_setup(
         pick_handler(seen, lambda request: httpx.Response(409, json={"detail": "nothing waits"}))
@@ -575,18 +597,19 @@ def test_an_agent_with_nothing_waiting_is_409_and_the_thread_stays_pending() -> 
     response = client.post(f"/threads/{thread_id}/subjects", json={"subject_ids": [S2]}, headers=AUTH)
 
     assert response.status_code == 409 and threads.threads[thread_id].awaiting_subjects
+    assert response.json() == {"detail": "This question can no longer be answered. Ask it again."}
     assert agent_paths(seen) == ["/ask", "/resume"]  # the agent was asked, and refused
 
 
 def test_resume_without_ready_documents_is_409_and_the_agent_is_not_called() -> None:
     seen: list[httpx.Request] = []
     client, threads = setup(recording(seen), ready_document=False)[:2]
-    threads.add(Thread.pending(ThreadId("t-1"), UserId("ada"), "What is attention?", FixedClock().now()))
+    threads.add(Thread.pending(ThreadId(S3), UserId("ada"), "What is attention?", FixedClock().now()))
 
-    response = client.post("/threads/t-1/subjects", json={"subject_ids": [GENERAL]}, headers=AUTH)
+    response = client.post(f"/threads/{S3}/subjects", json={"subject_ids": [GENERAL]}, headers=AUTH)
 
     assert response.status_code == 409 and response.json() == {"detail": "Upload a document first"}
-    assert seen == [] and threads.threads["t-1"].awaiting_subjects
+    assert seen == [] and threads.threads[S3].awaiting_subjects
 
 
 def test_an_agent_that_resumes_with_other_subjects_is_unavailable_and_binds_nothing() -> None:
@@ -643,4 +666,9 @@ def test_get_thread_reads_a_bound_thread_with_named_subjects() -> None:
 
 def test_get_unknown_thread_is_404() -> None:
     client, _, _ = two_subject_setup(event_stream(CHOOSE))
-    assert client.get("/threads/nope", headers=AUTH).status_code == 404
+    assert client.get(f"/threads/{S3}", headers=AUTH).status_code == 404
+
+
+def test_get_thread_with_an_id_that_is_not_a_uuid_is_422() -> None:
+    client, _, _ = two_subject_setup(event_stream(CHOOSE))
+    assert client.get("/threads/nope", headers=AUTH).status_code == 422

@@ -4,7 +4,8 @@ import type { ComponentProps } from "react";
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AskRefusedError, NoDocumentsError, type ChatEvent } from "../../api/chat";
+import { AskRefusedError, chooseSubjects, NoDocumentsError, type ChatEvent } from "../../api/chat";
+import { createClient, createConfig } from "../../api/generated/client";
 import type { DocumentResponse } from "../../api/generated/types.gen";
 import { SessionExpiredError, sessionExpiry } from "../../auth/authClient";
 import { ChatPage } from "./ChatPage";
@@ -381,6 +382,27 @@ describe("ChatPage", () => {
       expect(await picker()).toBeInTheDocument();
       expect(continueButton()).toBeEnabled();
       await waitFor(() => expect(search()).toBe("?thread=t1"));
+    });
+
+    it.each([
+      ["the tutor no longer holds it (409)", 409, "This question can no longer be answered. Ask it again."],
+      ["its thread is gone (404)", 404, "No such conversation"],
+    ])("gives the question back to ask again when %s", async (_, status, detail) => {
+      // The real client maps the API's answer, so this checks the whole refusal path from the HTTP status.
+      const fetch = vi.fn(async () => Response.json({ detail }, { status }));
+      const apiClient = createClient(createConfig({ baseUrl: "http://api.test", fetch }));
+      const group = await askUnsure({ choose: (threadId, ids) => chooseSubjects(threadId, ids, apiClient) });
+      await waitFor(() => expect(search()).toBe("?thread=t1"));
+      await userEvent.click(within(group).getByRole("button", { name: "LLMs" }));
+      await userEvent.click(continueButton());
+      expect(await screen.findByText("This question can no longer be answered. Ask it again.")).toBeInTheDocument();
+      expect(screen.queryByRole("group", { name: "Which subjects is this about?" })).not.toBeInTheDocument();
+      await waitFor(() => expect(search()).toBe(""));
+      const box = await question();
+      expect(box).toHaveValue(QUESTION);
+      expect(box).toBeEnabled();
+      await waitFor(() => expect(box).toHaveFocus());
+      expect(askButton()).toBeEnabled();
     });
 
     it("resumes a waiting thread after a reload with the learner's subjects", async () => {

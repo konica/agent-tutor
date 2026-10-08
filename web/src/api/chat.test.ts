@@ -8,6 +8,8 @@ import {
   formatCitation,
   loadThread,
   NoDocumentsError,
+  QUESTION_EXPIRED,
+  QuestionExpiredError,
   type ChatEvent,
 } from "./chat";
 import { configureApiClient } from "./client";
@@ -137,11 +139,21 @@ describe("chooseSubjects", () => {
     expect(await request.json()).toEqual({ subject_ids: ["s1", "s2"] });
   });
 
-  it.each([409, 422, 404])("rejects with AskRefusedError carrying the detail on %i", async (status) => {
+  it.each([409, 422])("rejects with AskRefusedError carrying the detail on %i", async (status) => {
     const { apiClient } = api(() => json({ detail: "This conversation already has its subjects." }, status));
     const failure = collect(chooseSubjects("t1", ["s1"], apiClient));
     await expect(failure).rejects.toBeInstanceOf(AskRefusedError);
     await expect(failure).rejects.toThrow("This conversation already has its subjects.");
+  });
+
+  it.each([
+    ["the tutor no longer holds the question (409)", 409, QUESTION_EXPIRED],
+    ["the thread is gone (404)", 404, "No such conversation"],
+  ])("rejects with QuestionExpiredError when %s", async (_, status, message) => {
+    const { apiClient } = api(() => json({ detail: message }, status));
+    const failure = collect(chooseSubjects("t1", ["s1"], apiClient));
+    await expect(failure).rejects.toBeInstanceOf(QuestionExpiredError);
+    await expect(failure).rejects.toThrow(QUESTION_EXPIRED);
   });
 
   it("rejects with NoDocumentsError when the learner has no ready documents", async () => {
@@ -188,6 +200,11 @@ describe("loadThread", () => {
   it("returns null when there is no such thread", async () => {
     const { apiClient } = api(() => json({ detail: "Not found" }, 404));
     expect(await loadThread("t1", apiClient)).toBeNull();
+  });
+
+  it("returns null when the id is not a thread id (422)", async () => {
+    const { apiClient } = api(() => json({ detail: [{ msg: "Input should be a valid UUID" }] }, 422));
+    expect(await loadThread("nope", apiClient)).toBeNull();
   });
 
   it("rejects with SessionExpiredError on 401", async () => {

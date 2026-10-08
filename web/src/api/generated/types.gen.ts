@@ -15,6 +15,20 @@ export type AskRequest = {
 };
 
 /**
+ * ChooseSubjectsRequest
+ */
+export type ChooseSubjectsRequest = {
+    /**
+     * New Names
+     */
+    new_names?: Array<string>;
+    /**
+     * Subject Ids
+     */
+    subject_ids?: Array<string>;
+};
+
+/**
  * DocumentResponse
  */
 export type DocumentResponse = {
@@ -233,6 +247,16 @@ export type ThreadResponse = {
 };
 
 /**
+ * ThreadSubjectsRequest
+ */
+export type ThreadSubjectsRequest = {
+    /**
+     * Subject Ids
+     */
+    subject_ids: Array<string>;
+};
+
+/**
  * UploadLimitsResponse
  */
 export type UploadLimitsResponse = {
@@ -272,30 +296,6 @@ export type ValidationError = {
      * Error Type
      */
     type: string;
-};
-
-/**
- * ChooseSubjectsRequest
- */
-export type SmartTutorAppsApiRoutesKnowledgeChooseSubjectsRequest = {
-    /**
-     * New Names
-     */
-    new_names?: Array<string>;
-    /**
-     * Subject Ids
-     */
-    subject_ids?: Array<string>;
-};
-
-/**
- * ChooseSubjectsRequest
- */
-export type SmartTutorAppsApiRoutesThreadsChooseSubjectsRequest = {
-    /**
-     * Subject Ids
-     */
-    subject_ids: Array<string>;
 };
 
 export type ListDocumentsData = {
@@ -402,7 +402,7 @@ export type GetSubjectSuggestionsResponses = {
 export type GetSubjectSuggestionsResponse = GetSubjectSuggestionsResponses[keyof GetSubjectSuggestionsResponses];
 
 export type ChooseSubjectsData = {
-    body: SmartTutorAppsApiRoutesKnowledgeChooseSubjectsRequest;
+    body: ChooseSubjectsRequest;
     path: {
         /**
          * Document Id
@@ -557,7 +557,7 @@ export type GetThreadResponses = {
 export type GetThreadResponse = GetThreadResponses[keyof GetThreadResponses];
 
 export type ChooseThreadSubjectsData = {
-    body: SmartTutorAppsApiRoutesThreadsChooseSubjectsRequest;
+    body: ThreadSubjectsRequest;
     path: {
         /**
          * Thread Id
@@ -574,7 +574,7 @@ export type ChooseThreadSubjectsErrors = {
      */
     404: unknown;
     /**
-     * The conversation already has its subjects, or the tutor has no question waiting.
+     * The conversation already has its subjects, or the tutor no longer holds its question (detail: 'This question can no longer be answered. Ask it again.').
      */
     409: unknown;
     /**

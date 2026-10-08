@@ -17,6 +17,32 @@
         "title": "AskRequest",
         "type": "object"
       },
+      "ChooseSubjectsRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "new_names": {
+            "items": {
+              "maxLength": 60,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 3,
+            "title": "New Names",
+            "type": "array"
+          },
+          "subject_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 3,
+            "title": "Subject Ids",
+            "type": "array"
+          }
+        },
+        "title": "ChooseSubjectsRequest",
+        "type": "object"
+      },
       "DocumentResponse": {
         "properties": {
           "attempt": {
@@ -364,6 +390,25 @@
         "title": "ThreadResponse",
         "type": "object"
       },
+      "ThreadSubjectsRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "subject_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "Subject Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "subject_ids"
+        ],
+        "title": "ThreadSubjectsRequest",
+        "type": "object"
+      },
       "UploadLimitsResponse": {
         "properties": {
           "max_bytes": {
@@ -420,51 +465,6 @@
           "type"
         ],
         "title": "ValidationError",
-        "type": "object"
-      },
-      "smart_tutor__apps__api__routes__knowledge__ChooseSubjectsRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "new_names": {
-            "items": {
-              "maxLength": 60,
-              "minLength": 1,
-              "type": "string"
-            },
-            "maxItems": 3,
-            "title": "New Names",
-            "type": "array"
-          },
-          "subject_ids": {
-            "items": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "maxItems": 3,
-            "title": "Subject Ids",
-            "type": "array"
-          }
-        },
-        "title": "ChooseSubjectsRequest",
-        "type": "object"
-      },
-      "smart_tutor__apps__api__routes__threads__ChooseSubjectsRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "subject_ids": {
-            "items": {
-              "type": "string"
-            },
-            "maxItems": 3,
-            "minItems": 1,
-            "title": "Subject Ids",
-            "type": "array"
-          }
-        },
-        "required": [
-          "subject_ids"
-        ],
-        "title": "ChooseSubjectsRequest",
         "type": "object"
       }
     },
@@ -669,7 +669,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/smart_tutor__apps__api__routes__knowledge__ChooseSubjectsRequest"
+                "$ref": "#/components/schemas/ChooseSubjectsRequest"
               }
             }
           },
@@ -876,6 +876,7 @@
             "name": "thread_id",
             "required": true,
             "schema": {
+              "format": "uuid",
               "title": "Thread Id",
               "type": "string"
             }
@@ -924,6 +925,7 @@
             "name": "thread_id",
             "required": true,
             "schema": {
+              "format": "uuid",
               "title": "Thread Id",
               "type": "string"
             }
@@ -933,7 +935,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/smart_tutor__apps__api__routes__threads__ChooseSubjectsRequest"
+                "$ref": "#/components/schemas/ThreadSubjectsRequest"
               }
             }
           },
@@ -954,7 +956,7 @@
             "description": "No such conversation."
           },
           "409": {
-            "description": "The conversation already has its subjects, or the tutor has no question waiting."
+            "description": "The conversation already has its subjects, or the tutor no longer holds its question (detail: 'This question can no longer be answered. Ask it again.')."
           },
           "422": {
             "description": "The pick is not 1 to 3 distinct subjects of the learner's own."

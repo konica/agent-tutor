@@ -9,6 +9,7 @@ import {
   formatCitation,
   loadThread,
   NoDocumentsError,
+  QuestionExpiredError,
   type ChatCitation,
   type ChatEvent,
   type ThreadView,
@@ -92,7 +93,8 @@ export function ChatPage({
   const url = useRef({ searchParams, setSearchParams });
   const questionBox = useRef<HTMLTextAreaElement>(null);
   // Set by Continue: the picker (and the focused Continue button) goes away once the answer starts, so focus
-  // returns to the question box when the answer is done. A refused pick keeps the picker, which keeps focus.
+  // returns to the question box when the answer is done, or when the question comes back to it because it can't be
+  // answered any more. Any other refused pick keeps the picker, which keeps focus.
   const focusQuestionWhenDone = useRef(false);
 
   useEffect(() => {
@@ -188,14 +190,15 @@ export function ChatPage({
   }
 
   function onContinue(subjectIds: string[]) {
-    if (!pending || busy.current) return;
+    if (!exchange || !pending || busy.current) return;
     const { threadId } = pending;
     focusQuestionWhenDone.current = true;
-    void consume(() => choose(threadId, subjectIds));
+    void consume(() => choose(threadId, subjectIds), exchange.question);
   }
 
-  // Reads one answer stream, for a question or for the pick that lets a waiting question be answered.
-  async function consume(open: () => AsyncIterable<ChatEvent>) {
+  // Reads one answer stream, for a question or for the pick that lets a waiting question be answered (`waiting` is
+  // that question, given back to the question box if it can't be answered any more).
+  async function consume(open: () => AsyncIterable<ChatEvent>, waiting?: string) {
     busy.current = true;
     setAnswering(true);
     setProblem(null);
@@ -225,7 +228,14 @@ export function ChatPage({
       if (!alive.current) return;
       // The last ready document was archived since the page loaded.
       if (error instanceof NoDocumentsError) setNoDocuments(true);
-      else if (error instanceof AskRefusedError) setProblem({ message: error.message });
+      // The waiting question can't be answered any more (the thread is gone, or the tutor lost it): drop the picker
+      // and the thread, and put the question back in the box (focused once answering ends) to ask it again.
+      else if (error instanceof QuestionExpiredError) {
+        setExchange(null);
+        setQuestion(waiting ?? "");
+        forgetThread();
+        setProblem({ message: error.message });
+      } else if (error instanceof AskRefusedError) setProblem({ message: error.message });
       // A SessionExpiredError was already reported by the API client; the session screen replaces this page.
       else if (!(error instanceof SessionExpiredError)) setProblem({ message: GENERIC_FAILURE });
     } finally {

@@ -33,6 +33,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["tutoring"])
 
 UNAVAILABLE = "The tutor is unavailable. Try again in a moment."
+# The agent no longer holds the waiting question (its checkpoint moved on, but the API never bound the pick).
+QUESTION_EXPIRED = "This question can no longer be answered. Ask it again."
 # Proxies must pass each event on as it comes, and nothing may cache the answer.
 SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 SSE_RESPONSE: dict[int | str, dict[str, object]] = {
@@ -49,7 +51,10 @@ RESUME_RESPONSE: dict[int | str, dict[str, object]] = {
         "content": {"text/event-stream": {"schema": {"type": "string"}}},
     },
     404: {"description": "No such conversation."},
-    409: {"description": "The conversation already has its subjects, or the tutor has no question waiting."},
+    409: {
+        "description": "The conversation already has its subjects, or the tutor no longer holds its question "
+        f"(detail: {QUESTION_EXPIRED!r})."
+    },
     422: {"description": "The pick is not 1 to 3 distinct subjects of the learner's own."},
 }
 
@@ -61,7 +66,7 @@ class AskRequest(BaseModel):
     question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)]
 
 
-class ChooseSubjectsRequest(BaseModel):
+class ThreadSubjectsRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     subject_ids: Annotated[list[str], Field(min_length=1, max_length=MAX_SUBJECTS)]
 
@@ -226,7 +231,8 @@ async def ask_in_new_thread(
         return _sse("thread", {"thread_id": thread.thread_id, "subjects": _named_list(thread.subject_ids, named)})
 
     async def pending(choice_ids: list[str]) -> bytes | None:
-        choices = [s for s in choice_ids if s in named]
+        # Listed like GET /me/subjects (by name), so the picker's order is the same after a reload.
+        choices = sorted((s for s in choice_ids if s in named), key=lambda s: (named[s].casefold(), s))
         if len(choices) != len(choice_ids):
             logger.warning("the agent's choices %s include subjects the learner doesn't have", choice_ids)
         if not choices:
@@ -251,8 +257,8 @@ async def ask_in_new_thread(
     responses=RESUME_RESPONSE,
 )
 async def choose_thread_subjects(
-    thread_id: str,
-    body: ChooseSubjectsRequest,
+    thread_id: uuid.UUID,
+    body: ThreadSubjectsRequest,
     principal: CurrentPrincipal,
     token: BearerToken,
     conversations: Conversations,
@@ -260,9 +266,10 @@ async def choose_thread_subjects(
     agent: Agent,
 ) -> StreamingResponse:
     """The learner's pick for a thread waiting for its subjects; the agent then answers the first question."""
+    pending_id = ThreadId(str(thread_id))
     picked = [SubjectId(s) for s in body.subject_ids]
     try:
-        await run_in_threadpool(conversations.pending_thread, principal.user_id, ThreadId(thread_id))
+        await run_in_threadpool(conversations.pending_thread, principal.user_id, pending_id)
         await run_in_threadpool(conversations.check_choice, principal.user_id, picked)
         named = await _named_subjects(conversations, subjects, principal.user_id)
     except NoDocumentsError as e:
@@ -274,37 +281,39 @@ async def choose_thread_subjects(
     except ThreadSubjectsError as e:
         raise HTTPException(422, str(e)) from None
     try:
-        answer = await agent.resume_answer(token, thread_id, body.subject_ids)
+        answer = await agent.resume_answer(token, pending_id, body.subject_ids)
     except UnauthenticatedError:
         raise _unauthenticated() from None
-    except AgentConflictError as e:
-        raise HTTPException(409, str(e)) from None
+    except AgentConflictError:
+        # The thread is still unbound here, so the learner can only ask again in a new thread.
+        logger.warning("the agent holds no question for pending thread %s", pending_id)
+        raise HTTPException(409, QUESTION_EXPIRED) from None
     except AgentUnavailableError:
         raise HTTPException(503, UNAVAILABLE) from None
 
     async def bind(subject_ids: list[str]) -> bytes | None:
         if subject_ids != body.subject_ids:
-            logger.warning("the agent resumed thread %s with %s, not the pick %s", thread_id, subject_ids, picked)
+            logger.warning("the agent resumed thread %s with %s, not the pick %s", pending_id, subject_ids, picked)
             return None
         try:
-            bound = await run_in_threadpool(conversations.bind_subjects, principal.user_id, ThreadId(thread_id), picked)
+            bound = await run_in_threadpool(conversations.bind_subjects, principal.user_id, pending_id, picked)
         except Exception:
-            logger.exception("binding the subjects of thread %s failed", thread_id)
+            logger.exception("binding the subjects of thread %s failed", pending_id)
             return None
         if not bound:
-            logger.warning("thread %s was bound by someone else first", thread_id)
+            logger.warning("thread %s was bound by someone else first", pending_id)
             return None
-        return _sse("thread", {"thread_id": thread_id, "subjects": _named_list(subject_ids, named)})
+        return _sse("thread", {"thread_id": pending_id, "subjects": _named_list(subject_ids, named)})
 
     return StreamingResponse(_relay(answer, bind), media_type="text/event-stream", headers=SSE_HEADERS)
 
 
 @router.get("/threads/{thread_id}", operation_id="get_thread")
 async def get_thread(
-    thread_id: str, principal: CurrentPrincipal, conversations: Conversations, subjects: Subjects
+    thread_id: uuid.UUID, principal: CurrentPrincipal, conversations: Conversations, subjects: Subjects
 ) -> ThreadResponse:
     try:
-        thread = await run_in_threadpool(conversations.get_thread, principal.user_id, ThreadId(thread_id))
+        thread = await run_in_threadpool(conversations.get_thread, principal.user_id, ThreadId(str(thread_id)))
     except ThreadNotFoundError:
         raise HTTPException(404, "No such conversation") from None
     names = await run_in_threadpool(subjects.names_for, principal.user_id, list(thread.subject_ids))

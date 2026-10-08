@@ -48,6 +48,17 @@ export class AskRefusedError extends Error {
   }
 }
 
+/** The API's 409 detail when the tutor no longer holds a waiting question (POST /threads/{thread_id}/subjects). */
+export const QUESTION_EXPIRED = "This question can no longer be answered. Ask it again.";
+
+/** The waiting question can't be answered any more (that 409, or the thread is gone): only asking it again helps. */
+export class QuestionExpiredError extends Error {
+  constructor() {
+    super(QUESTION_EXPIRED);
+    this.name = "QuestionExpiredError";
+  }
+}
+
 function detail(error: unknown): string | null {
   if (typeof error === "object" && error !== null && "detail" in error && typeof error.detail === "string") return error.detail;
   return null;
@@ -97,8 +108,9 @@ export async function* askInNewThread(question: string, apiClient: Client = clie
 }
 
 // The learner's pick for a thread waiting for its subjects; the answer to the kept question streams back like
-// askInNewThread's (a plain request for the same reasons). A refusal (the pick is invalid, the thread no longer
-// waits, it doesn't exist) carries a message for the learner.
+// askInNewThread's (a plain request for the same reasons). A thread that is gone (404) or whose question the tutor
+// no longer holds (409 QUESTION_EXPIRED) is a QuestionExpiredError; any other refusal (the pick is invalid, the
+// thread no longer waits) carries a message for the learner.
 export async function* chooseSubjects(
   threadId: string,
   subjectIds: string[],
@@ -117,6 +129,9 @@ export async function* chooseSubjects(
   if (error instanceof SessionExpiredError || response?.status === 401) throw new SessionExpiredError();
   if (response && response.status >= 400 && response.status < 500) {
     const message = detail(error);
+    if (response.status === 404 || (response.status === 409 && message === QUESTION_EXPIRED)) {
+      throw new QuestionExpiredError();
+    }
     if (message === NO_DOCUMENTS) throw new NoDocumentsError(message);
     if (message !== null) throw new AskRefusedError(message);
   }
@@ -131,11 +146,12 @@ async function* events(response: Response | undefined, request: string): AsyncGe
   }
 }
 
-/** The thread for the chat page to resume after a reload; null when it doesn't exist or isn't the learner's. */
+/** The thread for the chat page to resume after a reload; null when it doesn't exist, isn't the learner's, or its id
+ * isn't a thread id at all (422). */
 export async function loadThread(threadId: string, apiClient: Client = client): Promise<ThreadView | null> {
   const { data, error, response } = await getThread({ client: apiClient, path: { thread_id: threadId }, throwOnError: false });
   if (error instanceof SessionExpiredError || response?.status === 401) throw new SessionExpiredError();
-  if (response?.status === 404) return null;
+  if (response?.status === 404 || response?.status === 422) return null;
   if (!data) throw new Error(`GET /threads/{thread_id} failed (${response?.status ?? "no response"})`);
   return data;
 }
