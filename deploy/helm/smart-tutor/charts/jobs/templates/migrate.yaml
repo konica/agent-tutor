@@ -1,0 +1,63 @@
+{{- if .Values.global.secretStore }}
+{{- $hook := dict "helm.sh/hook" "pre-install,pre-upgrade" "helm.sh/hook-delete-policy" "before-hook-creation,hook-succeeded" }}
+# Alembic to head before the API rolls out (after the db-bootstrap hook creates the database, weight 0). A failed
+# migration fails the release, so the old API keeps serving.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: migrate-db
+  annotations:
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "5") $hook) | nindent 4 }}
+spec:
+  refreshInterval: "0"
+  secretStoreRef:
+    name: {{ .Values.global.secretStore }}
+    kind: SecretStore
+  target:
+    name: migrate-db
+    creationPolicy: Owner
+    template:
+      data:
+        url: {{ "postgresql+psycopg://{{ .username }}:{{ .password }}@{{ .host }}:{{ .port }}/{{ .dbname }}?sslmode=require" | quote }}
+  dataFrom:
+    - extract:
+        key: {{ .Values.secrets.database }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate
+  annotations:
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "10") $hook) | nindent 4 }}
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 600
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrate
+          image: {{ include "jobs.image" . }}
+          command: ["python", "-m", "smart_tutor.apps.jobs.migrate"]
+          env:
+            - name: SMART_TUTOR_DATABASE_URL
+              valueFrom: {secretKeyRef: {name: migrate-db, key: url}}
+            - name: HOME
+              value: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}

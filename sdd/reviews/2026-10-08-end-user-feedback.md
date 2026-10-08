@@ -2,7 +2,7 @@
 
 - Date: 2026-10-08
 - Decided by: product owner (Thao Dinh)
-- Result: PRD v2.21 (Q54–Q58), ADR 0011, design brief v0.8
+- Result: PRD v2.22 (Q54–Q58), ADR 0011, design brief v0.8
 
 ## Feedback
 
@@ -44,7 +44,7 @@ The cross-user link also had costs beyond how it felt to learners:
 
 ## Product owner and UI/UX review (2026-10-08)
 
-Both reviews read PRD v2.21 and brief v0.8. Their questions all had simple defaults consistent with the owner's decisions, so the defaults were adopted (PRD Q59); the owner can override any of them in the PR review.
+Both reviews read PRD v2.22 and brief v0.8. Their questions all had simple defaults consistent with the owner's decisions, so the defaults were adopted (PRD Q59); the owner can override any of them in the PR review.
 
 | Topic | Default adopted |
 |---|---|
@@ -66,7 +66,7 @@ New states from the review: `viewer-loading`, `viewer-error`, `chat-documents-us
 ## Effect on tickets
 
 - **Close as not planned** (detection work): #12 US-3b, #85, #86, #113.
-- **Re-scope:** #11 becomes "US-3 Start a conversation". #13 US-4, #14 US-5, #19 US-10, #21 US-11, #22 US-12, and #23 US-13 follow PRD v2.21.
+- **Re-scope:** #11 becomes "US-3 Start a conversation". #13 US-4, #14 US-5, #19 US-10, #21 US-11, #22 US-12, and #23 US-13 follow PRD v2.22.
 - **Undo built behavior:**
   - #83 and #84 bound threads to subjects; a new slice removes thread subjects and detection from the agent, the API, and the web.
   - #60 links duplicates across learners; a new slice under US-11 makes contents per learner.

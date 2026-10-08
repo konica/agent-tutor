@@ -1,4 +1,4 @@
-"""EKS cluster with a small managed node group, access entries, and Pod Identity for the cluster add-ons (#56).
+"""EKS cluster with a small managed node group, access entries, and Pod Identity for the cluster add-ons and the API (#56, #58).
 
 The add-ons themselves (AWS Load Balancer Controller, External Secrets, metrics-server) are Helm releases with the
 values in deploy/helm/addons/; this stack only gives them IAM roles through Pod Identity.
@@ -88,6 +88,20 @@ class ClusterStack(cdk.Stack):
                     iam.PolicyStatement(
                         actions=["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"],
                         resources=[f"arn:aws:secretsmanager:{self.region}:{self.account}:secret:smart-tutor/*"],
+                    )
+                ]
+            ),
+        )
+        # The API reads its startup parameters (PRD §11, §9.5, D27). S3, SQS, and Bedrock arrive with upload and chat.
+        self._pod_identity(
+            "Api",
+            "smart-tutor",
+            "api",
+            iam.PolicyDocument(
+                statements=[
+                    iam.PolicyStatement(
+                        actions=["ssm:GetParameter", "ssm:GetParameters"],
+                        resources=[f"arn:aws:ssm:{self.region}:{self.account}:parameter/smart-tutor/*"],
                     )
                 ]
             ),

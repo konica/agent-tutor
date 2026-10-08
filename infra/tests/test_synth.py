@@ -308,7 +308,7 @@ def test_cloudfront_sends_auth_to_keycloak_uncached_with_every_method() -> None:
         {
             "DistributionConfig": Match.object_like(
                 {
-                    "CacheBehaviors": [
+                    "CacheBehaviors": Match.array_with([
                         Match.object_like(
                             {
                                 "PathPattern": "/auth/*",
@@ -319,7 +319,7 @@ def test_cloudfront_sends_auth_to_keycloak_uncached_with_every_method() -> None:
                                 "OriginRequestPolicyId": "216adef6-5c7f-47e4-b989-5492eafa07d3",
                             }
                         )
-                    ],
+                    ]),
                 }
             )
         },
@@ -434,3 +434,84 @@ def test_data_deploys_after_the_cluster_whose_pods_it_admits() -> None:
     app.synth()  # cross-stack references add their stack dependencies while synthesizing
 
     assert stacks["SmartTutor-prod-Cluster"] in stacks["SmartTutor-prod-Data"].dependencies
+
+
+def test_api_target_group_takes_api_paths_on_8080() -> None:
+    t = template(make_app(), "Edge")
+
+    t.has_resource_properties(
+        "AWS::ElasticLoadBalancingV2::TargetGroup",
+        {
+            "Name": "smart-tutor-prod-api",
+            "TargetType": "ip",
+            "Port": 8080,
+            "Protocol": "HTTP",
+            "HealthCheckPath": "/api/healthz",  # through the root path, as CloudFront calls it
+        },
+    )
+    t.has_resource_properties(
+        "AWS::ElasticLoadBalancingV2::ListenerRule",
+        {
+            "Priority": 20,
+            "Conditions": [
+                {"Field": "path-pattern", "PathPatternConfig": {"Values": ["/api/*"]}}
+            ],
+        },
+    )
+    t.has_output("ApiTargetGroupName", {"Value": "smart-tutor-prod-api"})
+
+
+def test_cloudfront_sends_api_uncached_with_every_method() -> None:
+    t = template(make_app(), "Edge")
+
+    t.has_resource_properties(
+        "AWS::CloudFront::Distribution",
+        {
+            "DistributionConfig": Match.object_like(
+                {
+                    "CacheBehaviors": Match.array_with(
+                        [
+                            Match.object_like(
+                                {
+                                    "PathPattern": "/api/*",
+                                    "ViewerProtocolPolicy": "redirect-to-https",
+                                    "AllowedMethods": [
+                                        "GET",
+                                        "HEAD",
+                                        "OPTIONS",
+                                        "PUT",
+                                        "PATCH",
+                                        "POST",
+                                        "DELETE",
+                                    ],
+                                    "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",  # CachingDisabled
+                                    # AllViewer: Authorization reaches the API when caching is off
+                                    "OriginRequestPolicyId": "216adef6-5c7f-47e4-b989-5492eafa07d3",
+                                }
+                            )
+                        ]
+                    ),
+                }
+            )
+        },
+    )
+
+
+def test_api_reads_only_the_smart_tutor_parameters_through_pod_identity() -> None:
+    t = template(make_app(), "Cluster")
+
+    t.has_resource_properties(
+        "AWS::EKS::PodIdentityAssociation",
+        {"Namespace": "smart-tutor", "ServiceAccount": "api"},
+    )
+    policies = [
+        p
+        for p in t.find_resources("AWS::IAM::ManagedPolicy").values()
+        if "ssm:" in json.dumps(p["Properties"]["PolicyDocument"])
+    ]
+    assert len(policies) == 1
+    statements = policies[0]["Properties"]["PolicyDocument"]["Statement"]
+    assert [s["Action"] for s in statements] == [
+        ["ssm:GetParameter", "ssm:GetParameters"]
+    ]
+    assert "parameter/smart-tutor/*" in json.dumps(statements[0]["Resource"])

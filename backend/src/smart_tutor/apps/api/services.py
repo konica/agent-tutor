@@ -1,6 +1,7 @@
 """Services the API's routes call, built once per process (tests pass fakes to create_app instead)."""
 
 from dataclasses import dataclass
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -52,7 +53,7 @@ def build_services(settings: Settings) -> ApiServices:
     queue = SqsMessageQueue(sqs_client(settings), settings.ingest_queue_url)
     subject_repo = SqlSubjectRepository(engine)
     names = SubjectNames(subject_repo)
-    documents = DocumentService(library, max_attempts)
+    documents = DocumentService(library, max_attempts, time_zone=ZoneInfo(params.get(settings.app_time_zone_param)))
     return ApiServices(
         uploads=UploadService(library, objects, SystemClock(), limits),
         documents=documents,

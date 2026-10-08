@@ -1,0 +1,15 @@
+{{- if .Values.targetGroupName }}
+# The AWS Load Balancer Controller registers the API pods' IPs in the CDK-made target group (EdgeStack).
+apiVersion: elbv2.k8s.aws/v1beta1
+kind: TargetGroupBinding
+metadata:
+  name: api
+  labels:
+    {{- include "api.labels" . | nindent 4 }}
+spec:
+  serviceRef:
+    name: api
+    port: 80
+  targetGroupName: {{ .Values.targetGroupName }}
+  targetType: ip
+{{- end }}

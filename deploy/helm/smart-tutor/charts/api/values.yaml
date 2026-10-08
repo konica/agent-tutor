@@ -1,7 +1,23 @@
-# FastAPI server behind the ALB (SSE streaming).
-image:
-  repository: smart-tutor-api
-  tag: ""  # defaults to global.imageTag
-port: 8080
+# FastAPI server at /api behind CloudFront (ADR 0009). Pods register in an ALB target group that CDK owns (EdgeStack).
+# Image: backend/Dockerfile, target api.
 replicaCount: 1
-# Owns its NetworkPolicy and ExternalSecret (spec §8).
+image:
+  repository: smart-tutor/api
+  tag: ""  # defaults to global.imageTag
+# ALB target group to register pods in (TargetGroupBinding). Empty renders no binding.
+targetGroupName: ""
+rootPath: /api
+awsRegion: us-east-1
+# How the API reaches Keycloak for token introspection (ADR 0007): the in-cluster Service, not CloudFront.
+keycloakInternalUrl: http://keycloak/auth/realms/smart-tutor
+keycloakClientId: smart-tutor-api
+# Secrets Manager entries (CDK DataStack and ConfigStack), read through global.secretStore.
+secrets:
+  database: smart-tutor/db/app
+  keycloakClient: smart-tutor/keycloak/api-client
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi

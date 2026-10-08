@@ -1,11 +1,11 @@
 """Library routes (knowledge module): start an upload, list the caller's documents, check a file hash against them,
 retry a failed one, suggest and save its subjects."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from smart_tutor.apps.api.deps import CurrentPrincipal, Documents, Retries, SubjectChoice, Subjects, Uploads
@@ -55,16 +55,21 @@ class SubjectResponse(BaseModel):
     name: str
 
 
+DocumentState = Literal["processing", "awaiting_subjects", "ready", "failed"]
+
+
 class DocumentResponse(BaseModel):
     document_id: str
     title: str
-    state: Literal["processing", "awaiting_subjects", "ready", "failed"]
+    state: DocumentState
     failure_reason: str | None
     attempt: int | None  # processing attempts of the shared content so far; null until the upload is hashed
     max_attempts: int
     can_retry: bool
     created_at: datetime
     subjects: list[SubjectResponse]
+    authors: list[str]  # from the shared content; empty when the PDF names none
+    year: int | None
 
 
 class SuggestionResponse(BaseModel):
@@ -128,12 +133,33 @@ def _document_response(view: DocumentView, names: dict[SubjectId, str]) -> Docum
         can_retry=view.can_retry,
         created_at=view.created_at,
         subjects=[SubjectResponse(subject_id=s, name=names[s]) for s in view.subject_ids if s in names],
+        authors=list(view.authors),
+        year=view.year,
     )
 
 
 @router.get("/documents", operation_id="list_documents")
-def list_documents(principal: CurrentPrincipal, documents: Documents, subjects: Subjects) -> list[DocumentResponse]:
-    views = documents.list_documents(principal.user_id)
+def list_documents(
+    principal: CurrentPrincipal,
+    documents: Documents,
+    subjects: Subjects,
+    subject_id: Annotated[list[UUID], Query(max_length=100)] = [],  # noqa: B006 - FastAPI copies the default
+    state: Annotated[list[DocumentState], Query()] = [],  # noqa: B006
+    uploaded_from: date | None = None,
+    uploaded_to: date | None = None,
+) -> list[DocumentResponse]:
+    """The caller's documents, newest first, narrowed by any subset of the filters (PRD §8 US-10).
+
+    `subject_id` and `state` repeat; a document matches when it has any of the subjects and is in any of the states.
+    `uploaded_from` and `uploaded_to` are inclusive calendar days in the app time zone (D27). The filters combine.
+    """
+    views = documents.list_documents(
+        principal.user_id,
+        subject_ids=[SubjectId(str(s)) for s in subject_id],
+        states=state,
+        uploaded_from=uploaded_from,
+        uploaded_to=uploaded_to,
+    )
     names = subjects.names_for(principal.user_id, {s for d in views for s in d.subject_ids})
     return [_document_response(d, names) for d in views]
 

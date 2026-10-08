@@ -6,7 +6,7 @@
 
 ## Context
 
-ADR 0002 stored each unique file once in the whole system. A learner whose upload matched another learner's file got a document linked to the shared content, with no re-extraction or re-embedding. End-user feedback (PRD v2.21, Q54) rejected this as hidden sharing. The link also had concrete costs:
+ADR 0002 stored each unique file once in the whole system. A learner whose upload matched another learner's file got a document linked to the shared content, with no re-extraction or re-embedding. End-user feedback (PRD v2.22, Q54) rejected this as hidden sharing. The link also had concrete costs:
 
 - **Timing signal.** A duplicate became ready in seconds, which revealed that another learner had the file.
 - **Shared state.** Failure and retry state were shared across learners.

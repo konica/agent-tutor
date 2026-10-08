@@ -26,6 +26,14 @@ def test_detection_thresholds_are_ssm_parameters() -> None:
         template.has_resource_properties("AWS::SSM::Parameter", {"Name": f"/smart-tutor/{name}", "Value": value})
 
 
+def test_app_time_zone_is_an_ssm_parameter() -> None:
+    template = Template.from_stack(ConfigStack(cdk.App(), "Config"))
+
+    template.has_resource_properties(
+        "AWS::SSM::Parameter", {"Name": "/smart-tutor/app-time-zone", "Value": "Asia/Ho_Chi_Minh"}
+    )
+
+
 def test_keycloak_admin_and_client_secrets_are_generated_not_written() -> None:
     template = Template.from_stack(ConfigStack(cdk.App(), "Config"))
 

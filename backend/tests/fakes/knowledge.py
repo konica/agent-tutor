@@ -9,7 +9,7 @@ from typing import Self
 
 from smart_tutor.knowledge.domain.chunk import Chunk
 from smart_tutor.knowledge.domain.content import Content
-from smart_tutor.knowledge.domain.document import Document, DocumentState
+from smart_tutor.knowledge.domain.document import NO_FILTER, Document, DocumentFilter, DocumentState
 from smart_tutor.knowledge.domain.search import ChunkHit
 from smart_tutor.knowledge.domain.upload import Upload, UploadOutcome
 from smart_tutor.knowledge.ports.library import (
@@ -103,12 +103,18 @@ class _Documents(DocumentRepository):
             if d.content_id == content_id and d.state is DocumentState.PROCESSING
         ]
 
-    def list_readable_by(self, user_id: UserId) -> list[Document]:
-        mine = [copy.deepcopy(d) for d in self._s.documents.values() if d.can_be_read_by(user_id) and not d.archived]
+    def list_readable_by(self, user_id: UserId, document_filter: DocumentFilter = NO_FILTER) -> list[Document]:
+        mine = [
+            copy.deepcopy(d)
+            for d in self._s.documents.values()
+            if d.can_be_read_by(user_id) and not d.archived and d.matches(document_filter)
+        ]
         for d in mine:
             content = self._s.contents.get(d.content_id) if d.content_id is not None else None
             d.content_title = content.title if content else None
             d.content_attempts = content.attempts if content else None
+            d.content_authors = list(content.authors) if content else []
+            d.content_year = content.year if content else None
         return sorted(mine, key=lambda d: d.created_at, reverse=True)
 
     def find_readable_by_sha256(self, user_id: UserId, sha256: str) -> DocumentId | None:

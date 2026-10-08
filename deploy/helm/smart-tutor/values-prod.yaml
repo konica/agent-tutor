@@ -13,10 +13,11 @@ keycloak:
   enabled: true
   targetGroupName: smart-tutor-prod-keycloak  # SmartTutor-prod-Edge output KeycloakTargetGroupName
 api:
-  enabled: false  # #58
+  enabled: true
   replicaCount: 2
+  targetGroupName: smart-tutor-prod-api  # SmartTutor-prod-Edge output ApiTargetGroupName
 jobs:
-  enabled: false  # #58 (migrate)
+  enabled: true  # the migrate hook; CronJobs come with their slices
 agent:
   enabled: false
   replicaCount: 2

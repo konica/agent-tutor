@@ -1,15 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { DocumentResponse } from "../../api/documents";
+import type { DocumentFilters, DocumentResponse } from "../../api/documents";
 
-export type DocumentsState = { documents: DocumentResponse[] | null; unavailable: boolean; refresh: () => Promise<void> };
+export type DocumentsState = { documents: DocumentResponse[] | null; applied: DocumentFilters; unavailable: boolean; refresh: () => Promise<void> };
+
+const NO_FILTERS: DocumentFilters = {};
 
 // Loads the library now and every `pollMs`, so processing states update without a reload.
-// Only the latest response is applied, ticks skip while a load is running, and nothing is set after unmount.
-export function useDocuments(load: () => Promise<DocumentResponse[]>, pollMs: number): DocumentsState {
+// A change of `filters` reloads at once and polling continues with the new ones.
+// Only the latest response is applied (so a slow response for old filters never overwrites newer ones), ticks skip while a load is running, and nothing is set after unmount.
+export function useDocuments(load: (filters: DocumentFilters) => Promise<DocumentResponse[]>, pollMs: number, filters: DocumentFilters = NO_FILTERS): DocumentsState {
   const [documents, setDocuments] = useState<DocumentResponse[] | null>(null);
+  const [applied, setApplied] = useState<DocumentFilters>(NO_FILTERS); // the filters `documents` was loaded with
   const [unavailable, setUnavailable] = useState(false);
   const loadRef = useRef(load);
+  const filtersKey = JSON.stringify(filters); // callers may pass a fresh object every render
+  const filtersRef = useRef(filters);
   const sequence = useRef(0);
   const inFlight = useRef(0);
   const alive = useRef(true);
@@ -18,13 +24,19 @@ export function useDocuments(load: () => Promise<DocumentResponse[]>, pollMs: nu
     loadRef.current = load; // an inline `load` must not restart polling
   }, [load]);
 
+  useEffect(() => {
+    filtersRef.current = filters;
+  }, [filters]);
+
   const run = useCallback(async () => {
     const mine = ++sequence.current;
     inFlight.current++;
     try {
-      const result = await loadRef.current();
+      const asked = filtersRef.current;
+      const result = await loadRef.current(asked);
       if (alive.current && mine === sequence.current) {
         setDocuments(result);
+        setApplied(asked);
         setUnavailable(false);
       }
     } catch {
@@ -45,7 +57,7 @@ export function useDocuments(load: () => Promise<DocumentResponse[]>, pollMs: nu
       alive.current = false;
       clearInterval(timer);
     };
-  }, [run, pollMs]);
+  }, [run, pollMs, filtersKey]);
 
-  return { documents, unavailable, refresh: run };
+  return { documents, applied, unavailable, refresh: run };
 }

@@ -1,16 +1,18 @@
 """The learner's library as they see it. Reads go through `can_read` (PRD §9.3)."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, time, timedelta, tzinfo
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from smart_tutor.knowledge.domain.content import RETRIES_USED_UP
-from smart_tutor.knowledge.domain.document import Document, DocumentState
+from smart_tutor.knowledge.domain.document import Document, DocumentFilter, DocumentState
 from smart_tutor.knowledge.ports.library import LibraryUnitOfWork
 from smart_tutor.shared.domain.ids import DocumentId, SubjectId, UserId
 
 DocumentStateName = Literal["processing", "awaiting_subjects", "ready", "failed"]
+DEFAULT_TIME_ZONE = ZoneInfo("Asia/Ho_Chi_Minh")  # GMT+7 (PRD D27); the API passes the SSM value
 
 
 @dataclass(frozen=True)
@@ -21,6 +23,8 @@ class DocumentView:
     failure_reason: str | None
     created_at: datetime
     subject_ids: tuple[SubjectId, ...]
+    authors: tuple[str, ...]  # of the shared content; empty until it is described
+    year: int | None
     attempt: int | None  # of the shared content; None until the upload is hashed
     max_attempts: int
     can_retry: bool
@@ -38,6 +42,8 @@ def document_view(d: Document, max_attempts: int) -> DocumentView:
         RETRIES_USED_UP if used_up else d.failure_reason,
         d.created_at,
         tuple(d.subject_ids),
+        tuple(d.content_authors),
+        d.content_year,
         attempts,
         max_attempts,
         failed and not used_up,
@@ -45,12 +51,32 @@ def document_view(d: Document, max_attempts: int) -> DocumentView:
 
 
 class DocumentService:
-    def __init__(self, uow: Callable[[], LibraryUnitOfWork], max_attempts: int) -> None:
-        self._uow, self._max_attempts = uow, max_attempts
+    def __init__(
+        self, uow: Callable[[], LibraryUnitOfWork], max_attempts: int, time_zone: tzinfo = DEFAULT_TIME_ZONE
+    ) -> None:
+        self._uow, self._max_attempts, self._tz = uow, max_attempts, time_zone
 
-    def list_documents(self, user_id: UserId) -> list[DocumentView]:
+    def list_documents(
+        self,
+        user_id: UserId,
+        *,
+        subject_ids: Collection[SubjectId] = (),
+        states: Collection[DocumentStateName] = (),
+        uploaded_from: date | None = None,
+        uploaded_to: date | None = None,
+    ) -> list[DocumentView]:
+        """The learner's documents, newest first, narrowed by any of the subjects and states and by upload dates.
+
+        Both dates are inclusive calendar days in the app time zone (PRD US-10, D24, D27).
+        """
+        document_filter = DocumentFilter(
+            frozenset(subject_ids),
+            frozenset(DocumentState(s) for s in states),
+            None if uploaded_from is None else datetime.combine(uploaded_from, time(), tzinfo=self._tz),
+            None if uploaded_to is None else datetime.combine(uploaded_to + timedelta(days=1), time(), tzinfo=self._tz),
+        )
         with self._uow() as tx:
-            documents = tx.documents.list_readable_by(user_id)
+            documents = tx.documents.list_readable_by(user_id, document_filter)
         return [document_view(d, self._max_attempts) for d in documents]
 
     def learner_subjects(self, user_id: UserId) -> frozenset[SubjectId]:

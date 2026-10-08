@@ -37,6 +37,10 @@ export type DocumentResponse = {
      */
     attempt: number | null;
     /**
+     * Authors
+     */
+    authors: Array<string>;
+    /**
      * Can Retry
      */
     can_retry: boolean;
@@ -68,6 +72,10 @@ export type DocumentResponse = {
      * Title
      */
     title: string;
+    /**
+     * Year
+     */
+    year: number | null;
 };
 
 /**
@@ -269,9 +277,35 @@ export type ValidationError = {
 export type ListDocumentsData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Subject Id
+         */
+        subject_id?: Array<string>;
+        /**
+         * State
+         */
+        state?: Array<'processing' | 'awaiting_subjects' | 'ready' | 'failed'>;
+        /**
+         * Uploaded From
+         */
+        uploaded_from?: string | null;
+        /**
+         * Uploaded To
+         */
+        uploaded_to?: string | null;
+    };
     url: '/documents';
 };
+
+export type ListDocumentsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListDocumentsError = ListDocumentsErrors[keyof ListDocumentsErrors];
 
 export type ListDocumentsResponses = {
     /**

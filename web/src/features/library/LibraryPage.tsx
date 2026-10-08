@@ -1,21 +1,25 @@
-import { AlertCircle, Info, Upload } from "lucide-react";
+import { AlertCircle, Filter, Info, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import { SessionExpiredError } from "../../auth/authClient";
-import { findInLibrary, loadDocuments, loadSubjectSuggestions, loadUploadLimits, megabytes, rejectionReason, RetriesUsedUpError, retryProcessing, saveSubjects as saveChosenSubjects, uploadPdf, type DocumentResponse, type SubjectSuggestions, type UploadEvents, type UploadLimits } from "../../api/documents";
+import { findInLibrary, loadDocuments, loadSubjectSuggestions, loadUploadLimits, megabytes, rejectionReason, RetriesUsedUpError, retryProcessing, saveSubjects as saveChosenSubjects, uploadPdf, type DocumentFilters, type DocumentResponse, type SubjectSuggestions, type UploadEvents, type UploadLimits } from "../../api/documents";
+import type { SubjectResponse } from "../../api/generated/types.gen";
+import { loadMySubjects } from "../../api/subjects";
 import { Button } from "../../components/Button/Button";
 import { EmptyState } from "../../components/EmptyState/EmptyState";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
 import { UploadTray, type TrayItem } from "../../components/UploadTray/UploadTray";
 import { DropOverlay } from "./DropOverlay";
 import { DocumentTable } from "./DocumentTable";
+import { hasFilters, LibraryFilters } from "./LibraryFilters";
 import { SubjectPicker } from "./SubjectPicker";
 import styles from "./LibraryPage.module.css";
 import { useDocuments } from "./useDocuments";
 import { usePageDrop } from "./usePageDrop";
 
 type Props = {
-  load?: () => Promise<DocumentResponse[]>;
+  load?: (filters: DocumentFilters) => Promise<DocumentResponse[]>;
+  loadSubjects?: () => Promise<SubjectResponse[]>;
   upload?: (file: File, events: UploadEvents) => Promise<void>;
   retry?: (documentId: string) => Promise<void>;
   loadLimits?: () => Promise<UploadLimits>;
@@ -39,12 +43,18 @@ const defaultRetry = (id: string) => retryProcessing(id);
 const defaultLoadLimits = () => loadUploadLimits();
 const defaultCheck = (file: File) => findInLibrary(file);
 
+const defaultLoadSubjects = () => loadMySubjects();
 const defaultLoadSuggestions = (id: string) => loadSubjectSuggestions(id);
 const defaultSaveSubjects = (id: string, choice: { subject_ids: string[]; new_names: string[] }) => saveChosenSubjects(id, choice);
 
-// Library: upload by picking or dropping PDFs (US-2), the upload tray, and the document list. Tabs and filters come later.
-export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retry = defaultRetry, loadLimits = defaultLoadLimits, check = defaultCheck, loadSuggestions = defaultLoadSuggestions, saveSubjects = defaultSaveSubjects, pollMs = 2000 }: Props) {
-  const { documents, unavailable, refresh } = useDocuments(load, pollMs);
+// Library: upload by picking or dropping PDFs (US-2), the upload tray, and the document list narrowed by subject, upload dates and state (US-10). Tabs come later.
+export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSubjects, upload = defaultUpload, retry = defaultRetry, loadLimits = defaultLoadLimits, check = defaultCheck, loadSuggestions = defaultLoadSuggestions, saveSubjects = defaultSaveSubjects, pollMs = 2000 }: Props) {
+  const [filters, setFilters] = useState<DocumentFilters>({});
+  const { documents, applied, unavailable, refresh } = useDocuments(load, pollMs, filters);
+  // The empty states follow the filters the list was loaded with, so clearing never flashes the upload card before the full list arrives.
+  const filtered = hasFilters(filters) || hasFilters(applied);
+  const [subjects, setSubjects] = useState<SubjectResponse[]>([]);
+  const subjectSelect = useRef<HTMLSelectElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState("");
   const [failed, setFailed] = useState<string[]>([]);
@@ -73,11 +83,16 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
     }
   }, [picking]);
 
+  function clearFilters() {
+    setFilters({});
+    subjectSelect.current?.focus(); // the Clear button disappears
+  }
+
   async function onSaved(doc: DocumentResponse) {
     justSaved.current.add(doc.document_id);
     seen.current?.set(doc.document_id, "ready");
     setStatus(`Subjects saved. ${doc.title} is ready to use.`);
-    await refresh();
+    await Promise.all([refresh(), refreshSubjects()]);
   }
 
   // One polite live region carries upload results and processing-state changes (DESIGN.md → Accessibility).
@@ -96,6 +111,22 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
 
   const loadLimitsRef = useRef(loadLimits);
   const alive = useRef(true);
+  // The subject options are the learner's own; a failure keeps the previous options, and the filter still works by state and date.
+  const loadSubjectsRef = useRef(loadSubjects);
+  useEffect(() => {
+    loadSubjectsRef.current = loadSubjects;
+  }, [loadSubjects]);
+  const refreshSubjects = useCallback(async () => {
+    try {
+      const loaded = await loadSubjectsRef.current();
+      if (alive.current) setSubjects(loaded);
+    } catch {
+      // keep the previous options
+    }
+  }, []);
+  useEffect(() => {
+    void refreshSubjects();
+  }, [refreshSubjects]);
   useEffect(() => {
     loadLimitsRef.current = loadLimits; // an inline `loadLimits` must not restart the load
   }, [loadLimits]);
@@ -264,7 +295,7 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
       <PageHeader
         title="Library"
         description="Your documents. They're private to you, and the tutor answers only from them."
-        actions={documents?.length ? <Button variant="primary" icon={Upload} onClick={pick}>Upload</Button> : undefined}
+        actions={documents && (documents.length > 0 || filtered) ? <Button variant="primary" icon={Upload} onClick={pick}>Upload</Button> : undefined}
       />
       <input
         ref={input}
@@ -315,7 +346,13 @@ export function LibraryPage({ load = loadDocuments, upload = defaultUpload, retr
           Can't load your library. Retrying…
         </p>
       )}
-      {documents?.length === 0 && (
+      {documents && (documents.length > 0 || filtered) && <LibraryFilters ref={subjectSelect} filters={filters} onChange={setFilters} subjects={subjects} count={documents.length} onClear={clearFilters} />}
+      {documents?.length === 0 && filtered && (
+        <EmptyState icon={Filter} title="No documents match these filters" actions={<Button onClick={clearFilters}>Clear filters</Button>}>
+          <p>Try another subject, state or a wider date range.</p>
+        </EmptyState>
+      )}
+      {documents?.length === 0 && !filtered && (
         <EmptyState
           variant="dropzone"
           icon={Upload}

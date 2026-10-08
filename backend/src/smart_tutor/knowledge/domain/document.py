@@ -31,6 +31,19 @@ def clean_file_name(raw: str) -> str:
     return name
 
 
+@dataclass(frozen=True)
+class DocumentFilter:
+    """What the Library narrows to (PRD US-10); an empty set or `None` puts no constraint on that part."""
+
+    subject_ids: frozenset[SubjectId] = frozenset()  # a document matches when it has any of them
+    states: frozenset[DocumentState] = frozenset()
+    uploaded_from: datetime | None = None  # inclusive
+    uploaded_before: datetime | None = None  # exclusive
+
+
+NO_FILTER = DocumentFilter()
+
+
 @dataclass
 class Document:
     document_id: DocumentId
@@ -44,6 +57,8 @@ class Document:
     title_override: str | None = None
     content_title: str | None = None  # contents.title, filled when listing; never saved
     content_attempts: int | None = None  # contents.attempts, filled when listing; never saved
+    content_authors: list[str] = field(default_factory=list)  # contents.authors, filled when listing; never saved
+    content_year: int | None = None  # contents.year, filled when listing; never saved
     subject_ids: list[SubjectId] = field(default_factory=list)
     archived: bool = False
 
@@ -74,6 +89,16 @@ class Document:
             and self.state is DocumentState.READY
             and not self.archived
             and not set(subject_ids).isdisjoint(self.subject_ids)
+        )
+
+    def matches(self, document_filter: DocumentFilter) -> bool:
+        """The Library filter (PRD US-10); the SQL `WHERE` of `list_readable_by` is its twin."""
+        f = document_filter
+        return (
+            (not f.subject_ids or not f.subject_ids.isdisjoint(self.subject_ids))
+            and (not f.states or self.state in f.states)
+            and (f.uploaded_from is None or self.created_at >= f.uploaded_from)
+            and (f.uploaded_before is None or self.created_at < f.uploaded_before)
         )
 
     def link_content(self, content_id: ContentId) -> None:

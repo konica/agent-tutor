@@ -5,13 +5,13 @@ from collections.abc import Collection
 from types import TracebackType
 from typing import Any, Self
 
-from sqlalchemy import ColumnElement, Connection, Engine, delete, func, select, text, update
+from sqlalchemy import ColumnElement, Connection, Engine, delete, exists, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 
 from smart_tutor.knowledge.adapters.sql_tables import chunks, contents, document_subjects, documents, uploads
 from smart_tutor.knowledge.domain.chunk import Chunk
 from smart_tutor.knowledge.domain.content import Content, ContentState
-from smart_tutor.knowledge.domain.document import Document, DocumentState
+from smart_tutor.knowledge.domain.document import NO_FILTER, Document, DocumentFilter, DocumentState
 from smart_tutor.knowledge.domain.search import ChunkHit
 from smart_tutor.knowledge.domain.upload import Upload, UploadOutcome
 from smart_tutor.knowledge.ports.library import (
@@ -68,6 +68,8 @@ def _document(row: Any, subject_ids: list[SubjectId]) -> Document:
         title_override=row.title_override,
         content_title=getattr(row, "content_title", None),  # only listings join contents (FOR UPDATE can't)
         content_attempts=getattr(row, "content_attempts", None),
+        content_authors=list(getattr(row, "content_authors", None) or []),
+        content_year=getattr(row, "content_year", None),
         subject_ids=subject_ids,
         archived=row.archived,
     )
@@ -187,18 +189,35 @@ class _Documents(DocumentRepository):
         ).all()
         return self._load(list(rows))
 
-    def list_readable_by(self, user_id: UserId) -> list[Document]:
-        rows = self._conn.execute(
+    def list_readable_by(self, user_id: UserId, document_filter: DocumentFilter = NO_FILTER) -> list[Document]:
+        f = document_filter
+        stmt = (
             select(
                 documents,
                 contents.c.title.label("content_title"),
                 contents.c.attempts.label("content_attempts"),
+                contents.c.authors.label("content_authors"),
+                contents.c.year.label("content_year"),
             )
             .select_from(documents.outerjoin(contents, documents.c.content_id == contents.c.content_id))
             .where(readable_by(user_id), documents.c.archived.is_(False))
             .order_by(documents.c.created_at.desc(), documents.c.document_id)
         )
-        return self._load(list(rows))
+        # The twin of Document.matches: each part applies only when set.
+        if f.subject_ids:
+            stmt = stmt.where(
+                exists().where(
+                    document_subjects.c.document_id == documents.c.document_id,
+                    document_subjects.c.subject_id.in_(f.subject_ids),
+                )
+            )
+        if f.states:
+            stmt = stmt.where(documents.c.state.in_([s.value for s in f.states]))
+        if f.uploaded_from is not None:
+            stmt = stmt.where(documents.c.created_at >= f.uploaded_from)
+        if f.uploaded_before is not None:
+            stmt = stmt.where(documents.c.created_at < f.uploaded_before)
+        return self._load(list(self._conn.execute(stmt)))
 
     def find_readable_by_sha256(self, user_id: UserId, sha256: str) -> DocumentId | None:
         found = self._conn.execute(

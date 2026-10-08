@@ -1,4 +1,5 @@
-from datetime import UTC, datetime
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -13,7 +14,7 @@ from smart_tutor.knowledge.domain.content import (
     pages_key,
     too_many_pages,
 )
-from smart_tutor.knowledge.domain.document import DUPLICATE_UPLOAD, Document, DocumentState
+from smart_tutor.knowledge.domain.document import DUPLICATE_UPLOAD, Document, DocumentFilter, DocumentState
 from smart_tutor.knowledge.domain.errors import (
     ContentStateError,
     DocumentStateError,
@@ -318,3 +319,49 @@ def test_only_a_failed_document_with_content_can_retry() -> None:
     doc.fail("Duplicate uploads aren't supported yet")  # failed, but no content
     with pytest.raises(DocumentStateError):
         doc.retry()
+
+
+def _listed(state: DocumentState, subjects: list[str], created_at: datetime) -> Document:
+    doc = new_document()
+    doc.state, doc.created_at = state, created_at
+    doc.subject_ids = [SubjectId(s) for s in subjects]
+    return doc
+
+
+def test_an_empty_filter_matches_every_document() -> None:
+    assert _listed(DocumentState.FAILED, [], NOW).matches(DocumentFilter())
+
+
+def test_a_filter_matches_a_document_with_any_of_its_subjects() -> None:
+    doc = _listed(DocumentState.READY, ["s1", "s2"], NOW)
+    assert doc.matches(DocumentFilter(subject_ids=frozenset({SubjectId("s2"), SubjectId("s9")})))
+    assert not doc.matches(DocumentFilter(subject_ids=frozenset({SubjectId("s9")})))
+    no_subjects = _listed(DocumentState.PROCESSING, [], NOW)
+    assert not no_subjects.matches(DocumentFilter(subject_ids=frozenset({SubjectId("s1")})))
+
+
+def test_a_filter_matches_any_of_its_states() -> None:
+    doc = _listed(DocumentState.READY, [], NOW)
+    assert doc.matches(DocumentFilter(states=frozenset({DocumentState.READY, DocumentState.FAILED})))
+    assert not doc.matches(DocumentFilter(states=frozenset({DocumentState.FAILED})))
+
+
+def test_the_upload_range_includes_its_start_and_excludes_its_end() -> None:
+    doc = _listed(DocumentState.READY, [], NOW)
+    assert doc.matches(DocumentFilter(uploaded_from=NOW))
+    assert not doc.matches(DocumentFilter(uploaded_from=NOW + timedelta(seconds=1)))
+    assert doc.matches(DocumentFilter(uploaded_before=NOW + timedelta(seconds=1)))
+    assert not doc.matches(DocumentFilter(uploaded_before=NOW))
+
+
+def test_a_filter_needs_every_part_to_match() -> None:
+    doc = _listed(DocumentState.READY, ["s1"], NOW)
+    both = DocumentFilter(
+        subject_ids=frozenset({SubjectId("s1")}),
+        states=frozenset({DocumentState.READY}),
+        uploaded_from=NOW - timedelta(days=1),
+        uploaded_before=NOW + timedelta(days=1),
+    )
+    assert doc.matches(both)
+    assert not doc.matches(replace(both, states=frozenset({DocumentState.FAILED})))
+    assert not doc.matches(replace(both, uploaded_before=NOW))

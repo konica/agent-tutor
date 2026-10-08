@@ -3,12 +3,17 @@ import { FileText, RefreshCw } from "lucide-react";
 import type { DocumentResponse } from "../../api/documents";
 import { Button } from "../../components/Button/Button";
 import { StateBadge } from "../../components/StateBadge/StateBadge";
+import { APP_TIME_ZONE } from "../../time";
+import { byline } from "./byline";
 import styles from "./DocumentTable.module.css";
+
+// Calendar day in the app time zone (PRD D27), so the shown day matches the filter days.
+const dayKey = (date: Date) => date.toLocaleDateString("en-CA", { timeZone: APP_TIME_ZONE });
 
 function uploadedOn(iso: string, now = new Date()): string {
   const date = new Date(iso);
-  if (date.toDateString() === now.toDateString()) return "Today";
-  return date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  if (dayKey(date) === dayKey(now)) return "Today";
+  return date.toLocaleDateString(undefined, { timeZone: APP_TIME_ZONE, day: "numeric", month: "short", year: "numeric" });
 }
 
 const NONE: ReadonlySet<string> = new Set();
@@ -53,14 +58,19 @@ export function DocumentTable({ documents, onRetry, retrying, onChooseSubjects, 
         </tr>
       </thead>
       <tbody>
-        {documents.map((doc) => (
+        {documents.map((doc) => {
+          const by = byline(doc.authors, doc.year);
+          return (
           <tr key={doc.document_id} id={`document-${doc.document_id}`}>
             <td>
               <span className={styles.doc}>
                 <span className={styles.fileIcon}>
                   <FileText strokeWidth={1.5} aria-hidden="true" />
                 </span>
-                <span className={styles.title}>{doc.title}</span>
+                <span className={styles.titleStack}>
+                  <span className={styles.title}>{doc.title}</span>
+                  {by && <span className={styles.byline}>{by}</span>}
+                </span>
               </span>
             </td>
             <td className={doc.subjects.length ? undefined : styles.muted}>{doc.subjects.map((s) => s.name).join(", ") || "Not chosen yet"}</td>
@@ -81,7 +91,8 @@ export function DocumentTable({ documents, onRetry, retrying, onChooseSubjects, 
               )}
             </td>
           </tr>
-        ))}
+          );
+        })}
       </tbody>
     </table>
   );

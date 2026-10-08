@@ -1,4 +1,5 @@
 import hashlib
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -8,6 +9,7 @@ from fakes import (
     FakeObjectStore,
     FakeQueue,
     FakeTokenVerifier,
+    FixedClock,
     InMemoryLibrary,
     api_services,
     fake_tools,
@@ -270,3 +272,107 @@ def test_the_subject_routes_need_a_token(client: TestClient) -> None:
 
     assert client.get(f"/documents/{doc}/subject-suggestions").status_code == 401
     assert client.put(f"/documents/{doc}/subjects", json={"new_names": ["X"]}).status_code == 401
+
+
+GENERAL = "00000000-0000-4000-8000-000000000001"
+OTHER = "00000000-0000-4000-8000-0000000000ff"
+
+
+def library_of_three(client: TestClient) -> dict[str, str]:
+    """A ready document (General), one awaiting subjects, and one still processing; ids by state."""
+    ready = awaiting_document(client)
+    client.put(f"/documents/{ready}/subjects", json={"subject_ids": [GENERAL]}, headers=AUTH)
+    awaiting = awaiting_document(client)
+    processing = client.post("/uploads", json={"file_name": "new.pdf"}, headers=AUTH).json()["document_id"]
+    return {"ready": ready, "awaiting_subjects": awaiting, "processing": processing}
+
+
+def listed_ids(client: TestClient, params: dict[str, str] | list[tuple[str, str]]) -> set[str]:
+    r = client.get("/documents", headers=AUTH, params=params)
+    assert r.status_code == 200
+    return {d["document_id"] for d in r.json()}
+
+
+def test_documents_carry_authors_and_year(client: TestClient) -> None:
+    awaiting_document(client)
+    client.post("/uploads", json={"file_name": "new.pdf"}, headers=AUTH)
+
+    by_title = {d["title"]: d for d in client.get("/documents", headers=AUTH).json()}
+
+    processed = next(d for d in by_title.values() if d["state"] == "awaiting_subjects")
+    assert (processed["authors"], processed["year"]) == (["Ashish Vaswani", "Noam Shazeer"], 2017)
+    assert (by_title["new.pdf"]["authors"], by_title["new.pdf"]["year"]) == ([], None)
+
+
+def test_no_filter_lists_everything(client: TestClient) -> None:
+    ids = library_of_three(client)
+    assert listed_ids(client, {}) == set(ids.values())
+
+
+def test_filter_by_state(client: TestClient) -> None:
+    ids = library_of_three(client)
+    assert listed_ids(client, {"state": "ready"}) == {ids["ready"]}
+    both = [("state", "ready"), ("state", "processing")]
+    assert listed_ids(client, both) == {ids["ready"], ids["processing"]}
+
+
+def test_filter_by_subject(client: TestClient) -> None:
+    ids = library_of_three(client)
+    assert listed_ids(client, {"subject_id": GENERAL}) == {ids["ready"]}
+    assert listed_ids(client, {"subject_id": OTHER}) == set()
+
+
+def test_repeated_subject_id_matches_any_of_them(client: TestClient) -> None:
+    ids = library_of_three(client)
+    assert listed_ids(client, [("subject_id", OTHER), ("subject_id", GENERAL)]) == {ids["ready"]}
+
+
+def test_filter_by_upload_dates_in_gmt_plus_7(client: TestClient) -> None:
+    ids = library_of_three(client)  # all uploaded at 2026-10-04T09:00Z, which is 16:00 on Oct 4 in GMT+7
+    everything = set(ids.values())
+    assert listed_ids(client, {"uploaded_from": "2026-10-04", "uploaded_to": "2026-10-04"}) == everything
+    assert listed_ids(client, {"uploaded_from": "2026-10-05"}) == set()
+    assert listed_ids(client, {"uploaded_to": "2026-10-03"}) == set()
+    assert listed_ids(client, {"uploaded_from": "2026-10-01", "uploaded_to": "2026-10-04"}) == everything
+
+
+def test_filters_combine(client: TestClient) -> None:
+    ids = library_of_three(client)
+    params = {"subject_id": GENERAL, "state": "ready", "uploaded_from": "2026-10-04", "uploaded_to": "2026-10-04"}
+    assert listed_ids(client, params) == {ids["ready"]}
+    assert listed_ids(client, {**params, "state": "failed"}) == set()
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"subject_id": "not-a-uuid"},
+        {"state": "archived"},
+        {"uploaded_from": "yesterday"},
+        {"uploaded_to": "2026-13-45"},
+    ],
+)
+def test_a_malformed_filter_is_422(client: TestClient, params: dict[str, str]) -> None:
+    assert client.get("/documents", headers=AUTH, params=params).status_code == 422
+
+
+def test_more_than_100_subject_ids_is_422(client: TestClient) -> None:
+    params = [("subject_id", f"00000000-0000-4000-8000-{n:012d}") for n in range(101)]
+    assert client.get("/documents", headers=AUTH, params=params).status_code == 422
+
+
+def test_upload_date_filter_uses_the_gmt_plus_7_day_at_the_boundary() -> None:
+    verifier = FakeTokenVerifier()
+    verifier.add("ada-token", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
+    clock = FixedClock(datetime(2026, 10, 1, 17, 30, tzinfo=UTC))  # 00:30 on Oct 2 in GMT+7
+    services = api_services(InMemoryLibrary(), FakeObjectStore(), queue=FakeQueue(), clock=clock)
+    boundary = TestClient(create_app(Settings(), verifier=verifier, services=services))
+    document_id = boundary.post("/uploads", json={"file_name": "late.pdf"}, headers=AUTH).json()["document_id"]
+
+    assert listed_ids(boundary, {"uploaded_to": "2026-10-01"}) == set()
+    assert listed_ids(boundary, {"uploaded_from": "2026-10-02", "uploaded_to": "2026-10-02"}) == {document_id}
+
+
+def test_a_range_with_from_after_to_is_empty_not_an_error(client: TestClient) -> None:
+    library_of_three(client)
+    assert listed_ids(client, {"uploaded_from": "2026-10-05", "uploaded_to": "2026-10-01"}) == set()
