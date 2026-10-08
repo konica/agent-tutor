@@ -906,5 +906,10 @@ button.cp-row:hover { background: var(--surface-2); color: var(--text); }
 .chat-v10 .thread-head .th-title-btn { flex: 0 1 auto; min-width: 0; max-width: 100%; width: auto; }
 .chat-v10 .thread-head .th-title-text { flex: 0 1 auto; min-width: 0; max-width: none; }
 
+/* P7 · Library: the title is a link to the viewer; ready rows show "Chat" */
+a.doc-title { color: var(--text); text-decoration: none; }
+a.doc-title:hover { color: var(--accent-text); text-decoration: underline; text-underline-offset: 3px; }
+.lib-row .row-actions .btn-sm { min-height: 28px; height: 28px; }
+
 /* Programmatic focus on <main> after a route change is for screen readers; it needs no visible ring. */
 main[tabindex="-1"]:focus, main[tabindex="-1"]:focus-visible { outline: none; }

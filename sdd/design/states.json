@@ -221,7 +221,7 @@
     "id": "library-more-menu",
     "group": "Library",
     "ref": "§6.3 · US-10c",
-    "desc": "“More” menu with “Ask about this” and Delete (K4); a processing row offers neither.",
+    "desc": "“More” menu of a ready row: Details, Change subjects, Edit title, Archive, Delete (K4); ready rows show “Chat” and the title opens the viewer (P7). A processing row offers no Delete.",
     "release": 1,
     "stories": [
       "US-10"

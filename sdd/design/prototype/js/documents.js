@@ -206,13 +206,13 @@
     if (d.archived) primary = `<button class="btn btn-secondary btn-sm" type="button" data-action="doc-restore" data-id="${d.id}" aria-label="Restore ${esc(d.title)}">${ic('restore', 'sm')}Restore</button>`;
     else if (needs) primary = `<button class="btn btn-primary btn-sm" type="button" data-action="choose-one" data-id="${d.id}" data-fk="choose-${d.id}" aria-label="Choose subjects for ${esc(d.title)}">Choose subjects</button>`;
     else if (d.state === 'failed' && (d.attempts || 0) < 3) primary = `<button class="btn btn-secondary btn-sm" type="button" data-action="doc-retry" data-id="${d.id}" data-fk="retry-${d.id}" aria-label="Retry ${esc(d.title)}">${ic('retry', 'sm')}Retry</button>`;
-    else primary = `<button class="btn btn-quiet btn-sm" type="button" data-action="open-doc" data-id="${d.id}" aria-label="Open ${esc(d.title)}">Open</button>`;
+    else if (d.state === 'ready') primary = `<button class="btn btn-secondary btn-sm" type="button" data-action="ask-about" data-id="${d.id}" data-fk="chat-${d.id}" aria-label="Chat about ${esc(d.title)}" data-od-id="row-chat-${d.id}">${ic('message', 'sm')}Chat</button>`; /* P7 */
+    else primary = ''; /* processing, uploading, failed after 3 attempts: no row action */
     const open = S.rowMenu === d.id;
     const canChange = d.subjects.length && !d.archived && d.state === 'ready'; // E7: archived → Restore first
     const menu = open ? `<div class="row-menu" role="menu" aria-label="Actions for ${esc(d.title)}">
-      <button class="menu-item" role="menuitem" type="button" data-action="open-doc" data-id="${d.id}">${ic('doc')}Open details</button>
+      <button class="menu-item" role="menuitem" type="button" data-action="open-doc" data-id="${d.id}">${ic('info')}Details</button>
       ${canChange ? `<button class="menu-item" role="menuitem" type="button" data-action="change-subjects" data-id="${d.id}">${ic('tag')}Change subjects</button>` : ''}
-      ${!d.archived && d.state === 'ready' ? `<button class="menu-item" role="menuitem" type="button" data-action="ask-about" data-id="${d.id}" data-od-id="row-menu-ask">${ic('message')}Ask about this</button>` : ''}
       ${!d.archived && d.state !== 'failed' ? `<button class="menu-item" role="menuitem" type="button" data-action="edit-title" data-id="${d.id}">${ic('pen')}Edit title</button>` : ''}
       ${d.state === 'failed' && (d.attempts || 0) < 3 && !d.archived ? `<button class="menu-item" role="menuitem" type="button" data-action="doc-retry" data-id="${d.id}">${ic('retry')}Retry</button>` : ''}
       ${d.archived ? `<button class="menu-item" role="menuitem" type="button" data-action="doc-restore" data-id="${d.id}">${ic('restore')}Restore</button>` : `<button class="menu-item" role="menuitem" type="button" data-action="doc-archive" data-id="${d.id}">${ic('archive')}Archive</button>`}
@@ -220,7 +220,7 @@
     </div>` : '';
     return `<div class="lib-row ${needs ? 'needs' : ''} ${d.archived ? 'is-archived' : ''} ${d.state === 'failed' ? 'is-failed' : ''} ${open ? 'menu-open' : ''}" role="row" data-od-id="library-row-${d.id}">
       <div class="doc-cell" role="cell"><span class="doc-icon">${ic(d.book ? 'book' : 'doc')}</span>
-        <div class="od-stack" style="--od-gap:2px"><button class="doc-title" type="button" data-action="open-doc" data-id="${d.id}" data-fk="title-${d.id}" title="${esc(d.title)}">${esc(d.title)}</button><span class="doc-meta">${docMeta(d)}</span></div></div>
+        <div class="od-stack" style="--od-gap:2px">${['ready', 'choose'].includes(d.state) ? `<a class="doc-title" href="#/library-default" data-action="title-view" data-id="${d.id}" data-fk="title-${d.id}" title="${esc(d.title)}" aria-label="${esc(d.title)}, open in the document viewer">${esc(d.title)}</a>` : `<button class="doc-title" type="button" data-action="open-doc" data-id="${d.id}" data-fk="title-${d.id}" title="${esc(d.title)}">${esc(d.title)}</button>`}<span class="doc-meta">${docMeta(d)}</span></div></div>
       <div role="cell" class="subj-cell">${d.subjects.length ? subjChips(d.subjects) : `<span class="nc">${d.state === 'failed' ? '—' : 'Not chosen yet'}</span>`}</div>
       <div role="cell" class="state-cell">${ST.stateBadge(d)}</div>
       <div class="row-meta row-date" role="cell">${ST.fmtDate(d.uploaded, false)}</div>
@@ -233,6 +233,7 @@
     'row-more': (el) => { const id = el.dataset.id; S.rowMenu = S.rowMenu === id ? null : id; ST.render(); const m = document.querySelector('.row-menu .menu-item'); if (m) m.focus(); },
     upload: () => { if (S.uploadLimit) return; document.getElementById('file-input').click(); },
     'open-doc': (el) => { S.rowMenu = null; ST.openDetails(el.dataset.id); },
+    'title-view': (el, e) => { if (e) e.preventDefault(); S.rowMenu = null; ST.openViewer(el.dataset.id, { page: 1, from: 'library' }); }, /* P7: the title opens the viewer overlay */
     'edit-title': (el) => { S.rowMenu = null; ST.openDetails(el.dataset.id, { editing: true }); },
     'choose-one': (el) => { const id = el.dataset.id; ST.openPicker([id, ...S.docs.filter((d) => !d.archived && !d.deleted && d.state === 'choose' && d.id !== id).map((d) => d.id)]); },
     'choose-all': () => ST.openPicker(S.docs.filter((d) => !d.archived && d.state === 'choose').map((d) => d.id)),

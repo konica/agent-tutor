@@ -69,7 +69,7 @@
     lib('US-10', 'After archiving ReAct (J4): find it under Archived.', () => { doc('d3').archived = true; ST.L.tab = 'archived'; }, { id: 'library-archived-after-archive' }),
     lib('US-10', 'No results: “No documents match these filters” and Clear filters.', () => { Object.assign(ST.L, { subject: 'rl', from: '2026-10-01' }); }, { id: 'library-no-results' }),
     lib('US-10', 'Filtered by subject (matches any of a document\'s subjects).', () => { ST.L.subject = 'agents'; }, { id: 'library-filtered-by-subject' }),
-    lib('US-10c', '“More” menu with “Ask about this” and Delete (K4); a processing row offers neither.', () => { S.rowMenu = 'd2'; }, { id: 'library-more-menu' }),
+    lib('US-10c', '“More” menu of a ready row: Details, Change subjects, Edit title, Archive, Delete (K4); ready rows show “Chat” and the title opens the viewer (P7). A processing row offers no Delete.', () => { S.rowMenu = 'd2'; }, { id: 'library-more-menu' }),
     lib('US-10c', 'Delete confirmation: Cancel focused, Delete in danger style, “Archive instead” under the warning. The same dialog opens from details.', null, { id: 'library-delete-confirm', afterEnter: () => ST.confirmDelete('d2') }),
     lib('US-10c', 'Deleted: the row is gone and “Chain-of-Thought Prompting… deleted.” confirms it. No undo.', () => { ST.deleteDoc(doc('d2')); }, { id: 'library-deleted' }),
     lib('US-2', 'Upload limit reached: hourly “You can upload again at 11:40 (GMT+7)”, daily “You can upload again at 00:00 (GMT+7)”; Upload disabled.', () => { S.uploadLimit = true; }, { id: 'library-rate-limited' }),
