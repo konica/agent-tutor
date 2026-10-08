@@ -8,6 +8,7 @@ a few minutes. Exit 0 when all checks pass, 1 otherwise. Standard library only; 
 """
 
 import argparse
+import http.client
 import json
 import sys
 import time
@@ -66,9 +67,12 @@ def check_issuer(base: str) -> str | None:
     if r.status != 200:
         return f"openid-configuration gave {r.status}, expected 200"
     try:
-        issuer = json.loads(r.body).get("issuer")
+        document = json.loads(r.body)
     except ValueError:
         return "openid-configuration is not JSON"
+    if not isinstance(document, dict):
+        return "openid-configuration is not a JSON object"
+    issuer = document.get("issuer")
     return (
         None if issuer == expected else f"issuer is {issuer!r}, expected {expected!r}"
     )
@@ -83,7 +87,7 @@ def run_checks(url: str) -> list[str]:
     for check in CHECKS:
         try:
             failure = check(base)
-        except (urllib.error.URLError, OSError) as e:
+        except (http.client.HTTPException, OSError) as e:
             failure = f"{check.__name__}: {e}"
         if failure:
             failures.append(failure)

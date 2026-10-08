@@ -1,5 +1,6 @@
 """The post-deploy smoke test (deploy/pilot/smoke_test.py) against a local fake of the public address."""
 
+import http.client
 import importlib.util
 import json
 import threading
@@ -157,3 +158,36 @@ def test_gives_up_with_the_failing_checks(site, capsys) -> None:
     )
     out = capsys.readouterr().out
     assert "/api/me" in out and "openid-configuration" in out
+
+
+@pytest.mark.parametrize("body", [b"[]", b"null"])
+def test_discovery_document_that_is_not_an_object_fails_without_raising(
+    site, body
+) -> None:
+    base, set_routes, _ = site
+    routes = healthy(base)
+    routes["/auth/realms/smart-tutor/.well-known/openid-configuration"] = (
+        200,
+        {"Content-Type": "application/json"},
+        body,
+    )
+    set_routes(routes)
+    failures = smoke.run_checks(base)
+    assert len(failures) == 1 and "openid-configuration" in failures[0]
+
+
+def test_broken_response_body_fails_one_check_and_the_rest_still_run(
+    site, monkeypatch
+) -> None:
+    base, set_routes, _ = site
+    set_routes(healthy(base))
+    real_fetch = smoke.fetch
+
+    def truncated_health(url: str) -> smoke.Response:
+        if url.endswith("/api/healthz"):
+            raise http.client.IncompleteRead(b"")
+        return real_fetch(url)
+
+    monkeypatch.setattr(smoke, "fetch", truncated_health)
+    failures = smoke.run_checks(base)
+    assert len(failures) == 1 and "check_health" in failures[0]
