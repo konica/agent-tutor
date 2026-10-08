@@ -6,7 +6,14 @@ from langchain_core.messages import AIMessage
 
 from evals.corpus_index import CorpusIndex, IndexedChunk
 from evals.detection_dataset import dump_items, load_items
-from evals.generators.subject_detection import SINGLE_PROMPT, generate, make_learners
+from evals.generators.subject_detection import (
+    AMBIGUOUS_PROMPT,
+    MULTI_PROMPT,
+    SINGLE_PROMPT,
+    generate,
+    looks_like_references,
+    make_learners,
+)
 from evals.seed_corpus.manifest import SeedDocument
 from fakes import fake_chat_model
 
@@ -100,3 +107,37 @@ def test_empty_replies_are_retried_and_unclosed_think_is_stripped() -> None:
     )
     items = generate(index, learners, model, random.Random(3), {"single": (1, 0)})
     assert [i.question for i in items] == ["What is a graph?"]
+
+
+REFS = (
+    "[1] Vaswani, A., et al. Attention is all you need. In Proc. NeurIPS, 2017. pp. 5998-6008.\n"
+    "[2] Devlin, J., et al. BERT. arXiv preprint arXiv:1810.04805, 2018.\n"
+    "[3] He, K., et al. Deep residual learning. In Proceedings of CVPR, 2016. " + "x" * 200
+)
+PROSE_ONE_YEAR = (
+    "Attention layers have replaced recurrence in most models since the transformer. " * 4 + "It appeared in 2017."
+)
+
+
+def test_reference_chunks_are_detected_and_prose_with_one_year_is_not() -> None:
+    assert looks_like_references(REFS)
+    assert looks_like_references("References\n[1] Some paper " + "x" * 300)
+    assert not looks_like_references(PROSE_ONE_YEAR)
+
+
+def test_generate_skips_reference_chunks() -> None:
+    chunks = [IndexedChunk(f"{k}:0", k, 1, LONG) for k in DOCS] + [IndexedChunk(f"{k}:ref", k, 2, REFS) for k in DOCS]
+    index = CorpusIndex(DOCS, chunks, np.zeros((len(chunks), 2)))
+    learners = make_learners(list(DOCS.values()), random.Random(2), 6)
+    counts = {"single": (5, 5), "multi": (3, 3)}
+    items = generate(index, learners, fake_chat_model(*replies(20)), random.Random(3), counts)
+    assert all(not c.endswith(":ref") for i in items for c in i.source_chunks)
+
+
+def test_prompts_keep_passages_quoted_and_set_kind_specific_rules() -> None:
+    for prompt in (SINGLE_PROMPT, MULTI_PROMPT, AMBIGUOUS_PROMPT):
+        assert "{passages}" in prompt and "quoted data" in prompt and "Reply with the question only." in prompt
+        assert "by number" in prompt
+    assert "self-contained" in SINGLE_PROMPT and "names the specific concept" in SINGLE_PROMPT
+    assert "names one concept from each" in MULTI_PROMPT and "comparison or contrast" in MULTI_PROMPT
+    assert "Do not name any field" in AMBIGUOUS_PROMPT and "How was the model evaluated?" in AMBIGUOUS_PROMPT
