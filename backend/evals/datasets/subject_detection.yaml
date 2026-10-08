@@ -9,12 +9,13 @@ items:
   - jin-2023
   - pinkovich-2025
   - ting-2025
-  question: How does the mapping network transform the visual embedding in the described process?
+  question: What is the purpose of using a small dataset of captioned images in the supervised training
+    stage of a vision-language model?
   expected_subjects:
   - Computer vision
   - Natural language processing
   source_chunks:
-  - jin-2023:9
+  - jin-2023:8
 - id: single-002
   kind: single
   smoke: true
@@ -22,12 +23,12 @@ items:
   - hirasawa-2020
   - pilva-2022
   - zwennicker-2022
-  question: What is the range of the Dirichlet boundary conditions used in the simulations described in
-    the passage?
+  question: What is the minimum number of input frames required for reliable prediction on different geometries
+    in frame prediction tasks?
   expected_subjects:
   - Graph neural networks
   source_chunks:
-  - pilva-2022:25
+  - pilva-2022:32
 - id: single-003
   kind: single
   smoke: true
@@ -37,12 +38,12 @@ items:
   - jia-2026
   - pilva-2022
   - pinkovich-2025
-  question: What is the dimension of the decoder state in the model described?
+  question: What is the role of video and imagery encoders in a video-guided machine translation system?
   expected_subjects:
   - Computer vision
   - Natural language processing
   source_chunks:
-  - hirasawa-2020:11
+  - hirasawa-2020:7
 - id: single-004
   kind: single
   smoke: true
@@ -53,12 +54,12 @@ items:
   - hirasawa-2020
   - liu-2026
   - wang-2025
-  question: What does the theorem suggest about the relationship between optimizing the value network
-    and the policy network in terms of steps and learning rates?
+  question: How does improving value estimation affect the performance of the Vanilla Policy Gradient
+    method in reinforcement learning?
   expected_subjects:
   - Reinforcement learning
   source_chunks:
-  - wang-2025:31
+  - wang-2025:25
 - id: single-005
   kind: single
   smoke: true
@@ -69,12 +70,13 @@ items:
   - liu-2026
   - pilva-2022
   - vasilev-2021
-  question: How does the mapping network transform the visual embedding in the described model?
+  question: What is the role of the supervised training stage in establishing a baseline proficiency for
+    a model using the CLIP model and a small dataset of captioned images?
   expected_subjects:
   - Computer vision
   - Natural language processing
   source_chunks:
-  - jin-2023:9
+  - jin-2023:8
 - id: single-006
   kind: single
   smoke: true
@@ -84,11 +86,12 @@ items:
   - pinkovich-2025
   - tolmachev-2021
   - wang-2025
-  question: What issues did the SegFormer MIT-B3 model face in predicting terrain types in the given examples?
+  question: What factors influence the performance of semantic segmentation models like Mask2Former and
+    SegFormer-B3 on different object categories?
   expected_subjects:
   - Computer vision
   source_chunks:
-  - pinkovich-2025:64
+  - pinkovich-2025:41
 - id: single-007
   kind: single
   smoke: true
@@ -98,76 +101,47 @@ items:
   - jia-2026
   - pilva-2022
   - pinkovich-2025
-  question: What are some key features of the datasets related to MESSI that are summarized in Table 1?
+  question: What is the purpose of comparing horizontal trajectories at different elevations in the study
+    of Agamim and Ir Yamim paths?
   expected_subjects:
   - Computer vision
   source_chunks:
-  - pinkovich-2025:9
+  - pinkovich-2025:62
 - id: single-008
   kind: single
   smoke: true
   learner_documents:
-  - chakravarthi-2020
+  - cha-2021
   - cordonnier-2023
-  - hirasawa-2020
   - jia-2026
+  - jin-2023
   - liu-2026
-  question: What are some examples of resources or methods used for machine translation evaluation and
-    improvement mentioned in the provided references?
+  - nachmani-2020
+  - pinkovich-2025
+  question: What is the Gumbel-Softmax method used for in the context of training models with discrete
+    variables?
   expected_subjects:
+  - Computer vision
   - Natural language processing
   source_chunks:
-  - chakravarthi-2020:94
+  - jin-2023:7
 - id: single-009
   kind: single
   smoke: true
   learner_documents:
+  - cordonnier-2023
   - fang-2021
-  - hirasawa-2020
-  - jia-2026
-  - pilva-2022
+  - gooding-2023
+  - nachmani-2020
   - pinkovich-2025
-  question: How does the passage explain the use of graph neural networks in approximating differential
-    operators in PDEs?
+  - sidahmed-2024
+  question: How does the use of hypernetworks with a stabilization mechanism improve performance in molecule
+    prediction tasks and decoding linear block codes?
   expected_subjects:
   - Graph neural networks
   source_chunks:
-  - pilva-2022:16
+  - nachmani-2020:31
 - id: single-010
-  kind: single
-  smoke: true
-  learner_documents:
-  - fang-2021
-  - jia-2026
-  - jin-2023
-  - liu-2026
-  - pilva-2022
-  - vasilev-2021
-  question: What is Retrieval-Guided Refinement for Image Captioning (Re 3Cap), and how does it aim to
-    improve image captioning in LVLMs?
-  expected_subjects:
-  - Computer vision
-  - Natural language processing
-  - Reinforcement learning
-  source_chunks:
-  - jia-2026:15
-- id: single-011
-  kind: single
-  smoke: true
-  learner_documents:
-  - cordonnier-2023
-  - croce-2023
-  - fu-2021
-  - hirasawa-2020
-  - liu-2026
-  - wang-2025
-  question: Why is it easier to classify machine-translated (MT) sentences than human-translated (HT)
-    ones, and how does lexical diversity affect this?
-  expected_subjects:
-  - Natural language processing
-  source_chunks:
-  - fu-2021:33
-- id: single-012
   kind: single
   smoke: true
   learner_documents:
@@ -175,43 +149,78 @@ items:
   - hirasawa-2020
   - nachmani-2020
   - ting-2025
-  question: How are the video representations made position-aware in the model?
+  question: How does the described model combine textual and video context vectors during decoding using
+    attention mechanisms?
   expected_subjects:
   - Computer vision
   - Natural language processing
   source_chunks:
-  - hirasawa-2020:4
-- id: single-013
+  - hirasawa-2020:5
+- id: single-011
   kind: single
-  smoke: false
+  smoke: true
+  learner_documents:
+  - cha-2021
+  - cordonnier-2023
+  - jia-2026
+  - jin-2023
+  - liu-2026
+  - nachmani-2020
+  - pinkovich-2025
+  question: What is the continuous counterpart of an MPGNN, and how is it defined in terms of convergence
+    and expectation?
+  expected_subjects:
+  - Graph neural networks
+  source_chunks:
+  - cordonnier-2023:52
+- id: single-012
+  kind: single
+  smoke: true
   learner_documents:
   - croce-2023
   - gooding-2023
   - pinkovich-2025
   - tolmachev-2021
   - wang-2025
-  question: What is the main goal of the approach described in the study material?
+  question: What is the role of the RTK INS/GPS algorithm in the data collection process using the DJI
+    MAVIC 2 PRO drone?
   expected_subjects:
-  - Graph neural networks
+  - Computer vision
   source_chunks:
-  - tolmachev-2021:26
+  - pinkovich-2025:17
+- id: single-013
+  kind: single
+  smoke: false
+  learner_documents:
+  - cha-2021
+  - hirasawa-2020
+  - jia-2026
+  - jin-2023
+  - liu-2024
+  - nachmani-2020
+  question: What is the impact of using different types of video features, such as object and scene features,
+    on the performance of a translation system when combined with textual features?
+  expected_subjects:
+  - Computer vision
+  - Natural language processing
+  source_chunks:
+  - hirasawa-2020:13
 - id: single-014
   kind: single
   smoke: false
   learner_documents:
+  - chakravarthi-2020
   - cordonnier-2023
-  - fang-2021
+  - hirasawa-2020
   - jia-2026
-  - jin-2023
-  - pinkovich-2025
-  - ting-2025
-  question: What are some recent advancements in improving multi-modal models and evaluating their performance?
+  - liu-2026
+  question: What is Re3Cap and how does it improve image captioning with LVLMs?
   expected_subjects:
   - Computer vision
   - Natural language processing
   - Reinforcement learning
   source_chunks:
-  - jia-2026:49
+  - jia-2026:45
 - id: single-015
   kind: single
   smoke: false
@@ -220,42 +229,41 @@ items:
   - hirasawa-2020
   - nachmani-2020
   - ting-2025
-  question: Why is it difficult to evaluate the quality of a summary using human feedback?
+  question: What is the role of action maps in image-level reinforcement learning, and how do they help
+    reduce the action sampling space?
   expected_subjects:
-  - Natural language processing
+  - Computer vision
   - Reinforcement learning
   source_chunks:
-  - gooding-2023:9
+  - ting-2025:18
 - id: single-016
   kind: single
   smoke: false
   learner_documents:
-  - chakravarthi-2020
-  - cordonnier-2023
-  - hirasawa-2020
-  - jia-2026
-  - liu-2026
-  question: What are some methods used to improve machine translation between closely-related languages?
+  - gooding-2023
+  - pinkovich-2025
+  - vasilev-2021
+  - zwennicker-2022
+  question: What is the impact of omitting the "Building" category on the performance of the SegFormer-B3
+    model in a semantic segmentation task?
   expected_subjects:
-  - Natural language processing
+  - Computer vision
   source_chunks:
-  - chakravarthi-2020:40
+  - pinkovich-2025:36
 - id: single-017
   kind: single
   smoke: false
   learner_documents:
-  - cordonnier-2023
-  - fang-2021
-  - jia-2026
-  - jin-2023
-  - pinkovich-2025
-  - ting-2025
-  question: What are some common themes or topics covered in the listed research works?
+  - hirasawa-2020
+  - pilva-2022
+  - zwennicker-2022
+  question: What is the role of positional encoding in the processing of video representations in a sequence
+    modeling task?
   expected_subjects:
   - Computer vision
   - Natural language processing
   source_chunks:
-  - jin-2023:22
+  - hirasawa-2020:4
 - id: single-018
   kind: single
   smoke: false
@@ -266,26 +274,29 @@ items:
   - jin-2023
   - pinkovich-2025
   - ting-2025
-  question: What equipment and methods were used to collect the images in Agamim’s dataset?
+  question: What is the self-supervised image captioning method introduced in the text, and how does it
+    differ from supervised methods in terms of the language used in generated descriptions?
   expected_subjects:
   - Computer vision
+  - Natural language processing
   source_chunks:
-  - pinkovich-2025:17
+  - jin-2023:18
 - id: single-019
   kind: single
   smoke: false
   learner_documents:
-  - croce-2023
-  - gooding-2023
+  - cordonnier-2023
+  - fang-2021
+  - jia-2026
+  - jin-2023
   - pinkovich-2025
-  - tolmachev-2021
-  - wang-2025
-  question: What is the difference in altitude and image overlap between the horizontal and vertical trajectory
-    sequences described in the material?
+  - ting-2025
+  question: What is the purpose of the MESSI dataset in the context of evaluating semantic segmentation
+    algorithms?
   expected_subjects:
   - Computer vision
   source_chunks:
-  - pinkovich-2025:16
+  - pinkovich-2025:43
 - id: single-020
   kind: single
   smoke: false
@@ -296,44 +307,43 @@ items:
   - liu-2026
   - pilva-2022
   - vasilev-2021
-  question: What is a common issue with current methods for improving image captioning in large vision-language
-    models, and how do they attempt to address it?
+  question: How does the MPGNN model generalize to new physical domains when trained on a square domain?
   expected_subjects:
-  - Computer vision
-  - Natural language processing
-  - Reinforcement learning
+  - Graph neural networks
   source_chunks:
-  - jia-2026:3
+  - pilva-2022:30
 - id: single-021
   kind: single
   smoke: false
   learner_documents:
   - fang-2021
-  - hirasawa-2020
   - jia-2026
+  - jin-2023
+  - liu-2026
   - pilva-2022
-  - pinkovich-2025
-  question: What is the role of semantic constraints in improving large-scale structure from motion for
-    aerial images?
+  - vasilev-2021
+  question: What is the process for building a k-core of a bipartite graph, and how is it applied in the
+    example with k=2?
   expected_subjects:
   - Computer vision
+  - Natural language processing
+  - Reinforcement learning
   source_chunks:
-  - pinkovich-2025:50
+  - jia-2026:11
 - id: single-022
   kind: single
   smoke: false
   learner_documents:
-  - cordonnier-2023
-  - croce-2023
-  - fu-2021
-  - hirasawa-2020
-  - liu-2026
-  - wang-2025
-  question: What is the main focus of the research mentioned in the 2023 study on training vision transformers?
+  - gooding-2023
+  - pinkovich-2025
+  - vasilev-2021
+  - zwennicker-2022
+  question: What is the effect of increasing the number of BPE merge operations on translation quality
+    in Sranan-Dutch language pairs?
   expected_subjects:
-  - Computer vision
+  - Natural language processing
   source_chunks:
-  - croce-2023:53
+  - zwennicker-2022:9
 - id: single-023
   kind: single
   smoke: false
@@ -344,13 +354,29 @@ items:
   - hirasawa-2020
   - liu-2026
   - wang-2025
-  question: What is the trade-off associated with allowing multiple policy updates on a single batch in
-    reinforcement learning algorithms like PPO?
+  question: How is the derivative of the Jensen-Shannon divergence with respect to the logits computed
+    in the context of semantic segmentation?
+  expected_subjects:
+  - Computer vision
+  source_chunks:
+  - croce-2023:63
+- id: single-024
+  kind: single
+  smoke: false
+  learner_documents:
+  - cordonnier-2023
+  - croce-2023
+  - fu-2021
+  - hirasawa-2020
+  - liu-2026
+  - wang-2025
+  question: What is the relationship between the number of value network optimization steps and the learning
+    rates in the context of policy gradient methods?
   expected_subjects:
   - Reinforcement learning
   source_chunks:
-  - wang-2025:43
-- id: single-024
+  - wang-2025:31
+- id: single-025
   kind: single
   smoke: false
   learner_documents:
@@ -360,145 +386,14 @@ items:
   - jin-2023
   - pinkovich-2025
   - ting-2025
-  question: What is the main focus of the research described in the first entry in the passage?
+  question: What is the Progressive Scale Rewards (PSR) method, and how does it help in action sampling
+    for tasks like semantic segmentation?
   expected_subjects:
   - Computer vision
   - Reinforcement learning
   source_chunks:
-  - ting-2025:46
-- id: single-025
-  kind: single
-  smoke: false
-  learner_documents:
-  - cordonnier-2023
-  - fang-2021
-  - gooding-2023
-  - nachmani-2020
-  - pinkovich-2025
-  - sidahmed-2024
-  question: What are some common components of image captioning models, and how do object tags help in
-    connecting different modalities?
-  expected_subjects:
-  - Computer vision
-  - Natural language processing
-  source_chunks:
-  - fang-2021:11
+  - ting-2025:21
 - id: single-026
-  kind: single
-  smoke: false
-  learner_documents:
-  - chakravarthi-2020
-  - cordonnier-2023
-  - hirasawa-2020
-  - jia-2026
-  - liu-2026
-  question: What is the purpose of adding positional encodings to the video representations in the model
-    described?
-  expected_subjects:
-  - Computer vision
-  - Natural language processing
-  source_chunks:
-  - hirasawa-2020:3
-- id: single-027
-  kind: single
-  smoke: false
-  learner_documents:
-  - chakravarthi-2020
-  - cordonnier-2023
-  - hirasawa-2020
-  - jia-2026
-  - liu-2026
-  question: What is the main focus of the survey discussed in the text?
-  expected_subjects:
-  - Natural language processing
-  source_chunks:
-  - chakravarthi-2020:3
-- id: single-028
-  kind: single
-  smoke: false
-  learner_documents:
-  - cordonnier-2023
-  - fang-2021
-  - gooding-2023
-  - nachmani-2020
-  - pinkovich-2025
-  - sidahmed-2024
-  question: What is the impact of removing certain components like h0v and the hypernetwork on the performance
-    of the NMP-Edge and IGN models?
-  expected_subjects:
-  - Graph neural networks
-  source_chunks:
-  - nachmani-2020:30
-- id: single-029
-  kind: single
-  smoke: false
-  learner_documents:
-  - cordonnier-2023
-  - fang-2021
-  - gooding-2023
-  - nachmani-2020
-  - pinkovich-2025
-  - sidahmed-2024
-  question: What does it mean when it says language models are few-shot learners?
-  expected_subjects:
-  - Computer vision
-  - Natural language processing
-  source_chunks:
-  - fang-2021:78
-- id: single-030
-  kind: single
-  smoke: false
-  learner_documents:
-  - cha-2021
-  - cordonnier-2023
-  - jia-2026
-  - jin-2023
-  - liu-2026
-  - nachmani-2020
-  - pinkovich-2025
-  question: What is the focus of the research on secondary integrated pole-mounted switches and how does
-    it use compgcn and maml fusion?
-  expected_subjects:
-  - Graph neural networks
-  - Reinforcement learning
-  source_chunks:
-  - liu-2026:51
-- id: single-031
-  kind: single
-  smoke: false
-  learner_documents:
-  - fang-2021
-  - hirasawa-2020
-  - jia-2026
-  - pilva-2022
-  - pinkovich-2025
-  question: What is the ViTCAP architecture based on, and how many transformer blocks are used in the
-    Stem Image Encoder and the CTN branch?
-  expected_subjects:
-  - Computer vision
-  - Natural language processing
-  source_chunks:
-  - fang-2021:27
-- id: single-032
-  kind: single
-  smoke: false
-  learner_documents:
-  - cha-2021
-  - cordonnier-2023
-  - jia-2026
-  - jin-2023
-  - liu-2026
-  - nachmani-2020
-  - pinkovich-2025
-  question: What is the main advantage of the method described in the passage compared to GRPO in terms
-    of image captioning performance?
-  expected_subjects:
-  - Computer vision
-  - Natural language processing
-  - Reinforcement learning
-  source_chunks:
-  - jia-2026:38
-- id: single-033
   kind: single
   smoke: false
   learner_documents:
@@ -508,12 +403,124 @@ items:
   - liu-2026
   - pilva-2022
   - vasilev-2021
-  question: What are the key contributions of the ViTCAP model in the field of image captioning?
+  question: What is the effect of different concept tokenization strategies on the performance of the
+    ViTAP model in image captioning?
   expected_subjects:
   - Computer vision
   - Natural language processing
   source_chunks:
-  - fang-2021:8
+  - fang-2021:62
+- id: single-027
+  kind: single
+  smoke: false
+  learner_documents:
+  - gooding-2023
+  - hirasawa-2020
+  - nachmani-2020
+  - ting-2025
+  question: What is the effect of using different reward models, such as DIST, MIN, and MAX, on the performance
+    of a T5-small model in a summarization task evaluated with ROUGE scores?
+  expected_subjects:
+  - Natural language processing
+  - Reinforcement learning
+  source_chunks:
+  - gooding-2023:25
+- id: single-028
+  kind: single
+  smoke: false
+  learner_documents:
+  - gooding-2023
+  - pinkovich-2025
+  - vasilev-2021
+  - zwennicker-2022
+  question: What is the purpose of using ROUGE metrics like ROUGE-1, ROUGE-2, and ROUGE-L in evaluating
+    text generation models?
+  expected_subjects:
+  - Natural language processing
+  - Reinforcement learning
+  source_chunks:
+  - gooding-2023:22
+- id: single-029
+  kind: single
+  smoke: false
+  learner_documents:
+  - chakravarthi-2020
+  - cordonnier-2023
+  - hirasawa-2020
+  - jia-2026
+  - liu-2026
+  question: What is the Caption Quality Assessor (CQA) and how does it use retrieval results to improve
+    caption generation?
+  expected_subjects:
+  - Computer vision
+  - Natural language processing
+  - Reinforcement learning
+  source_chunks:
+  - jia-2026:19
+- id: single-030
+  kind: single
+  smoke: false
+  learner_documents:
+  - fang-2021
+  - jia-2026
+  - jin-2023
+  - liu-2026
+  - pilva-2022
+  - vasilev-2021
+  question: What is the general form of a time-dependent partial differential equation (PDE) that describes
+    a continuous dynamical system evolving over time and space?
+  expected_subjects:
+  - Graph neural networks
+  source_chunks:
+  - pilva-2022:12
+- id: single-031
+  kind: single
+  smoke: false
+  learner_documents:
+  - cordonnier-2023
+  - fang-2021
+  - jia-2026
+  - jin-2023
+  - pinkovich-2025
+  - ting-2025
+  question: What is the main challenge with supervised learning in image captioning, and how does the
+    discussed method address it?
+  expected_subjects:
+  - Computer vision
+  - Natural language processing
+  source_chunks:
+  - jin-2023:1
+- id: single-032
+  kind: single
+  smoke: false
+  learner_documents:
+  - cordonnier-2023
+  - croce-2023
+  - fu-2021
+  - hirasawa-2020
+  - liu-2026
+  - wang-2025
+  question: What is the bounded differences method, and how is it used in the context of analyzing graph
+    signals with MPGNNs?
+  expected_subjects:
+  - Graph neural networks
+  source_chunks:
+  - cordonnier-2023:62
+- id: single-033
+  kind: single
+  smoke: false
+  learner_documents:
+  - gooding-2023
+  - hirasawa-2020
+  - nachmani-2020
+  - ting-2025
+  question: What is the role of keyframes and positional encoding in a video-guided machine translation
+    system?
+  expected_subjects:
+  - Computer vision
+  - Natural language processing
+  source_chunks:
+  - hirasawa-2020:2
 - id: single-034
   kind: single
   smoke: false
@@ -525,56 +532,66 @@ items:
   - liu-2026
   - nachmani-2020
   - pinkovich-2025
-  question: What does the data in Table 4 show about the performance of Re3Cap compared to GRPO?
+  question: What is the performance of the SM-VCENet model using a ResNet50 backbone on the PASCAL-5i
+    task for zero-shot semantic segmentation?
   expected_subjects:
   - Computer vision
-  - Natural language processing
-  - Reinforcement learning
   source_chunks:
-  - jia-2026:77
+  - cha-2021:25
 - id: single-035
   kind: single
   smoke: false
   learner_documents:
-  - gooding-2023
-  - hirasawa-2020
-  - nachmani-2020
+  - cordonnier-2023
+  - fang-2021
+  - jia-2026
+  - jin-2023
+  - pinkovich-2025
   - ting-2025
-  question: What is the Progressive Scale Rewards (PSR) method, and how does it help with model training?
+  question: What is the purpose of the Re3Cap prompt in improving image caption accuracy?
   expected_subjects:
   - Computer vision
+  - Natural language processing
   - Reinforcement learning
   source_chunks:
-  - ting-2025:22
+  - jia-2026:75
 - id: single-036
   kind: single
   smoke: false
-  learner_documents:
-  - hirasawa-2020
-  - pilva-2022
-  - zwennicker-2022
-  question: What is the purpose of creating non-religious validation and test sets from the SRNcorpus?
-  expected_subjects:
-  - Natural language processing
-  source_chunks:
-  - zwennicker-2022:3
-- id: multi-001
-  kind: multi
-  smoke: true
   learner_documents:
   - fang-2021
   - hirasawa-2020
   - jia-2026
   - pilva-2022
   - pinkovich-2025
-  question: How can deep learning methods for solving partial differential equations be applied to improve
-    semantic segmentation in dense urban environments with class imbalance?
+  question: What is the performance comparison of different reward methods on the COCO-LN500 and DOCCI500
+    datasets for tasks like object detection, attribute recognition, relation detection, and question
+    answering?
+  expected_subjects:
+  - Computer vision
+  - Natural language processing
+  - Reinforcement learning
+  source_chunks:
+  - jia-2026:76
+- id: multi-001
+  kind: multi
+  smoke: true
+  learner_documents:
+  - cordonnier-2023
+  - fang-2021
+  - jia-2026
+  - jin-2023
+  - pinkovich-2025
+  - ting-2025
+  question: How does the Hölder stability of neural network layers relate to the effectiveness of self-supervised
+    image captioning methods that use CLIP relevance?
   expected_subjects:
   - Computer vision
   - Graph neural networks
+  - Natural language processing
   source_chunks:
-  - pilva-2022:48
-  - pinkovich-2025:46
+  - cordonnier-2023:67
+  - jin-2023:19
 - id: multi-002
   kind: multi
   smoke: true
@@ -585,15 +602,14 @@ items:
   - jin-2023
   - pinkovich-2025
   - ting-2025
-  question: How do the theoretical convergence rates discussed in the first passage relate to the practical
-    observations about model performance with varying training dataset sizes in the second passage?
+  question: How does a graph signal relate to the generation of image captions using a supervised method?
   expected_subjects:
   - Computer vision
   - Graph neural networks
   - Natural language processing
   source_chunks:
-  - cordonnier-2023:18
-  - jin-2023:29
+  - cordonnier-2023:22
+  - jin-2023:30
 - id: multi-003
   kind: multi
   smoke: true
@@ -603,51 +619,103 @@ items:
   - hirasawa-2020
   - jia-2026
   - liu-2026
-  question: How do message-passing frameworks in graph neural networks compare to earlier approaches in
-    statistical machine translation in terms of flexibility and adaptability?
+  question: How does the use of orthographic information in machine translation relate to the mathematical
+    analysis of function approximation in learning algorithms?
   expected_subjects:
   - Graph neural networks
   - Natural language processing
   source_chunks:
-  - chakravarthi-2020:143
-  - cordonnier-2023:10
+  - chakravarthi-2020:83
+  - cordonnier-2023:100
 - id: multi-004
   kind: multi
   smoke: true
   learner_documents:
-  - chakravarthi-2020
-  - cordonnier-2023
-  - hirasawa-2020
-  - jia-2026
-  - liu-2026
-  question: How can advancements in machine translation robustness be applied to improve the resilience
-    of power distribution networks during extreme events?
+  - gooding-2023
+  - pinkovich-2025
+  - vasilev-2021
+  - zwennicker-2022
+  question: How does the use of COMA-CC in multi-agent reinforcement learning compare to the application
+    of BPE in neural machine translation?
   expected_subjects:
-  - Graph neural networks
   - Natural language processing
   - Reinforcement learning
   source_chunks:
-  - chakravarthi-2020:116
-  - liu-2026:2
+  - vasilev-2021:29
+  - zwennicker-2022:10
 - id: multi-005
   kind: multi
   smoke: true
   learner_documents:
-  - chakravarthi-2020
-  - cordonnier-2023
-  - hirasawa-2020
-  - jia-2026
-  - liu-2026
-  question: How can graph neural networks and reinforcement learning be combined to improve distribution
-    network control while addressing limitations in capturing global structure and topology?
+  - gooding-2023
+  - pinkovich-2025
+  - vasilev-2021
+  - zwennicker-2022
+  question: How does strict semi-on-policy training relate to the use of language temperature sampling
+    in multilingual neural machine translation?
   expected_subjects:
-  - Graph neural networks
   - Natural language processing
   - Reinforcement learning
   source_chunks:
-  - chakravarthi-2020:128
-  - liu-2026:13
+  - vasilev-2021:20
+  - zwennicker-2022:10
 - id: multi-006
+  kind: multi
+  smoke: true
+  learner_documents:
+  - cordonnier-2023
+  - croce-2023
+  - fu-2021
+  - hirasawa-2020
+  - liu-2026
+  - wang-2025
+  question: How does the cross-entropy gradient bound relate to the design of graph embeddings in neural
+    networks?
+  expected_subjects:
+  - Computer vision
+  - Graph neural networks
+  - Reinforcement learning
+  source_chunks:
+  - croce-2023:62
+  - liu-2026:27
+- id: multi-007
+  kind: multi
+  smoke: true
+  learner_documents:
+  - cha-2021
+  - hirasawa-2020
+  - jia-2026
+  - jin-2023
+  - liu-2024
+  - nachmani-2020
+  question: How does self-supervised image captioning using CLIP relevance differ from training graph
+    isomorphism networks for molecule parameter prediction?
+  expected_subjects:
+  - Computer vision
+  - Graph neural networks
+  - Natural language processing
+  source_chunks:
+  - jin-2023:18
+  - nachmani-2020:26
+- id: multi-008
+  kind: multi
+  smoke: true
+  learner_documents:
+  - fang-2021
+  - hirasawa-2020
+  - jia-2026
+  - pilva-2022
+  - pinkovich-2025
+  question: How does the use of open-form captions in ViTCAP for improving semantic concept recognition
+    compare to the use of node features in MPGNN for solving advection-diffusion equations?
+  expected_subjects:
+  - Computer vision
+  - Graph neural networks
+  - Natural language processing
+  source_chunks:
+  - fang-2021:49
+  - pilva-2022:41
+- id: multi-009
   kind: multi
   smoke: true
   learner_documents:
@@ -657,67 +725,138 @@ items:
   - nachmani-2020
   - pinkovich-2025
   - sidahmed-2024
-  question: How do data diversity and category-specific performance impact model accuracy in reward modeling
-    and segmentation tasks?
+  question: How does the importance of annotator agreement in summary quality evaluation compare to the
+    use of deep neural networks in improving semantic segmentation of aerial images?
   expected_subjects:
   - Computer vision
   - Natural language processing
   - Reinforcement learning
   source_chunks:
-  - gooding-2023:27
-  - pinkovich-2025:41
-- id: multi-007
+  - gooding-2023:29
+  - pinkovich-2025:3
+- id: multi-010
   kind: multi
-  smoke: true
+  smoke: false
   learner_documents:
-  - fang-2021
+  - cha-2021
   - hirasawa-2020
   - jia-2026
-  - pilva-2022
-  - pinkovich-2025
-  question: How can video features be used to improve machine translation, and how does this relate to
-    using graph neural networks to model temporal data in partial differential equations?
+  - jin-2023
+  - liu-2024
+  - nachmani-2020
+  question: How does the position encoding in transformer models relate to the use of adaptive step sizes
+    in policy gradient methods?
   expected_subjects:
   - Computer vision
-  - Graph neural networks
   - Natural language processing
+  - Reinforcement learning
   source_chunks:
-  - hirasawa-2020:7
-  - pilva-2022:24
-- id: multi-008
+  - hirasawa-2020:5
+  - liu-2024:56
+- id: multi-011
   kind: multi
-  smoke: true
+  smoke: false
   learner_documents:
   - croce-2023
   - gooding-2023
   - pinkovich-2025
   - tolmachev-2021
   - wang-2025
-  question: How can I combine embedding vectors with existing representations for use in a neural network,
-    and how does this relate to creating initial node representations for graph data?
+  question: How does the use of mode products in tensor operations relate to the challenges of policy
+    updates in reinforcement learning?
+  expected_subjects:
+  - Graph neural networks
+  - Reinforcement learning
+  source_chunks:
+  - tolmachev-2021:39
+  - wang-2025:43
+- id: multi-012
+  kind: multi
+  smoke: false
+  learner_documents:
+  - fang-2021
+  - hirasawa-2020
+  - jia-2026
+  - pilva-2022
+  - pinkovich-2025
+  question: How does positional encoding in video-guided machine translation compare to using relative
+    positions as edge features in graph-based models?
   expected_subjects:
   - Computer vision
   - Graph neural networks
+  - Natural language processing
   source_chunks:
-  - pinkovich-2025:55
-  - tolmachev-2021:37
-- id: multi-009
+  - hirasawa-2020:2
+  - pilva-2022:42
+- id: multi-013
   kind: multi
-  smoke: true
+  smoke: false
+  learner_documents:
+  - cordonnier-2023
+  - fang-2021
+  - jia-2026
+  - jin-2023
+  - pinkovich-2025
+  - ting-2025
+  question: How does the concept of a continuous counterpart of an MPGNN relate to the use of CLIP relevance
+    in self-supervised image captioning?
+  expected_subjects:
+  - Computer vision
+  - Graph neural networks
+  - Natural language processing
+  source_chunks:
+  - cordonnier-2023:52
+  - jin-2023:19
+- id: multi-014
+  kind: multi
+  smoke: false
+  learner_documents:
+  - gooding-2023
+  - hirasawa-2020
+  - nachmani-2020
+  - ting-2025
+  question: How does the use of graph neural networks in molecule property prediction compare to the application
+    of reinforcement learning in semantic segmentation?
+  expected_subjects:
+  - Computer vision
+  - Graph neural networks
+  - Reinforcement learning
+  source_chunks:
+  - nachmani-2020:2
+  - ting-2025:26
+- id: multi-015
+  kind: multi
+  smoke: false
   learner_documents:
   - gooding-2023
   - pinkovich-2025
   - vasilev-2021
   - zwennicker-2022
-  question: How can I handle memory limitations when working with large images in semantic segmentation,
-    and what are some relevant datasets or tools that might help with this?
+  question: How does domain shift in drone image sequences affect translation performance when using domain
+    temperature sampling?
+  expected_subjects:
+  - Computer vision
+  - Natural language processing
+  source_chunks:
+  - pinkovich-2025:16
+  - zwennicker-2022:8
+- id: multi-016
+  kind: multi
+  smoke: false
+  learner_documents:
+  - gooding-2023
+  - pinkovich-2025
+  - vasilev-2021
+  - zwennicker-2022
+  question: How does tiling images for semantic segmentation affect model performance compared to using
+    byte pair encoding in machine translation?
   expected_subjects:
   - Computer vision
   - Natural language processing
   source_chunks:
   - pinkovich-2025:30
-  - zwennicker-2022:13
-- id: multi-010
+  - zwennicker-2022:10
+- id: multi-017
   kind: multi
   smoke: false
   learner_documents:
@@ -727,219 +866,105 @@ items:
   - liu-2026
   - pilva-2022
   - vasilev-2021
-  question: How can I combine physics-informed deep learning with multi-agent reinforcement learning to
-    model complex systems?
-  expected_subjects:
-  - Graph neural networks
-  - Reinforcement learning
-  source_chunks:
-  - pilva-2022:51
-  - vasilev-2021:49
-- id: multi-011
-  kind: multi
-  smoke: false
-  learner_documents:
-  - chakravarthi-2020
-  - cordonnier-2023
-  - hirasawa-2020
-  - jia-2026
-  - liu-2026
-  question: How can techniques for normalizing historical text be applied to improve the training of machine
-    translation models using large-scale lexical resources?
-  expected_subjects:
-  - Graph neural networks
-  - Natural language processing
-  - Reinforcement learning
-  source_chunks:
-  - chakravarthi-2020:103
-  - liu-2026:29
-- id: multi-012
-  kind: multi
-  smoke: false
-  learner_documents:
-  - cha-2021
-  - cordonnier-2023
-  - jia-2026
-  - jin-2023
-  - liu-2026
-  - nachmani-2020
-  - pinkovich-2025
-  question: I'm trying to understand how the asymptotic behavior in Inequality (23) relates to the non-asymptotic
-    result in Inequality (21), and also how these mathematical bounds might be applied in the context
-    of image captioning evaluation methods mentioned in the references. Can you help me connect these
-    ideas?
+  question: How does knowledge distillation in vision-language models like ViTCAP compare to the use of
+    spectral methods in solving fluid dynamics equations?
   expected_subjects:
   - Computer vision
   - Graph neural networks
   - Natural language processing
   source_chunks:
-  - cordonnier-2023:72
-  - jin-2023:23
-- id: multi-013
-  kind: multi
-  smoke: false
-  learner_documents:
-  - gooding-2023
-  - hirasawa-2020
-  - nachmani-2020
-  - ting-2025
-  question: How can machine learning models be trained effectively for tasks like semantic segmentation
-    when detailed labels are unavailable, and what alternative feedback mechanisms can be used?
-  expected_subjects:
-  - Computer vision
-  - Graph neural networks
-  - Reinforcement learning
-  source_chunks:
-  - nachmani-2020:44
-  - ting-2025:2
-- id: multi-014
-  kind: multi
-  smoke: false
-  learner_documents:
-  - fang-2021
-  - hirasawa-2020
-  - jia-2026
-  - pilva-2022
-  - pinkovich-2025
-  question: How can graph neural networks be used to model physical systems, and how does this relate
-    to methods that use cross-entropy loss and optimization in tasks like image and text processing?
-  expected_subjects:
-  - Computer vision
-  - Graph neural networks
-  - Natural language processing
-  source_chunks:
-  - fang-2021:33
-  - pilva-2022:9
-- id: multi-015
-  kind: multi
-  smoke: false
-  learner_documents:
-  - cordonnier-2023
-  - fang-2021
-  - jia-2026
-  - jin-2023
-  - pinkovich-2025
-  - ting-2025
-  question: How do the expressive power limitations of graph neural networks, as related to the graph
-    isomorphism problem and the Weisfeiler-Lehman algorithm, compare to the performance variations observed
-    in segmentation models when certain categories like "Building" are excluded from training and testing?
-  expected_subjects:
-  - Computer vision
-  - Graph neural networks
-  source_chunks:
-  - cordonnier-2023:4
-  - pinkovich-2025:36
-- id: multi-016
-  kind: multi
-  smoke: false
-  learner_documents:
-  - cordonnier-2023
-  - fang-2021
-  - gooding-2023
-  - nachmani-2020
-  - pinkovich-2025
-  - sidahmed-2024
-  question: How can I improve the performance of a Mask2Former model on categories like "bicycle" while
-    also ensuring that the generated responses in tasks like response generation or visual question answering
-    are more helpful and accurate compared to baseline models?
-  expected_subjects:
-  - Computer vision
-  - Natural language processing
-  - Reinforcement learning
-  source_chunks:
-  - pinkovich-2025:60
-  - sidahmed-2024:17
-- id: multi-017
-  kind: multi
-  smoke: false
-  learner_documents:
-  - cha-2021
-  - cordonnier-2023
-  - jia-2026
-  - jin-2023
-  - liu-2026
-  - nachmani-2020
-  - pinkovich-2025
-  question: How can self-supervised learning be used to improve image captioning when labeled data is
-    limited, and what role does CLIP relevance play in this process?
-  expected_subjects:
-  - Computer vision
-  - Graph neural networks
-  - Natural language processing
-  source_chunks:
-  - jin-2023:0
-  - nachmani-2020:47
+  - fang-2021:46
+  - pilva-2022:55
 - id: multi-018
   kind: multi
   smoke: false
   learner_documents:
   - gooding-2023
-  - hirasawa-2020
-  - nachmani-2020
-  - ting-2025
-  question: How do the design choices for video and imagery encoders in a machine translation system compare
-    to the neural network configurations used in molecular parameter prediction tasks?
+  - pinkovich-2025
+  - vasilev-2021
+  - zwennicker-2022
+  question: How does the performance of SegFormer-B3 in image segmentation compare to the amount of religious
+    content in the SRNcorpus?
   expected_subjects:
   - Computer vision
-  - Graph neural networks
   - Natural language processing
   source_chunks:
-  - hirasawa-2020:7
-  - nachmani-2020:26
+  - pinkovich-2025:37
+  - zwennicker-2022:5
 - id: multi-019
   kind: multi
   smoke: false
   learner_documents:
-  - chakravarthi-2020
-  - cordonnier-2023
+  - fang-2021
   - hirasawa-2020
   - jia-2026
-  - liu-2026
-  question: How can transliteration improve machine translation between closely related languages, and
-    how does this relate to the challenges faced by Graph Neural Networks in handling structured data?
-  expected_subjects:
-  - Graph neural networks
-  - Natural language processing
-  source_chunks:
-  - chakravarthi-2020:59
-  - cordonnier-2023:2
-- id: multi-020
-  kind: multi
-  smoke: false
-  learner_documents:
-  - hirasawa-2020
   - pilva-2022
-  - zwennicker-2022
-  question: How can I effectively combine different types of video features, like action and appearance
-    features, in a machine translation system, and how might the choice of these features impact the performance
-    of the model when tested on different domains or geometries?
+  - pinkovich-2025
+  question: How does positional encoding in sequence models relate to the use of latent space snapshots
+    in solving partial differential equations?
   expected_subjects:
   - Computer vision
   - Graph neural networks
   - Natural language processing
   source_chunks:
-  - hirasawa-2020:7
-  - pilva-2022:40
+  - hirasawa-2020:5
+  - pilva-2022:21
+- id: multi-020
+  kind: multi
+  smoke: false
+  learner_documents:
+  - gooding-2023
+  - pinkovich-2025
+  - vasilev-2021
+  - zwennicker-2022
+  question: How does the impact of annotator agreement on reward models in reinforcement learning compare
+    to the tradeoff between altitude and spatial resolution in aerial image segmentation?
+  expected_subjects:
+  - Computer vision
+  - Natural language processing
+  - Reinforcement learning
+  source_chunks:
+  - gooding-2023:30
+  - pinkovich-2025:45
 - id: multi-021
   kind: multi
   smoke: false
   learner_documents:
   - cordonnier-2023
+  - croce-2023
+  - fu-2021
+  - hirasawa-2020
+  - liu-2026
+  - wang-2025
+  question: How does using ensemble models with different video features improve translation performance,
+    compared to how mollified value landscapes help in policy gradient methods?
+  expected_subjects:
+  - Computer vision
+  - Natural language processing
+  - Reinforcement learning
+  source_chunks:
+  - hirasawa-2020:14
+  - wang-2025:66
+- id: multi-022
+  kind: multi
+  smoke: false
+  learner_documents:
   - fang-2021
   - jia-2026
   - jin-2023
-  - pinkovich-2025
-  - ting-2025
-  question: How can I connect the theoretical convergence analysis in the first passage with the practical
-    applications mentioned in the second passage, especially regarding model evaluation and performance?
+  - liu-2026
+  - pilva-2022
+  - vasilev-2021
+  question: How does self-supervised training affect BLEU@4 scores compared to using graph neural networks
+    for solving PDEs?
   expected_subjects:
   - Computer vision
   - Graph neural networks
   - Natural language processing
   source_chunks:
-  - cordonnier-2023:76
-  - jin-2023:25
-- id: multi-022
+  - jin-2023:28
+  - pilva-2022:11
+- id: multi-023
   kind: multi
   smoke: false
   learner_documents:
@@ -950,33 +975,15 @@ items:
   - liu-2026
   - nachmani-2020
   - pinkovich-2025
-  question: How can techniques from few-shot learning and pre-trained image architectures be applied to
-    improve energy management systems in power distribution networks?
+  question: How can spectral graph reinforcement learning be applied to improve the training of semantic
+    segmentation neural networks using trajectory data?
   expected_subjects:
   - Computer vision
   - Graph neural networks
   - Reinforcement learning
   source_chunks:
-  - cha-2021:44
-  - liu-2026:51
-- id: multi-023
-  kind: multi
-  smoke: false
-  learner_documents:
-  - fang-2021
-  - hirasawa-2020
-  - jia-2026
-  - pilva-2022
-  - pinkovich-2025
-  question: How can I connect the advection-diffusion equation simulation setup with the analysis of class
-    distribution changes over altitude intervals, especially in terms of modeling dynamic changes in data
-    distributions over different domains?
-  expected_subjects:
-  - Computer vision
-  - Graph neural networks
-  source_chunks:
-  - pilva-2022:38
-  - pinkovich-2025:25
+  - liu-2026:39
+  - pinkovich-2025:19
 - id: multi-024
   kind: multi
   smoke: false
@@ -985,15 +992,14 @@ items:
   - pinkovich-2025
   - vasilev-2021
   - zwennicker-2022
-  question: How can I address the class imbalance in my dataset, as shown in Figure 2, while also using
-    the validation set for hyperparameter tuning, especially when working on a multi-agent reinforcement
-    learning problem?
+  question: How does the computational complexity of the COMA-CC critic relate to the use of drone navigation
+    data in terms of processing requirements?
   expected_subjects:
   - Computer vision
   - Reinforcement learning
   source_chunks:
-  - pinkovich-2025:23
-  - vasilev-2021:43
+  - pinkovich-2025:18
+  - vasilev-2021:54
 - id: multi-025
   kind: multi
   smoke: false
@@ -1003,14 +1009,14 @@ items:
   - jia-2026
   - pilva-2022
   - pinkovich-2025
-  question: How can I apply the Fourier transformation technique described in the first passage to improve
-    the quality control process mentioned in the second passage?
+  question: How does the permutation invariance in message passing graph neural networks relate to the
+    use of stabilized downward-looking RGB cameras in collecting spatial data?
   expected_subjects:
   - Computer vision
   - Graph neural networks
   source_chunks:
-  - pilva-2022:36
-  - pinkovich-2025:21
+  - pilva-2022:45
+  - pinkovich-2025:17
 - id: multi-026
   kind: multi
   smoke: false
@@ -1018,51 +1024,53 @@ items:
   - hirasawa-2020
   - pilva-2022
   - zwennicker-2022
-  question: How can incorporating different types of video features in a translation system and using
-    neural networks inspired by PDE discretization techniques both contribute to improving model performance?
+  question: How does ensemble modeling in machine translation relate to the use of multiple input frames
+    in video prediction tasks?
   expected_subjects:
   - Computer vision
   - Graph neural networks
   - Natural language processing
   source_chunks:
-  - hirasawa-2020:13
-  - pilva-2022:6
+  - hirasawa-2020:15
+  - pilva-2022:32
 - id: multi-027
   kind: multi
   smoke: false
   learner_documents:
-  - fang-2021
-  - hirasawa-2020
+  - cha-2021
+  - cordonnier-2023
   - jia-2026
-  - pilva-2022
+  - jin-2023
+  - liu-2026
+  - nachmani-2020
   - pinkovich-2025
-  question: How can techniques from vision-language pre-training and neural image captioning be applied
-    to improve the interpretability and generalization of graph neural network solvers for partial differential
-    equations?
+  question: How does the self-healing capability of a smart grid relate to the use of vertical trajectory
+    sampling in drone operations?
   expected_subjects:
   - Computer vision
   - Graph neural networks
-  - Natural language processing
+  - Reinforcement learning
   source_chunks:
-  - fang-2021:95
-  - pilva-2022:11
+  - liu-2026:3
+  - pinkovich-2025:63
 - id: ambiguous-001
   kind: ambiguous
   smoke: true
   learner_documents:
   - fang-2021
-  - hirasawa-2020
   - jia-2026
+  - jin-2023
+  - liu-2026
   - pilva-2022
-  - pinkovich-2025
-  question: How can I better understand the structure and key components of the datasets used in these
-    studies?
+  - vasilev-2021
+  question: What is the main advantage of the proposed method compared to existing approaches?
   expected_subjects:
   - Computer vision
-  - Graph neural networks
+  - Natural language processing
+  - Reinforcement learning
   source_chunks:
-  - pilva-2022:21
-  - pinkovich-2025:22
+  - jin-2023:18
+  - vasilev-2021:12
 - id: ambiguous-002
   kind: ambiguous
   smoke: true
@@ -1073,121 +1081,64 @@ items:
   - jin-2023
   - pinkovich-2025
   - ting-2025
-  question: Can you explain how the model handles transformations in the input data?
+  question: What is the purpose of the additional operation in the model design?
   expected_subjects:
   - Computer vision
   - Graph neural networks
   - Natural language processing
   source_chunks:
-  - cordonnier-2023:30
-  - fang-2021:94
+  - cordonnier-2023:29
+  - fang-2021:23
 - id: ambiguous-003
   kind: ambiguous
   smoke: true
   learner_documents:
-  - fang-2021
-  - jia-2026
-  - jin-2023
-  - liu-2026
-  - pilva-2022
-  - vasilev-2021
-  question: How do I better understand the method used to handle boundary or input conditions in the model?
+  - croce-2023
+  - gooding-2023
+  - pinkovich-2025
+  - tolmachev-2021
+  - wang-2025
+  question: What kind of data representation was used in the study?
   expected_subjects:
+  - Computer vision
   - Graph neural networks
-  - Reinforcement learning
   source_chunks:
-  - pilva-2022:58
-  - vasilev-2021:25
+  - pinkovich-2025:47
+  - tolmachev-2021:27
 - id: ambiguous-004
   kind: ambiguous
   smoke: true
   learner_documents:
-  - cordonnier-2023
-  - fang-2021
+  - cha-2021
+  - hirasawa-2020
   - jia-2026
   - jin-2023
-  - pinkovich-2025
-  - ting-2025
-  question: Can you help me understand the main idea of this study?
+  - liu-2024
+  - nachmani-2020
+  question: What is the main focus of the research presented?
   expected_subjects:
   - Computer vision
-  - Graph neural networks
+  - Natural language processing
   - Reinforcement learning
   source_chunks:
-  - cordonnier-2023:76
-  - ting-2025:8
+  - hirasawa-2020:4
+  - liu-2024:0
 - id: ambiguous-005
   kind: ambiguous
   smoke: true
   learner_documents:
-  - cordonnier-2023
-  - fang-2021
-  - jia-2026
-  - jin-2023
-  - pinkovich-2025
-  - ting-2025
-  question: What are some challenges in adapting neural networks to different types of data structures?
+  - hirasawa-2020
+  - pilva-2022
+  - zwennicker-2022
+  question: What were the key components used in the model's input?
   expected_subjects:
   - Computer vision
   - Graph neural networks
   - Natural language processing
   source_chunks:
-  - cordonnier-2023:2
-  - fang-2021:63
+  - hirasawa-2020:12
+  - pilva-2022:19
 - id: ambiguous-006
-  kind: ambiguous
-  smoke: true
-  learner_documents:
-  - cordonnier-2023
-  - croce-2023
-  - fu-2021
-  - hirasawa-2020
-  - liu-2026
-  - wang-2025
-  question: What are the main challenges in distinguishing between different types of translations or
-    in managing power systems?
-  expected_subjects:
-  - Graph neural networks
-  - Natural language processing
-  - Reinforcement learning
-  source_chunks:
-  - fu-2021:9
-  - liu-2026:21
-- id: ambiguous-007
-  kind: ambiguous
-  smoke: true
-  learner_documents:
-  - fang-2021
-  - jia-2026
-  - jin-2023
-  - liu-2026
-  - pilva-2022
-  - vasilev-2021
-  question: How can I improve the efficiency of my model training?
-  expected_subjects:
-  - Graph neural networks
-  - Reinforcement learning
-  source_chunks:
-  - pilva-2022:4
-  - vasilev-2021:18
-- id: ambiguous-008
-  kind: ambiguous
-  smoke: true
-  learner_documents:
-  - fang-2021
-  - hirasawa-2020
-  - jia-2026
-  - pilva-2022
-  - pinkovich-2025
-  question: How can combining different models improve results in a machine learning task?
-  expected_subjects:
-  - Computer vision
-  - Graph neural networks
-  - Natural language processing
-  source_chunks:
-  - hirasawa-2020:15
-  - pilva-2022:21
-- id: ambiguous-009
   kind: ambiguous
   smoke: true
   learner_documents:
@@ -1196,97 +1147,101 @@ items:
   - hirasawa-2020
   - jia-2026
   - liu-2026
-  question: Can you help me understand how a model incorporates different types of information in its
-    computations?
+  question: What assumptions are made about the transformation function?
+  expected_subjects:
+  - Graph neural networks
+  - Natural language processing
+  source_chunks:
+  - chakravarthi-2020:41
+  - cordonnier-2023:36
+- id: ambiguous-007
+  kind: ambiguous
+  smoke: true
+  learner_documents:
+  - cordonnier-2023
+  - fang-2021
+  - jia-2026
+  - jin-2023
+  - pinkovich-2025
+  - ting-2025
+  question: What was the source of the training data used in the experiments?
+  expected_subjects:
+  - Computer vision
+  - Graph neural networks
+  - Natural language processing
+  source_chunks:
+  - cordonnier-2023:51
+  - fang-2021:53
+- id: ambiguous-008
+  kind: ambiguous
+  smoke: true
+  learner_documents:
+  - cordonnier-2023
+  - fang-2021
+  - gooding-2023
+  - nachmani-2020
+  - pinkovich-2025
+  - sidahmed-2024
+  question: What were the main factors considered in modifying the model?
+  expected_subjects:
+  - Computer vision
+  - Graph neural networks
+  source_chunks:
+  - nachmani-2020:22
+  - pinkovich-2025:36
+- id: ambiguous-009
+  kind: ambiguous
+  smoke: true
+  learner_documents:
+  - cordonnier-2023
+  - fang-2021
+  - gooding-2023
+  - nachmani-2020
+  - pinkovich-2025
+  - sidahmed-2024
+  question: What factors influenced the model's performance on different evaluation measures?
   expected_subjects:
   - Graph neural networks
   - Natural language processing
   - Reinforcement learning
   source_chunks:
-  - chakravarthi-2020:95
-  - liu-2026:28
+  - gooding-2023:24
+  - nachmani-2020:28
 - id: ambiguous-010
   kind: ambiguous
   smoke: false
   learner_documents:
-  - hirasawa-2020
-  - pilva-2022
-  - zwennicker-2022
-  question: What are some methods used to improve performance in tasks involving differential equations
-    or translation models?
+  - croce-2023
+  - gooding-2023
+  - pinkovich-2025
+  - tolmachev-2021
+  - wang-2025
+  question: What factors influence the differences observed in the results?
   expected_subjects:
-  - Graph neural networks
-  - Natural language processing
+  - Computer vision
+  - Reinforcement learning
   source_chunks:
-  - pilva-2022:50
-  - zwennicker-2022:8
+  - pinkovich-2025:62
+  - wang-2025:67
 - id: ambiguous-011
   kind: ambiguous
   smoke: false
   learner_documents:
-  - croce-2023
-  - gooding-2023
-  - pinkovich-2025
-  - tolmachev-2021
-  - wang-2025
-  question: How can I improve the performance of my model when dealing with imbalanced data?
-  expected_subjects:
-  - Computer vision
-  - Reinforcement learning
-  source_chunks:
-  - pinkovich-2025:27
-  - wang-2025:17
-- id: ambiguous-012
-  kind: ambiguous
-  smoke: false
-  learner_documents:
-  - croce-2023
-  - gooding-2023
-  - pinkovich-2025
-  - tolmachev-2021
-  - wang-2025
-  question: Can you explain how the annotation process was handled in the project?
-  expected_subjects:
-  - Computer vision
-  - Graph neural networks
-  source_chunks:
-  - pinkovich-2025:20
-  - tolmachev-2021:21
-- id: ambiguous-013
-  kind: ambiguous
-  smoke: false
-  learner_documents:
-  - croce-2023
-  - gooding-2023
-  - pinkovich-2025
-  - tolmachev-2021
-  - wang-2025
-  question: What are some challenges in evaluating or implementing models for a specific task?
-  expected_subjects:
-  - Computer vision
-  - Natural language processing
-  - Reinforcement learning
-  source_chunks:
-  - gooding-2023:9
-  - pinkovich-2025:32
-- id: ambiguous-014
-  kind: ambiguous
-  smoke: false
-  learner_documents:
   - cordonnier-2023
   - croce-2023
   - fu-2021
   - hirasawa-2020
   - liu-2026
   - wang-2025
-  question: How can adjusting parameters during training affect model performance?
+  question: What assumptions are made about the functions involved in the analysis?
   expected_subjects:
   - Computer vision
-  - Reinforcement learning
+  - Graph neural networks
+  - Natural language processing
   source_chunks:
-  - croce-2023:31
-  - wang-2025:61
-- id: ambiguous-015
+  - cordonnier-2023:87
+  - hirasawa-2020:7
+- id: ambiguous-012
   kind: ambiguous
   smoke: false
   learner_documents:
@@ -1296,70 +1251,15 @@ items:
   - liu-2026
   - pilva-2022
   - vasilev-2021
-  question: What are some ways to improve model performance when relying on reference data?
-  expected_subjects:
-  - Computer vision
-  - Natural language processing
-  - Reinforcement learning
-  source_chunks:
-  - jin-2023:2
-  - vasilev-2021:33
-- id: ambiguous-016
-  kind: ambiguous
-  smoke: false
-  learner_documents:
-  - cordonnier-2023
-  - fang-2021
-  - jia-2026
-  - jin-2023
-  - pinkovich-2025
-  - ting-2025
-  question: What is the main focus of the research described in the text?
+  question: What was the main goal of the training process?
   expected_subjects:
   - Computer vision
   - Graph neural networks
   - Natural language processing
   source_chunks:
-  - cordonnier-2023:84
-  - jin-2023:25
-- id: ambiguous-017
-  kind: ambiguous
-  smoke: false
-  learner_documents:
-  - cha-2021
-  - cordonnier-2023
-  - jia-2026
-  - jin-2023
-  - liu-2026
-  - nachmani-2020
-  - pinkovich-2025
-  question: What are some common challenges when applying machine learning methods to real-world problems?
-  expected_subjects:
-  - Computer vision
-  - Graph neural networks
-  - Reinforcement learning
-  source_chunks:
-  - liu-2026:12
-  - pinkovich-2025:30
-- id: ambiguous-018
-  kind: ambiguous
-  smoke: false
-  learner_documents:
-  - cha-2021
-  - cordonnier-2023
-  - jia-2026
-  - jin-2023
-  - liu-2026
-  - nachmani-2020
-  - pinkovich-2025
-  question: What are the key challenges or open problems mentioned in the text?
-  expected_subjects:
-  - Computer vision
-  - Graph neural networks
-  source_chunks:
-  - cordonnier-2023:98
-  - pinkovich-2025:54
-- id: ambiguous-019
+  - jin-2023:10
+  - pilva-2022:16
+- id: ambiguous-013
   kind: ambiguous
   smoke: false
   learner_documents:
@@ -1367,51 +1267,29 @@ items:
   - hirasawa-2020
   - nachmani-2020
   - ting-2025
-  question: What are some challenges when working with datasets in research?
+  question: What is the purpose of comparing different model versions or configurations?
   expected_subjects:
   - Graph neural networks
   - Natural language processing
   - Reinforcement learning
   source_chunks:
-  - gooding-2023:30
-  - nachmani-2020:6
-- id: ambiguous-020
+  - gooding-2023:23
+  - nachmani-2020:16
+- id: ambiguous-014
   kind: ambiguous
   smoke: false
   learner_documents:
-  - cordonnier-2023
-  - croce-2023
-  - fu-2021
   - hirasawa-2020
-  - liu-2026
-  - wang-2025
-  question: What are some key ideas or findings presented in the material?
+  - pilva-2022
+  - zwennicker-2022
+  question: What factors influenced the performance of the models in the experiments?
   expected_subjects:
-  - Computer vision
-  - Natural language processing
-  - Reinforcement learning
-  source_chunks:
-  - hirasawa-2020:5
-  - wang-2025:44
-- id: ambiguous-021
-  kind: ambiguous
-  smoke: false
-  learner_documents:
-  - cordonnier-2023
-  - fang-2021
-  - jia-2026
-  - jin-2023
-  - pinkovich-2025
-  - ting-2025
-  question: Can you help me understand the main focus of these study materials?
-  expected_subjects:
-  - Computer vision
   - Graph neural networks
-  - Reinforcement learning
+  - Natural language processing
   source_chunks:
-  - cordonnier-2023:140
-  - ting-2025:25
-- id: ambiguous-022
+  - pilva-2022:17
+  - zwennicker-2022:10
+- id: ambiguous-015
   kind: ambiguous
   smoke: false
   learner_documents:
@@ -1419,13 +1297,132 @@ items:
   - pinkovich-2025
   - vasilev-2021
   - zwennicker-2022
-  question: What are some key challenges in building systems for this type of research?
+  question: What sources were used to gather the data?
   expected_subjects:
   - Natural language processing
   - Reinforcement learning
   source_chunks:
-  - vasilev-2021:49
-  - zwennicker-2022:0
+  - vasilev-2021:40
+  - zwennicker-2022:2
+- id: ambiguous-016
+  kind: ambiguous
+  smoke: false
+  learner_documents:
+  - cha-2021
+  - hirasawa-2020
+  - jia-2026
+  - jin-2023
+  - liu-2024
+  - nachmani-2020
+  question: What assumptions or parameters were used in the analysis?
+  expected_subjects:
+  - Graph neural networks
+  - Reinforcement learning
+  source_chunks:
+  - liu-2024:97
+  - nachmani-2020:51
+- id: ambiguous-017
+  kind: ambiguous
+  smoke: false
+  learner_documents:
+  - fang-2021
+  - hirasawa-2020
+  - jia-2026
+  - pilva-2022
+  - pinkovich-2025
+  question: What are the key features that contribute to the model's strong performance?
+  expected_subjects:
+  - Computer vision
+  - Graph neural networks
+  - Natural language processing
+  source_chunks:
+  - fang-2021:49
+  - pilva-2022:19
+- id: ambiguous-018
+  kind: ambiguous
+  smoke: false
+  learner_documents:
+  - hirasawa-2020
+  - pilva-2022
+  - zwennicker-2022
+  question: How were additional features incorporated into the model?
+  expected_subjects:
+  - Computer vision
+  - Graph neural networks
+  - Natural language processing
+  source_chunks:
+  - hirasawa-2020:2
+  - pilva-2022:23
+- id: ambiguous-019
+  kind: ambiguous
+  smoke: false
+  learner_documents:
+  - cordonnier-2023
+  - fang-2021
+  - gooding-2023
+  - nachmani-2020
+  - pinkovich-2025
+  - sidahmed-2024
+  question: What was the purpose of the dataset used in the study?
+  expected_subjects:
+  - Computer vision
+  - Natural language processing
+  - Reinforcement learning
+  source_chunks:
+  - gooding-2023:18
+  - pinkovich-2025:7
+- id: ambiguous-020
+  kind: ambiguous
+  smoke: false
+  learner_documents:
+  - chakravarthi-2020
+  - cordonnier-2023
+  - hirasawa-2020
+  - jia-2026
+  - liu-2026
+  question: What is the purpose of the process that converts text into a more structured form before further
+    processing?
+  expected_subjects:
+  - Graph neural networks
+  - Natural language processing
+  source_chunks:
+  - chakravarthi-2020:21
+  - cordonnier-2023:93
+- id: ambiguous-021
+  kind: ambiguous
+  smoke: false
+  learner_documents:
+  - fang-2021
+  - jia-2026
+  - jin-2023
+  - liu-2026
+  - pilva-2022
+  - vasilev-2021
+  question: What factors influence the model's performance during training?
+  expected_subjects:
+  - Computer vision
+  - Graph neural networks
+  - Natural language processing
+  source_chunks:
+  - jin-2023:29
+  - pilva-2022:41
+- id: ambiguous-022
+  kind: ambiguous
+  smoke: false
+  learner_documents:
+  - fang-2021
+  - hirasawa-2020
+  - jia-2026
+  - pilva-2022
+  - pinkovich-2025
+  question: What is the main focus of the approach discussed?
+  expected_subjects:
+  - Computer vision
+  - Graph neural networks
+  - Natural language processing
+  source_chunks:
+  - fang-2021:59
+  - pilva-2022:3
 - id: ambiguous-023
   kind: ambiguous
   smoke: false
@@ -1436,14 +1433,14 @@ items:
   - liu-2026
   - pilva-2022
   - vasilev-2021
-  question: How can I improve my understanding of the training strategies used in the model?
+  question: What approach was taken to improve the model's performance during training?
   expected_subjects:
   - Computer vision
   - Graph neural networks
   - Natural language processing
   source_chunks:
   - fang-2021:29
-  - pilva-2022:23
+  - pilva-2022:30
 - id: ambiguous-024
   kind: ambiguous
   smoke: false
@@ -1454,13 +1451,13 @@ items:
   - liu-2026
   - pilva-2022
   - vasilev-2021
-  question: How does increasing the complexity of a model affect its performance on unseen data?
+  question: What parameters or settings were adjusted during the experiments?
   expected_subjects:
   - Graph neural networks
   - Reinforcement learning
   source_chunks:
-  - pilva-2022:29
-  - vasilev-2021:9
+  - pilva-2022:36
+  - vasilev-2021:10
 - id: ambiguous-025
   kind: ambiguous
   smoke: false
@@ -1470,14 +1467,14 @@ items:
   - jia-2026
   - pilva-2022
   - pinkovich-2025
-  question: How do different models or methods compare in terms of efficiency and accuracy?
+  question: What are the limitations of using predefined categories for concept extraction?
   expected_subjects:
   - Computer vision
   - Graph neural networks
   - Natural language processing
   source_chunks:
   - fang-2021:56
-  - pilva-2022:38
+  - pilva-2022:52
 - id: ambiguous-026
   kind: ambiguous
   smoke: false
@@ -1488,27 +1485,25 @@ items:
   - jin-2023
   - pinkovich-2025
   - ting-2025
-  question: What are some challenges in evaluating semantic segmentation algorithms?
+  question: What examples or scenarios were considered to illustrate the concept?
   expected_subjects:
   - Computer vision
   - Graph neural networks
   source_chunks:
-  - cordonnier-2023:99
-  - pinkovich-2025:14
+  - cordonnier-2023:63
+  - pinkovich-2025:62
 - id: ambiguous-027
   kind: ambiguous
   smoke: false
   learner_documents:
-  - croce-2023
-  - gooding-2023
-  - pinkovich-2025
-  - tolmachev-2021
-  - wang-2025
-  question: How does the model's performance change with different data settings?
+  - hirasawa-2020
+  - pilva-2022
+  - zwennicker-2022
+  question: What factors were considered in improving the system's performance?
   expected_subjects:
+  - Computer vision
   - Graph neural networks
   - Natural language processing
-  - Reinforcement learning
   source_chunks:
-  - gooding-2023:19
-  - tolmachev-2021:39
+  - hirasawa-2020:13
+  - pilva-2022:26
