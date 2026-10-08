@@ -56,6 +56,13 @@
             ],
             "title": "Attempt"
           },
+          "authors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Authors",
+            "type": "array"
+          },
           "can_retry": {
             "title": "Can Retry",
             "type": "boolean"
@@ -104,6 +111,17 @@
           "title": {
             "title": "Title",
             "type": "string"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
           }
         },
         "required": [
@@ -115,7 +133,9 @@
           "max_attempts",
           "can_retry",
           "created_at",
-          "subjects"
+          "subjects",
+          "authors",
+          "year"
         ],
         "title": "DocumentResponse",
         "type": "object"
@@ -433,7 +453,78 @@
   "paths": {
     "/documents": {
       "get": {
+        "description": "The caller's documents, newest first, narrowed by any subset of the filters (PRD \u00a78 US-10).\n\n`subject_id` and `state` repeat; a document matches when it has any of the subjects and is in any of the states.\n`uploaded_from` and `uploaded_to` are inclusive calendar days in the app time zone (D27). The filters combine.",
         "operationId": "list_documents",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "subject_id",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "maxItems": 100,
+              "title": "Subject Id",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "enum": [
+                  "processing",
+                  "awaiting_subjects",
+                  "ready",
+                  "failed"
+                ],
+                "type": "string"
+              },
+              "title": "State",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "uploaded_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Uploaded From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "uploaded_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Uploaded To"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -448,6 +539,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "security": [

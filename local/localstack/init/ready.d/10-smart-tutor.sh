@@ -44,4 +44,7 @@ awslocal ssm put-parameter --name /smart-tutor/detect-threshold --type String --
 awslocal ssm put-parameter --name /smart-tutor/detect-margin --type String --value 0.05 --overwrite
 awslocal ssm put-parameter --name /smart-tutor/multi-margin --type String --value 0.03 --overwrite
 
+# The one app time zone (PRD D27): the API turns the Library's upload dates into instants in it.
+awslocal ssm put-parameter --name /smart-tutor/app-time-zone --type String --value Asia/Ho_Chi_Minh --overwrite
+
 echo "smart-tutor LocalStack resources ready"
