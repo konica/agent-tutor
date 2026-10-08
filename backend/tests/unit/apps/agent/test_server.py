@@ -73,6 +73,12 @@ def test_more_than_100_subjects_is_422() -> None:
     assert c.post("/ask", json={**BODY, "learner_subjects": many}, headers=AUTH).status_code == 422
 
 
+def test_a_repeated_subject_is_422() -> None:
+    c, _ = client(FakeRetriever([CHUNK]))
+    twice = [{"subject_id": "s1", "name": "General"}, {"subject_id": "s1", "name": "Other"}]
+    assert c.post("/ask", json={**BODY, "learner_subjects": twice}, headers=AUTH).status_code == 422
+
+
 def test_citations_carry_the_marker_number_the_answer_uses() -> None:
     other = RetrievedChunk("c2", "b.pdf", None, "Other text.", 0.8)
     c, _ = client(FakeRetriever([CHUNK, other]), reply="Only the second [2].")

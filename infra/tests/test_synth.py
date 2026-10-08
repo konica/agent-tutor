@@ -385,7 +385,7 @@ def test_database_is_private_encrypted_and_kept_as_a_snapshot() -> None:
                     "DBInstanceIdentifier": "smart-tutor-prod",
                     "Engine": "postgres",
                     "EngineVersion": "17",
-                    "DBInstanceClass": "db.t4g.micro",
+                    "DBInstanceClass": "db.t3.micro",
                     "StorageEncrypted": True,
                     "PubliclyAccessible": False,
                     "MultiAZ": False,
