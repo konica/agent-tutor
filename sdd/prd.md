@@ -281,6 +281,7 @@ Story IDs are stable. Release 1: US-1 to US-13b (US-3b removed in v2.22). Releas
 
 **US-13b Manage notes**
 - List notes with subjects, date, and source conversation; filter by date range and subject; archive and restore.
+- Conversations and Notes have a **search by title** (case-insensitive, combined with the filters); it doesn't search previews or note text (Q63).
 
 **US-19 Research map** *(R2)*
 - For a subject, the learner sees their works on a timeline (by year), with citation links between works they have, and one node per work even when they hold several files of it.
@@ -670,6 +671,7 @@ Measured over the pilot unless stated; minimum sample 100 events per metric.
 | Q56 | What a conversation drew on (end-user feedback) | The conversation lists its documents used; each opens in the document viewer, and a citation opens at its page with the chunk highlighted (US-4b). |
 | Q57 | Deleting a document (end-user feedback) | The owner can delete a document that isn't processing or shared; conversations and notes keep their text; citations read "Deleted document"; the documents-used list highlights it as deleted and it can't be opened; archive stays the reversible option (D10, US-10c). Reverses Q24. |
 | Q58 | Glacier tier for PDFs | Removed: PDFs stay in S3 Standard while their document exists, for the document viewer (D10, §9.5). |
+| Q63 | Design round questions L1 and N3 (owner, 2026-10-08) | L1: a deleted document's subjects no longer count for the conversations and notes that used it (D11, as already written). N3: search in Conversations and Notes covers titles only (US-13, US-13b). |
 | Q62 | Conversation header (owner, 2026-10-08) | The header holds only the panel toggle ("Hide panel" / "Show panel") and the conversation title, which the learner can rename inline (US-13); no overflow menu: Show citations and Archive live in the conversation panel. |
 | Q61 | Choosing a conversation's documents (owner, 2026-10-08) | The learner adds and removes documents in a conversation's list, can start a conversation from any ready document (listed from the start), and can switch "Only search these documents" (opt-in, off by default); a limited decline offers "Add documents" and "Search all my documents", which re-asks the question. Brings "Restricting a thread to selected documents" from the backlog into Release 1 (US-4c). |
 | Q60 | Where a cited document opens (owner, 2026-10-08) | In a conversation, beside the conversation in one click (split view), not in an overlay; the conversation's documents used, note, and actions move to a side panel the learner can hide (US-4b). Elsewhere (Library, document details) the viewer stays an overlay. The side pane also offers "Open in dialog" for a larger view with the document's details. |

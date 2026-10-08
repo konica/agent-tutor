@@ -781,7 +781,7 @@
     "id": "conversations-filtered",
     "group": "Conversations",
     "ref": "§6.7 · US-13",
-    "desc": "Subject filter matches any subject of a conversation's documents used.",
+    "desc": "Subject filter matches any subject of a conversation's documents used; Chain-of-Thought Prompting… is deleted, so its subjects no longer count (L1).",
     "release": 1,
     "stories": [
       "US-13"

@@ -293,7 +293,6 @@
     ['S2', 'Question', '“Change” in the scope line', 'It opens the panel and focuses the switch, where the list can be edited.', 'Confirm, or open the Add documents picker directly.'],
     ['S3', 'Question', 'Archived documents in the picker', 'The picker lists ready, active documents only.', 'Keep archived ones out; restoring stays in the Library.'],
     ['N2', 'Open', 'Show citations hidden in a menu', 'Now also a switch in the panel, so it is visible whenever the panel is open.', 'Closed by P1.'],
-    ['L1, L2', 'Open', 'Deleted documents\u2019 subjects; Library row “Open”', 'Unchanged from round 9.', 'See round 9.'],
     ['I1, F4, H1, E5, E10', 'Open', 'Smaller items', 'Unchanged.', 'Unchanged.'],
     ['Q4, Q5, Q8', 'Defaults kept', 'Still open in §12', 'Q4 the citations switch also covers notes · Q5 several files at once · Q8 first suggestion pre-selected.', 'All shown as designed.']
   ];

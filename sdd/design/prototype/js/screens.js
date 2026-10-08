@@ -21,7 +21,7 @@
       <div class="list-head cv-grid" role="row"><span role="columnheader">Conversation</span><span role="columnheader">Subjects of documents used</span><span role="columnheader">Documents</span><span role="columnheader" class="ta-r">Last activity</span><span role="columnheader"><span class="vh">Actions</span></span></div>
       ${rows.map((c) => { const prev = firstSentence(ST.ANSWERS[c.answers[0]] && ST.ANSWERS[c.answers[0]].text); return `<div class="row cv-grid ${S.rowMenu === c.id ? 'menu-open' : ''}" role="row" data-od-id="conversation-row-${c.id}">
         <div class="row-line" role="cell"><a class="rl-title" href="#/open/${c.id}" title="${esc(c.title)}">${esc(c.title)}</a>${c.noteId ? `<span class="badge badge-note" title="Has a lesson note">${ic('note')}Note</span>` : ''}<span class="rl-preview" title="${esc(prev)}">${esc(prev)}</span></div>
-        <div role="cell" class="chips-cell">${ST.chips(c.subjects, 'sm')}</div>
+        <div role="cell" class="chips-cell">${ST.cellChips(c.subjects)}</div>
         <div class="row-meta mono-num" role="cell">${ST.convDocs(c).length}</div>
         <div class="row-meta row-date ta-r" role="cell">${ST.fmtDate(c.last)}</div>
         <div class="row-actions" role="cell">${rowMenu(c.id, { label: `Actions for ${esc(c.title)}`, html: `<a class="menu-item" role="menuitem" href="#/open/${c.id}">${ic('message')}Open</a>${c.archived ? `<button class="menu-item" role="menuitem" type="button" data-action="conv-restore" data-id="${c.id}">${ic('restore')}Restore</button>` : `<button class="menu-item" role="menuitem" type="button" data-action="conv-archive" data-id="${c.id}">${ic('archive')}Archive</button>`}` })}</div></div>`; }).join('')}</div>`;
@@ -48,7 +48,7 @@
       <div class="list-head nt-grid" role="row"><span role="columnheader">Note</span><span role="columnheader">Subjects</span><span role="columnheader">Source conversation</span><span role="columnheader" class="ta-r">Date</span><span role="columnheader"><span class="vh">Actions</span></span></div>
       ${rows.map((n) => { const c = ST.conv(n.convId); const prev = notePreview(n); return `<div class="row nt-grid ${S.rowMenu === n.id ? 'menu-open' : ''}" role="row" data-od-id="note-row-${n.id}">
         <div class="row-line" role="cell"><a class="rl-title" href="#/note/${n.id}" title="${esc(n.title)}">${esc(n.title)}</a>${n.edited ? `<span class="badge">${ic('pen')}Edited</span>` : ''}<span class="rl-preview" title="${esc(prev)}">${esc(prev)}</span></div>
-        <div role="cell" class="chips-cell">${ST.chips(n.subjects, 'sm')}</div>
+        <div role="cell" class="chips-cell">${ST.cellChips(n.subjects)}</div>
         <div class="row-meta" role="cell">${c ? `<a class="rl-link" href="#/open/${c.id}" title="${esc(c.title)}">${esc(c.title)}</a>` : '—'}</div>
         <div class="row-meta row-date ta-r" role="cell">${ST.fmtDate(n.date)}</div>
         <div class="row-actions" role="cell">${rowMenu(n.id, { label: `Actions for ${esc(n.title)}`, html: `<a class="menu-item" role="menuitem" href="#/note/${n.id}">${ic('note')}Open</a>${n.archived ? `<button class="menu-item" role="menuitem" type="button" data-action="note-restore" data-id="${n.id}">${ic('restore')}Restore</button>` : `<button class="menu-item" role="menuitem" type="button" data-action="note-archive" data-id="${n.id}">${ic('archive')}Archive</button>`}` })}</div></div>`; }).join('')}</div>`;

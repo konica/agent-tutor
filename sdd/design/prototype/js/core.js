@@ -134,13 +134,21 @@
   ST.sname = (id) => { const s = ST.subj(id); return s ? (s.mine || s.shared) : id; };
   ST.hueKey = (id) => (['llm', 'agents', 'rag', 'rl', 'tool'].includes(id) ? id : 'other');
   ST.schip = (id, cls = '') => `<span class="schip ${cls}" data-s="${ST.hueKey(id)}"><span class="dot" aria-hidden="true"></span>${ST.esc(ST.sname(id))}</span>`;
+  /* Subject chips in a table cell: at most 2, each truncating its own label (full name in the tooltip), the rest as "+N". */
+  ST.cellChips = (ids) => {
+    const shown = ids.slice(0, 2);
+    const longest = shown.reduce((m, id) => (ST.sname(id).length > ST.sname(m).length ? id : m), shown[0]);
+    const chip = (id) => `<span class="schip sm in-cell ${id === longest && shown.length > 1 ? 'can-shrink' : ''}" data-s="${ST.hueKey(id)}" title="${ST.esc(ST.sname(id))}"><span class="dot" aria-hidden="true"></span><span class="sc-label">${ST.esc(ST.sname(id))}</span></span>`;
+    const rest = ids.slice(2);
+    return `<span class="chips cell-chips">${ids.slice(0, 2).map(chip).join('')}${rest.length ? `<span class="chip-more" title="${ST.esc(rest.map(ST.sname).join(', '))}"><span aria-hidden="true">+${rest.length}</span><span class="vh">, ${rest.length} more: ${ST.esc(rest.map(ST.sname).join(', '))}</span></span>` : ''}</span>`;
+  };
   ST.chips = (ids, cls = '') => `<span class="chips">${ids.map((i) => ST.schip(i, cls)).join('')}</span>`;
   /* "My subjects": subjects of ready, non-archived, not deleted documents */
   ST.mySubjects = () => { const set = []; ST.S.docs.forEach((d) => { if (d.state === 'ready' && !d.archived && !d.deleted) d.subjects.forEach((s) => { if (!set.includes(s)) set.push(s); }); }); return set; };
   ST.needsAction = () => ST.S.docs.filter((d) => !d.archived && !d.deleted && (d.state === 'choose' || d.state === 'failed')).length;
   ST.stillProcessing = () => ST.S.docs.filter((d) => !d.archived && !d.deleted && ['uploading', 'processing', 'choose'].includes(d.state)).length;
   /* K1: a conversation's subjects (list chips, filters, Subjects counts) come from the documents it used. */
-  ST.subjectsOfDocs = (ids) => { const set = []; ids.forEach((id) => { const d = ST.doc(id); if (d) d.subjects.forEach((s) => { if (!set.includes(s)) set.push(s); }); }); return set; };
+  ST.subjectsOfDocs = (ids) => { const set = []; ids.forEach((id) => { const d = ST.doc(id); if (d && !d.deleted) d.subjects.forEach((s) => { if (!set.includes(s)) set.push(s); }); }); return set; };
   ST.convDocs = (c) => { const ids = []; (c.answers || []).forEach((k) => (ST.ANSWERS[k] ? ST.ANSWERS[k].cites : []).forEach((x) => { if (!ids.includes(x.doc)) ids.push(x.doc); })); return ids; };
   ST.syncConvSubjects = (c) => { c.subjects = ST.subjectsOfDocs(ST.convDocs(c)); };
   ST.docTitle = (id) => { const d = ST.doc(id); return d ? d.title : ''; };

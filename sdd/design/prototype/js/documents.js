@@ -71,7 +71,7 @@
     return `<div class="toolbar" data-od-id="toolbar">
       ${ST.tabsHtml(counts)}
       <div class="tb-filters" role="search" aria-label="Filter ${noun}s">
-        ${search ? `<input class="input tb-search" type="search" placeholder="Search ${noun}s" aria-label="Search ${noun}s" value="${esc(ST.L.q)}" data-input="f-q" data-fk="f-q">` : ''}
+        ${search ? `<input class="input tb-search" type="search" placeholder="Search titles" aria-label="Search ${noun} titles" value="${esc(ST.L.q)}" data-input="f-q" data-fk="f-q">` : ''}
         <select class="select tb-sel" id="f-subj" aria-label="Subject" data-change="f-subj" data-fk="f-subj">
           <option value="all" ${ST.L.subject === 'all' ? 'selected' : ''}>All subjects</option>
           ${subjects.map((x) => `<option value="${esc(x)}" ${ST.L.subject === x ? 'selected' : ''}>${esc(ST.sname(x))}</option>`).join('')}
@@ -221,7 +221,7 @@
     return `<div class="lib-row ${needs ? 'needs' : ''} ${d.archived ? 'is-archived' : ''} ${d.state === 'failed' ? 'is-failed' : ''} ${open ? 'menu-open' : ''}" role="row" data-od-id="library-row-${d.id}">
       <div class="doc-cell" role="cell"><span class="doc-icon">${ic(d.book ? 'book' : 'doc')}</span>
         <div class="od-stack" style="--od-gap:2px">${['ready', 'choose'].includes(d.state) ? `<a class="doc-title" href="#/library-default" data-action="title-view" data-id="${d.id}" data-fk="title-${d.id}" title="${esc(d.title)}" aria-label="${esc(d.title)}, open in the document viewer">${esc(d.title)}</a>` : `<button class="doc-title" type="button" data-action="open-doc" data-id="${d.id}" data-fk="title-${d.id}" title="${esc(d.title)}">${esc(d.title)}</button>`}<span class="doc-meta">${docMeta(d)}</span></div></div>
-      <div role="cell" class="subj-cell">${d.subjects.length ? subjChips(d.subjects) : `<span class="nc">${d.state === 'failed' ? '—' : 'Not chosen yet'}</span>`}</div>
+      <div role="cell" class="subj-cell">${d.subjects.length ? ST.cellChips(d.subjects) : `<span class="nc">${d.state === 'failed' ? '—' : 'Not chosen yet'}</span>`}</div>
       <div role="cell" class="state-cell">${ST.stateBadge(d)}</div>
       <div class="row-meta row-date" role="cell">${ST.fmtDate(d.uploaded, false)}</div>
       <div class="row-actions" role="cell">${primary}
@@ -552,10 +552,11 @@
   };
   ST.actions['ask-about'] = (el) => ST.askAbout(el.dataset.id);
   ST.canDelete = (d) => !['uploading', 'processing'].includes(d.state);
-  ST.deleteDoc = (d) => {
+  ST.deleteDoc = (d) => { /* L1: conversations drop subjects that came only from this document */
     d.deleted = true; d.archived = false;
     S.deletedNotice = d.title;
     S.tray = S.tray.filter((t) => t.docId !== d.id);
+    S.convs.forEach((c) => ST.syncConvSubjects(c));
   };
   ST.confirmDelete = (id, { fromDetails = false } = {}) => {
     const d = ST.doc(id);

@@ -911,5 +911,21 @@ a.doc-title { color: var(--text); text-decoration: none; }
 a.doc-title:hover { color: var(--accent-text); text-decoration: underline; text-underline-offset: 3px; }
 .lib-row .row-actions .btn-sm { min-height: 28px; height: 28px; }
 
+/* Subject chips in table cells: chips shrink and truncate their own label; never clipped at the cell edge */
+.chips-cell, .subj-cell { min-width: 0; overflow: visible; }
+.cell-chips { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; min-width: 0; max-width: 100%; overflow: visible; }
+.schip.in-cell { flex: 0 1 auto; min-width: 32px; max-width: 180px; overflow: hidden; }
+.schip.in-cell .dot { flex: none; }
+.schip.in-cell .sc-label { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cell-chips .chip-more { flex: none; }
+
+/* Subjects column at least 300px (the preview text truncates first); short chips keep their width, only the longest shrinks */
+.cv-grid { grid-template-columns: minmax(0, 1fr) minmax(300px, 340px) 76px 112px 32px; }
+.nt-grid { grid-template-columns: minmax(0, 1fr) minmax(300px, 340px) 200px 112px 32px; }
+.schip.in-cell { flex: none; max-width: none; }
+.schip.in-cell.can-shrink { flex: 0 1 auto; min-width: 48px; max-width: 180px; }
+.schip.in-cell:only-child, .cell-chips .schip.in-cell:first-child:nth-last-child(2):not(.can-shrink) { flex: none; }
+.cell-chips .chip-more { flex: none; }
+
 /* Programmatic focus on <main> after a route change is for screen readers; it needs no visible ring. */
 main[tabindex="-1"]:focus, main[tabindex="-1"]:focus-visible { outline: none; }
