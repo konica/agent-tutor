@@ -29,7 +29,7 @@ Every color, font size, space, radius, shadow, and duration in feature code is a
 | Type | `--font-display` (serif: brand word, landing page, empty-state headline only), `--font-body` (system UI; all app headings), `--font-mono` (numbers, ids, token counts; tabular figures); sizes `--fs-12`, `--fs-13`, `--fs-14` (body), `--fs-16`, `--fs-18`, `--fs-20`, `--fs-24`, `--fs-32` (landing), `--fs-64` (landing headline only); `--lh-body` 1.45 (UI), `--lh-read` 1.6 (chat answers, note editor), `--lh-head` 1.25 |
 | Space and shape | `--sp-0` (2px), `--sp-1` (4px) … `--sp-6` (24px) in the app; `--sp-8` … `--sp-16` on the landing page only; `--r-sm` 4px, `--r-md` 6px, `--r-lg` 8px (dialogs, drawers), `--r-pill` |
 | Motion | `--dur-fast`, `--dur-base`, `--dur-exit`, `--dur-spin`, `--ease-out`, `--ease-in`; everything stops under `prefers-reduced-motion: reduce` |
-| Layout | `--nav-w` 208px (`--nav-w-collapsed` 56px), `--page-w` 1200px, `--page-w-wide` fluid up to 1360px (Library and tables), `--chat-w` 720px, `--panel-w` 340px, `--viewer-w` `min(960px, 100% - 64px)`, `--tray-w` 320px |
+| Layout | `--nav-w` 208px (`--nav-w-collapsed` 56px), `--page-w` 1200px, `--page-w-wide` fluid up to 1360px (Library and tables), `--chat-w` 720px, `--panel-w` 340px, `--chat-panel-w` 260px (conversation side panel), `--chat-min-w` 480px (conversation beside a document), `--viewer-w` `min(960px, 100% - 64px)` (overlay outside chat), `--tray-w` 320px |
 
 The prototype's `--chrome-*` tokens, `.rb-*` classes, and `od-*` layout primitives belong to the review tool, not the product: leave them out.
 
@@ -97,7 +97,13 @@ One visual language everywhere (Library row, details, upload tray). Color is alw
 
 ## Chat
 
-The tutor's words, the learner's words, quoted document text, and system notices (e.g. "Started from note") each look different: quoted and cited material is set apart from the tutor's prose, and notices are centered dashed pills (the maximum warning uses `--info-soft`). Citations show the document's display title and page, or "page unavailable": one compact **Sources** line of 22px chips under each answer ("*Short title* · p. 3", full title in the tooltip and accessible name), each opening the document viewer. Helpful / Not helpful are two 28px icon buttons at the end of that line (`aria-label`, `aria-pressed`, visible tooltip). Quoted passages are a 13px block with a 2px left rule. The chat header is one 40px row: the title, "Documents used (*N*)", "Summarize lesson", and an overflow menu (Archive, Show citations).
+The tutor's words, the learner's words, quoted document text, and system notices (e.g. "Started from note") each look different: quoted and cited material is set apart from the tutor's prose, and notices are centered dashed pills (the maximum warning uses `--info-soft`). Citations show the document's display title and page, or "page unavailable": one compact **Sources** line of 22px chips under each answer ("*Short title* · p. 3", full title in the tooltip and accessible name), each opening the document viewer. Helpful / Not helpful are two 28px icon buttons at the end of that line (`aria-label`, `aria-pressed`, visible tooltip). Quoted passages are a 13px block with a 2px left rule. **Chat layout (Q60).** The chat body has two panes:
+- **Conversation panel** (left, `--chat-panel-w`, `--surface`, right border), toggled by a button at the left of the chat header (`aria-expanded`, `aria-controls`; the choice is remembered). Sections: **Documents used** (32px rows: icon, title, page count, "Archived" / "Deleted" badge), **Lesson Note** (the conversation's note: open it, or "Summarize lesson" / "Update lesson note"), and **Actions** (Show citations switch, Archive conversation).
+- **Conversation** (right): the messages in a column up to `--chat-w`, the composer, and the status line.
+
+The chat header is one 40px row: the panel toggle, the title, and an overflow menu.
+
+**Split view.** One click on a document in the panel or on a Sources chip opens the document **beside the conversation**: the conversation keeps at least `--chat-min-w`, the document pane takes the rest, the conversation panel collapses and the app nav drops to its rail while the split is open (both re-openable). The pane has one 40px toolbar (title, "p. 3 / 33", zoom, Close) and is a labelled region, not a modal: focus moves to its title on open; Esc or Close returns focus to the chip or row that opened it; the chip whose passage is shown stays highlighted in the conversation. Another chip or row swaps the document in place. Outside chat (Library, details) the viewer is an overlay of `--viewer-w`.
 
 ## Accessibility
 
