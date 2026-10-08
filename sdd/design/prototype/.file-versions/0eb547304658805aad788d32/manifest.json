@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "fileName": "index.html",
-  "currentVersionId": "0fe42ecf-dc80-4703-a4b8-0338fe012870",
+  "currentVersionId": "de5bc245-6fee-45d5-a532-68f050df7bb3",
   "entries": [
     {
       "id": "f36e6729-f195-4945-9c3c-52c32a4f64eb",
@@ -105,7 +105,22 @@
       "mime": "text/html; charset=utf-8",
       "kind": "html",
       "contentPath": "0007-0fe42ecf-dc80-4703-a4b8-0338fe012870.html",
-      "contentDigest": "2ef3e70aa46e42edb2bd1906cb6795bd824f49bb840583ec6b36663283059674",
+      "promptSource": "message",
+      "contentDigest": "2ef3e70aa46e42edb2bd1906cb6795bd824f49bb840583ec6b36663283059674"
+    },
+    {
+      "id": "de5bc245-6fee-45d5-a532-68f050df7bb3",
+      "fileName": "index.html",
+      "version": 8,
+      "label": "Version 8",
+      "createdAt": 1791445319569,
+      "source": "ai",
+      "prompt": "Follow the design brief **v0.10** in this project (`brief-v0.10.md`; the only brief now) and `DESIGN.md` → Chat and Density. Start with **§0 What changed** (P1–P3): this round changes **only the chat** of the round 9 prototype (v0.9, compact density). Keep every other screen, state, flow, and the density as they are. Set `ST.BRIEF = 'v0.10'` and update the page title, overview, and questions page.\n\nRules for this round:\n- **P1:** the chat body becomes two panes: a collapsible **conversation panel** on the left (260px; sections Documents used, Lesson Note, Actions with \"Show citations\" and \"Archive conversation\"), toggled by a button at the left of the 40px chat header (header: toggle, title, overflow). \"Documents used (N)\" and \"Summarize lesson\" leave the header.\n- **P2:** one click on a Documents used row or a **Sources** chip opens the document **beside the conversation** (split view): conversation at least 480px, the document pane takes the rest; the conversation panel collapses and the app nav drops to its 56px rail while a document is open. From a chip: the cited page with the passage highlighted, and that chip stays highlighted in the conversation; from the panel: page 1. Another chip swaps the document in place. Close restores the layout.\n- **P3:** the pane is a labelled region (not a modal) with one 40px toolbar (title, \"p. 3 / 33\", zoom, Close). Loading, error, no-highlight states render inside the pane. `viewer-archived` stays the overlay, opened from the Library.\n- Redo the states listed at the end of §0 and add `chat-panel-collapsed` (ref US-4b). Keep every other state id and `ref`; remove none.\n- Check the split at 1440 and 1280 in both themes: the answer text stays 16px / 1.6 and readable at 480px; the PDF page stays at 100% or \"fit width\" in the pane.\n- Do not edit `brief-v0.10.md`, `DESIGN.md`, `history/`, `.file-versions/`, `.od-frames/`, `.od-skills/`, or `v0.2/`. Keep the `main[tabindex=\"-1\"]` rule last in `v03.css`.\n\nEnd with the states you changed and added, and questions or proposed changes to the brief.",
+      "size": 3253,
+      "mime": "text/html; charset=utf-8",
+      "kind": "html",
+      "contentPath": "0008-de5bc245-6fee-45d5-a532-68f050df7bb3.html",
+      "contentDigest": "70351d80dfb001cba48e7dd06b0a360a5f903cc80ea4b14451eac17abae85967",
       "promptSource": "message"
     }
   ]

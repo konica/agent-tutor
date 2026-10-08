@@ -773,5 +773,105 @@ table.data td.num, table.data th.num { font-size: var(--fs-12); }
 .nav-sub li { min-width: 0; }
 .nav-sub a { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
+/* ============ v0.10 · chat in two panes, documents beside the conversation (brief v0.10 P1–P3) ============ */
+:root { --chat-panel-w: 260px; --chat-min-w: 480px; }
+.chat.chat-v10 { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 100%; }
+.chat-body { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; }
+.chat-v10.with-panel .chat-body { grid-template-columns: var(--chat-panel-w) minmax(0, 1fr); }
+/* split: the conversation keeps at least 480px, the document takes the rest (about 60%) */
+.chat-v10.with-doc .chat-body { grid-template-columns: minmax(var(--chat-min-w), 2fr) minmax(0, 3fr); }
+.chat-v10.with-doc.with-panel .chat-body { grid-template-columns: var(--chat-panel-w) minmax(var(--chat-min-w), 2fr) minmax(0, 3fr); }
+.conv-col { display: grid; grid-template-rows: minmax(0, 1fr) auto auto; min-width: 0; min-height: 0; }
+.chat-v10 .thread-head h1 { flex: 0 1 auto; }
+
+/* P1 · conversation panel */
+.conv-panel { display: grid; gap: 16px; align-content: start; min-height: 0; overflow-y: auto; padding: 12px 8px; background: var(--surface); border-right: 1px solid var(--border); }
+.cp-sec { display: grid; gap: 4px; min-width: 0; }
+.cp-h { display: flex; align-items: center; gap: 6px; padding: 0 8px; margin-bottom: 2px; font-size: var(--fs-12); font-weight: 600; color: var(--text-2); }
+.cp-count { min-width: 18px; padding: 0 6px; border-radius: var(--r-pill); background: var(--surface-2); font-family: var(--font-mono); font-size: var(--fs-12); line-height: 18px; text-align: center; color: var(--text-2); }
+.cp-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.cp-row { width: 100%; display: grid; grid-template-columns: 16px minmax(0, 1fr) auto auto; align-items: center; gap: 6px; min-height: 32px; padding: 0 8px; background: transparent; border: 0; border-radius: var(--r-sm); text-align: left; font: inherit; font-size: var(--fs-13); color: var(--text); }
+button.cp-row { cursor: pointer; }
+button.cp-row:hover { background: var(--surface-2); color: var(--text); }
+.cp-row.is-open { background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
+.cp-row.is-open:hover { background: var(--accent-soft); color: var(--accent-text); box-shadow: inset 0 0 0 1px var(--accent); }
+.cp-row.is-deleted { color: var(--text-2); }
+.cp-icon { display: grid; place-items: center; color: var(--text-2); }
+.cp-row.is-open .cp-icon { color: var(--accent-text); }
+.cp-title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cp-pages { font-size: var(--fs-12); color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cp-row.is-open .cp-pages { color: var(--accent-text); }
+.cp-note, .cp-empty { display: flex; gap: 6px; align-items: flex-start; margin: 0; padding: 2px 8px; font-size: var(--fs-13); color: var(--text-2); }
+.cp-note .icon { width: 14px; height: 14px; margin-top: 2px; flex: none; }
+.cp-note-link { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 8px; font-size: var(--fs-13); min-width: 0; }
+.cp-btns { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 8px 0; }
+.cp-switch { width: 100%; justify-content: flex-start; padding: 0 8px; font-weight: 500; }
+.cp-act { width: 100%; justify-content: flex-start; padding: 0 8px; font-weight: 500; }
+
+/* P2 · the chip whose passage is shown stays highlighted (fill + border, not colour alone: aria-current too) */
+.cite.is-open { background: var(--accent-soft); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.cite.is-open .doc-name, .cite.is-open .cite-page { color: var(--accent-text); }
+
+/* P3 · document pane: a labelled region beside the conversation with one 40px toolbar */
+.doc-pane { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; min-height: 0; background: var(--surface); border-left: 1px solid var(--border); }
+.doc-pane .vw-head { border-bottom: 1px solid var(--border); padding: 4px 8px 4px 12px; }
+.doc-pane .vw-body { overflow-y: auto; padding: 16px; background: var(--surface-3); }
+.doc-pane .vw-title:focus { outline: none; }
+.doc-pane .vw-title:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.doc-pane .vw-error { margin-top: 10vh; }
+
+/* ============ v0.10 · P4 open in dialog, P5 the conversation's documents ============ */
+/* P5 · Documents rows: remove button on hover and focus */
+.cp-li { position: relative; }
+.cp-li .cp-row { padding-right: 34px; }
+.cp-x { position: absolute; right: 4px; top: 4px; z-index: 1; width: 24px; height: 24px; display: grid; place-items: center; padding: 0; background: var(--surface); border: 0; border-radius: var(--r-sm); color: var(--text-2); opacity: 0; }
+.cp-x:hover { background: var(--surface-2); color: var(--text); }
+.cp-li:hover .cp-x, .cp-li:focus-within .cp-x { opacity: 1; }
+@media (hover: none) { .cp-x { opacity: 1; } }
+.cp-li .cp-row.is-open + .cp-x, .cp-li .cp-x:has(+ .cp-row.is-open) { background: var(--accent-soft); color: var(--accent-text); }
+.cp-add { padding: 0 6px; }
+.cp-switch:disabled { opacity: 1; color: var(--text-3); cursor: not-allowed; }
+.cp-switch:disabled .track { background: var(--surface-3); }
+/* composer scope line (12px) */
+.scope-line { display: flex; align-items: center; gap: 6px; margin: 0; font-size: var(--fs-12); color: var(--text-2); }
+.scope-line .icon { width: 14px; height: 14px; color: var(--accent-text); }
+.link-btn { padding: 0 2px; min-height: 24px; background: none; border: 0; border-radius: var(--r-sm); color: var(--accent-text); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.link-btn:hover { color: var(--accent-hover); }
+/* Add documents picker */
+.dialog.doc-picker { width: min(520px, 100%); }
+.dpk-list { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--r-md); }
+.dpk-row { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; border-bottom: 1px solid var(--border); font-size: var(--fs-13); color: var(--text); cursor: pointer; }
+.dpk-list li:last-child .dpk-row { border-bottom: 0; }
+.dpk-row:hover { background: var(--surface-2); }
+.dpk-row input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.dpk-row.is-listed { color: var(--text-2); cursor: default; }
+.dpk-title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; }
+.dpk-meta { font-size: var(--fs-12); color: var(--text-2); white-space: nowrap; }
+/* P4 · dialog details strip under the toolbar */
+.vw-details { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 32px; padding: 4px 12px; border-bottom: 1px solid var(--border); background: var(--surface); font-size: var(--fs-12); color: var(--text-2); }
+.vd-sep { color: var(--border-strong); }
+.viewer { grid-template-rows: auto auto minmax(0, 1fr); }
+/* R3 · panel re-opened in split view: the page fits the narrower pane */
+.doc-pane.fit .pg { width: 100%; max-width: calc(600px * var(--zoom, 1)); }
+
+/* US-4c · started from a document */
+.chat-empty .from-doc { margin: 0; }
+
+/* ============ v0.10 review fixes ============ */
+/* Viewer toolbars: the grid's implicit column grew to the title's full width and clipped the controls.
+   One minmax(0, 1fr) column keeps the 40px row inside the box; the title takes the flexible space and truncates first. */
+.viewer, .doc-pane { grid-template-columns: minmax(0, 1fr); }
+.vw-head { flex-wrap: nowrap; min-width: 0; overflow: hidden; }
+.vw-head > :not(.vw-title):not(.od-fill) { flex: none; }
+.vw-head .vw-title { flex: 1 1 auto; min-width: 48px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.vw-head .od-fill { flex: 0 1 0; min-width: 0; }
+/* Status line: one 12px line; the hint truncates (full text in the tooltip), the token count stays whole */
+.conv-col { container-type: inline-size; }
+.status-line { flex-wrap: nowrap; white-space: nowrap; min-width: 0; }
+.status-line .input-hint, .status-line .sl-keys { display: inline-flex; align-items: center; gap: 4px; flex: 1 1 auto; min-width: 0; overflow: hidden; }
+.status-line .sl-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.status-line .tokens { flex: none; margin-left: auto; white-space: nowrap; }
+@container (max-width: 640px) { .status-line .tk-label { display: none; } }
+
 /* Programmatic focus on <main> after a route change is for screen readers; it needs no visible ring. */
 main[tabindex="-1"]:focus, main[tabindex="-1"]:focus-visible { outline: none; }

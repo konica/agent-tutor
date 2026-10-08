@@ -1,4 +1,4 @@
-/* Smart Tutor v0.9 — overview with what changed and the flows, R2 research map and R3 learning loop
+/* Smart Tutor v0.10 — overview with what changed and the flows, R2 research map and R3 learning loop
    wireframes, components page (§10), decisions and questions for the brief owner (§11.5). */
 (function () {
   const ST = window.ST;
@@ -8,18 +8,15 @@
   /* =========================================================
      Overview
      ========================================================= */
-  /* §0 What changed in v0.9: [source, change, states checked closely or added, states removed]. Every app-shell state inherits M1–M4. */
+  /* §0 What changed in v0.10: [source, change, states redone or added, states removed]. Chat only. */
   ST.CHANGES = [
-    ['M1', '14px body, 20px sans page titles, 12px floor', ['library-default', 'conversations-active', 'subjects-list'], []],
-    ['M2', '32px controls (28 in toolbars and rows), 20px chips, radius 4/6/8', ['library-default', 'picker-default'], []],
-    ['M3', '208px nav in groups, 56px icon rail, 16/12px page padding', ['shell-nav-collapsed', 'library-empty'], []],
-    ['M4', 'One 40px header row and one 36px toolbar row; 32px notices', ['library-default', 'conversations-active', 'usage-overview'], []],
-    ['M5', 'Library: 40px single-line rows', ['library-default', 'library-delete-confirm', 'details-ready'], []],
-    ['M6', 'Chat: 40px header with overflow, 22px Sources chips, 28px thumbs; answers stay 16px / 1.6 in 720px', ['chat-answer-citations', 'chat-documents-used-deleted'], []],
-    ['M7', 'Panels 340px, viewer min(960px, 100% − 64px) with one 40px toolbar, dialogs 440px', ['viewer-citation-highlight', 'details-ready', 'library-delete-confirm'], []],
-    ['M8', 'Lists 36px with a preview line; note editor with a 280px details area; Usage strip and 32px tables', ['conversations-active', 'notes-editor', 'subjects-list', 'usage-overview'], []]
+    ['P1', 'Conversation panel (260px): Documents used, Lesson Note, Actions; header = toggle, title, overflow', ['chat-answer-citations', 'chat-documents-used', 'chat-documents-used-empty', 'chat-documents-used-deleted', 'chat-summarize-done', 'chat-update-note', 'chat-panel-collapsed'], []],
+    ['P2', 'One click opens the document beside the conversation (split view)', ['viewer-citation-highlight', 'viewer-document'], []],
+    ['P3', 'The pane: a labelled region with one 40px toolbar; loading, error and no-highlight inside it', ['viewer-no-highlight', 'viewer-loading', 'viewer-error'], []],
+    ['P3', 'Outside chat the viewer stays the overlay', ['viewer-archived'], []]
   ];
-  ST.NEW_IDS = ['shell-nav-collapsed'];
+  ST.CHANGES.push(['P4', 'Open in dialog from the pane, with a details strip', ['viewer-dialog'], []], ['P5', 'Choose the conversation\'s documents; Only search these documents', ['chat-documents-add', 'chat-scope-limited', 'chat-decline-limited', 'chat-documents-used'], []]);
+  ST.NEW_IDS = ['chat-panel-collapsed', 'viewer-dialog', 'chat-documents-add', 'chat-scope-limited', 'chat-decline-limited', 'chat-new-from-document'];
   const changed = () => { const set = new Set(); ST.CHANGES.forEach((c) => c[2].forEach((id) => set.add(id))); return set; };
   ST.indexView = () => {
     const groups = [];
@@ -28,21 +25,21 @@
     return `<main class="index-page" id="main-content" tabindex="-1">
       <section class="index-hero">
         <div><span class="brand" style="padding:0 0 24px">${ST.logo('logo', 'Smart Tutor logo')}<span class="word">Smart Tutor</span></span>
-          <h1>Round 9: compact</h1>
-          <p>Brief v0.9 makes every screen compact so Smart Tutor has room to grow: 14px type, one 40px page header and one 36px toolbar, 40px Library rows, a collapsible navigation, and a one-row chat header. Behavior is unchanged from round 8; answers stay 16px at 1.6 in a 720px column.</p>
+          <h1>Round 10: documents beside the conversation</h1>
+          <p>Brief v0.10 changes the chat only. A 260px conversation panel holds Documents used, the Lesson Note and the conversation's actions, and one click on a Sources chip or a document opens it beside the conversation: the conversation keeps at least 480px, the panel collapses and the nav drops to its rail. Everything else is the round 9 design.</p>
           <div class="od-cluster" style="margin-top:24px;--od-gap:12px">
             <button class="btn btn-primary btn-lg" type="button" data-action="start-flow" data-flow="J1">Start with J1 · First run${ic('arrowRight', 'sm')}</button>
             <a class="btn btn-secondary btn-lg" href="#/library-default">Open the Library</a>
             <a class="btn btn-ghost btn-lg" href="#/brief-questions">Questions for the brief</a>
           </div></div>
         <dl class="meta">
-          <div><dt>Brief</dt><dd>v0.9 · PRD v2.21</dd></div><div><dt>Owner</dt><dd>Thao Dinh</dd></div><div><dt>Date</dt><dd>8 Oct 2026</dd></div>
+          <div><dt>Brief</dt><dd>v0.10 · PRD Q60</dd></div><div><dt>Owner</dt><dd>Thao Dinh</dd></div><div><dt>Date</dt><dd>8 Oct 2026</dd></div>
           <div><dt>Screens</dt><dd>Laptop, 1280–1920 px</dd></div><div><dt>Themes</dt><dd>Light and dark</dd></div><div><dt>States</dt><dd>${ST.STATES.length - 1}</dd></div>
           <div><dt>Round 1</dt><dd><a href="v0.2/index.html">v0.2 prototype</a></dd></div>
         </dl>
       </section>
 
-      <h2 class="section-title">What changed in v0.9</h2>
+      <h2 class="section-title">What changed in v0.10</h2>
       <div class="changes" role="table" aria-label="Decisions and the states they changed">
         ${ST.CHANGES.map(([id, title, states, removed]) => `<div class="change-row" role="row"><span class="qid" role="cell">${esc(id)}</span><span class="change-title" role="cell">${esc(title)}</span>
           <span class="change-states" role="cell">${states.length ? '' : '<span class="small muted">No state changes</span>'}${states.map((sid) => `<a href="#/${sid}"><code>${sid}</code>${ST.NEW_IDS.includes(sid) ? '<span class="badge badge-note">New</span>' : ''}</a>`).join('')}${(removed || []).map((sid) => `<span class="removed-id"><del><code>${sid}</code></del><span class="badge badge-archived">Removed</span></span>`).join('')}</span></div>`).join('')}
@@ -66,7 +63,7 @@
       <h2 class="section-title">All states</h2>
       <div class="index-groups">${groups.map((g) => `<section class="index-group ${g.items.length > 12 ? 'span2' : ''}" aria-labelledby="g-${g.items[0].id}">
         <h2 id="g-${g.items[0].id}">${esc(g.name)}<span class="ig-ref">${esc(g.ref)}</span></h2>
-        <ul>${g.items.map((s) => `<li><a href="#/${s.id}"><code>${s.id}@${ST.BRIEF}</code>${ST.NEW_IDS.includes(s.id) ? '<span class="badge badge-note">New in v0.9</span>' : ch.has(s.id) ? '<span class="badge">Checked in v0.9</span>' : ''}<span>${esc(s.desc)}</span></a></li>`).join('')}</ul></section>`).join('')}</div>
+        <ul>${g.items.map((s) => `<li><a href="#/${s.id}"><code>${s.id}@${ST.BRIEF}</code>${ST.NEW_IDS.includes(s.id) ? '<span class="badge badge-note">New in v0.10</span>' : ch.has(s.id) ? '<span class="badge">Changed in v0.10</span>' : ''}<span>${esc(s.desc)}</span></a></li>`).join('')}</ul></section>`).join('')}</div>
     </main>`;
   };
   ST.actions['start-flow-at'] = (el, e) => { ST.flow = el.dataset.flow; try { sessionStorage.setItem('st3_flow', ST.flow); } catch (x) {} };
@@ -282,27 +279,27 @@
      Brief v0.5 decisions and questions
      ========================================================= */
   const DECISIONS = [
-    ['M1–M2', 'Type and controls', 'Tokens follow DESIGN.md → Density: 14px body at 1.45, 13px secondary, 12px floor for headers, chips, badges and dates; 20px sans page titles; 32px controls, 28px in toolbars and rows; 20px chips and badges; radius 4 / 6 / 8.', ['library-default', 'picker-default']],
-    ['M3', 'App shell', '208px navigation with 32px items in three hairline-separated groups and the 3 most recent conversations under Conversations; a chevron collapses it to a 56px icon rail with tooltips, remembered per browser; one 36px user row.', ['shell-nav-collapsed']],
-    ['M4', 'Header and toolbar', 'One 40px header row (title, count, info tooltip, action) and one 36px toolbar row (tabs with counts, unlabelled filters, dates in one popover, a status chip, the count). Notices are 32px rows; the upload limit, archived conversation and rate limit keep full banners because they block an action.', ['library-default', 'conversations-active', 'notes-active']],
-    ['M5', 'Library rows', '40px single-line rows: title with authors and year in 13px, state badge and hint on one line (hint truncated with a tooltip, a failure reason wraps instead), the primary action always visible at 28px, More on hover and focus.', ['library-default', 'library-failed']],
-    ['M6', 'Chat', 'One 40px header with Documents used, Summarize lesson and an overflow (Show citations, Archive conversation); Sources as 22px chips (“ReAct · p. 3”); 28px Helpful / Not helpful icon buttons with tooltips; 13px quotes with a 2px left rule; 40px composer with one 12px status line.', ['chat-answer-citations', 'chat-feedback-reason']],
-    ['M7–M8', 'Panels, viewer, lists, Usage', 'Details and Documents used at 340px with 32px rows; viewer toolbar in one 40px row; 440px dialogs; 36px list rows with a preview line, search and sort; note editor with a collapsible 280px details area; a 56px Usage strip and 32px table rows with sticky headers.', ['viewer-citation-highlight', 'notes-editor', 'usage-overview']]
+    ['P1', 'Conversation panel', 'A 260px panel on the left, toggled from the chat header and remembered: Documents used (32px rows with page count and Archived / Deleted badges), Lesson Note (Open note, Summarize lesson / Update lesson note) and Actions (Show citations, Archive conversation). The header is the toggle, the title and an overflow.', ['chat-answer-citations', 'chat-documents-used', 'chat-panel-collapsed']],
+    ['P2', 'Split view in one click', 'A Sources chip opens its cited page with the passage highlighted beside the conversation, and the chip stays highlighted; a panel row opens page 1. The conversation keeps at least 480px (about 550px at 1440, 490px at 1280) and the document takes the rest; the panel collapses and the nav drops to its 56px rail. Another chip swaps the document in place; Close or Esc restores the layout and returns focus to the chip or row.', ['viewer-citation-highlight', 'viewer-document']],
+    ['P3', 'The pane', 'A labelled region (not a modal) with one 40px toolbar: title, “p. 3 / 33”, zoom, Close. Loading, error and no-highlight render inside it. viewer-archived stays the overlay, opened from the Library.', ['viewer-no-highlight', 'viewer-loading', 'viewer-error', 'viewer-archived']]
   ];
+  DECISIONS.push(
+    ['P4', 'Open in dialog', 'A maximize button before Close opens the same document at the same page and highlight in the large overlay, with a details strip (authors, year, pages, subjects, Archived). Close returns to the split view with focus on the button.', ['viewer-dialog']],
+    ['P5', 'The conversation\'s documents', 'The panel\'s first section is Documents: documents used plus added ones, each with a remove button on hover and focus; “Add documents” opens a searchable picker; “Only search these documents” (off by default, disabled while empty) shows “Searching N documents · Change” above the composer and declines with “Add documents” / “Search all my documents”.', ['chat-documents-add', 'chat-scope-limited', 'chat-decline-limited']],
+    ['R1–R3', 'Answered', 'R1 no new state; R2 Show citations and Archive stay in the overflow too; R3 the panel can be re-opened in split view and the pane then fits the page to its width.', ['viewer-citation-highlight']]
+  );
   const QUESTIONS = [
-    ['N1', 'Question', 'Two signals for documents that need subjects', 'The Library shows the required “1 document needs subjects” notice and the toolbar status chip “1 needs subjects”.', 'Keep the chip only once the notice wording is no longer required; until then both stay.'],
-    ['N2', 'Question', 'Show citations is now inside the chat overflow', 'A remembered setting behind a menu is easy to miss; the brief asks for it in the overflow.', 'Keep, and show “Citations hidden” in the Sources line when it is off.'],
-    ['N3', 'Question', 'Search and sort in Conversations and Notes', 'M8 asks for search and sort but not their scope. The prototype searches titles and sorts by date (newest or oldest first).', 'Confirm, or also search the preview text and note bodies.'],
-    ['N4', 'Proposal', 'Subjects and Usage have no toolbar', 'Neither page has tabs or filters, so their count sits in the header row instead of a toolbar.', 'Add a toolbar only when they gain filters.'],
-    ['N5', 'Note', 'Library rows that fit', 'At 1440 × 900 with the review bar hidden, the Library has room for about 18 rows (12 + 40 + 8 header, one 32px notice, 36 + 8 toolbar, 28px table header, then 40px rows). The sample has 8 active documents.', 'No change.'],
-    ['L1', 'Open', 'A deleted document’s subjects on its conversations', 'The PRD excludes deleted documents (Q59); the prototype still counts them.', 'Follow the PRD next round.'],
-    ['L2', 'Open', 'Library row “Open” goes to details', 'Reading a PDF takes two clicks.', 'Let the row “Open” open the viewer.'],
-    ['I1, F4, H1, E5, E10', 'Open', 'Smaller items', 'Daily limit states; Keycloak Remember me / Forgot password; upload-rights line by a disabled Upload; chat hint wording; a D6 state.', 'Unchanged.'],
+    ['S1', 'Question', 'Removing a document the answers already cited', 'Removing a used document takes it out of the list and the search scope, but its citations in earlier answers still open it.', 'Keep the citations working; removal only affects future answers.'],
+    ['S2', 'Question', '“Change” in the scope line', 'It opens the panel and focuses the switch, where the list can be edited.', 'Confirm, or open the Add documents picker directly.'],
+    ['S3', 'Question', 'Archived documents in the picker', 'The picker lists ready, active documents only.', 'Keep archived ones out; restoring stays in the Library.'],
+    ['N2', 'Open', 'Show citations hidden in a menu', 'Now also a switch in the panel, so it is visible whenever the panel is open.', 'Closed by P1.'],
+    ['L1, L2', 'Open', 'Deleted documents\u2019 subjects; Library row “Open”', 'Unchanged from round 9.', 'See round 9.'],
+    ['I1, F4, H1, E5, E10', 'Open', 'Smaller items', 'Unchanged.', 'Unchanged.'],
     ['Q4, Q5, Q8', 'Defaults kept', 'Still open in §12', 'Q4 the citations switch also covers notes · Q5 several files at once · Q8 first suggestion pre-selected.', 'All shown as designed.']
   ];
   ST.questionsView = () => `<main class="index-page" id="main-content" tabindex="-1">
-    <div class="page-head" style="margin-bottom:32px"><div><h1 style="font-size:48px">Decisions &amp; questions</h1><p>For brief v0.9, round 9. First the density changes applied (M1–M8) and where to check them, then open questions: the new ones first, then those still open.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
-    <h2 class="section-title" style="margin-top:0">Applied in v0.9</h2>
+    <div class="page-head" style="margin-bottom:32px"><div><h1 style="font-size:48px">Decisions &amp; questions</h1><p>For brief v0.10, round 10 (chat only). First what P1–P3 changed and where, then open questions.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
+    <h2 class="section-title" style="margin-top:0">Applied in v0.10</h2>
     <ol class="qa-list">${DECISIONS.map(([id, title, what, states]) => `<li class="qa-item"><span class="qid">${esc(id)}</span>
       <div><h3>${esc(title)}</h3><p>${esc(what)}</p><p class="proposal"><strong>Applied in:</strong> ${states.length ? '' : 'no change needed'}${states.map((sid) => `<a href="#/${sid}"><code class="mono">${sid}</code></a>`).join(', ')}</p></div>
       <span class="badge qtype badge-ready-q">${ic('check')}Applied</span></li>`).join('')}</ol>

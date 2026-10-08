@@ -212,6 +212,7 @@
     const menu = open ? `<div class="row-menu" role="menu" aria-label="Actions for ${esc(d.title)}">
       <button class="menu-item" role="menuitem" type="button" data-action="open-doc" data-id="${d.id}">${ic('doc')}Open details</button>
       ${canChange ? `<button class="menu-item" role="menuitem" type="button" data-action="change-subjects" data-id="${d.id}">${ic('tag')}Change subjects</button>` : ''}
+      ${!d.archived && d.state === 'ready' ? `<button class="menu-item" role="menuitem" type="button" data-action="ask-about" data-id="${d.id}" data-od-id="row-menu-ask">${ic('message')}Ask about this</button>` : ''}
       ${!d.archived && d.state !== 'failed' ? `<button class="menu-item" role="menuitem" type="button" data-action="edit-title" data-id="${d.id}">${ic('pen')}Edit title</button>` : ''}
       ${d.state === 'failed' && (d.attempts || 0) < 3 && !d.archived ? `<button class="menu-item" role="menuitem" type="button" data-action="doc-retry" data-id="${d.id}">${ic('retry')}Retry</button>` : ''}
       ${d.archived ? `<button class="menu-item" role="menuitem" type="button" data-action="doc-restore" data-id="${d.id}">${ic('restore')}Restore</button>` : `<button class="menu-item" role="menuitem" type="button" data-action="doc-archive" data-id="${d.id}">${ic('archive')}Archive</button>`}
@@ -521,6 +522,7 @@
           <span class="od-fill"></span>
           ${d.archived ? `<button class="btn btn-${canOpen(d) ? 'secondary' : 'primary'}" type="button" data-action="dp-restore" data-od-id="details-restore">${ic('restore', 'sm')}Restore</button>`
             : `<button class="btn btn-secondary" type="button" data-action="dp-archive" data-fk="dp-archive" data-od-id="details-archive">${ic('archive', 'sm')}Archive</button>`}
+          ${!d.archived && d.state === 'ready' ? `<button class="btn btn-secondary" type="button" data-action="ask-about" data-id="${d.id}" data-od-id="details-ask">${ic('message', 'sm')}Ask about this</button>` : ''}
           ${canOpen(d) ? `<button class="btn btn-primary" type="button" data-action="dp-open" data-fk="dp-open" data-od-id="details-open">${ic('doc', 'sm')}Open</button>` : ''}</footer>
       </aside>`;
   }
@@ -541,6 +543,13 @@
   /* =========================================================
      K4 · Delete a document (§6.3): confirmed, permanent, not while processing
      ========================================================= */
+  ST.askAbout = (id) => {
+    const d = ST.doc(id); if (!d || d.archived || d.deleted || d.state !== 'ready') return;
+    S.rowMenu = null; if (ST.ov) ST.hideOverlay(false);
+    ST.pendingThread = ST.newThread({ added: [id], fromDoc: id, scopeOn: false });
+    ST.goto('chat-new');
+  };
+  ST.actions['ask-about'] = (el) => ST.askAbout(el.dataset.id);
   ST.canDelete = (d) => !['uploading', 'processing'].includes(d.state);
   ST.deleteDoc = (d) => {
     d.deleted = true; d.archived = false;

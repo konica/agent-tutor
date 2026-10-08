@@ -1,4 +1,4 @@
-/* Smart Tutor v0.9 — every named state <screen>-<state>@v0.9, plus the four review flows (§5).
+/* Smart Tutor v0.10 — every named state <screen>-<state>@v0.10, plus the four review flows (§5).
    Contract (§11 item 6): window.ST.STATES = [{ id, group, ref, desc }], one user story per ref,
    each state at index.html#/<state-id>, review chrome hidden with ?shot=1.
    "live" states are where the app's own navigation lands: they keep whatever the reviewer did.
@@ -20,11 +20,12 @@
   const pick = (us, desc, open, setup, extra = {}) => Object.assign({ group: 'Choose subjects', ref: '§6.4 · ' + us, desc, view: ST.libraryView, setup: () => { fresh(); ST.resetList(); if (setup) setup(); }, afterEnter: open }, extra);
   const det = (us, desc, open, setup, extra = {}) => Object.assign({ group: 'Document details', ref: '§6.5 · ' + us, desc, view: ST.libraryView, setup: () => { fresh(); ST.resetList(); if (setup) setup(); }, afterEnter: open }, extra);
   const chat = (us, desc, setup, extra = {}) => Object.assign({ group: 'Chat', ref: '§6.6 · ' + us, desc, view: ST.chatView, afterRender: ST.chatAfter, afterEnter: ST.chatEnter, setup: () => { fresh(); setup(); } }, extra);
-  const view = (desc, open, setup, extra = {}) => Object.assign({ group: 'Document viewer', ref: '§6.12 · US-4b', desc, view: ST.chatView, afterRender: ST.chatAfter, setup: () => { fresh(); setup(); }, afterEnter: () => { ST.chatEnter(); open(); } }, extra);
+  const view = (desc, open, setup, extra = {}) => Object.assign({ group: 'Document viewer', ref: '§6.12 · US-4b', desc, view: ST.chatView, afterRender: ST.chatAfter, setup: () => { fresh(); setup(); open(); }, afterEnter: ST.chatEnter }, extra);
+  const firstAnswer = () => S.thread.messages.find((m) => m.kind === 'answer');
   const j2 = (n, o) => { ST.conv('cv1').noteId = null; S.thread = ST.j2Thread(n, Object.assign({ noteId: null }, o || {})); return S.thread; };
 
   const defs = [
-    { id: 'index', group: 'Overview', ref: '§5 · review flows', desc: 'Round 9 overview: what changed in v0.9 (compact density), the four review flows and every state.', view: ST.indexView, setup: () => { fresh(); } },
+    { id: 'index', group: 'Overview', ref: '§5 · review flows', desc: 'Round 10 overview: what changed in v0.10 (chat in two panes, documents beside the conversation), the four review flows and every state.', view: ST.indexView, setup: () => { fresh(); } },
 
     /* §6.0 */
     { id: 'landing-default', group: 'Landing page', ref: '§6.0 · US-1', desc: 'Public page at /: what Smart Tutor does, how it works, trust points, “Create an account” and “Sign in”. Text only, outside the app shell.', view: ST.landingView, setup: () => { ST.noTray = true; } },
@@ -68,7 +69,7 @@
     lib('US-10', 'After archiving ReAct (J4): find it under Archived.', () => { doc('d3').archived = true; ST.L.tab = 'archived'; }, { id: 'library-archived-after-archive' }),
     lib('US-10', 'No results: “No documents match these filters” and Clear filters.', () => { Object.assign(ST.L, { subject: 'rl', from: '2026-10-01' }); }, { id: 'library-no-results' }),
     lib('US-10', 'Filtered by subject (matches any of a document\'s subjects).', () => { ST.L.subject = 'agents'; }, { id: 'library-filtered-by-subject' }),
-    lib('US-10c', '“More” menu with Delete (K4); a processing row offers no Delete.', () => { S.rowMenu = 'd2'; }, { id: 'library-more-menu' }),
+    lib('US-10c', '“More” menu with “Ask about this” and Delete (K4); a processing row offers neither.', () => { S.rowMenu = 'd2'; }, { id: 'library-more-menu' }),
     lib('US-10c', 'Delete confirmation: Cancel focused, Delete in danger style, “Archive instead” under the warning. The same dialog opens from details.', null, { id: 'library-delete-confirm', afterEnter: () => ST.confirmDelete('d2') }),
     lib('US-10c', 'Deleted: the row is gone and “Chain-of-Thought Prompting… deleted.” confirms it. No undo.', () => { ST.deleteDoc(doc('d2')); }, { id: 'library-deleted' }),
     lib('US-2', 'Upload limit reached: hourly “You can upload again at 11:40 (GMT+7)”, daily “You can upload again at 00:00 (GMT+7)”; Upload disabled.', () => { S.uploadLimit = true; }, { id: 'library-rate-limited' }),
@@ -87,7 +88,7 @@
 
 
     /* §6.5 */
-    det('US-10', 'Ready document: facts, summary, subjects; Open (viewer), Archive and Delete. No download.', () => ST.openDetails('d3'), () => { ST.L.subject = 'agents'; }, { id: 'details-ready' }),
+    det('US-10', 'Ready document: facts, summary, subjects; Open (viewer), Ask about this, Archive and Delete. No download.', () => ST.openDetails('d3'), () => { ST.L.subject = 'agents'; }, { id: 'details-ready' }),
     det('US-10', 'Editing the display title, with “Reset to extracted title”.', () => ST.openDetails('d3', { editing: true, draft: 'ReAct (Yao et al.)' }), () => { ST.L.subject = 'agents'; }, { id: 'details-edit-title' }),
     det('US-10', 'Processing a 424-page book: up to 15 minutes; no Open and no Delete while processing.', () => ST.openDetails('d6'), null, { id: 'details-processing' }),
     det('US-10', 'Failed: “No text layer (scanned PDFs are not supported yet)”, with Retry.', () => ST.openDetails('d7'), null, { id: 'details-failed' }),
@@ -95,7 +96,8 @@
 
     /* §6.6 */
     chat('US-3', 'New conversation: placeholder and optional example questions; no subjects (K1). Where navigation lands.', () => {}, { id: 'chat-new', live: true,
-      setup: () => { S.thread = ST.pendingThread || ST.newThread(); ST.pendingThread = null; } }),
+      setup: () => { S.thread = ST.pendingThread || ST.newThread(); ST.pendingThread = null; if (S.thread.fromDoc) S.chatPanel = true; } }),
+    chat('US-4c', 'New conversation started from ReAct… (“Ask about this”): listed in the panel as added, composer focused, “Only search these documents” off.', () => { S.thread = ST.newThread({ added: ['d3'], fromDoc: 'd3', scopeOn: false }); S.chatPanel = true; }, { id: 'chat-new-from-document', ref: '§6.6 · US-4c' }),
     chat('US-3', 'No documents yet: chat is replaced by “Upload a document first”.', () => { S.docs = []; S.convs = []; S.notes = []; S.thread = ST.newThread(); }, { id: 'chat-no-documents' }),
     chat('US-3', 'Documents still processing: a quiet hint above the input.', () => { S.thread = ST.newThread(); }, { id: 'chat-documents-processing' }),
     chat('US-4', 'Streaming answer with Stop.', () => {
@@ -109,13 +111,20 @@
       const t = j2(2); const a = t.messages.filter((m) => m.kind === 'answer');
       a[0].fb = 'up'; Object.assign(a[1], { fb: 'down', reasonOpen: true, reason: "Citation doesn't match" });
     }, { id: 'chat-feedback-reason' }),
-    chat('US-4b', 'Documents used (3): ReAct, Retrieval-Augmented Generation and PPO, in order of first use.', () => { j2(3); }, { id: 'chat-documents-used', afterEnter: () => { ST.chatEnter(); ST.openDocsUsed(); } }),
-    chat('US-4b', 'Documents used before the first answer: “Documents used to answer will appear here.”', () => { S.thread = ST.newThread(); }, { id: 'chat-documents-used-empty', afterEnter: () => ST.openDocsUsed() }),
-    chat('US-4b', 'A deleted document stays listed as “Deleted”, can\'t be opened; “Deleted documents can\'t be opened.”', () => {
+    chat('US-4b', 'Conversation panel, Documents used (3): ReAct, Retrieval-Augmented Generation and PPO, in order of first use; one click opens a document beside the conversation.', () => { j2(3); }, { id: 'chat-documents-used' }),
+    chat('US-4b', 'Conversation panel before the first answer: “Documents used to answer will appear here.”', () => { S.thread = ST.newThread(); }, { id: 'chat-documents-used-empty' }),
+    chat('US-4c', 'Add documents: the picker with search, the learner\'s ready documents, listed ones checked and disabled, one selected, “Add”.', () => { j2(2); }, { id: 'chat-documents-add', ref: '§6.6 · US-4c', afterEnter: () => { ST.chatEnter(); ST.openDocPicker({ sel: ['d8'] }); } }),
+    chat('US-4c', '“Only search these documents” on: three documents listed and “Searching 3 documents · Change” above the composer.', () => { const t = j2(2); t.added = ['d1']; t.scopeOn = true; }, { id: 'chat-scope-limited', ref: '§6.6 · US-4c' }),
+    chat('US-4c', 'A decline with the switch on: “These documents don\'t cover this.” with “Add documents” and “Search all my documents”.', () => {
+      const t = j2(1); t.added = ['d4']; t.scopeOn = true; const q = ST.J2[2].q;
+      t.messages.push(ST.M({ role: 'user', text: q }), ST.M({ role: 'tutor', kind: 'decline', limited: true, question: q, count: 2 }));
+    }, { id: 'chat-decline-limited', ref: '§6.6 · US-4c' }),
+    chat('US-4b', 'Conversation panel collapsed with the header toggle: the conversation takes the full width (the choice is remembered).', () => { j2(2); S.chatPanel = false; }, { id: 'chat-panel-collapsed' }),
+    chat('US-4b', 'Conversation panel: a deleted document stays listed as “Deleted”, can\'t be opened; “Deleted documents can\'t be opened.”', () => {
       const t = ST.newThread({ convId: 'cv2', title: ST.conv('cv2').title, tokens: [9870, 2140] });
       t.messages.push(ST.M({ role: 'user', text: t.title }), ST.answerMsg('cot'), ST.M({ role: 'user', text: ST.J2[0].q }), ST.answerMsg('react'));
       S.thread = t; ST.deleteDoc(doc('d2')); S.deletedNotice = null;
-    }, { id: 'chat-documents-used-deleted', afterEnter: () => { ST.chatEnter(); ST.openDocsUsed(); } }),
+    }, { id: 'chat-documents-used-deleted' }),
     chat('US-10c', 'A citation to a deleted document reads “Deleted document”, with no link.', () => {
       const t = ST.newThread({ convId: 'cv2', title: ST.conv('cv2').title, tokens: [9870, 2140] });
       t.messages.push(ST.M({ role: 'user', text: t.title }), ST.answerMsg('cot'));
@@ -132,8 +141,8 @@
       S.thread = t;
     }, { id: 'chat-no-active-documents' }),
     chat('US-7', '“Summarize lesson” in progress.', () => { j2(2, { summarizing: true, summaryHold: true }); }, { id: 'chat-summarize-progress' }),
-    chat('US-7', 'Note saved: confirmation with a link; the header now links the note.', () => { const t = j2(2); ST.makeNote(t, 'saved'); }, { id: 'chat-summarize-done' }),
-    chat('US-7', 'A note exists and wasn\'t edited: “Update lesson note” replaces it directly.', () => { S.thread = ST.threadFromConv('cv1'); }, { id: 'chat-update-note' }),
+    chat('US-7', 'Note saved: confirmation in the conversation; the panel\'s Lesson Note links the note.', () => { const t = j2(2); ST.makeNote(t, 'saved'); }, { id: 'chat-summarize-done' }),
+    chat('US-7', 'A note exists and wasn\'t edited: the panel offers “Open note” and “Update lesson note”, which replaces it directly.', () => { S.thread = ST.threadFromConv('cv1'); }, { id: 'chat-update-note' }),
     chat('US-7', 'The note was edited: “You\'ve edited this note. Replace it with a new summary?”', () => { S.thread = ST.threadFromConv('cv2'); }, { id: 'chat-update-edited-note', afterEnter: () => { ST.chatEnter(); ST.actions.summarize(); } }),
     chat('US-13', 'Archived conversation: banner with Restore, input disabled.', () => { S.thread = ST.threadFromConv('cv6'); }, { id: 'chat-archived' }),
     chat('US-9', 'Rate limited: per minute “You can send again at 11:25 (GMT+7)”, daily “You can send again at 00:00 (GMT+7)”; input disabled until then.', () => { j2(2, { rateLimit: 42 }); }, { id: 'chat-rate-limited', afterEnter: () => { ST.chatEnter(); ST.startRateLimit(42); } }),
@@ -149,12 +158,14 @@
     }, { id: 'chat-first-answer' }),
 
     /* §6.12 */
-    view('Opened from Documents used: page 1 of ReAct…, no highlight.', () => ST.openViewer('d3', { page: 1, from: 'docs' }), () => { j2(3); }, { id: 'viewer-document' }),
-    view('Opened from the citation “ReAct…, p. 3”: page 3, the cited passage highlighted and in view.', () => ST.openViewer('d3', { page: 3, highlight: { page: 3 }, from: 'chat' }), () => { j2(2); }, { id: 'viewer-citation-highlight' }),
-    view('Cited page shown: “Couldn\'t highlight the passage on this page.”', () => ST.openViewer('d3', { page: 5, highlight: { page: 5 }, noHighlight: true, from: 'chat' }), () => { j2(2); }, { id: 'viewer-no-highlight' }),
-    view('An archived document opens read-only with “Archived” and “Restore” in the header.', () => ST.openViewer('d4', { page: 2, highlight: { page: 2 }, from: 'chat' }), () => { doc('d4').archived = true; j2(2); }, { id: 'viewer-archived' }),
-    view('Loading: page skeleton while the cited page loads first.', () => ST.openViewer('d3', { page: 3, highlight: { page: 3 }, from: 'chat', status: 'loading' }), () => { j2(2); }, { id: 'viewer-loading' }),
-    view('Error: “We couldn\'t open this document.” with Retry.', () => ST.openViewer('d3', { page: 3, highlight: { page: 3 }, from: 'chat', status: 'error' }), () => { j2(2); }, { id: 'viewer-error' }),
+    view('Split view from the panel: ReAct… opens beside the conversation at page 1, no highlight; panel collapsed, nav on its rail.', () => ST.setPane('d3', { page: 1, row: 'd3' }), () => { j2(3); }, { id: 'viewer-document' }),
+    view('Split view from the chip “ReAct · p. 3”: page 3 beside the conversation, passage highlighted, the chip stays highlighted.', () => ST.setPane('d3', { page: 3, highlight: { page: 3 }, chip: { mid: firstAnswer().id, ci: 0 } }), () => { j2(2); }, { id: 'viewer-citation-highlight' }),
+    view('Split view: the cited page with “Couldn\'t highlight the passage on this page.” inside the pane.', () => ST.setPane('d3', { page: 5, highlight: { page: 5 }, noHighlight: true, chip: { mid: firstAnswer().id, ci: 1 } }), () => { j2(2); }, { id: 'viewer-no-highlight' }),
+    { id: 'viewer-archived', group: 'Document viewer', ref: '§6.12 · US-4b', desc: 'Outside chat the viewer stays the overlay: an archived document opened from the Library (details → Open), read-only with “Archived” and “Restore”.', view: ST.libraryView,
+      setup: () => { fresh(); ST.resetList({ tab: 'archived' }); doc('d4').archived = true; }, afterEnter: () => ST.openViewer('d4', { page: 1, from: 'details' }) },
+    view('Open in dialog from the pane: the same document, page 3 and highlight in the large overlay, with a details strip (authors, year, pages, subjects); Close returns to the split view.', () => ST.setPane('d3', { page: 3, highlight: { page: 3 }, chip: { mid: firstAnswer().id, ci: 0 } }), () => { j2(2); }, { id: 'viewer-dialog', afterEnter: () => { ST.chatEnter(); ST.openPaneDialog(); } }),
+    view('Split view loading: page skeleton inside the pane while the cited page loads first.', () => ST.setPane('d3', { page: 3, highlight: { page: 3 }, status: 'loading', chip: { mid: firstAnswer().id, ci: 0 } }), () => { j2(2); }, { id: 'viewer-loading' }),
+    view('Split view error: “We couldn\'t open this document.” with Retry inside the pane.', () => ST.setPane('d3', { page: 3, highlight: { page: 3 }, status: 'error', chip: { mid: firstAnswer().id, ci: 0 } }), () => { j2(2); }, { id: 'viewer-error' }),
 
     /* §6.7 */
     { id: 'conversations-active', live: true, group: 'Conversations', ref: '§6.7 · US-13', desc: 'Live list: subject chips of the documents used, number of documents used, last activity, note indicator.', setup: () => ST.resetList(), view: ST.conversationsView },
@@ -212,6 +223,7 @@
         if (ST.showDrop) ST.showDrop(false);
         S.citations = ST.ls.get('st3_citations', 'on') !== 'off';
         S.navCollapsed = ST.ls.get('st9_nav', 'open') === 'collapsed'; S.tipDemo = null;
+        S.chatPanel = ST.ls.get('st10_panel', 'open') !== 'closed'; ST.VW = null;
         S.release = d.release || 0;
         if (own) own();
       }
@@ -236,16 +248,16 @@
       { state: 'chat-new', text: 'Open Chat: nothing to choose, just ask' },
       { state: 'chat-streaming', text: 'Ask: the answer streams in' },
       { state: 'chat-answer-citations', text: 'Cited answer; the follow-up comes from another document' },
-      { state: 'chat-documents-used', text: 'Open Documents used' },
+      { state: 'chat-documents-used', text: 'Documents used in the conversation panel' },
       { state: 'chat-summarize-progress', text: '“Summarize lesson”' },
       { state: 'chat-summarize-done', text: 'Note saved' },
       { state: 'notes-editor', text: 'Open the note' }
     ] },
     { id: 'J3', title: 'Check the source', summary: 'Open a citation in the document viewer with the passage highlighted, go back, and open another document from Documents used.', steps: [
       { state: 'chat-answer-citations', text: 'An answer with citations' },
-      { state: 'viewer-citation-highlight', text: 'Select “ReAct…, p. 3”: the passage is highlighted' },
-      { state: 'chat-documents-used', text: 'Back to the conversation; open Documents used' },
-      { state: 'viewer-document', text: 'Open a document from the list at page 1' }
+      { state: 'viewer-citation-highlight', text: 'One click on “ReAct · p. 3”: the page opens beside the conversation, passage highlighted' },
+      { state: 'chat-documents-used', text: 'Close: the panel and nav come back' },
+      { state: 'viewer-document', text: 'One click on a Documents used row: page 1 beside the conversation' }
     ] },
     { id: 'J4', title: 'Library upkeep', summary: 'Filter, open, change subjects, fix the title, archive, restore, delete another document, and retry a failed file.', steps: [
       { state: 'library-filtered-by-subject', text: 'Filter the Library by AI Agents' },
