@@ -46,6 +46,8 @@
   --ease-out: cubic-bezier(.2, .7, .2, 1);
   --ease-in: cubic-bezier(.5, 0, .75, .2);
 
+  --control-h: 40px;
+  --filter-field-w: 160px;
   --nav-w: 240px;
   --chat-w: 760px;
   --page-w: 1120px;

@@ -1,10 +1,8 @@
-import { X } from "lucide-react";
 import { forwardRef } from "react";
 
 import type { DocumentFilters } from "../../api/documents";
 import type { SubjectResponse } from "../../api/generated/types.gen";
-import { Button } from "../../components/Button/Button";
-import styles from "./LibraryFilters.module.css";
+import { FilterBar, FilterField, FilterRange, FilterRangeDash } from "../../components/FilterBar/FilterBar";
 
 // Same wording as StateBadge; the value is the API's state.
 const STATES: { value: NonNullable<DocumentFilters["state"]>; label: string }[] = [
@@ -38,10 +36,9 @@ export const LibraryFilters = forwardRef<HTMLSelectElement, Props>(function Libr
     onChange(next);
   };
   return (
-    <div className={styles.bar} role="search" aria-label="Filter documents">
-      <div className={styles.field}>
-        <label htmlFor="filter-subject">Subject</label>
-        <select id="filter-subject" ref={subjectRef} className={styles.control} value={filters.subject_ids?.[0] ?? ""} onChange={(e) => set({ subject_ids: e.target.value ? [e.target.value] : undefined })}>
+    <FilterBar label="Filter documents" noun="document" count={count} active={hasFilters(filters)} onClear={onClear}>
+      <FilterField id="filter-subject" label="Subject">
+        <select id="filter-subject" ref={subjectRef} value={filters.subject_ids?.[0] ?? ""} onChange={(e) => set({ subject_ids: e.target.value ? [e.target.value] : undefined })}>
           <option value="">All subjects</option>
           {subjects.map((s) => (
             <option key={s.subject_id} value={s.subject_id}>
@@ -49,23 +46,18 @@ export const LibraryFilters = forwardRef<HTMLSelectElement, Props>(function Libr
             </option>
           ))}
         </select>
-      </div>
-      <div className={styles.range}>
-        <div className={styles.field}>
-          <label htmlFor="filter-from">From</label>
-          <input id="filter-from" type="date" className={styles.control} value={filters.uploaded_from ?? ""} max={filters.uploaded_to || undefined} onChange={(e) => set({ uploaded_from: e.target.value })} />
-        </div>
-        <span className={styles.dash} aria-hidden="true">
-          –
-        </span>
-        <div className={styles.field}>
-          <label htmlFor="filter-to">To</label>
-          <input id="filter-to" type="date" className={styles.control} value={filters.uploaded_to ?? ""} min={filters.uploaded_from || undefined} onChange={(e) => set({ uploaded_to: e.target.value })} />
-        </div>
-      </div>
-      <div className={styles.field}>
-        <label htmlFor="filter-state">State</label>
-        <select id="filter-state" className={styles.control} value={filters.state ?? ""} onChange={(e) => set({ state: (e.target.value || undefined) as DocumentFilters["state"] })}>
+      </FilterField>
+      <FilterRange>
+        <FilterField id="filter-from" label="From">
+          <input id="filter-from" type="date" value={filters.uploaded_from ?? ""} max={filters.uploaded_to || undefined} onChange={(e) => set({ uploaded_from: e.target.value })} />
+        </FilterField>
+        <FilterRangeDash />
+        <FilterField id="filter-to" label="To">
+          <input id="filter-to" type="date" value={filters.uploaded_to ?? ""} min={filters.uploaded_from || undefined} onChange={(e) => set({ uploaded_to: e.target.value })} />
+        </FilterField>
+      </FilterRange>
+      <FilterField id="filter-state" label="State">
+        <select id="filter-state" value={filters.state ?? ""} onChange={(e) => set({ state: (e.target.value || undefined) as DocumentFilters["state"] })}>
           <option value="">All states</option>
           {STATES.map((s) => (
             <option key={s.value} value={s.value}>
@@ -73,15 +65,7 @@ export const LibraryFilters = forwardRef<HTMLSelectElement, Props>(function Libr
             </option>
           ))}
         </select>
-      </div>
-      <div className={styles.summary}>
-        <span aria-live="polite">{count === null ? "" : count === 1 ? "1 document" : `${count} documents`}</span>
-        {hasFilters(filters) && (
-          <Button variant="ghost" size="sm" icon={X} onClick={onClear}>
-            Clear filters
-          </Button>
-        )}
-      </div>
-    </div>
+      </FilterField>
+    </FilterBar>
   );
 });

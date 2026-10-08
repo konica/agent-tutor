@@ -10,19 +10,20 @@ const processing: DocumentResponse = { document_id: "d1", title: "lewis-rag-2020
 const duplicate: DocumentResponse = { document_id: "d2", title: "copy.pdf", state: "failed", failure_reason: "Duplicate uploads aren't supported yet", created_at: today, subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: [], year: null };
 
 const notInLibrary = async () => null;
+const noSubjects = async () => [];
 const limits = async () => ({ max_bytes: 52_428_800, max_pages: 500 });
 
 afterEach(() => vi.useRealTimers());
 
 describe("LibraryPage", () => {
   it("shows the first-run card when the library is empty", async () => {
-    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => []} upload={vi.fn()} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => []} upload={vi.fn()} />);
     expect(await screen.findByText("Upload your first document")).toBeVisible();
     expect(screen.getByRole("button", { name: "Choose PDFs" })).toBeEnabled();
   });
 
   it("lists a processing document by its file name with the subjects hint", async () => {
-    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => [processing]} upload={vi.fn()} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => [processing]} upload={vi.fn()} />);
     const row = (await screen.findByText("lewis-rag-2020.pdf")).closest("tr")!;
     expect(within(row).getByText("Processing")).toBeVisible();
     expect(within(row).getByText("Not chosen yet")).toBeVisible();
@@ -32,7 +33,7 @@ describe("LibraryPage", () => {
 
   it("shows a ready document's subjects by name", async () => {
     const ready: DocumentResponse = { ...processing, state: "ready", subjects: [{ subject_id: "s1", name: "General" }] };
-    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => [ready]} upload={vi.fn()} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => [ready]} upload={vi.fn()} />);
     const row = (await screen.findByText("lewis-rag-2020.pdf")).closest("tr")!;
     expect(within(row).getByText("General")).toBeVisible();
     expect(within(row).queryByText("Not chosen yet")).toBeNull();
@@ -40,7 +41,7 @@ describe("LibraryPage", () => {
   });
 
   it("shows a failed document's reason", async () => {
-    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => [duplicate]} upload={vi.fn()} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => [duplicate]} upload={vi.fn()} />);
     const row = (await screen.findByText("copy.pdf")).closest("tr")!;
     expect(within(row).getByText("Failed")).toBeVisible();
     expect(within(row).getByText("Duplicate uploads aren't supported yet")).toBeVisible();
@@ -49,7 +50,7 @@ describe("LibraryPage", () => {
   it("uploads the picked PDF and refreshes the list", async () => {
     const load = vi.fn().mockResolvedValueOnce([]).mockResolvedValue([processing]);
     const upload = vi.fn(async () => {});
-    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={load} upload={upload} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={upload} />);
     await screen.findByText("Upload your first document");
     const file = new File(["%PDF"], "lewis-rag-2020.pdf", { type: "application/pdf" });
     await userEvent.upload(screen.getByLabelText("Upload PDFs"), file);
@@ -62,7 +63,7 @@ describe("LibraryPage", () => {
     const upload = vi.fn(async () => {
       throw new Error("Upload to storage failed (403)");
     });
-    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => []} upload={upload} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => []} upload={upload} />);
     await screen.findByText("Upload your first document");
     await userEvent.upload(screen.getByLabelText("Upload PDFs"), new File(["x"], "big.pdf", { type: "application/pdf" }));
     expect(await screen.findByText("Couldn't upload big.pdf. Try again.")).toBeVisible();
@@ -72,7 +73,7 @@ describe("LibraryPage", () => {
 
   it("refuses a non-PDF and an oversized file in the browser, uploads the rest, and says why", async () => {
     const upload = vi.fn(async () => {});
-    render(<LibraryPage check={notInLibrary} load={async () => []} upload={upload} loadLimits={limits} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} load={async () => []} upload={upload} loadLimits={limits} />);
     await screen.findByText("Upload your first document");
     const docx = new File(["x"], "reading-list.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
     const big = new File(["x"], "deep-learning-book-full.pdf", { type: "application/pdf" });
@@ -90,7 +91,7 @@ describe("LibraryPage", () => {
 
   it("announces every refusal reason and the upload in the one status region", async () => {
     const upload = vi.fn(async () => {});
-    render(<LibraryPage check={notInLibrary} load={async () => []} upload={upload} loadLimits={limits} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} load={async () => []} upload={upload} loadLimits={limits} />);
     await screen.findByText("Upload your first document");
     const docx = new File(["x"], "reading-list.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
     const big = new File(["x"], "deep-learning-book-full.pdf", { type: "application/pdf" });
@@ -107,7 +108,7 @@ describe("LibraryPage", () => {
 
   it("refuses a non-PDF with its reason even when the limits can't be loaded", async () => {
     const upload = vi.fn(async () => {});
-    render(<LibraryPage check={notInLibrary} load={async () => []} upload={upload} loadLimits={async () => { throw new Error("down"); }} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} load={async () => []} upload={upload} loadLimits={async () => { throw new Error("down"); }} />);
     await screen.findByText("Upload your first document");
     await userEvent.upload(screen.getByLabelText("Upload PDFs"), new File(["x"], "notes.docx", { type: "application/msword" }), { applyAccept: false });
     expect(await screen.findByText("Not uploaded. Only PDF files can be uploaded.")).toBeVisible();
@@ -117,16 +118,16 @@ describe("LibraryPage", () => {
 
   it("loads the limits once when the loader is an inline function", async () => {
     const loadLimits = vi.fn(limits);
-    const { rerender } = render(<LibraryPage check={notInLibrary} load={async () => []} upload={vi.fn()} loadLimits={() => loadLimits()} />);
+    const { rerender } = render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} load={async () => []} upload={vi.fn()} loadLimits={() => loadLimits()} />);
     await screen.findByText(/PDFs up to 50 MB/);
-    rerender(<LibraryPage check={notInLibrary} load={async () => []} upload={vi.fn()} loadLimits={() => loadLimits()} />);
+    rerender(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} load={async () => []} upload={vi.fn()} loadLimits={() => loadLimits()} />);
     expect(loadLimits).toHaveBeenCalledTimes(1);
   });
 
   it("makes no request at all for a refused file", async () => {
     const fetch = vi.spyOn(globalThis, "fetch");
     const upload = vi.fn(async () => {});
-    render(<LibraryPage check={notInLibrary} load={async () => []} upload={upload} loadLimits={limits} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} load={async () => []} upload={upload} loadLimits={limits} />);
     await screen.findByText("Upload your first document");
     await userEvent.upload(screen.getByLabelText("Upload PDFs"), new File(["x"], "a.txt", { type: "text/plain" }), { applyAccept: false });
     expect(await screen.findByText("Not uploaded. Only PDF files can be uploaded.")).toBeVisible();
@@ -136,13 +137,13 @@ describe("LibraryPage", () => {
   });
 
   it("states the limits from settings in the first-run card", async () => {
-    render(<LibraryPage check={notInLibrary} load={async () => []} upload={vi.fn()} loadLimits={async () => ({ max_bytes: 10 * 1_048_576, max_pages: 200 })} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} load={async () => []} upload={vi.fn()} loadLimits={async () => ({ max_bytes: 10 * 1_048_576, max_pages: 200 })} />);
     expect(await screen.findByText(/PDFs up to 10 MB and 200 pages/)).toBeVisible();
   });
 
   it("never uploads when the limits can't be loaded", async () => {
     const upload = vi.fn(async () => {});
-    render(<LibraryPage check={notInLibrary} load={async () => []} upload={upload} loadLimits={async () => { throw new Error("down"); }} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} load={async () => []} upload={upload} loadLimits={async () => { throw new Error("down"); }} />);
     await screen.findByText("Upload your first document");
     await userEvent.upload(screen.getByLabelText("Upload PDFs"), new File(["%PDF"], "paper.pdf", { type: "application/pdf" }));
     expect(await screen.findByText("Couldn't upload paper.pdf. Try again.")).toBeVisible();
@@ -151,10 +152,19 @@ describe("LibraryPage", () => {
 
   it("announces a processing state change in the status region, but not the first load", async () => {
     const failedNow: DocumentResponse = { ...processing, state: "failed", failure_reason: "Duplicate uploads aren't supported yet" };
-    const load = vi.fn().mockResolvedValueOnce([processing]).mockResolvedValue([failedNow]);
-    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} pollMs={20} />);
-    await screen.findByText("Processing");
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve)); // the change arrives only after the first-load check
+    const load = vi
+      .fn()
+      .mockResolvedValueOnce([processing])
+      .mockImplementation(async () => {
+        await gate;
+        return [failedNow];
+      });
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} pollMs={20} />);
+    await screen.findByText("lewis-rag-2020.pdf"); // not "Processing": the State filter has that option too
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    release();
     await waitFor(() =>
       expect(screen.getByRole("status")).toHaveTextContent("lewis-rag-2020.pdf failed: Duplicate uploads aren't supported yet."),
     );
@@ -163,7 +173,7 @@ describe("LibraryPage", () => {
   it("refreshes every 2 seconds", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const load = vi.fn(async () => [processing]);
-    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} />);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(4100);
     });
@@ -173,7 +183,7 @@ describe("LibraryPage", () => {
   it("skips the upload of a file already in the library and links to its row", async () => {
     const upload = vi.fn(async () => {});
     const check = vi.fn(async () => "d1");
-    render(<LibraryPage loadLimits={limits} load={async () => [processing]} upload={upload} check={check} />);
+    render(<LibraryPage loadSubjects={noSubjects} loadLimits={limits} load={async () => [processing]} upload={upload} check={check} />);
     await screen.findByText("lewis-rag-2020.pdf");
     const file = new File(["%PDF"], "lewis-rag-2020.pdf", { type: "application/pdf" });
     await userEvent.upload(screen.getByLabelText("Upload PDFs"), file);
@@ -189,7 +199,7 @@ describe("LibraryPage", () => {
   it("uploads only the files not already in the library", async () => {
     const upload = vi.fn(async () => {});
     const check = vi.fn(async (f: File) => (f.name === "have.pdf" ? "d1" : null));
-    render(<LibraryPage loadLimits={limits} load={async () => [processing]} upload={upload} check={check} />);
+    render(<LibraryPage loadSubjects={noSubjects} loadLimits={limits} load={async () => [processing]} upload={upload} check={check} />);
     await screen.findByText("lewis-rag-2020.pdf");
     const have = new File(["%PDF a"], "have.pdf", { type: "application/pdf" });
     const fresh = new File(["%PDF b"], "fresh.pdf", { type: "application/pdf" });
@@ -206,7 +216,7 @@ describe("LibraryPage", () => {
     const check = vi.fn(async () => {
       throw new Error("500");
     });
-    render(<LibraryPage loadLimits={limits} load={async () => []} upload={upload} check={check} />);
+    render(<LibraryPage loadSubjects={noSubjects} loadLimits={limits} load={async () => []} upload={upload} check={check} />);
     await screen.findByText("Upload your first document");
     const file = new File(["%PDF"], "x.pdf", { type: "application/pdf" });
     await userEvent.upload(screen.getByLabelText("Upload PDFs"), file);
@@ -215,7 +225,7 @@ describe("LibraryPage", () => {
 
   it("does not check a rejected file", async () => {
     const check = vi.fn(async () => null);
-    render(<LibraryPage loadLimits={limits} load={async () => []} upload={vi.fn()} check={check} />);
+    render(<LibraryPage loadSubjects={noSubjects} loadLimits={limits} load={async () => []} upload={vi.fn()} check={check} />);
     await screen.findByText("Upload your first document");
     await userEvent.upload(screen.getByLabelText("Upload PDFs"), new File(["x"], "notes.docx", { type: "application/msword" }), { applyAccept: false });
     expect(check).not.toHaveBeenCalled();
@@ -242,7 +252,7 @@ describe("LibraryPage drop zone and upload tray", () => {
   }
 
   it("highlights the page on drag-over and clears it on drag-leave", async () => {
-    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => []} upload={vi.fn()} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => []} upload={vi.fn()} />);
     await screen.findByText("Upload your first document");
     fireEvent.dragEnter(document.body, { dataTransfer: { types: ["Files"], files: [] } });
     expect(screen.getByText("Drop PDFs to upload")).toBeInTheDocument();
@@ -252,7 +262,7 @@ describe("LibraryPage drop zone and upload tray", () => {
 
   it("uploads three dropped PDFs in parallel, each with its own progress bar", async () => {
     const { upload, pending } = controlledUpload();
-    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => []} upload={upload} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => []} upload={upload} />);
     await screen.findByText("Upload your first document");
     drop([pdf("a.pdf"), pdf("b.pdf"), pdf("c.pdf")]);
     expect(screen.queryByText("Drop PDFs to upload")).toBeNull();
@@ -271,7 +281,7 @@ describe("LibraryPage drop zone and upload tray", () => {
 
   it("refuses a dropped non-PDF the same way as a picked one", async () => {
     const upload = vi.fn(async () => {});
-    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => []} upload={upload} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => []} upload={upload} />);
     await screen.findByText("Upload your first document");
     drop([new File(["x"], "reading-list.docx", { type: "application/msword" }), pdf("paper.pdf")]);
     const list = await screen.findByRole("list", { name: "Files not uploaded" });
@@ -282,7 +292,7 @@ describe("LibraryPage drop zone and upload tray", () => {
 
   it("keeps the other uploads going when one fails", async () => {
     const { upload, pending } = controlledUpload();
-    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => []} upload={upload} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => []} upload={upload} />);
     await screen.findByText("Upload your first document");
     drop([pdf("a.pdf"), pdf("b.pdf")]);
     await waitFor(() => expect(upload).toHaveBeenCalledTimes(2));
@@ -297,7 +307,7 @@ describe("LibraryPage drop zone and upload tray", () => {
 
   it("adds a second drop to the same tray, newest first, and hides Close until all finish", async () => {
     const { upload, pending } = controlledUpload();
-    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => []} upload={upload} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => []} upload={upload} />);
     await screen.findByText("Upload your first document");
     drop([pdf("first.pdf")]);
     await waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
@@ -314,7 +324,7 @@ describe("LibraryPage drop zone and upload tray", () => {
 
   it("announces both batches when a second drop starts before the first finishes", async () => {
     const { upload, pending } = controlledUpload();
-    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => []} upload={upload} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => []} upload={upload} />);
     await screen.findByText("Upload your first document");
     drop([pdf("a.pdf")]);
     await waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
@@ -336,7 +346,7 @@ describe("LibraryPage drop zone and upload tray", () => {
 
   it("uploads at most three files at a time", async () => {
     const { upload, pending } = controlledUpload();
-    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => []} upload={upload} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => []} upload={upload} />);
     await screen.findByText("Upload your first document");
     drop(["a", "b", "c", "d", "e"].map((n) => pdf(`${n}.pdf`)));
     await waitFor(() => expect(upload).toHaveBeenCalledTimes(3));
@@ -359,7 +369,7 @@ describe("LibraryPage drop zone and upload tray", () => {
   it("removes a queued file from the tray when it is already in the library", async () => {
     const { upload, pending } = controlledUpload();
     const check = vi.fn(async (f: File) => (f.name === "have.pdf" ? "d1" : null));
-    render(<LibraryPage check={check} loadLimits={limits} load={async () => []} upload={upload} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={check} loadLimits={limits} load={async () => []} upload={upload} />);
     await screen.findByText("Upload your first document");
     drop([pdf("have.pdf"), pdf("fresh.pdf")]);
     await waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
@@ -375,7 +385,7 @@ describe("LibraryPage drop zone and upload tray", () => {
     const { upload, pending } = controlledUpload();
     const row: DocumentResponse = { ...processing, document_id: "d9", title: "a.pdf" };
     const load = vi.fn().mockResolvedValueOnce([]).mockResolvedValue([row]);
-    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={load} upload={upload} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={upload} />);
     await screen.findByText("Upload your first document");
     drop([pdf("a.pdf")]);
     await waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
@@ -389,7 +399,7 @@ describe("LibraryPage drop zone and upload tray", () => {
 
   it("uploads by keyboard from the Upload button", async () => {
     const upload = vi.fn(async () => {});
-    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => [processing]} upload={upload} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => [processing]} upload={upload} />);
     const button = await screen.findByRole("button", { name: "Upload" });
     const input = screen.getByLabelText("Upload PDFs") as HTMLInputElement;
     const click = vi.spyOn(input, "click");
@@ -399,7 +409,7 @@ describe("LibraryPage drop zone and upload tray", () => {
   });
 
   it("tells the learner they can drop files in the first-run card", async () => {
-    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => []} upload={vi.fn()} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => []} upload={vi.fn()} />);
     expect(await screen.findByText("Or drop files anywhere on this page. You can add several at once.")).toBeVisible();
   });
 });
@@ -417,7 +427,7 @@ describe("LibraryPage choose subjects", () => {
   const pageStatus = () => screen.getAllByRole("status").find((el) => el.tagName === "P")!;
 
   it("offers the action only on a document waiting for subjects", async () => {
-    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => [waiting, duplicate, processing]} upload={vi.fn()} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => [waiting, duplicate, processing]} upload={vi.fn()} />);
     const row = (await screen.findByText("Toolformer")).closest("tr")!;
     expect(within(row).getAllByText("Choose subjects")).toHaveLength(2); // the badge and the button label
     expect(within(row).getByRole("button", { name: "Choose subjects for Toolformer" })).toBeVisible();
@@ -429,7 +439,7 @@ describe("LibraryPage choose subjects", () => {
     const load = vi.fn().mockResolvedValueOnce([waiting]).mockResolvedValue([ready]);
     const loadSuggestions = vi.fn(async () => suggestions);
     const saveSubjects = vi.fn(async () => ready);
-    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} loadSuggestions={loadSuggestions} saveSubjects={saveSubjects} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} loadSuggestions={loadSuggestions} saveSubjects={saveSubjects} />);
     await userEvent.click(await screen.findByRole("button", { name: "Choose subjects for Toolformer" }));
     expect(screen.getByRole("dialog", { name: "Choose subjects" })).toBeVisible();
     await userEvent.click(await screen.findByRole("button", { name: "Save" }));
@@ -444,7 +454,7 @@ describe("LibraryPage choose subjects", () => {
 
   it("ignores a file dropped while the picker is open", async () => {
     const upload = vi.fn(async () => {});
-    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={async () => [waiting]} upload={upload} loadSuggestions={async () => suggestions} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => [waiting]} upload={upload} loadSuggestions={async () => suggestions} />);
     await userEvent.click(await screen.findByRole("button", { name: "Choose subjects for Toolformer" }));
     expect(screen.getByRole("dialog", { name: "Choose subjects" })).toBeVisible();
     fireEvent.dragEnter(document.body, { dataTransfer: { types: ["Files"], files: [] } });
@@ -464,7 +474,7 @@ describe("LibraryPage choose subjects", () => {
       didSave = true;
       return ready;
     };
-    render(<LibraryPage check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} loadSuggestions={async () => suggestions} saveSubjects={saveSubjects} pollMs={50} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} loadSuggestions={async () => suggestions} saveSubjects={saveSubjects} pollMs={50} />);
     await userEvent.click(await screen.findByRole("button", { name: "Choose subjects for Toolformer" }));
     await userEvent.click(await screen.findByRole("button", { name: "Save" }));
     await waitFor(() => expect(load.mock.calls.length).toBeGreaterThan(2));
@@ -480,7 +490,7 @@ describe("LibraryPage retry", () => {
   it("retries a failed document and refreshes the list", async () => {
     const load = vi.fn().mockResolvedValueOnce([scan]).mockResolvedValue([{ ...scan, state: "processing", failure_reason: null, attempt: 2, can_retry: false }]);
     const retry = vi.fn(async () => {});
-    render(<LibraryPage loadLimits={limits} load={load} upload={vi.fn()} retry={retry} />);
+    render(<LibraryPage loadSubjects={noSubjects} loadLimits={limits} load={load} upload={vi.fn()} retry={retry} />);
     const row = (await screen.findByText("scan.pdf")).closest("tr")!;
     await userEvent.click(within(row).getByRole("button", { name: "Retry scan.pdf" }));
     expect(retry).toHaveBeenCalledWith("d3");
@@ -491,14 +501,14 @@ describe("LibraryPage retry", () => {
 
   it("shows no Retry once the attempts are used up", async () => {
     const usedUp = { ...scan, failure_reason: "This file could not be processed", attempt: 3, can_retry: false };
-    render(<LibraryPage loadLimits={limits} load={async () => [usedUp]} upload={vi.fn()} retry={vi.fn()} />);
+    render(<LibraryPage loadSubjects={noSubjects} loadLimits={limits} load={async () => [usedUp]} upload={vi.fn()} retry={vi.fn()} />);
     const row = (await screen.findByText("scan.pdf")).closest("tr")!;
     expect(within(row).getByText("This file could not be processed")).toBeVisible();
     expect(within(row).queryByRole("button", { name: /Retry/ })).toBeNull();
   });
 
   it("shows no Retry for a failed document without a retry", async () => {
-    render(<LibraryPage loadLimits={limits} load={async () => [duplicate]} upload={vi.fn()} retry={vi.fn()} />);
+    render(<LibraryPage loadSubjects={noSubjects} loadLimits={limits} load={async () => [duplicate]} upload={vi.fn()} retry={vi.fn()} />);
     const row = (await screen.findByText("copy.pdf")).closest("tr")!;
     expect(within(row).queryByRole("button", { name: /Retry/ })).toBeNull();
   });
@@ -507,7 +517,7 @@ describe("LibraryPage retry", () => {
     const retry = vi.fn(async () => {
       throw new Error("POST /documents/d3/retry failed (500)");
     });
-    render(<LibraryPage loadLimits={limits} load={async () => [scan]} upload={vi.fn()} retry={retry} />);
+    render(<LibraryPage loadSubjects={noSubjects} loadLimits={limits} load={async () => [scan]} upload={vi.fn()} retry={retry} />);
     const row = (await screen.findByText("scan.pdf")).closest("tr")!;
     await userEvent.click(within(row).getByRole("button", { name: "Retry scan.pdf" }));
     expect(await screen.findByRole("status")).toHaveTextContent("Couldn't retry scan.pdf. Try again.");
@@ -518,7 +528,7 @@ describe("LibraryPage retry", () => {
     const retry = vi.fn(async () => {
       throw new RetriesUsedUpError();
     });
-    render(<LibraryPage loadLimits={limits} load={async () => [scan]} upload={vi.fn()} retry={retry} />);
+    render(<LibraryPage loadSubjects={noSubjects} loadLimits={limits} load={async () => [scan]} upload={vi.fn()} retry={retry} />);
     const row = (await screen.findByText("scan.pdf")).closest("tr")!;
     await userEvent.click(within(row).getByRole("button", { name: "Retry scan.pdf" }));
     expect(await screen.findByRole("status")).toHaveTextContent("scan.pdf could not be processed.");

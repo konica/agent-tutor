@@ -14,7 +14,8 @@ class ConfigStack(cdk.Stack):
         super().__init__(scope, construct_id, **kwargs)
 
         # Per-file limits and processing attempts (PRD §11, §9.5), read at startup by the API and the worker, and the
-        # detection thresholds (PRD §9.2), read by the agent, and the app time zone (D27), read by the API; change them here, not in code.
+        # detection thresholds (PRD §9.2), read by the agent, and the app time zone (D27), read by the API; change
+        # them here, not in code.
         for name, value in (
             ("max-upload-mb", "50"),
             ("max-pages", "500"),

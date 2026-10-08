@@ -2,13 +2,13 @@
   display: flex; align-items: flex-end; flex-wrap: wrap; gap: var(--sp-4); padding: var(--sp-4); margin: 0 0 var(--sp-4);
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
 }
-.field { min-width: 160px; }
+.field { min-width: var(--filter-field-w); }
 .field label { display: block; margin-bottom: var(--sp-1); font-size: var(--fs-14); font-weight: 650; color: var(--text); }
-.control {
-  width: 100%; min-height: 40px; padding: 0 var(--sp-3); border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+.field select, .field input {
+  width: 100%; min-height: var(--control-h); padding: 0 var(--sp-3); border: 1px solid var(--border-strong); border-radius: var(--r-sm);
   background: var(--surface); color: var(--text); font-size: var(--fs-14);
 }
 .range { display: flex; align-items: flex-end; gap: var(--sp-2); }
 .range .field { min-width: 0; }
-.dash { padding-bottom: 10px; color: var(--text-2); }
-.summary { margin-left: auto; display: flex; align-items: center; gap: var(--sp-3); min-height: 40px; font-size: var(--fs-14); color: var(--text-2); }
+.dash { display: flex; align-items: center; min-height: var(--control-h); color: var(--text-2); }
+.summary { margin-left: auto; display: flex; align-items: center; gap: var(--sp-3); min-height: var(--control-h); font-size: var(--fs-14); color: var(--text-2); }

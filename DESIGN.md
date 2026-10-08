@@ -58,7 +58,8 @@ Shared components live in `web/src/components/`, one folder each (`Button/Button
 | `EmptyState` | `.empty` | icon, h2, one sentence, actions, optional `note` below the actions |
 | `StateBadge` | `.state-*` | see Document states |
 | `SubjectChip` | `.schip` | the one chip for subjects everywhere (Library, picker, chat header, lists), learner's subject name, stable hue per subject |
-| `Banner`, `Toast`, `Dialog`, `SidePanel`, `Tabs`, `FilterBar`, `UploadTray`, `Citation`, `SystemNotice` | `.banner-*`, `.toast`, `.dialog`, `.side-panel`, `.tabs`, `.filter-bar`, `.tray`, `.cite`, `.notice` | built with the story that first shows them |
+| `FilterBar` | `.filter-bar` | built (Library): `role="search"` with a label, labelled fields, live count, Clear filters shown only while a filter is set; `noun` reuses it for conversations and notes |
+| `Banner`, `Toast`, `Dialog`, `SidePanel`, `Tabs`, `UploadTray`, `Citation`, `SystemNotice` | `.banner-*`, `.toast`, `.dialog`, `.side-panel`, `.tabs`, `.tray`, `.cite`, `.notice` | built with the story that first shows them |
 
 Icons: one outline family at 1.5px stroke, `lucide-react` with `strokeWidth={1.5}`, sized 16–20px, `aria-hidden` unless the icon is the only label.
 

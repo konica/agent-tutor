@@ -1,4 +1,5 @@
 import hashlib
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -8,6 +9,7 @@ from fakes import (
     FakeObjectStore,
     FakeQueue,
     FakeTokenVerifier,
+    FixedClock,
     InMemoryLibrary,
     api_services,
     fake_tools,
@@ -357,3 +359,20 @@ def test_a_malformed_filter_is_422(client: TestClient, params: dict[str, str]) -
 def test_more_than_100_subject_ids_is_422(client: TestClient) -> None:
     params = [("subject_id", f"00000000-0000-4000-8000-{n:012d}") for n in range(101)]
     assert client.get("/documents", headers=AUTH, params=params).status_code == 422
+
+
+def test_upload_date_filter_uses_the_gmt_plus_7_day_at_the_boundary() -> None:
+    verifier = FakeTokenVerifier()
+    verifier.add("ada-token", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
+    clock = FixedClock(datetime(2026, 10, 1, 17, 30, tzinfo=UTC))  # 00:30 on Oct 2 in GMT+7
+    services = api_services(InMemoryLibrary(), FakeObjectStore(), queue=FakeQueue(), clock=clock)
+    boundary = TestClient(create_app(Settings(), verifier=verifier, services=services))
+    document_id = boundary.post("/uploads", json={"file_name": "late.pdf"}, headers=AUTH).json()["document_id"]
+
+    assert listed_ids(boundary, {"uploaded_to": "2026-10-01"}) == set()
+    assert listed_ids(boundary, {"uploaded_from": "2026-10-02", "uploaded_to": "2026-10-02"}) == {document_id}
+
+
+def test_a_range_with_from_after_to_is_empty_not_an_error(client: TestClient) -> None:
+    library_of_three(client)
+    assert listed_ids(client, {"uploaded_from": "2026-10-05", "uploaded_to": "2026-10-01"}) == set()
