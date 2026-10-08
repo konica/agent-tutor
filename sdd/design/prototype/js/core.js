@@ -1,4 +1,4 @@
-/* Smart Tutor v0.8 — core: helpers, icons, store, shell, overlays, upload tray, router, review chrome. */
+/* Smart Tutor v0.9 — core: helpers, icons, store, shell, overlays, upload tray, router, review chrome. */
 (function () {
   const ST = window.ST;
 
@@ -250,36 +250,45 @@
   ];
   ST.NAV_LATER = { map: { label: 'Research map', icon: 'map', after: 'library', href: '#/r2-map' }, quizzes: { label: 'Quizzes', icon: 'quiz', after: 'notes', href: '#/r3-quizzes-list' }, reports: { label: 'Reports', icon: 'report', after: 'quizzes', href: '#/r3-reports' } };
 
+  /* M3: 208px nav, 32px items in hairline-separated groups, collapsible to a 56px icon rail (names in tooltips). */
+  ST.NAV_GROUPS = [['library', 'chat'], ['conversations', 'notes'], ['subjects', 'usage']];
   ST.shell = ({ nav = '', content = '', currentConv = null }) => {
     const S = ST.S;
     const n = ST.needsAction();
     const later = S.release || 0; // 2 shows the map, 3 shows the learning loop (wireframes only)
-    const item = (it, id) => `<li><a class="nav-link" href="${it.href}" ${nav === id ? 'aria-current="page"' : ''}>${ST.ic(it.icon)}<span>${it.label}</span>${
-      id === 'library' && n ? `<span class="nav-count" aria-label="${ST.plural(n, 'document')} need${n === 1 ? 's' : ''} your action">${n}</span>` : ''}${
-      id === 'chat' ? '<span class="vh">: start a new conversation</span>' : ''}${
-      ['map', 'quizzes', 'reports'].includes(id) ? `<span class="nav-tag">R${id === 'map' ? 2 : 3}</span>` : ''}</a></li>`;
-    let items = '';
-    ST.NAV.forEach((it) => {
-      items += item(it, it.id);
-      if (it.id === 'library' && later >= 2) items += item(ST.NAV_LATER.map, 'map');
-      if (it.id === 'notes' && later >= 3) items += item(ST.NAV_LATER.quizzes, 'quizzes') + item(ST.NAV_LATER.reports, 'reports');
-    });
-    const recent = S.convs.filter((c) => !c.archived).sort((a, b) => b.last.localeCompare(a.last)).slice(0, 4);
-    return `<div class="app">
-      <nav class="sidenav" aria-label="Main">
-        <a class="brand" href="#/library-default" aria-label="Smart Tutor, Library">${ST.logo()}<span class="word">Smart Tutor</span></a>
-        <ul class="nav-list">${items}</ul>
-        ${recent.length ? `<p class="nav-section" id="recent-h">Recent conversations</p>
-        <ul class="nav-list recent" aria-labelledby="recent-h">${recent.map((c) => `<li><a class="od-truncate" href="#/open/${c.id}" ${currentConv === c.id ? 'aria-current="page"' : ''}>${ST.esc(c.title)}</a></li>`).join('')}</ul>` : ''}
+    const rail = !!S.navCollapsed;
+    const byId = (id) => ST.NAV.find((x) => x.id === id) || ST.NAV_LATER[id];
+    const item = (id) => {
+      const it = byId(id);
+      const label = it.label + (id === 'chat' ? ', start a new conversation' : '');
+      return `<li><a class="nav-link ${S.tipDemo === id ? 'tip-demo' : ''}" href="${it.href}" ${nav === id ? 'aria-current="page"' : ''} ${rail ? `data-tip="${it.label}" aria-label="${label}${id === 'library' && n ? `, ${n} need your action` : ''}"` : ''} data-od-id="nav-${id}">${ST.ic(it.icon)}<span class="nl-text">${it.label}</span>${
+        id === 'library' && n ? `<span class="nav-count" ${rail ? 'aria-hidden="true"' : `aria-label="${ST.plural(n, 'document')} need${n === 1 ? 's' : ''} your action"`}>${n}</span>` : ''}${
+        id === 'chat' && !rail ? '<span class="vh">: start a new conversation</span>' : ''}${
+        ['map', 'quizzes', 'reports'].includes(id) ? `<span class="nav-tag">R${id === 'map' ? 2 : 3}</span>` : ''}</a>${id === 'conversations' && !rail ? recentList() : ''}</li>`;
+    };
+    const recentList = () => {
+      const recent = S.convs.filter((c) => !c.archived).sort((a, b) => b.last.localeCompare(a.last)).slice(0, 3);
+      return recent.length ? `<ul class="nav-sub" aria-label="Recent conversations">${recent.map((c) => `<li><a class="od-truncate" href="#/open/${c.id}" title="${ST.esc(c.title)}" ${currentConv === c.id ? 'aria-current="page"' : ''}>${ST.esc(c.title)}</a></li>`).join('')}</ul>` : '';
+    };
+    const groups = ST.NAV_GROUPS.map((g) => {
+      const ids = [];
+      g.forEach((id) => { ids.push(id); if (id === 'library' && later >= 2) ids.push('map'); if (id === 'notes' && later >= 3) ids.push('quizzes', 'reports'); });
+      return `<ul class="nav-list">${ids.map(item).join('')}</ul>`;
+    }).join('<hr class="nav-hr">');
+    return `<div class="app ${rail ? 'nav-collapsed' : ''}">
+      <nav class="sidenav" aria-label="Main" data-od-id="side-nav">
+        <a class="brand" href="#/library-default" aria-label="Smart Tutor, Library" ${rail ? 'data-tip="Smart Tutor"' : ''}>${ST.logo()}<span class="word">Smart Tutor</span></a>
+        ${groups}
         <div class="nav-foot">
+          <button class="nav-collapse" type="button" data-action="nav-collapse" aria-expanded="${!rail}" aria-label="${rail ? 'Expand navigation' : 'Collapse navigation'}" data-tip="${rail ? 'Expand navigation' : 'Collapse navigation'}" data-od-id="nav-collapse">${ST.ic(rail ? 'chevronRight' : 'chevronLeft', 'sm')}</button>
           ${S.userMenu ? `<div class="user-menu" id="user-menu">
             <div class="um-head od-stack" style="--od-gap:0"><strong>${ST.esc(ST.USER.name)}</strong><span class="small muted od-truncate">${ST.esc(ST.USER.email)}</span></div>
             <button class="menu-item" type="button" data-action="theme-toggle">${ST.ic(S.theme === 'dark' ? 'sun' : 'moon')}${S.theme === 'dark' ? 'Light theme' : 'Dark theme'}</button>
             <button class="menu-item" type="button" data-action="sign-out">${ST.ic('logout')}Sign out</button>
           </div>` : ''}
-          <button class="user-btn" type="button" data-action="user-menu" data-fk="user-btn" aria-expanded="${S.userMenu}" aria-controls="user-menu">
+          <button class="user-btn" type="button" data-action="user-menu" data-fk="user-btn" aria-expanded="${S.userMenu}" aria-controls="user-menu" ${rail ? `aria-label="${ST.esc(ST.USER.name)}, account menu" data-tip="${ST.esc(ST.USER.name)}"` : ''} data-od-id="user-menu-button">
             <span class="avatar" aria-hidden="true">${ST.USER.initials}</span>
-            <span class="od-fill od-stack" style="--od-gap:0"><span class="small" style="font-weight:600">${ST.esc(ST.USER.name)}</span><span class="xsmall muted">PhD student</span></span>
+            <span class="ub-name od-truncate">${ST.esc(ST.USER.name)}</span>
             ${ST.ic(S.userMenu ? 'chevronDown' : 'chevronUp', 'sm')}
           </button>
         </div>
@@ -287,6 +296,14 @@
       <main class="main" id="main-content" tabindex="-1">${content}</main>
     </div>`;
   };
+  ST.actions = ST.actions || {};
+  ST.actions['nav-collapse'] = () => { ST.S.navCollapsed = !ST.S.navCollapsed; ST.S.tipDemo = null; ST.ls.set('st9_nav', ST.S.navCollapsed ? 'collapsed' : 'open'); ST.render(); const b = document.querySelector('[data-action="nav-collapse"]'); if (b) b.focus(); };
+
+  /* M4: one 40px page header row: h1, a short count, an info button whose tooltip holds the longer description, the action. */
+  ST.pageHead = ({ title, count = '', info = '', action = '', id = '' }) => `<div class="page-head" data-od-id="page-header">
+      <h1 ${id ? `id="${id}" tabindex="-1"` : ''}>${title}</h1>${count ? `<span class="ph-count">${count}</span>` : ''}
+      ${info ? `<button class="info-btn" type="button" aria-label="About this page: ${ST.esc(info)}" data-tip="${ST.esc(info)}">${ST.ic('info', 'sm')}</button>` : ''}
+      <span class="od-fill"></span>${action}</div>`;
 
   /* ---------- upload tray (global, non-blocking) ---------- */
   ST.renderTray = () => {
@@ -314,7 +331,7 @@
     return `<li class="tray-item ${cls}"><span class="ti-icon">${ST.ic(icon)}</span><div class="od-stack" style="--od-gap:0">
       <span class="ti-name od-truncate">${ST.esc(t.name)}</span><span class="ti-status">${status}</span>${bar}${actions ? `<div class="ti-actions">${actions}</div>` : ''}</div></li>`;
   }
-  ST.actions = {};
+  ST.actions = ST.actions || {};
   Object.assign(ST.actions, {
     'tray-toggle': () => { ST.S.trayCollapsed = !ST.S.trayCollapsed; ST.renderTray(); const b = document.querySelector('[data-action="tray-toggle"]'); if (b) b.focus(); },
     'tray-close': () => { ST.S.tray = []; ST.renderTray(); const m = document.getElementById('main-content'); if (m) m.focus(); }
@@ -339,15 +356,18 @@
     const el = e.target.closest('[data-action]');
     const S = ST.S;
     if (S.rowMenu && !e.target.closest('.row-menu-wrap')) { S.rowMenu = null; if (!el) ST.render(); }
+    if (S.chatMenu && !e.target.closest('.th-more')) { S.chatMenu = false; if (!el) ST.render(); }
     if (el && ST.actions[el.dataset.action] && !el.disabled && el.getAttribute('aria-disabled') !== 'true') { ST.actions[el.dataset.action](el, e); return; }
     if (S.userMenu && !e.target.closest('.nav-foot')) { S.userMenu = false; ST.render(); }
   });
+  document.addEventListener('toggle', (e) => { const d = e.target; if (d && d.dataset && d.dataset.pop === 'date' && ST.L) ST.L.datePop = d.open; }, true);
   document.addEventListener('change', (e) => { const el = e.target.closest('[data-change]'); if (el && ST.actions[el.dataset.change]) ST.actions[el.dataset.change](el, e); });
   document.addEventListener('input', (e) => { const el = e.target.closest('[data-input]'); if (el && ST.actions[el.dataset.input]) ST.actions[el.dataset.input](el, e); });
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (ST.S.userMenu) { ST.S.userMenu = false; ST.render(); const b = document.querySelector('[data-fk="user-btn"]'); if (b) b.focus(); }
     if (ST.S.rowMenu) { const id = ST.S.rowMenu; ST.S.rowMenu = null; ST.render(); const b = document.querySelector(`[data-fk="more-${id}"]`); if (b) b.focus(); }
+    if (ST.S.chatMenu) { ST.S.chatMenu = false; ST.render(); const b = document.querySelector('[data-fk="chat-menu"]'); if (b) b.focus(); }
   });
   Object.assign(ST.actions, {
     'user-menu': () => { ST.S.userMenu = !ST.S.userMenu; ST.render(); if (ST.S.userMenu) { const m = document.querySelector('#user-menu .menu-item'); if (m) m.focus(); } },
@@ -383,7 +403,7 @@
     closeDrawer(false);
     const st = ST.resolve(location.hash);
     ST.current = st;
-    Object.assign(ST.S, { userMenu: false, rowMenu: null, release: 0 });
+    Object.assign(ST.S, { userMenu: false, rowMenu: null, chatMenu: false, release: 0 });
     ST.emptyDemo = false; ST.noTray = false;
     if (st.setup) st.setup();
     ST.mount(st.view(), { navigated: true });

@@ -1,4 +1,4 @@
-/* Smart Tutor v0.8 — every named state <screen>-<state>@v0.8, plus the four review flows (§5).
+/* Smart Tutor v0.9 — every named state <screen>-<state>@v0.9, plus the four review flows (§5).
    Contract (§11 item 6): window.ST.STATES = [{ id, group, ref, desc }], one user story per ref,
    each state at index.html#/<state-id>, review chrome hidden with ?shot=1.
    "live" states are where the app's own navigation lands: they keep whatever the reviewer did.
@@ -24,7 +24,7 @@
   const j2 = (n, o) => { ST.conv('cv1').noteId = null; S.thread = ST.j2Thread(n, Object.assign({ noteId: null }, o || {})); return S.thread; };
 
   const defs = [
-    { id: 'index', group: 'Overview', ref: '§5 · review flows', desc: 'Round 8 overview: what changed in v0.8, the four review flows and every state.', view: ST.indexView, setup: () => { fresh(); } },
+    { id: 'index', group: 'Overview', ref: '§5 · review flows', desc: 'Round 9 overview: what changed in v0.9 (compact density), the four review flows and every state.', view: ST.indexView, setup: () => { fresh(); } },
 
     /* §6.0 */
     { id: 'landing-default', group: 'Landing page', ref: '§6.0 · US-1', desc: 'Public page at /: what Smart Tutor does, how it works, trust points, “Create an account” and “Sign in”. Text only, outside the app shell.', view: ST.landingView, setup: () => { ST.noTray = true; } },
@@ -33,6 +33,9 @@
     { id: 'auth-sign-up', group: 'Sign in, sign up', ref: '§6.2 · US-1', desc: 'Keycloak registration page: stock keycloak.v2 layout, email as username (no Username field), with the Smart Tutor logo, colours, font and name (low-detail reference).', view: ST.authSignUp },
     { id: 'auth-verify-email', group: 'Sign in, sign up', ref: '§6.2 · US-1', desc: 'Keycloak email-verification page: stock keycloak.v2 layout (low-detail reference).', view: ST.authVerify },
     { id: 'auth-sign-in', group: 'Sign in, sign up', ref: '§6.2 · US-1', desc: 'Keycloak login page: stock keycloak.v2 layout (low-detail reference).', view: ST.authSignIn },
+
+    /* §6.1 */
+    { id: 'shell-nav-collapsed', group: 'App shell', ref: '§6.1 · US-13', desc: 'Navigation collapsed to the 56px icon rail; names show as tooltips on hover and focus (here: Chat). The choice is remembered.', view: ST.libraryView, setup: () => { fresh(); ST.resetList(); S.navCollapsed = true; S.tipDemo = 'chat'; } },
 
     /* §6.3 */
     lib('US-2', 'Live Library: the home screen, with the sample documents; the upload-rights line sits under “Upload” (where navigation lands).', null, { id: 'library-default', live: true, setup: () => { if (!ST.keepListFilters) ST.resetList(); ST.keepListFilters = false; } }),
@@ -47,7 +50,7 @@
       ST.later(() => { S.docs.forEach((d) => { if (d.titlePending) { d.titlePending = false; d.title = d.realTitle; } }); ST.render(); }, 1500);
       ST.later(() => { S.docs.forEach((d) => { if (d.state === 'processing') d.state = 'choose'; }); ST.announce('3 documents have finished processing and need subjects.'); ST.render(); }, 5000);
     } }),
-    lib('US-2', 'Processing finished: highlighted rows, “Choose subjects” and “3 documents need subjects”.', () => { newUser('choose'); }, { id: 'library-first-choose' }),
+    lib('US-2', 'Processing finished: highlighted rows, “Choose subjects”, and the toolbar chip “3 need subjects” (no banner, M10).', () => { newUser('choose'); }, { id: 'library-first-choose' }),
     lib('US-2', 'All three documents ready; “Ask a question” leads to the first answer.', () => { newUser('ready'); }, { id: 'library-first-ready' }),
     lib('US-2', 'Needs action: Toolformer needs subjects; banner and Library badge.', null, { id: 'library-choose-subjects' }),
     lib('US-2', 'Rejected before upload: not a PDF, or over 50 MB.', () => {
@@ -208,6 +211,7 @@
       setup: () => {
         if (ST.showDrop) ST.showDrop(false);
         S.citations = ST.ls.get('st3_citations', 'on') !== 'off';
+        S.navCollapsed = ST.ls.get('st9_nav', 'open') === 'collapsed'; S.tipDemo = null;
         S.release = d.release || 0;
         if (own) own();
       }
@@ -223,7 +227,7 @@
       { state: 'library-empty', text: 'Land on the empty Library' },
       { state: 'library-uploading', text: 'Drop 3 PDFs: progress in the upload tray' },
       { state: 'library-first-processing', text: 'Watch processing: titles first, subjects later' },
-      { state: 'library-first-choose', text: 'Processing finished: 3 documents need subjects' },
+      { state: 'library-first-choose', text: 'Processing finished: “3 need subjects” in the toolbar' },
       { state: 'picker-step-through', text: 'Accept suggestions; each document is ready on save' },
       { state: 'library-first-ready', text: 'All ready: “Ask a question”' },
       { state: 'chat-first-answer', text: 'The first cited answer' }

@@ -31,6 +31,10 @@
 
 States to redo, both themes: every state that shows the app shell inherits M1–M4. Check these closely: `library-default`, `library-empty`, `library-delete-confirm`, `chat-answer-citations`, `chat-documents-used-deleted`, `viewer-citation-highlight`, `conversations-active`, `notes-editor`, `subjects-list`, `usage-overview`, `details-ready`, `picker-default`. New: `shell-nav-collapsed` (the 56px rail with a tooltip).
 
+**M9 — landing trust points (owner, 2026-10-08).** Three trust points, each with a bold lead, in three columns that line up with the three How it works steps; "A pilot for laptop browsers." is dropped (the hero says "Pilot · laptop browsers only."). Copy in §9. State: `landing-default`.
+
+**M10 — no "needs subjects" banner (owner, 2026-10-08; designer N1).** Remove the Library's "*N* document(s) need subjects" notice row. The toolbar chip "*N* needs subjects" (a filter) and the Library nav badge carry the count; a row's "Choose subjects" opens the picker, which steps through all of them. States: `library-default`, `library-first-choose`, `library-choose-subjects`.
+
 ---
 
 ## 1. Product in one paragraph
@@ -102,7 +106,7 @@ The public page at `/` for anyone not signed in (and the same page for signed-in
 - **Header:** Smart Tutor logo and name on the left; a text link **"Sign in"** on the right.
 - **Hero:** headline, sub-line, **"Create an account"** (primary) and **"Sign in"** (secondary), and the line "Pilot · laptop browsers only." Text only: no product image or illustration.
 - **How it works:** three steps: upload your PDFs, ask a question, check the page it came from.
-- **Trust points:** four short points: only your documents; private to you; title and page cited; a pilot for laptop browsers.
+- **Trust points:** three short points, each with a bold lead, in the same three columns as How it works: only your documents; private to you; cited answers. (The pilot is already said under the hero buttons.)
 - **Closing:** the two buttons again; a plain footer (no terms of use link).
 - "Create an account" opens Keycloak's registration page, "Sign in" its login page; both return to the Library. A signed-in visitor who chooses "Sign in" goes straight to the Library.
 - Use the copy in §9 verbatim where it is quoted.
@@ -136,7 +140,7 @@ The home screen and the hub for documents.
 | **Already in your library** | The browser recognized the file: nothing uploads. "Already in your library" with a link to the document, or **"Restore"** if it is archived. |
 | **Uploading** | Progress bar per file in the upload tray. |
 | **Processing** | State "Processing" with an indeterminate indicator, and the extracted title once the first pages are read. No "Choose subjects" yet (Q7). Hint: "You can choose subjects when processing finishes." |
-| **Choose subjects** (needs action) | Processing has finished. Highlighted row and a call-to-action **"Choose subjects"**; opens the subject picker (§6.4). A banner at the top of the Library: "*N* documents need subjects". |
+| **Choose subjects** (needs action) | Processing has finished. Highlighted row and a call-to-action **"Choose subjects"**; opens the subject picker (§6.4), which steps through every document that needs subjects. No banner: the toolbar's "*N* needs subjects" chip (also a filter) and the nav badge show the count (M10). |
 | **Ready** | State "Ready". The document is searchable. |
 | **Failed** | State "Failed" with the reason in plain words (e.g. "This PDF has more than 500 pages", "We couldn't read this PDF", "No text layer (scanned PDFs are not supported yet)") and **"Retry"**. After 3 attempts: "This file could not be processed" and no Retry. |
 | **Archived tab** | Archived documents with **"Restore"**; their subjects can't be changed until restored (E7). One line explaining archived documents are not used for answers but old citations still work. |
@@ -305,7 +309,7 @@ Use this realistic sample data, not lorem ipsum.
 - Sub-line: "Upload your PDFs. Smart Tutor answers only from them and shows the title and page for every answer."
 - Buttons: "Create an account" (primary), "Sign in" (secondary). Below them: "Pilot · laptop browsers only."
 - How it works: "Upload your PDFs" · "Ask a question" · "Check the page it came from".
-- Trust points: "Only your documents: the tutor never answers from anything else." · "Private to you: no one else sees your documents, conversations, or notes." · "Every answer cites the document title and page." · "A pilot for laptop browsers."
+- Trust points: "**Only your documents:** the tutor never answers from anything else." · "**Private to you:** no one else sees your documents, conversations, or notes." · "**Cited answers:** every answer cites the document title and page."
 
 ## 10. Visual, interaction, and accessibility requirements
 

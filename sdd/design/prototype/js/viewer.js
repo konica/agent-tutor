@@ -1,4 +1,4 @@
-/* Smart Tutor v0.8 — Documents used panel (K2, §6.6) and the in-app document viewer (K3, §6.12). */
+/* Smart Tutor v0.9 — Documents used panel (K2, §6.6) and the in-app document viewer (K3, §6.12). */
 (function () {
   const ST = window.ST;
   const S = ST.S;
@@ -123,22 +123,19 @@
     const ready = V.status === 'ready';
     return `<div class="dialog-scrim vw-scrim" data-scrim>
       <section class="viewer" role="dialog" aria-modal="true" aria-labelledby="vw-title" data-od-id="document-viewer">
-        <header class="vw-head">
-          <div class="vw-titlebar">
-            <div class="od-fill od-stack" style="--od-gap:2px"><h2 class="vw-title od-truncate" id="vw-title" tabindex="-1" data-autofocus>${esc(d.title)}</h2>
-              <span class="small muted">${meta(d)}</span></div>
-            ${d.archived ? `<span class="badge badge-archived">${ic('archive')}Archived · read-only</span><button class="btn btn-secondary btn-sm" type="button" data-action="vw-restore" data-od-id="viewer-restore">${ic('restore', 'sm')}Restore</button>` : ''}
-            <button class="btn btn-quiet btn-sm" type="button" data-action="vw-close" data-od-id="viewer-close">${fromChat ? `${ic('arrowLeft', 'sm')}Back to conversation` : `${ic('x', 'sm')}Close`}</button>
-          </div>
-          <div class="vw-tools" role="toolbar" aria-label="Page and zoom">
-            <button class="icon-btn sm" type="button" data-action="vw-prev" aria-label="Previous page" ${V.page <= 1 || !ready ? 'disabled' : ''}>${ic('chevronLeft')}</button>
-            <span class="vw-page mono">Page ${V.page} of ${d.pages}</span>
-            <button class="icon-btn sm" type="button" data-action="vw-next" aria-label="Next page" ${V.page >= d.pages || !ready ? 'disabled' : ''}>${ic('chevronRight')}</button>
-            <span class="th-sep" aria-hidden="true"></span>
-            <button class="icon-btn sm" type="button" data-action="vw-zoom" data-dir="-1" aria-label="Zoom out" ${V.zoom <= 75 || !ready ? 'disabled' : ''}>${ic('minus')}</button>
-            <output class="vw-zoom mono" aria-label="Zoom">${V.zoom}%</output>
-            <button class="icon-btn sm" type="button" data-action="vw-zoom" data-dir="1" aria-label="Zoom in" ${V.zoom >= 150 || !ready ? 'disabled' : ''}>${ic('plus')}</button>
-          </div>
+        <header class="vw-head" role="toolbar" aria-label="Document viewer" data-od-id="viewer-toolbar">
+          <button class="btn btn-quiet btn-sm" type="button" data-action="vw-close" data-od-id="viewer-close" ${fromChat ? '' : 'aria-label="Close document viewer"'}>${fromChat ? `${ic('arrowLeft', 'sm')}Back to conversation` : `${ic('x', 'sm')}Close`}</button>
+          <span class="th-sep" aria-hidden="true"></span>
+          <h2 class="vw-title od-truncate" id="vw-title" tabindex="-1" data-autofocus title="${esc(d.title)} · ${meta(d)}">${esc(d.title)}<span class="vh">, ${meta(d)}</span></h2>
+          ${d.archived ? `<span class="badge badge-archived">${ic('archive')}Archived · read-only</span><button class="btn btn-secondary btn-sm" type="button" data-action="vw-restore" data-od-id="viewer-restore">${ic('restore', 'sm')}Restore</button>` : ''}
+          <span class="od-fill"></span>
+          <button class="icon-btn sm" type="button" data-action="vw-prev" aria-label="Previous page" data-tip="Previous page" ${V.page <= 1 || !ready ? 'disabled' : ''}>${ic('chevronLeft')}</button>
+          <span class="vw-page mono" aria-label="Page ${V.page} of ${d.pages}">p. ${V.page} / ${d.pages}</span>
+          <button class="icon-btn sm" type="button" data-action="vw-next" aria-label="Next page" data-tip="Next page" ${V.page >= d.pages || !ready ? 'disabled' : ''}>${ic('chevronRight')}</button>
+          <span class="th-sep" aria-hidden="true"></span>
+          <button class="icon-btn sm" type="button" data-action="vw-zoom" data-dir="-1" aria-label="Zoom out" data-tip="Zoom out" ${V.zoom <= 75 || !ready ? 'disabled' : ''}>${ic('minus')}</button>
+          <output class="vw-zoom mono" aria-label="Zoom">${V.zoom}%</output>
+          <button class="icon-btn sm" type="button" data-action="vw-zoom" data-dir="1" aria-label="Zoom in" data-tip="Zoom in" ${V.zoom >= 150 || !ready ? 'disabled' : ''}>${ic('plus')}</button>
         </header>
         <div class="vw-body" id="vw-scroll" data-keep-scroll="vw">${body}</div>
         <p class="vh" role="status">${esc(statusText())}</p>

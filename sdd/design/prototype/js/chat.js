@@ -1,4 +1,4 @@
-/* Smart Tutor v0.8 — chat (§6.6): no subjects in conversations (K1); every question is answered from all
+/* Smart Tutor v0.9 — chat (§6.6): no subjects in conversations (K1); every question is answered from all
    ready documents. Documents used (K2) and citations open the document viewer (K3, js/viewer.js). */
 (function () {
   const ST = window.ST;
@@ -60,28 +60,34 @@
   const noActiveDocs = () => !S.docs.some((d) => d.state === 'ready' && !d.archived && !d.deleted);
   const hasNoDocs = () => !S.docs.some((d) => !d.deleted);
 
-  function citesHtml(m) {
+  /* M6: Sources as one line of 22px chips ("ReAct · p. 3"), full title in the tooltip and accessible name;
+     Helpful / Not helpful as two 28px icon buttons with tooltips at the end of that line. */
+  ST.shortTitle = (t) => { const c = t.split(':')[0]; if (c.length <= 30) return c; const w = c.split(' '); let o = ''; for (const x of w) { if ((o + ' ' + x).trim().length > 28) break; o = (o + ' ' + x).trim(); } return o + '…'; };
+  function citeChips(m) {
     if (!S.citations || !m.cites.length) return '';
-    return `<div class="cites"><span class="cites-label" id="cl-${m.id}">Sources</span>
-      <div class="cite-list" role="list" aria-labelledby="cl-${m.id}">${m.cites.map((c, i) => {
-        const d = ST.doc(c.doc);
-        if (!d || d.deleted) return `<span role="listitem"><span class="cite cite-deleted" data-od-id="cite-deleted">${ic('doc')}<span><span class="doc-name">Deleted document</span></span></span></span>`;
-        return `<span role="listitem"><button class="cite" type="button" data-action="cite" data-mid="${m.id}" data-ci="${i}" data-fk="cite-${m.id}-${i}" aria-label="Open ${esc(d.title)} at ${c.page ? 'page ' + c.page : 'page 1, page unavailable'}">
-        ${ic('doc')}<span><span class="doc-name">${esc(d.title)}</span><span class="page">, ${c.page ? 'p. ' + c.page : 'page unavailable'}</span></span>${d.archived ? `<span class="badge badge-archived">${ic('archive')}Archived</span>` : ''}</button></span>`; }).join('')}</div></div>`;
+    return m.cites.map((c, i) => {
+      const d = ST.doc(c.doc);
+      if (!d || d.deleted) return `<span class="cite cite-deleted" role="listitem" data-od-id="cite-deleted">${ic('doc', 'sm')}Deleted document</span>`;
+      const pg = c.page ? 'p. ' + c.page : 'page unavailable';
+      return `<span role="listitem"><button class="cite" type="button" data-action="cite" data-mid="${m.id}" data-ci="${i}" data-fk="cite-${m.id}-${i}" aria-label="${esc(d.title)}, ${pg}${d.archived ? ', archived' : ''}. Open in the document viewer" data-tip="${esc(d.title)}, ${pg}">
+        ${ic('doc', 'sm')}<span class="doc-name">${esc(ST.shortTitle(d.title))}</span><span class="cite-page">· ${pg}</span>${d.archived ? `<span class="cite-arch">${ic('archive', 'sm')}Archived</span>` : ''}</button></span>`;
+    }).join('');
   }
-  function feedbackHtml(m) {
-    let html = `<div class="feedback" role="group" aria-label="Rate this answer">
-      <button class="fb-btn" type="button" data-action="fb-up" data-mid="${m.id}" data-fk="up-${m.id}" aria-pressed="${m.fb === 'up'}">${ic('thumb', 'sm')}Helpful</button>
-      <button class="fb-btn" type="button" data-action="fb-down" data-mid="${m.id}" data-fk="down-${m.id}" aria-pressed="${m.fb === 'down'}">${ic('thumb', 'sm flip-y')}Not helpful</button>
-      ${m.fb === 'up' ? '<span class="fb-thanks">Thanks — glad it helped.</span>' : ''}${m.fb === 'down' && m.reasonSent ? '<span class="fb-thanks">Thanks — your feedback helps improve answers.</span>' : ''}</div>`;
-    if (m.fb === 'down' && m.reasonOpen) {
-      const reasons = ['Not accurate', "Didn't answer my question", "Citation doesn't match", 'Hard to follow'];
-      html += `<form class="reason-form" onsubmit="return false"><fieldset><legend>What could be better? <span class="muted" style="font-weight:400">Optional</span></legend>
+  function sourcesLine(m) {
+    const chips = citeChips(m);
+    const fb = `<span class="fb-group" role="group" aria-label="Rate this answer">
+      <button class="fb-icon" type="button" data-action="fb-up" data-mid="${m.id}" data-fk="up-${m.id}" aria-pressed="${m.fb === 'up'}" aria-label="Helpful" data-tip="Helpful">${ic('thumb', 'sm')}</button>
+      <button class="fb-icon" type="button" data-action="fb-down" data-mid="${m.id}" data-fk="down-${m.id}" aria-pressed="${m.fb === 'down'}" aria-label="Not helpful" data-tip="Not helpful">${ic('thumb', 'sm flip-y')}</button></span>`;
+    const thanks = m.fb === 'up' ? '<span class="fb-thanks">Thanks — glad it helped.</span>' : m.fb === 'down' && m.reasonSent ? '<span class="fb-thanks">Thanks — your feedback helps improve answers.</span>' : '';
+    return `<div class="sources-line" data-od-id="sources-line">${chips ? `<span class="cites-label" id="cl-${m.id}">Sources</span><span class="cite-list" role="list" aria-labelledby="cl-${m.id}">${chips}</span>` : ''}${fb}</div>${thanks ? `<div class="fb-thanks-row">${thanks}</div>` : ''}`;
+  }
+  function reasonForm(m) {
+    if (!(m.fb === 'down' && m.reasonOpen)) return '';
+    const reasons = ['Not accurate', "Didn't answer my question", "Citation doesn't match", 'Hard to follow'];
+    return `<form class="reason-form" onsubmit="return false"><fieldset><legend>What could be better? <span class="muted" style="font-weight:400">Optional</span></legend>
         <div class="reason-opts">${reasons.map((r, i) => `<label><input type="radio" name="reason-${m.id}" value="${esc(r)}" ${m.reason === r ? 'checked' : ''} data-change="fb-reason" data-mid="${m.id}" data-fk="r-${m.id}-${i}">${esc(r)}</label>`).join('')}</div></fieldset>
         <div class="field"><label for="rt-${m.id}">Anything else? <span class="muted" style="font-weight:400">Optional</span></label><textarea class="textarea" id="rt-${m.id}" rows="2" data-input="fb-text" data-mid="${m.id}">${esc(m.reasonText || '')}</textarea></div>
         <div class="rf-actions"><button class="btn btn-quiet btn-sm" type="button" data-action="fb-skip" data-mid="${m.id}">Skip</button><button class="btn btn-primary btn-sm" type="button" data-action="fb-send" data-mid="${m.id}">Send feedback</button></div></form>`;
-    }
-    return html;
   }
   const tutorWrap = (m, inner, busy = false) => `<article class="msg-tutor msg-enter" id="m-${m.id}" aria-label="Smart Tutor">${ST.logo('logo')}
     <div class="msg-body" ${busy ? 'aria-busy="true"' : ''}><span class="msg-name">Smart Tutor</span>${inner}</div></article>`;
@@ -93,7 +99,7 @@
       if (m.streaming) return tutorWrap(m, `<div class="stream" id="stream-${m.id}">${ST.mdParas(m.partial || '')}<span class="cursor" aria-hidden="true"></span></div>`, true);
       const text = m.stopped ? m.partial : m.text;
       return tutorWrap(m, `${ST.mdParas(text)}${m.quote && !m.stopped ? quoteHtml(m.quote) : ''}
-        ${m.stopped ? `<p class="small muted">${ic('stop', 'sm')} You stopped this answer.</p>` : ''}${citesHtml(m)}${feedbackHtml(m)}`);
+        ${m.stopped ? `<p class="small muted">${ic('stop', 'sm')} You stopped this answer.</p>` : ''}${sourcesLine(m)}${reasonForm(m)}`);
     }
     if (m.kind === 'decline') {
       return tutorWrap(m, `<div class="tutor-card decline">
@@ -115,6 +121,7 @@
     return '';
   }
 
+  /* M6: one 40px header row: title, Documents used (N), Summarize lesson, overflow (Archive, Show citations). */
   function headerHtml() {
     const t = T();
     const note = t.noteId ? ST.note(t.noteId) : null;
@@ -123,21 +130,23 @@
     let summarize = '';
     if (hasAnswer && t.readOnly !== 'archived') {
       summarize = t.summarizing
-        ? `<button class="btn btn-secondary" type="button" disabled data-fk="summ"><span class="spinner" aria-hidden="true"></span>Summarizing…</button>`
-        : `<button class="btn btn-secondary" type="button" data-action="summarize" data-fk="summ" ${t.streaming || t.rateLimit ? 'disabled' : ''}>${ic('note', 'sm')}${note ? 'Update lesson note' : 'Summarize lesson'}</button>`;
+        ? `<button class="btn btn-secondary btn-sm" type="button" disabled data-fk="summ"><span class="spinner" aria-hidden="true"></span>Summarizing…</button>`
+        : `<button class="btn btn-secondary btn-sm" type="button" data-action="summarize" data-fk="summ" ${t.streaming || t.rateLimit ? 'disabled' : ''}>${ic('note', 'sm')}${note ? 'Update lesson note' : 'Summarize lesson'}</button>`;
     }
+    const menuOpen = S.chatMenu;
     return `<header class="thread-head" data-od-id="thread-header">
-      <div class="th-title"><h1 class="od-truncate">${esc(t.title)}</h1>
-        ${note ? `<div class="th-sub"><a href="#/note/${note.id}" class="od-row" style="--od-gap:6px;min-width:0">${ic('note', 'sm')}<span class="od-truncate">Lesson note: ${esc(note.title)}</span></a></div>` : ''}</div>
-      <div class="th-actions">
-        <button class="btn btn-quiet" type="button" data-action="docs-used" data-fk="docs-used" aria-haspopup="dialog" data-od-id="documents-used-button">${ic('layers', 'sm')}Documents used (${used})</button>
-        <span class="th-sep" aria-hidden="true"></span>
-        <button class="switch" type="button" role="switch" aria-checked="${S.citations}" data-action="toggle-citations" data-fk="cit-switch"><span class="track" aria-hidden="true"></span>Show citations<span class="state" aria-hidden="true">${S.citations ? 'On' : 'Off'}</span></button>
-        ${summarize ? '<span class="th-sep" aria-hidden="true"></span>' + summarize : ''}
-        ${t.convId && !t.readOnly ? `<button class="icon-btn" type="button" data-action="archive-thread" aria-label="Archive conversation" title="Archive conversation">${ic('archive')}</button>` : ''}
-      </div></header>`;
+      <h1 class="od-truncate" title="${esc(t.title)}">${esc(t.title)}</h1>
+      ${note ? `<a href="#/note/${note.id}" class="th-note" title="Lesson note: ${esc(note.title)}">${ic('note', 'sm')}<span class="od-truncate">Lesson note</span></a>` : ''}
+      <span class="od-fill"></span>
+      <button class="btn btn-quiet btn-sm" type="button" data-action="docs-used" data-fk="docs-used" aria-haspopup="dialog" data-od-id="documents-used-button">${ic('layers', 'sm')}Documents used (${used})</button>
+      ${summarize}
+      <span class="row-menu-wrap th-more"><button class="icon-btn sm" type="button" data-action="chat-menu" data-fk="chat-menu" aria-haspopup="menu" aria-expanded="${!!menuOpen}" aria-label="More conversation actions" data-tip="More" data-od-id="thread-overflow">${ic('more')}</button>
+        ${menuOpen ? `<div class="row-menu" role="menu" aria-label="Conversation actions">
+          <button class="menu-item" role="menuitemcheckbox" aria-checked="${S.citations}" type="button" data-action="toggle-citations" data-fk="cit-switch">${ic(S.citations ? 'check' : 'quote')}Show citations<span class="mi-state">${S.citations ? 'On' : 'Off'}</span></button>
+          ${t.convId && !t.readOnly ? `<button class="menu-item" role="menuitem" type="button" data-action="archive-thread">${ic('archive')}Archive conversation</button>` : ''}
+        </div>` : ''}</span>
+    </header>`;
   }
-
   function summaryCard() {
     const t = T();
     if (t.summarizing) return `<div class="tutor-card" role="status"><p class="tc-head"><span class="spinner" aria-hidden="true"></span>Summarizing this lesson into a note…</p>
@@ -157,15 +166,15 @@
       banner = `<div class="banner banner-warn">${ic('clock')}<div class="b-body"><strong>You've sent 20 messages in the last minute.</strong><span>You can send again at 11:25 (${ST.TZ.short}), in <span id="rl-count" class="mono">${t.rateLimit}</span> seconds.</span><span class="b-variant">If it's the daily limit (500 per day): You can send again at 00:00 (${ST.TZ.short}).</span></div></div>`;
     }
     const processing = ST.stillProcessing();
-    const hint = !disabled && processing ? `<p class="input-hint">${ic('clock', 'sm')}${ST.plural(processing, 'document')} ${processing === 1 ? 'is' : 'are'} still processing and can't be used yet.</p>` : '';
+    T().hint = !disabled && processing ? `${ST.plural(processing, 'document')} ${processing === 1 ? 'is' : 'are'} still processing and can't be used yet.` : '';
     const btn = t.streaming
       ? `<button class="btn btn-secondary" type="button" data-action="stop" data-fk="stop">${ic('stop', 'sm')}Stop</button>`
       : `<button class="btn btn-primary send" type="button" data-action="send" data-fk="send" aria-label="Send question" ${disabled ? 'disabled' : ''}>${ic('send')}</button>`;
-    return `<div class="composer-wrap"><div class="composer-inner">${banner}${hint}
+    return `<div class="composer-wrap"><div class="composer-inner">${banner}
       <div class="composer ${disabled ? 'disabled' : ''}"><label class="vh" for="composer-input">Ask the tutor</label>
         <textarea id="composer-input" rows="1" placeholder="${placeholder}" data-input="draft" data-fk="composer" ${disabled ? 'disabled' : ''} ${!t.messages.length && !disabled ? 'data-autofocus' : ''}>${esc(t.draft)}</textarea>${btn}</div></div></div>`;
   }
-  const statusHtml = () => { const t = T(); return `<div class="status-wrap"><div class="status-line"><span class="tokens mono" id="token-line">Tokens: ${ST.num(t.tokens[0])} in · ${ST.num(t.tokens[1])} out</span><span>Enter to send · Shift + Enter for a new line</span></div></div>`; };
+  const statusHtml = () => { const t = T(); return `<div class="status-wrap"><div class="status-line">${t.hint ? `<span class="input-hint">${ic('clock', 'sm')}${esc(t.hint)}</span>` : '<span class="sl-keys">Enter to send · Shift + Enter for a new line</span>'}<span class="tokens mono" id="token-line">Tokens: ${ST.num(t.tokens[0])} in · ${ST.num(t.tokens[1])} out</span></div></div>`; };
 
   function emptyHtml() {
     return `<div class="chat-empty">
@@ -267,7 +276,8 @@
     send: () => ST.ask(T().draft),
     example: (el) => ST.ask(el.dataset.q),
     stop: () => ST.stopStream(false),
-    'toggle-citations': () => { S.citations = !S.citations; ST.ls.set('st3_citations', S.citations ? 'on' : 'off'); ST.render(); ST.announce(S.citations ? 'Citations shown.' : 'Citations hidden.'); },
+    'chat-menu': () => { S.chatMenu = !S.chatMenu; ST.render(); if (S.chatMenu) { const m = document.querySelector('.th-more .menu-item'); if (m) m.focus(); } },
+    'toggle-citations': () => { S.chatMenu = false; S.citations = !S.citations; ST.ls.set('st3_citations', S.citations ? 'on' : 'off'); ST.render(); ST.announce(S.citations ? 'Citations shown.' : 'Citations hidden.'); },
     cite: (el) => { const c = findMsg(el).cites[+el.dataset.ci]; ST.openViewer(c.doc, { page: c.page || 1, highlight: c.page ? c : null, from: 'chat' }); },
     'docs-used': () => ST.openDocsUsed(),
     'fb-up': (el) => { const m = findMsg(el); m.fb = m.fb === 'up' ? null : 'up'; m.reasonOpen = false; ST.render(); },
@@ -285,7 +295,7 @@
           actions: [{ label: 'Cancel', autofocus: true }, { label: 'Replace', cls: 'btn-primary', onClick: () => startSummary('updated') }] });
       } else startSummary(n ? 'updated' : 'saved');
     },
-    'archive-thread': () => { const t = T(); const c = ST.conv(t.convId); c.archived = true; t.readOnly = 'archived'; ST.render(); ST.toast('Conversation archived.', { undo: () => { c.archived = false; t.readOnly = null; ST.render(); } }); },
+    'archive-thread': () => { S.chatMenu = false; const t = T(); const c = ST.conv(t.convId); c.archived = true; t.readOnly = 'archived'; ST.render(); ST.toast('Conversation archived.', { undo: () => { c.archived = false; t.readOnly = null; ST.render(); } }); },
     'restore-thread': () => { const t = T(); const c = ST.conv(t.convId); if (c) c.archived = false; t.readOnly = null; ST.render(); ST.toast('Conversation restored.'); const i = document.getElementById('composer-input'); if (i) i.focus(); }
   });
   document.addEventListener('keydown', (e) => { if (e.target.id === 'composer-input' && e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); ST.ask(T().draft); } });

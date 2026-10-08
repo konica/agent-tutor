@@ -1,4 +1,4 @@
-/* Smart Tutor v0.8 — overview with what changed and the flows, R2 research map and R3 learning loop
+/* Smart Tutor v0.9 — overview with what changed and the flows, R2 research map and R3 learning loop
    wireframes, components page (§10), decisions and questions for the brief owner (§11.5). */
 (function () {
   const ST = window.ST;
@@ -8,15 +8,18 @@
   /* =========================================================
      Overview
      ========================================================= */
-  /* §0 What changed in v0.8: [source, change, states redone or added, states removed]. */
+  /* §0 What changed in v0.9: [source, change, states checked closely or added, states removed]. Every app-shell state inherits M1–M4. */
   ST.CHANGES = [
-    ['K1', 'Conversations have no subjects', ['chat-new', 'chat-answer-citations', 'chat-first-answer', 'chat-no-active-documents'], ['chat-subjects-detected', 'chat-subjects-detected-multi', 'chat-detection-unsure', 'chat-subject-added', 'chat-maximum-reached', 'chat-fourth-subject-refused', 'chat-new-from-refused', 'chat-new-conversation']],
-    ['K2', 'Documents used', ['chat-documents-used', 'chat-documents-used-empty', 'chat-documents-used-deleted'], []],
-    ['K3', 'Document viewer with the cited passage highlighted', ['viewer-document', 'viewer-citation-highlight', 'viewer-no-highlight', 'viewer-archived', 'viewer-loading', 'viewer-error'], ['chat-citation-opens-details']],
-    ['K4', 'Delete a document', ['library-more-menu', 'library-delete-confirm', 'library-deleted', 'chat-citation-deleted', 'details-ready', 'details-archived', 'details-processing'], []],
-    ['K5', 'Same file, different learners: processed like any new file', ['usage-overview'], []]
+    ['M1', '14px body, 20px sans page titles, 12px floor', ['library-default', 'conversations-active', 'subjects-list'], []],
+    ['M2', '32px controls (28 in toolbars and rows), 20px chips, radius 4/6/8', ['library-default', 'picker-default'], []],
+    ['M3', '208px nav in groups, 56px icon rail, 16/12px page padding', ['shell-nav-collapsed', 'library-empty'], []],
+    ['M4', 'One 40px header row and one 36px toolbar row; 32px notices', ['library-default', 'conversations-active', 'usage-overview'], []],
+    ['M5', 'Library: 40px single-line rows', ['library-default', 'library-delete-confirm', 'details-ready'], []],
+    ['M6', 'Chat: 40px header with overflow, 22px Sources chips, 28px thumbs; answers stay 16px / 1.6 in 720px', ['chat-answer-citations', 'chat-documents-used-deleted'], []],
+    ['M7', 'Panels 340px, viewer min(960px, 100% − 64px) with one 40px toolbar, dialogs 440px', ['viewer-citation-highlight', 'details-ready', 'library-delete-confirm'], []],
+    ['M8', 'Lists 36px with a preview line; note editor with a 280px details area; Usage strip and 32px tables', ['conversations-active', 'notes-editor', 'subjects-list', 'usage-overview'], []]
   ];
-  ST.NEW_IDS = ['chat-documents-used', 'chat-documents-used-empty', 'chat-documents-used-deleted', 'viewer-document', 'viewer-citation-highlight', 'viewer-no-highlight', 'viewer-archived', 'viewer-loading', 'viewer-error', 'library-more-menu', 'library-delete-confirm', 'library-deleted', 'chat-citation-deleted'];
+  ST.NEW_IDS = ['shell-nav-collapsed'];
   const changed = () => { const set = new Set(); ST.CHANGES.forEach((c) => c[2].forEach((id) => set.add(id))); return set; };
   ST.indexView = () => {
     const groups = [];
@@ -25,21 +28,21 @@
     return `<main class="index-page" id="main-content" tabindex="-1">
       <section class="index-hero">
         <div><span class="brand" style="padding:0 0 24px">${ST.logo('logo', 'Smart Tutor logo')}<span class="word">Smart Tutor</span></span>
-          <h1>Round 8: check the source</h1>
-          <p>Brief v0.8 answers end-user feedback. Chat has no subjects any more: every question uses all of the learner's ready documents. Each conversation lists its documents used, citations open the PDF at the highlighted passage, and a document can be deleted after a confirmation. Everything else is the accepted v0.7 design.</p>
+          <h1>Round 9: compact</h1>
+          <p>Brief v0.9 makes every screen compact so Smart Tutor has room to grow: 14px type, one 40px page header and one 36px toolbar, 40px Library rows, a collapsible navigation, and a one-row chat header. Behavior is unchanged from round 8; answers stay 16px at 1.6 in a 720px column.</p>
           <div class="od-cluster" style="margin-top:24px;--od-gap:12px">
             <button class="btn btn-primary btn-lg" type="button" data-action="start-flow" data-flow="J1">Start with J1 · First run${ic('arrowRight', 'sm')}</button>
             <a class="btn btn-secondary btn-lg" href="#/library-default">Open the Library</a>
             <a class="btn btn-ghost btn-lg" href="#/brief-questions">Questions for the brief</a>
           </div></div>
         <dl class="meta">
-          <div><dt>Brief</dt><dd>v0.8 · PRD v2.21</dd></div><div><dt>Owner</dt><dd>Thao Dinh</dd></div><div><dt>Date</dt><dd>8 Oct 2026</dd></div>
+          <div><dt>Brief</dt><dd>v0.9 · PRD v2.21</dd></div><div><dt>Owner</dt><dd>Thao Dinh</dd></div><div><dt>Date</dt><dd>8 Oct 2026</dd></div>
           <div><dt>Screens</dt><dd>Laptop, 1280–1920 px</dd></div><div><dt>Themes</dt><dd>Light and dark</dd></div><div><dt>States</dt><dd>${ST.STATES.length - 1}</dd></div>
           <div><dt>Round 1</dt><dd><a href="v0.2/index.html">v0.2 prototype</a></dd></div>
         </dl>
       </section>
 
-      <h2 class="section-title">What changed in v0.8</h2>
+      <h2 class="section-title">What changed in v0.9</h2>
       <div class="changes" role="table" aria-label="Decisions and the states they changed">
         ${ST.CHANGES.map(([id, title, states, removed]) => `<div class="change-row" role="row"><span class="qid" role="cell">${esc(id)}</span><span class="change-title" role="cell">${esc(title)}</span>
           <span class="change-states" role="cell">${states.length ? '' : '<span class="small muted">No state changes</span>'}${states.map((sid) => `<a href="#/${sid}"><code>${sid}</code>${ST.NEW_IDS.includes(sid) ? '<span class="badge badge-note">New</span>' : ''}</a>`).join('')}${(removed || []).map((sid) => `<span class="removed-id"><del><code>${sid}</code></del><span class="badge badge-archived">Removed</span></span>`).join('')}</span></div>`).join('')}
@@ -63,7 +66,7 @@
       <h2 class="section-title">All states</h2>
       <div class="index-groups">${groups.map((g) => `<section class="index-group ${g.items.length > 12 ? 'span2' : ''}" aria-labelledby="g-${g.items[0].id}">
         <h2 id="g-${g.items[0].id}">${esc(g.name)}<span class="ig-ref">${esc(g.ref)}</span></h2>
-        <ul>${g.items.map((s) => `<li><a href="#/${s.id}"><code>${s.id}@${ST.BRIEF}</code>${ST.NEW_IDS.includes(s.id) ? '<span class="badge badge-note">New in v0.8</span>' : ch.has(s.id) ? '<span class="badge">Changed in v0.8</span>' : ''}<span>${esc(s.desc)}</span></a></li>`).join('')}</ul></section>`).join('')}</div>
+        <ul>${g.items.map((s) => `<li><a href="#/${s.id}"><code>${s.id}@${ST.BRIEF}</code>${ST.NEW_IDS.includes(s.id) ? '<span class="badge badge-note">New in v0.9</span>' : ch.has(s.id) ? '<span class="badge">Checked in v0.9</span>' : ''}<span>${esc(s.desc)}</span></a></li>`).join('')}</ul></section>`).join('')}</div>
     </main>`;
   };
   ST.actions['start-flow-at'] = (el, e) => { ST.flow = el.dataset.flow; try { sessionStorage.setItem('st3_flow', ST.flow); } catch (x) {} };
@@ -192,7 +195,7 @@
   ST.componentsView = () => {
     const d = { id: 'dx', title: 'Toolformer: Language Models Can Teach Themselves to Use Tools', authors: 'Schick et al.', year: 2023, state: 'choose', subjects: [], attempts: 0 };
     return `<main class="index-page" id="main-content" tabindex="-1">
-    <div class="page-head" style="margin-bottom:48px"><div><h1 style="font-size:48px">Components</h1><p>The reusable set for v0.8. Tokens live once in <code class="mono">styles.css</code> and <code class="mono">v03.css</code>, for light and dark.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
+    <div class="page-head" style="margin-bottom:48px"><div><h1 style="font-size:48px">Components</h1><p>The compact set for v0.9 (DESIGN.md → Density). Tokens live once in <code class="mono">styles.css</code> and <code class="mono">v03.css</code>, for light and dark.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
 
     <section class="cmp-section"><h2>Tokens</h2><p>The round 1 palette, plus an attention colour for “needs action” and one hue per subject. Chip text always uses the main text colour, so contrast holds whatever the hue.</p>
       <div class="cmp-grid">${tokenGrid('light')}${tokenGrid('dark')}</div></section>
@@ -238,9 +241,9 @@
 
     <section class="cmp-section"><h2>Conversation pieces</h2><p>Citations, quoted material and system notices each look different from the tutor's own words and from your messages.</p>
       <div class="cmp-grid">
-        ${spec('citation', `<div class="cite-list"><button class="cite" type="button">${ic('doc')}<span><span class="doc-name">ReAct: Synergizing Reasoning and Acting in Language Models</span><span class="page">, p. 3</span></span></button>
-          <button class="cite" type="button">${ic('doc')}<span><span class="doc-name">Proximal Policy Optimization Algorithms</span><span class="page">, page unavailable</span></span></button>
-          <button class="cite" type="button">${ic('doc')}<span><span class="doc-name">Language Models are Few-Shot Learners</span><span class="page">, p. 8</span></span><span class="badge badge-archived">${ic('archive')}Archived</span></button>
+        ${spec('citation', `<div class="cite-list"><button class="cite" type="button">${ic('doc')}<span><span class="doc-name">ReAct: Synergizing Reasoning and Acting in Language Models</span><span class="cite-page">· p. 3</span></span></button>
+          <button class="cite" type="button">${ic('doc')}<span><span class="doc-name">Proximal Policy Optimization Algorithms</span><span class="cite-page">· page unavailable</span></span></button>
+          <button class="cite" type="button">${ic('doc')}<span><span class="doc-name">Language Models are Few-Shot Learners</span><span class="cite-page">· p. 8</span></span><span class="badge badge-archived">${ic('archive')}Archived</span></button>
           <span class="cite cite-deleted">${ic('doc')}<span><span class="doc-name">Deleted document</span></span></span></div>
           <p class="small muted">A citation opens the document viewer at the cited page. A deleted document's citation reads “Deleted document” and isn't a link.</p>`)}
         ${spec('documents used · row / archived / deleted', `<ol class="du-list">
@@ -279,27 +282,27 @@
      Brief v0.5 decisions and questions
      ========================================================= */
   const DECISIONS = [
-    ['K1', 'Conversations have no subjects', 'Every question uses all ready documents. Removed the subject chips in the chat header, “Your subjects”, detection, the 3-subject maximum and the “New conversation” refusal. Conversations and notes still show subject chips, taken from the documents used.', ['chat-new', 'chat-answer-citations', 'conversations-active']],
-    ['K2', 'Documents used', 'A “Documents used (N)” button in the header opens a side panel, in order of first use, with Archived and Deleted badges. Selecting a document opens the viewer at page 1; closing it returns to the panel.', ['chat-documents-used', 'chat-documents-used-empty', 'chat-documents-used-deleted']],
-    ['K3', 'Document viewer', 'A modal overlay about 720 px wide. Citations open it at the cited page with the passage highlighted (fill, outline and a “Cited passage” label); Close returns focus to what opened it.', ['viewer-citation-highlight', 'viewer-document', 'viewer-no-highlight', 'viewer-archived', 'viewer-loading', 'viewer-error']],
-    ['K4', 'Delete a document', '“Delete…” in the row’s More menu and in document details (not while processing), always confirmed with Cancel focused and “Archive instead”. Citations read “Deleted document”.', ['library-more-menu', 'library-delete-confirm', 'library-deleted', 'chat-citation-deleted', 'details-ready']],
-    ['K5', 'No cross-learner duplicates', 'ReAct is now processed like any new file in Usage; only “Already in your library” remains.', ['usage-overview', 'library-already-in-library']]
+    ['M1–M2', 'Type and controls', 'Tokens follow DESIGN.md → Density: 14px body at 1.45, 13px secondary, 12px floor for headers, chips, badges and dates; 20px sans page titles; 32px controls, 28px in toolbars and rows; 20px chips and badges; radius 4 / 6 / 8.', ['library-default', 'picker-default']],
+    ['M3', 'App shell', '208px navigation with 32px items in three hairline-separated groups and the 3 most recent conversations under Conversations; a chevron collapses it to a 56px icon rail with tooltips, remembered per browser; one 36px user row.', ['shell-nav-collapsed']],
+    ['M4', 'Header and toolbar', 'One 40px header row (title, count, info tooltip, action) and one 36px toolbar row (tabs with counts, unlabelled filters, dates in one popover, a status chip, the count). Notices are 32px rows; the upload limit, archived conversation and rate limit keep full banners because they block an action.', ['library-default', 'conversations-active', 'notes-active']],
+    ['M5', 'Library rows', '40px single-line rows: title with authors and year in 13px, state badge and hint on one line (hint truncated with a tooltip, a failure reason wraps instead), the primary action always visible at 28px, More on hover and focus.', ['library-default', 'library-failed']],
+    ['M6', 'Chat', 'One 40px header with Documents used, Summarize lesson and an overflow (Show citations, Archive conversation); Sources as 22px chips (“ReAct · p. 3”); 28px Helpful / Not helpful icon buttons with tooltips; 13px quotes with a 2px left rule; 40px composer with one 12px status line.', ['chat-answer-citations', 'chat-feedback-reason']],
+    ['M7–M8', 'Panels, viewer, lists, Usage', 'Details and Documents used at 340px with 32px rows; viewer toolbar in one 40px row; 440px dialogs; 36px list rows with a preview line, search and sort; note editor with a collapsible 280px details area; a 56px Usage strip and 32px table rows with sticky headers.', ['viewer-citation-highlight', 'notes-editor', 'usage-overview']]
   ];
   const QUESTIONS = [
-    ['L1', 'Question', 'Where do a conversation’s subject chips come from?', '§6.7 shows the subjects of its documents used. If a document is deleted, its subjects still count for the conversation in the prototype.', 'Keep a deleted document’s subjects on its conversations, so filters keep finding them. Or drop them.'],
-    ['L2', 'Question', 'The Library row “Open” opens details, not the viewer', '§6.3 keeps one “Open” per ready row; §6.5 adds “Open” (viewer) in details. Two clicks to read a PDF from the Library.', 'Let the row “Open” go straight to the viewer, and move details to the title link and More.'],
-    ['L3', 'Question', 'Delete for failed documents', 'Delete is withheld only while processing, so a failed file (e.g. lecture-03-scan.pdf) can be deleted.', 'Keep: it is the main way to clear a scanned PDF from the list.'],
-    ['L4', 'Question', 'Deleting an archived document', '“Archive instead” makes no sense when it is already archived, so the dialog drops that line there.', 'Confirm.'],
-    ['L5', 'Note', 'Usage sample for a deleted document', '§6.10 asks for processing of a deleted document to stay in the totals; §9 has none, so Usage shows one sample row labeled “Deleted document” (22,400 in · 1,310 out).', 'Replace with real numbers once there are any.'],
-    ['L6', 'Question', 'Viewer page count', '§6.12 uses “Page 3 of 12” as an example; the prototype shows each document’s real page count (ReAct has 33).', 'Keep the real count.'],
-    ['I1', 'Open', 'One state shows two limit messages', 'library-rate-limited and chat-rate-limited show the hourly or per-minute message with the daily one as a secondary line.', 'Keep one state each, or add *-daily states.'],
-    ['F4', 'Open', 'Remember me and Forgot Password? on the login page', 'Both are realm settings.', 'Keep both on for the pilot.'],
-    ['H1, E5, E10', 'Open', 'Smaller items', 'Upload-rights line next to a disabled Upload; chat processing hint wording; a separate D6 state.', 'Unchanged.'],
+    ['N1', 'Question', 'Two signals for documents that need subjects', 'The Library shows the required “1 document needs subjects” notice and the toolbar status chip “1 needs subjects”.', 'Keep the chip only once the notice wording is no longer required; until then both stay.'],
+    ['N2', 'Question', 'Show citations is now inside the chat overflow', 'A remembered setting behind a menu is easy to miss; the brief asks for it in the overflow.', 'Keep, and show “Citations hidden” in the Sources line when it is off.'],
+    ['N3', 'Question', 'Search and sort in Conversations and Notes', 'M8 asks for search and sort but not their scope. The prototype searches titles and sorts by date (newest or oldest first).', 'Confirm, or also search the preview text and note bodies.'],
+    ['N4', 'Proposal', 'Subjects and Usage have no toolbar', 'Neither page has tabs or filters, so their count sits in the header row instead of a toolbar.', 'Add a toolbar only when they gain filters.'],
+    ['N5', 'Note', 'Library rows that fit', 'At 1440 × 900 with the review bar hidden, the Library has room for about 18 rows (12 + 40 + 8 header, one 32px notice, 36 + 8 toolbar, 28px table header, then 40px rows). The sample has 8 active documents.', 'No change.'],
+    ['L1', 'Open', 'A deleted document’s subjects on its conversations', 'The PRD excludes deleted documents (Q59); the prototype still counts them.', 'Follow the PRD next round.'],
+    ['L2', 'Open', 'Library row “Open” goes to details', 'Reading a PDF takes two clicks.', 'Let the row “Open” open the viewer.'],
+    ['I1, F4, H1, E5, E10', 'Open', 'Smaller items', 'Daily limit states; Keycloak Remember me / Forgot password; upload-rights line by a disabled Upload; chat hint wording; a D6 state.', 'Unchanged.'],
     ['Q4, Q5, Q8', 'Defaults kept', 'Still open in §12', 'Q4 the citations switch also covers notes · Q5 several files at once · Q8 first suggestion pre-selected.', 'All shown as designed.']
   ];
   ST.questionsView = () => `<main class="index-page" id="main-content" tabindex="-1">
-    <div class="page-head" style="margin-bottom:32px"><div><h1 style="font-size:48px">Decisions &amp; questions</h1><p>For brief v0.8, round 8. First the end-user feedback applied (K1–K5) and where, then open questions: the new ones first, then those still open.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
-    <h2 class="section-title" style="margin-top:0">Applied in v0.8</h2>
+    <div class="page-head" style="margin-bottom:32px"><div><h1 style="font-size:48px">Decisions &amp; questions</h1><p>For brief v0.9, round 9. First the density changes applied (M1–M8) and where to check them, then open questions: the new ones first, then those still open.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
+    <h2 class="section-title" style="margin-top:0">Applied in v0.9</h2>
     <ol class="qa-list">${DECISIONS.map(([id, title, what, states]) => `<li class="qa-item"><span class="qid">${esc(id)}</span>
       <div><h3>${esc(title)}</h3><p>${esc(what)}</p><p class="proposal"><strong>Applied in:</strong> ${states.length ? '' : 'no change needed'}${states.map((sid) => `<a href="#/${sid}"><code class="mono">${sid}</code></a>`).join(', ')}</p></div>
       <span class="badge qtype badge-ready-q">${ic('check')}Applied</span></li>`).join('')}</ol>

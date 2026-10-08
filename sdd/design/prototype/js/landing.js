@@ -7,9 +7,8 @@
   const TRUST = [
     ['Only your documents:', 'the tutor never answers from anything else.'],
     ['Private to you:', 'no one else sees your documents, conversations, or notes.'],
-    ['', 'Every answer cites the document title and page.'],
-    ['', 'A pilot for laptop browsers.']
-  ];
+    ['Cited answers:', 'every answer cites the document title and page.']
+  ]; /* M9: three points, each with a bold lead, in the same three columns as How it works */
   const ctas = (where) => `<div class="ld-ctas">
       <a class="btn btn-primary btn-lg" href="#/auth-sign-up" data-od-id="landing-${where}-create-account">Create an account</a>
       <a class="btn btn-secondary btn-lg" href="#/auth-sign-in" data-od-id="landing-${where}-sign-in">Sign in</a>
@@ -34,7 +33,7 @@
       </section>
 
       <section class="ld-section" aria-label="What you can rely on" data-od-id="landing-trust">
-        <ul class="ld-trust">${TRUST.map(([lead, rest], i) => `<li data-od-id="landing-trust-${i + 1}">${lead ? `<strong>${ST.esc(lead)}</strong> ` : ''}${ST.esc(rest)}</li>`).join('')}</ul>
+        <ul class="ld-trust">${TRUST.map(([lead, rest], i) => `<li data-od-id="landing-trust-${i + 1}"><strong>${ST.esc(lead)}</strong> ${ST.esc(rest)}</li>`).join('')}</ul>
       </section>
 
       <section class="ld-close" aria-labelledby="ld-close-h" data-od-id="landing-closing">

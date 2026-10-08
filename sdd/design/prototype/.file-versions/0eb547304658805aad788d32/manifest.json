@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "fileName": "index.html",
-  "currentVersionId": "fc066bed-4c49-42e7-b278-3a2f21ce50b8",
+  "currentVersionId": "0fe42ecf-dc80-4703-a4b8-0338fe012870",
   "entries": [
     {
       "id": "f36e6729-f195-4945-9c3c-52c32a4f64eb",
@@ -90,7 +90,22 @@
       "mime": "text/html; charset=utf-8",
       "kind": "html",
       "contentPath": "0006-fc066bed-4c49-42e7-b278-3a2f21ce50b8.html",
-      "contentDigest": "aa9636d5546b1c00b60acdd36df92eeaa27b8d37fd932da015b3df328a209568",
+      "promptSource": "message",
+      "contentDigest": "aa9636d5546b1c00b60acdd36df92eeaa27b8d37fd932da015b3df328a209568"
+    },
+    {
+      "id": "0fe42ecf-dc80-4703-a4b8-0338fe012870",
+      "fileName": "index.html",
+      "version": 7,
+      "label": "Version 7",
+      "createdAt": 1791441826835,
+      "source": "ai",
+      "prompt": "You are designing **Smart Tutor**, a laptop web app (1440 px, light mode) where learners upload their own PDFs and ask a tutor that answers only from them, with citations. Follow the design brief **v0.9** in this project (`brief-v0.9.md`; it is the only brief now) exactly, and `DESIGN.md` → **Density** for exact sizes. Start with **§0 What changed** (M1–M8): this round makes the existing prototype (round 8, brief v0.8) **compact on every screen**. Keep every screen, state, flow, and the round 8 behavior (no subjects in chat, documents used, document viewer, delete) as they are; change density, layout chrome, and type only. Set `ST.BRIEF = 'v0.9'` and update the page title, the overview, and the questions page. Follow the prototype contract in §11 item 6: every state in `window.ST.STATES` with one specific user story in `ref`, each state at `index.html#/<state-id>`, review chrome hidden with `?shot=1`.\n\nRules for this round:\n- Change the tokens in `styles.css` / `v03.css` to the Density values (`--fs-13`, `--lh-body` 1.45, `--lh-read` 1.6, `--lh-head` 1.25, `--sp-0`, `--r-sm` 4, `--r-md` 6, `--r-lg` 8, `--nav-w` 208, `--nav-w-collapsed` 56, `--page-w` 1200, fluid wide pages up to 1360, `--chat-w` 720, `--panel-w` 340, `--viewer-w`, `--tray-w` 320) and make the components use them; body 14px; app h1 20px sans; no serif page titles.\n- One-row page header and one-row toolbar (tabs, unlabelled filters, status chip, count) on Library, Conversations, Notes, Subjects, Usage. The Library must show about 14 document rows at 1440×900.\n- Chat: one-row header with an overflow menu (Archive, Show citations); Sources as one line of 22px chips; Helpful / Not helpful as 28px icon buttons with tooltips; answers stay 16px / 1.6 in 720px.\n- Add one state `shell-nav-collapsed` (ref US-13, the 56px icon rail with a tooltip on hover/focus). Keep every other state id and its `ref` unchanged; remove none.\n- Keep required wording verbatim (§9 and quoted text in §6), including \"Only upload documents you have the right to use.\" and \"Delete *title*?\".\n- Never below: 12px text, 24px pointer targets, 2px unclipped focus rings, 4.5:1 contrast for secondary text and placeholders.\n- Do not edit `brief-v0.9.md`, `DESIGN.md`, `history/`, `.file-versions/`, `.od-frames/`, `.od-skills/`, or `v0.2/`. Keep the `main[tabindex=\"-1\"]` focus rule at the end of `v03.css`.\n\nEnd with the states you changed and added, how many Library rows fit at 1440×900, and questions or proposed changes to the brief.",
+      "size": 3274,
+      "mime": "text/html; charset=utf-8",
+      "kind": "html",
+      "contentPath": "0007-0fe42ecf-dc80-4703-a4b8-0338fe012870.html",
+      "contentDigest": "2ef3e70aa46e42edb2bd1906cb6795bd824f49bb840583ec6b36663283059674",
       "promptSource": "message"
     }
   ]
