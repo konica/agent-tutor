@@ -1,6 +1,6 @@
-# Pilot deploy (#56, #57)
+# Pilot deploy (#56, #57, #58)
 
-Deploys the pilot's infrastructure and the `web` and `keycloak` charts, so the CloudFront address serves the app shell and Keycloak at `/auth` on RDS (PRD §9.12, ADRs 0009 and 0010). It needs an account admin. Do [`pilot-aws-prerequisites.md`](pilot-aws-prerequisites.md) (#55) first. The big picture is in [`pilot-environment-overview.md`](pilot-environment-overview.md).
+Deploys the pilot's infrastructure and the `web`, `keycloak`, and `api` charts, so the CloudFront address serves the app shell, Keycloak at `/auth` on RDS, and the API at `/api` (PRD §9.12, ADRs 0009 and 0010). It needs an account admin. Do [`pilot-aws-prerequisites.md`](pilot-aws-prerequisites.md) (#55) first. The big picture is in [`pilot-environment-overview.md`](pilot-environment-overview.md).
 
 Commands are for **PowerShell 7** (`pwsh`). Run them from the repository root with your admin profile.
 
@@ -78,6 +78,8 @@ docker build --build-arg VITE_API_URL=/api --build-arg VITE_KEYCLOAK_URL=/auth -
 docker push "$Registry/smart-tutor/web:$Tag"
 docker build -t "$Registry/smart-tutor/keycloak:$Tag" deploy/keycloak
 docker push "$Registry/smart-tutor/keycloak:$Tag"
+docker build --target api -t "$Registry/smart-tutor/api:$Tag" backend
+docker push "$Registry/smart-tutor/api:$Tag"
 ```
 
 `/api` and `/auth` are relative, so the web image does not depend on the CloudFront address. The Keycloak image is optimized once at build time (ADR 0010).
@@ -88,7 +90,7 @@ docker push "$Registry/smart-tutor/keycloak:$Tag"
 helm upgrade --install smart-tutor deploy/helm/smart-tutor -n smart-tutor --create-namespace -f deploy/helm/smart-tutor/values-prod.yaml --set global.imageRegistry=$Registry --set global.imageTag=$Tag --set global.publicUrl=$Url --wait --timeout 15m
 ```
 
-`global.publicUrl` is the CloudFront address from step 2. Without it Keycloak refuses to start. The first install runs the `db-bootstrap` hook, which creates the database roles and databases. Keycloak's first start takes about 2 min (schema and realm import), so `--wait` is slow the first time; `--timeout 15m` (Helm's default is 5 min) covers the hook plus that first start.
+`global.publicUrl` is the CloudFront address from step 2. Without it Keycloak refuses to start. The first install runs the `db-bootstrap` hook, which creates the database roles and databases. Keycloak's first start takes about 2 min (schema and realm import), so `--wait` is slow the first time; `--timeout 15m` (Helm's default is 5 min) covers the hook plus that first start. Before the API rolls out, the `migrate` hook brings the app database to the latest Alembic revision; if it fails, the release fails and the running API stays.
 
 ## 7. Check
 
@@ -98,6 +100,7 @@ A new distribution and new targets can take a few minutes to settle. A 502 or 50
 kubectl -n smart-tutor get pods,externalsecrets,targetgroupbindings
 aws elbv2 describe-target-health --target-group-arn (aws elbv2 describe-target-groups --names smart-tutor-prod-web --query "TargetGroups[0].TargetGroupArn" --output text)
 aws elbv2 describe-target-health --target-group-arn (aws elbv2 describe-target-groups --names smart-tutor-prod-keycloak --query "TargetGroups[0].TargetGroupArn" --output text)
+aws elbv2 describe-target-health --target-group-arn (aws elbv2 describe-target-groups --names smart-tutor-prod-api --query "TargetGroups[0].TargetGroupArn" --output text)
 curl.exe -sI $Url
 curl.exe -sI ($Url -replace '^https','http')
 $d = curl.exe -s "$Url/auth/realms/smart-tutor/.well-known/openid-configuration" | ConvertFrom-Json; $d.issuer; $d.token_endpoint; $d.jwks_uri
@@ -105,11 +108,18 @@ aws rds describe-db-instances --db-instance-identifier smart-tutor-prod --query 
 ```
 
 - The pods are `Running`, the ExternalSecrets show `SecretSynced`, and the `TargetGroupBinding` objects exist.
-- Target health shows 2 healthy web targets and healthy Keycloak targets.
+- Target health shows 2 healthy web targets and healthy Keycloak targets, and 2 healthy API targets.
 - The HTTPS request returns 200; the HTTP request returns 301 to HTTPS.
 - The OpenID configuration shows `issuer` `<Url>/auth/realms/smart-tutor`, with your CloudFront address as `<Url>`, and `token_endpoint` and `jwks_uri` also start with `$Url/auth/`. An internal ALB name there means CloudFront is not forwarding the viewer Host (ADR 0010).
 - The database is private: the RDS query prints `False`.
-- Open `$Url` in a browser: the app shell loads. Sign-in from the app waits for #58.
+- Open `$Url` in a browser: the app shell loads.
+- The API answers through CloudFront:
+
+```powershell
+curl.exe -si "$Url/api/me"          # 401, WWW-Authenticate: Bearer
+curl.exe -s "$Url/api/healthz"      # {"status":"ok"}
+```
+
 - The ALB is not public:
 
 ```powershell
@@ -118,7 +128,7 @@ $Alb = aws elbv2 describe-load-balancers --names smart-tutor-prod --query "LoadB
 Resolve-DnsName $Alb                                                                                       # only 10.40.x.x addresses
 ```
 
-- Check the budget in **Billing → Budgets → smart-tutor-prod-monthly** (USD 400, emails at 80% actual and 100% forecasted). Delete the old $20 budget if it is still there (#55 follow-up).
+- Check the budget in **Billing → Budgets → smart-tutor-prod-monthly** (the amount in `smart-tutor:budget-monthly-usd`, emails at 80% actual and 100% forecasted). Delete the old $20 budget if it is still there (#55 follow-up).
 
 ## 8. Manage client accounts
 
@@ -135,11 +145,39 @@ aws secretsmanager get-secret-value --secret-id smart-tutor/keycloak/admin --que
 4. Demo (#57): open `$Url/auth/realms/smart-tutor/account` in a private window and sign in as the new user. Keycloak asks for a new password, then shows the account console. In DevTools → Application → Cookies for the CloudFront address, `KEYCLOAK_IDENTITY` and `KEYCLOAK_SESSION` show **Secure**: this proves CloudFront's `Forwarded: proto=https` reaches Keycloak (ADR 0010).
 5. To remove access: **Users →** the user → **Enabled** off. Sessions end. The PRD has no account deletion.
 
-Send the client the address, username, and temporary password through separate channels (#58 hands over access).
+Send the client the address, username, and temporary password through separate channels, after the demo below passes.
+
+### Demo: a learner signs in (#58)
+
+Use the account from step 8. Never paste a token anywhere except the variable below.
+
+1. Open `$Url` in a private window and choose **Sign in**. Sign in as the step 8 account. The Library shows, with the user's name in the user menu.
+2. In DevTools → Network, find the request to `/api/me` and copy the `Authorization` value after `Bearer `. In PowerShell:
+
+```powershell
+$Tok = "<paste>"
+curl.exe -s -o NUL -w "%{http_code}" -H "Authorization: Bearer $Tok" "$Url/api/me"      # 200
+```
+
+3. Sign out in the app and run the same `curl.exe` again: `401`.
+4. Call without a token: `401` with `WWW-Authenticate: Bearer`.
+
+```powershell
+curl.exe -si "$Url/api/me"
+```
+
+5. Restart Keycloak. While it rolls out, `/api/healthz` stays `200` and a call with a token gives `401`, never 5xx. After the rollout, signing in again works.
+
+```powershell
+kubectl -n smart-tutor rollout restart deploy/keycloak
+curl.exe -s -o NUL -w "%{http_code}" "$Url/api/healthz"      # 200
+```
+
+6. DevTools shows no `OPTIONS` preflight to `/api`, because the app and the API share one origin.
 
 ## 9. Update after a change
 
-Rebuild and push the images with a new tag, then run the `helm upgrade` from step 6 again (with `--timeout 15m`). It runs the `db-bootstrap` hook first, so a password rotated in Secrets Manager reaches the database. Running Keycloak pods keep the old `KC_DB_PASSWORD` (the environment is read at start, and External Secrets refreshes `keycloak-db` only hourly), so after rotating: run the `helm upgrade`, force the sync with `kubectl -n smart-tutor annotate externalsecret keycloak-db force-sync=$(Get-Date -UFormat %s) --overwrite`, then `kubectl -n smart-tutor rollout restart deploy/keycloak`. For infrastructure changes, run `npx aws-cdk@latest deploy --all` from `infra/`. #59 automates both.
+Deploy infrastructure changes with CDK first (`npx aws-cdk@latest deploy --all` from `infra/`), then rebuild and push the images with a new tag and run the `helm upgrade` from step 6 again (with `--timeout 15m`). The order matters: the API pods read their SSM parameters at startup through a Pod Identity association that the CDK stacks create. The upgrade runs the `db-bootstrap` and `migrate` hooks first, so a password rotated in Secrets Manager reaches the database. Running Keycloak pods keep the old `KC_DB_PASSWORD` (the environment is read at start, and External Secrets refreshes `keycloak-db` only hourly), so after rotating: run the `helm upgrade`, force the sync with `kubectl -n smart-tutor annotate externalsecret keycloak-db force-sync=$(Get-Date -UFormat %s) --overwrite`, then `kubectl -n smart-tutor rollout restart deploy/keycloak`. #59 automates both.
 
 ## 10. Tear down
 
