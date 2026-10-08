@@ -18,6 +18,8 @@
 }
 .fileIcon svg { width: 18px; height: 18px; }
 .title { font-weight: 650; color: var(--text); overflow-wrap: anywhere; }
+.titleStack { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; }
+.byline { font-size: var(--fs-14); color: var(--text-2); }
 .muted { color: var(--text-2); }
 .hint, .reason { margin: var(--sp-1) 0 0; font-size: var(--fs-12); max-width: 22ch; }
 .hint { color: var(--text-2); }

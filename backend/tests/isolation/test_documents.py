@@ -117,3 +117,24 @@ def test_b_checking_as_file_hash_finds_nothing() -> None:
     }
     assert client.post("/documents/duplicate-check", json={"sha256": sha}, headers=B).json() == {"document_id": None}
     assert client.get("/documents", headers=B).json() == []  # the check linked nothing
+
+
+def test_b_filters_find_nothing_of_a_and_a_filtered_list_holds_only_as() -> None:
+    client, objects, ingestion = setup()
+    general = "00000000-0000-4000-8000-000000000001"
+    stored = client.post("/uploads", json={"file_name": "a1.pdf"}, headers=A).json()
+    objects.objects[stored["fields"]["key"]] = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
+    ingestion.ingest_upload(stored["fields"]["key"])
+    client.put(f"/documents/{stored['document_id']}/subjects", json={"subject_ids": [general]}, headers=A)
+    client.post("/uploads", json={"file_name": "b1.pdf"}, headers=B)  # B's own document, still processing
+    day = {"uploaded_from": "2026-10-04", "uploaded_to": "2026-10-04"}
+
+    by_subject = client.get("/documents", headers=B, params={"subject_id": general}).json()
+    by_state = client.get("/documents", headers=B, params={"state": "ready"}).json()
+    by_dates = client.get("/documents", headers=B, params=day).json()
+    mine = client.get("/documents", headers=A, params={"subject_id": general, "state": "ready", **day}).json()
+
+    assert by_subject == []
+    assert by_state == []
+    assert [d["title"] for d in by_dates] == ["b1.pdf"]  # the range covers A's upload too, but B sees only B's
+    assert [d["document_id"] for d in mine] == [stored["document_id"]]

@@ -31,12 +31,24 @@ describe("loadDocuments", () => {
   it("returns the caller's documents", async () => {
     const doc = { document_id: "d1", title: "a.pdf", state: "processing", failure_reason: null, created_at: "2026-10-04T09:00:00Z", subjects: [], attempt: null, max_attempts: 3, can_retry: false };
     const { apiClient } = api(() => json([doc]));
-    await expect(loadDocuments(apiClient)).resolves.toEqual([doc]);
+    await expect(loadDocuments({}, apiClient)).resolves.toEqual([doc]);
+  });
+
+  it("maps filters to the query and sends none when there are none", async () => {
+    const { apiClient, fetch } = api(() => json([]));
+    await loadDocuments({}, apiClient);
+    expect(new URL((fetch.mock.calls[0][0] as Request).url).search).toBe("");
+    await loadDocuments({ subject_ids: ["s1", "s2"], state: "awaiting_subjects", uploaded_from: "2026-10-01", uploaded_to: "2026-10-07" }, apiClient);
+    const url = new URL((fetch.mock.calls[1][0] as Request).url);
+    expect(url.searchParams.getAll("subject_id")).toEqual(["s1", "s2"]);
+    expect(url.searchParams.getAll("state")).toEqual(["awaiting_subjects"]);
+    expect(url.searchParams.get("uploaded_from")).toBe("2026-10-01");
+    expect(url.searchParams.get("uploaded_to")).toBe("2026-10-07");
   });
 
   it("rejects with SessionExpiredError on 401", async () => {
     const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
-    await expect(loadDocuments(apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+    await expect(loadDocuments({}, apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
   });
 });
 

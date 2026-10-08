@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     max_pages_param: str = "/smart-tutor/max-pages"
     # Processing attempts per content (PRD §9.5), read once at startup by the API.
     max_processing_attempts_param: str = "/smart-tutor/max-processing-attempts"
+    # The one app time zone (PRD D27), an IANA name; the API reads it at startup to turn the Library's upload dates
+    # into instants. An invalid name stops startup.
+    app_time_zone_param: str = "/smart-tutor/app-time-zone"
     # Subject detection (PRD §9.2 step 1), read once at startup by the agent; starting values, tuned by evals.
     detect_threshold_param: str = "/smart-tutor/detect-threshold"
     detect_margin_param: str = "/smart-tutor/detect-margin"

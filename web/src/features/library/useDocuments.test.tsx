@@ -1,10 +1,10 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { DocumentResponse } from "../../api/documents";
+import type { DocumentFilters, DocumentResponse } from "../../api/documents";
 import { useDocuments } from "./useDocuments";
 
-const doc = (id: string): DocumentResponse => ({ document_id: id, title: `${id}.pdf`, state: "processing", failure_reason: null, created_at: "2026-10-04T09:00:00Z", subjects: [], attempt: null, max_attempts: 3, can_retry: false });
+const doc = (id: string): DocumentResponse => ({ document_id: id, title: `${id}.pdf`, state: "processing", failure_reason: null, created_at: "2026-10-04T09:00:00Z", subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: [], year: null });
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -39,6 +39,53 @@ describe("useDocuments", () => {
       first.resolve([doc("old")]);
     });
     expect(result.current.documents).toEqual([doc("new")]);
+  });
+
+  it("reloads at once when the filters change and polls with the new ones", async () => {
+    vi.useFakeTimers();
+    const load = vi.fn(async () => [doc("a")]);
+    const { rerender } = renderHook(({ filters }) => useDocuments(load, 1000, filters), { initialProps: { filters: {} as DocumentFilters } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(load).toHaveBeenLastCalledWith({});
+    rerender({ filters: { state: "ready" } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(load).toHaveBeenLastCalledWith({ state: "ready" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(load).toHaveBeenLastCalledWith({ state: "ready" });
+  });
+
+  it("does not reload for an equal filters object", async () => {
+    vi.useFakeTimers();
+    const load = vi.fn(async () => [doc("a")]);
+    const { rerender } = renderHook(({ filters }) => useDocuments(load, 60000, filters), { initialProps: { filters: { state: "ready" } as DocumentFilters } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    rerender({ filters: { state: "ready" } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops a response for old filters that arrives after the new ones", async () => {
+    const slow = deferred<DocumentResponse[]>();
+    const load = vi.fn((filters: DocumentFilters) => (filters.state ? Promise.resolve([doc("filtered")]) : slow.promise));
+    const { result, rerender } = renderHook(({ filters }) => useDocuments(load, 60000, filters), { initialProps: { filters: {} as DocumentFilters } });
+    rerender({ filters: { state: "ready" } });
+    await act(async () => {});
+    expect(result.current.documents).toEqual([doc("filtered")]);
+    await act(async () => {
+      slow.resolve([doc("everything")]);
+    });
+    expect(result.current.documents).toEqual([doc("filtered")]);
   });
 
   it("sets nothing after unmount", async () => {

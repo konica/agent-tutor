@@ -25,8 +25,22 @@ export function failure(error: unknown): Error {
   return new Error("");
 }
 
-export async function loadDocuments(apiClient: Client = client): Promise<DocumentResponse[]> {
-  const { data, error, response } = await listDocuments({ client: apiClient, throwOnError: false });
+// What the Library narrows by; every field is optional and they combine. Dates are YYYY-MM-DD calendar days, sent as the date input holds them.
+export type DocumentFilters = {
+  subject_ids?: string[];
+  state?: DocumentResponse["state"];
+  uploaded_from?: string;
+  uploaded_to?: string;
+};
+
+export async function loadDocuments(filters: DocumentFilters = {}, apiClient: Client = client): Promise<DocumentResponse[]> {
+  const query = {
+    ...(filters.subject_ids?.length ? { subject_id: filters.subject_ids } : {}),
+    ...(filters.state ? { state: [filters.state] } : {}),
+    ...(filters.uploaded_from ? { uploaded_from: filters.uploaded_from } : {}),
+    ...(filters.uploaded_to ? { uploaded_to: filters.uploaded_to } : {}),
+  };
+  const { data, error, response } = await listDocuments({ client: apiClient, query, throwOnError: false });
   if (sessionOver(error, response)) throw new SessionExpiredError();
   if (!data) throw new Error(`GET /documents failed (${response?.status ?? "no response"})`);
   return data;
