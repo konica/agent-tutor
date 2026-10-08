@@ -57,7 +57,7 @@ Shared components live in `web/src/components/`, one folder each (`Button/Button
 | `Button`, `IconButton` | `.btn-primary` / `-secondary` / `-ghost` / `-quiet`, `-sm` / `-lg`; `.icon-btn` | one primary button per view; an icon button always has `aria-label` |
 | `EmptyState` | `.empty` | icon, h2, one sentence, actions, optional `note` below the actions |
 | `StateBadge` | `.state-*` | see Document states |
-| `SubjectChip` | `.schip` | the one chip for subjects everywhere (Library, picker, chat header, lists), learner's subject name, stable hue per subject |
+| `SubjectChip` | `.schip` | the one chip for subjects everywhere (Library, picker, lists; never in the chat header), learner's subject name, stable hue per subject |
 | `Banner`, `Toast`, `Dialog`, `SidePanel`, `Tabs`, `FilterBar`, `UploadTray`, `Citation`, `SystemNotice` | `.banner-*`, `.toast`, `.dialog`, `.side-panel`, `.tabs`, `.filter-bar`, `.tray`, `.cite`, `.notice` | built with the story that first shows them |
 
 Icons: one outline family at 1.5px stroke, `lucide-react` with `strokeWidth={1.5}`, sized 16–20px, `aria-hidden` unless the icon is the only label.
@@ -76,7 +76,7 @@ One visual language everywhere (Library row, details, upload tray). Color is alw
 
 ## Chat
 
-The tutor's words, the learner's words, quoted document text, and system notices (subject added, maximum reached) each look different: quoted and cited material is set apart from the tutor's prose, and notices are centered dashed pills (the maximum warning uses `--info-soft`). Citations show the document's display title and page, or "page unavailable".
+The tutor's words, the learner's words, quoted document text, and system notices (e.g. "Started from note") each look different: quoted and cited material is set apart from the tutor's prose, and notices are centered dashed pills (the maximum warning uses `--info-soft`). Citations show the document's display title and page, or "page unavailable".
 
 ## Accessibility
 

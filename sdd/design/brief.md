@@ -19,17 +19,17 @@
 
 | Change | States |
 |---|---|
-| **K1 — conversations have no subjects.** No subject detection, no "Which subjects is this about?", no subject added, no 3-subject maximum, no "New conversation" refusal. Every question is answered from all of the learner's ready documents. Remove the subject chips from the chat header and "Your subjects: …" from the new conversation. | **Remove** `chat-subjects-detected`, `chat-subjects-detected-multi`, `chat-detection-unsure`, `chat-subject-added`, `chat-maximum-reached`, `chat-fourth-subject-refused`, `chat-new-from-refused`; redo `chat-new`, `chat-new-conversation`, `chat-answer-citations`, `chat-first-answer`, `chat-no-active-documents` |
-| **K2 — documents used.** Each conversation lists the documents used to answer it (in order of first use), with "Archived" or "Deleted" when it applies. Opening one opens the document viewer (K3). A deleted document is highlighted as "Deleted" and can't be opened. | New `chat-documents-used`, `chat-documents-used-deleted` |
-| **K3 — document viewer.** An in-app PDF viewer (§6.12). A citation opens it at the cited page, scrolled to the chunk, with the chunk text highlighted; opening a document from the list starts at page 1. Archived documents open read-only. | New `viewer-document`, `viewer-citation-highlight`, `viewer-no-highlight`, `viewer-archived`; **remove** `chat-citation-opens-details` |
-| **K4 — delete a document.** "Delete" in the Library row's "More" menu and in document details, with a confirmation. Not offered while processing. Citations to a deleted document read "Deleted document" with no link. | New `library-delete-confirm`, `library-deleted`, `chat-citation-deleted`; redo `details-ready`, `details-archived` |
+| **K1 — conversations have no subjects.** No subject detection, no "Which subjects is this about?", no subject added, no 3-subject maximum, no "New conversation" refusal. Every question is answered from all of the learner's ready documents. Remove the subject chips from the chat header and "Your subjects: …" from the new conversation. | **Remove** `chat-subjects-detected`, `chat-subjects-detected-multi`, `chat-detection-unsure`, `chat-subject-added`, `chat-maximum-reached`, `chat-fourth-subject-refused`, `chat-new-from-refused`; **merge** `chat-new-conversation` into `chat-new`; redo `chat-new`, `chat-answer-citations`, `chat-first-answer`, `chat-no-active-documents` |
+| **K2 — documents used.** Each conversation lists the documents used to answer it (in order of first use), with "Archived" or "Deleted" when it applies. Opening one opens the document viewer (K3). A deleted document is highlighted as "Deleted" and can't be opened. | New `chat-documents-used`, `chat-documents-used-empty`, `chat-documents-used-deleted` |
+| **K3 — document viewer.** An in-app PDF viewer (§6.12). A citation opens it at the cited page, scrolled to the chunk, with the chunk text highlighted; opening a document from the list starts at page 1. Archived documents open read-only. | New `viewer-document`, `viewer-citation-highlight`, `viewer-no-highlight`, `viewer-archived`, `viewer-loading`, `viewer-error`; **remove** `chat-citation-opens-details` |
+| **K4 — delete a document.** "Delete" in the Library row's "More" menu and in document details, with a confirmation. Not offered while processing. Citations to a deleted document read "Deleted document" with no link. | New `library-more-menu` (Delete in the row menu; absent for processing rows), `library-delete-confirm` (the same dialog opens from details), `library-deleted`, `chat-citation-deleted`; redo `details-ready`, `details-archived` (Restore and Delete), `details-processing` (no Delete) |
 | **K5 — same file, different learners.** A learner's upload is never linked to another learner's copy, so a duplicate of someone else's file processes like any new file. Only "Already in your library" remains. | none (removes the "fast duplicate" note in §6.3) |
 
 ---
 
 ## 1. Product in one paragraph
 
-Smart Tutor is a study tool for **the learner's own documents**. A learner uploads PDFs (research papers, books, course notes) into a private **Library**. For each upload, Smart Tutor reads the first pages and suggests three subjects; the learner keeps one to three with a click. The learner then just asks questions: the tutor works out which of their subjects the question is about, answers **only from their documents**, and shows where each answer came from (document and page). If their documents don't cover a question, it says so instead of guessing. Conversations become **Lesson Notes** the learner can edit and revisit. Release 2 adds a **research map**: how the learner's papers cite each other, a timeline, and a suggested reading order.
+Smart Tutor is a study tool for **the learner's own documents**. A learner uploads PDFs (research papers, books, course notes) into a private **Library**. For each upload, Smart Tutor reads the first pages and suggests three subjects; the learner keeps one to three with a click. The learner then just asks questions, with no subject to pick: the tutor answers **only from their documents**, shows where each answer came from (document and page), lists the documents each conversation used, and opens a cited passage in the PDF. If their documents don't cover a question, it says so instead of guessing. Conversations become **Lesson Notes** the learner can edit and revisit. Release 2 adds a **research map**: how the learner's papers cite each other, a timeline, and a suggested reading order.
 
 ## 2. Who we are designing for
 
@@ -47,10 +47,10 @@ Typical learner: a graduate student or self-taught engineer with dozens to hundr
 1. **Library first.** Nothing works without documents. Every empty state leads to uploading, and the first-run journey ends with a first answer, not a settings page.
 2. **Suggest, don't ask.** Subjects are pre-suggested; accepting them is one click. Typing is the exception.
 3. **Show the system's work honestly.** Processing takes seconds to minutes; always show which state a document is in, what happens next, and whether the learner needs to act.
-4. **Trust is visible.** Answers carry citations (document and page). The conversation's subjects are always on screen.
-5. **Scope is visible and grows predictably.** When a conversation gains a subject, the learner sees it happen inline. At the maximum of 3 they are told, before it matters.
+4. **Trust is visible.** Answers carry citations (document and page) that open the passage in the PDF. The documents a conversation used are one click away.
+5. **Scope is simple.** Every answer comes from all of the learner's ready documents; there are no subjects to choose in chat.
 6. **Declines are helpful, not errors.** A decline explains why and offers the next step.
-7. **Nothing is lost.** "Delete" is always **Archive**, and everything archived can be restored. Never show a permanent-delete action.
+7. **Prefer archive.** Archive is the safe, reversible action and is offered first. Deleting a document is permanent, always confirmed, and offered next to Archive. Notes and conversations are only archived.
 8. **Private by default, with one clear exception.** Documents, conversations, and notes are private. **Subject names are shared with everyone**; the UI says so wherever a learner types one.
 9. **One management pattern everywhere.** Library, Conversations, and Notes (and later Quizzes and Reports) share one list layout: filters, Active / Archived tabs, row actions, empty states.
 
@@ -134,7 +134,7 @@ The home screen and the hub for documents.
 | **Ready** | State "Ready". The document is searchable. |
 | **Failed** | State "Failed" with the reason in plain words (e.g. "This PDF has more than 500 pages", "We couldn't read this PDF", "No text layer (scanned PDFs are not supported yet)") and **"Retry"**. After 3 attempts: "This file could not be processed" and no Retry. |
 | **Archived tab** | Archived documents with **"Restore"**; their subjects can't be changed until restored (E7). One line explaining archived documents are not used for answers but old citations still work. |
-| **Delete confirmation** | "Delete *title*? This can't be undone. Conversations and notes keep their text." with **Delete** (destructive) and **Cancel**. Suggest **Archive** instead in one line ("Archive hides it and can be undone."). |
+| **Delete confirmation** | A dialog: "Delete *title*? This can't be undone. Conversations and notes keep their text." **Cancel** has the initial focus; **Delete** is the destructive button (danger style, text label, not the default); **Archive instead** is a secondary action under the warning: "Archive hides it and can be undone." The same dialog opens from document details; after Delete, both close and focus moves to the Library heading. |
 | **Deleted** | The row disappears; a short confirmation "*Title* deleted." No undo. |
 | **No results** | Filters match nothing: "No documents match these filters" and "Clear filters". |
 | **Rate limited** | Upload limit reached (20 per hour, 100 per day): message with the time uploads are available again, in GMT+7: "You can upload again at 11:40" for the hourly limit, "You can upload again at 00:00 (GMT+7)" for the daily limit, which resets at midnight GMT+7 (D8, E8). |
@@ -163,7 +163,7 @@ A side panel (drawer) opened from a Library row.
 - Display title (editable inline; "Reset to extracted title"), authors, year, DOI (if any), file name, pages, upload date, state.
 - Summary.
 - Subjects (chips) with **"Change subjects"** (opens §6.4); not shown when archived (E7).
-- Actions: **Open** (document viewer, §6.12; ready and archived documents); **Archive** / **Restore**; **Retry** when failed; **Delete** (with the confirmation in §6.3; not while processing).
+- Actions: **Open** (document viewer, §6.12; ready, *choose subjects*, and archived documents); **Archive** / **Restore**; **Retry** when failed; **Delete** (with the confirmation in §6.3; not while processing).
 - Note: there is **no download**.
 
 ### 6.6 Chat — US-3, US-4, US-4b, US-5, US-6, US-7, US-9, US-10, US-10c
@@ -178,7 +178,7 @@ The core screen. Structure: thread header (title, **Documents used**, citations 
 | **Answer with citations** | Under each answer: citations as compact references, "*Display title*, p. 42" (or "page unavailable"). Clicking one opens the **document viewer** at that page with the passage highlighted (§6.12). A citation to an archived document shows an "Archived" badge; a citation to a deleted document reads **"Deleted document"** with no link. Outline thumb icons labelled **"Helpful"** / **"Not helpful"** with a visible pressed state on each answer; "Not helpful" opens an optional reason (D1). |
 | **Citations switch** | "Show citations" switch in the header, **on by default**. Off hides the citations under every answer in view; answers are unchanged. Remembered for the learner across conversations. Show the thread both ways. |
 | **Decline** | One or two friendly sentences saying the learner's documents don't cover this. A decline adds nothing to Documents used. It must not look like an error. Say that a document on the topic is needed to continue, with **"Upload a document"** as the only action (D4). Never offer "New conversation" here (E4); the declined question is not kept (E6). |
-| **Documents used** | A "Documents used (*N*)" button in the header opens a side panel listing the documents used to answer this conversation, in order of first use: display title, authors and year, and an "Archived" or "Deleted" badge when it applies. Selecting a document opens the document viewer at page 1. A **deleted** document stays in the list, highlighted (muted row, "Deleted" badge, its last title), and can't be opened. Empty before the first answer: "Documents used to answer will appear here." |
+| **Documents used** | A "Documents used (*N*)" button in the header opens a side panel listing the documents used to answer this conversation, in order of first use: display title, authors and year, and an "Archived" or "Deleted" badge when it applies. Selecting a document opens the document viewer at page 1, in place of the panel; closing the viewer returns to the panel. A **deleted** document stays in the list, highlighted (muted but readable title, a "Deleted" badge with an icon and text, no strikethrough), isn't interactive, and the panel says once: "Deleted documents can't be opened." Empty before the first answer (`chat-documents-used-empty`): "Documents used to answer will appear here." |
 | **No active documents** | All of the learner's documents are archived or deleted: the conversation's history stays readable, and a new question gets the request to upload a document, with **"Upload"**. |
 | **Summarize lesson** | "Summarize lesson" in the header → progress → confirmation with a link to the note. If a note exists, the action reads "Update lesson note". **If the learner edited that note**, confirm first: "You've edited this note. Replace it with a new summary?" (Replace / Cancel). |
 | **Archived conversation** | Banner "This conversation is archived." with **"Restore"**; input disabled. |
@@ -211,21 +211,25 @@ The core screen. Structure: thread header (title, **Documents used**, citations 
 - Totals: input and output tokens, for today (the GMT+7 day, D8) and all time.
 - Three sections: **Conversations** (per conversation, sortable), **Document processing** (per document the learner's upload processed first), **Background** (notes and learning records).
 - One line explaining that a file already in the learner's library isn't processed again and costs nothing.
+- Processing of a deleted document stays in the totals, labeled "Deleted document".
 - No limits, credits, or upgrade prompts.
 
 ### 6.11 Settings
 Removed in v0.5: no Settings page in Release 1 (PRD Q45).
 
 ### 6.12 Document viewer — US-4b
-A full-height panel or page over the current screen, so "Back" returns to the conversation or Library row the learner came from.
+A full-height overlay (dialog) over the current screen, about 720 px wide, with the conversation or Library dimmed behind it. **Close** ("Back to conversation" when opened from chat) returns focus to the element that opened it: the citation, the Documents used row, or the details action.
 
 - **Header:** display title, authors, year, page indicator ("Page 3 of 12"), previous / next page, zoom, and **Close**.
 - **Body:** the PDF pages, scrollable; text is selectable.
 - **From a citation:** opens at the cited page, scrolls the passage into view, and highlights the chunk text with a soft accent background (not only color: add an outline or side marker). A small label near the highlight: "Cited passage".
 - **Passage not found:** the page opens without a highlight and a quiet note: "Couldn't highlight the passage on this page."
 - **From Documents used or document details:** opens at page 1, no highlight.
-- **Archived document:** opens read-only with an "Archived" badge and **"Restore"** in the header.
+- **Archived document:** opens read-only with an "Archived" badge and **"Restore"** in the header; after Restore the badge goes, the viewer stays open, and a short confirmation shows.
 - **Loading:** page skeleton; the cited page loads first.
+- **Error:** the PDF can't be loaded: "We couldn't open this document." with **Retry**.
+- Opens for ready, *choose subjects*, and archived documents; not for processing or failed ones.
+- **Accessibility:** a modal dialog (focus moves to the title on open, Tab stays inside, Esc closes); "Previous page" / "Next page" buttons and PageUp / PageDown; labelled zoom with a visible value; the highlight has hidden "Cited passage begins" / "ends" text, and a polite status says "Opened page 3 of 12. Cited passage highlighted." (or "Couldn't highlight the passage on this page."). Text over the highlight keeps 4.5:1 in both themes.
 - No download button; no annotation.
 
 | State | What the learner sees |
@@ -234,6 +238,8 @@ A full-height panel or page over the current screen, so "Back" returns to the co
 | `viewer-citation-highlight` | Opened from the citation "*ReAct…*, p. 3": page 3, highlighted passage in view. |
 | `viewer-no-highlight` | Cited page shown, "Couldn't highlight the passage on this page." |
 | `viewer-archived` | An archived document, read-only, "Restore" in the header. |
+| `viewer-loading` | Skeleton while the cited page loads. |
+| `viewer-error` | "We couldn't open this document." with Retry. |
 
 ## 7. Release 2: research map (low-fidelity wireframes) — US-19, US-20
 
@@ -376,7 +382,7 @@ Use this realistic sample data, not lorem ipsum.
 | 5 (designer) | v0.5 | Round 4 applied the scope cut on top of the landing page. G1 two different v0.5 briefs; G2 the terms checkbox held the upload-rights confirmation; G3 Settings held the theme and the citations default (both already elsewhere, note only); G4 where sign-out goes. F1 email as username; F2 "Sign in" for a signed-in visitor. | G1 merged into v0.6; G2 one line "Only upload documents you have the right to use." under the drop zone, nothing to accept; G3 noted; G4 the landing page (keep). F1, F4 and E4, E6, E7, E8 still open; F3 moot. PRD v2.15 (Q46, Q47). | v0.6 |
 | 6 (owner) | v0.6 | Answers to E4, E6, E7, E8, F1, F2. | E4: "New conversation" only at 3 subjects, never on a decline; E6: don't keep the declined question; E7: no changing subjects of archived documents (low business value; reverses D7); E8: daily limits reset at midnight GMT+7; F1: email as username; F2: confirmed. F4 still open. PRD v2.16 (Q48–Q52). | v0.7 |
 | 7 (designer) | v0.7 | Round 6 delivered: 97 states (removed `chat-decline-other-subject`, `picker-change-subjects-archived`); E4, E7, E8, F1 applied. Questions: **I1** each limit state shows both the hourly and the daily message, though only one applies at a time: keep one state each, or add `library-rate-limited-daily` and `chat-rate-limited-daily`?; I2 fixing an archived document's subject means restoring it, which makes it count for answers again (accepted; revisit after the pilot); H1 the upload-rights line stays under the disabled "Upload" at the limit; E5 chat hint "2 documents can't be used yet: 1 is processing, 1 needs subjects"; E10 a separate D6 state (optional). F4 still open. | Owner: round accepted as `design-v0.7`. F4: follow the designer, "Remember me" and "Forgot password?" on (PRD v2.17, Q53). I1: deferred, low priority; the limit states stay as they are. I2 accepted. H1, E5, E10: not pursued. | v0.7 (accepted) |
-| 8 (end users, owner) | v0.7 | End-user feedback: same file by different learners must not be linked; chat must not need subjects; see the documents a conversation used and open them; see where a cited chunk is in its document; delete own unshared documents. | Owner: per-learner contents; remove subject detection from conversations; documents used; PDF viewer at the highlighted chunk; delete with "Deleted" in documents used and citations; archive stays. PRD v2.21 (Q54–Q58). | v0.8 |
+| 8 (end users, owner) | v0.7 | End-user feedback: same file by different learners must not be linked; chat must not need subjects; see the documents a conversation used and open them; see where a cited chunk is in its document; delete own unshared documents. | Owner: per-learner contents; remove subject detection from conversations; documents used; PDF viewer at the highlighted chunk; delete with "Deleted" in documents used and citations; archive stays. PRD v2.21 (Q54–Q58). Product owner and UI/UX review (Q59): Documents used as a header button and side panel; viewer as a modal overlay returning focus; delete dialog with Cancel focused and "Archive instead"; new `viewer-loading`, `viewer-error`, `chat-documents-used-empty`, `library-more-menu`; `chat-new-conversation` merged into `chat-new`; §1 and §3 principles updated. | v0.8 |
 
 ---
 

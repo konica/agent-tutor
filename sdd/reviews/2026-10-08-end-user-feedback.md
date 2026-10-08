@@ -42,6 +42,27 @@ The cross-user link also had costs beyond how it felt to learners:
 - Chunks gain `start_index`, their character offset in the page's cleaned text. Existing chunks are backfilled by re-chunking the saved page text.
 - Delete removes every S3 version of the PDF. Traces that contain the document's text expire with the 180-day trace retention.
 
+## Product owner and UI/UX review (2026-10-08)
+
+Both reviews read PRD v2.21 and brief v0.8. Their questions all had simple defaults consistent with the owner's decisions, so the defaults were adopted (PRD Q59); the owner can override any of them in the PR review.
+
+| Topic | Default adopted |
+|---|---|
+| Subject filter for conversations and notes | One rule, at read time: subjects of the thread's documents used that still exist (archived included, deleted excluded). Notes no longer store subjects; learning records keep a snapshot. |
+| Excerpts after delete | Retrieved chunk text is not kept in the thread's saved state; citations are stored as `(document_id, chunk_id, page)`. A delete leaves the learner's and tutor's messages and removes nothing else from the conversation. |
+| When a turn counts | Only when its answer is saved. A stopped answer or lost stream adds nothing. A delete during a streamed answer: the answer is saved, the document shows as "Deleted". |
+| Which documents open in the viewer | Ready, *choose subjects*, and archived (read-only). Not processing or failed. The viewer renews its short-lived link while open. Restore from the viewer keeps it open. |
+| Highlight matching | pdf.js text layer matched against the chunk text after the chunking cleanup; `start_index` picks between repeats; no match → page without highlight. Seed-corpus target ≥ 95% plus a content-free production count of misses. |
+| Storage keys and re-upload | `contents/<owner_id>/<content_id>.pdf`: a delete and a re-upload of the same file never share a key; old citations never point to the new upload. |
+| Migration | A shared content is copied for each extra owner (row, chunks, S3 objects, state); afterwards every content has one owner. |
+| Storage growth | Accepted at pilot scale; storage per learner reported next to the budget alerts. |
+| Documents used in chat | Header button "Documents used (*N*)" opening a side panel; the viewer replaces the panel and Close returns to it. |
+| Viewer | Modal overlay (~720 px) over the dimmed screen; Close returns focus to the opener; keyboard paging; announced highlight. |
+| Delete dialog | Cancel focused; danger-styled "Delete"; "Archive instead" as a secondary action; same dialog from details. |
+| Deleted treatment | Muted but readable title, "Deleted" badge with icon and text, no strikethrough; not interactive. |
+
+New states from the review: `viewer-loading`, `viewer-error`, `chat-documents-used-empty`, `library-more-menu`; `chat-new-conversation` merges into `chat-new`.
+
 ## Effect on tickets
 
 - **Close as not planned** (detection work): #12 US-3b, #85, #86, #113.

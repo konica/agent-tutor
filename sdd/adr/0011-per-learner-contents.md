@@ -17,7 +17,7 @@ Embedding is a small part of processing cost, so the saving from sharing content
 ## Decision
 
 - **Content stays separate from document**, but a content has **one owner**:
-  - it is unique per `(owner_id, sha256)` and stored at `contents/<owner_id>/<sha256>.pdf`, with its page text next to it;
+  - it is unique per `(owner_id, sha256)` and stored at `contents/<owner_id>/<content_id>.pdf`, with its page text next to it (keyed by `content_id`, so a delete and a re-upload of the same file never share an S3 key);
   - the worker's insert-or-get uses `(owner_id, sha256)` and never looks up another learner's content.
 - **Duplicates only within a learner's library:**
   - the browser hash skips an upload of a file the learner already has;

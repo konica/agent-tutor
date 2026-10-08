@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Draft v2.21 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; conversations over all of a learner's documents; per-learner contents; research map in Release 2) |
-| **Changes from v2.20** | End-user feedback (`sdd/reviews/2026-10-08-end-user-feedback.md`, Q54–Q58). **No cross-user deduplication:** each learner's upload is stored, processed, and embedded for that learner; duplicates are caught only within the learner's own library (D18, D19, US-11; ADR 0011). **Conversations have no subjects and no subject detection:** the tutor searches all of the learner's ready, non-archived documents (D3, US-3, US-4; US-3b removed). Each conversation **lists the documents used** to answer it, and the learner opens one in a **PDF viewer**; a citation opens at its page with the chunk highlighted (US-4b; chunks gain a page offset; PDFs stay in S3 Standard, so the Glacier tier is removed). The owner can **delete a document** that isn't shared: its file, page text, and chunks are removed; conversations and notes keep their text, citations read "Deleted document", and the conversation's list marks it deleted (D10, US-10c). |
+| **Changes from v2.20** | End-user feedback (`sdd/reviews/2026-10-08-end-user-feedback.md`, Q54–Q58). **No cross-user deduplication:** each learner's upload is stored, processed, and embedded for that learner; duplicates are caught only within the learner's own library (D18, D19, US-11; ADR 0011). **Conversations have no subjects and no subject detection:** the tutor searches all of the learner's ready, non-archived documents (D3, US-3, US-4; US-3b removed). Each conversation **lists the documents used** to answer it, and the learner opens one in a **PDF viewer**; a citation opens at its page with the chunk highlighted (US-4b; chunks gain a page offset; PDFs stay in S3 Standard, so the Glacier tier is removed). The owner can **delete a document** that isn't shared: its file, page text, and chunks are removed; conversations and notes keep their text, citations read "Deleted document", and the conversation's list marks it deleted (D10, US-10c). Product owner and UI/UX review defaults (Q59): conversations and notes are filtered by the subjects of their documents used, read at query time; retrieved chunk text isn't kept in a thread's saved state; content files are keyed by `content_id`. |
 | **Changes from v2.19** | Subject detection (§9.2 step 1) states that the runner-up is the best subject not bound, and that a subject with no chunk among the top 20 results has no score. Starting values in SSM: `detect-threshold` 0.35, `detect-margin` 0.05, `multi-margin` 0.03. The agent reads them at startup and does not start when a read fails, so its IAM role needs `ssm:GetParameter` on `/smart-tutor/*` (Appendix A). |
 | **Changes from v2.18** | US-2b typed names (#78): the picker's *Add your own* field searches the shared catalog (`GET /subjects/search`), the learner's subjects first by their names, then shared subjects by canonical name; a typed name is trimmed, at most 60 characters (Save is blocked while it is longer), reuses a subject whose normalized name matches exactly, and otherwise creates a shared subject. Near-duplicate reuse and the name check follow in #79. |
 | **Changes from v2.17** | US-2b first slice (#77): when its content becomes ready, a document goes to *choose subjects* (`awaiting_subjects`) with 3 suggestions; the interim "General" step is removed (documents that already have "General" keep it). Suggestions are computed when the learner opens *choose subjects* (nothing is stored), and content without a description fills the picker with the learner's other subjects, then "General". The API and worker IAM roles gain Bedrock invoke on the embedding (and, for the worker, agent) models. |
@@ -59,7 +59,7 @@ Learners and researchers work through many documents on a topic but lack the bac
 
 | Term | Definition |
 |---|---|
-| **Content** | One file uploaded by one learner, identified by the **SHA-256** of its bytes within that learner's library. Stored at `contents/<owner_id>/<sha256>.pdf`, extracted, chunked, and embedded for that learner. Holds the extracted metadata and the saved page text. Two learners with the same file have two contents, never linked (D18). |
+| **Content** | One file uploaded by one learner, identified by the **SHA-256** of its bytes within that learner's library. Stored at `contents/<owner_id>/<content_id>.pdf`, extracted, chunked, and embedded for that learner. Holds the extracted metadata and the saved page text. Two learners with the same file have two contents, never linked (D18). |
 | **Work** | The paper or book a content represents. Different files of the same work (preprint vs published version, v1 vs v2) are different contents with the same `work_key` (DOI, else normalized title + year). Used by the research map to show one node per work. |
 | **Document** | A learner's **library entry** for their content: owner, 1–3 subjects, state, archived flag, visibility. Archived (restorable) or deleted by its owner (permanent, only while not shared; D10). |
 | **Library** | All documents a learner owns (Release 4: also documents shared with them or added from published or imported documents). |
@@ -123,7 +123,7 @@ Learners and researchers work through many documents on a topic but lack the bac
 | D8 | **One Lesson Note per thread**, in PostgreSQL, private to its owner; **soft delete only**. "Summarize lesson" on a note the learner has edited **asks for confirmation** before overwriting. | Nothing a learner wrote is lost without consent. |
 | D9 | A **learning record** is written (a) when the learner asks for a note and (b) when the thread has been idle for `learning_record_idle_minutes` (default 10). At most one record per thread, **updated in place** by either trigger. Only **learner messages** reset the idle timer. | Lifetime progress tracking. |
 | D10 | Learners **archive** documents (restorable) or **delete** their own (permanent). Delete is refused while a document is processing or shared (Release 4: stop sharing first) and removes its PDF, saved page text, chunks, and embeddings; threads and notes keep their text, and citations to it read "Deleted document". PDFs stay in S3 Standard while their document exists (no Glacier tier). | End-user feedback (Q57, Q58). Per-learner contents (D18) mean a delete affects only its owner; the document viewer needs the PDF at hand. |
-| D11 | Documents, conversations, notes, quizzes, and reports all use **archive/restore** and support **filtering by date and subject** (a subject filter matches any of an item's subjects; a conversation's subjects are those of its documents used). | One management model across the app. |
+| D11 | Documents, conversations, notes, quizzes, and reports all use **archive/restore** and support **filtering by date and subject** (a subject filter matches any of an item's subjects; a conversation's or note's subjects are those of its thread's documents used that still exist, archived included, read at query time). | One management model across the app. |
 | D12 | *(R3)* Quizzes are **multiple choice only**, generated from selected notes, **graded in code**. | Deterministic, cheap grading. |
 | D13 | *(R3)* Reports are generated **daily and weekly** (learner's time zone, only with activity) and **on demand**, across all subjects. | Summary without asking. |
 | D14 | *(R3)* "What to learn next" picks topics **only from the topic catalog of the learner's active documents**, weak quiz topics first, and **respects the reading order** from the research map. | Grounded recommendations that follow how ideas build. |
@@ -215,8 +215,9 @@ Story IDs are stable. Release 1: US-1 to US-13b (US-3b removed in v2.21). Releas
 **US-4b Documents used and the document viewer**
 - Each conversation keeps its **documents used**: the documents whose chunks were given to the model for an answered turn, in order of first use. A declined turn adds nothing. The learner sees the list in the conversation, with each document's display title and, when it applies, "Archived" or "Deleted".
 - *When* the learner opens a document from the list, *then* the **document viewer** shows its PDF from the first page. *When* they select a citation, *then* the viewer opens at the cited page, scrolls to the chunk, and highlights its text; if the text can't be found on the page, the page opens without a highlight.
-- An archived document opens read-only. A deleted document stays in the list, highlighted as "Deleted", and can't be opened (US-10c).
-- The PDF is served only to a reader allowed by `can_read`, through a short-lived link.
+- Ready, *choose subjects*, and archived documents open (archived read-only); processing and failed documents don't. A deleted document stays in the list, highlighted as "Deleted", and can't be opened (US-10c).
+- A turn counts only when its answer is saved: an answer the learner stops, or a stream that is lost, adds nothing. If a document is deleted while an answer citing it streams, the answer is saved, the document is listed as "Deleted", and its citations read "Deleted document".
+- The PDF is served only to a reader allowed by `can_read`, through a short-lived link that the viewer renews while it stays open.
 
 **US-5 Decline what the documents don't cover**
 - *When* the learner's documents don't support an answer, *then* the tutor declines in one or two friendly sentences, without answering from its own knowledge, and tells the learner to upload a document on the topic to continue, with **"Upload a document"** as the only action. The declined question is not kept; the learner asks again once the document is ready.
@@ -229,7 +230,7 @@ Story IDs are stable. Release 1: US-1 to US-13b (US-3b removed in v2.21). Releas
 - *When* the learner clicks "Summarize lesson", *then* the tutor writes the thread's Markdown note, or overwrites it; *if* the learner has edited the note since it was last generated, *then* they are asked to confirm the overwrite first.
 - The learner can view and edit it. "Delete" **archives** it (restorable); archiving doesn't affect the thread or its learning record.
 - "Discuss this note" starts a new thread with the note as context and a link back to the note (`source_note_id`).
-- A note's subjects are the subjects of its thread's documents used when it was written.
+- A note's subjects are the subjects of its thread's documents used that still exist, read at query time (D11).
 
 **US-8 Learning record**
 - **On request:** "Summarize lesson" writes the note and the thread's learning record (subject ids of its documents used, topics, key points, thread id, note id, timestamp) together.
@@ -239,6 +240,7 @@ Story IDs are stable. Release 1: US-1 to US-13b (US-3b removed in v2.21). Releas
 **US-9 Token usage**
 - The learner sees input/output tokens per thread, for **document processing** they triggered (first processing of a new content: metadata, suggestions, embeddings), and in total; daily totals across all usage rows match Bedrock's reported usage. A duplicate of a file already in the learner's own library isn't processed again and costs nothing.
 - Exceeding a rate limit or daily cap returns `429` with a retry-after message; the UI shows the time it ends in GMT+7 (D27).
+- Usage for a deleted document's processing stays in the totals, labeled "Deleted document".
 - "Today" in usage totals and the daily caps follow GMT+7: daily caps reset at midnight GMT+7 (D27). Shorter limits (per hour, per minute) are rolling windows.
 
 **US-10 Manage documents**
@@ -253,7 +255,7 @@ Story IDs are stable. Release 1: US-1 to US-13b (US-3b removed in v2.21). Releas
 **US-10c Delete a document**
 - *When* the owner chooses **Delete** on a document, *then* they confirm ("Delete *title*? This can't be undone. Conversations and notes keep their text."), and the document, its PDF (every stored version), saved page text, chunks, and embeddings are removed for good. Delete isn't offered while the document is processing, or (Release 4) while it is shared.
 - Conversations and Lesson Notes keep their text. Citations to the document read "Deleted document" with no link; each conversation's documents used keeps its title, highlighted as "Deleted", and it can't be opened. Learning records are unchanged.
-- A subject leaves the learner's subjects when no other document has it. Uploading the same file again is a new upload, processed in full.
+- A subject leaves the learner's subjects when no other document has it. Uploading the same file again is a new upload, processed in full, with new ids, so old citations never point to it.
 - Traces that contain its text expire with the 180-day trace retention (D25).
 
 **US-11 Duplicate uploads**
@@ -305,7 +307,7 @@ Story IDs are stable. Release 1: US-1 to US-13b (US-3b removed in v2.21). Releas
    ▼                  Keycloak (OIDC)                                                              ▲
  S3 uploads/<user>/ ──► S3 event → SQS → Ingestion worker (hash → own-library duplicate check → first pages: ┘
                                           metadata, suggestions → page text (pypdf, saved JSON) → work key → chunk → embed)
-                         contents/<owner>/<sha256>.pdf + contents/<owner>/<sha256>.pages.json (S3 Standard; viewer reads the PDF)
+                         contents/<owner>/<content_id>.pdf + contents/<owner>/<content_id>.pages.json (S3 Standard; viewer reads the PDF)
 ```
 
 | Component | Responsibilities |
@@ -326,21 +328,21 @@ A plain **LangGraph** graph; retrieval is never a model decision. A thread has n
 1. **Search (fixed step).** MCP `search` over all of the learner's readable, ready, non-archived documents; top-k chunks (k = 5). An empty readable set gets the US-3 request to upload a document.
 2. **Relevance gate (code).** If the best score is below `answer_floor` → decline (US-5) without calling the LLM, and log the decline.
 3. **Answer (Nova 2 Lite, streamed).** System prompt + capped history + chunks **wrapped as quoted data** with an instruction to treat document text as information, never as instructions (D7). The model answers with citations or calls `decline(reason)`.
-4. **Record documents used (code).** After an answered turn, the documents of the chunks given to the model are added to the thread's documents used (`thread_documents`); a decline adds nothing.
+4. **Record documents used (code).** When an answered turn is saved, the documents of the chunks given to the model are added to the thread's documents used (`thread_documents`); a decline, a stopped answer, or a lost stream adds nothing. Each answer stores its citations as `(document_id, chunk_id, page)`; titles resolve at read time, and a citation whose document no longer exists reads "Deleted document". Retrieved chunk text is not kept in the thread's saved state (only in the model call and its trace), so a delete leaves no excerpt in the conversation.
 
 There is no subject detection, growth check, or subject maximum (Q55). `answer_floor` is a configuration value (SSM `answer-floor`) tuned on the decline dataset in M2 (§10.3); its starting value is recorded in configuration before M2 evals run.
 
-**Summarize path:** read the thread → if the note was edited since last generated, the API asks the learner to confirm first → one model call returns the Lesson Note and the learning record (`save_learning_record` tool call) → upsert both, with the subjects of the thread's documents used.
+**Summarize path:** read the thread → if the note was edited since last generated, the API asks the learner to confirm first → one model call returns the Lesson Note and the learning record (`save_learning_record` tool call) → upsert both; the learning record keeps the subject ids of the thread's documents used at that moment.
 
 **Idle record path:** a sweeper every minute selects threads with `last_learner_message_at < now − learning_record_idle_minutes` and `last_learner_message_at > record_written_at` and writes or updates the record only.
 
 **Document processing path (worker):**
 1. Validate type, size, page count, parseability, and that the PDF has extractable text; compute SHA-256 of the uploaded bytes.
 2. **Insert-or-get the content by `(owner, hash)`.** The learner already has this file → delete the uploaded copy and point the upload to their existing document (US-11); stop. A file another learner has is **not** looked up.
-3. **New content:** move the file to `contents/<owner_id>/<sha256>.pdf`.
+3. **New content:** move the file to `contents/<owner_id>/<content_id>.pdf`.
 4. **First-pages step (fast, one model call, `describe_document` tool call)** on text extracted from pages 1–2: title, authors, year, DOI, a two-sentence summary, and 3 proposed subject names; an embedding of the summary is stored on the content. The payload is validated in code; a reply without one valid call stores no metadata, and processing continues with the file name as title; an invalid DOI or year is dropped without losing the rest.
 5. **Suggestions for this learner (code):** rank shared subjects by similarity between the summary embedding and subject name embeddings, boosting subjects the learner already has and matching their personal names; fill the remaining of 3 slots with the model's proposed names that don't match an existing subject. Suggestions are computed when the learner opens *choose subjects*; nothing is stored. When the content has no description, the learner's other subjects and then "General" fill the picker so it is never empty.
-6. **Full extraction:** `pypdf` reads the text page by page into LangChain `Document`s → save `contents/<owner_id>/<sha256>.pages.json` → **work key** (DOI, else normalized title + year) in code from the first-pages metadata → split each page with `RecursiveCharacterTextSplitter` (separators `\n\n`, `\n`, `. `, space; ≤ 1,000 characters, overlap 200) into chunks that keep their page number and their start offset in the page's cleaned text (`start_index`), after light cleanup (NFKC, joined line-end hyphens, no control characters); reference lists and front matter are kept; pages without text yield no chunks → embed (chunk writes idempotent per content, ordered by `seq`; `contents.chunker` records the method and settings). Runs before the learner can choose subjects (US-2b). A PDF whose pages average fewer than 50 non-whitespace characters fails with "No text layer (scanned PDFs are not supported yet)".
+6. **Full extraction:** `pypdf` reads the text page by page into LangChain `Document`s → save `contents/<owner_id>/<content_id>.pages.json` → **work key** (DOI, else normalized title + year) in code from the first-pages metadata → split each page with `RecursiveCharacterTextSplitter` (separators `\n\n`, `\n`, `. `, space; ≤ 1,000 characters, overlap 200) into chunks that keep their page number and their start offset in the page's cleaned text (`start_index`), after light cleanup (NFKC, joined line-end hyphens, no control characters); reference lists and front matter are kept; pages without text yield no chunks → embed (chunk writes idempotent per content, ordered by `seq`; `contents.chunker` records the method and settings). Runs before the learner can choose subjects (US-2b). A PDF whose pages average fewer than 50 non-whitespace characters fails with "No text layer (scanned PDFs are not supported yet)".
 
 **Release 2 path (research map):** at ingestion (from Release 2, which adds structured extraction of reference lists; backfilled from stored PDFs for older contents) references are matched to works by DOI, then normalized title + year; the map and reading order for a learner are computed in code from their works. Reading-path answers retrieve per work in reading order and cite each step.
 
@@ -357,7 +359,7 @@ Because readable documents come from code and the database, attacks like "search
 2. The API has **Keycloak validate the token** (token introspection as the `smart-tutor-api` client: `active`, `iss`, `aud`), applies rate limits, invokes the agent, and **forwards the same token**. Signing out or revoking a session therefore ends access on the next request, on every service (ADR 0007).
 3. The agent validates the token the same way and attaches it to every MCP request (HTTP header, LangGraph runtime context — **never in the prompt, state, or traces**).
 4. The MCP server has Keycloak validate the token (introspection as the `rag-mcp` client), reads `sub`, and builds the search filter in SQL: chunks whose `content_id` belongs to a document that is `ready`, not archived, and readable by `sub` (Releases 1–3: `owner_id = sub`; Release 4: also a grant or `visibility = public`). An empty readable set returns an empty result; the agent turns it into the US-3 request to upload a document (no error is shown to the learner).
-5. **Document viewer:** `GET /documents/{id}/file` checks `can_read` (archived documents included) and returns a presigned GET for the PDF, valid for 5 minutes; `GET /chunks/{id}` returns a chunk's document, page, offset, and text, only through a readable document. A deleted document returns `404`.
+5. **Document viewer:** `GET /documents/{id}/file` checks `can_read` (archived documents included) and returns a presigned GET for the PDF, valid for 5 minutes; `GET /chunks/{id}` returns a chunk's document, page, offset, and text, only through a readable document. A deleted document returns `404`. The viewer (pdf.js) finds the chunk on its page by matching the chunk text against the page's text layer after the same cleanup used for chunking (NFKC, joined line-end hyphens, collapsed whitespace); `start_index` picks between repeated matches. No match → the page opens without a highlight.
 
 **`can_read(user, document)`** is implemented once (domain rule + one SQL predicate) and used by the API, the MCP server, citation resolution, and the document viewer.
 
@@ -371,8 +373,8 @@ Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow onl
 
 | Data | Store | Key | Notes |
 |---|---|---|---|
-| Content | PostgreSQL `contents` | `content_id`; unique `(owner_id, sha256)` | `owner_id`, `sha256`, `s3_key` (`contents/<owner_id>/<sha256>.pdf`), `text_key` (`contents/<owner_id>/<sha256>.pages.json`, the saved page text), `bytes`, `pages`, `state` (`processing` / `ready` / `failed`), `failure_reason`, `attempts`, `title`, `authors[]`, `year`, `doi`, `work_key`, `references[]` (from Release 2), `summary`, `summary_embedding`, `proposed_subject_names[]`, `embedding_model`, `embedding_dim`, `chunker` (method, settings, version; ADR 0008), `processed_at`. One owner; never linked to another learner's document (Release 4 grants give read access to it). Deleted with its document. |
-| Chunk | PostgreSQL `chunks` (pgvector) | `chunk_id` | `content_id`, `seq` (order within the content; unique per content), `page` (physical 1-based page; nullable for future non-PDF sources), `start_index` (character offset of the chunk in its page's cleaned text, for the viewer's highlight), `text`, `embedding` (1024-dim, HNSW). |
+| Content | PostgreSQL `contents` | `content_id`; unique `(owner_id, sha256)` | `owner_id`, `sha256`, `s3_key` (`contents/<owner_id>/<content_id>.pdf`), `text_key` (`contents/<owner_id>/<content_id>.pages.json`, the saved page text), `bytes`, `pages`, `state` (`processing` / `ready` / `failed`), `failure_reason`, `attempts`, `title`, `authors[]`, `year`, `doi`, `work_key`, `references[]` (from Release 2), `summary`, `summary_embedding`, `proposed_subject_names[]`, `embedding_model`, `embedding_dim`, `chunker` (method, settings, version; ADR 0008), `processed_at`. One owner; never linked to another learner's document (Release 4 grants give read access to it). Deleted with its document. |
+| Chunk | PostgreSQL `chunks` (pgvector) | `chunk_id` | `content_id`, `seq` (order within the content; unique per content), `page` (physical 1-based page; nullable for future non-PDF sources), `start_index` (character offset of the chunk in its page's cleaned text, for the viewer's highlight; existing chunks get it by locating their text in the saved page text, so chunk ids don't change), `text`, `embedding` (1024-dim, HNSW). |
 | Document | PostgreSQL `documents` | `document_id`; unique `(owner_id, content_id)` where `content_id` is set | `owner_id`, `content_id` (null until hashed), `upload_id`, `state` (`processing` / `awaiting_subjects` / `ready` / `failed`), `archived` (bool), `archived_at`, `visibility` (`private`; R4: `shared` / `public`), `title_override`, `file_name` (the picked file's name; the title until the first-pages step), `failure_reason`, `added_via` (`upload`; R4: `share` / `public` / `import`), `created_at`. A deleted document's row is removed; references to it resolve to "Deleted document". |
 | Document subjects | PostgreSQL `document_subjects` | `(document_id, subject_id)` | 1–3 rows per ready document (enforced in the domain and by a check). |
 | Document grant *(R4)* | PostgreSQL `document_grants` | `(document_id, grantee_id)` | `grantee_type` (`user`; later `group`), `permission` (`read`), `granted_at`. Created in Release 1, unused. |
@@ -380,7 +382,7 @@ Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow onl
 | Personal subject name | PostgreSQL `user_subject_names` | `(user_id, subject_id)`; unique `(user_id, normalized display_name)` | `display_name`, `updated_at`. |
 | Thread | PostgreSQL `threads` | `thread_id` | `user_id`, `title`, `status` (`active` / `archived`), `created_at`, `last_learner_message_at`, `record_written_at`. |
 | Thread document | PostgreSQL `thread_documents` | `(thread_id, document_id)` | The thread's documents used: `first_used_at`, `deleted_title` (the display title, copied when the document is deleted; null otherwise). No foreign key to `documents`, so rows outlive a deleted document. |
-| Lesson Note | PostgreSQL `lesson_notes` | `thread_id` (unique) | `user_id`, `subject_ids[]` (of the thread's documents used when written), `markdown`, `status` (`active` / `archived`), `edited_since_generated` (bool), `archived_at`, `source_note_id` (the note a "Discuss this note" thread started from), `updated_at`. |
+| Lesson Note | PostgreSQL `lesson_notes` | `thread_id` (unique) | `user_id` (subjects come from the thread's documents used at read time, D11), `markdown`, `status` (`active` / `archived`), `edited_since_generated` (bool), `archived_at`, `source_note_id` (the note a "Discuss this note" thread started from), `updated_at`. |
 | Learning record | LangGraph store, namespace `("learning", user_id)` | `thread_id` | `subject_ids[]`, `topics[]`, `key_points[]`, `note_id`, `trigger`, `learned_at`, `updated_at`. |
 | Decline log | PostgreSQL `declines` | `decline_id` | Scrubbed question text, best score, `reason`, timestamp. **No user id.** Deleted after 90 days. |
 | Learner profile *(R3)* | PostgreSQL `learners` | `user_id` | `time_zone`, for reports (D13). Not created in Release 1: the time zone is the `app-time-zone` setting (D27). |
@@ -411,7 +413,7 @@ Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow onl
 - `processing` → `failed` when its content fails or validation fails; **Retry** returns it to `processing`.
 - Open gap: a document whose upload never arrives (the browser's POST to S3 failed or was abandoned) stays `processing`; a follow-up will fail it once the presign/upload lifecycle expires.
 - `archived` is a separate flag on any state: archive hides the document from search and lists; restore clears the flag.
-- **Delete** (US-10c) removes the document and its content in any state but `processing`.
+- **Delete** (US-10c) removes the document and its content in any document state but `processing`. A system re-embedding of the content doesn't block it; the job skips contents that no longer exist.
 - **Searchable** only when the document is `ready`, not archived, and its content is `ready`.
 
 | Learner action | What happens |
@@ -419,12 +421,14 @@ Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow onl
 | Select a file already in their library (browser SHA-256 matches one of **their** documents) | No upload. "Already in your library" (or "Restore" if archived). |
 | Upload a new file | Presigned POST to `uploads/…` → S3 event → worker computes SHA-256. |
 | ↳ Hash matches one of the learner's own contents | Uploaded copy deleted; no second document; the learner is pointed to the existing one (restore if archived). |
-| ↳ Otherwise (including a file another learner has) | Stored at `contents/<owner_id>/<sha256>.pdf`; full processing (§9.2). |
+| ↳ Otherwise (including a file another learner has) | Stored at `contents/<owner_id>/<content_id>.pdf`; full processing (§9.2). |
 | Choose / change subjects (1–3), edit display title | Updates `document_subjects` / `title_override` only. |
 | Archive / restore | Updates `documents.archived`. Content and chunks kept, excluded from search while archived. |
 | Delete | Refused while `processing` or (R4) shared. Copies the display title into `thread_documents.deleted_title`, then removes the document, its `document_subjects`, the content, its chunks, and the PDF (every S3 version) and page text. |
 
 **Storage:** PDFs and saved page text stay in S3 Standard while their document exists, so the document viewer (US-4b) and Release 2 structured extraction can read them; there is no Glacier tier (Q58). Versioning stays on to protect against accidental overwrites; a delete removes every version.
+
+**Migration from shared contents (v2.21):** a content linked to documents of several owners is copied for each extra owner (content row, chunks, S3 objects), keeping its state, attempts, and failure reason; afterwards every content has exactly one owner.
 
 ### 9.6 Decline log
 
@@ -466,7 +470,7 @@ Every decline (relevance gate or `decline` tool) writes the question text with p
 | **Filtered search returns too few results.** | Iterative HNSW scans and exact-search fallback; recall test under selective filters (§9.3, M1). |
 | **Same work in different files.** Preprint and published PDFs hash differently. | Each is embedded (accepted cost); `work_key` collapses them into one research-map node. |
 | **Queue starvation and upload cost.** One learner uploads hundreds of files. | Per-user fair scheduling, first-pages step first, upload rate limits and daily caps, budget alerts. |
-| **The same file processed for many learners.** Popular papers are embedded once per learner (D18). | Accepted: embedding is a small part of processing cost; per-file limits, rate limits, daily caps, and budget alerts bound it. |
+| **The same file processed for many learners.** Popular papers are embedded once per learner (D18). | Accepted: embedding is a small part of processing cost; per-file limits, rate limits, daily caps, and budget alerts bound it; storage per learner is reported next to the budget alerts (no Glacier tier). |
 | **Malicious PDFs against the parser.** | Worker isolation: non-root, read-only root filesystem, NetworkPolicy egress only to AWS endpoints and PostgreSQL, resource limits, per-file timeout. |
 | **Poor metadata (scanned or unusual PDFs).** Missing year or title weakens the research map. | Fields optional; display title editable; works without a year listed separately; extraction accuracy measured. |
 | **Tool calling in streamed answers; cross-region routing; token cost; long streams on Kubernetes; EKS operations; judge bias.** | Streamed text + tool calls verified in M0 through `ChatBedrockConverse` (ADR 0006; `make bedrock-check`); the `us.` inference profile keeps requests in US regions; capped history and chunks, prompt caching, budget alerts; `preStop` hooks, grace periods, and PodDisruptionBudgets for streaming pods; managed node group with a small add-on set; judges use a different model family (Qwen) calibrated against human feedback. |
@@ -547,7 +551,7 @@ One Python package organized **by module first**, with `domain`, `application`, 
 |---|---|---|---|
 | **Search step ran** | Code | Every answered turn calls MCP `search` over the learner's readable documents. | 100% |
 | **Documents used** | Code (integration tests) | An answered turn adds exactly the documents of the chunks given to the model; a decline adds none; a deleted document stays listed as deleted and can't be opened. | 100% |
-| **Citation highlight** | Code | Seed-corpus chunks found on their page by the viewer's text match. | ≥ 95% |
+| **Citation highlight** | Code | Seed-corpus chunks found on their page by the viewer's text match (§9.3); in production, a content-free count of "Couldn't highlight" views is monitored. | ≥ 95% |
 | **Subject suggestion** | Code (labeled) | Labeled subjects appear among the 3 suggestions; existing matching subjects preferred over new names. | ≥ 90% top-3 |
 | **Subject name check** | Code (labeled) | Personal-data and offensive names rejected; ordinary topic names accepted. | ≥ 95% recall on bad names; ≤ 5% false rejections |
 | **Metadata extraction** | Code (labeled) | Title and year correct; authors F1; DOI exact. | ≥ 95% / ≥ 90% / ≥ 0.85 / ≥ 95% |
@@ -656,6 +660,7 @@ Measured over the pilot unless stated; minimum sample 100 events per metric.
 | Q56 | What a conversation drew on (end-user feedback) | The conversation lists its documents used; each opens in the document viewer, and a citation opens at its page with the chunk highlighted (US-4b). |
 | Q57 | Deleting a document (end-user feedback) | The owner can delete a document that isn't processing or shared; conversations and notes keep their text; citations read "Deleted document"; the documents-used list highlights it as deleted and it can't be opened; archive stays the reversible option (D10, US-10c). Reverses Q24. |
 | Q58 | Glacier tier for PDFs | Removed: PDFs stay in S3 Standard while their document exists, for the document viewer (D10, §9.5). |
+| Q59 | Product owner and UI/UX review of Q54–Q58 (2026-10-08) | Defaults adopted: conversations and notes take subjects from their documents used at read time (deleted excluded; no stored note subjects); retrieved chunk text isn't kept in a thread's saved state, and citations are stored as ids; a turn counts once its answer is saved; the viewer opens ready, *choose subjects*, and archived documents and renews its link; content files keyed by `content_id`; shared contents split per owner on migration; storage growth accepted and reported per learner (`sdd/reviews/2026-10-08-end-user-feedback.md`). |
 
 ## 14. Roadmap: releases and milestones
 
