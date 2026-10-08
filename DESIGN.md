@@ -8,7 +8,7 @@ How the web app looks and how to build its UI. Read this before writing anything
 |---|---|
 | Screens, required wording, accessibility rules | `sdd/design/brief.md` (§6 screens, §10 visual rules) |
 | What a state looks like | `make design-shots ROUND=v0.4 STATES="<ids>" THEME=both` (the round in the ticket's `## Design` section); ids in `sdd/design/states.json` |
-| Token values | `web/src/styles/tokens.css` (ported from `sdd/design/prototype/styles.css` and `v03.css` at tag `design-v0.3`; round v0.4 added no tokens) |
+| Token values | `web/src/styles/tokens.css` (ported from `sdd/design/prototype/styles.css` and `v03.css` at tag `design-v0.3`; **Density** below replaces the type, space, and layout values from round v0.9) |
 | Design decisions and open questions | PRD v2.7 (Q38–Q43) and brief v0.4 (§0, Feedback log). The designer's round 3 questions E1–E10 are open; the ticket's `## Design` section says which apply. |
 
 The brand is Smart Tutor's own (`smart-tutor-ds`, light and dark). The Open Design project has the Cisco design system switched on, but the owner chose the own brand instead (2026-10-02, `sdd/design/prototype/history/`); follow the accepted round's tokens, not Cisco.
@@ -26,12 +26,31 @@ Every color, font size, space, radius, shadow, and duration in feature code is a
 | Status | `--success`, `--warn`, `--danger`, `--info`, `--attn` (needs the learner's action), each with a `-soft` background |
 | Subjects | `--subj-*` hues, used only through the subject chip |
 | Focus | `--focus` (2px outline, 2px offset, on `:focus-visible`) |
-| Type | `--font-display` (serif: h1–h3, brand word), `--font-body` (system UI), `--font-mono` (numbers, ids, token counts; tabular figures); sizes `--fs-12` … `--fs-40`, plus `--fs-64` for the landing headline (only); `--lh-body` 1.55, `--lh-head` 1.2 |
-| Space and shape | `--sp-1` (4px) … `--sp-16` (64px); `--r-sm` 6px, `--r-md` 10px, `--r-pill` |
+| Type | `--font-display` (serif: brand word, landing page, empty-state headline only), `--font-body` (system UI; all app headings), `--font-mono` (numbers, ids, token counts; tabular figures); sizes `--fs-12`, `--fs-13`, `--fs-14` (body), `--fs-16`, `--fs-18`, `--fs-20`, `--fs-24`, `--fs-32` (landing), `--fs-64` (landing headline only); `--lh-body` 1.45 (UI), `--lh-read` 1.6 (chat answers, note editor), `--lh-head` 1.25 |
+| Space and shape | `--sp-0` (2px), `--sp-1` (4px) … `--sp-6` (24px) in the app; `--sp-8` … `--sp-16` on the landing page only; `--r-sm` 4px, `--r-md` 6px, `--r-lg` 8px (dialogs, drawers), `--r-pill` |
 | Motion | `--dur-fast`, `--dur-base`, `--dur-exit`, `--dur-spin`, `--ease-out`, `--ease-in`; everything stops under `prefers-reduced-motion: reduce` |
-| Layout | `--nav-w` 240px, `--page-w` 1120px, `--page-w-wide` 1200px (Library), `--chat-w` 760px, `--panel-w` 480px, `--tray-w` 384px |
+| Layout | `--nav-w` 208px (`--nav-w-collapsed` 56px), `--page-w` 1200px, `--page-w-wide` fluid up to 1360px (Library and tables), `--chat-w` 720px, `--panel-w` 340px, `--viewer-w` `min(960px, 100% - 64px)`, `--tray-w` 320px |
 
 The prototype's `--chrome-*` tokens, `.rb-*` classes, and `od-*` layout primitives belong to the review tool, not the product: leave them out.
+
+## Density
+
+Smart Tutor is a **compact** tool: many features will share the screen, so space goes to content, not chrome (owner, 2026-10-08; brief v0.9 §0). Values below are the targets; `tokens.css` and the shared components follow them from the compact-density foundation ticket.
+
+| Element | Size |
+|---|---|
+| Body text | `--fs-14`, `--lh-body` 1.45; secondary lines `--fs-13`; table headers, badges, chips, timestamps `--fs-12` (never smaller) |
+| Headings | app h1 `--fs-20` sans 650; h2 and dialog titles `--fs-18`; section titles `--fs-14` 600 |
+| Controls | button, input, select 32px; in toolbars and table rows 28px; one 36px primary button only on empty states; icon buttons 28px |
+| Tables and lists | Library rows 40px, other lists and Usage 32–36px, single line; header row 28px, sticky |
+| Spacing defaults | toolbar gap `--sp-2`, card padding `--sp-3`, section gap `--sp-4`, page padding 16px sides and 12px top |
+| Icons | 16px (14px in chips and badges, 20px only in empty states), 1.5px stroke |
+| Chips and badges | 20px high (citation chips 22px with a 24px hit area) |
+| Dialogs and drawers | dialog 440px, 16px padding, 32px footer buttons (primary last); details drawer and Documents used panel `--panel-w` 340px |
+
+**Never smaller:** chat answer text stays `--fs-16` at `--lh-read` within `--chat-w` (about 70 characters a line); the PDF opens at 100%; focus rings stay 2px and are never clipped; error and required text is at least 13px, never truncated, with an icon; pointer targets are at least 24px; `--text-3` and placeholders keep 4.5:1.
+
+**Truncation:** a single-line cell or title truncates with an ellipsis and shows the full text in a tooltip and the accessible name; a failure reason or error never truncates.
 
 ## Themes
 
@@ -40,9 +59,11 @@ Light is required, dark is supported: `tokens.css` defines both under `[data-the
 ## Layout
 
 - **Laptop only:** designed at 1440px, checked at 1280px, `body { min-width: 1024px }`. No phone or tablet breakpoints.
-- **App shell:** a two-column grid, left nav (`--nav-w`, `--surface`, right border) and a scrolling `<main id="main-content">`. Pages sit in a centered column of `--page-w` with `--sp-8` padding (a route sets `handle: { wide: true }` for `--page-w-wide`); chat uses `--chat-w`.
-- **Page header:** h1 at `--fs-32` in the display font, an optional one-line description in `--text-2` (max 64ch), and the page's primary action on the right.
-- **Left nav,** in this order: Library (home), Chat (starts a new conversation), Conversations, Notes, Subjects, Usage, Settings. Later releases slot in without reordering: Research map after Library (R2), Quizzes and Reports after Notes (R3); they are not rendered in Release 1. The current item has `aria-current="page"` (`--accent-soft` fill, `--accent-text`). Library shows a count badge (`--attn-soft` / `--attn`) for documents needing the learner's action. The user menu sits at the bottom: avatar initials, name, and Sign out.
+- **App shell:** a two-column grid, left nav (`--nav-w`, collapsible to `--nav-w-collapsed`, `--surface`, right border) and a scrolling `<main id="main-content">`. Pages sit in a centered column of `--page-w` with 16px side and 12px top padding (a route sets `handle: { wide: true }` for the fluid `--page-w-wide`); chat uses `--chat-w`.
+- **Page header:** one 40px row: h1 (`--fs-20`, sans), a short count or context in `--text-2` `--fs-13` on the same line, an info button whose tooltip holds any longer description, and the primary action on the right. Nothing wraps under the h1.
+- **Toolbar:** one 36px row under the header: tabs with inline counts on the left, unlabelled compact filters (each with an `aria-label`; dates in one popover), a status chip that doubles as a filter (e.g. "1 needs subjects"), and the result count on the right.
+- **Notices:** an inline notice is one 32px row (icon, one sentence, a link or small button) in the toolbar area; only errors and blocking states use a full-width banner.
+- **Left nav,** 32px items in groups separated by a hairline (no uppercase group labels): Library (home), Chat (starts a new conversation) | Conversations (with the 3 most recent conversations as a sub-list), Notes | Subjects, Usage. Later releases slot in without reordering: Research map after Library (R2), Quizzes and Reports after Notes (R3); they are not rendered in Release 1. A chevron at the bottom collapses the nav to a 56px icon rail (names in tooltips and `aria-label`); the choice is remembered. The current item has `aria-current="page"` (`--accent-soft` fill, `--accent-text`). Library shows a count badge (`--attn-soft` / `--attn`) for documents needing the learner's action. The user menu is one 36px row at the bottom: avatar initials, name, and a menu with Sign out.
 - **Upload tray:** fixed bottom right (`--tray-w`), on every screen, non-blocking.
 - **Landing page** (`/`): public, outside the app shell, centered `--page-w` column with header, hero, how it works, trust points, closing, footer.
 
@@ -60,7 +81,7 @@ Shared components live in `web/src/components/`, one folder each (`Button/Button
 | `SubjectChip` | `.schip` | the one chip for subjects everywhere (Library, picker, lists; never in the chat header), learner's subject name, stable hue per subject |
 | `Banner`, `Toast`, `Dialog`, `SidePanel`, `Tabs`, `FilterBar`, `UploadTray`, `Citation`, `SystemNotice` | `.banner-*`, `.toast`, `.dialog`, `.side-panel`, `.tabs`, `.filter-bar`, `.tray`, `.cite`, `.notice` | built with the story that first shows them |
 
-Icons: one outline family at 1.5px stroke, `lucide-react` with `strokeWidth={1.5}`, sized 16–20px, `aria-hidden` unless the icon is the only label.
+Icons: one outline family at 1.5px stroke, `lucide-react` with `strokeWidth={1.5}`, 16px by default (see Density), `aria-hidden` unless the icon is the only label.
 
 ## Document states
 
@@ -76,11 +97,11 @@ One visual language everywhere (Library row, details, upload tray). Color is alw
 
 ## Chat
 
-The tutor's words, the learner's words, quoted document text, and system notices (e.g. "Started from note") each look different: quoted and cited material is set apart from the tutor's prose, and notices are centered dashed pills (the maximum warning uses `--info-soft`). Citations show the document's display title and page, or "page unavailable".
+The tutor's words, the learner's words, quoted document text, and system notices (e.g. "Started from note") each look different: quoted and cited material is set apart from the tutor's prose, and notices are centered dashed pills (the maximum warning uses `--info-soft`). Citations show the document's display title and page, or "page unavailable": one compact **Sources** line of 22px chips under each answer ("*Short title* · p. 3", full title in the tooltip and accessible name), each opening the document viewer. Helpful / Not helpful are two 28px icon buttons at the end of that line (`aria-label`, `aria-pressed`, visible tooltip). Quoted passages are a 13px block with a 2px left rule. The chat header is one 40px row: the title, "Documents used (*N*)", "Summarize lesson", and an overflow menu (Archive, Show citations).
 
 ## Accessibility
 
-WCAG 2.1 AA: AA contrast in both themes, everything reachable and operable by keyboard, visible `:focus-visible` outlines, labelled controls. Announce processing-state changes and upload results through one polite live region; announce a streamed answer once when it completes, never word by word. The drop zone always has a keyboard "Upload" button beside it.
+WCAG 2.2 AA: pointer targets of at least 24px, AA contrast in both themes, everything reachable and operable by keyboard, visible `:focus-visible` outlines, labelled controls. Announce processing-state changes and upload results through one polite live region; announce a streamed answer once when it completes, never word by word. The drop zone always has a keyboard "Upload" button beside it.
 
 ## Copy
 
