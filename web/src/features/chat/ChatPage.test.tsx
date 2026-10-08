@@ -82,7 +82,7 @@ describe("ChatPage", () => {
       ),
     );
     renderChat({ ask });
-    await userEvent.type(await question(), "What is attention?");
+    await userEvent.type(await question(), "What is attention?", { delay: null });
     await userEvent.click(askButton());
     expect(ask).toHaveBeenCalledWith("What is attention?");
     expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
@@ -104,7 +104,7 @@ describe("ChatPage", () => {
       ),
     );
     renderChat({ ask });
-    await userEvent.type(await question(), "What is attention?");
+    await userEvent.type(await question(), "What is attention?", { delay: null });
     await userEvent.click(askButton());
     const citations = await screen.findByRole("region", { name: "Citations" });
     const [item] = within(citations).getAllByRole("listitem");
@@ -117,7 +117,7 @@ describe("ChatPage", () => {
       throw new AskRefusedError("Subject detection isn't available yet");
     });
     renderChat({ ask });
-    await userEvent.type(await question(), "What is attention?");
+    await userEvent.type(await question(), "What is attention?", { delay: null });
     await userEvent.click(askButton());
     expect(await screen.findByText("Subject detection isn't available yet")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /library/i })).not.toBeInTheDocument();
@@ -128,9 +128,9 @@ describe("ChatPage", () => {
     renderChat({ ask });
     await question();
     expect(askButton()).toBeDisabled();
-    await userEvent.type(await question(), "   ");
+    await userEvent.type(await question(), "   ", { delay: null });
     expect(askButton()).toBeDisabled();
-    await userEvent.type(await question(), "{Enter}");
+    await userEvent.type(await question(), "{Enter}", { delay: null });
     expect(ask).not.toHaveBeenCalled();
   });
 
@@ -138,7 +138,7 @@ describe("ChatPage", () => {
     const control = controlledStream();
     const ask = vi.fn(() => control.stream());
     renderChat({ ask });
-    await userEvent.type(await question(), "What is attention?");
+    await userEvent.type(await question(), "What is attention?", { delay: null });
     await userEvent.click(askButton());
 
     control.push({ type: "thread", thread_id: "t1", subjects: [] });
@@ -154,7 +154,7 @@ describe("ChatPage", () => {
     control.push(null);
     await waitFor(() => expect(region).toHaveAttribute("aria-busy", "false"));
     expect(await question()).toBeEnabled();
-    await userEvent.type(await question(), "Another?");
+    await userEvent.type(await question(), "Another?", { delay: null });
     expect(askButton()).toBeEnabled();
   });
 
@@ -166,7 +166,7 @@ describe("ChatPage", () => {
       ),
     );
     renderChat({ ask });
-    await userEvent.type(await question(), "What is attention?");
+    await userEvent.type(await question(), "What is attention?", { delay: null });
     await userEvent.click(askButton());
     expect(await screen.findByText("The tutor is unavailable. Try again in a moment.")).toBeInTheDocument();
   });
@@ -180,7 +180,7 @@ describe("ChatPage", () => {
       ),
     );
     renderChat({ ask });
-    await userEvent.type(await question(), "What is attention?");
+    await userEvent.type(await question(), "What is attention?", { delay: null });
     await userEvent.click(askButton());
     await waitFor(() => expect(notify).toHaveBeenCalledOnce());
   });
@@ -190,7 +190,7 @@ describe("ChatPage", () => {
       events({ type: "thread", thread_id: "t1", subjects: [] }, { type: "delta", text: "It weighs" }),
     );
     renderChat({ ask });
-    await userEvent.type(await question(), "What is attention?");
+    await userEvent.type(await question(), "What is attention?", { delay: null });
     await userEvent.click(askButton());
     expect(await screen.findByText("The tutor couldn't answer right now. Try again in a moment.")).toBeInTheDocument();
     expect(screen.getByText("It weighs")).toBeInTheDocument();
@@ -201,7 +201,7 @@ describe("ChatPage", () => {
       throw new Error("POST /threads failed (500)");
     });
     renderChat({ ask });
-    await userEvent.type(await question(), "What is attention?");
+    await userEvent.type(await question(), "What is attention?", { delay: null });
     await userEvent.click(askButton());
     expect(await screen.findByText("The tutor couldn't answer right now. Try again in a moment.")).toBeInTheDocument();
   });
@@ -223,7 +223,7 @@ describe("ChatPage", () => {
       ),
     );
     renderChat({ ask });
-    await userEvent.type(await question(), "How does chain-of-thought help?");
+    await userEvent.type(await question(), "How does chain-of-thought help?", { delay: null });
     await userEvent.click(askButton());
     const heading = await screen.findByRole("heading", { level: 1, name: "How does chain-of-thought help?" });
     const list = within(heading.closest("header")!).getByRole("list", { name: "Subjects" });
@@ -236,7 +236,7 @@ describe("ChatPage", () => {
       events({ type: "error", code: "unavailable", message: "The tutor is unavailable. Try again in a moment." }),
     );
     renderChat({ ask });
-    await userEvent.type(await question(), "What is attention?");
+    await userEvent.type(await question(), "What is attention?", { delay: null });
     await userEvent.click(askButton());
     expect(await screen.findByText("The tutor is unavailable. Try again in a moment.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1, name: "What is attention?" })).toBeInTheDocument();
@@ -283,7 +283,7 @@ describe("ChatPage", () => {
       events({ type: "thread", thread_id: "t1", subjects: [{ subject_id: "s2", name: "AI Agents" }] }, { type: "done" }),
     );
     renderChat({ ask, loadDocs: async () => [doc("processing")] });
-    await userEvent.type(await question(), "What is attention?");
+    await userEvent.type(await question(), "What is attention?", { delay: null });
     await userEvent.click(askButton());
     expect(await screen.findByRole("heading", { level: 1, name: "What is attention?" })).toBeInTheDocument();
     const list = screen.getByRole("list", { name: "Subjects" });
@@ -298,7 +298,7 @@ describe("ChatPage", () => {
       throw new NoDocumentsError("Upload a document first");
     });
     renderChat({ ask });
-    await userEvent.type(await question(), "What is attention?");
+    await userEvent.type(await question(), "What is attention?", { delay: null });
     await userEvent.click(askButton());
     expect(await screen.findByRole("heading", { name: "Upload a document first" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Upload" })).toHaveAttribute("href", "/library");
@@ -332,7 +332,7 @@ describe("ChatPage", () => {
     async function askUnsure(props: ComponentProps<typeof ChatPage> = {}) {
       const ask = vi.fn(() => events(UNSURE, { type: "done" }));
       renderChat({ ask, ...props });
-      await userEvent.type(await question(), QUESTION);
+      await userEvent.type(await question(), QUESTION, { delay: null });
       await userEvent.click(askButton());
       return picker();
     }
@@ -343,7 +343,7 @@ describe("ChatPage", () => {
       expect(screen.getByRole("heading", { level: 1, name: QUESTION })).toBeInTheDocument();
       expect(screen.getByText("Subjects appear after your first question.")).toBeInTheDocument();
       expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual(["LLMs", "AI Agents"]);
-      expect(search()).toBe("?thread=t1");
+      await waitFor(() => expect(search()).toBe("?thread=t1"));
       await waitFor(async () => expect(await question()).toBeDisabled());
       expect(askButton()).toBeDisabled();
     });
@@ -366,7 +366,7 @@ describe("ChatPage", () => {
       expect(within(within(header).getByRole("list", { name: "Subjects" })).getByText("AI Agents")).toBeInTheDocument();
       expect(screen.getByText("a.pdf, p. 3")).toBeInTheDocument();
       expect(screen.queryByRole("group", { name: "Which subjects is this about?" })).not.toBeInTheDocument();
-      expect(search()).toBe("");
+      await waitFor(() => expect(search()).toBe(""));
       expect(await question()).toBeEnabled();
     });
 
@@ -380,7 +380,7 @@ describe("ChatPage", () => {
       expect(await screen.findByText("Pick 1 to 3 of your own subjects.")).toBeInTheDocument();
       expect(await picker()).toBeInTheDocument();
       expect(continueButton()).toBeEnabled();
-      expect(search()).toBe("?thread=t1");
+      await waitFor(() => expect(search()).toBe("?thread=t1"));
     });
 
     it("resumes a waiting thread after a reload with the learner's subjects", async () => {
@@ -390,7 +390,7 @@ describe("ChatPage", () => {
       expect(loadPending).toHaveBeenCalledWith("t1");
       expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual(["LLMs", "AI Agents"]);
       expect(screen.getByText("You asked:").parentElement).toHaveTextContent(`You asked: ${QUESTION}`);
-      expect(search()).toBe("?thread=t1");
+      await waitFor(() => expect(search()).toBe("?thread=t1"));
     });
 
     it.each([
@@ -402,6 +402,47 @@ describe("ChatPage", () => {
       expect(screen.getByRole("heading", { level: 1, name: "New conversation" })).toBeInTheDocument();
       expect(screen.queryByRole("group", { name: "Which subjects is this about?" })).not.toBeInTheDocument();
       await waitFor(() => expect(search()).toBe(""));
+    });
+
+    it("keeps the thread in the URL and says so when the waiting question can't be loaded", async () => {
+      renderChat({ loadPending: () => Promise.reject(new Error("GET /threads/{thread_id} failed (500)")) }, "/chat?thread=t1");
+      expect(await screen.findByText("Your question couldn't be loaded. Reload the page to try again.")).toBeInTheDocument();
+      expect(screen.queryByRole("group", { name: "Which subjects is this about?" })).not.toBeInTheDocument();
+      expect(search()).toBe("?thread=t1");
+    });
+
+    it("moves focus to the picker when it appears", async () => {
+      await askUnsure();
+      await waitFor(() => expect(screen.getByRole("heading", { name: "Which subjects is this about?" })).toHaveFocus());
+    });
+
+    it("moves focus to the picker when it comes back after a reload", async () => {
+      const loadPending = async () => ({ thread_id: "t1", question: QUESTION, subjects: [], awaiting_subjects: true });
+      renderChat({ loadPending }, "/chat?thread=t1");
+      await picker();
+      await waitFor(() => expect(screen.getByRole("heading", { name: "Which subjects is this about?" })).toHaveFocus());
+    });
+
+    it("returns focus to the question box once the picked answer is done", async () => {
+      const choose = vi.fn(() =>
+        events({ type: "thread", thread_id: "t1", subjects: SUBJECTS }, { type: "delta", text: "Answer." }, { type: "done" }),
+      );
+      const group = await askUnsure({ choose });
+      await userEvent.click(within(group).getByRole("button", { name: "LLMs" }));
+      await userEvent.click(continueButton());
+      expect(await screen.findByText("Answer.")).toBeInTheDocument();
+      await waitFor(async () => expect(await question()).toHaveFocus());
+    });
+
+    it("keeps focus on Continue when the pick is refused", async () => {
+      const choose = vi.fn(() => {
+        throw new AskRefusedError("Pick 1 to 3 of your own subjects.");
+      });
+      const group = await askUnsure({ choose });
+      await userEvent.click(within(group).getByRole("button", { name: "LLMs" }));
+      await userEvent.click(continueButton());
+      await screen.findByText("Pick 1 to 3 of your own subjects.");
+      await waitFor(() => expect(continueButton()).toHaveFocus());
     });
   });
 

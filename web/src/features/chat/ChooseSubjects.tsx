@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { BrandMark } from "../../components/BrandMark/BrandMark";
 import { Button } from "../../components/Button/Button";
@@ -22,16 +22,33 @@ export function ChooseSubjects({ subjects, busy, onContinue }: Props) {
   const titleId = useId();
   const hintId = useId();
   const atMax = picked.length >= MAX_SUBJECTS;
+  const section = useRef<HTMLElement>(null);
+  const title = useRef<HTMLHeadingElement>(null);
+  const continueButton = useRef<HTMLButtonElement>(null);
+  const wasBusy = useRef(busy);
+
+  // The question box is disabled while the thread waits, so focus would drop to the page: it moves to the
+  // question the tutor asks, and the keyboard continues from there into the chips.
+  useEffect(() => {
+    title.current?.focus();
+  }, []);
+
+  // A refused Continue leaves the picker in place; focus returns to Continue if it was lost while busy.
+  useEffect(() => {
+    const doc = section.current?.ownerDocument;
+    if (wasBusy.current && !busy && doc && !section.current?.contains(doc.activeElement)) continueButton.current?.focus();
+    wasBusy.current = busy;
+  }, [busy]);
 
   function toggle(id: string) {
     setPicked((current) => (current.includes(id) ? current.filter((p) => p !== id) : [...current, id]));
   }
 
   return (
-    <section className={styles.message} aria-labelledby={titleId}>
+    <section ref={section} className={styles.message} aria-labelledby={titleId}>
       <BrandMark size="sm" />
       <div className={styles.card}>
-        <h2 id={titleId} className={styles.title}>
+        <h2 ref={title} id={titleId} className={styles.title} tabIndex={-1}>
           Which subjects is this about?
         </h2>
         <p id={hintId} className={styles.hint}>
@@ -53,7 +70,7 @@ export function ChooseSubjects({ subjects, busy, onContinue }: Props) {
           })}
         </div>
         <div>
-          <Button variant="primary" disabled={busy || picked.length === 0} onClick={() => onContinue(picked)}>
+          <Button ref={continueButton} variant="primary" disabled={busy || picked.length === 0} onClick={() => onContinue(picked)}>
             Continue
           </Button>
         </div>

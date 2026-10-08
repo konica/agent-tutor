@@ -54,6 +54,7 @@ type Problem = { message: string };
 
 const MAX_QUESTION = 4000;
 const GENERIC_FAILURE = "The tutor couldn't answer right now. Try again in a moment.";
+const RESUME_FAILURE = "Your question couldn't be loaded. Reload the page to try again.";
 
 const defaultAsk = (question: string) => askInNewThread(question);
 const defaultChoose = (threadId: string, subjectIds: string[]) => chooseSubjects(threadId, subjectIds);
@@ -89,9 +90,19 @@ export function ChatPage({
   const busy = useRef(false);
   // The latest URL and setter, for the stream loop and the loading effect, which outlive a render.
   const url = useRef({ searchParams, setSearchParams });
+  const questionBox = useRef<HTMLTextAreaElement>(null);
+  // Set by Continue: the picker (and the focused Continue button) goes away once the answer starts, so focus
+  // returns to the question box when the answer is done. A refused pick keeps the picker, which keeps focus.
+  const focusQuestionWhenDone = useRef(false);
 
   useEffect(() => {
     url.current = { searchParams, setSearchParams };
+  });
+
+  useEffect(() => {
+    if (!focusQuestionWhenDone.current || answering || busy.current) return;
+    focusQuestionWhenDone.current = false;
+    if (!exchange?.pending) questionBox.current?.focus();
   });
 
   useEffect(() => {
@@ -126,13 +137,14 @@ export function ChatPage({
 
   // The subjects decide what the page is; the document count only feeds a hint, so its failure is not shown.
   // A thread in the URL that still waits for the pick comes back with its question and the learner's subjects;
-  // otherwise (answered, gone, or not loadable) the page starts a new conversation.
+  // an answered or missing thread starts a new conversation. A thread that couldn't be loaded keeps its id in the
+  // URL, so reloading the page tries again.
   useEffect(() => {
     let current = true;
-    const resuming = resumeId
+    const resuming: Promise<ThreadView | null | "failed"> = resumeId
       ? loadPending(resumeId).catch((error: unknown) => {
           if (error instanceof SessionExpiredError) throw error;
-          return null;
+          return "failed" as const;
         })
       : Promise.resolve(null);
     Promise.all([loadSubjects(), resuming]).then(
@@ -140,7 +152,8 @@ export function ChatPage({
         if (!current) return;
         if (list.length === 0) return setNoDocuments(true);
         setSubjects({ status: "ready", list });
-        if (thread?.awaiting_subjects) {
+        if (thread === "failed") setProblem({ message: RESUME_FAILURE });
+        else if (thread?.awaiting_subjects) {
           setExchange({
             question: thread.question,
             subjects: [],
@@ -160,7 +173,7 @@ export function ChatPage({
       current = false;
     };
     // forgetThread reads the URL through a ref, so changing the URL doesn't load everything again.
-  },[loadSubjects, loadDocs, loadPending, resumeId]);
+  }, [loadSubjects, loadDocs, loadPending, resumeId]);
 
   const trimmed = question.trim();
   const pending = exchange?.pending ?? null;
@@ -177,6 +190,7 @@ export function ChatPage({
   function onContinue(subjectIds: string[]) {
     if (!pending || busy.current) return;
     const { threadId } = pending;
+    focusQuestionWhenDone.current = true;
     void consume(() => choose(threadId, subjectIds));
   }
 
@@ -350,6 +364,7 @@ export function ChatPage({
           Your question
         </label>
         <textarea
+          ref={questionBox}
           id="chat-question"
           className={styles.input}
           rows={3}
