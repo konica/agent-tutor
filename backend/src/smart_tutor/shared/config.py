@@ -53,6 +53,8 @@ class Settings(BaseSettings):
     keycloak_client_id: str = "smart-tutor-api"
     keycloak_client_secret: SecretStr = SecretStr("")
     cors_origins: list[str] = ["http://localhost:10453"]
+    # Path prefix the API is served under: /api behind CloudFront (ADR 0009). Routes match with and without it.
+    root_path: str = ""
     documents_bucket: str = "smart-tutor-documents"
     # LocalStack serves buckets by path (http://localhost:10402/<bucket>); AWS uses virtual-hosted URLs.
     s3_path_style: bool = False

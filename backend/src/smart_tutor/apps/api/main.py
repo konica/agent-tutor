@@ -42,7 +42,7 @@ def create_app(
             app.state.verifier = keycloak_verifier(settings, http)
             yield
 
-    app = FastAPI(title="Smart Tutor API", lifespan=lifespan)
+    app = FastAPI(title="Smart Tutor API", lifespan=lifespan, root_path=settings.root_path)
     if verifier is not None:
         app.state.verifier = verifier
     if services is not None:

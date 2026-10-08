@@ -45,7 +45,7 @@ spec:
             - name: KC_PROXY_HEADERS
               value: forwarded
             - name: KC_DB_POOL_MAX_SIZE
-              value: "20"  # db.t4g.micro allows about 80 (DBInstanceClassMemory/9531392); 20 per pod leaves room for a rollout surge (2 pods) plus the API
+              value: "20"  # db.t3.micro allows about 80 (DBInstanceClassMemory/9531392); 20 per pod leaves room for a rollout surge (2 pods) plus the API pods (SQLAlchemy default pool: 5 + 10 overflow per pod)
             - name: KC_DB_URL
               valueFrom: {secretKeyRef: {name: keycloak-db, key: url}}
             - name: KC_DB_USERNAME
