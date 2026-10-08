@@ -158,8 +158,8 @@ sequenceDiagram
   GH->>GH: checks (ruff, mypy, import contracts, pytest, web build, infra tests)
   GH->>STS: OIDC token → AssumeRoleWithWebIdentity
   STS-->>GH: 1-hour credentials of smart-tutor-github-deploy
-  GH->>ECR: push api, web, keycloak images tagged with the commit SHA
   GH->>CFN: cdk deploy (VPC, EKS, RDS, ECR, CloudFront, budget ...)
+  GH->>ECR: push api, web, keycloak images tagged with the commit SHA
   GH->>EKS: helm upgrade --set global.imageTag=SHA
   EKS->>EKS: pre-upgrade hook: migrate Job (a failure stops the release)
   EKS->>EKS: roll out api, web, keycloak (readiness probes)
@@ -167,7 +167,9 @@ sequenceDiagram
   CF-->>GH: pass, or the run fails visibly
 ```
 
-To roll back, run `helm upgrade` with an earlier commit SHA as the image tag (the #59 runbook).
+The files: `deploy.yml` (trigger), `ci.yml` (checks), `deploy-pilot.yml` (the job in `pilot`), and `rollback.yml`. The add-ons install also runs on each deploy.
+
+To roll back, run `rollback.yml` with an earlier commit SHA as the image tag (`pilot-deploy.md` section 12).
 
 ## 5. Who builds which piece
 
@@ -177,7 +179,7 @@ To roll back, run `helm upgrade` with an earlier commit SHA as the image tag (th
 | VPC, NAT, EKS + node group, Pod Identity, ECR, add-ons (load balancer controller, External Secrets, metrics-server), internal load balancer, CloudFront with VPC origin, `web`, budget alarm, ADR + PRD update | #56 | Agent; human runs the first deploy | CDK `NetworkStack`, `ClusterStack`, `RegistryStack`, `EdgeStack`, `BudgetsStack`; `deploy/helm/addons/`; chart `web` |
 | RDS (DB app, DB keycloak), Secrets Manager entries, `keycloak` at `/auth`, production realm | #57 | Agent; human creates the client's account | CDK `DataStack`, `ConfigStack`; chart `keycloak`; `deploy/keycloak/Dockerfile`; the `db-bootstrap` hook; ADR 0010 |
 | `api` at `/api`, `migrate` hook Job, same-origin web build, probes | #58 | Agent; human runs the demo and hands over access | chart `api`, `values-prod.yaml` |
-| Deploy-on-merge workflow, smoke test, rollback runbook | #59 | Agent; human merges and approves | `.github/workflows/` |
+| Deploy-on-merge workflow, smoke test, rollback runbook | #59 | Agent; human merges and approves | `.github/workflows/deploy.yml`, `deploy-pilot.yml`, `rollback.yml`; `deploy/pilot/smoke_test.py` |
 | S3 documents bucket, SQS, agent, MCP server, worker, Bedrock access | Later slices | — | `StorageStack`; charts stay disabled for now |
 
 ## Cost

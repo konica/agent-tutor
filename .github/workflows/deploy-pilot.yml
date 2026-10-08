@@ -1,0 +1,135 @@
+# Deploys the pilot (PRD §9.12, #59). Called by deploy.yml (every push to main, after the checks) and rollback.yml.
+# Signs in to AWS with the GitHub OIDC deploy role (#55), which trusts only jobs in the `pilot` environment.
+name: deploy-pilot
+
+on:
+  workflow_call:
+    inputs:
+      image_tag:
+        description: Commit SHA whose images to deploy
+        type: string
+        required: true
+      build:
+        description: Deploy the infrastructure and build the images (false for a rollback)
+        type: boolean
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: pilot
+    # One deployment at a time; a queued one waits instead of cancelling the running release.
+    concurrency:
+      group: deploy-pilot
+      cancel-in-progress: false
+    timeout-minutes: 60
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      IMAGE_TAG: ${{ inputs.image_tag }}
+      JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION: "1"
+    steps:
+      # Reject a malformed tag before checking out or signing in.
+      - name: Check the rollback tag
+        if: ${{ !inputs.build }}
+        run: |
+          [[ "$IMAGE_TAG" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::image_tag must be a full 40-character commit SHA"; exit 1; }
+
+      # A rollback checks out the old commit, so the chart matches its images.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ inputs.image_tag }}
+
+      # Setup actions run before the AWS credentials exist in the environment.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        if: inputs.build
+        with:
+          node-version: 22
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        if: inputs.build
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+        with:
+          version: v4.2.1
+
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Deploy the infrastructure (CDK)
+        if: inputs.build
+        working-directory: infra
+        run: |
+          uv sync --frozen
+          npx --yes aws-cdk@2.1145.0 deploy --all --require-approval never
+
+      - name: Read the stack outputs
+        run: |
+          output() {
+            aws cloudformation describe-stacks --stack-name "SmartTutor-prod-$1" \
+              --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text
+          }
+          registry=$(output Registry RegistryUri)
+          [[ -n "$registry" && "$registry" != None ]] || { echo "::error::SmartTutor-prod-Registry has no RegistryUri output"; exit 1; }
+          cloudfront_url=$(output Edge CloudFrontUrl)
+          [[ -n "$cloudfront_url" && "$cloudfront_url" != None ]] || { echo "::error::SmartTutor-prod-Edge has no CloudFrontUrl output"; exit 1; }
+          vpc_id=$(output Network VpcId)
+          [[ -n "$vpc_id" && "$vpc_id" != None ]] || { echo "::error::SmartTutor-prod-Network has no VpcId output"; exit 1; }
+          {
+            echo "REGISTRY=$registry"
+            echo "CLOUDFRONT_URL=$cloudfront_url"
+            echo "VPC_ID=$vpc_id"
+          } >> "$GITHUB_ENV"
+
+      - name: Check the images to roll back to exist
+        if: ${{ !inputs.build }}
+        run: |
+          for repo in api web keycloak; do
+            aws ecr describe-images --repository-name "smart-tutor/$repo" --image-ids imageTag="$IMAGE_TAG" > /dev/null \
+              || { echo "::error::smart-tutor/$repo:$IMAGE_TAG is not in ECR (it keeps the last 30 images)"; exit 1; }
+          done
+
+      - name: Build the images
+        if: inputs.build
+        run: |
+          aws ecr get-login-password | docker login --username AWS --password-stdin "$REGISTRY"
+          docker build --target api -t "$REGISTRY/smart-tutor/api:$IMAGE_TAG" backend
+          docker build --build-arg VITE_API_URL=/api --build-arg VITE_KEYCLOAK_URL=/auth -t "$REGISTRY/smart-tutor/web:$IMAGE_TAG" web
+          docker build -t "$REGISTRY/smart-tutor/keycloak:$IMAGE_TAG" deploy/keycloak
+
+      - name: Push the images
+        if: inputs.build
+        run: |
+          for repo in api web keycloak; do docker push "$REGISTRY/smart-tutor/$repo:$IMAGE_TAG"; done
+
+      - name: Connect to the cluster
+        run: aws eks update-kubeconfig --name smart-tutor-prod --region "$AWS_REGION"
+
+      - name: Install the cluster add-ons
+        run: |
+          helm repo add eks https://aws.github.io/eks-charts
+          helm repo add external-secrets https://charts.external-secrets.io
+          helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+          helm repo update
+          helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller --version 3.5.0 -n kube-system -f deploy/helm/addons/aws-load-balancer-controller.yaml --set vpcId="$VPC_ID" --wait
+          helm upgrade --install external-secrets external-secrets/external-secrets --version 2.11.0 -n external-secrets --create-namespace -f deploy/helm/addons/external-secrets.yaml --wait
+          helm upgrade --install metrics-server metrics-server/metrics-server --version 3.14.0 -n kube-system -f deploy/helm/addons/metrics-server.yaml --wait
+
+      - name: Release the app (Helm)
+        run: |
+          helm upgrade --install smart-tutor deploy/helm/smart-tutor -n smart-tutor --create-namespace \
+            -f deploy/helm/smart-tutor/values-prod.yaml \
+            --set global.imageRegistry="$REGISTRY" --set global.imageTag="$IMAGE_TAG" \
+            --set global.publicUrl="$CLOUDFRONT_URL" --wait --timeout 15m
+
+      - name: Smoke test the public address
+        run: |
+          python3 deploy/pilot/smoke_test.py "$CLOUDFRONT_URL"
+          echo "Deployed \`$IMAGE_TAG\` to $CLOUDFRONT_URL" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Diagnostics
+        if: failure()
+        run: |
+          kubectl -n smart-tutor get pods,jobs,externalsecrets,targetgroupbindings || true
+          kubectl -n smart-tutor logs job/migrate --tail=100 || true
+          kubectl -n smart-tutor logs job/db-bootstrap --tail=50 || true
+          helm -n smart-tutor history smart-tutor || true

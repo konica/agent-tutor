@@ -1,6 +1,6 @@
-# Pilot deploy (#56, #57, #58)
+# Pilot deploy (#56, #57, #58, #59)
 
-Deploys the pilot's infrastructure and the `web`, `keycloak`, and `api` charts, so the CloudFront address serves the app shell, Keycloak at `/auth` on RDS, and the API at `/api` (PRD §9.12, ADRs 0009 and 0010). It needs an account admin. Do [`pilot-aws-prerequisites.md`](pilot-aws-prerequisites.md) (#55) first. The big picture is in [`pilot-environment-overview.md`](pilot-environment-overview.md).
+Deploys the pilot's infrastructure and the `web`, `keycloak`, and `api` charts, so the CloudFront address serves the app shell, Keycloak at `/auth` on RDS, and the API at `/api` (PRD §9.12, ADRs 0009 and 0010). It needs an account admin. Do [`pilot-aws-prerequisites.md`](pilot-aws-prerequisites.md) (#55) first. The big picture is in [`pilot-environment-overview.md`](pilot-environment-overview.md). After the first deploy, every merge to `main` deploys automatically (section 12); this runbook stays the manual path and the reference for what the workflow does.
 
 Commands are for **PowerShell 7** (`pwsh`). Run them from the repository root with your admin profile.
 
@@ -185,7 +185,7 @@ curl.exe -s -o NUL -w "%{http_code}" -H "Authorization: Bearer $Tok2" "$Url/api/
 
 ## 9. Update after a change
 
-Deploy infrastructure changes with CDK first (`npx aws-cdk@latest deploy --all` from `infra/`), then rebuild and push the images with a new tag and run the `helm upgrade` from step 6 again (with `--timeout 15m`). The order matters: the API pods read their SSM parameters at startup through a Pod Identity association that the CDK stacks create. The upgrade runs the `db-bootstrap` and `migrate` hooks first. Only `db-bootstrap` resets database passwords, so a password rotated in Secrets Manager reaches the database there; `migrate` only applies the schema. Running Keycloak and API pods keep the old password (the environment is read at start, and External Secrets refreshes `keycloak-db` and `api-db` only hourly), so after rotating: run the `helm upgrade`, force the syncs with `kubectl -n smart-tutor annotate externalsecret keycloak-db force-sync=$(Get-Date -UFormat %s) --overwrite` and `kubectl -n smart-tutor annotate externalsecret api-db force-sync=$(Get-Date -UFormat %s) --overwrite`, then `kubectl -n smart-tutor rollout restart deploy/keycloak` and `kubectl -n smart-tutor rollout restart deploy/api`. #59 automates both.
+Merging to `main` does all of this (section 12). By hand: deploy infrastructure changes with CDK first (`npx aws-cdk@latest deploy --all` from `infra/`), then rebuild and push the images with a new tag and run the `helm upgrade` from step 6 again (with `--timeout 15m`). The order matters: the API pods read their SSM parameters at startup through a Pod Identity association that the CDK stacks create. The upgrade runs the `db-bootstrap` and `migrate` hooks first. Only `db-bootstrap` resets database passwords, so a password rotated in Secrets Manager reaches the database there; `migrate` only applies the schema. Running Keycloak and API pods keep the old password (the environment is read at start, and External Secrets refreshes `keycloak-db` and `api-db` only hourly), so after rotating: run the `helm upgrade`, force the syncs with `kubectl -n smart-tutor annotate externalsecret keycloak-db force-sync=$(Get-Date -UFormat %s) --overwrite` and `kubectl -n smart-tutor annotate externalsecret api-db force-sync=$(Get-Date -UFormat %s) --overwrite`, then `kubectl -n smart-tutor rollout restart deploy/keycloak` and `kubectl -n smart-tutor rollout restart deploy/api`. Merging redeploys (it runs the hooks and the CDK deploy), but after a rotation the force-sync and `rollout restart` commands are still manual.
 
 ## 10. Tear down
 
@@ -227,3 +227,39 @@ Delete old snapshots you don't need, because they cost storage. A fresh deploy s
 ## 11. Costs
 
 About **$250–300 a month** while idle, including RDS (`db.t3.micro` with 20 GiB, about $15 a month). During the testing phase the budget is **$20 a month** (`smart-tutor:budget-monthly-usd` in `infra/cdk.json`), with alerts. That is below the idle cost, so expect the 80% alert email within the first days the environment runs. Raise the value and run `npx aws-cdk@latest deploy SmartTutor-prod-Budgets` from `infra/` when the pilot starts.
+
+## 12. Deploy on merge and roll back (#59)
+
+**What runs.** `.github/workflows/deploy.yml` runs on every push to `main`: the CI checks (`ci.yml`), then `deploy-pilot.yml` in the `pilot` environment. That job runs `cdk deploy --all`, builds and pushes the three images tagged with the full commit SHA, installs the add-ons, runs `helm upgrade --install smart-tutor`, and runs `deploy/pilot/smoke_test.py` against the CloudFront address. One deployment runs at a time; a second merge waits.
+
+**Concurrency.** GitHub keeps only one *pending* run per group. If several merges land while a deploy runs, only the newest waits and the ones in between are cancelled (latest wins). A queued rollback can likewise be replaced by a newer merge's deploy.
+
+**Watch it.** `gh run list --workflow deploy.yml --limit 5`, then `gh run watch`. The run summary names the deployed SHA and address. A red step is the failure; the release stays as Helm left it (`helm -n smart-tutor history smart-tutor`).
+
+**Optional approval.** **Settings → Environments → pilot → Required reviewers** makes each deploy wait for an approval.
+
+**Smoke test by hand.**
+
+```powershell
+python deploy/pilot/smoke_test.py $Url
+```
+
+**A stuck release.** If a run is cancelled or times out during `helm upgrade --wait`, the release can stay in `pending-upgrade`, and the next deploy fails with "another operation (install/upgrade/rollback) is in progress". From a laptop (step 3 sets up kubectl and helm access), find the last deployed revision, roll back to it, then re-run the deploy (`gh run rerun <id>`, or merge again):
+
+```powershell
+helm -n smart-tutor history smart-tutor
+helm -n smart-tutor rollback smart-tutor <last deployed revision>
+```
+
+**Roll back.**
+
+```powershell
+gh workflow run rollback.yml --ref main -f image_tag=<full SHA of an earlier successful deploy>
+```
+
+Find the SHA with `gh run list --workflow deploy.yml --status success --limit 10 --json headSha,displayTitle,createdAt`. The workflow checks the images are still in ECR (the last 30 per repository), checks out that commit's chart, and runs the add-ons, `helm upgrade`, and the smoke test, without CDK or a build. It doesn't undo infrastructure changes.
+
+- It runs the old commit's chart, add-on values, and smoke test. Commits from before deploy on merge (no `deploy/pilot/smoke_test.py`, images not tagged with the full SHA) can't be rolled back to with the workflow; use the laptop path.
+- Rollback across a migration doesn't work: the old image's `migrate` hook can't find the newer Alembic revision in the database, so the release stops before anything rolls out. Fix forward instead (revert the PR and merge).
+
+**By hand (laptop) instead:** steps 3 and 6 with `$Tag` set to the tag the images were pushed with: the full SHA for workflow deploys, the 12-character short SHA for manual step 5 builds.
