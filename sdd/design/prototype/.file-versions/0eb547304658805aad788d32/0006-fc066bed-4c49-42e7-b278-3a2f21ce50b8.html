@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Smart Tutor — Round 8 design @v0.8</title>
+  <meta name="description" content="Smart Tutor learner web app, round 8 design answering design brief v0.8: conversations without subjects, documents used, an in-app document viewer and document deletion; flows J1–J4." />
+  <script>
+    try { var t = localStorage.getItem('st_theme'); if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+    if (/[?&]shot=1(&|$)/.test(location.search)) document.documentElement.classList.add('shot'); // hide review chrome (§11 item 6)
+  </script>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="v03.css" />
+</head>
+<body>
+  <a class="vh" href="#main-content">Skip to content</a>
+
+  <!-- Design review chrome: not part of the product UI. -->
+  <header class="review-bar" aria-label="Design review">
+    <div class="rb-brand"><span>Smart Tutor</span><span class="muted">· Round 8 · brief v0.8</span></div>
+    <div class="rb-state" id="rb-state" aria-live="polite"></div>
+    <div class="rb-actions">
+      <button class="rb-btn" type="button" id="rb-sim" data-action="rb-sim" hidden title="Review aid: simulates dropping the three J1 sample PDFs">
+        <svg class="icon sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5M12 3v12"/></svg>Simulate drop · 3 PDFs
+      </button>
+      <button class="rb-btn" type="button" data-action="rb-prev" aria-label="Previous step">
+        <svg class="icon sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>Prev
+      </button>
+      <button class="rb-btn" type="button" data-action="rb-next" aria-label="Next step">
+        Next<svg class="icon sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+      <button class="rb-btn" type="button" id="rb-exit" data-action="rb-exit" hidden>Exit flow</button>
+      <button class="rb-btn" type="button" data-action="rb-theme" id="rb-theme" aria-label="Switch theme"></button>
+      <button class="rb-btn" type="button" data-action="rb-index" aria-haspopup="dialog">
+        <svg class="icon sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>All states
+      </button>
+    </div>
+  </header>
+
+  <div id="root"></div>
+  <div id="tray-root"></div>
+  <div id="overlay-root"></div>
+  <div id="toasts" role="status" aria-live="polite"></div>
+  <div id="announcer" class="vh" aria-live="polite"></div>
+  <input type="file" id="file-input" accept="application/pdf,.pdf" multiple hidden>
+
+  <script src="js/data.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/documents.js"></script>
+  <script src="js/landing.js"></script>
+  <script src="js/chat.js"></script>
+  <script src="js/viewer.js"></script>
+  <script src="js/screens.js"></script>
+  <script src="js/extra.js"></script>
+  <script src="js/states.js"></script>
+</body>
+</html>

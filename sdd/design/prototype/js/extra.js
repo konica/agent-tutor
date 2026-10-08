@@ -1,4 +1,4 @@
-/* Smart Tutor v0.7 — overview with what changed and the flows, R2 research map and R3 learning loop
+/* Smart Tutor v0.10 — overview with what changed and the flows, R2 research map and R3 learning loop
    wireframes, components page (§10), decisions and questions for the brief owner (§11.5). */
 (function () {
   const ST = window.ST;
@@ -8,15 +8,15 @@
   /* =========================================================
      Overview
      ========================================================= */
-  /* §0 What changed in v0.7: [source, change, states redone, states removed]. */
+  /* §0 What changed in v0.10: [source, change, states redone or added, states removed]. Chat only. */
   ST.CHANGES = [
-    ['E4', 'A decline never offers “New conversation”', ['chat-decline'], ['chat-decline-other-subject']],
-    ['E6', 'The declined question is not kept', [], []],
-    ['E7', 'No changing subjects of archived documents; Restore first', ['library-archived', 'details-archived'], ['picker-change-subjects-archived']],
-    ['E8', 'Daily limits reset at 00:00 (GMT+7)', ['library-rate-limited', 'chat-rate-limited'], []],
-    ['F1', 'Registration uses the email as the username', ['auth-sign-up'], []]
+    ['P1', 'Conversation panel (260px): Documents used, Lesson Note, Actions; header = toggle, title, overflow', ['chat-answer-citations', 'chat-documents-used', 'chat-documents-used-empty', 'chat-documents-used-deleted', 'chat-summarize-done', 'chat-update-note', 'chat-panel-collapsed'], []],
+    ['P2', 'One click opens the document beside the conversation (split view)', ['viewer-citation-highlight', 'viewer-document'], []],
+    ['P3', 'The pane: a labelled region with one 40px toolbar; loading, error and no-highlight inside it', ['viewer-no-highlight', 'viewer-loading', 'viewer-error'], []],
+    ['P3', 'Outside chat the viewer stays the overlay', ['viewer-archived'], []]
   ];
-  ST.NEW_IDS = [];
+  ST.CHANGES.push(['P4', 'Open in dialog from the pane, with a details strip', ['viewer-dialog'], []], ['P5', 'Choose the conversation\'s documents; Only search these documents', ['chat-documents-add', 'chat-scope-limited', 'chat-decline-limited', 'chat-documents-used'], []]);
+  ST.NEW_IDS = ['chat-panel-collapsed', 'viewer-dialog', 'chat-documents-add', 'chat-scope-limited', 'chat-decline-limited', 'chat-new-from-document', 'chat-title-editing'];
   const changed = () => { const set = new Set(); ST.CHANGES.forEach((c) => c[2].forEach((id) => set.add(id))); return set; };
   ST.indexView = () => {
     const groups = [];
@@ -25,21 +25,21 @@
     return `<main class="index-page" id="main-content" tabindex="-1">
       <section class="index-hero">
         <div><span class="brand" style="padding:0 0 24px">${ST.logo('logo', 'Smart Tutor logo')}<span class="word">Smart Tutor</span></span>
-          <h1>Round 6: the owner's answers</h1>
-          <p>Brief v0.7 settles E4, E6, E7, E8 and F1. Declines only ask for a document, archived documents must be restored before their subjects change, daily limits end at 00:00 (GMT+7), and registration has no Username field. Two states are gone. Everything else is the round 5 design. Review the changed states first, then walk the four flows. Every state is labelled <code class="mono">&lt;screen&gt;-&lt;state&gt;@v0.4</code> and opens at <code class="mono">index.html#/&lt;state-id&gt;</code>; add <code class="mono">?shot=1</code> to hide this review chrome.</p>
+          <h1>Round 10: documents beside the conversation</h1>
+          <p>Brief v0.10 changes the chat only. A 260px conversation panel holds Documents used, the Lesson Note and the conversation's actions, and one click on a Sources chip or a document opens it beside the conversation: the conversation keeps at least 480px, the panel collapses and the nav drops to its rail. Everything else is the round 9 design.</p>
           <div class="od-cluster" style="margin-top:24px;--od-gap:12px">
             <button class="btn btn-primary btn-lg" type="button" data-action="start-flow" data-flow="J1">Start with J1 · First run${ic('arrowRight', 'sm')}</button>
             <a class="btn btn-secondary btn-lg" href="#/library-default">Open the Library</a>
             <a class="btn btn-ghost btn-lg" href="#/brief-questions">Questions for the brief</a>
           </div></div>
         <dl class="meta">
-          <div><dt>Brief</dt><dd>v0.7 · PRD v2.16</dd></div><div><dt>Owner</dt><dd>Thao Dinh</dd></div><div><dt>Date</dt><dd>6 Oct 2026</dd></div>
+          <div><dt>Brief</dt><dd>v0.10 · PRD Q60</dd></div><div><dt>Owner</dt><dd>Thao Dinh</dd></div><div><dt>Date</dt><dd>8 Oct 2026</dd></div>
           <div><dt>Screens</dt><dd>Laptop, 1280–1920 px</dd></div><div><dt>Themes</dt><dd>Light and dark</dd></div><div><dt>States</dt><dd>${ST.STATES.length - 1}</dd></div>
           <div><dt>Round 1</dt><dd><a href="v0.2/index.html">v0.2 prototype</a></dd></div>
         </dl>
       </section>
 
-      <h2 class="section-title">What changed in v0.7</h2>
+      <h2 class="section-title">What changed in v0.10</h2>
       <div class="changes" role="table" aria-label="Decisions and the states they changed">
         ${ST.CHANGES.map(([id, title, states, removed]) => `<div class="change-row" role="row"><span class="qid" role="cell">${esc(id)}</span><span class="change-title" role="cell">${esc(title)}</span>
           <span class="change-states" role="cell">${states.length ? '' : '<span class="small muted">No state changes</span>'}${states.map((sid) => `<a href="#/${sid}"><code>${sid}</code>${ST.NEW_IDS.includes(sid) ? '<span class="badge badge-note">New</span>' : ''}</a>`).join('')}${(removed || []).map((sid) => `<span class="removed-id"><del><code>${sid}</code></del><span class="badge badge-archived">Removed</span></span>`).join('')}</span></div>`).join('')}
@@ -56,14 +56,14 @@
       <section class="direction" aria-label="Visual system additions">
         <div><h3>Subject chips</h3><div class="chips">${['llm', 'agents', 'rag', 'rl'].map((s) => ST.schip(s)).join('')}</div><p class="small muted">One chip everywhere, with a stable colour per subject. The text always meets AA contrast and the name is always shown.</p></div>
         <div><h3>Document states</h3><div class="od-stack" style="--od-gap:6px;align-items:flex-start">${['processing', 'choose', 'ready', 'failed'].map((st) => ST.stateBadge({ state: st, subjects: [], attempts: 1, failReason: '' }, false)).join('')}${ST.stateBadge({ archived: true }, false)}</div></div>
-        <div><h3>System notices</h3><div class="notice"><div>${ic('plusCircle')}<span>Added <em>Retrieval-Augmented Generation</em> to this conversation</span></div></div><p class="small muted">Centred and outlined, so they read differently from both the tutor's answers and your own messages.</p></div>
+        <div><h3>Cited passage</h3><div class="vw-hl" style="margin:8px 0 0"><span class="vw-hl-label" aria-hidden="true">Cited passage</span>Reasoning traces help the model induce, track, and update action plans.</div><p class="small muted">Soft accent fill plus an outline and a label, so the highlight never relies on colour alone.</p></div>
         <div><h3>Quoted material</h3><figure class="excerpt"><blockquote>“An attention function can be described as mapping a query and a set of key-value pairs to an output…”</blockquote><figcaption>Quoted from your document</figcaption></figure></div>
       </section>
 
       <h2 class="section-title">All states</h2>
       <div class="index-groups">${groups.map((g) => `<section class="index-group ${g.items.length > 12 ? 'span2' : ''}" aria-labelledby="g-${g.items[0].id}">
         <h2 id="g-${g.items[0].id}">${esc(g.name)}<span class="ig-ref">${esc(g.ref)}</span></h2>
-        <ul>${g.items.map((s) => `<li><a href="#/${s.id}"><code>${s.id}@${ST.BRIEF}</code>${ST.NEW_IDS.includes(s.id) ? '<span class="badge badge-note">New in v0.7</span>' : ch.has(s.id) ? '<span class="badge">Changed in v0.7</span>' : ''}<span>${esc(s.desc)}</span></a></li>`).join('')}</ul></section>`).join('')}</div>
+        <ul>${g.items.map((s) => `<li><a href="#/${s.id}"><code>${s.id}@${ST.BRIEF}</code>${ST.NEW_IDS.includes(s.id) ? '<span class="badge badge-note">New in v0.10</span>' : ch.has(s.id) ? '<span class="badge">Changed in v0.10</span>' : ''}<span>${esc(s.desc)}</span></a></li>`).join('')}</ul></section>`).join('')}</div>
     </main>`;
   };
   ST.actions['start-flow-at'] = (el, e) => { ST.flow = el.dataset.flow; try { sessionStorage.setItem('st3_flow', ST.flow); } catch (x) {} };
@@ -123,7 +123,7 @@
       <span>1 · Chain-of-Thought Prompting (2022): reasoning written out step by step <span class="wf-tag">[cite p. 2]</span></span>
       <span>2 · ReAct (2022): reasoning interleaved with tool actions <span class="wf-tag">[cite p. 3]</span></span>
       <span>3 · Toolformer (2023): the model learns when to call tools <span class="wf-tag">[cite p. 1]</span></span>
-      <span class="wf-note">Normal chat rules apply: the conversation's subjects, citations switch and status line.</span></div>`);
+      <span class="wf-note">Normal chat rules apply: documents used, citations switch and status line.</span></div>`);
   ST.r2Sparse = () => wfPage('map', 2, 'US-19', `
     <div class="page-head"><div><h1>Research map</h1></div></div>${subjSelect()}
     <div class="wf-box" style="justify-items:center;text-align:center;padding:48px">
@@ -192,7 +192,7 @@
   ST.componentsView = () => {
     const d = { id: 'dx', title: 'Toolformer: Language Models Can Teach Themselves to Use Tools', authors: 'Schick et al.', year: 2023, state: 'choose', subjects: [], attempts: 0 };
     return `<main class="index-page" id="main-content" tabindex="-1">
-    <div class="page-head" style="margin-bottom:48px"><div><h1 style="font-size:48px">Components</h1><p>The reusable set for v0.7. Tokens live once in <code class="mono">styles.css</code> and <code class="mono">v03.css</code>, for light and dark.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
+    <div class="page-head" style="margin-bottom:48px"><div><h1 style="font-size:48px">Components</h1><p>The compact set for v0.9 (DESIGN.md → Density). Tokens live once in <code class="mono">styles.css</code> and <code class="mono">v03.css</code>, for light and dark.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
 
     <section class="cmp-section"><h2>Tokens</h2><p>The round 1 palette, plus an attention colour for “needs action” and one hue per subject. Chip text always uses the main text colour, so contrast holds whatever the hue.</p>
       <div class="cmp-grid">${tokenGrid('light')}${tokenGrid('dark')}</div></section>
@@ -238,15 +238,22 @@
 
     <section class="cmp-section"><h2>Conversation pieces</h2><p>Citations, quoted material and system notices each look different from the tutor's own words and from your messages.</p>
       <div class="cmp-grid">
-        ${spec('citation', `<div class="cite-list"><button class="cite" type="button">${ic('doc')}<span><span class="doc-name">ReAct: Synergizing Reasoning and Acting in Language Models</span><span class="page">, p. 3</span></span></button>
-          <button class="cite" type="button">${ic('doc')}<span><span class="doc-name">Proximal Policy Optimization Algorithms</span><span class="page">, page unavailable</span></span></button>
-          <button class="cite" type="button">${ic('doc')}<span><span class="doc-name">Language Models are Few-Shot Learners</span><span class="page">, p. 8</span></span><span class="badge badge-archived">${ic('archive')}Archived</span></button></div>`)}
+        ${spec('citation', `<div class="cite-list"><button class="cite" type="button">${ic('doc')}<span><span class="doc-name">ReAct: Synergizing Reasoning and Acting in Language Models</span><span class="cite-page">· p. 3</span></span></button>
+          <button class="cite" type="button">${ic('doc')}<span><span class="doc-name">Proximal Policy Optimization Algorithms</span><span class="cite-page">· page unavailable</span></span></button>
+          <button class="cite" type="button">${ic('doc')}<span><span class="doc-name">Language Models are Few-Shot Learners</span><span class="cite-page">· p. 8</span></span><span class="badge badge-archived">${ic('archive')}Archived</span></button>
+          <span class="cite cite-deleted">${ic('doc')}<span><span class="doc-name">Deleted document</span></span></span></div>
+          <p class="small muted">A citation opens the document viewer at the cited page. A deleted document's citation reads “Deleted document” and isn't a link.</p>`)}
+        ${spec('documents used · row / archived / deleted', `<ol class="du-list">
+          <li><button class="du-row" type="button"><span class="du-icon">${ic('doc')}</span><span class="du-text"><span class="du-title">ReAct: Synergizing Reasoning and Acting in Language Models</span><span class="du-meta">Yao et al. · 2022</span></span></button></li>
+          <li><button class="du-row" type="button"><span class="du-icon">${ic('doc')}</span><span class="du-text"><span class="du-title">Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks</span><span class="du-meta">Lewis et al. · 2020</span></span><span class="badge badge-archived">${ic('archive')}Archived</span></button></li>
+          <li class="du-row is-deleted"><span class="du-icon">${ic('doc')}</span><span class="du-text"><span class="du-title">Chain-of-Thought Prompting Elicits Reasoning in Large Language Models</span><span class="du-meta">Wei et al. · 2022</span></span><span class="badge badge-deleted">${ic('x')}Deleted</span></li></ol>`)}
         ${spec('answer feedback · default / “Helpful” pressed / “Not helpful” pressed (D1)', `<div class="feedback" role="group" aria-label="Example, default"><button class="fb-btn" type="button" aria-pressed="false">${ic('thumb', 'sm')}Helpful</button><button class="fb-btn" type="button" aria-pressed="false">${ic('thumb', 'sm flip-y')}Not helpful</button></div>
           <div class="feedback" role="group" aria-label="Example, helpful pressed"><button class="fb-btn" type="button" aria-pressed="true">${ic('thumb', 'sm')}Helpful</button><button class="fb-btn" type="button" aria-pressed="false">${ic('thumb', 'sm flip-y')}Not helpful</button><span class="fb-thanks">Thanks — glad it helped.</span></div>
           <div class="feedback" role="group" aria-label="Example, not helpful pressed"><button class="fb-btn" type="button" aria-pressed="false">${ic('thumb', 'sm')}Helpful</button><button class="fb-btn" type="button" aria-pressed="true">${ic('thumb', 'sm flip-y')}Not helpful</button></div>
           <p class="small muted">Outline icons with a text label. Pressed adds a tinted fill, an accent border and a heavier label, so the state never relies on colour alone.</p>`)}
-        ${spec('system notice · added / maximum', `<div class="notice"><div>${ic('plusCircle')}<span>Added <em>Retrieval-Augmented Generation</em> to this conversation</span></div></div>
-          <div class="notice max"><div>${ic('info')}<span>This conversation now covers 3 subjects, the maximum. For other topics, start a new conversation.</span></div></div>`)}
+        ${spec('system notice · started from a note', `<div class="banner banner-info">${ic('note')}<div class="b-body">Started from note: <a href="#/note/n2"><em>Chain-of-thought prompting</em></a></div></div>`)}
+        ${spec('buttons · destructive', `<div class="od-cluster"><button class="btn btn-secondary" type="button">Cancel</button><button class="btn btn-danger" type="button">${ic('trash', 'sm')}Delete</button><button class="btn btn-danger-quiet" type="button">${ic('trash', 'sm')}Delete…</button></div>
+          <p class="small muted">Delete is never the default button: Cancel takes the initial focus, and Archive is offered first.</p>`)}
         ${spec('quoted material', `<figure class="excerpt"><blockquote>“reasoning traces help the model induce, track, and update action plans as well as handle exceptions”</blockquote><figcaption>${ic('quote', 'sm')}Quoted from <span style="text-transform:none;letter-spacing:0"><em>ReAct…</em>, p. 3</span></figcaption></figure>`)}
         ${spec('banner', `<div class="banner" style="background:var(--attn-soft);border-color:transparent">${ic('tag')}<div class="b-body"><strong>2 documents need subjects</strong><span>Processing has finished.</span></div><button class="btn btn-primary btn-sm" type="button">Choose subjects</button></div>
           <div class="banner">${ic('archive')}<div class="b-body"><strong>This conversation is archived.</strong></div><button class="btn btn-primary btn-sm" type="button">Restore</button></div>`)}
@@ -272,25 +279,26 @@
      Brief v0.5 decisions and questions
      ========================================================= */
   const DECISIONS = [
-    ['E4', 'A decline never offers “New conversation”', 'Every decline says a document on the topic is needed to continue, with “Upload a document” as the only action. “New conversation” stays only in the fourth-subject refusal. chat-decline-other-subject is removed.', ['chat-decline', 'chat-fourth-subject-refused']],
-    ['E6', 'The declined question is not kept', 'No reminder or “ask again” prompt after “Upload a document”; the prototype already behaved this way.', []],
-    ['E7', 'Archived documents: Restore first', 'No “Change subjects” on archived rows, in their More menu or in archived document details (reverses D7). picker-change-subjects-archived is removed.', ['library-archived', 'details-archived']],
-    ['E8', 'Daily limits reset at midnight GMT+7', '“You can upload again at 00:00 (GMT+7)” and “You can send again at 00:00 (GMT+7)” for the daily limits; the hourly and per-minute messages keep their own end time.', ['library-rate-limited', 'chat-rate-limited']],
-    ['F1', 'Sign up with an email address', 'Stock registration asks for the email, first and last name, and a new secret twice; there is no separate sign-in name.', ['auth-sign-up']],
-    ['F2, E3', 'Confirmed / settled', '“Sign in” stays for signed-in visitors. With one decline left, E3 (which decline id is which) no longer applies.', ['landing-default']]
+    ['P1', 'Conversation panel', 'A 260px panel on the left, toggled from the chat header and remembered: Documents used (32px rows with page count and Archived / Deleted badges), Lesson Note (Open note, Summarize lesson / Update lesson note) and Actions (Show citations, Archive conversation). The header is the toggle, the title and an overflow.', ['chat-answer-citations', 'chat-documents-used', 'chat-panel-collapsed']],
+    ['P2', 'Split view in one click', 'A Sources chip opens its cited page with the passage highlighted beside the conversation, and the chip stays highlighted; a panel row opens page 1. The conversation keeps at least 480px (about 550px at 1440, 490px at 1280) and the document takes the rest; the panel collapses and the nav drops to its 56px rail. Another chip swaps the document in place; Close or Esc restores the layout and returns focus to the chip or row.', ['viewer-citation-highlight', 'viewer-document']],
+    ['P3', 'The pane', 'A labelled region (not a modal) with one 40px toolbar: title, “p. 3 / 33”, zoom, Close. Loading, error and no-highlight render inside it. viewer-archived stays the overlay, opened from the Library.', ['viewer-no-highlight', 'viewer-loading', 'viewer-error', 'viewer-archived']]
   ];
+  DECISIONS.push(
+    ['P4', 'Open in dialog', 'A maximize button before Close opens the same document at the same page and highlight in the large overlay, with a details strip (authors, year, pages, subjects, Archived). Close returns to the split view with focus on the button.', ['viewer-dialog']],
+    ['P5', 'The conversation\'s documents', 'The panel\'s first section is Documents: documents used plus added ones, each with a remove button on hover and focus; “Add documents” opens a searchable picker; “Only search these documents” (off by default, disabled while empty) shows “Searching N documents · Change” above the composer and declines with “Add documents” / “Search all my documents”.', ['chat-documents-add', 'chat-scope-limited', 'chat-decline-limited']],
+    ['R1–R3', 'Answered', 'R1 no new state; R2 Show citations and Archive stay in the overflow too; R3 the panel can be re-opened in split view and the pane then fits the page to its width.', ['viewer-citation-highlight']]
+  );
   const QUESTIONS = [
-    ['I1', 'Question', 'One state shows two limit messages', 'library-rate-limited and chat-rate-limited show the hourly or per-minute message with the daily one as a secondary line. In the product only one applies at a time.', 'Keep it as one state, or add library-rate-limited-daily and chat-rate-limited-daily so each message can be checked alone.'],
-    ['I2', 'Question', 'Restoring an archived document to change its subjects', 'With E7, a learner who only wants to fix a subject must restore the document, which makes it count for answers again.', 'Accept, as the owner decided. If it comes up in the pilot, allow the change without restoring.'],
-    ['F4', 'Open', 'Remember me and Forgot Password? on the login page', 'Both are stock and controlled by realm settings, not the theme.', 'Keep both on for the pilot.'],
-    ['H1', 'Open', 'Upload-rights line next to a disabled Upload', 'When the upload limit is reached the line still shows under the disabled button.', 'Keep it: it describes the upload area, not the action.'],
-    ['E5', 'Proposal', 'Chat hint counts documents waiting for subjects as “processing”', 'Under Q7 they have finished processing but can\'t be used yet.', '“2 documents can\'t be used yet: 1 is processing, 1 needs subjects.”'],
-    ['E10', 'Open', 'A separate state for D6', 'Renaming to a shared name the learner doesn\'t have shows no message.', 'No separate state unless you want one.'],
+    ['S1', 'Question', 'Removing a document the answers already cited', 'Removing a used document takes it out of the list and the search scope, but its citations in earlier answers still open it.', 'Keep the citations working; removal only affects future answers.'],
+    ['S2', 'Question', '“Change” in the scope line', 'It opens the panel and focuses the switch, where the list can be edited.', 'Confirm, or open the Add documents picker directly.'],
+    ['S3', 'Question', 'Archived documents in the picker', 'The picker lists ready, active documents only.', 'Keep archived ones out; restoring stays in the Library.'],
+    ['N2', 'Open', 'Show citations hidden in a menu', 'Now also a switch in the panel, so it is visible whenever the panel is open.', 'Closed by P1.'],
+    ['I1, F4, H1, E5, E10', 'Open', 'Smaller items', 'Unchanged.', 'Unchanged.'],
     ['Q4, Q5, Q8', 'Defaults kept', 'Still open in §12', 'Q4 the citations switch also covers notes · Q5 several files at once · Q8 first suggestion pre-selected.', 'All shown as designed.']
   ];
   ST.questionsView = () => `<main class="index-page" id="main-content" tabindex="-1">
-    <div class="page-head" style="margin-bottom:32px"><div><h1 style="font-size:48px">Decisions &amp; questions</h1><p>For brief v0.7, round 6. First the owner's answers to E4, E6, E7, E8, F1 and F2 and where they are applied, then open questions: the new ones first, then those still open.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
-    <h2 class="section-title" style="margin-top:0">Answered and applied in v0.7</h2>
+    <div class="page-head" style="margin-bottom:32px"><div><h1 style="font-size:48px">Decisions &amp; questions</h1><p>For brief v0.10, round 10 (chat only). First what P1–P3 changed and where, then open questions.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
+    <h2 class="section-title" style="margin-top:0">Applied in v0.10</h2>
     <ol class="qa-list">${DECISIONS.map(([id, title, what, states]) => `<li class="qa-item"><span class="qid">${esc(id)}</span>
       <div><h3>${esc(title)}</h3><p>${esc(what)}</p><p class="proposal"><strong>Applied in:</strong> ${states.length ? '' : 'no change needed'}${states.map((sid) => `<a href="#/${sid}"><code class="mono">${sid}</code></a>`).join(', ')}</p></div>
       <span class="badge qtype badge-ready-q">${ic('check')}Applied</span></li>`).join('')}</ol>

@@ -1,8 +1,8 @@
-/* Smart Tutor — sample data for round 6 (brief v0.7, §9). Dates relative to 3 Oct 2026. */
+/* Smart Tutor — sample data for round 10 (brief v0.10, §9). Dates relative to 3 Oct 2026. */
 window.ST = window.ST || {};
 
 ST.TODAY = '2026-10-03';
-ST.BRIEF = 'v0.7';
+ST.BRIEF = 'v0.10';
 /* G2: shown in the Library's upload area; a plain line, nothing to accept. */
 ST.RIGHTS = 'Only upload documents you have the right to use.';
 /* D8: one time zone for everyone in Release 1. */
@@ -32,7 +32,7 @@ ST.DOCS = [
     summary: 'Introduces the Transformer, a sequence model built entirely on attention, without recurrence or convolution. It reaches state-of-the-art translation quality while training much faster in parallel.' },
   { id: 'd2', title: 'Chain-of-Thought Prompting Elicits Reasoning in Large Language Models', extracted: 'Chain-of-Thought Prompting Elicits Reasoning in Large Language Models', authors: 'Wei et al.', year: 2022, doi: '10.48550/arXiv.2201.11903', file: '2201.11903v6.pdf', pages: 43, size: '1.9 MB', uploaded: '2026-09-14T15:02', state: 'ready', subjects: ['llm', 'agents'], archived: false, tokens: [96400, 2210],
     summary: 'Shows that prompting large models with a few worked examples that spell out intermediate reasoning steps improves arithmetic, commonsense and symbolic reasoning. The effect appears only in sufficiently large models.' },
-  { id: 'd3', title: 'ReAct: Synergizing Reasoning and Acting in Language Models', extracted: 'ReAct: Synergizing Reasoning and Acting in Language Models', authors: 'Yao et al.', year: 2022, doi: '10.48550/arXiv.2210.03629', file: 'react-yao-2022.pdf', pages: 33, size: '3.1 MB', uploaded: '2026-09-20T10:11', state: 'ready', subjects: ['agents'], archived: false, tokens: [0, 0], dedup: true,
+  { id: 'd3', title: 'ReAct: Synergizing Reasoning and Acting in Language Models', extracted: 'ReAct: Synergizing Reasoning and Acting in Language Models', authors: 'Yao et al.', year: 2022, doi: '10.48550/arXiv.2210.03629', file: 'react-yao-2022.pdf', pages: 33, size: '3.1 MB', uploaded: '2026-09-20T10:11', state: 'ready', subjects: ['agents'], archived: false, tokens: [38600, 1740],
     summary: 'Proposes prompting language models to interleave reasoning traces with task actions such as search calls. Reasoning helps plan and track actions, while actions gather outside information that keeps reasoning grounded.' },
   { id: 'd4', title: 'Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks', extracted: 'Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks', authors: 'Lewis et al.', year: 2020, doi: '10.48550/arXiv.2005.11401', file: 'lewis-rag-2020.pdf', pages: 19, size: '0.9 MB', uploaded: '2026-09-22T08:44', state: 'ready', subjects: ['rag'], archived: false, tokens: [48800, 1990],
     summary: 'Combines a pretrained sequence-to-sequence model with a dense retriever over Wikipedia. Generating from retrieved passages improves factual question answering and produces more specific, less hallucinated text.' },
@@ -105,19 +105,20 @@ ST.ANSWERS = {
   }
 };
 
-/* Conversations. subjects: up to 3 subject ids. */
+/* Conversations (K1: no subjects of their own). answers: answer keys in order; Documents used and the list's
+   subject chips are derived from the documents those answers cite. */
 ST.CONVERSATIONS = [
-  { id: 'cv1', title: 'How does ReAct combine reasoning and acting?', subjects: ['agents', 'rag', 'llm'], last: '2026-10-03T09:48', noteId: 'n1', archived: false, tokens: [12480, 3215] },
-  { id: 'cv2', title: 'What does chain-of-thought prompting change about how a model answers?', subjects: ['llm', 'agents'], last: '2026-10-02T16:20', noteId: 'n2', archived: false, tokens: [9870, 2140], answer: 'cot' },
-  { id: 'cv3', title: 'How does self-attention scale with sequence length?', subjects: ['llm'], last: '2026-09-30T11:05', noteId: null, archived: false, tokens: [6230, 1480], answer: 'long_docs' },
-  { id: 'cv4', title: 'Why does RAG use a dense retriever instead of BM25?', subjects: ['rag'], last: '2026-09-28T19:40', noteId: 'n3', archived: false, tokens: [8110, 1902], answer: 'rag_dense' },
-  { id: 'cv5', title: 'What problem does the PPO clipped objective solve?', subjects: ['rl'], last: '2026-09-25T14:12', noteId: null, archived: false, tokens: [5340, 1296], answer: 'ppo' },
-  { id: 'cv6', title: 'What does a Transformer encoder block contain?', subjects: ['llm'], last: '2026-09-12T10:30', noteId: 'n4', archived: true, tokens: [4420, 1150], answer: 'attention' }
+  { id: 'cv1', title: 'How does ReAct combine reasoning and acting?', answers: ['react', 'rag_loop', 'ppo'], last: '2026-10-03T09:48', noteId: 'n1', archived: false, tokens: [12480, 3215] },
+  { id: 'cv2', title: 'What does chain-of-thought prompting change about how a model answers?', last: '2026-10-02T16:20', noteId: 'n2', archived: false, tokens: [9870, 2140], answers: ['cot'] },
+  { id: 'cv3', title: 'How does self-attention scale with sequence length?', last: '2026-09-30T11:05', noteId: null, archived: false, tokens: [6230, 1480], answers: ['long_docs'] },
+  { id: 'cv4', title: 'Why does RAG use a dense retriever instead of BM25?', last: '2026-09-28T19:40', noteId: 'n3', archived: false, tokens: [8110, 1902], answers: ['rag_dense'] },
+  { id: 'cv5', title: 'What problem does the PPO clipped objective solve?', last: '2026-09-25T14:12', noteId: null, archived: false, tokens: [5340, 1296], answers: ['ppo'] },
+  { id: 'cv6', title: 'What does a Transformer encoder block contain?', last: '2026-09-12T10:30', noteId: 'n4', archived: true, tokens: [4420, 1150], answers: ['attention'] }
 ];
 
 ST.NOTES = [
-  { id: 'n1', title: 'ReAct: reasoning and acting', subjects: ['agents', 'rag', 'llm'], date: '2026-10-03T09:55', convId: 'cv1', archived: false, edited: false,
-    body: '# ReAct: reasoning and acting\n\n## The loop\n\n1. **Thought** — plan the next step or update what the model knows.\n2. **Action** — call a tool, such as search.\n3. **Observation** — read the result and feed it into the next thought.\n\n## Why retrieval helps\n\n- Actions can be retrieval calls, so each step is grounded in a real passage.\n- Grounding reduces hallucination compared with reasoning from memory alone.\n\n## Self-attention, briefly\n\n- Each token becomes a query, a key and a value.\n- Multi-head attention tracks several kinds of relationship at once.\n\n*Sources: ReAct, p. 3; Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks, p. 2; Attention Is All You Need, p. 3*' },
+  { id: 'n1', title: 'ReAct: reasoning and acting', subjects: ['agents', 'rag', 'rl'], date: '2026-10-03T09:55', convId: 'cv1', archived: false, edited: false,
+    body: '# ReAct: reasoning and acting\n\n## The loop\n\n1. **Thought** — plan the next step or update what the model knows.\n2. **Action** — call a tool, such as search.\n3. **Observation** — read the result and feed it into the next thought.\n\n## Why retrieval helps\n\n- Actions can be retrieval calls, so each step is grounded in a real passage.\n- Grounding reduces hallucination compared with reasoning from memory alone.\n\n## PPO, briefly\n\n- The probability ratio between new and old policy is clipped to about 0.8–1.2.\n- Updates gain nothing from moving further than the clip allows.\n\n*Sources: ReAct, p. 3; Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks, p. 2; Proximal Policy Optimization Algorithms, p. 3*' },
   { id: 'n2', title: 'Chain-of-thought prompting', subjects: ['llm', 'agents'], date: '2026-10-02T16:31', convId: 'cv2', archived: false, edited: true, editedAt: '2026-10-02T21:10',
     body: '# Chain-of-thought prompting\n\nWorked examples that show **intermediate steps** make large models reason step by step.\n\n- Gains appear only in large models.\n- Biggest on multi-step arithmetic and symbolic tasks.\n\n## My notes\n\n- Try this on the agent planner prompts for chapter 3 of my thesis.\n\n*Sources: Chain-of-Thought Prompting…, p. 2*' },
   { id: 'n3', title: 'Dense retrieval in RAG', subjects: ['rag'], date: '2026-09-28T19:52', convId: 'cv4', archived: false, edited: false,
@@ -139,3 +140,6 @@ ST.QUIZ = [
   { q: 'What does PPO clip?', opts: ['The reward', 'The learning rate', 'The probability ratio between new and old policy', 'The value loss only'], a: 2, pick: 0, topic: 'Reinforcement Learning' },
   { q: 'When do chain-of-thought gains appear?', opts: ['In all model sizes', 'Mainly in large models', 'Only with retrieval', 'Only in fine-tuned models'], a: 1, pick: 1, topic: 'LLMs' }
 ];
+
+/* §6.10: processing of a document Mai deleted earlier stays in Usage, labeled "Deleted document" (sample tokens). */
+ST.DELETED_PROCESSING = [{ uploaded: '2026-09-18T16:40', tokens: [22400, 1310] }];

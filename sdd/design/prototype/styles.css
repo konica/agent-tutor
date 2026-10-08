@@ -86,23 +86,27 @@
   --font-body: system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
 
-  --fs-12: 12px; --fs-14: 14px; --fs-16: 16px; --fs-18: 18px;
-  --fs-20: 20px; --fs-24: 24px; --fs-32: 32px; --fs-40: 40px;
-  --lh-body: 1.55; --lh-head: 1.2;
+  /* Density (DESIGN.md, brief v0.9 M1): 14px body, 12px floor */
+  --fs-12: 12px; --fs-13: 13px; --fs-14: 14px; --fs-16: 16px; --fs-18: 18px;
+  --fs-20: 20px; --fs-24: 24px; --fs-32: 32px; --fs-40: 40px; --fs-64: 64px;
+  --lh-body: 1.45; --lh-read: 1.6; --lh-head: 1.25;
 
-  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px;
+  --sp-0: 2px; --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px;
   --sp-6: 24px; --sp-8: 32px; --sp-12: 48px; --sp-16: 64px;
 
-  --r-sm: 6px; --r-md: 10px; --r-pill: 999px;
+  --r-sm: 4px; --r-md: 6px; --r-lg: 8px; --r-pill: 999px;
 
   --dur-fast: 150ms; --dur-base: 220ms; --dur-exit: 150ms;
   --ease-out: cubic-bezier(.2, .7, .2, 1);
   --ease-in: cubic-bezier(.5, 0, .75, .2);
 
-  --nav-w: 240px;
+  --nav-w: 208px;
+  --nav-w-collapsed: 56px;
   --review-h: 48px;
-  --chat-w: 760px;
-  --page-w: 1120px;
+  --chat-w: 720px;
+  --page-w: 1200px;
+  --page-w-wide: 1360px; /* fluid: Library and tables use min(1360px, 100%) */
+  --viewer-w: min(960px, 100% - 64px);
 }
 
 [data-theme="dark"] {
@@ -143,12 +147,12 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-body);
-  font-size: var(--fs-16);
+  font-size: var(--fs-14);
   line-height: var(--lh-body);
   -webkit-font-smoothing: antialiased;
 }
 h1, h2, h3, h4, p { margin: 0; }
-h1, h2, h3 { font-family: var(--font-display); font-weight: 600; line-height: var(--lh-head); letter-spacing: -.01em; }
+h1, h2, h3 { font-family: var(--font-body); font-weight: 650; line-height: var(--lh-head); letter-spacing: 0; } /* M1: app titles are sans; the serif stays for the brand word, the landing page and empty-state headlines */
 h4 { font-size: var(--fs-14); font-weight: 650; }
 a { color: var(--accent-text); text-underline-offset: 3px; }
 a:hover { color: var(--accent-hover); }

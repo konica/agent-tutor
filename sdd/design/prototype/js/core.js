@@ -1,4 +1,4 @@
-/* Smart Tutor v0.5 — core: helpers, icons, store, shell, overlays, upload tray, router, review chrome. */
+/* Smart Tutor v0.9 — core: helpers, icons, store, shell, overlays, upload tray, router, review chrome. */
 (function () {
   const ST = window.ST;
 
@@ -24,6 +24,10 @@
   const ICONS = {
     message: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    minus: '<path d="M5 12h14"/>',
+    panelLeft: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
+    maximize: '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>',
+    trash: '<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/>',
     list: '<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
     note: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>',
     library: '<path d="M4 19.5V4.5A1.5 1.5 0 0 1 5.5 3H8v18H5.5A1.5 1.5 0 0 1 4 19.5z"/><path d="M8 3h4v18H8M12 4.5l4-1 4 16-4 1z"/>',
@@ -117,11 +121,12 @@
     S.docs = ST.clone(ST.DOCS);
     S.catalog = ST.clone(ST.CATALOG);
     S.convs = ST.clone(ST.CONVERSATIONS);
+    S.deletedNotice = null;
     S.notes = ST.clone(ST.NOTES);
     S.tray = []; S.trayCollapsed = false; S.uploadLimit = false;
     S.rowMenu = null; S.userMenu = false;
+    S.convs.forEach((c) => ST.syncConvSubjects(c));
   };
-  ST.resetData();
   ST.doc = (id) => ST.S.docs.find((d) => d.id === id);
   ST.conv = (id) => ST.S.convs.find((c) => c.id === id);
   ST.note = (id) => ST.S.notes.find((n) => n.id === id);
@@ -129,12 +134,25 @@
   ST.sname = (id) => { const s = ST.subj(id); return s ? (s.mine || s.shared) : id; };
   ST.hueKey = (id) => (['llm', 'agents', 'rag', 'rl', 'tool'].includes(id) ? id : 'other');
   ST.schip = (id, cls = '') => `<span class="schip ${cls}" data-s="${ST.hueKey(id)}"><span class="dot" aria-hidden="true"></span>${ST.esc(ST.sname(id))}</span>`;
+  /* Subject chips in a table cell: at most 2, each truncating its own label (full name in the tooltip), the rest as "+N". */
+  ST.cellChips = (ids) => {
+    const shown = ids.slice(0, 2);
+    const longest = shown.reduce((m, id) => (ST.sname(id).length > ST.sname(m).length ? id : m), shown[0]);
+    const chip = (id) => `<span class="schip sm in-cell ${id === longest && shown.length > 1 ? 'can-shrink' : ''}" data-s="${ST.hueKey(id)}" title="${ST.esc(ST.sname(id))}"><span class="dot" aria-hidden="true"></span><span class="sc-label">${ST.esc(ST.sname(id))}</span></span>`;
+    const rest = ids.slice(2);
+    return `<span class="chips cell-chips">${ids.slice(0, 2).map(chip).join('')}${rest.length ? `<span class="chip-more" title="${ST.esc(rest.map(ST.sname).join(', '))}"><span aria-hidden="true">+${rest.length}</span><span class="vh">, ${rest.length} more: ${ST.esc(rest.map(ST.sname).join(', '))}</span></span>` : ''}</span>`;
+  };
   ST.chips = (ids, cls = '') => `<span class="chips">${ids.map((i) => ST.schip(i, cls)).join('')}</span>`;
-  /* "My subjects": subjects of ready, non-archived documents */
-  ST.mySubjects = () => { const set = []; ST.S.docs.forEach((d) => { if (d.state === 'ready' && !d.archived) d.subjects.forEach((s) => { if (!set.includes(s)) set.push(s); }); }); return set; };
-  ST.needsAction = () => ST.S.docs.filter((d) => !d.archived && (d.state === 'choose' || d.state === 'failed')).length;
-  ST.stillProcessing = () => ST.S.docs.filter((d) => !d.archived && ['uploading', 'processing', 'choose'].includes(d.state)).length;
+  /* "My subjects": subjects of ready, non-archived, not deleted documents */
+  ST.mySubjects = () => { const set = []; ST.S.docs.forEach((d) => { if (d.state === 'ready' && !d.archived && !d.deleted) d.subjects.forEach((s) => { if (!set.includes(s)) set.push(s); }); }); return set; };
+  ST.needsAction = () => ST.S.docs.filter((d) => !d.archived && !d.deleted && (d.state === 'choose' || d.state === 'failed')).length;
+  ST.stillProcessing = () => ST.S.docs.filter((d) => !d.archived && !d.deleted && ['uploading', 'processing', 'choose'].includes(d.state)).length;
+  /* K1: a conversation's subjects (list chips, filters, Subjects counts) come from the documents it used. */
+  ST.subjectsOfDocs = (ids) => { const set = []; ids.forEach((id) => { const d = ST.doc(id); if (d && !d.deleted) d.subjects.forEach((s) => { if (!set.includes(s)) set.push(s); }); }); return set; };
+  ST.convDocs = (c) => { const ids = []; (c.answers || []).forEach((k) => (ST.ANSWERS[k] ? ST.ANSWERS[k].cites : []).forEach((x) => { if (!ids.includes(x.doc)) ids.push(x.doc); })); return ids; };
+  ST.syncConvSubjects = (c) => { c.subjects = ST.subjectsOfDocs(ST.convDocs(c)); };
   ST.docTitle = (id) => { const d = ST.doc(id); return d ? d.title : ''; };
+  ST.resetData();
 
   ST.setTheme = (t) => {
     ST.S.theme = t;
@@ -242,36 +260,45 @@
   ];
   ST.NAV_LATER = { map: { label: 'Research map', icon: 'map', after: 'library', href: '#/r2-map' }, quizzes: { label: 'Quizzes', icon: 'quiz', after: 'notes', href: '#/r3-quizzes-list' }, reports: { label: 'Reports', icon: 'report', after: 'quizzes', href: '#/r3-reports' } };
 
+  /* M3: 208px nav, 32px items in hairline-separated groups, collapsible to a 56px icon rail (names in tooltips). */
+  ST.NAV_GROUPS = [['library', 'chat'], ['conversations', 'notes'], ['subjects', 'usage']];
   ST.shell = ({ nav = '', content = '', currentConv = null }) => {
     const S = ST.S;
     const n = ST.needsAction();
     const later = S.release || 0; // 2 shows the map, 3 shows the learning loop (wireframes only)
-    const item = (it, id) => `<li><a class="nav-link" href="${it.href}" ${nav === id ? 'aria-current="page"' : ''}>${ST.ic(it.icon)}<span>${it.label}</span>${
-      id === 'library' && n ? `<span class="nav-count" aria-label="${ST.plural(n, 'document')} need${n === 1 ? 's' : ''} your action">${n}</span>` : ''}${
-      id === 'chat' ? '<span class="vh">: start a new conversation</span>' : ''}${
-      ['map', 'quizzes', 'reports'].includes(id) ? `<span class="nav-tag">R${id === 'map' ? 2 : 3}</span>` : ''}</a></li>`;
-    let items = '';
-    ST.NAV.forEach((it) => {
-      items += item(it, it.id);
-      if (it.id === 'library' && later >= 2) items += item(ST.NAV_LATER.map, 'map');
-      if (it.id === 'notes' && later >= 3) items += item(ST.NAV_LATER.quizzes, 'quizzes') + item(ST.NAV_LATER.reports, 'reports');
-    });
-    const recent = S.convs.filter((c) => !c.archived).sort((a, b) => b.last.localeCompare(a.last)).slice(0, 4);
-    return `<div class="app">
-      <nav class="sidenav" aria-label="Main">
-        <a class="brand" href="#/library-default" aria-label="Smart Tutor, Library">${ST.logo()}<span class="word">Smart Tutor</span></a>
-        <ul class="nav-list">${items}</ul>
-        ${recent.length ? `<p class="nav-section" id="recent-h">Recent conversations</p>
-        <ul class="nav-list recent" aria-labelledby="recent-h">${recent.map((c) => `<li><a class="od-truncate" href="#/open/${c.id}" ${currentConv === c.id ? 'aria-current="page"' : ''}>${ST.esc(c.title)}</a></li>`).join('')}</ul>` : ''}
+    const rail = !!S.navCollapsed;
+    const byId = (id) => ST.NAV.find((x) => x.id === id) || ST.NAV_LATER[id];
+    const item = (id) => {
+      const it = byId(id);
+      const label = it.label + (id === 'chat' ? ', start a new conversation' : '');
+      return `<li><a class="nav-link ${S.tipDemo === id ? 'tip-demo' : ''}" href="${it.href}" ${nav === id ? 'aria-current="page"' : ''} ${rail ? `data-tip="${it.label}" aria-label="${label}${id === 'library' && n ? `, ${n} need your action` : ''}"` : ''} data-od-id="nav-${id}">${ST.ic(it.icon)}<span class="nl-text">${it.label}</span>${
+        id === 'library' && n ? `<span class="nav-count" ${rail ? 'aria-hidden="true"' : `aria-label="${ST.plural(n, 'document')} need${n === 1 ? 's' : ''} your action"`}>${n}</span>` : ''}${
+        id === 'chat' && !rail ? '<span class="vh">: start a new conversation</span>' : ''}${
+        ['map', 'quizzes', 'reports'].includes(id) ? `<span class="nav-tag">R${id === 'map' ? 2 : 3}</span>` : ''}</a>${id === 'conversations' && !rail ? recentList() : ''}</li>`;
+    };
+    const recentList = () => {
+      const recent = S.convs.filter((c) => !c.archived).sort((a, b) => b.last.localeCompare(a.last)).slice(0, 3);
+      return recent.length ? `<ul class="nav-sub" aria-label="Recent conversations">${recent.map((c) => `<li><a class="od-truncate" href="#/open/${c.id}" title="${ST.esc(c.title)}" ${currentConv === c.id ? 'aria-current="page"' : ''}>${ST.esc(c.title)}</a></li>`).join('')}</ul>` : '';
+    };
+    const groups = ST.NAV_GROUPS.map((g) => {
+      const ids = [];
+      g.forEach((id) => { ids.push(id); if (id === 'library' && later >= 2) ids.push('map'); if (id === 'notes' && later >= 3) ids.push('quizzes', 'reports'); });
+      return `<ul class="nav-list">${ids.map(item).join('')}</ul>`;
+    }).join('<hr class="nav-hr">');
+    return `<div class="app ${rail ? 'nav-collapsed' : ''}">
+      <nav class="sidenav" aria-label="Main" data-od-id="side-nav">
+        <a class="brand" href="#/library-default" aria-label="Smart Tutor, Library" ${rail ? 'data-tip="Smart Tutor"' : ''}>${ST.logo()}<span class="word">Smart Tutor</span></a>
+        ${groups}
         <div class="nav-foot">
+          <button class="nav-collapse" type="button" data-action="nav-collapse" aria-expanded="${!rail}" aria-label="${rail ? 'Expand navigation' : 'Collapse navigation'}" data-tip="${rail ? 'Expand navigation' : 'Collapse navigation'}" data-od-id="nav-collapse">${ST.ic(rail ? 'chevronRight' : 'chevronLeft', 'sm')}</button>
           ${S.userMenu ? `<div class="user-menu" id="user-menu">
             <div class="um-head od-stack" style="--od-gap:0"><strong>${ST.esc(ST.USER.name)}</strong><span class="small muted od-truncate">${ST.esc(ST.USER.email)}</span></div>
             <button class="menu-item" type="button" data-action="theme-toggle">${ST.ic(S.theme === 'dark' ? 'sun' : 'moon')}${S.theme === 'dark' ? 'Light theme' : 'Dark theme'}</button>
             <button class="menu-item" type="button" data-action="sign-out">${ST.ic('logout')}Sign out</button>
           </div>` : ''}
-          <button class="user-btn" type="button" data-action="user-menu" data-fk="user-btn" aria-expanded="${S.userMenu}" aria-controls="user-menu">
+          <button class="user-btn" type="button" data-action="user-menu" data-fk="user-btn" aria-expanded="${S.userMenu}" aria-controls="user-menu" ${rail ? `aria-label="${ST.esc(ST.USER.name)}, account menu" data-tip="${ST.esc(ST.USER.name)}"` : ''} data-od-id="user-menu-button">
             <span class="avatar" aria-hidden="true">${ST.USER.initials}</span>
-            <span class="od-fill od-stack" style="--od-gap:0"><span class="small" style="font-weight:600">${ST.esc(ST.USER.name)}</span><span class="xsmall muted">PhD student</span></span>
+            <span class="ub-name od-truncate">${ST.esc(ST.USER.name)}</span>
             ${ST.ic(S.userMenu ? 'chevronDown' : 'chevronUp', 'sm')}
           </button>
         </div>
@@ -279,6 +306,14 @@
       <main class="main" id="main-content" tabindex="-1">${content}</main>
     </div>`;
   };
+  ST.actions = ST.actions || {};
+  ST.actions['nav-collapse'] = () => { ST.S.navCollapsed = !ST.S.navCollapsed; ST.S.tipDemo = null; ST.ls.set('st9_nav', ST.S.navCollapsed ? 'collapsed' : 'open'); ST.render(); const b = document.querySelector('[data-action="nav-collapse"]'); if (b) b.focus(); };
+
+  /* M4: one 40px page header row: h1, a short count, an info button whose tooltip holds the longer description, the action. */
+  ST.pageHead = ({ title, count = '', info = '', action = '', id = '' }) => `<div class="page-head" data-od-id="page-header">
+      <h1 ${id ? `id="${id}" tabindex="-1"` : ''}>${title}</h1>${count ? `<span class="ph-count">${count}</span>` : ''}
+      ${info ? `<button class="info-btn" type="button" aria-label="About this page: ${ST.esc(info)}" data-tip="${ST.esc(info)}">${ST.ic('info', 'sm')}</button>` : ''}
+      <span class="od-fill"></span>${action}</div>`;
 
   /* ---------- upload tray (global, non-blocking) ---------- */
   ST.renderTray = () => {
@@ -306,7 +341,7 @@
     return `<li class="tray-item ${cls}"><span class="ti-icon">${ST.ic(icon)}</span><div class="od-stack" style="--od-gap:0">
       <span class="ti-name od-truncate">${ST.esc(t.name)}</span><span class="ti-status">${status}</span>${bar}${actions ? `<div class="ti-actions">${actions}</div>` : ''}</div></li>`;
   }
-  ST.actions = {};
+  ST.actions = ST.actions || {};
   Object.assign(ST.actions, {
     'tray-toggle': () => { ST.S.trayCollapsed = !ST.S.trayCollapsed; ST.renderTray(); const b = document.querySelector('[data-action="tray-toggle"]'); if (b) b.focus(); },
     'tray-close': () => { ST.S.tray = []; ST.renderTray(); const m = document.getElementById('main-content'); if (m) m.focus(); }
@@ -331,15 +366,18 @@
     const el = e.target.closest('[data-action]');
     const S = ST.S;
     if (S.rowMenu && !e.target.closest('.row-menu-wrap')) { S.rowMenu = null; if (!el) ST.render(); }
+    if (S.chatMenu && !e.target.closest('.th-more')) { S.chatMenu = false; if (!el) ST.render(); }
     if (el && ST.actions[el.dataset.action] && !el.disabled && el.getAttribute('aria-disabled') !== 'true') { ST.actions[el.dataset.action](el, e); return; }
     if (S.userMenu && !e.target.closest('.nav-foot')) { S.userMenu = false; ST.render(); }
   });
+  document.addEventListener('toggle', (e) => { const d = e.target; if (d && d.dataset && d.dataset.pop === 'date' && ST.L) ST.L.datePop = d.open; }, true);
   document.addEventListener('change', (e) => { const el = e.target.closest('[data-change]'); if (el && ST.actions[el.dataset.change]) ST.actions[el.dataset.change](el, e); });
   document.addEventListener('input', (e) => { const el = e.target.closest('[data-input]'); if (el && ST.actions[el.dataset.input]) ST.actions[el.dataset.input](el, e); });
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (ST.S.userMenu) { ST.S.userMenu = false; ST.render(); const b = document.querySelector('[data-fk="user-btn"]'); if (b) b.focus(); }
     if (ST.S.rowMenu) { const id = ST.S.rowMenu; ST.S.rowMenu = null; ST.render(); const b = document.querySelector(`[data-fk="more-${id}"]`); if (b) b.focus(); }
+    if (ST.S.chatMenu) { ST.S.chatMenu = false; ST.render(); const b = document.querySelector('[data-fk="chat-menu"]'); if (b) b.focus(); }
   });
   Object.assign(ST.actions, {
     'user-menu': () => { ST.S.userMenu = !ST.S.userMenu; ST.render(); if (ST.S.userMenu) { const m = document.querySelector('#user-menu .menu-item'); if (m) m.focus(); } },
@@ -375,7 +413,7 @@
     closeDrawer(false);
     const st = ST.resolve(location.hash);
     ST.current = st;
-    Object.assign(ST.S, { userMenu: false, rowMenu: null, release: 0 });
+    Object.assign(ST.S, { userMenu: false, rowMenu: null, chatMenu: false, release: 0 });
     ST.emptyDemo = false; ST.noTray = false;
     if (st.setup) st.setup();
     ST.mount(st.view(), { navigated: true });

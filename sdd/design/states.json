@@ -3,7 +3,7 @@
     "id": "index",
     "group": "Overview",
     "ref": "§5 · review flows",
-    "desc": "Round 6 overview: what changed in v0.7, the four review flows and every state.",
+    "desc": "Round 10 overview: what changed in v0.10 (chat in two panes, documents beside the conversation), the four review flows and every state.",
     "release": 1,
     "stories": []
   },
@@ -45,6 +45,16 @@
     "release": 1,
     "stories": [
       "US-1"
+    ]
+  },
+  {
+    "id": "shell-nav-collapsed",
+    "group": "App shell",
+    "ref": "§6.1 · US-13",
+    "desc": "Navigation collapsed to the 56px icon rail; names show as tooltips on hover and focus (here: Chat). The choice is remembered.",
+    "release": 1,
+    "stories": [
+      "US-13"
     ]
   },
   {
@@ -101,7 +111,7 @@
     "id": "library-first-choose",
     "group": "Library",
     "ref": "§6.3 · US-2",
-    "desc": "Processing finished: highlighted rows, “Choose subjects” and “3 documents need subjects”.",
+    "desc": "Processing finished: highlighted rows, “Choose subjects”, and the toolbar chip “3 need subjects” (no banner, M10).",
     "release": 1,
     "stories": [
       "US-2"
@@ -202,6 +212,36 @@
     "group": "Library",
     "ref": "§6.3 · US-10",
     "desc": "Filtered by subject (matches any of a document's subjects).",
+    "release": 1,
+    "stories": [
+      "US-10"
+    ]
+  },
+  {
+    "id": "library-more-menu",
+    "group": "Library",
+    "ref": "§6.3 · US-10c",
+    "desc": "“More” menu of a ready row: Details, Change subjects, Edit title, Archive, Delete (K4); ready rows show “Chat” and the title opens the viewer (P7). A processing row offers no Delete.",
+    "release": 1,
+    "stories": [
+      "US-10"
+    ]
+  },
+  {
+    "id": "library-delete-confirm",
+    "group": "Library",
+    "ref": "§6.3 · US-10c",
+    "desc": "Delete confirmation: Cancel focused, Delete in danger style, “Archive instead” under the warning. The same dialog opens from details.",
+    "release": 1,
+    "stories": [
+      "US-10"
+    ]
+  },
+  {
+    "id": "library-deleted",
+    "group": "Library",
+    "ref": "§6.3 · US-10c",
+    "desc": "Deleted: the row is gone and “Chain-of-Thought Prompting… deleted.” confirms it. No undo.",
     "release": 1,
     "stories": [
       "US-10"
@@ -321,7 +361,7 @@
     "id": "details-ready",
     "group": "Document details",
     "ref": "§6.5 · US-10",
-    "desc": "Ready document: facts, summary, subjects, Archive. No download, no delete.",
+    "desc": "Ready document: facts, summary, subjects; Open (viewer), Ask about this, Archive and Delete. No download.",
     "release": 1,
     "stories": [
       "US-10"
@@ -341,7 +381,7 @@
     "id": "details-processing",
     "group": "Document details",
     "ref": "§6.5 · US-10",
-    "desc": "Processing a 424-page book: up to 15 minutes; subjects can be chosen when processing finishes.",
+    "desc": "Processing a 424-page book: up to 15 minutes; no Open and no Delete while processing.",
     "release": 1,
     "stories": [
       "US-10"
@@ -361,7 +401,7 @@
     "id": "details-archived",
     "group": "Document details",
     "ref": "§6.5 · US-10",
-    "desc": "Archived document with Restore (J4); no “Change subjects” until it is restored (E7).",
+    "desc": "Archived document (J4): Restore, Open read-only and Delete; no “Change subjects” until it is restored (E7).",
     "release": 1,
     "stories": [
       "US-10"
@@ -371,10 +411,20 @@
     "id": "chat-new",
     "group": "Chat",
     "ref": "§6.6 · US-3",
-    "desc": "Live chat: a new conversation (where navigation lands).",
+    "desc": "New conversation: placeholder and optional example questions; no subjects (K1). Where navigation lands.",
     "release": 1,
     "stories": [
       "US-3"
+    ]
+  },
+  {
+    "id": "chat-new-from-document",
+    "group": "Chat",
+    "ref": "§6.6 · US-4c",
+    "desc": "New conversation started from ReAct… (“Ask about this”): listed in the panel as added, composer focused, “Only search these documents” off.",
+    "release": 1,
+    "stories": [
+      "US-4"
     ]
   },
   {
@@ -382,16 +432,6 @@
     "group": "Chat",
     "ref": "§6.6 · US-3",
     "desc": "No documents yet: chat is replaced by “Upload a document first”.",
-    "release": 1,
-    "stories": [
-      "US-3"
-    ]
-  },
-  {
-    "id": "chat-new-conversation",
-    "group": "Chat",
-    "ref": "§6.6 · US-3",
-    "desc": "New conversation: “Your subjects”, optional example questions, no subject picker.",
     "release": 1,
     "stories": [
       "US-3"
@@ -418,40 +458,10 @@
     ]
   },
   {
-    "id": "chat-subjects-detected",
-    "group": "Chat",
-    "ref": "§6.6 · US-3",
-    "desc": "Subjects detected: one chip in the header, cited answer with a quoted passage.",
-    "release": 1,
-    "stories": [
-      "US-3"
-    ]
-  },
-  {
-    "id": "chat-subjects-detected-multi",
-    "group": "Chat",
-    "ref": "§6.6 · US-3",
-    "desc": "First question covering two subjects: two chips.",
-    "release": 1,
-    "stories": [
-      "US-3"
-    ]
-  },
-  {
-    "id": "chat-detection-unsure",
-    "group": "Chat",
-    "ref": "§6.6 · US-3",
-    "desc": "Detection unsure: pick 1–3 subjects, then Continue; the question stays.",
-    "release": 1,
-    "stories": [
-      "US-3"
-    ]
-  },
-  {
     "id": "chat-answer-citations",
     "group": "Chat",
     "ref": "§6.6 · US-4",
-    "desc": "Answer with citations (one to an archived document shows “Archived”), and labelled “Helpful” / “Not helpful” thumbs.",
+    "desc": "Answers with citations; the follow-up is answered from another document (one archived, “Archived”). No subject chips; citations open the viewer.",
     "release": 1,
     "stories": [
       "US-4"
@@ -478,60 +488,100 @@
     ]
   },
   {
-    "id": "chat-citation-opens-details",
+    "id": "chat-documents-used",
     "group": "Chat",
-    "ref": "§6.6 · US-10",
-    "desc": "Clicking a citation opens the document details at the cited page.",
+    "ref": "§6.6 · US-4b",
+    "desc": "Conversation panel, Documents used (3): ReAct, Retrieval-Augmented Generation and PPO, in order of first use; one click opens a document beside the conversation.",
+    "release": 1,
+    "stories": [
+      "US-4b"
+    ]
+  },
+  {
+    "id": "chat-documents-used-empty",
+    "group": "Chat",
+    "ref": "§6.6 · US-4b",
+    "desc": "Conversation panel before the first answer: “Documents used to answer will appear here.”",
+    "release": 1,
+    "stories": [
+      "US-4b"
+    ]
+  },
+  {
+    "id": "chat-documents-add",
+    "group": "Chat",
+    "ref": "§6.6 · US-4c",
+    "desc": "Add documents: the picker with search, the learner's ready documents, listed ones checked and disabled, one selected, “Add”.",
+    "release": 1,
+    "stories": [
+      "US-4"
+    ]
+  },
+  {
+    "id": "chat-scope-limited",
+    "group": "Chat",
+    "ref": "§6.6 · US-4c",
+    "desc": "“Only search these documents” on: three documents listed and “Searching 3 documents · Change” above the composer.",
+    "release": 1,
+    "stories": [
+      "US-4"
+    ]
+  },
+  {
+    "id": "chat-decline-limited",
+    "group": "Chat",
+    "ref": "§6.6 · US-4c",
+    "desc": "A decline with the switch on: “These documents don't cover this.” with “Add documents” and “Search all my documents”.",
+    "release": 1,
+    "stories": [
+      "US-4"
+    ]
+  },
+  {
+    "id": "chat-title-editing",
+    "group": "Chat",
+    "ref": "§6.6 · US-13",
+    "desc": "Editing the conversation title inline: the field is open with the title selected (Enter or clicking away saves, Esc cancels, 1–120 characters).",
+    "release": 1,
+    "stories": [
+      "US-13"
+    ]
+  },
+  {
+    "id": "chat-panel-collapsed",
+    "group": "Chat",
+    "ref": "§6.6 · US-4b",
+    "desc": "Conversation panel collapsed with the header toggle: the conversation takes the full width (the choice is remembered).",
+    "release": 1,
+    "stories": [
+      "US-4b"
+    ]
+  },
+  {
+    "id": "chat-documents-used-deleted",
+    "group": "Chat",
+    "ref": "§6.6 · US-4b",
+    "desc": "Conversation panel: a deleted document stays listed as “Deleted”, can't be opened; “Deleted documents can't be opened.”",
+    "release": 1,
+    "stories": [
+      "US-4b"
+    ]
+  },
+  {
+    "id": "chat-citation-deleted",
+    "group": "Chat",
+    "ref": "§6.6 · US-10c",
+    "desc": "A citation to a deleted document reads “Deleted document”, with no link.",
     "release": 1,
     "stories": [
       "US-10"
     ]
   },
   {
-    "id": "chat-subject-added",
-    "group": "Chat",
-    "ref": "§6.6 · US-3b",
-    "desc": "Subject added: inline notice, new chip highlighted in the header.",
-    "release": 1,
-    "stories": [
-      "US-3b"
-    ]
-  },
-  {
-    "id": "chat-maximum-reached",
-    "group": "Chat",
-    "ref": "§6.6 · US-3b",
-    "desc": "Maximum reached: the third subject is added and the learner is told.",
-    "release": 1,
-    "stories": [
-      "US-3b"
-    ]
-  },
-  {
-    "id": "chat-fourth-subject-refused",
-    "group": "Chat",
-    "ref": "§6.6 · US-3b",
-    "desc": "Fourth subject refused: no answer; “A new conversation will answer it straight away.”",
-    "release": 1,
-    "stories": [
-      "US-3b"
-    ]
-  },
-  {
-    "id": "chat-new-from-refused",
-    "group": "Chat",
-    "ref": "§6.6 · US-3b",
-    "desc": "The carried question was sent right away; the new conversation answers it (Reinforcement Learning).",
-    "release": 1,
-    "stories": [
-      "US-3b"
-    ]
-  },
-  {
     "id": "chat-decline",
     "group": "Chat",
     "ref": "§6.6 · US-5",
-    "desc": "Decline, no subject fits: a document on the topic is needed to continue; “Upload a document” is the only action.",
+    "desc": "Decline: a document on the topic is needed to continue; “Upload a document” is the only action. Adds nothing to Documents used.",
     "release": 1,
     "stories": [
       "US-5"
@@ -541,7 +591,7 @@
     "id": "chat-no-active-documents",
     "group": "Chat",
     "ref": "§6.6 · US-10",
-    "desc": "No active documents in these subjects: history readable, input disabled.",
+    "desc": "No active documents: all documents archived; history stays readable and a new question gets “Upload”.",
     "release": 1,
     "stories": [
       "US-10"
@@ -561,7 +611,7 @@
     "id": "chat-summarize-done",
     "group": "Chat",
     "ref": "§6.6 · US-7",
-    "desc": "Note saved: confirmation with a link; the header now links the note.",
+    "desc": "Note saved: confirmation in the conversation; the panel's Lesson Note links the note.",
     "release": 1,
     "stories": [
       "US-7"
@@ -571,7 +621,7 @@
     "id": "chat-update-note",
     "group": "Chat",
     "ref": "§6.6 · US-7",
-    "desc": "A note exists and wasn't edited: “Update lesson note” replaces it directly.",
+    "desc": "A note exists and wasn't edited: the panel offers “Open note” and “Update lesson note”, which replaces it directly.",
     "release": 1,
     "stories": [
       "US-7"
@@ -631,17 +681,87 @@
     "id": "chat-first-answer",
     "group": "Chat",
     "ref": "§6.6 · US-4",
-    "desc": "J1 ends here: the first cited answer from freshly uploaded papers.",
+    "desc": "J1 ends here: the first cited answer from freshly uploaded papers; no subjects to choose.",
     "release": 1,
     "stories": [
       "US-4"
     ]
   },
   {
+    "id": "viewer-document",
+    "group": "Document viewer",
+    "ref": "§6.12 · US-4b",
+    "desc": "Split view from the panel: ReAct… opens beside the conversation at page 1, no highlight; panel collapsed, nav on its rail.",
+    "release": 1,
+    "stories": [
+      "US-4b"
+    ]
+  },
+  {
+    "id": "viewer-citation-highlight",
+    "group": "Document viewer",
+    "ref": "§6.12 · US-4b",
+    "desc": "Split view from the chip “ReAct · p. 3”: page 3 beside the conversation, passage highlighted, the chip stays highlighted.",
+    "release": 1,
+    "stories": [
+      "US-4b"
+    ]
+  },
+  {
+    "id": "viewer-no-highlight",
+    "group": "Document viewer",
+    "ref": "§6.12 · US-4b",
+    "desc": "Split view: the cited page with “Couldn't highlight the passage on this page.” inside the pane.",
+    "release": 1,
+    "stories": [
+      "US-4b"
+    ]
+  },
+  {
+    "id": "viewer-archived",
+    "group": "Document viewer",
+    "ref": "§6.12 · US-4b",
+    "desc": "Outside chat the viewer stays the overlay: an archived document opened from the Library (details → Open), read-only with “Archived” and “Restore”.",
+    "release": 1,
+    "stories": [
+      "US-4b"
+    ]
+  },
+  {
+    "id": "viewer-dialog",
+    "group": "Document viewer",
+    "ref": "§6.12 · US-4b",
+    "desc": "Open in dialog from the pane: the same document, page 3 and highlight in the large overlay, with a details strip (authors, year, pages, subjects); Close returns to the split view.",
+    "release": 1,
+    "stories": [
+      "US-4b"
+    ]
+  },
+  {
+    "id": "viewer-loading",
+    "group": "Document viewer",
+    "ref": "§6.12 · US-4b",
+    "desc": "Split view loading: page skeleton inside the pane while the cited page loads first.",
+    "release": 1,
+    "stories": [
+      "US-4b"
+    ]
+  },
+  {
+    "id": "viewer-error",
+    "group": "Document viewer",
+    "ref": "§6.12 · US-4b",
+    "desc": "Split view error: “We couldn't open this document.” with Retry inside the pane.",
+    "release": 1,
+    "stories": [
+      "US-4b"
+    ]
+  },
+  {
     "id": "conversations-active",
     "group": "Conversations",
     "ref": "§6.7 · US-13",
-    "desc": "Live list: subject chips (up to 3), last activity, note indicator.",
+    "desc": "Live list: subject chips of the documents used, number of documents used, last activity, note indicator.",
     "release": 1,
     "stories": [
       "US-13"
@@ -661,7 +781,7 @@
     "id": "conversations-filtered",
     "group": "Conversations",
     "ref": "§6.7 · US-13",
-    "desc": "Subject filter matches any of a conversation's subjects.",
+    "desc": "Subject filter matches any subject of a conversation's documents used; Chain-of-Thought Prompting… is deleted, so its subjects no longer count (L1).",
     "release": 1,
     "stories": [
       "US-13"

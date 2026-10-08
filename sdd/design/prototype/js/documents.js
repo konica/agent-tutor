@@ -1,4 +1,4 @@
-/* Smart Tutor v0.7 — documents: sign-in theme, shared list pattern, Library, uploads,
+/* Smart Tutor v0.9 — documents: sign-in theme, shared list pattern, Library, uploads,
    subject picker (§6.4), document details (§6.5), Subjects (§6.9). */
 (function () {
   const ST = window.ST;
@@ -50,17 +50,48 @@
      Shared list pattern (Library, Conversations, Notes)
      ========================================================= */
   ST.L = {};
-  ST.resetList = (o = {}) => { ST.L = Object.assign({ tab: 'active', from: '', to: '', subject: 'all', state: 'all' }, o); };
+  ST.resetList = (o = {}) => { ST.L = Object.assign({ tab: 'active', from: '', to: '', subject: 'all', state: 'all', q: '', sort: 'new', datePop: false }, o); };
   ST.resetList();
-  ST.hasFilters = () => !!(ST.L.from || ST.L.to || ST.L.subject !== 'all' || ST.L.state !== 'all');
+  ST.hasFilters = () => !!(ST.L.from || ST.L.to || ST.L.subject !== 'all' || ST.L.state !== 'all' || ST.L.q);
   ST.applyFilters = (items, dateKey) => items.filter((it) => {
     const d = it[dateKey].slice(0, 10);
     if (ST.L.from && d < ST.L.from) return false;
     if (ST.L.to && d > ST.L.to) return false;
     if (ST.L.subject !== 'all' && !it.subjects.includes(ST.L.subject)) return false;
     if (ST.L.state !== 'all' && it.state !== undefined && it.state !== ST.L.state) return false;
+    if (ST.L.q && !it.title.toLowerCase().includes(ST.L.q.toLowerCase())) return false;
     return true;
-  });
+  }).sort((a, b) => (ST.L.sort === 'old' ? 1 : -1) * a[dateKey].localeCompare(b[dateKey]));
+
+  /* M4: one 36px toolbar row: tabs with inline counts, unlabelled filters (dates in one popover), a status chip, the count. */
+  const fmtShort = (iso) => ST.fmtLong(iso).replace(/ 2026$/, '');
+  ST.toolbar = ({ counts, count, noun, subjects, states = false, chip = null, search = false, sort = false, dateLabel = 'Date' }) => {
+    const dateOn = ST.L.from || ST.L.to;
+    const dateText = dateOn ? `${dateLabel}: ${ST.L.from ? fmtShort(ST.L.from) : '…'} – ${ST.L.to ? fmtShort(ST.L.to) : '…'}` : dateLabel;
+    return `<div class="toolbar" data-od-id="toolbar">
+      ${ST.tabsHtml(counts)}
+      <div class="tb-filters" role="search" aria-label="Filter ${noun}s">
+        ${search ? `<input class="input tb-search" type="search" placeholder="Search titles" aria-label="Search ${noun} titles" value="${esc(ST.L.q)}" data-input="f-q" data-fk="f-q">` : ''}
+        <select class="select tb-sel" id="f-subj" aria-label="Subject" data-change="f-subj" data-fk="f-subj">
+          <option value="all" ${ST.L.subject === 'all' ? 'selected' : ''}>All subjects</option>
+          ${subjects.map((x) => `<option value="${esc(x)}" ${ST.L.subject === x ? 'selected' : ''}>${esc(ST.sname(x))}</option>`).join('')}
+        </select>
+        <details class="tb-pop" ${ST.L.datePop ? 'open' : ''} data-pop="date"><summary class="tb-btn ${dateOn ? 'on' : ''}" data-fk="f-date">${ic('clock', 'sm')}${esc(dateText)}${ic('chevronDown', 'sm')}</summary>
+          <div class="pop" role="group" aria-label="${dateLabel} between">
+            <label class="pop-field">From<input class="input" type="date" id="f-from" value="${ST.L.from}" max="${ST.TODAY}" data-change="f-from" data-fk="f-from"></label>
+            <label class="pop-field">To<input class="input" type="date" id="f-to" value="${ST.L.to}" max="${ST.TODAY}" data-change="f-to" data-fk="f-to"></label>
+          </div></details>
+        ${states ? `<select class="select tb-sel" id="f-state" aria-label="State" data-change="f-state" data-fk="f-state">
+          ${[['all', 'All states'], ['processing', 'Processing'], ['choose', 'Needs subjects'], ['ready', 'Ready'], ['failed', 'Failed']].map(([v, l]) => `<option value="${v}" ${ST.L.state === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` : ''}
+        ${sort ? `<select class="select tb-sel" aria-label="Sort" data-change="f-sort" data-fk="f-sort"><option value="new" ${ST.L.sort === 'new' ? 'selected' : ''}>Newest first</option><option value="old" ${ST.L.sort === 'old' ? 'selected' : ''}>Oldest first</option></select>` : ''}
+        ${chip ? `<button class="status-chip" type="button" aria-pressed="${ST.L.state === chip.state}" data-action="f-chip" data-state="${chip.state}" data-fk="f-chip" data-od-id="toolbar-status-chip">${ic('tag', 'sm')}${esc(chip.label)}</button>` : ''}
+        ${ST.hasFilters() ? `<button class="btn btn-ghost btn-sm" type="button" data-action="f-clear" data-fk="f-clear">${ic('x', 'sm')}Clear filters</button>` : ''}
+      </div>
+      <span class="tb-count" aria-live="polite">${ST.plural(count, noun)}</span>
+    </div>`;
+  };
+  /* M4: an inline notice is one 32px row; only errors and blocking states use a full banner. */
+  ST.notice = ({ tone = 'info', icon = 'info', html, action = '', id = '' }) => `<div class="notice-row nr-${tone}" role="status" ${id ? `data-od-id="${id}"` : ''}>${ic(icon, 'sm')}<span class="nr-text">${html}</span>${action}</div>`;
   ST.filterBar = ({ count, noun, subjects, states }) => `<div class="filter-bar" role="search" aria-label="Filter ${noun}s">
     <div class="field"><label for="f-subj">Subject</label>
       <select class="select" id="f-subj" data-change="f-subj" data-fk="f-subj">
@@ -86,7 +117,10 @@
     'f-to': (el) => { ST.L.to = el.value; ST.render(); },
     'f-subj': (el) => { ST.L.subject = el.value; ST.render(); },
     'f-state': (el) => { ST.L.state = el.value; ST.render(); },
-    'f-clear': () => { Object.assign(ST.L, { from: '', to: '', subject: 'all', state: 'all' }); ST.render(); const f = document.getElementById('f-subj'); if (f) f.focus(); },
+    'f-clear': () => { Object.assign(ST.L, { from: '', to: '', subject: 'all', state: 'all', q: '' }); ST.render(); const f = document.getElementById('f-subj'); if (f) f.focus(); },
+    'f-q': (el) => { ST.L.q = el.value; ST.render(); },
+    'f-sort': (el) => { ST.L.sort = el.value; ST.render(); },
+    'f-chip': (el) => { ST.L.state = ST.L.state === el.dataset.state ? 'all' : el.dataset.state; ST.L.tab = 'active'; ST.render(); },
     tab: (el) => { ST.L.tab = el.dataset.tab; if (el.dataset.tab === 'archived') ST.L.state = 'all'; ST.render(); }
   });
   document.addEventListener('keydown', (e) => {
@@ -109,7 +143,7 @@
       ready: ['state-ready', ic('check'), 'Ready', ''],
       failed: ['state-failed', ic('alert'), 'Failed', d.attempts >= 3 ? 'This file could not be processed' : d.failReason]
     }[d.state];
-    return `<span class="state ${m[0]}">${m[1]}${m[2]}</span>${withHint && m[3] ? `<span class="state-hint ${d.state === 'failed' ? 'err' : ''}">${esc(m[3])}</span>` : ''}`;
+    return `<span class="state ${m[0]}">${m[1]}${m[2]}</span>${withHint && m[3] ? `<span class="state-hint ${d.state === 'failed' ? 'err' : ''}" title="${esc(m[3])}">${esc(m[3])}</span>` : ''}`;
   };
   const docMeta = (d) => d.titlePending ? `${esc(d.file)} · Reading the first pages…` : d.book ? `${esc(d.authors)} · Book` : d.authors ? `${esc(d.authors)}${d.year ? ' · ' + d.year : ''}` : `${esc(d.file)} · ${d.size}`;
 
@@ -117,16 +151,16 @@
      §6.3 Library
      ========================================================= */
   ST.libraryView = () => {
-    const all = ST.emptyDemo ? [] : S.docs;
+    const all = ST.emptyDemo ? [] : S.docs.filter((d) => !d.deleted); // K4: a deleted document leaves the Library
     const counts = { active: all.filter((d) => !d.archived).length, archived: all.filter((d) => d.archived).length };
     const inTab = all.filter((d) => (ST.L.tab === 'archived') === d.archived);
-    const rows = ST.applyFilters(inTab, 'uploaded').sort((a, b) => b.uploaded.localeCompare(a.uploaded));
+    const rows = ST.applyFilters(inTab, 'uploaded');
     const choose = all.filter((d) => !d.archived && d.state === 'choose');
     const processingFirst = S.convs.length ? [] : all.filter((d) => !d.archived && ['uploading', 'processing'].includes(d.state));
     const subjOpts = [];
     all.forEach((d) => d.subjects.forEach((s) => { if (!subjOpts.includes(s)) subjOpts.push(s); }));
     const uploadBtn = `<button class="btn btn-primary" type="button" data-action="upload" data-fk="upload-btn" ${S.uploadLimit ? 'disabled aria-describedby="limit-msg upload-rights"' : 'aria-describedby="upload-rights"'}>${ic('upload', 'sm')}Upload</button>`;
-    const limit = S.uploadLimit ? `<div class="banner banner-warn" style="margin-bottom:16px" id="limit-msg">${ic('clock')}<div class="b-body"><strong>Upload limit reached.</strong><span>You can upload up to 20 files per hour and 100 per day. You can upload again at 11:40 (${ST.TZ.short}).</span><span class="b-variant">If it's the daily limit (100 per day): You can upload again at 00:00 (${ST.TZ.short}).</span></div></div>` : '';
+    const limit = S.uploadLimit ? `<div class="banner banner-warn" id="limit-msg">${ic('clock')}<div class="b-body"><strong>Upload limit reached.</strong><span>You can upload up to 20 files per hour and 100 per day. You can upload again at 11:40 (${ST.TZ.short}).</span><span class="b-variant">If it's the daily limit (100 per day): You can upload again at 00:00 (${ST.TZ.short}).</span></div></div>` : '';
 
     let body;
     if (all.length === 0) {
@@ -142,50 +176,56 @@
       let list;
       if (rows.length === 0 && ST.hasFilters()) list = ST.emptyState({ icon: 'filter', title: 'No documents match these filters', text: 'Try another subject, state or a wider date range.', actions: `<button class="btn btn-secondary" type="button" data-action="f-clear">Clear filters</button>` });
       else if (rows.length === 0) list = ST.emptyState({ icon: 'archive', title: ST.L.tab === 'archived' ? 'No archived documents' : 'No active documents', text: ST.L.tab === 'archived' ? 'Documents you archive appear here. You can restore them at any time.' : 'Upload a PDF to start asking questions about it.', actions: ST.L.tab === 'archived' ? '' : uploadBtn });
-      else list = `<div class="list" role="table" aria-label="Documents">
+      else list = `<div class="list lib-list" role="table" aria-label="Documents">
         <div class="lib-head" role="row"><span role="columnheader">Document</span><span role="columnheader">Subjects</span><span role="columnheader">State</span><span role="columnheader">Uploaded</span><span role="columnheader"><span class="vh">Actions</span></span></div>
         ${rows.map(libRow).join('')}</div>`;
-      body = `${ST.tabsHtml(counts)}
-        ${ST.L.tab === 'archived' ? `<p class="legend-line">${ic('info', 'sm')}Archived documents aren't used for answers, but citations to them in past conversations still work. Restore a document to change its subjects.</p>` : ''}
-        ${ST.filterBar({ count: rows.length, noun: 'document', subjects: subjOpts, states: ST.L.tab === 'active' })}
+      body = `${ST.toolbar({ counts, count: rows.length, noun: 'document', subjects: subjOpts, states: ST.L.tab === 'active', dateLabel: 'Uploaded', chip: choose.length && ST.L.tab === 'active' ? { state: 'choose', label: `${choose.length} need${choose.length === 1 ? 's' : ''} subjects` } : null })}
+        ${ST.L.tab === 'archived' ? ST.notice({ html: "Archived documents aren't used for answers, but citations to them in past conversations still work. Restore a document to change its subjects." }) : ''}
         <div id="list-panel" role="tabpanel" aria-labelledby="tab-${ST.L.tab}">${list}</div>`;
     }
-    return ST.shell({ nav: 'library', content: `<div class="page" style="max-width:1200px">
-      <div class="page-head"><div><h1>Library</h1><p>Your documents. They're private to you, and the tutor answers only from them.</p></div>${all.length ? `<div class="upload-area" data-od-id="library-upload-area">${uploadBtn}<p class="upload-rights" id="upload-rights">${esc(ST.RIGHTS)}</p></div>` : ''}</div>
-      ${limit}
-      ${!S.convs.length && all.some((d) => d.state === 'ready' && !d.archived) && ST.L.tab === 'active' ? `<div class="banner banner-success" style="margin-bottom:16px" role="status">${ic('checkCircle')}<div class="b-body"><strong>Your documents are ready.</strong><span>Ask anything about them. Answers cite the document and page.</span></div>
-        <a class="btn btn-primary btn-sm" href="#/chat-new" data-fk="ask-first">${ic('message', 'sm')}Ask a question</a></div>` : ''}
-      ${processingFirst.length && !choose.length && ST.L.tab === 'active' ? `<div class="banner banner-info" style="margin-bottom:16px" role="status">${ic('clock')}<div class="b-body"><strong>Processing ${ST.plural(processingFirst.length, 'document')}</strong><span>Titles appear within about 30 seconds. Processing takes up to 5 minutes (15 for very long documents). You can choose subjects when processing finishes.</span></div></div>` : ''}
-      ${choose.length && ST.L.tab === 'active' ? `<div class="banner" style="margin-bottom:16px;background:var(--attn-soft);border-color:transparent">${ic('tag')}<div class="b-body"><strong>${ST.plural(choose.length, 'document')} need${choose.length === 1 ? 's' : ''} subjects</strong><span>Processing has finished. Accept the suggested subjects in one click, and each document is ready to use.</span></div>
-        <button class="btn btn-primary btn-sm" type="button" data-action="choose-all" data-fk="choose-all">Choose subjects</button></div>` : ''}
+    const notices = [
+      limit,
+      S.deletedNotice ? ST.notice({ tone: 'success', icon: 'checkCircle', id: 'library-deleted-confirmation', html: `<em>${esc(S.deletedNotice)}</em> deleted.`, action: `<button class="icon-btn sm" type="button" data-action="deleted-dismiss" aria-label="Dismiss" data-tip="Dismiss">${ic('x', 'sm')}</button>` }) : '',
+      !S.convs.length && all.some((d) => d.state === 'ready' && !d.archived) && ST.L.tab === 'active' ? ST.notice({ tone: 'success', icon: 'checkCircle', html: '<strong>Your documents are ready.</strong> Ask anything about them; answers cite the document and page.', action: `<a class="btn btn-primary btn-sm" href="#/chat-new" data-fk="ask-first">${ic('message', 'sm')}Ask a question</a>` }) : '',
+      processingFirst.length && !choose.length && ST.L.tab === 'active' ? ST.notice({ icon: 'clock', html: `<strong>Processing ${ST.plural(processingFirst.length, 'document')}.</strong> Titles appear within about 30 seconds; processing takes up to 5 minutes (15 for very long documents).` }) : ''
+    ].filter(Boolean).join('');
+    const action = all.length ? `<div class="upload-area" data-od-id="library-upload-area"><p class="upload-rights" id="upload-rights">${esc(ST.RIGHTS)}</p>${uploadBtn}</div>` : '';
+    return ST.shell({ nav: 'library', content: `<div class="page wide">
+      ${ST.pageHead({ title: 'Library', id: 'lib-h', count: all.length ? ST.plural(counts.active, 'active document') : '', info: "Your documents. They're private to you, and the tutor answers only from them.", action })}
+      ${notices ? `<div class="notices">${notices}</div>` : ''}
       ${body}
     </div>` });
   };
 
+  /* Subjects sized to content: at most 2 chips, then "+N" with every name in the tooltip and accessible name. */
+  const subjChips = (ids) => ids.length <= 2 ? ST.chips(ids, 'sm')
+    : `<span class="chips">${ids.slice(0, 2).map((i) => ST.schip(i, 'sm')).join('')}<span class="chip-more" title="${esc(ids.map(ST.sname).join(', '))}" aria-label="${ids.length - 2} more: ${esc(ids.slice(2).map(ST.sname).join(', '))}">+${ids.length - 2}</span></span>`;
   function libRow(d) {
     const needs = !d.archived && d.state === 'choose';
     let primary;
     if (d.archived) primary = `<button class="btn btn-secondary btn-sm" type="button" data-action="doc-restore" data-id="${d.id}" aria-label="Restore ${esc(d.title)}">${ic('restore', 'sm')}Restore</button>`;
     else if (needs) primary = `<button class="btn btn-primary btn-sm" type="button" data-action="choose-one" data-id="${d.id}" data-fk="choose-${d.id}" aria-label="Choose subjects for ${esc(d.title)}">Choose subjects</button>`;
     else if (d.state === 'failed' && (d.attempts || 0) < 3) primary = `<button class="btn btn-secondary btn-sm" type="button" data-action="doc-retry" data-id="${d.id}" data-fk="retry-${d.id}" aria-label="Retry ${esc(d.title)}">${ic('retry', 'sm')}Retry</button>`;
-    else primary = `<button class="btn btn-quiet btn-sm" type="button" data-action="open-doc" data-id="${d.id}" aria-label="Open ${esc(d.title)}">Open</button>`;
+    else if (d.state === 'ready') primary = `<button class="btn btn-secondary btn-sm" type="button" data-action="ask-about" data-id="${d.id}" data-fk="chat-${d.id}" aria-label="Chat about ${esc(d.title)}" data-od-id="row-chat-${d.id}">${ic('message', 'sm')}Chat</button>`; /* P7 */
+    else primary = ''; /* processing, uploading, failed after 3 attempts: no row action */
     const open = S.rowMenu === d.id;
     const canChange = d.subjects.length && !d.archived && d.state === 'ready'; // E7: archived → Restore first
     const menu = open ? `<div class="row-menu" role="menu" aria-label="Actions for ${esc(d.title)}">
-      <button class="menu-item" role="menuitem" type="button" data-action="open-doc" data-id="${d.id}">${ic('doc')}Open details</button>
+      <button class="menu-item" role="menuitem" type="button" data-action="open-doc" data-id="${d.id}">${ic('info')}Details</button>
       ${canChange ? `<button class="menu-item" role="menuitem" type="button" data-action="change-subjects" data-id="${d.id}">${ic('tag')}Change subjects</button>` : ''}
       ${!d.archived && d.state !== 'failed' ? `<button class="menu-item" role="menuitem" type="button" data-action="edit-title" data-id="${d.id}">${ic('pen')}Edit title</button>` : ''}
       ${d.state === 'failed' && (d.attempts || 0) < 3 && !d.archived ? `<button class="menu-item" role="menuitem" type="button" data-action="doc-retry" data-id="${d.id}">${ic('retry')}Retry</button>` : ''}
       ${d.archived ? `<button class="menu-item" role="menuitem" type="button" data-action="doc-restore" data-id="${d.id}">${ic('restore')}Restore</button>` : `<button class="menu-item" role="menuitem" type="button" data-action="doc-archive" data-id="${d.id}">${ic('archive')}Archive</button>`}
+      ${ST.canDelete(d) ? `<span class="menu-sep" role="separator"></span><button class="menu-item danger" role="menuitem" type="button" data-action="doc-delete" data-id="${d.id}" data-od-id="row-menu-delete">${ic('trash')}Delete…</button>` : ''}
     </div>` : '';
-    return `<div class="lib-row ${needs ? 'needs' : ''} ${d.archived ? 'is-archived' : ''}" role="row">
+    return `<div class="lib-row ${needs ? 'needs' : ''} ${d.archived ? 'is-archived' : ''} ${d.state === 'failed' ? 'is-failed' : ''} ${open ? 'menu-open' : ''}" role="row" data-od-id="library-row-${d.id}">
       <div class="doc-cell" role="cell"><span class="doc-icon">${ic(d.book ? 'book' : 'doc')}</span>
-        <div class="od-stack" style="--od-gap:2px"><button class="doc-title od-clamp-2" type="button" data-action="open-doc" data-id="${d.id}" data-fk="title-${d.id}">${esc(d.title)}</button><span class="doc-meta od-truncate">${docMeta(d)}</span></div></div>
-      <div role="cell">${d.subjects.length ? ST.chips(d.subjects, 'sm') : `<span class="small muted">${d.state === 'failed' ? '—' : 'Not chosen yet'}</span>`}</div>
-      <div role="cell">${ST.stateBadge(d)}</div>
-      <div class="row-meta od-nowrap" role="cell">${ST.fmtDate(d.uploaded, false)}</div>
+        <div class="od-stack" style="--od-gap:2px">${['ready', 'choose'].includes(d.state) ? `<a class="doc-title" href="#/library-default" data-action="title-view" data-id="${d.id}" data-fk="title-${d.id}" title="${esc(d.title)}" aria-label="${esc(d.title)}, open in the document viewer">${esc(d.title)}</a>` : `<button class="doc-title" type="button" data-action="open-doc" data-id="${d.id}" data-fk="title-${d.id}" title="${esc(d.title)}">${esc(d.title)}</button>`}<span class="doc-meta">${docMeta(d)}</span></div></div>
+      <div role="cell" class="subj-cell">${d.subjects.length ? ST.cellChips(d.subjects) : `<span class="nc">${d.state === 'failed' ? '—' : 'Not chosen yet'}</span>`}</div>
+      <div role="cell" class="state-cell">${ST.stateBadge(d)}</div>
+      <div class="row-meta row-date" role="cell">${ST.fmtDate(d.uploaded, false)}</div>
       <div class="row-actions" role="cell">${primary}
-        <span class="row-menu-wrap"><button class="icon-btn sm" type="button" data-action="row-more" data-id="${d.id}" data-fk="more-${d.id}" aria-haspopup="menu" aria-expanded="${open}" aria-label="More actions for ${esc(d.title)}">${ic('more')}</button>${menu}</span></div>
+        <span class="row-menu-wrap"><button class="icon-btn sm row-more" type="button" data-action="row-more" data-id="${d.id}" data-fk="more-${d.id}" aria-haspopup="menu" aria-expanded="${open}" aria-label="More actions for ${esc(d.title)}" data-tip="More">${ic('more')}</button>${menu}</span></div>
     </div>`;
   }
 
@@ -193,8 +233,9 @@
     'row-more': (el) => { const id = el.dataset.id; S.rowMenu = S.rowMenu === id ? null : id; ST.render(); const m = document.querySelector('.row-menu .menu-item'); if (m) m.focus(); },
     upload: () => { if (S.uploadLimit) return; document.getElementById('file-input').click(); },
     'open-doc': (el) => { S.rowMenu = null; ST.openDetails(el.dataset.id); },
+    'title-view': (el, e) => { if (e) e.preventDefault(); S.rowMenu = null; ST.openViewer(el.dataset.id, { page: 1, from: 'library' }); }, /* P7: the title opens the viewer overlay */
     'edit-title': (el) => { S.rowMenu = null; ST.openDetails(el.dataset.id, { editing: true }); },
-    'choose-one': (el) => ST.openPicker([el.dataset.id]),
+    'choose-one': (el) => { const id = el.dataset.id; ST.openPicker([id, ...S.docs.filter((d) => !d.archived && !d.deleted && d.state === 'choose' && d.id !== id).map((d) => d.id)]); },
     'choose-all': () => ST.openPicker(S.docs.filter((d) => !d.archived && d.state === 'choose').map((d) => d.id)),
     'change-subjects': (el) => { S.rowMenu = null; ST.openPicker([el.dataset.id], { mode: 'change' }); },
     'doc-archive': (el) => {
@@ -206,7 +247,9 @@
       S.tray.forEach((t) => { if (t.docId === d.id && t.status === 'duplicate-archived') t.status = 'duplicate'; });
       ST.render(); ST.toast(`Restored “${d.title}”.`);
     },
-    'doc-retry': (el) => { S.rowMenu = null; ST.retryDoc(ST.doc(el.dataset.id)); }
+    'doc-retry': (el) => { S.rowMenu = null; ST.retryDoc(ST.doc(el.dataset.id)); },
+    'doc-delete': (el) => { S.rowMenu = null; ST.render(); ST.confirmDelete(el.dataset.id); },
+    'deleted-dismiss': () => { S.deletedNotice = null; ST.render(); const h = document.getElementById('lib-h'); if (h) h.focus(); }
   });
 
   /* ---------- simulated upload pipeline (background, survives navigation) ---------- */
@@ -438,6 +481,7 @@
     ST.DP = { id, editing, draft: draft != null ? draft : d.title, cited };
     ST.showOverlay(detailsView, { onClose: () => { ST.DP = null; } });
   };
+  const canOpen = (d) => ['ready', 'choose'].includes(d.state); // §6.12: ready, choose subjects, and archived (archived keeps its state)
   function detailsView() {
     const P = ST.DP; const d = ST.doc(P.id);
     const titleBlock = P.editing
@@ -474,13 +518,19 @@
             ${d.subjects.length && !d.archived && d.state === 'ready' ? `<button class="btn btn-secondary btn-sm" type="button" data-action="dp-change" data-fk="dp-change" style="justify-self:start">${ic('tag', 'sm')}Change subjects</button>` : ''}
           </section>
         </div>
-        <footer>${d.archived ? `<button class="btn btn-primary" type="button" data-action="dp-restore">${ic('restore', 'sm')}Restore</button>`
-          : `<button class="btn btn-secondary" type="button" data-action="dp-archive" data-fk="dp-archive">${ic('archive', 'sm')}Archive</button>`}
-          <button class="btn btn-quiet" type="button" data-action="dp-close">Close</button></footer>
+        <footer class="dp-foot">
+          ${ST.canDelete(d) ? `<button class="btn btn-danger-quiet" type="button" data-action="dp-delete" data-fk="dp-delete" data-od-id="details-delete">${ic('trash', 'sm')}Delete…</button>` : ''}
+          <span class="od-fill"></span>
+          ${d.archived ? `<button class="btn btn-${canOpen(d) ? 'secondary' : 'primary'}" type="button" data-action="dp-restore" data-od-id="details-restore">${ic('restore', 'sm')}Restore</button>`
+            : `<button class="btn btn-secondary" type="button" data-action="dp-archive" data-fk="dp-archive" data-od-id="details-archive">${ic('archive', 'sm')}Archive</button>`}
+          ${!d.archived && d.state === 'ready' ? `<button class="btn btn-secondary" type="button" data-action="ask-about" data-id="${d.id}" data-od-id="details-ask">${ic('message', 'sm')}Ask about this</button>` : ''}
+          ${canOpen(d) ? `<button class="btn btn-primary" type="button" data-action="dp-open" data-fk="dp-open" data-od-id="details-open">${ic('doc', 'sm')}Open</button>` : ''}</footer>
       </aside>`;
   }
   Object.assign(ST.actions, {
     'dp-close': () => ST.hideOverlay(),
+    'dp-open': () => { const id = ST.DP.id; ST.hideOverlay(false); ST.openViewer(id, { page: 1, from: 'details' }); },
+    'dp-delete': () => { const id = ST.DP.id; ST.hideOverlay(false); ST.confirmDelete(id, { fromDetails: true }); },
     'dp-edit-title': () => { ST.DP.editing = true; ST.DP.draft = ST.doc(ST.DP.id).title; ST.redrawOverlay(); const i = document.getElementById('dp-title'); if (i) i.focus(); },
     'dp-draft': (el) => { ST.DP.draft = el.value; const b = document.querySelector('[data-action="dp-save-title"]'); if (b) b.disabled = !el.value.trim(); },
     'dp-cancel-title': () => { ST.DP.editing = false; ST.redrawOverlay(); const b = document.querySelector('[data-fk="dp-edit"]'); if (b) b.focus(); },
@@ -492,6 +542,49 @@
   });
 
   /* =========================================================
+     K4 · Delete a document (§6.3): confirmed, permanent, not while processing
+     ========================================================= */
+  ST.askAbout = (id) => {
+    const d = ST.doc(id); if (!d || d.archived || d.deleted || d.state !== 'ready') return;
+    S.rowMenu = null; if (ST.ov) ST.hideOverlay(false);
+    ST.pendingThread = ST.newThread({ added: [id], fromDoc: id, scopeOn: false });
+    ST.goto('chat-new');
+  };
+  ST.actions['ask-about'] = (el) => ST.askAbout(el.dataset.id);
+  ST.canDelete = (d) => !['uploading', 'processing'].includes(d.state);
+  ST.deleteDoc = (d) => { /* L1: conversations drop subjects that came only from this document */
+    d.deleted = true; d.archived = false;
+    S.deletedNotice = d.title;
+    S.tray = S.tray.filter((t) => t.docId !== d.id);
+    S.convs.forEach((c) => ST.syncConvSubjects(c));
+  };
+  ST.confirmDelete = (id, { fromDetails = false } = {}) => {
+    const d = ST.doc(id);
+    let done = false;
+    ST.openDialog({
+      title: `Delete <em>${esc(d.title)}</em>?`,
+      body: `<p>This can't be undone. Conversations and notes keep their text.</p>
+        ${d.archived ? '' : `<div class="del-alt"><p>Archive hides it and can be undone.</p><button class="btn btn-secondary btn-sm" type="button" data-action="del-archive-instead" data-id="${d.id}" data-od-id="delete-archive-instead">${ic('archive', 'sm')}Archive instead</button></div>`}`,
+      actions: [
+        { label: 'Cancel', autofocus: true },
+        { label: `${ic('trash', 'sm')}Delete`, cls: 'btn-danger', onClick: () => { done = true; ST.deleteDoc(d); } }
+      ],
+      onClose: () => {
+        if (done || d.deleted) {
+          if (ST.current && ST.current.id.startsWith('library')) ST.render(); else ST.goto('library-default');
+          setTimeout(() => { const h = document.getElementById('lib-h'); if (h) h.focus(); }, 0);
+          ST.announce(`${d.title} deleted.`);
+        } else if (fromDetails && !d.archived) setTimeout(() => ST.openDetails(d.id), 0);
+      }
+    });
+  };
+  ST.actions['del-archive-instead'] = (el) => {
+    const d = ST.doc(el.dataset.id); d.archived = true; ST.hideOverlay(false); ST.render();
+    ST.toast(`Archived “${d.title}”. It won't be used for answers.`, { undo: () => { d.archived = false; ST.render(); } });
+    const h = document.getElementById('lib-h'); if (h) h.focus();
+  };
+
+  /* =========================================================
      §6.9 Subjects (personal rename)
      ========================================================= */
   ST.SB = { editing: null, draft: '' };
@@ -500,7 +593,7 @@
     const docCount = (id) => S.docs.filter((d) => d.state === 'ready' && !d.archived && d.subjects.includes(id)).length;
     const convCount = (id) => S.convs.filter((c) => c.subjects.includes(id)).length;
     return ST.shell({ nav: 'subjects', content: `<div class="page">
-      <div class="page-head"><div><h1>Subjects</h1><p>Subjects come from your documents. Rename one to match how you think about it. Only you see your names.</p></div></div>
+      ${ST.pageHead({ title: 'Subjects', count: ST.plural(mine.length, 'subject'), info: 'Subjects come from your documents. Rename one to match how you think about it. Only you see your names.' })}
       <div class="subj-list" role="table" aria-label="My subjects">
         <div class="subj-head" role="row"><span role="columnheader">Subject</span><span role="columnheader">Documents</span><span role="columnheader">Conversations</span><span role="columnheader"><span class="vh">Actions</span></span></div>
         ${mine.map((id) => {
