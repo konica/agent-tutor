@@ -39,13 +39,12 @@ awslocal ssm put-parameter --name /smart-tutor/max-upload-mb --type String --val
 awslocal ssm put-parameter --name /smart-tutor/max-pages --type String --value 500 --overwrite
 # Processing attempts per content (PRD §9.5): the API refuses a Retry after this many.
 awslocal ssm put-parameter --name /smart-tutor/max-processing-attempts --type String --value 3 --overwrite
+# The one app time zone (PRD D27): the API turns the Library's upload dates into instants in it.
+awslocal ssm put-parameter --name /smart-tutor/app-time-zone --type String --value Asia/Ho_Chi_Minh --overwrite
 # Subject detection (PRD §9.2 step 1): starting values, read by the agent; the detection evals tune them.
 awslocal ssm put-parameter --name /smart-tutor/detect-threshold --type String --value 0.35 --overwrite
 awslocal ssm put-parameter --name /smart-tutor/detect-margin --type String --value 0.05 --overwrite
 # Keep multi-margin the last parameter written: the LocalStack healthcheck in compose.yaml waits for it.
 awslocal ssm put-parameter --name /smart-tutor/multi-margin --type String --value 0.03 --overwrite
-
-# The one app time zone (PRD D27): the API turns the Library's upload dates into instants in it.
-awslocal ssm put-parameter --name /smart-tutor/app-time-zone --type String --value Asia/Ho_Chi_Minh --overwrite
 
 echo "smart-tutor LocalStack resources ready"
