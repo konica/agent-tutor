@@ -106,7 +106,7 @@ Learners and researchers work through many documents on a topic but lack the bac
 - **Admin product functions:** subject catalog moderation (rename, merge, hide) and account-deletion tooling. *Known gap:* there is no process to erase a user's data; required before launch if users are subject to GDPR or similar law (tracked in §9.10 and M4).
 - Token credits, quotas, or billing; a cap on the number of documents (cost is protected by per-file limits, rate limits, daily caps, and budget alerts).
 - Web search; document formats other than PDF; scanned PDFs without a text layer (no OCR in Release 1).
-- Restricting a thread to selected documents; more than 3 subjects per document; mobile apps; non-English UI.
+- More than 3 subjects per document; mobile apps; non-English UI.
 - Deep Agents planning/filesystem features (a plain LangGraph flow is enough).
 
 ## 6. Key product decisions
@@ -115,7 +115,7 @@ Learners and researchers work through many documents on a topic but lack the bac
 |---|---|---|
 | D1 | **Subjects form one shared catalog** with stable `subject_id`s and no admin moderation. A learner's subjects are the subjects of their ready, non-archived documents. | Common names help suggestions, the research map, and later sharing; ids keep references stable. |
 | D2 | **Learners upload their own PDFs** into a private library. There is no admin corpus and no enrollment. | The tutor serves each learner's own reading. |
-| D3 | **Conversations have no subjects.** Every turn searches all of the learner's ready, non-archived documents; there is no subject detection, no subject limit, and no "New conversation" prompt. Each thread keeps its **documents used** (US-4b). Replaces detection and growth (Q55). | End-user feedback: subjects must never stand between a learner and a question; the documents used show what a conversation drew on. |
+| D3 | **Conversations have no subjects.** Every turn searches all of the learner's ready, non-archived documents, unless the learner limits the conversation to its own document list (US-4c, Q61); there is no subject detection, no subject limit, and no "New conversation" prompt. Each thread keeps its **documents used** (US-4b). Replaces detection and growth (Q55). | End-user feedback: subjects must never stand between a learner and a question; the documents used show what a conversation drew on. |
 | D4 | Access is decided by one rule, **`can_read(user, document)`** (Releases 1–3: owner only; Release 4: owner, grantee, or public), enforced in the **RAG MCP server** with the user's forwarded token (§9.3), never by the prompt. | The LLM is not the access boundary; sharing later extends one function. |
 | D5 | **Search always runs first** (a fixed graph step). Off-topic and uncovered questions get the **same friendly decline**. | Fewer model calls, predictable trajectory. |
 | D6 | **No token credit.** Usage is recorded and displayed; cost is protected by per-file limits, rate limits with daily caps, and Bedrock budget alerts. | Simplicity. |
@@ -180,7 +180,7 @@ Learners and researchers work through many documents on a topic but lack the bac
 - Model-labeled relationships between works with evidence (chunk and page); concept history across papers; figures and tables (multimodal embeddings).
 
 ### Later (backlog)
-- Restricting a thread to selected documents; free-text quizzes; spaced repetition; notifications; token tiers; more formats; mobile; multilingual UI; Keycloak token exchange for MCP; admin tooling (catalog moderation, account deletion) when needed.
+- Free-text quizzes; spaced repetition; notifications; token tiers; more formats; mobile; multilingual UI; Keycloak token exchange for MCP; admin tooling (catalog moderation, account deletion) when needed.
 
 ## 8. User stories and acceptance criteria
 
@@ -219,6 +219,12 @@ Story IDs are stable. Release 1: US-1 to US-13b (US-3b removed in v2.21). Releas
 - Ready, *choose subjects*, and archived documents open (archived read-only); processing and failed documents don't. A deleted document stays in the list, highlighted as "Deleted", and can't be opened (US-10c).
 - A turn counts only when its answer is saved: an answer the learner stops, or a stream that is lost, adds nothing. If a document is deleted while an answer citing it streams, the answer is saved, the document is listed as "Deleted", and its citations read "Deleted document".
 - The PDF is served only to a reader allowed by `can_read`, through a short-lived link that the viewer renews while it stays open.
+
+**US-4c Choose a conversation's documents**
+- The conversation's document list holds the documents used to answer it (US-4b) and documents the learner **adds** ("Add documents": a searchable picker of their ready, non-archived documents). The learner can **remove** a document from the list; the document itself is unchanged, and old citations to it still open it.
+- A switch **"Only search these documents"** (off by default; disabled while the list is empty) limits search to the listed ready, non-archived documents. Off, search covers the whole library and documents used are added automatically. The composer shows the scope when it is on ("Searching 3 documents").
+- *Given* the switch is on, *when* the listed documents don't cover a question, *then* the tutor declines ("These documents don't cover this.") with **"Add documents"** and **"Search all my documents"**; the latter turns the switch off and asks the same question again.
+- The list and the switch are kept with the conversation. The scope is enforced in code (document ids from the conversation, `can_read` in the MCP server), never by the prompt.
 
 **US-5 Decline what the documents don't cover**
 - *When* the learner's documents don't support an answer, *then* the tutor declines in one or two friendly sentences, without answering from its own knowledge, and tells the learner to upload a document on the topic to continue, with **"Upload a document"** as the only action. The declined question is not kept; the learner asks again once the document is ready.
@@ -326,7 +332,7 @@ A plain **LangGraph** graph; retrieval is never a model decision. A thread has n
 
 **Ask path (every chat turn):**
 
-1. **Search (fixed step).** MCP `search` over all of the learner's readable, ready, non-archived documents; top-k chunks (k = 5). An empty readable set gets the US-3 request to upload a document.
+1. **Search (fixed step).** MCP `search` over the learner's readable, ready, non-archived documents (all of them, or only the conversation's listed documents when "Only search these documents" is on, US-4c); top-k chunks (k = 5). An empty readable set gets the US-3 request to upload a document.
 2. **Relevance gate (code).** If the best score is below `answer_floor` → decline (US-5) without calling the LLM, and log the decline.
 3. **Answer (Nova 2 Lite, streamed).** System prompt + capped history + chunks **wrapped as quoted data** with an instruction to treat document text as information, never as instructions (D7). The model answers with citations or calls `decline(reason)`.
 4. **Record documents used (code).** When an answered turn is saved, the documents of the chunks given to the model are added to the thread's documents used (`thread_documents`); a decline, a stopped answer, or a lost stream adds nothing. Each answer stores its citations as `(document_id, chunk_id, page)`; titles resolve at read time, and a citation whose document no longer exists reads "Deleted document". Retrieved chunk text is not kept in the thread's saved state (only in the model call and its trace), so a delete leaves no excerpt in the conversation.
@@ -359,7 +365,7 @@ Because readable documents come from code and the database, attacks like "search
 1. The Web App signs in with Keycloak (Authorization Code + PKCE) and calls the API with `Authorization: Bearer <access_token>`.
 2. The API has **Keycloak validate the token** (token introspection as the `smart-tutor-api` client: `active`, `iss`, `aud`), applies rate limits, invokes the agent, and **forwards the same token**. Signing out or revoking a session therefore ends access on the next request, on every service (ADR 0007).
 3. The agent validates the token the same way and attaches it to every MCP request (HTTP header, LangGraph runtime context — **never in the prompt, state, or traces**).
-4. The MCP server has Keycloak validate the token (introspection as the `rag-mcp` client), reads `sub`, and builds the search filter in SQL: chunks whose `content_id` belongs to a document that is `ready`, not archived, and readable by `sub` (Releases 1–3: `owner_id = sub`; Release 4: also a grant or `visibility = public`). An empty readable set returns an empty result; the agent turns it into the US-3 request to upload a document (no error is shown to the learner).
+4. The MCP server has Keycloak validate the token (introspection as the `rag-mcp` client), reads `sub`, and builds the search filter in SQL: chunks whose `content_id` belongs to a document that is `ready`, not archived, in the optional `document_ids` (the conversation's list when its search is limited; never wider than the readable set), and readable by `sub` (Releases 1–3: `owner_id = sub`; Release 4: also a grant or `visibility = public`). An empty readable set returns an empty result; the agent turns it into the US-3 request to upload a document (no error is shown to the learner).
 5. **Document viewer:** `GET /documents/{id}/file` checks `can_read` (archived documents included) and returns a presigned GET for the PDF, valid for 5 minutes; `GET /chunks/{id}` returns a chunk's document, page, offset, and text, only through a readable document. A deleted document returns `404`. The viewer (pdf.js) finds the chunk on its page by matching the chunk text against the page's text layer after the same cleanup used for chunking (NFKC, joined line-end hyphens, collapsed whitespace); `start_index` picks between repeated matches. No match → the page opens without a highlight.
 
 **`can_read(user, document)`** is implemented once (domain rule + one SQL predicate) and used by the API, the MCP server, citation resolution, and the document viewer.
@@ -381,8 +387,8 @@ Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow onl
 | Document grant *(R4)* | PostgreSQL `document_grants` | `(document_id, grantee_id)` | `grantee_type` (`user`; later `group`), `permission` (`read`), `granted_at`. Created in Release 1, unused. |
 | Subject | PostgreSQL `subjects` | `subject_id` (UUID); unique `normalized_name` | `canonical_name`, `name_embedding`, `created_at`. No creator shown; no status (no admin actions). |
 | Personal subject name | PostgreSQL `user_subject_names` | `(user_id, subject_id)`; unique `(user_id, normalized display_name)` | `display_name`, `updated_at`. |
-| Thread | PostgreSQL `threads` | `thread_id` | `user_id`, `title`, `status` (`active` / `archived`), `created_at`, `last_learner_message_at`, `record_written_at`. |
-| Thread document | PostgreSQL `thread_documents` | `(thread_id, document_id)` | The thread's documents used: `first_used_at`, `deleted_title` (the display title, copied when the document is deleted; null otherwise). No foreign key to `documents`, so rows outlive a deleted document. |
+| Thread | PostgreSQL `threads` | `thread_id` | `user_id`, `title`, `search_scope` (`library` / `listed`, US-4c), `status` (`active` / `archived`), `created_at`, `last_learner_message_at`, `record_written_at`. |
+| Thread document | PostgreSQL `thread_documents` | `(thread_id, document_id)` | The thread's document list: `added_by` (`answer` / `learner`), `first_used_at` (null until used), `added_at`, `deleted_title` (the display title, copied when the document is deleted; null otherwise). No foreign key to `documents`, so rows outlive a deleted document. |
 | Lesson Note | PostgreSQL `lesson_notes` | `thread_id` (unique) | `user_id` (subjects come from the thread's documents used at read time, D11), `markdown`, `status` (`active` / `archived`), `edited_since_generated` (bool), `archived_at`, `source_note_id` (the note a "Discuss this note" thread started from), `updated_at`. |
 | Learning record | LangGraph store, namespace `("learning", user_id)` | `thread_id` | `subject_ids[]`, `topics[]`, `key_points[]`, `note_id`, `trigger`, `learned_at`, `updated_at`. |
 | Decline log | PostgreSQL `declines` | `decline_id` | Scrubbed question text, best score, `reason`, timestamp. **No user id.** Deleted after 90 days. |
@@ -550,7 +556,7 @@ One Python package organized **by module first**, with `domain`, `application`, 
 
 | Evaluator | Type | What it checks | Target |
 |---|---|---|---|
-| **Search step ran** | Code | Every answered turn calls MCP `search` over the learner's readable documents. | 100% |
+| **Search step ran** | Code | Every answered turn calls MCP `search` over the learner's readable documents, limited to the conversation's listed documents when its search is limited (US-4c); a limited search never returns another document's chunks. | 100% |
 | **Documents used** | Code (integration tests) | An answered turn adds exactly the documents of the chunks given to the model; a decline adds none; a deleted document stays listed as deleted and can't be opened. | 100% |
 | **Citation highlight** | Code | Seed-corpus chunks found on their page by the viewer's text match (§9.3); in production, a content-free count of "Couldn't highlight" views is monitored. | ≥ 95% |
 | **Subject suggestion** | Code (labeled) | Labeled subjects appear among the 3 suggestions; existing matching subjects preferred over new names. | ≥ 90% top-3 |
@@ -661,6 +667,7 @@ Measured over the pilot unless stated; minimum sample 100 events per metric.
 | Q56 | What a conversation drew on (end-user feedback) | The conversation lists its documents used; each opens in the document viewer, and a citation opens at its page with the chunk highlighted (US-4b). |
 | Q57 | Deleting a document (end-user feedback) | The owner can delete a document that isn't processing or shared; conversations and notes keep their text; citations read "Deleted document"; the documents-used list highlights it as deleted and it can't be opened; archive stays the reversible option (D10, US-10c). Reverses Q24. |
 | Q58 | Glacier tier for PDFs | Removed: PDFs stay in S3 Standard while their document exists, for the document viewer (D10, §9.5). |
+| Q61 | Choosing a conversation's documents (owner, 2026-10-08) | The learner adds and removes documents in a conversation's list and can switch "Only search these documents" (off by default); a limited decline offers "Add documents" and "Search all my documents", which re-asks the question. Brings "Restricting a thread to selected documents" from the backlog into Release 1 (US-4c). |
 | Q60 | Where a cited document opens (owner, 2026-10-08) | In a conversation, beside the conversation in one click (split view), not in an overlay; the conversation's documents used, note, and actions move to a side panel the learner can hide (US-4b). Elsewhere (Library, document details) the viewer stays an overlay. The side pane also offers "Open in dialog" for a larger view with the document's details. |
 | Q59 | Product owner and UI/UX review of Q54–Q58 (2026-10-08) | Defaults adopted: conversations and notes take subjects from their documents used at read time (deleted excluded; no stored note subjects); retrieved chunk text isn't kept in a thread's saved state, and citations are stored as ids; a turn counts once its answer is saved; the viewer opens ready, *choose subjects*, and archived documents and renews its link; content files keyed by `content_id`; shared contents split per owner on migration; storage growth accepted and reported per learner (`sdd/reviews/2026-10-08-end-user-feedback.md`). |
 
