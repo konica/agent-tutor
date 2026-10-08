@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
+from langgraph.checkpoint.memory import InMemorySaver
 
 from fakes import FakeRetriever, FakeTokenVerifier, fake_chat_model
 from smart_tutor.apps.agent.graph import build_graph
@@ -17,16 +18,24 @@ from smart_tutor.tutoring.application import DetectionPolicy
 from smart_tutor.tutoring.domain.errors import RetrievalError
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 
-BODY = {"question": "What is attention?", "learner_subjects": [{"subject_id": "s1", "name": "General"}]}
+THREAD = "11111111-1111-4111-8111-111111111111"
+BODY = {
+    "thread_id": THREAD,
+    "question": "What is attention?",
+    "learner_subjects": [{"subject_id": "s1", "name": "General"}],
+}
 POLICY = DetectionPolicy(0.5, 0.125, 0.0625)
 AUTH = {"Authorization": "Bearer t-ada"}
 CHUNK = RetrievedChunk("c1", "a.pdf", 3, "Attention weighs tokens.", 0.9)
 
 
-def client(retriever: FakeRetriever, reply: str = "It weighs tokens [1].") -> tuple[TestClient, FakeTokenVerifier]:
+def client(
+    retriever: FakeRetriever, reply: str = "It weighs tokens [1].", policy: DetectionPolicy = POLICY
+) -> tuple[TestClient, FakeTokenVerifier]:
     verifier = FakeTokenVerifier()
     verifier.add("t-ada", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
-    graph = build_graph(lambda token: retriever, fake_chat_model(AIMessage(reply)), POLICY)
+    verifier.add("t-bob", Principal(UserId("bob"), "Bob", frozenset({"learner"})))
+    graph = build_graph(lambda token: retriever, fake_chat_model(AIMessage(reply)), policy, InMemorySaver())
     return TestClient(create_app(Settings(), verifier=verifier, graph=graph)), verifier
 
 
@@ -126,6 +135,8 @@ def test_rejects_bad_bodies() -> None:
     assert c.post("/ask", json={**BODY, "question": ""}, headers=AUTH).status_code == 422
     assert c.post("/ask", json={**BODY, "question": "x" * 4001}, headers=AUTH).status_code == 422
     assert c.post("/ask", json={**BODY, "learner_subjects": []}, headers=AUTH).status_code == 422
+    assert c.post("/ask", json={k: v for k, v in BODY.items() if k != "thread_id"}, headers=AUTH).status_code == 422
+    assert c.post("/ask", json={**BODY, "thread_id": "nope"}, headers=AUTH).status_code == 422
     old = {"question": "What is attention?", "subjects": BODY["learner_subjects"]}
     assert c.post("/ask", json=old, headers=AUTH).status_code == 422
 
@@ -141,3 +152,72 @@ def test_startup_fails_without_a_client_secret() -> None:
         TestClient(create_app(Settings(keycloak_client_secret=""))),
     ):
         pass
+
+
+UNSURE_POLICY = DetectionPolicy(0.5, 0.125, 0.0)
+UNSURE_BODY = {**BODY, "learner_subjects": [{"subject_id": "s1", "name": "A"}, {"subject_id": "s2", "name": "B"}]}
+UNSURE_CHUNKS = [
+    RetrievedChunk("c1", "a.pdf", 3, "Attention weighs tokens.", 0.6, ("s1",)),
+    RetrievedChunk("c2", "b.pdf", 1, "Agents call tools.", 0.58, ("s2",)),
+]
+BOB = {"Authorization": "Bearer t-bob"}
+
+
+def unsure_client() -> TestClient:
+    return client(FakeRetriever(UNSURE_CHUNKS), reply="Answer [1].", policy=UNSURE_POLICY)[0]
+
+
+def resume_body(*ids: str) -> dict[str, Any]:
+    return {"thread_id": THREAD, "subject_ids": list(ids)}
+
+
+def test_an_unsure_question_streams_the_choices_then_done() -> None:
+    c = unsure_client()
+    got = events(c.post("/ask", json=UNSURE_BODY, headers=AUTH).text)
+    assert got == [("choose_subjects", {"subject_ids": ["s1", "s2"]}), ("done", {})]
+
+
+def test_resume_answers_the_pending_question_with_the_picked_subjects() -> None:
+    c = unsure_client()
+    c.post("/ask", json=UNSURE_BODY, headers=AUTH)
+    response = c.post("/resume", json=resume_body("s2"), headers=AUTH)
+    assert response.status_code == 200
+    got = events(response.text)
+    assert got[0] == ("subjects", {"subject_ids": ["s2"]})
+    assert "".join(d["text"] for e, d in got if e == "delta") == "Answer [1]."
+    assert [e for e, _ in got][-2:] == ["citations", "done"]
+    assert [e for e, _ in got].count("subjects") == 1
+
+
+def test_resume_with_nothing_waiting_is_409() -> None:
+    c = unsure_client()
+    response = c.post("/resume", json=resume_body("s1"), headers=AUTH)
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Nothing is waiting for subjects in this thread"}
+
+
+def test_resume_cannot_reach_another_learners_pending_question() -> None:
+    c = unsure_client()
+    c.post("/ask", json=UNSURE_BODY, headers=AUTH)
+    assert c.post("/resume", json=resume_body("s1"), headers=BOB).status_code == 409
+    assert events(c.post("/resume", json=resume_body("s1"), headers=AUTH).text)[0][0] == "subjects"
+
+
+def test_an_invalid_pick_is_an_error_and_the_question_keeps_waiting() -> None:
+    c = unsure_client()
+    c.post("/ask", json=UNSURE_BODY, headers=AUTH)
+    got = events(c.post("/resume", json=resume_body("zz"), headers=AUTH).text)
+    assert got[-1][0] == "error" and got[-1][1]["code"] == "unavailable"
+    assert "done" not in [e for e, _ in got]
+    again = events(c.post("/resume", json=resume_body("s1"), headers=AUTH).text)
+    assert again[0] == ("subjects", {"subject_ids": ["s1"]}) and again[-1] == ("done", {})
+
+
+@pytest.mark.parametrize("ids", [[], ["a", "b", "c", "d"]])
+def test_resume_rejects_zero_or_four_subjects(ids: list[str]) -> None:
+    c = unsure_client()
+    assert c.post("/resume", json={"thread_id": THREAD, "subject_ids": ids}, headers=AUTH).status_code == 422
+
+
+def test_resume_needs_a_token() -> None:
+    assert unsure_client().post("/resume", json=resume_body("s1")).status_code == 401
