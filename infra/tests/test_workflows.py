@@ -126,7 +126,25 @@ def test_release_uses_the_tag_and_the_stack_outputs() -> None:
     assert 'global.imageTag="$IMAGE_TAG"' in text
     for output in ("RegistryUri", "CloudFrontUrl", "VpcId"):
         assert output in text
-    assert "values-prod.yaml" in text and "--wait --timeout 15m" in text
+    assert "values-prod.yaml" in text and "--timeout 15m" in text
+
+
+def test_release_waits_with_the_legacy_strategy() -> None:
+    # Helm 4's default watcher strategy sits out the whole --timeout on every non-Job hook (SecretStore,
+    # ExternalSecrets, ConfigMap), so the first install outran the job's 60 minutes. Legacy waits as Helm 3 did.
+    step = next(
+        s
+        for s in deploy_job()["steps"]
+        if "helm upgrade --install smart-tutor" in str(s.get("run", ""))
+    )
+    assert "--wait=legacy --timeout 15m" in step["run"]
+    runbook = (WORKFLOWS.parents[1] / "docs/runbooks/pilot-deploy.md").read_text(
+        encoding="utf-8"
+    )
+    lines = re.findall(r"helm upgrade --install smart-tutor .*", runbook)
+    assert lines
+    for line in lines:
+        assert "--wait=legacy --timeout 15m" in line, line
 
 
 def test_no_expressions_from_inputs_inside_run_scripts() -> None:
@@ -204,7 +222,7 @@ def test_rollback_checks_the_images_exist_and_skips_build_and_cdk() -> None:
 
 def test_smoke_test_runs_last_against_the_cloudfront_url() -> None:
     steps = deploy_job()["steps"]
-    last = next(s for s in reversed(steps) if s.get("if") != "failure()")
+    last = next(s for s in reversed(steps) if "failure()" not in str(s.get("if")))
     run = str(last["run"])
     assert "deploy/pilot/smoke_test.py" in run and "CLOUDFRONT_URL" in run
     # the summary names the deploy only after the smoke test passed
@@ -214,7 +232,8 @@ def test_smoke_test_runs_last_against_the_cloudfront_url() -> None:
 
 def test_failed_deploys_print_diagnostics() -> None:
     last = deploy_job()["steps"][-1]
-    assert last["if"] == "failure()"
+    # also when the job times out or is cancelled, which is when a stuck release needs explaining
+    assert last["if"] == "failure() || cancelled()"
     assert "helm -n smart-tutor history" in str(last["run"])
 
 
