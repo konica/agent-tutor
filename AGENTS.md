@@ -4,15 +4,15 @@ Instructions for coding agents in this repository. Before changing Python code, 
 
 ## Project
 
-Smart Tutor is an AI tutor for the learner's **own PDFs**. Learners upload documents into a private library; each document gets 1–3 subjects from a **shared subject catalog**. A conversation answers only from the learner's documents in its subjects (detected from the first question, growing to at most 3), with citations. Identical files (same SHA-256) are processed and embedded **once** across all users.
+Smart Tutor is an AI tutor for the learner's **own PDFs**. Learners upload documents into a private library; each document gets 1–3 subjects from a **shared subject catalog**. A conversation has no subjects: it answers only from all of the learner's ready documents, with citations, and lists the documents it used; a citation opens the PDF at the highlighted passage. Each learner's upload is processed and embedded for that learner; nothing is linked across learners.
 
 Sources of truth — read the relevant one before changing behavior or structure:
 
 | Need | Read |
 |---|---|
-| Product behavior, user stories, data model, flows, evals, roadmap | `sdd/prd.md` (v2.20) |
+| Product behavior, user stories, data model, flows, evals, roadmap | `sdd/prd.md` (v2.21) |
 | Folder structure, module boundaries, import rules | `sdd/specs/2026-10-02-project-structure-design.md` |
-| Why an architecture choice was made | `sdd/adr/` (0001–0010) |
+| Why an architecture choice was made | `sdd/adr/` (0001–0011) |
 | Why the PRD changed in v2.1 | `sdd/reviews/2026-10-03-prd-v2.0-review.md` |
 
 **Release scope:** build **Release 1** (core tutor: modules `knowledge`, `subjects`, `tutoring`, `learning`, `accounts`, `insights`). Later releases already have empty modules and prepared data (R2 research map → `graph`; R3 `catalog`, `quizzes`, `recommendations`, `reports`; R4 sharing and imports; R5 deep graph); build them only when asked.
@@ -33,10 +33,10 @@ Sources of truth — read the relevant one before changing behavior or structure
 Code must keep these true; each has tests or evals guarding it.
 
 - **Access:** every read of a document goes through one rule, `can_read(user, document)` (Release 1: owner only), enforced in code and SQL by the API and MCP server. Access never depends on the prompt.
-- **Deduplication:** link a file to existing content only after the **server** hashes the uploaded bytes. A browser-sent hash only finds files already in the learner's own library.
-- **Subjects:** store `subject_id`s everywhere; resolve names at read time (personal name, else canonical name). Documents have 1–3 subjects; threads hold 1–3 and only ever add.
+- **Per-learner contents:** a content belongs to one learner, unique per `(owner_id, sha256)`. Never link an upload to another learner's content; duplicates are caught only within the learner's own library (browser hash before upload, server hash after it). ADR 0011.
+- **Subjects:** store `subject_id`s everywhere; resolve names at read time (personal name, else canonical name). Documents have 1–3 subjects; threads have none (they keep their documents used).
 - **Untrusted input:** the user's prompt and uploaded document text. Pass chunks to the model as quoted data and follow only the system prompt's instructions.
-- **Lifecycle:** documents and Lesson Notes are archived, never deleted. Traces expire after 180 days, the decline log after 90; threads are kept.
+- **Lifecycle:** documents are archived or deleted by their owner (delete only when not processing or shared; it removes the PDF, page text, and chunks, and references show "Deleted document"); Lesson Notes are archived, never deleted. Traces expire after 180 days, the decline log after 90; threads are kept.
 - **Privacy:** the decline log stores no user id. Tokens travel in HTTP headers and runtime context only — never in prompts, logs, or traces.
 - **No admin product functions** (no subject rename/merge/hide, no account deletion) until the PRD adds them.
 

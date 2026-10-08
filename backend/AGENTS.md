@@ -10,9 +10,9 @@ One package, `src/smart_tutor/`, shared by every backend deployable. **Modules f
 smart_tutor/
 ├── shared/      # kernel: ids, TokenUsage, Citation, errors; port Clock; ModelFactory (LangChain models by role);
 │                #   bedrock, auth (JWT), postgres, aws adapters; config.py
-├── knowledge/   # library: contents (SHA-256 dedupe, states, retry), documents, can_read, upload, ingestion, search
+├── knowledge/   # library: contents (per learner, SHA-256 duplicate check, states, retry), documents (archive, delete), can_read, upload, ingestion, search, viewer links
 ├── subjects/    # shared subject catalog, personal names, suggestion ranking, name checks
-├── tutoring/    # threads (1–3 subjects, growth), detection, relevance gate, ask path
+├── tutoring/    # threads and their documents used, relevance gate, ask path
 ├── learning/    # Lesson Notes, learning records
 ├── accounts/    # learner profile and terms, rate limits and daily caps, token usage
 ├── insights/    # decline log
@@ -55,7 +55,7 @@ A new cross-module dependency means moving a module in the order on purpose and 
 
 - `tests/unit/<module>/` — domain and application with fakes from `tests/fakes/` (`from fakes import fake_chat_model, fake_embeddings`); the default `pytest` run. Async tests need no decorator.
 - `tests/integration/<module>/` — adapters against the Compose stack, marked `@pytest.mark.integration`.
-- `tests/isolation/` — cross-user access and dedupe guarantees (PRD US-11, US-12).
+- `tests/isolation/` — cross-user access, per-learner contents, and delete guarantees (PRD US-10c, US-11, US-12).
 - `tests/bedrock/` — real Bedrock calls through `ModelFactory`, marked `@pytest.mark.bedrock` (`make bedrock-check`). Run it after changing a model ID, an adapter, or boto3. Unit tests never trace to LangSmith (`tests/unit/conftest.py`).
 
 ## Images

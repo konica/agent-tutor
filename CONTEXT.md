@@ -5,7 +5,7 @@ An AI tutor that answers a learner's questions only from the learner's own docum
 ## Library
 
 **Content**:
-One unique file, identified by the SHA-256 of its bytes. Processed and embedded once in the whole system, however many learners hold it.
+One learner's copy of a file, identified by the SHA-256 of its bytes within that learner's library. Processed and embedded for that learner; two learners with the same file have two contents, never linked.
 _Avoid_: File, upload, blob
 
 **Work**:
@@ -13,7 +13,7 @@ The paper or book a content represents. Different files of the same paper (prepr
 _Avoid_: Paper, publication
 
 **Document**:
-A learner's library entry for a content, with its owner, 1–3 subjects, state, and archived flag. Never deleted, only archived.
+A learner's library entry for a content, with its owner, 1–3 subjects, state, and archived flag. Archived (restorable) or deleted by its owner when not shared.
 _Avoid_: File, upload, PDF (when meaning the library entry)
 
 **Library**:
@@ -21,7 +21,7 @@ All documents a learner owns.
 _Avoid_: Collection, shelf
 
 **Chunk**:
-An embedded fragment of a content, with its page, used for search and citation. Belongs to the content, not to a learner.
+An embedded fragment of a content, with its page and its offset in the page text, used for search, citation, and the viewer's highlight.
 _Avoid_: Passage, segment
 
 **Visibility**:
@@ -38,20 +38,26 @@ What a learner sees for a subject: their personal name if they renamed it, other
 _Avoid_: Label, title
 
 **My subjects**:
-The subjects of a learner's ready, non-archived documents. Detection and search work only within these.
+The subjects of a learner's ready, non-archived documents. They organize and filter the library, conversations, and notes; search doesn't use them.
 
 ## Tutoring
 
 **Thread**:
-One conversation. Starts with the subjects detected from its first question and grows to at most 3 subjects; subjects are never removed.
+One conversation. Has no subjects; answers from all of the learner's ready, non-archived documents and keeps its **documents used**.
 _Avoid_: Chat, session, conversation (in code; "conversation" is fine in UI copy)
+
+**Documents used**:
+The documents whose chunks were given to the model for a conversation's answered turns, in order of first use. A deleted one stays listed as "Deleted" and can't be opened.
+
+**Document viewer**:
+The in-app PDF viewer; from a citation it opens at the chunk's page and highlights its text.
 
 **Citation**:
 The reference returned with an answer: the document's display title and page, or "page unavailable".
 _Avoid_: Source, reference
 
 **Decline**:
-The tutor's refusal to answer a question its documents do not support or that matches none of the learner's subjects.
+The tutor's refusal to answer a question the learner's documents do not support.
 _Avoid_: Refusal, rejection
 
 **Decline log**:

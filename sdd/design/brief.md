@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Brief version** | v0.7 |
-| **Based on** | `sdd/prd.md` Draft v2.16 |
-| **Status** | Draft, round 6 (owner answers to E4, E6, E7, E8, F1; targeted changes) |
+| **Brief version** | v0.8 |
+| **Based on** | `sdd/prd.md` Draft v2.21 |
+| **Status** | Draft, round 8 (end-user feedback: conversations without subjects, documents used, document viewer, delete; targeted changes) |
 | **Owner** | Thao Dinh |
-| **Last updated** | 2026-10-06 |
+| **Last updated** | 2026-10-08 |
 | **Designer** | Open Design |
 
 > **For the designer:** this brief is the source of truth for the mockups. If the brief and the PRD disagree, follow the brief and flag the conflict. Name every deliverable with the brief version it answers (e.g. `chat-growth-notice@v0.3`). Read **§0 What changed** first on every new version. A ready-to-paste prompt for starting a round is in **Appendix A**.
@@ -15,15 +15,15 @@
 
 ## 0. What changed in this version
 
-**Targeted update.** Keep the round 5 prototype (v0.6: landing page, stock Keycloak pages, no terms or Settings, upload-rights line) and change only what is below. PRD v2.16 records the owner's answers to E4, E6, E7, E8, and F1 (Q48–Q52). The v0.6 changes are in the changelog (§13).
+**Targeted update.** Keep the round 7 prototype (v0.7, accepted as `design-v0.7`) and change only what is below. PRD v2.21 records end-user feedback (Q54–Q58; `sdd/reviews/2026-10-08-end-user-feedback.md`). The v0.7 changes are in the changelog (§13).
 
 | Change | States |
 |---|---|
-| **E4 — a decline never offers "New conversation".** "New conversation" appears only in the fourth-subject refusal (3 subjects already). Every decline says a document on the topic is needed to continue, with "Upload a document" as the only action. | `chat-decline` (keep); **remove** `chat-decline-other-subject` |
-| **E6 — the declined question is not kept** after "Upload a document". No reminder or "ask again" prompt. | none (confirms `chat-decline`) |
-| **E7 — an archived document's subjects can't be changed** (reverses D7). No "Change subjects" on archived rows or in archived document details; "Restore" first. | `library-archived`, `details-archived`; **remove** `picker-change-subjects-archived` |
-| **E8 — daily limits reset at midnight GMT+7.** A daily-limit message says "You can upload again at 00:00 (GMT+7)" (or send again); hourly and per-minute limits keep showing their own end time. | `library-rate-limited`, `chat-rate-limited` |
-| **F1 — registration uses the email as the username.** Keycloak's stock registration page has no "Username" field: Email, First name, Last name, Password, Confirm password. | `auth-sign-up` |
+| **K1 — conversations have no subjects.** No subject detection, no "Which subjects is this about?", no subject added, no 3-subject maximum, no "New conversation" refusal. Every question is answered from all of the learner's ready documents. Remove the subject chips from the chat header and "Your subjects: …" from the new conversation. | **Remove** `chat-subjects-detected`, `chat-subjects-detected-multi`, `chat-detection-unsure`, `chat-subject-added`, `chat-maximum-reached`, `chat-fourth-subject-refused`, `chat-new-from-refused`; redo `chat-new`, `chat-new-conversation`, `chat-answer-citations`, `chat-first-answer`, `chat-no-active-documents` |
+| **K2 — documents used.** Each conversation lists the documents used to answer it (in order of first use), with "Archived" or "Deleted" when it applies. Opening one opens the document viewer (K3). A deleted document is highlighted as "Deleted" and can't be opened. | New `chat-documents-used`, `chat-documents-used-deleted` |
+| **K3 — document viewer.** An in-app PDF viewer (§6.12). A citation opens it at the cited page, scrolled to the chunk, with the chunk text highlighted; opening a document from the list starts at page 1. Archived documents open read-only. | New `viewer-document`, `viewer-citation-highlight`, `viewer-no-highlight`, `viewer-archived`; **remove** `chat-citation-opens-details` |
+| **K4 — delete a document.** "Delete" in the Library row's "More" menu and in document details, with a confirmation. Not offered while processing. Citations to a deleted document read "Deleted document" with no link. | New `library-delete-confirm`, `library-deleted`, `chat-citation-deleted`; redo `details-ready`, `details-archived` |
+| **K5 — same file, different learners.** A learner's upload is never linked to another learner's copy, so a duplicate of someone else's file processes like any new file. Only "Already in your library" remains. | none (removes the "fast duplicate" note in §6.3) |
 
 ---
 
@@ -80,11 +80,11 @@ Design the screens in §6, then link them into these four flows. They are how th
 
 **J1 First run (most important).** Landing page → "Create an account" → sign up and verify email (Keycloak) → empty Library ("Upload your first document") → drop 3 PDFs → watch processing → choose subjects for each (accept suggestions) → "Ready" → "Ask a question" → first cited answer.
 
-**J2 Everyday question.** Open app → Chat → ask → subjects detected → cited answer → follow-up that **adds a second subject** → "Summarize lesson" → open the note.
+**J2 Everyday question.** Open app → Chat → ask (no subject to choose) → cited answer → follow-up answered from another document → open **Documents used** → "Summarize lesson" → open the note.
 
-**J3 Conversation reaches its limit.** A conversation already covers 3 subjects → a question clearly about a fourth subject → the tutor doesn't answer and offers **"New conversation"** carrying the question over → the new conversation answers it.
+**J3 Check the source.** An answer with citations → select a citation → the document viewer opens at that page with the passage highlighted → back to the conversation → open another document from **Documents used**.
 
-**J4 Library upkeep.** Filter the Library by subject → open a document → change its subjects → fix its display title → archive it → find it under Archived → restore it. Include one **failed** document and its **Retry**.
+**J4 Library upkeep.** Filter the Library by subject → open a document → change its subjects → fix its display title → archive it → find it under Archived → restore it → **delete** another document (confirm) and see it marked "Deleted" in a conversation's documents used. Include one **failed** document and its **Retry**.
 
 ## 6. Release 1 screens (full fidelity)
 
@@ -112,12 +112,12 @@ The public page at `/` for anyone not signed in (and the same page for signed-in
 - Keycloak's hosted login, registration, and email-verification pages keep **Keycloak's stock layout** (`keycloak.v2`), fields, and messages. We change only the logo, the accent and background colors, the font, and the display name "Smart Tutor". Registration uses the email as the username, so it has no "Username" field (F1). Show them as low-detail references (`auth-*` states); keep focus rings visible and contrast AA.
 - After sign-up or first sign-in, land on the empty **Library**. There is no terms of use step (PRD Q45); the upload-rights line in the Library replaces its checkbox (§6.3).
 
-### 6.3 Library — US-2, US-10, US-11
+### 6.3 Library — US-2, US-10, US-10c, US-11
 The home screen and the hub for documents.
 
 **Layout:** page header with **"Upload"**, a drop zone (the whole page accepts dropped files), filter bar, Active / Archived tabs, document table. Next to the drop zone and "Upload": "Only upload documents you have the right to use." (G2; no checkbox).
 
-**Table columns:** display title (with authors and year beneath), subjects (chips, by the learner's names), state, upload date. Row actions: one contextual button per row (**Choose subjects**, **Retry**, **Restore**, or **Open**), and the rest (change subjects, edit title, archive / restore) under **"More"** (D5).
+**Table columns:** display title (with authors and year beneath), subjects (chips, by the learner's names), state, upload date. Row actions: one contextual button per row (**Choose subjects**, **Retry**, **Restore**, or **Open**), and the rest (change subjects, edit title, archive / restore, **delete**) under **"More"** (D5). "Delete" isn't offered while a document is processing.
 
 **Filters:** subject (matches any of a document's subjects), date range, state; combinable; "Clear filters".
 
@@ -134,10 +134,12 @@ The home screen and the hub for documents.
 | **Ready** | State "Ready". The document is searchable. |
 | **Failed** | State "Failed" with the reason in plain words (e.g. "This PDF has more than 500 pages", "We couldn't read this PDF", "No text layer (scanned PDFs are not supported yet)") and **"Retry"**. After 3 attempts: "This file could not be processed" and no Retry. |
 | **Archived tab** | Archived documents with **"Restore"**; their subjects can't be changed until restored (E7). One line explaining archived documents are not used for answers but old citations still work. |
+| **Delete confirmation** | "Delete *title*? This can't be undone. Conversations and notes keep their text." with **Delete** (destructive) and **Cancel**. Suggest **Archive** instead in one line ("Archive hides it and can be undone."). |
+| **Deleted** | The row disappears; a short confirmation "*Title* deleted." No undo. |
 | **No results** | Filters match nothing: "No documents match these filters" and "Clear filters". |
 | **Rate limited** | Upload limit reached (20 per hour, 100 per day): message with the time uploads are available again, in GMT+7: "You can upload again at 11:40" for the hourly limit, "You can upload again at 00:00 (GMT+7)" for the daily limit, which resets at midnight GMT+7 (D8, E8). |
 
-**Timing the designer should reflect:** the title appears within about 30 seconds of upload; subjects can be chosen when processing finishes, up to 5 minutes later (15 minutes for very long documents). A duplicate of a file Smart Tutor has already processed is ready within about 10 seconds — show it as a normal, fast Processing state; never say another user has the file.
+**Timing the designer should reflect:** the title appears within about 30 seconds of upload; subjects can be chosen when processing finishes, up to 5 minutes later (15 minutes for very long documents). A file another learner has is processed like any new file; never say another user has the file.
 
 ### 6.4 Choose subjects (picker) — US-2b
 A dialog (or side panel) opened from a document that needs subjects (processing has finished, Q7), and reused for "Change subjects" on active documents (not archived ones, E7).
@@ -161,27 +163,23 @@ A side panel (drawer) opened from a Library row.
 - Display title (editable inline; "Reset to extracted title"), authors, year, DOI (if any), file name, pages, upload date, state.
 - Summary.
 - Subjects (chips) with **"Change subjects"** (opens §6.4); not shown when archived (E7).
-- Actions: **Archive** / **Restore**; **Retry** when failed.
-- Note: there is **no download** and **no delete**.
+- Actions: **Open** (document viewer, §6.12; ready and archived documents); **Archive** / **Restore**; **Retry** when failed; **Delete** (with the confirmation in §6.3; not while processing).
+- Note: there is **no download**.
 
-### 6.6 Chat — US-3, US-3b, US-4, US-5, US-6, US-7, US-9, US-10
-The core screen. Structure: thread header (title, subject chips, citations switch, "Summarize lesson", note link), message column, input, and a **status line** under the input.
+### 6.6 Chat — US-3, US-4, US-4b, US-5, US-6, US-7, US-9, US-10, US-10c
+The core screen. Structure: thread header (title, **Documents used**, citations switch, "Summarize lesson", note link), message column, input, and a **status line** under the input. There are **no subject chips** in chat (K1).
 
 | State | What the learner sees |
 |---|---|
 | **No documents yet** | Chat is replaced by an empty state asking the learner to upload a document first, with an **"Upload"** button. |
 | **Documents still processing** | Normal chat, plus a quiet hint above the input: "*N* documents are still processing and can't be used yet." |
-| **New conversation** | Input with placeholder ("Ask about your documents…") and the learner's subjects shown as context ("Your subjects: …"). **No subject picker.** *Proposal, not in the PRD:* up to 3 example questions; design a slot for them and mark it optional. |
-| **Subjects detected** | After the first question, 1–3 **subject chips** appear in the header (learner's names). No "Change" action. |
-| **Detection unsure** | Tutor message "Which subjects is this about?" with the learner's subjects as selectable chips (pick 1–3) and "Continue". The original question stays visible and is answered after the pick, without retyping. |
+| **New conversation** | Input with placeholder ("Ask about your documents…"). **No subjects, no subject picker** (K1). *Proposal, not in the PRD:* up to 3 example questions; design a slot for them and mark it optional. |
 | **Streaming answer** | Text appears progressively; **Stop** button. |
-| **Answer with citations** | Under each answer: citations as compact references, "*Display title*, p. 42" (or "page unavailable"). Clicking one opens the document details. A citation to an archived document shows an "Archived" badge. Outline thumb icons labelled **"Helpful"** / **"Not helpful"** with a visible pressed state on each answer; "Not helpful" opens an optional reason (D1). |
+| **Answer with citations** | Under each answer: citations as compact references, "*Display title*, p. 42" (or "page unavailable"). Clicking one opens the **document viewer** at that page with the passage highlighted (§6.12). A citation to an archived document shows an "Archived" badge; a citation to a deleted document reads **"Deleted document"** with no link. Outline thumb icons labelled **"Helpful"** / **"Not helpful"** with a visible pressed state on each answer; "Not helpful" opens an optional reason (D1). |
 | **Citations switch** | "Show citations" switch in the header, **on by default**. Off hides the citations under every answer in view; answers are unchanged. Remembered for the learner across conversations. Show the thread both ways. |
-| **Subject added** | An inline **system notice** between messages (not a chat bubble): "Added *Retrieval-Augmented Generation* to this conversation". The new chip appears in the header with a brief highlight. |
-| **Maximum reached** | Inline notice when the third subject is added: "This conversation now covers 3 subjects, the maximum. For other topics, start a new conversation." |
-| **Fourth subject refused** | The tutor doesn't answer: "This conversation already covers 3 subjects: *LLMs*, *AI Agents* and *Retrieval-Augmented Generation*. Your question is about *Reinforcement Learning*, so I haven't answered it here." (D3), then "A new conversation will answer it straight away." and **"New conversation"**, which opens a new conversation and **sends the question there right away** (D2). |
-| **Decline** | One or two friendly sentences saying the learner's documents don't cover this. It must not look like an error. Say that a document on the topic is needed to continue, with **"Upload a document"** as the only action (D4). Never offer "New conversation" here (E4); the declined question is not kept (E6). |
-| **No active documents in these subjects** | All documents in the conversation's subjects were archived: "There are no active documents in this conversation's subjects." with a link to the Library (Archived tab). History stays readable. |
+| **Decline** | One or two friendly sentences saying the learner's documents don't cover this. A decline adds nothing to Documents used. It must not look like an error. Say that a document on the topic is needed to continue, with **"Upload a document"** as the only action (D4). Never offer "New conversation" here (E4); the declined question is not kept (E6). |
+| **Documents used** | A "Documents used (*N*)" button in the header opens a side panel listing the documents used to answer this conversation, in order of first use: display title, authors and year, and an "Archived" or "Deleted" badge when it applies. Selecting a document opens the document viewer at page 1. A **deleted** document stays in the list, highlighted (muted row, "Deleted" badge, its last title), and can't be opened. Empty before the first answer: "Documents used to answer will appear here." |
+| **No active documents** | All of the learner's documents are archived or deleted: the conversation's history stays readable, and a new question gets the request to upload a document, with **"Upload"**. |
 | **Summarize lesson** | "Summarize lesson" in the header → progress → confirmation with a link to the note. If a note exists, the action reads "Update lesson note". **If the learner edited that note**, confirm first: "You've edited this note. Replace it with a new summary?" (Replace / Cancel). |
 | **Archived conversation** | Banner "This conversation is archived." with **"Restore"**; input disabled. |
 | **Rate limited** | Too many messages (20 per minute, 500 per day): inline message with the time the learner can send again, in GMT+7; the daily limit resets at midnight GMT+7 (D8, E8); input disabled until then. |
@@ -191,15 +189,15 @@ The core screen. Structure: thread header (title, subject chips, citations switc
 **Status line.** A slim line under the input shows this conversation's token usage, e.g. "Tokens: 12,480 in · 3,215 out", updated after each completed answer.
 
 ### 6.7 Conversations — US-13
-- List: title (from the first question), subject chips (up to 3), last activity, note indicator; newest first.
-- Filters: date range and subject (any of the conversation's subjects); Active / Archived tabs.
+- List: title (from the first question), subject chips of its documents used, number of documents used, last activity, note indicator; newest first.
+- Filters: date range and subject (any subject of its documents used); Active / Archived tabs.
 - Row actions: open, archive / restore.
 - Opening a conversation shows its history (§6.6) and its **Lesson Note** (link or side panel).
 - Empty states: no conversations yet (with "Start a conversation"); no results for these filters.
 
 ### 6.8 Notes — US-7, US-13b
 - **List:** title, subject chips, date, link to the source conversation; same filters and tabs as §6.7.
-- **Note editor:** Markdown editor with preview; save; **Archive** / Restore; **"Discuss this note"** (starts a new conversation with the note's subjects and a link back); link to the source conversation.
+- **Note editor:** Markdown editor with preview; save; **Archive** / Restore; **"Discuss this note"** (starts a new conversation with the note as context and a link back); link to the source conversation.
 - Show when a note has been edited since it was generated ("Edited"), since that triggers the overwrite confirmation in chat.
 
 ### 6.9 Subjects — US-10b
@@ -212,11 +210,30 @@ The core screen. Structure: thread header (title, subject chips, citations switc
 ### 6.10 Usage — US-9
 - Totals: input and output tokens, for today (the GMT+7 day, D8) and all time.
 - Three sections: **Conversations** (per conversation, sortable), **Document processing** (per document the learner's upload processed first), **Background** (notes and learning records).
-- One line explaining that a document Smart Tutor had already processed costs nothing.
+- One line explaining that a file already in the learner's library isn't processed again and costs nothing.
 - No limits, credits, or upgrade prompts.
 
 ### 6.11 Settings
 Removed in v0.5: no Settings page in Release 1 (PRD Q45).
+
+### 6.12 Document viewer — US-4b
+A full-height panel or page over the current screen, so "Back" returns to the conversation or Library row the learner came from.
+
+- **Header:** display title, authors, year, page indicator ("Page 3 of 12"), previous / next page, zoom, and **Close**.
+- **Body:** the PDF pages, scrollable; text is selectable.
+- **From a citation:** opens at the cited page, scrolls the passage into view, and highlights the chunk text with a soft accent background (not only color: add an outline or side marker). A small label near the highlight: "Cited passage".
+- **Passage not found:** the page opens without a highlight and a quiet note: "Couldn't highlight the passage on this page."
+- **From Documents used or document details:** opens at page 1, no highlight.
+- **Archived document:** opens read-only with an "Archived" badge and **"Restore"** in the header.
+- **Loading:** page skeleton; the cited page loads first.
+- No download button; no annotation.
+
+| State | What the learner sees |
+|---|---|
+| `viewer-document` | Opened from Documents used: page 1 of *ReAct…*. |
+| `viewer-citation-highlight` | Opened from the citation "*ReAct…*, p. 3": page 3, highlighted passage in view. |
+| `viewer-no-highlight` | Cited page shown, "Couldn't highlight the passage on this page." |
+| `viewer-archived` | An archived document, read-only, "Restore" in the header. |
 
 ## 7. Release 2: research map (low-fidelity wireframes) — US-19, US-20
 
@@ -250,7 +267,7 @@ Use this realistic sample data, not lorem ipsum.
 - Large Language Models → renamed by Mai to **LLMs**
 - AI Agents
 - Retrieval-Augmented Generation
-- Reinforcement Learning (used for the fourth-subject example)
+- Reinforcement Learning
 
 **Library** (title — authors, year — subjects — state):
 - *Attention Is All You Need* — Vaswani et al., 2017 — LLMs — Ready
@@ -264,12 +281,12 @@ Use this realistic sample data, not lorem ipsum.
 
 **Suggestions for Toolformer:** AI Agents (Your subject), Large Language Models shown as "LLMs" (Your subject), Tool Use (New).
 
-**J2/J3 conversation:**
-1. "How does ReAct combine reasoning and acting?" → detected: **AI Agents**; cited answer (*ReAct…*, p. 3).
-2. "How does retrieval reduce hallucination in that loop?" → "Added Retrieval-Augmented Generation to this conversation".
-3. "How does self-attention work?" → "Added LLMs to this conversation" + the maximum notice.
-4. "How does PPO clip the policy update?" → matches **Reinforcement Learning**, a fourth subject → not answered; **"New conversation"**.
-5. A decline example: "What's the best laptop for research?" → not covered by Mai's documents.
+**J2/J3 conversation** (no subjects to choose):
+1. "How does ReAct combine reasoning and acting?" → cited answer (*ReAct…*, p. 3). Documents used: *ReAct…*.
+2. "How does retrieval reduce hallucination in that loop?" → cited answer (*Retrieval-Augmented Generation…*, p. 2). Documents used: *ReAct…*, *Retrieval-Augmented Generation…*.
+3. "How does PPO clip the policy update?" → cited answer (*Proximal Policy Optimization Algorithms*, p. 3). Documents used: 3.
+4. A decline example: "What's the best laptop for research?" → not covered by Mai's documents.
+5. For `chat-documents-used-deleted`: Mai deleted *Chain-of-Thought Prompting…*, which an earlier answer cited; it stays listed as "Deleted", and that answer's citation reads "Deleted document".
 
 **Landing page copy** (§6.0; quoted text is required):
 - Headline: "Ask your own documents. Get answers you can check."
@@ -283,8 +300,10 @@ Use this realistic sample data, not lorem ipsum.
 - **Brand:** none yet. Propose one direction (logo mark, palette, type). Favor a reading-friendly, document-centric feel: generous line height for answers, a clear typographic distinction between the tutor's words and quoted or cited material.
 - **Screen sizes:** laptop only; design at 1440 px wide and check at 1280 px. No phone or tablet breakpoints.
 - **States have a consistent visual language:** processing (neutral, animated), needs action (attention color), ready (success), failed (error), archived (muted). Never use color alone; pair each with a label or icon.
-- **Subject chips:** one consistent chip component everywhere (Library, picker, chat header, lists). Subject chips may carry a stable color per subject; keep text contrast AA.
-- **System notices in chat** (subject added, maximum reached) must look different from both tutor and learner messages.
+- **Subject chips:** one consistent chip component everywhere (Library, picker, lists); none in the chat header. Subject chips may carry a stable color per subject; keep text contrast AA.
+- **System notices in chat** (e.g. "Started from note") must look different from both tutor and learner messages.
+- **Highlighted passage in the viewer** must be visible without relying on color alone (outline or side marker), with AA contrast for the text over the highlight.
+- **Deleted** items (documents used, citations) look muted but remain readable, with a text badge, not only a color.
 - **Accessibility:** WCAG 2.1 AA (contrast, keyboard navigation, visible focus, labelled controls). Streaming text must not be announced word by word; announce processing state changes and upload results through a polite live region. The drop zone needs a keyboard-accessible "Upload" button.
 - **Themes:** light mode required; dark mode optional.
 - **Components page:** app shell, filter bar, tabs, table row, document state badge, upload tray item, drop zone, subject chip, subject picker, citation, system notice, banner, empty state, dialog, side panel, status line, toast.
@@ -332,6 +351,7 @@ Use this realistic sample data, not lorem ipsum.
 
 | Version | Date | PRD | Changes | Screens to redo |
 |---|---|---|---|---|
+| v0.8 | 2026-10-08 | v2.21 | End-user feedback: conversations have no subjects (K1); documents used (K2); document viewer with the cited passage highlighted (K3); delete a document (K4); no cross-learner duplicate linking (K5). J2, J3, J4 and the §9 conversation rewritten. | Remove the 7 subject states and `chat-citation-opens-details`; new `chat-documents-used`, `chat-documents-used-deleted`, `chat-citation-deleted`, `viewer-*` (4), `library-delete-confirm`, `library-deleted`; redo the chat and details states listed in §0 |
 | v0.7 | 2026-10-06 | v2.16 | Owner answers: declines never offer "New conversation" (E4); the declined question isn't kept (E6); archived documents' subjects can't be changed, reversing D7 (E7); daily limits reset at midnight GMT+7 (E8); registration without a username field (F1). | Remove `chat-decline-other-subject`, `picker-change-subjects-archived`; redo `library-archived`, `details-archived`, `library-rate-limited`, `chat-rate-limited`, `auth-sign-up` |
 | v0.6 | 2026-10-06 | v2.15 | Joins the two parallel v0.5 versions below; upload-rights line in the Library (G2); no terms link on the landing page; sign-out returns to the landing page (G4). | `library-empty`, `library-default` and other drop-zone states; `landing-default` footer |
 | v0.5 | 2026-10-06 | v2.14 | Scope cut by the owner: no terms of use step, no Settings page; Q6 dropped. | Remove `terms-first-run`, `terms-accepted`, `settings-default`; navigation without Settings |
@@ -356,6 +376,7 @@ Use this realistic sample data, not lorem ipsum.
 | 5 (designer) | v0.5 | Round 4 applied the scope cut on top of the landing page. G1 two different v0.5 briefs; G2 the terms checkbox held the upload-rights confirmation; G3 Settings held the theme and the citations default (both already elsewhere, note only); G4 where sign-out goes. F1 email as username; F2 "Sign in" for a signed-in visitor. | G1 merged into v0.6; G2 one line "Only upload documents you have the right to use." under the drop zone, nothing to accept; G3 noted; G4 the landing page (keep). F1, F4 and E4, E6, E7, E8 still open; F3 moot. PRD v2.15 (Q46, Q47). | v0.6 |
 | 6 (owner) | v0.6 | Answers to E4, E6, E7, E8, F1, F2. | E4: "New conversation" only at 3 subjects, never on a decline; E6: don't keep the declined question; E7: no changing subjects of archived documents (low business value; reverses D7); E8: daily limits reset at midnight GMT+7; F1: email as username; F2: confirmed. F4 still open. PRD v2.16 (Q48–Q52). | v0.7 |
 | 7 (designer) | v0.7 | Round 6 delivered: 97 states (removed `chat-decline-other-subject`, `picker-change-subjects-archived`); E4, E7, E8, F1 applied. Questions: **I1** each limit state shows both the hourly and the daily message, though only one applies at a time: keep one state each, or add `library-rate-limited-daily` and `chat-rate-limited-daily`?; I2 fixing an archived document's subject means restoring it, which makes it count for answers again (accepted; revisit after the pilot); H1 the upload-rights line stays under the disabled "Upload" at the limit; E5 chat hint "2 documents can't be used yet: 1 is processing, 1 needs subjects"; E10 a separate D6 state (optional). F4 still open. | Owner: round accepted as `design-v0.7`. F4: follow the designer, "Remember me" and "Forgot password?" on (PRD v2.17, Q53). I1: deferred, low priority; the limit states stay as they are. I2 accepted. H1, E5, E10: not pursued. | v0.7 (accepted) |
+| 8 (end users, owner) | v0.7 | End-user feedback: same file by different learners must not be linked; chat must not need subjects; see the documents a conversation used and open them; see where a cited chunk is in its document; delete own unshared documents. | Owner: per-learner contents; remove subject detection from conversations; documents used; PDF viewer at the highlighted chunk; delete with "Deleted" in documents used and citations; archive stays. PRD v2.21 (Q54–Q58). | v0.8 |
 
 ---
 
@@ -363,4 +384,4 @@ Use this realistic sample data, not lorem ipsum.
 
 Paste this, together with this file, to start or continue a round:
 
-> You are designing **Smart Tutor**, a laptop web app (1440 px, light mode) where learners upload their own PDFs and ask a tutor that answers only from them, with citations. Follow the attached design brief **v0.7** exactly; it is the source of truth. Start with **§0 What changed**: this round updates the existing prototype in this project, so change only what is listed there and keep everything else as it is. Keep (1) the four clickable flows in §5 working, (2) every Release 1 screen and state in §6, (3) the wireframes for §7 and §8, and (4) the components page (§10). Use the sample data in §9 and the quoted wording verbatim. Name each frame `<screen>-<state>@v0.7`. Do not design anything listed as out of scope in §4. Follow the prototype contract in §11 item 6: every state in `window.ST.STATES` with its specific user stories in `ref`, each state at `index.html#/<state-id>`, and review chrome hidden when the URL has `?shot=1`. End with a list of questions or proposed changes to the brief.
+> You are designing **Smart Tutor**, a laptop web app (1440 px, light mode) where learners upload their own PDFs and ask a tutor that answers only from them, with citations. Follow the attached design brief **v0.8** exactly; it is the source of truth. Start with **§0 What changed**: this round updates the existing prototype in this project, so change only what is listed there and keep everything else as it is. Keep (1) the four clickable flows in §5 working, (2) every Release 1 screen and state in §6, (3) the wireframes for §7 and §8, and (4) the components page (§10). Use the sample data in §9 and the quoted wording verbatim. Name each frame `<screen>-<state>@v0.8`. Do not design anything listed as out of scope in §4. Follow the prototype contract in §11 item 6: every state in `window.ST.STATES` with its specific user stories in `ref`, each state at `index.html#/<state-id>`, and review chrome hidden when the URL has `?shot=1`. End with a list of questions or proposed changes to the brief.
