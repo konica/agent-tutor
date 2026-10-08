@@ -90,11 +90,11 @@ docker push "$Registry/smart-tutor/api:$Tag"
 helm upgrade --install smart-tutor deploy/helm/smart-tutor -n smart-tutor --create-namespace -f deploy/helm/smart-tutor/values-prod.yaml --set global.imageRegistry=$Registry --set global.imageTag=$Tag --set global.publicUrl=$Url --wait --timeout 15m
 ```
 
-`global.publicUrl` is the CloudFront address from step 2. Without it Keycloak refuses to start. The first install runs the `db-bootstrap` hook, which creates the database roles and databases. Keycloak's first start takes about 2 min (schema and realm import), so `--wait` is slow the first time; `--timeout 15m` (Helm's default is 5 min) covers the hook plus that first start. Before the API rolls out, the `migrate` hook brings the app database to the latest Alembic revision; if it fails, the release fails and the running API stays.
+`global.publicUrl` is the CloudFront address from step 2. Without it Keycloak refuses to start. The first install runs the `db-bootstrap` hook, which creates the database roles and databases. Keycloak's first start takes about 2 min (schema and realm import), so `--wait` is slow the first time; `--timeout 15m` (Helm's default is 5 min) covers the hook plus that first start. Before the API rolls out, the `migrate` hook brings the app database to the latest Alembic revision; if it fails, the release fails and the running API stays. A failed hook Job stays for debugging: `kubectl -n smart-tutor logs job/migrate`.
 
 ## 7. Check
 
-A new distribution and new targets can take a few minutes to settle. A 502 or 503 at first is expected: retry after 2 to 3 minutes.
+A new distribution and new targets can take a few minutes to settle. A 502 or 503 at first is expected: retry after 2 to 3 minutes. If the API pods CrashLoop, run `kubectl -n smart-tutor logs deploy/api`; a `ParameterNotFound` error means the Config stack is not deployed (run step 2).
 
 ```powershell
 kubectl -n smart-tutor get pods,externalsecrets,targetgroupbindings
@@ -152,32 +152,40 @@ Send the client the address, username, and temporary password through separate c
 Use the account from step 8. Never paste a token anywhere except the variable below.
 
 1. Open `$Url` in a private window and choose **Sign in**. Sign in as the step 8 account. The Library shows, with the user's name in the user menu.
-2. In DevTools → Network, find the request to `/api/me` and copy the `Authorization` value after `Bearer `. In PowerShell:
+2. In DevTools → Network, find the request to `/api/me` and copy the `Authorization` value after `Bearer `. Keep it in `$Tok`: step 3 reuses it after you sign out. In PowerShell:
 
 ```powershell
 $Tok = "<paste>"
 curl.exe -s -o NUL -w "%{http_code}" -H "Authorization: Bearer $Tok" "$Url/api/me"      # 200
 ```
 
-3. Sign out in the app and run the same `curl.exe` again: `401`.
+3. Sign out in the app and run the same `curl.exe` again with the `$Tok` captured in step 2: `401`.
 4. Call without a token: `401` with `WWW-Authenticate: Bearer`.
 
 ```powershell
 curl.exe -si "$Url/api/me"
 ```
 
-5. Restart Keycloak. While it rolls out, `/api/healthz` stays `200` and a call with a token gives `401`, never 5xx. After the rollout, signing in again works.
+5. Take Keycloak down. A rolling restart never does (`maxUnavailable: 0`), so scale it to zero. First sign in again in the app and copy a fresh token into `$Tok2` the same way as in step 2 (the old `$Tok` was revoked by the sign-out). Do not paste it anywhere else.
 
 ```powershell
-kubectl -n smart-tutor rollout restart deploy/keycloak
-curl.exe -s -o NUL -w "%{http_code}" "$Url/api/healthz"      # 200
+$Tok2 = "<paste>"
+kubectl -n smart-tutor scale deploy/keycloak --replicas=0
+kubectl -n smart-tutor get pods -l app.kubernetes.io/name=keycloak      # repeat until no pod is Running
+curl.exe -s -o NUL -w "%{http_code}" "$Url/api/healthz"                                          # 200
+curl.exe -s -o NUL -w "%{http_code}" -H "Authorization: Bearer $Tok2" "$Url/api/me"              # 401, never 5xx
+kubectl -n smart-tutor scale deploy/keycloak --replicas=1
+kubectl -n smart-tutor rollout status deploy/keycloak
+curl.exe -s -o NUL -w "%{http_code}" -H "Authorization: Bearer $Tok2" "$Url/api/me"              # 200 again
 ```
+
+   Keycloak keeps its sessions in the database, so the same `$Tok2` works again, and a new sign-in in the app works. The next `helm upgrade` restores the replica count from the values in any case.
 
 6. DevTools shows no `OPTIONS` preflight to `/api`, because the app and the API share one origin.
 
 ## 9. Update after a change
 
-Deploy infrastructure changes with CDK first (`npx aws-cdk@latest deploy --all` from `infra/`), then rebuild and push the images with a new tag and run the `helm upgrade` from step 6 again (with `--timeout 15m`). The order matters: the API pods read their SSM parameters at startup through a Pod Identity association that the CDK stacks create. The upgrade runs the `db-bootstrap` and `migrate` hooks first, so a password rotated in Secrets Manager reaches the database. Running Keycloak pods keep the old `KC_DB_PASSWORD` (the environment is read at start, and External Secrets refreshes `keycloak-db` only hourly), so after rotating: run the `helm upgrade`, force the sync with `kubectl -n smart-tutor annotate externalsecret keycloak-db force-sync=$(Get-Date -UFormat %s) --overwrite`, then `kubectl -n smart-tutor rollout restart deploy/keycloak`. #59 automates both.
+Deploy infrastructure changes with CDK first (`npx aws-cdk@latest deploy --all` from `infra/`), then rebuild and push the images with a new tag and run the `helm upgrade` from step 6 again (with `--timeout 15m`). The order matters: the API pods read their SSM parameters at startup through a Pod Identity association that the CDK stacks create. The upgrade runs the `db-bootstrap` and `migrate` hooks first. Only `db-bootstrap` resets database passwords, so a password rotated in Secrets Manager reaches the database there; `migrate` only applies the schema. Running Keycloak and API pods keep the old password (the environment is read at start, and External Secrets refreshes `keycloak-db` and `api-db` only hourly), so after rotating: run the `helm upgrade`, force the syncs with `kubectl -n smart-tutor annotate externalsecret keycloak-db force-sync=$(Get-Date -UFormat %s) --overwrite` and `kubectl -n smart-tutor annotate externalsecret api-db force-sync=$(Get-Date -UFormat %s) --overwrite`, then `kubectl -n smart-tutor rollout restart deploy/keycloak` and `kubectl -n smart-tutor rollout restart deploy/api`. #59 automates both.
 
 ## 10. Tear down
 
