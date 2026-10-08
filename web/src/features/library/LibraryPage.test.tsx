@@ -523,4 +523,80 @@ describe("LibraryPage retry", () => {
     await userEvent.click(within(row).getByRole("button", { name: "Retry scan.pdf" }));
     expect(await screen.findByRole("status")).toHaveTextContent("scan.pdf could not be processed.");
   });
+
+  describe("filters", () => {
+    const ready: DocumentResponse = { ...processing, state: "ready", subjects: [{ subject_id: "s1", name: "AI Agents" }], authors: ["Timo Schick", "Jane Dwivedi-Yu", "Roberto Dessì"], year: 2023 };
+    const subjects = async () => [
+      { subject_id: "s1", name: "AI Agents" },
+      { subject_id: "s2", name: "LLMs" },
+    ];
+
+    it("shows the byline and the filter bar with the count", async () => {
+      render(<LibraryPage check={notInLibrary} loadLimits={limits} loadSubjects={subjects} load={async () => [ready]} upload={vi.fn()} />);
+      expect(await screen.findByText("Schick et al. · 2023")).toBeVisible();
+      expect(screen.getByRole("search", { name: "Filter documents" })).toBeVisible();
+      expect(screen.getByText("1 document")).toBeVisible();
+      expect(screen.queryByRole("button", { name: "Clear filters" })).toBeNull();
+    });
+
+    it("loads with the chosen subject, state and dates", async () => {
+      const load = vi.fn(async () => [ready]);
+      render(<LibraryPage check={notInLibrary} loadLimits={limits} loadSubjects={subjects} load={load} upload={vi.fn()} />);
+      await screen.findByText("lewis-rag-2020.pdf");
+      expect(load).toHaveBeenLastCalledWith({});
+      await screen.findByRole("option", { name: "AI Agents" });
+      await userEvent.selectOptions(screen.getByLabelText("Subject"), "s1");
+      await waitFor(() => expect(load).toHaveBeenLastCalledWith({ subject_ids: ["s1"] }));
+      await userEvent.selectOptions(screen.getByLabelText("State"), "awaiting_subjects");
+      await waitFor(() => expect(load).toHaveBeenLastCalledWith({ subject_ids: ["s1"], state: "awaiting_subjects" }));
+      fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-10-01" } });
+      fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-10-07" } });
+      await waitFor(() => expect(load).toHaveBeenLastCalledWith({ subject_ids: ["s1"], state: "awaiting_subjects", uploaded_from: "2026-10-01", uploaded_to: "2026-10-07" }));
+    });
+
+    it("shows the no-results state, keeps Upload, and Clear filters restores the list and focuses Subject", async () => {
+      const load = vi.fn(async (filters: { subject_ids?: string[] }) => (filters.subject_ids ? [] : [ready]));
+      render(<LibraryPage check={notInLibrary} loadLimits={limits} loadSubjects={subjects} load={load} upload={vi.fn()} />);
+      await screen.findByText("lewis-rag-2020.pdf");
+      await screen.findByRole("option", { name: "LLMs" });
+      await userEvent.selectOptions(screen.getByLabelText("Subject"), "s2");
+      expect(await screen.findByText("No documents match these filters")).toBeVisible();
+      expect(screen.getByText("Try another subject, state or a wider date range.")).toBeVisible();
+      expect(screen.getByText("0 documents")).toBeVisible();
+      expect(screen.queryByText("Upload your first document")).toBeNull();
+      expect(screen.getByRole("button", { name: "Upload" })).toBeVisible();
+      const clear = screen.getAllByRole("button", { name: "Clear filters" });
+      await userEvent.click(clear[clear.length - 1]);
+      expect(await screen.findByText("lewis-rag-2020.pdf")).toBeVisible();
+      expect(load).toHaveBeenLastCalledWith({});
+      expect(screen.getByLabelText("Subject")).toHaveValue("");
+      expect(screen.getByLabelText("Subject")).toHaveFocus();
+      expect(screen.queryByRole("button", { name: "Clear filters" })).toBeNull();
+    });
+
+    it("keeps the upload empty state, without the filter bar, for an empty library with no filters", async () => {
+      render(<LibraryPage check={notInLibrary} loadLimits={limits} loadSubjects={subjects} load={async () => []} upload={vi.fn()} />);
+      expect(await screen.findByText("Upload your first document")).toBeVisible();
+      expect(screen.queryByRole("search")).toBeNull();
+      expect(screen.queryByText("No documents match these filters")).toBeNull();
+    });
+
+    it("does not announce documents entering or leaving the filtered set", async () => {
+      const load = vi.fn(async (filters: { state?: string }) => (filters.state === "ready" ? [ready] : [{ ...processing, document_id: "d8", title: "pending.pdf" }, { ...ready, document_id: "d9", title: "other.pdf" }]));
+      render(<LibraryPage check={notInLibrary} loadLimits={limits} loadSubjects={subjects} load={load} upload={vi.fn()} />);
+      await screen.findByText("other.pdf");
+      await userEvent.selectOptions(screen.getByLabelText("State"), "ready");
+      await waitFor(() => expect(screen.queryByText("other.pdf")).toBeNull());
+      expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    });
+
+    it("still lists documents when the subjects fail to load", async () => {
+      const broken = async () => {
+        throw new Error("down");
+      };
+      render(<LibraryPage check={notInLibrary} loadLimits={limits} loadSubjects={broken} load={async () => [ready]} upload={vi.fn()} />);
+      expect(await screen.findByText("lewis-rag-2020.pdf")).toBeVisible();
+      expect([...(screen.getByLabelText("Subject") as HTMLSelectElement).options].map((o) => o.text)).toEqual(["All subjects"]);
+    });
+  });
 });

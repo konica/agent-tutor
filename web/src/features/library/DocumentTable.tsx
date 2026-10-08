@@ -3,6 +3,7 @@ import { FileText, RefreshCw } from "lucide-react";
 import type { DocumentResponse } from "../../api/documents";
 import { Button } from "../../components/Button/Button";
 import { StateBadge } from "../../components/StateBadge/StateBadge";
+import { byline } from "./byline";
 import styles from "./DocumentTable.module.css";
 
 function uploadedOn(iso: string, now = new Date()): string {
@@ -60,7 +61,10 @@ export function DocumentTable({ documents, onRetry, retrying, onChooseSubjects, 
                 <span className={styles.fileIcon}>
                   <FileText strokeWidth={1.5} aria-hidden="true" />
                 </span>
-                <span className={styles.title}>{doc.title}</span>
+                <span className={styles.titleStack}>
+                  <span className={styles.title}>{doc.title}</span>
+                  {byline(doc.authors, doc.year) && <span className={styles.byline}>{byline(doc.authors, doc.year)}</span>}
+                </span>
               </span>
             </td>
             <td className={doc.subjects.length ? undefined : styles.muted}>{doc.subjects.map((s) => s.name).join(", ") || "Not chosen yet"}</td>
