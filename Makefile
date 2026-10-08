@@ -1,6 +1,6 @@
 # One entry point for local work. On Windows, run from Git Bash/WSL with `make` installed,
 # or run the commands below directly.
-.PHONY: help up down up-app api agent mcp worker api-debug agent-debug mcp-debug worker-debug sync migrate lint test test-integration bedrock-check sweep glacier-tag retention evals-smoke web api-client infra-synth helm-lint
+.PHONY: help up down up-app api agent mcp worker api-debug agent-debug mcp-debug worker-debug sync migrate lint test test-integration bedrock-check sweep glacier-tag retention evals-smoke evals-tune-detection seed-corpus web api-client infra-synth helm-lint
 .PHONY: design-states design-accept design-shots design-diff
 
 BACKEND := cd backend &&
@@ -69,6 +69,12 @@ retention:     ## run the retention job once: traces 180 days, decline log 90 da
 
 evals-smoke:
 	$(BACKEND) uv run --extra eval python -m evals.run --split smoke
+
+evals-tune-detection: ## sweep detection policies on the labeled dataset and print the best (no LangSmith)
+	$(BACKEND) uv run --extra eval python -m evals.tune_detection
+
+seed-corpus:   ## download the seed corpus PDFs, verifying each SHA-256
+	$(BACKEND) uv run --extra eval python -m evals.seed_corpus.download
 
 api-client:    ## regenerate web/src/api from the API's OpenAPI schema
 	$(BACKEND) uv run python -m smart_tutor.apps.api.openapi_export ../web/src/api/openapi.json && cd ../web && npm --prefix tools/api-gen ci && npm run api:generate

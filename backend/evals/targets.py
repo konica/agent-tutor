@@ -1,13 +1,29 @@
 """How an evaluation run invokes the agent: one input example in, the run's outputs and trajectory out (M2)."""
 
+import asyncio
+from collections.abc import Callable
 from typing import Any
 
-from evals.corpus_index import CorpusIndex, build_index, index_key, load_or_build_index
+from langchain_core.embeddings import Embeddings
+
+from evals.corpus_index import (
+    CorpusIndex,
+    SeedCorpusRetriever,
+    build_index,
+    index_key,
+    load_or_build_index,
+    subject_id,
+)
 from evals.seed_corpus.manifest import PDF_DIR, load_manifest
 from smart_tutor.knowledge.adapters.chunking import build_chunker
 from smart_tutor.knowledge.adapters.pypdf_extractor import PypdfExtractor
+from smart_tutor.shared.adapters.aws.clients import ssm_client
+from smart_tutor.shared.adapters.aws.ssm_parameters import SsmParameterStore
 from smart_tutor.shared.adapters.model_factory import ModelFactory
 from smart_tutor.shared.config import Settings
+from smart_tutor.tutoring.application import load_detection_policy
+from smart_tutor.tutoring.application.subject_detector import SubjectDetector
+from smart_tutor.tutoring.domain.detection import DetectionPolicy
 
 
 def seed_index(settings: Settings) -> CorpusIndex:
@@ -29,6 +45,48 @@ def seed_index(settings: Settings) -> CorpusIndex:
         key,
         lambda: build_index(docs, lambda d: d.pdf_path().read_bytes(), extractor, chunker, embeddings),
     )
+
+
+def ssm_policy(settings: Settings) -> DetectionPolicy:
+    """The policy the agent would load (SSM; LocalStack locally)."""
+    return load_detection_policy(
+        SsmParameterStore(ssm_client(settings)),
+        settings.detect_threshold_param,
+        settings.detect_margin_param,
+        settings.multi_margin_param,
+    )
+
+
+def parse_policy(text: str) -> DetectionPolicy:
+    """`T,M,MM` as given to `--policy`."""
+    parts = text.split(",")
+    if len(parts) != 3:
+        raise ValueError(f"--policy needs THRESHOLD,MARGIN,MULTI_MARGIN, got {text!r}")
+    threshold, margin, multi_margin = (float(p) for p in parts)
+    return DetectionPolicy(threshold, margin, multi_margin)
+
+
+def learner_subject_names(index: CorpusIndex, learner_documents: list[str]) -> list[str]:
+    return sorted({name for doc_id in learner_documents for name in index.documents[doc_id].subjects})
+
+
+def detection_target(
+    index: CorpusIndex, embeddings: Embeddings, policy: DetectionPolicy
+) -> Callable[[dict[str, Any]], dict[str, Any]]:
+    """Detect a first question's subjects as the agent would, over the learner's seed documents; names, not ids."""
+
+    def target(inputs: dict[str, Any]) -> dict[str, Any]:
+        names = learner_subject_names(index, inputs["learner_documents"])
+        by_id = {subject_id(n): n for n in names}
+        retriever = SeedCorpusRetriever(index, inputs["learner_documents"], embeddings)
+        detection = asyncio.run(SubjectDetector(retriever, policy).detect(inputs["question"], list(by_id)))
+        return {
+            "subjects": [by_id[s] for s in detection.subject_ids],
+            "unsure": detection.unsure,
+            "scores": {by_id[s]: score for s, score in detection.scores.items()},
+        }
+
+    return target
 
 
 def tutor_target(inputs: dict[str, Any]) -> dict[str, Any]:
