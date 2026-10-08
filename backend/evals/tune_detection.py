@@ -1,6 +1,8 @@
 """Pick detection thresholds: replay labeled per-subject scores through candidate policies (PRD §10.3).
 
-Usage: uv run --extra eval python -m evals.tune_detection [--split full|smoke]   (no LangSmith; embeds the questions)
+Usage (from backend/):
+    uv run --env-file ../.env --extra eval python -m evals.tune_detection [--split full|smoke]
+No LangSmith; embeds the questions.
 """
 
 import argparse
@@ -119,7 +121,7 @@ def main() -> None:
         goals,
         _frange(0.20, 0.80, 0.01),
         _frange(0.0, 0.15, 0.005),
-        _frange(0.0, 0.10, 0.005),
+        _frange(0.0, 0.20, 0.005),
     )
     print(f"Top 10 of {len(ranked)} policies on {len(items)} {args.split} items (targets {dict(goals)}):")
     for policy, metrics, margin in ranked[:10]:

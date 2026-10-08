@@ -1,7 +1,9 @@
 """How an evaluation run invokes the agent: one input example in, the run's outputs and trajectory out (M2)."""
 
 import asyncio
+import hashlib
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from langchain_core.embeddings import Embeddings
@@ -14,7 +16,7 @@ from evals.corpus_index import (
     load_or_build_index,
     subject_id,
 )
-from evals.seed_corpus.manifest import PDF_DIR, load_manifest
+from evals.seed_corpus.manifest import PDF_DIR, SeedDocument, load_manifest
 from smart_tutor.knowledge.adapters.chunking import build_chunker
 from smart_tutor.knowledge.adapters.pypdf_extractor import PypdfExtractor
 from smart_tutor.shared.adapters.aws.clients import ssm_client
@@ -24,6 +26,18 @@ from smart_tutor.shared.config import Settings
 from smart_tutor.tutoring.application import load_detection_policy
 from smart_tutor.tutoring.application.subject_detector import SubjectDetector
 from smart_tutor.tutoring.domain.detection import DetectionPolicy
+
+
+def read_verified_pdf(doc: SeedDocument, pdf_dir: Path = PDF_DIR) -> bytes:
+    """The document's PDF bytes, checked against the manifest SHA-256 so a truncated file is never indexed."""
+    path = doc.pdf_path(pdf_dir)
+    data = path.read_bytes()
+    if hashlib.sha256(data).hexdigest() != doc.sha256:
+        raise ValueError(
+            f"{doc.id}: {path} does not match the manifest SHA-256 (truncated or corrupt); "
+            "re-run `uv run --extra eval python -m evals.seed_corpus.download`"
+        )
+    return data
 
 
 def seed_index(settings: Settings) -> CorpusIndex:
@@ -43,7 +57,7 @@ def seed_index(settings: Settings) -> CorpusIndex:
         docs,
         PDF_DIR / "index",
         key,
-        lambda: build_index(docs, lambda d: d.pdf_path().read_bytes(), extractor, chunker, embeddings),
+        lambda: build_index(docs, read_verified_pdf, extractor, chunker, embeddings),
     )
 
 

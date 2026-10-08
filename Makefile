@@ -68,10 +68,10 @@ retention:     ## run the retention job once: traces 180 days, decline log 90 da
 	$(BACKEND) uv run python -m smart_tutor.apps.jobs.retention
 
 evals-smoke:
-	$(BACKEND) uv run --extra eval python -m evals.run --split smoke
+	$(HOST) --extra eval python -m evals.run --split smoke
 
 evals-tune-detection: ## sweep detection policies on the labeled dataset and print the best (no LangSmith)
-	$(BACKEND) uv run --extra eval python -m evals.tune_detection
+	$(HOST) --extra eval python -m evals.tune_detection
 
 seed-corpus:   ## download the seed corpus PDFs, verifying each SHA-256
 	$(BACKEND) uv run --extra eval python -m evals.seed_corpus.download

@@ -1,6 +1,6 @@
 """Download the seed corpus PDFs, verifying each against its manifest SHA-256.
 
-Run: `uv run python -m evals.seed_corpus.download` (from `backend/`).
+Run: `uv run --extra eval python -m evals.seed_corpus.download` (from `backend/`).
 """
 
 from __future__ import annotations

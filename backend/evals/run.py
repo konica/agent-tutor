@@ -1,6 +1,6 @@
 """Run an evaluation split as a LangSmith experiment and check it against thresholds.yaml.
 
-Usage: uv run --extra eval python -m evals.run --split smoke|full [--policy T,M,MM]
+Usage (from backend/): uv run --env-file ../.env --extra eval python -m evals.run --split smoke|full [--policy T,M,MM]
 
 The subject-detection dataset is YAML in this repo; each run syncs it to LangSmith (examples matched by
 `metadata.item_id`) and evaluates the chosen split against the policy the agent would load from SSM.

@@ -1,4 +1,9 @@
-"""Subject-detection metrics (PRD §10.1): exactly correct, contains a wrong subject, asked when clear."""
+"""Subject-detection metrics (PRD §10.1): exactly correct, contains a wrong subject, asked when clear.
+
+Denominators: `exact_set` and `asked_when_clear` average over clear items only (single- and multi-subject);
+`contains_wrong` averages over all items, ambiguous ones included, where binding any subset of the straddled
+subjects is not wrong.
+"""
 
 from collections import defaultdict
 from collections.abc import Collection, Iterable, Mapping

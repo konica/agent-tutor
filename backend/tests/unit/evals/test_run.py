@@ -155,8 +155,8 @@ def test_parse_policy() -> None:
 
 
 def test_tuning_grids_have_the_expected_sizes_and_endpoints() -> None:
-    thresholds, margins, multi = _frange(0.20, 0.80, 0.01), _frange(0.0, 0.15, 0.005), _frange(0.0, 0.10, 0.005)
-    assert (len(thresholds), len(margins), len(multi)) == (61, 31, 21)
+    thresholds, margins, multi = _frange(0.20, 0.80, 0.01), _frange(0.0, 0.15, 0.005), _frange(0.0, 0.20, 0.005)
+    assert (len(thresholds), len(margins), len(multi)) == (61, 31, 41)
     assert (thresholds[0], thresholds[-1]) == (0.20, 0.80)
     assert (margins[0], margins[-1]) == (0.0, 0.15)
-    assert (multi[0], multi[-1]) == (0.0, 0.10)
+    assert (multi[0], multi[-1]) == (0.0, 0.20)

@@ -29,7 +29,7 @@ def failures(scores: Mapping[str, float], targets: Mapping[str, tuple[str, float
         if metric not in scores:
             found.append(f"{metric} missing")
         elif comparator == "min" and scores[metric] < value:
-            found.append(f"{metric} {scores[metric]:.2f} < min {value:.2f}")
+            found.append(f"{metric} {scores[metric]:.3f} < min {value:.3f}")
         elif comparator == "max" and scores[metric] > value:
-            found.append(f"{metric} {scores[metric]:.2f} > max {value:.2f}")
+            found.append(f"{metric} {scores[metric]:.3f} > max {value:.3f}")
     return found
