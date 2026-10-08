@@ -1,5 +1,5 @@
 """The public entry point (ADR 0009): CloudFront on its default *.cloudfront.net domain reaches an internal ALB
-through a VPC origin. Path routing: `/` → web, `/auth/*` → Keycloak (#57); `/api/*` arrives with #58.
+through a VPC origin. Path routing: `/` → web, `/auth/*` → Keycloak (#57), `/api/*` → API (#58).
 
 CDK owns the ALB, its listener, and one target group per service. In the cluster, the AWS Load Balancer Controller
 only registers pod IPs into a target group, through a TargetGroupBinding that names it. So one `cdk deploy` builds the
@@ -15,7 +15,7 @@ from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_elasticloadbalancingv2 as elbv2
 from constructs import Construct
 
-POD_PORT = 8080  # web and Keycloak both listen here, so one ALB → pod rule covers both
+POD_PORT = 8080  # web, Keycloak, and the API all listen here, so one ALB → pod rule covers them
 
 
 class EdgeStack(cdk.Stack):
@@ -41,7 +41,7 @@ class EdgeStack(cdk.Stack):
         )
         alb_sg.add_ingress_rule(ec2.Peer.ipv4(vpc.vpc_cidr_block), ec2.Port.tcp(80), "CloudFront VPC origin")
         alb_sg.add_egress_rule(
-            ec2.Peer.security_group_id(cluster_security_group_id), ec2.Port.tcp(POD_PORT), "web and Keycloak pods"
+            ec2.Peer.security_group_id(cluster_security_group_id), ec2.Port.tcp(POD_PORT), "web, Keycloak, and API pods"
         )
         # Pods use the EKS cluster security group; the rule lives here to keep ClusterStack free of edge concerns.
         ec2.CfnSecurityGroupIngress(
@@ -52,7 +52,7 @@ class EdgeStack(cdk.Stack):
             from_port=POD_PORT,
             to_port=POD_PORT,
             source_security_group_id=alb_sg.security_group_id,
-            description="Internal ALB to web and Keycloak pods",
+            description="Internal ALB to web, Keycloak, and API pods",
         )
 
         load_balancer = elbv2.ApplicationLoadBalancer(
@@ -91,6 +91,19 @@ class EdgeStack(cdk.Stack):
             ),
             deregistration_delay=cdk.Duration.seconds(30),
         )
+        api_target_group_name = f"{name_prefix}-api"
+        api_targets = elbv2.ApplicationTargetGroup(
+            self,
+            "ApiTargets",
+            target_group_name=api_target_group_name,
+            vpc=vpc,
+            port=POD_PORT,
+            protocol=elbv2.ApplicationProtocol.HTTP,
+            target_type=elbv2.TargetType.IP,
+            # Through the API's root path (SMART_TUTOR_ROOT_PATH=/api), as CloudFront forwards it; needs no token.
+            health_check=elbv2.HealthCheck(path="/api/healthz", healthy_http_codes="200"),
+            deregistration_delay=cdk.Duration.seconds(30),
+        )
         listener = load_balancer.add_listener(
             "Http", port=80, protocol=elbv2.ApplicationProtocol.HTTP, open=False, default_target_groups=[web_targets]
         )
@@ -99,6 +112,12 @@ class EdgeStack(cdk.Stack):
             priority=10,
             conditions=[elbv2.ListenerCondition.path_patterns(["/auth/*"])],
             target_groups=[keycloak_targets],
+        )
+        listener.add_target_groups(
+            "Api",
+            priority=20,
+            conditions=[elbv2.ListenerCondition.path_patterns(["/api/*"])],
+            target_groups=[api_targets],
         )
 
         # No domain means no certificate for the ALB, so the CloudFront → ALB hop is HTTP. It stays on AWS's network
@@ -115,7 +134,7 @@ class EdgeStack(cdk.Stack):
         distribution = cloudfront.Distribution(
             self,
             "Distribution",
-            comment=f"{name_prefix}: web, /auth (later /api)",
+            comment=f"{name_prefix}: web, /auth, /api",
             price_class=cloudfront.PriceClass.PRICE_CLASS_100,
             default_behavior=cloudfront.BehaviorOptions(
                 origin=origin,
@@ -133,6 +152,13 @@ class EdgeStack(cdk.Stack):
                     # document (token_endpoint, jwks_uri) from the request Host, and the ALB routes by path only.
                     origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER,
                 ),
+                "/api/*": cloudfront.BehaviorOptions(
+                    origin=origin,
+                    viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                    allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
+                    cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,  # learner data, per token
+                    origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER,  # forwards Authorization
+                ),
             },
         )
 
@@ -140,3 +166,4 @@ class EdgeStack(cdk.Stack):
         cdk.CfnOutput(self, "DistributionId", value=distribution.distribution_id)
         cdk.CfnOutput(self, "WebTargetGroupName", value=web_target_group_name)
         cdk.CfnOutput(self, "KeycloakTargetGroupName", value=keycloak_target_group_name)
+        cdk.CfnOutput(self, "ApiTargetGroupName", value=api_target_group_name)
