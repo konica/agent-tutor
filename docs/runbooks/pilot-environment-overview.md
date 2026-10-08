@@ -158,8 +158,8 @@ sequenceDiagram
   GH->>GH: checks (ruff, mypy, import contracts, pytest, web build, infra tests)
   GH->>STS: OIDC token → AssumeRoleWithWebIdentity
   STS-->>GH: 1-hour credentials of smart-tutor-github-deploy
-  GH->>ECR: push api, web, keycloak images tagged with the commit SHA
   GH->>CFN: cdk deploy (VPC, EKS, RDS, ECR, CloudFront, budget ...)
+  GH->>ECR: push api, web, keycloak images tagged with the commit SHA
   GH->>EKS: helm upgrade --set global.imageTag=SHA
   EKS->>EKS: pre-upgrade hook: migrate Job (a failure stops the release)
   EKS->>EKS: roll out api, web, keycloak (readiness probes)

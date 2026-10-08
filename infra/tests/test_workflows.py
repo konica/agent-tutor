@@ -53,11 +53,17 @@ def test_only_main_and_rollback_reach_the_pilot_environment() -> None:
     assert deploy_job()["environment"] == "pilot"
     for name in ("deploy.yml", "rollback.yml"):
         wf = workflow(name)
-        assert wf["permissions"] == {"contents": "read", "id-token": "write"}, name
-        assert any(
-            j.get("uses") == "./.github/workflows/deploy-pilot.yml"
+        # id-token is granted only to the job that calls the deploy workflow
+        assert "permissions" not in wf, name
+        (caller,) = (
+            j
             for j in wf["jobs"].values()
-        ), name
+            if j.get("uses") == "./.github/workflows/deploy-pilot.yml"
+        )
+        assert caller["permissions"] == {"contents": "read", "id-token": "write"}, name
+    assert workflow("deploy.yml")["jobs"]["checks"]["permissions"] == {
+        "contents": "read"
+    }
     # Only the pilot deploy job names the pilot deploy role (openwiki-update.yml has its own Bedrock-only role).
     for path in WORKFLOWS.glob("*.yml"):
         if path.name != "deploy-pilot.yml":
@@ -117,10 +123,37 @@ def test_merge_builds_pushes_and_deploys_in_order() -> None:
 
 def test_release_uses_the_tag_and_the_stack_outputs() -> None:
     text = steps_text(deploy_job())
-    assert "global.imageTag=${{ inputs.image_tag }}" in text
+    assert 'global.imageTag="$IMAGE_TAG"' in text
     for output in ("RegistryUri", "CloudFrontUrl", "VpcId"):
         assert output in text
     assert "values-prod.yaml" in text and "--wait --timeout 15m" in text
+
+
+def test_no_expressions_from_inputs_inside_run_scripts() -> None:
+    for step in deploy_job()["steps"]:
+        assert "${{ inputs." not in str(step.get("run", "")), step.get("name")
+
+
+def test_stack_outputs_fail_loudly_when_missing() -> None:
+    step = next(
+        s for s in deploy_job()["steps"] if s.get("name") == "Read the stack outputs"
+    )
+    run = str(step["run"])
+    assert run.count("!= None") == 3
+    assert run.count("::error::") == 3
+
+
+def test_third_party_actions_are_pinned_and_set_up_before_credentials() -> None:
+    steps = deploy_job()["steps"]
+    uses = [str(s["uses"]) for s in steps if "uses" in s]
+    for ref in uses:
+        assert re.fullmatch(r"[\w./-]+@[0-9a-f]{40}", ref), ref
+    creds = next(
+        i for i, s in enumerate(steps) if "configure-aws" in str(s.get("uses"))
+    )
+    for i, step in enumerate(steps):
+        if "setup-" in str(step.get("uses")):
+            assert i < creds, step["uses"]
 
 
 def test_add_ons_match_the_runbook_versions() -> None:
@@ -155,16 +188,34 @@ def test_rollback_checks_the_images_exist_and_skips_build_and_cdk() -> None:
     assert (
         checkout["with"]["ref"] == "${{ inputs.image_tag }}"
     )  # the chart that matches the images
-    verify = next(s for s in steps if "describe-images" in str(s.get("run", "")))
-    assert verify["if"] == "${{ !inputs.build }}"
-    assert "^[0-9a-f]{40}$" in str(verify["run"])
+    index = {
+        key: next(i for i, s in enumerate(steps) if key in str(s.get("run", "")))
+        for key in ("^[0-9a-f]{40}$", "describe-images")
+    }
+    creds = next(
+        i for i, s in enumerate(steps) if "configure-aws" in str(s.get("uses"))
+    )
+    checkout_at = steps.index(checkout)
+    # a malformed tag is rejected before checkout and sign-in
+    assert index["^[0-9a-f]{40}$"] < checkout_at < creds
+    assert steps[index["^[0-9a-f]{40}$"]]["if"] == "${{ !inputs.build }}"
+    assert steps[index["describe-images"]]["if"] == "${{ !inputs.build }}"
 
 
 def test_smoke_test_runs_last_against_the_cloudfront_url() -> None:
+    steps = deploy_job()["steps"]
+    last = next(s for s in reversed(steps) if s.get("if") != "failure()")
+    run = str(last["run"])
+    assert "deploy/pilot/smoke_test.py" in run and "CLOUDFRONT_URL" in run
+    # the summary names the deploy only after the smoke test passed
+    assert run.index("smoke_test.py") < run.index("GITHUB_STEP_SUMMARY")
+    assert sum("GITHUB_STEP_SUMMARY" in str(s.get("run", "")) for s in steps) == 1
+
+
+def test_failed_deploys_print_diagnostics() -> None:
     last = deploy_job()["steps"][-1]
-    assert "deploy/pilot/smoke_test.py" in str(last["run"]) and "CLOUDFRONT_URL" in str(
-        last["run"]
-    )
+    assert last["if"] == "failure()"
+    assert "helm -n smart-tutor history" in str(last["run"])
 
 
 def test_deploy_job_has_a_time_limit() -> None:

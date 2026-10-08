@@ -28,22 +28,32 @@ jobs:
       IMAGE_TAG: ${{ inputs.image_tag }}
       JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION: "1"
     steps:
+      # Reject a malformed tag before checking out or signing in.
+      - name: Check the rollback tag
+        if: ${{ !inputs.build }}
+        run: |
+          [[ "$IMAGE_TAG" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::image_tag must be a full 40-character commit SHA"; exit 1; }
+
       # A rollback checks out the old commit, so the chart matches its images.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ inputs.image_tag }}
 
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
-
-      - uses: actions/setup-node@v4
+      # Setup actions run before the AWS credentials exist in the environment.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         if: inputs.build
         with:
           node-version: 22
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         if: inputs.build
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+        with:
+          version: v4.2.1
+
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
 
       - name: Deploy the infrastructure (CDK)
         if: inputs.build
@@ -58,17 +68,24 @@ jobs:
             aws cloudformation describe-stacks --stack-name "SmartTutor-prod-$1" \
               --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text
           }
-          echo "REGISTRY=$(output Registry RegistryUri)" >> "$GITHUB_ENV"
-          echo "CLOUDFRONT_URL=$(output Edge CloudFrontUrl)" >> "$GITHUB_ENV"
-          echo "VPC_ID=$(output Network VpcId)" >> "$GITHUB_ENV"
+          registry=$(output Registry RegistryUri)
+          [[ -n "$registry" && "$registry" != None ]] || { echo "::error::SmartTutor-prod-Registry has no RegistryUri output"; exit 1; }
+          cloudfront_url=$(output Edge CloudFrontUrl)
+          [[ -n "$cloudfront_url" && "$cloudfront_url" != None ]] || { echo "::error::SmartTutor-prod-Edge has no CloudFrontUrl output"; exit 1; }
+          vpc_id=$(output Network VpcId)
+          [[ -n "$vpc_id" && "$vpc_id" != None ]] || { echo "::error::SmartTutor-prod-Network has no VpcId output"; exit 1; }
+          {
+            echo "REGISTRY=$registry"
+            echo "CLOUDFRONT_URL=$cloudfront_url"
+            echo "VPC_ID=$vpc_id"
+          } >> "$GITHUB_ENV"
 
       - name: Check the images to roll back to exist
         if: ${{ !inputs.build }}
         run: |
-          [[ "$IMAGE_TAG" =~ ^[0-9a-f]{40}$ ]] || { echo "image_tag must be a full 40-character commit SHA"; exit 1; }
           for repo in api web keycloak; do
             aws ecr describe-images --repository-name "smart-tutor/$repo" --image-ids imageTag="$IMAGE_TAG" > /dev/null \
-              || { echo "smart-tutor/$repo:$IMAGE_TAG is not in ECR (it keeps the last 30 images)"; exit 1; }
+              || { echo "::error::smart-tutor/$repo:$IMAGE_TAG is not in ECR (it keeps the last 30 images)"; exit 1; }
           done
 
       - name: Build the images
@@ -83,10 +100,6 @@ jobs:
         if: inputs.build
         run: |
           for repo in api web keycloak; do docker push "$REGISTRY/smart-tutor/$repo:$IMAGE_TAG"; done
-
-      - uses: azure/setup-helm@v4
-        with:
-          version: v4.2.1
 
       - name: Connect to the cluster
         run: aws eks update-kubeconfig --name smart-tutor-prod --region "$AWS_REGION"
@@ -105,9 +118,18 @@ jobs:
         run: |
           helm upgrade --install smart-tutor deploy/helm/smart-tutor -n smart-tutor --create-namespace \
             -f deploy/helm/smart-tutor/values-prod.yaml \
-            --set global.imageRegistry="$REGISTRY" --set global.imageTag=${{ inputs.image_tag }} \
+            --set global.imageRegistry="$REGISTRY" --set global.imageTag="$IMAGE_TAG" \
             --set global.publicUrl="$CLOUDFRONT_URL" --wait --timeout 15m
-          echo "Deployed \`$IMAGE_TAG\` to $CLOUDFRONT_URL" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Smoke test the public address
-        run: python3 deploy/pilot/smoke_test.py "$CLOUDFRONT_URL"
+        run: |
+          python3 deploy/pilot/smoke_test.py "$CLOUDFRONT_URL"
+          echo "Deployed \`$IMAGE_TAG\` to $CLOUDFRONT_URL" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Diagnostics
+        if: failure()
+        run: |
+          kubectl -n smart-tutor get pods,jobs,externalsecrets,targetgroupbindings || true
+          kubectl -n smart-tutor logs job/migrate --tail=100 || true
+          kubectl -n smart-tutor logs job/db-bootstrap --tail=50 || true
+          helm -n smart-tutor history smart-tutor || true

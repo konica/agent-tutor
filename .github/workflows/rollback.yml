@@ -10,12 +10,11 @@ on:
         type: string
         required: true
 
-permissions:
-  contents: read
-  id-token: write  # OIDC sign-in to AWS, used only inside the `pilot` environment
-
 jobs:
   rollback:
+    permissions:
+      contents: read
+      id-token: write  # OIDC sign-in to AWS, used only inside the `pilot` environment
     uses: ./.github/workflows/deploy-pilot.yml
     with:
       image_tag: ${{ inputs.image_tag }}

@@ -257,9 +257,9 @@ helm -n smart-tutor rollback smart-tutor <last deployed revision>
 gh workflow run rollback.yml --ref main -f image_tag=<full SHA of an earlier successful deploy>
 ```
 
-Find the SHA with `gh run list --workflow deploy.yml --status success`. The workflow checks the images are still in ECR (the last 30 per repository), checks out that commit's chart, and runs the add-ons, `helm upgrade`, and the smoke test, without CDK or a build. It doesn't undo infrastructure changes.
+Find the SHA with `gh run list --workflow deploy.yml --status success --limit 10 --json headSha,displayTitle,createdAt`. The workflow checks the images are still in ECR (the last 30 per repository), checks out that commit's chart, and runs the add-ons, `helm upgrade`, and the smoke test, without CDK or a build. It doesn't undo infrastructure changes.
 
 - It runs the old commit's chart, add-on values, and smoke test. Commits from before deploy on merge (no `deploy/pilot/smoke_test.py`, images not tagged with the full SHA) can't be rolled back to with the workflow; use the laptop path.
 - Rollback across a migration doesn't work: the old image's `migrate` hook can't find the newer Alembic revision in the database, so the release stops before anything rolls out. Fix forward instead (revert the PR and merge).
 
-**By hand (laptop) instead:** steps 3 and 6 with `$Tag` set to the earlier SHA.
+**By hand (laptop) instead:** steps 3 and 6 with `$Tag` set to the tag the images were pushed with: the full SHA for workflow deploys, the 12-character short SHA for manual step 5 builds.

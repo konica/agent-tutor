@@ -5,16 +5,17 @@ on:
   push:
     branches: [main]
 
-permissions:
-  contents: read
-  id-token: write  # OIDC sign-in to AWS, used only inside the `pilot` environment
-
 jobs:
   checks:
+    permissions:
+      contents: read
     uses: ./.github/workflows/ci.yml
 
   deploy:
     needs: checks
+    permissions:
+      contents: read
+      id-token: write  # OIDC sign-in to AWS, used only inside the `pilot` environment
     uses: ./.github/workflows/deploy-pilot.yml
     with:
       image_tag: ${{ github.sha }}
