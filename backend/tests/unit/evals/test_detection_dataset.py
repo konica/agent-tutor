@@ -65,6 +65,8 @@ def test_smoke_split_returns_only_smoke_items(tmp_path: Path) -> None:
         item(expected_subjects=("Chemistry",)),
         item(learner_documents=("a", "c")),  # one subject only
         item(kind="ambiguous", expected_subjects=("NLP",)),
+        item(kind="bogus"),
+        item(question="  "),
     ],
 )
 def test_rejects_invalid_items(tmp_path: Path, bad: DetectionItem) -> None:

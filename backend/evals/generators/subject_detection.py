@@ -49,7 +49,7 @@ AMBIGUOUS_PROMPT = (
 
 PROMPTS: dict[str, str] = {"single": SINGLE_PROMPT, "multi": MULTI_PROMPT, "ambiguous": AMBIGUOUS_PROMPT}
 
-_THINK = re.compile(r"<think>.*?</think>", re.DOTALL)
+_THINK = re.compile(r"<think>.*?(?:</think>|$)", re.DOTALL)
 
 
 @dataclass(frozen=True)
@@ -112,11 +112,14 @@ def generate(
             for _ in range(MAX_ATTEMPTS):
                 learner = rng.choice(eligible)
                 picked = _pick_documents(kind, learner, docs, usable, rng)
-                if picked is not None:
+                if picked is None:
+                    continue
+                chunks = [rng.choice(usable[d]) for d in picked]
+                question = _ask(model, PROMPTS[kind], chunks)
+                if question:
                     break
             else:
-                raise ValueError(f"could not find a learner and documents for a {kind} item")
-            chunks = [rng.choice(usable[d]) for d in picked]
+                raise ValueError(f"could not generate a {kind} item: no usable documents or only empty replies")
             expected = tuple(sorted({s for d in picked for s in docs[d].subjects}))
             items.append(
                 DetectionItem(
@@ -124,7 +127,7 @@ def generate(
                     kind=kind,  # type: ignore[arg-type]
                     smoke=n < smoke,
                     learner_documents=tuple(sorted(learner.documents)),
-                    question=_ask(model, PROMPTS[kind], chunks),
+                    question=question,
                     expected_subjects=expected,
                     source_chunks=tuple(c.chunk_id for c in chunks),
                 )
@@ -150,7 +153,7 @@ def _pick_documents(
     return rng.choice(pairs) if pairs else None
 
 
-DEFAULT_COUNTS: dict[str, tuple[int, int]] = {"single": (6, 24), "multi": (4, 16), "ambiguous": (4, 16)}
+DEFAULT_COUNTS: dict[str, tuple[int, int]] = {"single": (12, 24), "multi": (9, 18), "ambiguous": (9, 18)}
 
 
 def main() -> None:

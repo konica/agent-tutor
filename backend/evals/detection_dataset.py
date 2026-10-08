@@ -46,6 +46,10 @@ def learner_subjects(item: DetectionItem, docs: Mapping[str, SeedDocument]) -> l
 
 
 def _validate(item: DetectionItem, docs: Mapping[str, SeedDocument]) -> None:
+    if item.kind not in ("single", "multi", "ambiguous"):
+        raise ValueError(f"{item.id}: unknown kind {item.kind!r}")
+    if not item.question.strip():
+        raise ValueError(f"{item.id}: empty question")
     unknown = [d for d in item.learner_documents if d not in docs]
     if unknown:
         raise ValueError(f"{item.id}: unknown documents {unknown}")

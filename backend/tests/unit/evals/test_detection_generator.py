@@ -88,3 +88,15 @@ def test_generate_is_deterministic() -> None:
 def test_prompt_quotes_passage_as_data() -> None:
     assert "<passage>" in SINGLE_PROMPT
     assert "Reply with the question only." in SINGLE_PROMPT
+
+
+def test_empty_replies_are_retried_and_unclosed_think_is_stripped() -> None:
+    index = make_index()
+    learners = make_learners(list(DOCS.values()), random.Random(2), 6)
+    model = fake_chat_model(
+        AIMessage(content="<think>only thinking</think>"),
+        AIMessage(content="<think>never closed"),
+        AIMessage(content="What is a graph?"),
+    )
+    items = generate(index, learners, model, random.Random(3), {"single": (1, 0)})
+    assert [i.question for i in items] == ["What is a graph?"]
