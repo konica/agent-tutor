@@ -12,7 +12,7 @@ from smart_tutor.knowledge.adapters.sql_library import SqlLibraryUnitOfWork
 from smart_tutor.knowledge.domain.chunk import Chunk
 from smart_tutor.knowledge.domain.content import UNREADABLE_PDF, Content
 from smart_tutor.knowledge.domain.description import DocumentDescription, parse_description
-from smart_tutor.knowledge.domain.document import DUPLICATE_UPLOAD, Document
+from smart_tutor.knowledge.domain.document import DUPLICATE_UPLOAD, Document, DocumentFilter, DocumentState
 from smart_tutor.knowledge.domain.search import ChunkHit
 from smart_tutor.knowledge.domain.upload import Upload, UploadOutcome
 from smart_tutor.shared.adapters.postgres.engine import create_db_engine
@@ -512,3 +512,96 @@ def test_find_by_sha256_is_owner_only_and_skips_unlinked_and_archived(engine: En
     with engine.begin() as conn:
         conn.execute(text("UPDATE documents SET archived = true WHERE document_id = :d"), {"d": mine.document_id})
     assert find(ada) is None
+
+
+def test_listing_returns_the_authors_and_year_of_the_content(engine: Engine) -> None:
+    owner = f"ada-{uid()}"
+    content = stored_content(engine, owner)
+    with SqlLibraryUnitOfWork(engine) as tx:
+        locked = tx.contents.get_for_update(content.content_id)
+        assert locked is not None
+        locked.describe(description(), [0.5] * 1024)
+        tx.contents.save(locked)
+        tx.commit()
+    described, uploading = start(engine, owner, "described.pdf"), start(engine, owner, "uploading.pdf")
+    link(engine, described, content)
+    with SqlLibraryUnitOfWork(engine) as tx:
+        by_id = {d.document_id: d for d in tx.documents.list_readable_by(UserId(owner))}
+    assert by_id[described.document_id].content_authors == ["Ashish Vaswani", "Noam Shazeer"]
+    assert by_id[described.document_id].content_year == 2017
+    assert (by_id[uploading.document_id].content_authors, by_id[uploading.document_id].content_year) == ([], None)
+
+
+def library_to_filter(engine: Engine, owner: str) -> tuple[SubjectId, SubjectId]:
+    """Ready `late.pdf` (s1, 2026-10-01T17:30Z), ready `early.pdf` (s2, 16:30Z), and a processing one."""
+    s1, s2 = SubjectId(uid()), SubjectId(uid())
+    with engine.begin() as conn:
+        for s in (s1, s2):
+            conn.execute(
+                text("INSERT INTO subjects (subject_id, canonical_name, normalized_name) VALUES (:id, :n, :n)"),
+                {"id": s, "n": f"subject {s}"},
+            )
+    for name, subject, created in (("late.pdf", s1, "2026-10-01T17:30Z"), ("early.pdf", s2, "2026-10-01T16:30Z")):
+        doc = start(engine, owner, name)
+        link(engine, doc, stored_content(engine, owner))
+        with SqlLibraryUnitOfWork(engine) as tx:
+            loaded = tx.documents.get_by_upload_for_update(doc.upload_id)
+            assert loaded is not None
+            loaded.await_subjects()
+            loaded.choose_subjects([subject])
+            tx.documents.save(loaded)
+            tx.commit()
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE documents SET created_at = :t WHERE document_id = :d"),
+                {"t": datetime.fromisoformat(created), "d": doc.document_id},
+            )
+    start(engine, owner, "processing.pdf")
+    return s1, s2
+
+
+def listed(engine: Engine, owner: str, document_filter: DocumentFilter) -> set[str]:
+    with SqlLibraryUnitOfWork(engine) as tx:
+        return {d.title for d in tx.documents.list_readable_by(UserId(owner), document_filter)}
+
+
+def test_listing_filters_by_any_subject(engine: Engine) -> None:
+    owner = f"ada-{uid()}"
+    s1, s2 = library_to_filter(engine, owner)
+    assert listed(engine, owner, DocumentFilter(subject_ids=frozenset({s1}))) == {"late.pdf"}
+    assert listed(engine, owner, DocumentFilter(subject_ids=frozenset({s1, s2}))) == {"late.pdf", "early.pdf"}
+    assert listed(engine, owner, DocumentFilter(subject_ids=frozenset({SubjectId(uid())}))) == set()
+
+
+def test_listing_filters_by_state(engine: Engine) -> None:
+    owner = f"ada-{uid()}"
+    library_to_filter(engine, owner)
+    ready = DocumentFilter(states=frozenset({DocumentState.READY}))
+    assert listed(engine, owner, ready) == {"late.pdf", "early.pdf"}
+    assert listed(engine, owner, DocumentFilter(states=frozenset({DocumentState.PROCESSING}))) == {"processing.pdf"}
+    assert listed(engine, owner, DocumentFilter(states=frozenset({DocumentState.FAILED}))) == set()
+
+
+def test_listing_filters_by_the_upload_instant_range(engine: Engine) -> None:
+    owner = f"ada-{uid()}"
+    library_to_filter(engine, owner)
+    boundary = datetime(2026, 10, 1, 17, 0, tzinfo=UTC)  # 00:00 on 2 Oct in GMT+7
+    assert listed(engine, owner, DocumentFilter(uploaded_before=boundary)) == {"early.pdf"}
+    assert "early.pdf" not in listed(engine, owner, DocumentFilter(uploaded_from=boundary))
+    assert "late.pdf" in listed(engine, owner, DocumentFilter(uploaded_from=boundary))
+    exact = datetime(2026, 10, 1, 17, 30, tzinfo=UTC)
+    assert "late.pdf" in listed(engine, owner, DocumentFilter(uploaded_from=exact))  # inclusive
+    assert "late.pdf" not in listed(engine, owner, DocumentFilter(uploaded_before=exact))  # exclusive
+
+
+def test_listing_combines_filters_and_stays_owner_only(engine: Engine) -> None:
+    owner, other = f"ada-{uid()}", f"bob-{uid()}"
+    s1, s2 = library_to_filter(engine, owner)
+    everything = DocumentFilter(
+        subject_ids=frozenset({s1, s2}),
+        states=frozenset({DocumentState.READY}),
+        uploaded_from=datetime(2026, 10, 1, 17, 0, tzinfo=UTC),
+        uploaded_before=datetime(2026, 10, 2, 17, 0, tzinfo=UTC),
+    )
+    assert listed(engine, owner, everything) == {"late.pdf"}
+    assert listed(engine, other, everything) == set()

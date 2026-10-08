@@ -7,7 +7,7 @@ from typing import Self
 
 from smart_tutor.knowledge.domain.chunk import Chunk
 from smart_tutor.knowledge.domain.content import Content
-from smart_tutor.knowledge.domain.document import Document
+from smart_tutor.knowledge.domain.document import NO_FILTER, Document, DocumentFilter
 from smart_tutor.knowledge.domain.search import ChunkHit
 from smart_tutor.knowledge.domain.upload import Upload, UploadOutcome
 from smart_tutor.shared.domain.ids import ContentId, DocumentId, SubjectId, UploadId, UserId
@@ -58,8 +58,11 @@ class DocumentRepository(ABC):
         """Every failed document linked to this content, locked until the unit of work ends."""
 
     @abstractmethod
-    def list_readable_by(self, user_id: UserId) -> list[Document]:
-        """`can_read` in storage: the caller's non-archived documents, newest first."""
+    def list_readable_by(self, user_id: UserId, document_filter: DocumentFilter = NO_FILTER) -> list[Document]:
+        """`can_read` in storage: the caller's non-archived documents matching the filter, newest first.
+
+        Each carries its content's title, attempts, authors, and year.
+        """
 
     @abstractmethod
     def find_readable_by_sha256(self, user_id: UserId, sha256: str) -> DocumentId | None:
