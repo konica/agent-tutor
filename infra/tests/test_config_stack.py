@@ -22,7 +22,7 @@ def test_max_processing_attempts_is_an_ssm_parameter() -> None:
 def test_detection_thresholds_are_ssm_parameters() -> None:
     template = Template.from_stack(ConfigStack(cdk.App(), "Config"))
 
-    for name, value in (("detect-threshold", "0.35"), ("detect-margin", "0.05"), ("multi-margin", "0.03")):
+    for name, value in (("detect-threshold", "0.54"), ("detect-margin", "0.015"), ("multi-margin", "0.02")):
         template.has_resource_properties("AWS::SSM::Parameter", {"Name": f"/smart-tutor/{name}", "Value": value})
 
 

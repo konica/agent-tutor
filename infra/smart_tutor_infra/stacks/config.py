@@ -19,9 +19,9 @@ class ConfigStack(cdk.Stack):
             ("max-upload-mb", "50"),
             ("max-pages", "500"),
             ("max-processing-attempts", "3"),
-            ("detect-threshold", "0.35"),
-            ("detect-margin", "0.05"),
-            ("multi-margin", "0.03"),
+            ("detect-threshold", "0.54"),
+            ("detect-margin", "0.015"),
+            ("multi-margin", "0.02"),
         ):
             ssm.StringParameter(self, f"Param-{name}", parameter_name=f"/smart-tutor/{name}", string_value=value)
 
