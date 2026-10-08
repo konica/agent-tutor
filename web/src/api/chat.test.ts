@@ -1,7 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { SessionExpiredError } from "../auth/authClient";
-import { askInNewThread, AskRefusedError, formatCitation, NoDocumentsError, type ChatEvent } from "./chat";
+import {
+  askInNewThread,
+  AskRefusedError,
+  chooseSubjects,
+  formatCitation,
+  loadThread,
+  NoDocumentsError,
+  type ChatEvent,
+} from "./chat";
 import { configureApiClient } from "./client";
 import { createClient, createConfig } from "./generated/client";
 
@@ -111,6 +119,85 @@ describe("askInNewThread", () => {
     const failure = collect(askInNewThread("q", apiClient));
     await expect(failure).rejects.toThrow("503");
     await expect(failure).rejects.not.toBeInstanceOf(NoDocumentsError);
+  });
+});
+
+describe("chooseSubjects", () => {
+  it("posts the pick for the waiting thread and yields the answer's events", async () => {
+    const { apiClient, fetch } = api(() => eventStream(answer));
+
+    const events = await collect(chooseSubjects("t1", ["s1", "s2"], apiClient));
+
+    expect(events[0]).toEqual({ type: "thread", thread_id: "t1", subjects: [{ subject_id: "s1", name: "General" }] });
+    expect(events.at(-1)).toEqual({ type: "done" });
+    const request = fetch.mock.calls[0]![0] as Request;
+    expect(request.method).toBe("POST");
+    expect(request.url).toBe("http://api.test/threads/t1/subjects");
+    expect(request.headers.get("Authorization")).toBe("Bearer t");
+    expect(await request.json()).toEqual({ subject_ids: ["s1", "s2"] });
+  });
+
+  it.each([409, 422, 404])("rejects with AskRefusedError carrying the detail on %i", async (status) => {
+    const { apiClient } = api(() => json({ detail: "This conversation already has its subjects." }, status));
+    const failure = collect(chooseSubjects("t1", ["s1"], apiClient));
+    await expect(failure).rejects.toBeInstanceOf(AskRefusedError);
+    await expect(failure).rejects.toThrow("This conversation already has its subjects.");
+  });
+
+  it("rejects with NoDocumentsError when the learner has no ready documents", async () => {
+    const { apiClient } = api(() => json({ detail: "Upload a document first" }, 409));
+    await expect(collect(chooseSubjects("t1", ["s1"], apiClient))).rejects.toBeInstanceOf(NoDocumentsError);
+  });
+
+  it("rejects with SessionExpiredError on 401", async () => {
+    const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
+    await expect(collect(chooseSubjects("t1", ["s1"], apiClient))).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+
+  it("rejects with a plain Error on 503", async () => {
+    const { apiClient } = api(() => json({ detail: "unavailable" }, 503));
+    const failure = collect(chooseSubjects("t1", ["s1"], apiClient));
+    await expect(failure).rejects.toThrow("503");
+    await expect(failure).rejects.not.toBeInstanceOf(AskRefusedError);
+  });
+});
+
+describe("choose_subjects event", () => {
+  it("carries the question waiting for the learner's pick", async () => {
+    const { apiClient } = api(() =>
+      eventStream(
+        'event: choose_subjects\ndata: {"thread_id": "t1", "question": "How?", "subjects": [{"subject_id": "s1", "name": "LLMs"}]}\n\n' +
+          "event: done\ndata: {}\n\n",
+      ),
+    );
+    expect(await collect(askInNewThread("How?", apiClient))).toEqual([
+      { type: "choose_subjects", thread_id: "t1", question: "How?", subjects: [{ subject_id: "s1", name: "LLMs" }] },
+      { type: "done" },
+    ]);
+  });
+});
+
+describe("loadThread", () => {
+  it("returns the thread", async () => {
+    const view = { thread_id: "t1", question: "How?", subjects: [], awaiting_subjects: true };
+    const { apiClient, fetch } = api(() => json(view));
+    expect(await loadThread("t1", apiClient)).toEqual(view);
+    expect((fetch.mock.calls[0]![0] as Request).url).toBe("http://api.test/threads/t1");
+  });
+
+  it("returns null when there is no such thread", async () => {
+    const { apiClient } = api(() => json({ detail: "Not found" }, 404));
+    expect(await loadThread("t1", apiClient)).toBeNull();
+  });
+
+  it("rejects with SessionExpiredError on 401", async () => {
+    const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
+    await expect(loadThread("t1", apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+
+  it("rejects on a server error", async () => {
+    const { apiClient } = api(() => json({ detail: "boom" }, 500));
+    await expect(loadThread("t1", apiClient)).rejects.toThrow("500");
   });
 });
 

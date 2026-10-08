@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AskRefusedError, NoDocumentsError, type ChatEvent } from "../../api/chat";
@@ -45,13 +45,20 @@ const SUBJECTS = [
 const doc = (state: string) => ({ state }) as DocumentResponse;
 
 // The page loads its subjects and documents first; tests that don't care get ready subjects and no processing documents.
-function renderChat(props: ComponentProps<typeof ChatPage> = {}) {
+function renderChat(props: ComponentProps<typeof ChatPage> = {}, path = "/chat") {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[path]}>
       <ChatPage loadSubjects={async () => SUBJECTS} loadDocs={async () => []} {...props} />
+      <Location />
     </MemoryRouter>,
   );
 }
+
+// Shows the current URL's query, for the tests that check the waiting thread is kept in it across a reload.
+function Location() {
+  return <output data-testid="location">{useLocation().search}</output>;
+}
+const search = () => screen.getByTestId("location").textContent;
 const question = () => screen.findByRole("textbox", { name: /question/i });
 const askButton = () => screen.getByRole("button", { name: /ask/i });
 
@@ -309,6 +316,93 @@ describe("ChatPage", () => {
     renderChat({ loadDocs: () => Promise.reject(new Error("boom")) });
     expect(await question()).toBeEnabled();
     expect(screen.queryByText(/still processing/)).not.toBeInTheDocument();
+  });
+
+  describe("when detection is unsure", () => {
+    const UNSURE: ChatEvent = {
+      type: "choose_subjects",
+      thread_id: "t1",
+      question: "How do these methods handle long documents?",
+      subjects: SUBJECTS,
+    };
+    const QUESTION = "How do these methods handle long documents?";
+    const picker = () => screen.findByRole("group", { name: "Which subjects is this about?" });
+    const continueButton = () => screen.getByRole("button", { name: "Continue" });
+
+    async function askUnsure(props: ComponentProps<typeof ChatPage> = {}) {
+      const ask = vi.fn(() => events(UNSURE, { type: "done" }));
+      renderChat({ ask, ...props });
+      await userEvent.type(await question(), QUESTION);
+      await userEvent.click(askButton());
+      return picker();
+    }
+
+    it("asks which subjects the question is about, keeps the thread in the URL, and allows only the pick", async () => {
+      const group = await askUnsure();
+      expect(screen.getByText("You asked:").parentElement).toHaveTextContent(`You asked: ${QUESTION}`);
+      expect(screen.getByRole("heading", { level: 1, name: QUESTION })).toBeInTheDocument();
+      expect(screen.getByText("Subjects appear after your first question.")).toBeInTheDocument();
+      expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual(["LLMs", "AI Agents"]);
+      expect(search()).toBe("?thread=t1");
+      await waitFor(async () => expect(await question()).toBeDisabled());
+      expect(askButton()).toBeDisabled();
+    });
+
+    it("answers the kept question after the pick and leaves the URL", async () => {
+      const choose = vi.fn(() =>
+        events(
+          { type: "thread", thread_id: "t1", subjects: [{ subject_id: "s2", name: "AI Agents" }] },
+          { type: "delta", text: "They chunk it [1]." },
+          { type: "citations", citations: [{ n: 1, chunk_id: "c1", document_title: "a.pdf", page: 3 }] },
+          { type: "done" },
+        ),
+      );
+      const group = await askUnsure({ choose });
+      await userEvent.click(within(group).getByRole("button", { name: "AI Agents" }));
+      await userEvent.click(continueButton());
+      expect(choose).toHaveBeenCalledWith("t1", ["s2"]);
+      expect(await screen.findByText("They chunk it [1].")).toBeInTheDocument();
+      const header = screen.getByRole("heading", { level: 1, name: QUESTION }).closest("header")!;
+      expect(within(within(header).getByRole("list", { name: "Subjects" })).getByText("AI Agents")).toBeInTheDocument();
+      expect(screen.getByText("a.pdf, p. 3")).toBeInTheDocument();
+      expect(screen.queryByRole("group", { name: "Which subjects is this about?" })).not.toBeInTheDocument();
+      expect(search()).toBe("");
+      expect(await question()).toBeEnabled();
+    });
+
+    it("keeps the picker and shows the refusal when Continue is refused", async () => {
+      const choose = vi.fn(() => {
+        throw new AskRefusedError("Pick 1 to 3 of your own subjects.");
+      });
+      const group = await askUnsure({ choose });
+      await userEvent.click(within(group).getByRole("button", { name: "LLMs" }));
+      await userEvent.click(continueButton());
+      expect(await screen.findByText("Pick 1 to 3 of your own subjects.")).toBeInTheDocument();
+      expect(await picker()).toBeInTheDocument();
+      expect(continueButton()).toBeEnabled();
+      expect(search()).toBe("?thread=t1");
+    });
+
+    it("resumes a waiting thread after a reload with the learner's subjects", async () => {
+      const loadPending = vi.fn(async () => ({ thread_id: "t1", question: QUESTION, subjects: [], awaiting_subjects: true }));
+      renderChat({ loadPending }, "/chat?thread=t1");
+      const group = await picker();
+      expect(loadPending).toHaveBeenCalledWith("t1");
+      expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual(["LLMs", "AI Agents"]);
+      expect(screen.getByText("You asked:").parentElement).toHaveTextContent(`You asked: ${QUESTION}`);
+      expect(search()).toBe("?thread=t1");
+    });
+
+    it.each([
+      ["no longer exists", null],
+      ["already has its subjects", { thread_id: "t1", question: QUESTION, subjects: SUBJECTS, awaiting_subjects: false }],
+    ])("starts a new conversation when the thread in the URL %s", async (_, view) => {
+      renderChat({ loadPending: async () => view }, "/chat?thread=t1");
+      expect(await question()).toBeEnabled();
+      expect(screen.getByRole("heading", { level: 1, name: "New conversation" })).toBeInTheDocument();
+      expect(screen.queryByRole("group", { name: "Which subjects is this about?" })).not.toBeInTheDocument();
+      await waitFor(() => expect(search()).toBe(""));
+    });
   });
 
   it("shows nothing of its own when the session has ended", async () => {

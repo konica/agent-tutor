@@ -1,0 +1,11 @@
+/* A tutor message: the brand mark and name, then the card indented past the mark (v0.7 .msg-tutor / .tutor-card). */
+.message { display: grid; gap: var(--sp-2); }
+.card {
+  display: grid; gap: var(--sp-3); justify-items: start;
+  margin-left: calc(28px + var(--sp-3)); /* the mark's width and the mark-to-name gap */
+  padding: var(--sp-4) var(--sp-5); border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface);
+}
+.title { margin: 0; font-family: var(--font-body); font-size: var(--fs-16); font-weight: 400; line-height: var(--lh-body); color: var(--text); }
+.hint { margin: 0; color: var(--text-2); font-size: var(--fs-14); }
+.chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
