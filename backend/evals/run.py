@@ -7,8 +7,9 @@ The subject-detection dataset is YAML in this repo; each run syncs it to LangSmi
 """
 
 import argparse
+import os
 import sys
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -110,8 +111,8 @@ def sync_dataset(client: Client, name: str, items: Sequence[DetectionItem]) -> N
 
 def run_subject_detection(
     split: Literal["smoke", "full"], policy_override: DetectionPolicy | None, client: Client
-) -> tuple[dict[str, float], str]:
-    """Sync the dataset, run the split, and return mean scores and the experiment link (or name)."""
+) -> tuple[dict[str, float], str, list[str]]:
+    """Sync the dataset, run the split; return mean scores, the experiment link (or name), and run problems."""
     settings = Settings()
     policy = policy_override or ssm_policy(settings)
     name = DATASET_NAMES["subject_detection"]
@@ -131,10 +132,35 @@ def run_subject_detection(
         max_concurrency=4,
         client=client,
     )
-    rows = [
-        {r.key: float(r.score) for r in row["evaluation_results"]["results"] if r.score is not None} for row in results
+    outcomes = [
+        RowOutcome(
+            item_id=str((row["example"].metadata or {}).get("item_id", row["example"].id)),
+            error=str(row["run"].error) if row["run"].error else None,
+            scores={r.key: float(r.score) for r in row["evaluation_results"]["results"] if r.score is not None},
+        )
+        for row in results
     ]
-    return summarize(rows), results.url or results.experiment_name
+    problems = row_failures(outcomes, {i.id for i in load_items(split)})
+    return summarize(o.scores for o in outcomes), results.url or results.experiment_name, problems
+
+
+@dataclass(frozen=True)
+class RowOutcome:
+    item_id: str
+    error: str | None
+    scores: dict[str, float]
+
+
+def row_failures(rows: Sequence[RowOutcome], expected_ids: Collection[str]) -> list[str]:
+    """Why the scores cannot be trusted: LangSmith swallows per-example errors, so a partial run must not pass."""
+    found = [f"{r.item_id}: target error: {r.error}" for r in rows if r.error]
+    found += [f"{r.item_id}: no result" for r in rows if not r.error and "contains_wrong" not in r.scores]
+    missing = sorted(set(expected_ids) - {r.item_id for r in rows})
+    if missing:
+        found.append(f"missing items ({len(missing)} of {len(expected_ids)}): {', '.join(missing)}")
+    if len(rows) != len(expected_ids) and not missing:
+        found.append(f"expected {len(expected_ids)} examples, got {len(rows)}")
+    return found
 
 
 def main() -> None:
@@ -142,14 +168,24 @@ def main() -> None:
     parser.add_argument("--split", choices=["smoke", "full"], required=True)
     parser.add_argument("--policy", help="THRESHOLD,MARGIN,MULTI_MARGIN; overrides the SSM policy")
     args = parser.parse_args()
+    if not (os.environ.get("LANGSMITH_API_KEY") or os.environ.get("LANGCHAIN_API_KEY")):
+        sys.exit("LANGSMITH_API_KEY is not set: put it in .env and run with `uv run --env-file ../.env`")
     override = parse_policy(args.policy) if args.policy else None
-    scores, link = run_subject_detection(args.split, override, Client())
+    if override is None:
+        try:
+            override = ssm_policy(Settings())
+        except Exception as error:  # botocore errors vary: no endpoint, missing parameter, bad value
+            sys.exit(
+                f"Cannot read the detection policy from SSM ({type(error).__name__}). Start LocalStack "
+                "(`docker compose up -d`) and seed the parameters, or pass --policy T,M,MM"
+            )
+    scores, link, problems = run_subject_detection(args.split, override, Client())
     goals = gate.targets(gate.load_thresholds(), "release_1", "subject_detection")
     for metric, (comparator, value) in goals.items():
         shown = f"{scores[metric]:.3f}" if metric in scores else "missing"
         print(f"{metric}: {shown} (target {comparator} {value:.2f})")
     print(f"experiment: {link}")
-    failed = gate.failures(scores, goals)
+    failed = [*problems, *gate.failures(scores, goals)]
     for message in failed:
         print(f"FAIL {message}")
     sys.exit(1 if failed else 0)
