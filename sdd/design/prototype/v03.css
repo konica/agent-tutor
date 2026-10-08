@@ -318,5 +318,75 @@ html.shot .review-note { display: none; }
 /* E8 · daily-limit variant as a short secondary line in limit banners */
 .banner .b-variant { display: block; margin-top: 2px; color: var(--text-2); }
 
+/* ============ v0.8 additions (brief v0.8, round 8) ============ */
+/* K4 · destructive actions: never the default, always a text label */
+.btn-danger { background: var(--danger); color: var(--surface); border-color: var(--danger); }
+.btn-danger:hover { background: color-mix(in oklab, var(--danger) 84%, var(--text)); color: var(--surface); }
+.btn-danger-quiet { background: transparent; color: var(--danger); border-color: transparent; }
+.btn-danger-quiet:hover { background: var(--danger-soft); color: var(--danger); }
+.menu-item.danger { color: var(--danger); }
+.menu-item.danger:hover { background: var(--danger-soft); color: var(--danger); }
+.menu-sep { display: block; height: 1px; margin: 4px 0; background: var(--border); }
+.dialog .d-body h2 em, .dialog header h2 em { font-style: italic; }
+.del-alt { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); margin-top: var(--sp-4); padding: var(--sp-3) var(--sp-4); background: var(--surface-2); border-radius: var(--r-sm); }
+.del-alt p { margin: 0; font-size: var(--fs-14); color: var(--text-2); }
+.dp-foot { align-items: center; }
+#lib-h:focus { outline: none; }
+#lib-h:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+
+/* K2/K4 · deleted items: muted but readable, a text badge with an icon */
+.badge-deleted { background: var(--danger-soft); color: var(--danger); border-color: transparent; }
+.cite.cite-deleted { cursor: default; color: var(--text-2); background: var(--surface-2); border-style: dashed; }
+.cite.cite-deleted .doc-name { color: var(--text-2); }
+
+/* K2 · Documents used panel */
+.du-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); }
+.du-row { width: 100%; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: var(--sp-3); padding: var(--sp-3); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); text-align: left; color: var(--text); font: inherit; }
+button.du-row { cursor: pointer; transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out); }
+button.du-row:hover { background: var(--surface-2); border-color: var(--border-strong); color: var(--text); }
+.du-row.is-deleted { background: var(--surface-2); border-style: dashed; }
+.du-row.is-deleted .du-title { color: var(--text-2); }
+.du-icon { width: 32px; height: 32px; display: grid; place-items: center; border-radius: var(--r-sm); background: var(--surface-2); color: var(--text-2); }
+.du-text { display: grid; gap: 2px; min-width: 0; }
+.du-title { font-weight: 600; font-size: var(--fs-14); line-height: 1.35; overflow-wrap: anywhere; }
+.du-meta { font-size: var(--fs-12); color: var(--text-2); }
+.du-note { display: flex; gap: var(--sp-2); align-items: center; font-size: var(--fs-14); color: var(--text-2); }
+.du-empty { display: grid; justify-items: center; gap: var(--sp-3); padding: var(--sp-12) var(--sp-4); text-align: center; color: var(--text-2); }
+
+/* K3 · Document viewer: modal overlay, PDF pages as paper */
+.vw-scrim { align-items: stretch; padding: var(--sp-6) var(--sp-8); }
+.viewer { width: min(720px, 100%); height: 100%; justify-self: center; display: grid; grid-template-rows: auto minmax(0, 1fr); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--shadow-lg); overflow: hidden; animation: rise-in var(--dur-base) var(--ease-out); }
+.vw-head { display: grid; gap: var(--sp-2); padding: var(--sp-4) var(--sp-5) var(--sp-3); border-bottom: 1px solid var(--border); }
+.vw-titlebar { display: flex; align-items: center; gap: var(--sp-3); }
+.vw-title { font-size: var(--fs-18); }
+.vw-title:focus { outline: none; }
+.vw-title:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.vw-tools { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-14); color: var(--text); }
+.vw-page { min-width: 104px; text-align: center; }
+.vw-zoom { min-width: 48px; text-align: center; }
+.vw-body { position: relative; overflow-y: auto; background: var(--surface-3); padding: var(--sp-6) var(--sp-5); }
+.vw-pages { display: grid; justify-items: center; gap: var(--sp-5); }
+.vw-note { display: flex; align-items: center; gap: var(--sp-2); width: fit-content; margin: 0 auto var(--sp-4); padding: var(--sp-2) var(--sp-3); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-pill); font-size: var(--fs-14); color: var(--text); }
+.pg { position: relative; width: calc(600px * var(--zoom, 1)); aspect-ratio: 8.5 / 11; padding: calc(44px * var(--zoom, 1)) calc(48px * var(--zoom, 1)); background: #fff; color: #1d2329; box-shadow: 0 1px 3px rgba(20, 32, 43, .14), 0 0 0 1px rgba(20, 32, 43, .06); font-family: var(--font-display); font-size: calc(10px * var(--zoom, 1)); line-height: 1.45; display: grid; align-content: start; gap: calc(12px * var(--zoom, 1)); user-select: text; }
+.pg-title { font-size: 1.9em; font-weight: 600; text-align: center; line-height: 1.2; }
+.pg-authors { text-align: center; font-family: var(--font-body); font-size: 1.05em; color: #4a5560; }
+.pg-abs { width: 82%; justify-self: center; display: grid; gap: .6em; }
+.pg-h { font-family: var(--font-body); font-weight: 700; font-size: 1.05em; letter-spacing: .02em; }
+.pg-sec { font-size: 1.2em; }
+.pg-cols { display: grid; grid-template-columns: 1fr 1fr; gap: calc(18px * var(--zoom, 1)); align-items: start; }
+.pg-cols > div { display: grid; gap: .9em; align-content: start; }
+.pp { display: grid; gap: .55em; }
+.pl { display: block; height: .5em; border-radius: 2px; background: #d9dee3; }
+.pg-num { position: absolute; bottom: calc(18px * var(--zoom, 1)); left: 0; right: 0; text-align: center; font-family: var(--font-body); font-size: .95em; color: #6b7680; }
+/* Highlight: soft accent fill + outline + label (not colour alone); dark text keeps 4.5:1 in both themes */
+.vw-hl { position: relative; padding: .7em .8em .6em; background: #E3F1EF; outline: 1.5px solid #0B6B66; border-radius: 3px; color: #14202B; font-size: 1.1em; line-height: 1.5; font-family: var(--font-display); }
+.vw-hl-label { position: absolute; top: -1.05em; left: .6em; padding: 0 .5em; background: #0B6B66; color: #fff; border-radius: 3px; font-family: var(--font-body); font-size: .8em; font-weight: 650; line-height: 1.6; }
+.pg-skel .sk { display: block; height: .7em; margin: .4em 0; border-radius: 3px; background: linear-gradient(90deg, #e6eaee 0%, #f2f4f6 50%, #e6eaee 100%); background-size: 200% 100%; animation: sk-shimmer 1.2s linear infinite; }
+@keyframes sk-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .pg-skel .sk { animation: none; } }
+.vw-error { display: grid; justify-items: center; gap: var(--sp-3); margin: 15vh auto 0; max-width: 360px; padding: var(--sp-8); text-align: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); color: var(--text); }
+.vw-error .icon { color: var(--danger); }
+.vw-error-t { font-weight: 650; }
+
 /* Programmatic focus on <main> after a route change is for screen readers; it needs no visible ring. */
 main[tabindex="-1"]:focus, main[tabindex="-1"]:focus-visible { outline: none; }

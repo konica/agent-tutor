@@ -1,4 +1,4 @@
-/* Smart Tutor v0.5 — Conversations (§6.7), Notes (§6.8), Usage (§6.10). Settings removed in v0.5 (PRD Q45). */
+/* Smart Tutor v0.8 — Conversations (§6.7), Notes (§6.8), Usage (§6.10). Settings removed in v0.5 (PRD Q45). */
 (function () {
   const ST = window.ST;
   const S = ST.S;
@@ -16,10 +16,11 @@
     else if (!rows.length && ST.hasFilters()) list = ST.emptyState({ icon: 'filter', title: 'No conversations match these filters', text: 'Try another subject or a wider date range.', actions: `<button class="btn btn-secondary" type="button" data-action="f-clear">Clear filters</button>` });
     else if (!rows.length) list = ST.emptyState({ icon: 'archive', title: 'No archived conversations', text: 'Conversations you archive appear here. You can restore them at any time.' });
     else list = `<div class="list" role="table" aria-label="Conversations">
-      <div class="list-head" role="row" style="grid-template-columns:minmax(0,1fr) 300px 140px 200px"><span role="columnheader">Conversation</span><span role="columnheader">Subjects</span><span role="columnheader">Last activity</span><span role="columnheader"><span class="vh">Actions</span></span></div>
-      ${rows.map((c) => `<div class="row" role="row" style="grid-template-columns:minmax(0,1fr) 300px 140px 200px">
+      <div class="list-head" role="row" style="grid-template-columns:minmax(0,1fr) 300px 120px 140px 200px"><span role="columnheader">Conversation</span><span role="columnheader">Subjects of documents used</span><span role="columnheader">Documents used</span><span role="columnheader">Last activity</span><span role="columnheader"><span class="vh">Actions</span></span></div>
+      ${rows.map((c) => `<div class="row" role="row" style="grid-template-columns:minmax(0,1fr) 300px 120px 140px 200px">
         <div class="row-title" role="cell"><a class="od-truncate" href="#/open/${c.id}">${esc(c.title)}</a>${c.noteId ? `<span class="row-meta"><span class="badge badge-note">${ic('note')}Lesson note</span></span>` : ''}</div>
         <div role="cell">${ST.chips(c.subjects, 'sm')}</div>
+        <div class="row-meta od-nowrap" role="cell">${ST.plural(ST.convDocs(c).length, 'document')}</div>
         <div class="row-meta od-nowrap" role="cell">${ST.fmtDate(c.last)}</div>
         <div class="row-actions" role="cell"><a class="btn btn-quiet btn-sm" href="#/open/${c.id}" aria-label="Open ${esc(c.title)}">Open</a>
           ${c.archived ? `<button class="btn btn-secondary btn-sm" type="button" data-action="conv-restore" data-id="${c.id}" aria-label="Restore ${esc(c.title)}">${ic('restore', 'sm')}Restore</button>`
@@ -96,7 +97,7 @@
     'ed-save': () => { const n = ST.note(ST.ed.id); n.title = ST.ed.title; n.body = ST.ed.body; n.edited = true; n.editedAt = ST.TODAY + 'T11:40'; ST.ed.dirty = false; ST.render(); ST.toast('Note saved. It now shows as Edited.'); },
     'ed-archive': () => { const n = ST.note(ST.ed.id); n.archived = true; ST.render(); ST.toast('Note archived.', { undo: () => { n.archived = false; ST.render(); } }); },
     'ed-restore': () => { const n = ST.note(ST.ed.id); n.archived = false; ST.render(); ST.toast('Note restored.'); },
-    'ed-discuss': () => { const n = ST.note(ST.ed.id); ST.pendingThread = ST.newThread({ subjects: n.subjects.slice(), fromNote: n.id }); ST.goto('chat-from-note'); }
+    'ed-discuss': () => { const n = ST.note(ST.ed.id); ST.pendingThread = ST.newThread({ fromNote: n.id }); ST.goto('chat-from-note'); }
   });
   document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && ST.ed && document.getElementById('md-ed')) { e.preventDefault(); if (ST.ed.dirty) ST.actions['ed-save'](); } });
   ST.dynamicNote = (nid) => { const n = ST.note(nid) || ST.note('n1'); return { id: 'note/' + n.id, fixed: false, label: 'note · ' + n.id, desc: 'Lesson note opened from a link.', setup: () => ST.openEditor(n.id), view: ST.editorView }; };
@@ -108,7 +109,7 @@
     const k = ST.U.key, dir = ST.U.dir === 'asc' ? 1 : -1;
     const val = (r) => k === 'in' ? r.tokens[0] : k === 'out' ? r.tokens[1] : k === 'total' ? r.total : r[k];
     convs.sort((a, b) => { const x = val(a), y = val(b); return (typeof x === 'string' ? x.localeCompare(y) : x - y) * dir; });
-    const docs = S.docs.filter((d) => d.tokens && (d.tokens[0] || d.dedup));
+    const docs = S.docs.filter((d) => d.tokens && d.tokens[0]).concat((ST.DELETED_PROCESSING || []).map((x, i) => ({ id: 'del' + i, deleted: true, uploaded: x.uploaded, tokens: x.tokens, state: 'ready' })));
     const sum = (arr, i) => arr.reduce((s, r) => s + r.tokens[i], 0);
     const allIn = sum(convs, 0) + sum(docs, 0) + sum(ST.BACKGROUND, 0);
     const allOut = sum(convs, 1) + sum(docs, 1) + sum(ST.BACKGROUND, 1);
@@ -129,11 +130,11 @@
           <tfoot><tr><td colspan="2">Total</td><td class="num">${ST.num(sum(convs, 0))}</td><td class="num">${ST.num(sum(convs, 1))}</td><td class="num">${ST.num(sum(convs, 0) + sum(convs, 1))}</td></tr></tfoot></table></div></section>
 
       <section class="usage-section" aria-labelledby="u-docs"><h2 id="u-docs">Document processing</h2>
-        <p>Reading, summarizing and indexing the documents you uploaded. A document Smart Tutor had already processed costs nothing.</p>
+        <p>Reading, summarizing and indexing the documents you uploaded. A file already in your library isn't processed again and costs nothing.</p>
         <div class="table-wrap"><table class="data"><caption class="vh">Tokens per document</caption>
           <thead><tr><th scope="col">Document</th><th scope="col">Uploaded</th><th scope="col" class="num">Input</th><th scope="col" class="num">Output</th></tr></thead>
-          <tbody>${docs.map((d) => `<tr><td style="max-width:460px"><span class="od-row"><button class="doc-title od-truncate" style="font-size:14px" type="button" data-action="open-doc" data-id="${d.id}">${esc(d.title)}</button>${d.state !== 'ready' && !d.archived ? `<span class="badge">In progress</span>` : ''}</span></td>
-            <td class="od-nowrap">${ST.fmtDate(d.uploaded, false)}</td>${d.dedup ? '<td class="num" colspan="2">Already processed · 0</td>' : `<td class="num">${ST.num(d.tokens[0])}</td><td class="num">${ST.num(d.tokens[1])}</td>`}</tr>`).join('')}</tbody>
+          <tbody>${docs.map((d) => `<tr><td style="max-width:460px"><span class="od-row">${d.deleted ? `<span class="muted">Deleted document</span><span class="badge badge-deleted">${ic('x')}Deleted</span>` : `<button class="doc-title od-truncate" style="font-size:14px" type="button" data-action="open-doc" data-id="${d.id}">${esc(d.title)}</button>${d.state !== 'ready' && !d.archived ? `<span class="badge">In progress</span>` : ''}`}</span></td>
+            <td class="od-nowrap">${ST.fmtDate(d.uploaded, false)}</td><td class="num">${ST.num(d.tokens[0])}</td><td class="num">${ST.num(d.tokens[1])}</td></tr>`).join('')}</tbody>
           <tfoot><tr><td colspan="2">Total</td><td class="num">${ST.num(sum(docs, 0))}</td><td class="num">${ST.num(sum(docs, 1))}</td></tr></tfoot></table></div></section>
 
       <section class="usage-section" aria-labelledby="u-bg"><h2 id="u-bg">Background</h2><p>Work Smart Tutor does for you between conversations.</p>

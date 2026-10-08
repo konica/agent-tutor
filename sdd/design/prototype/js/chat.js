@@ -1,23 +1,13 @@
-/* Smart Tutor v0.7 — chat (§6.6): multi-subject conversations that grow to 3, simulated tutor, every state. */
+/* Smart Tutor v0.8 — chat (§6.6): no subjects in conversations (K1); every question is answered from all
+   ready documents. Documents used (K2) and citations open the document viewer (K3, js/viewer.js). */
 (function () {
   const ST = window.ST;
   const S = ST.S;
   const esc = ST.esc, ic = ST.ic;
-  const MAX = 3;
 
-  /* ---------- detection & answer choice (simulated) ---------- */
-  const RULES = [
-    ['agents', /\breact\b|agent|tool use|\btools?\b|acting|planner/i],
-    ['rag', /retriev|\brag\b|hallucinat|grounding|dense|bm25/i],
-    ['llm', /attention|transformer|\bllms?\b|language model|chain[- ]of[- ]thought|prompting/i],
-    ['rl', /\bppo\b|polic(y|ies)|reinforcement|reward/i]
-  ];
+  /* ---------- answer choice (simulated) ---------- */
   const OFF_TOPIC = /laptop|buy|price|weather|recipe|movie|restaurant/i;
-  ST.classify = (q) => {
-    const mine = ST.mySubjects();
-    return RULES.filter(([id, rx]) => rx.test(q) && mine.includes(id)).map(([id]) => id);
-  };
-  ST.pickAnswer = (q, subjects) => {
+  ST.pickAnswer = (q) => {
     if (/\breact\b/i.test(q) && !/retriev|hallucinat/i.test(q)) return 'react';
     if (/hallucinat|retriev.*loop/i.test(q)) return 'rag_loop';
     if (/long documents|long input|handle long/i.test(q)) return 'long_docs';
@@ -25,7 +15,10 @@
     if (/\bppo\b|clip|polic(y|ies)/i.test(q)) return 'ppo';
     if (/chain/i.test(q)) return 'cot';
     if (/dense|bm25/i.test(q)) return 'rag_dense';
-    return 'generic_' + (subjects[0] || 'llm');
+    if (/agent|tool/i.test(q)) return 'generic_agents';
+    if (/retriev|\brag\b/i.test(q)) return 'generic_rag';
+    if (/reward|reinforcement/i.test(q)) return 'generic_rl';
+    return 'generic_llm';
   };
 
   /* ---------- thread model ---------- */
@@ -33,51 +26,48 @@
   const M = (o) => Object.assign({ id: 'm' + (++mid) }, o);
   ST.M = M;
   ST.newThread = (o = {}) => Object.assign({
-    convId: null, title: 'New conversation', subjects: [], fromNote: null, noteId: null, readOnly: null,
+    convId: null, title: 'New conversation', fromNote: null, noteId: null, readOnly: null,
     messages: [], tokens: [0, 0], streaming: null, summarizing: false, summaryHold: false, summaryDone: false,
-    rateLimit: 0, draft: '', highlight: null
+    rateLimit: 0, draft: ''
   }, o);
   const answerMsg = (key, extra = {}) => { const a = ST.ANSWERS[key]; return M(Object.assign({ role: 'tutor', kind: 'answer', key, text: a.text, quote: a.quote || null, cites: ST.clone(a.cites), fb: null }, extra)); };
   ST.answerMsg = answerMsg;
 
+  /* K2: documents used, in order of first use; declines add nothing. */
+  ST.docsUsed = (t) => { const ids = []; (t ? t.messages : []).forEach((m) => { if (m.kind === 'answer' && !m.streaming) m.cites.forEach((c) => { if (!ids.includes(c.doc)) ids.push(c.doc); }); }); return ids; };
+
   /* J2/J3 script (§9): returns the cv1 thread after `upTo` learner turns. */
   ST.J2 = [
-    { q: 'How does ReAct combine reasoning and acting?', add: ['agents'], a: 'react', tokens: [3920, 412] },
-    { q: 'How does retrieval reduce hallucination in that loop?', add: ['rag'], a: 'rag_loop', tokens: [8110, 1530] },
-    { q: 'How does self-attention work?', add: ['llm'], a: 'attention', tokens: [12480, 3215] },
-    { q: 'How does PPO clip the policy update?', refuse: 'rl' }
+    { q: 'How does ReAct combine reasoning and acting?', a: 'react', tokens: [3920, 412] },
+    { q: 'How does retrieval reduce hallucination in that loop?', a: 'rag_loop', tokens: [8110, 1530] },
+    { q: 'How does PPO clip the policy update?', a: 'ppo', tokens: [12480, 3215] }
   ];
   ST.j2Thread = (upTo, o = {}) => {
     const t = ST.newThread({ convId: 'cv1', title: ST.J2[0].q });
-    ST.J2.slice(0, upTo).forEach((s, i) => {
-      t.messages.push(M({ role: 'user', text: s.q }));
-      if (s.refuse) { t.messages.push(M({ role: 'tutor', kind: 'refused', question: s.q, subject: s.refuse })); return; }
-      if (i > 0) s.add.forEach((id) => t.messages.push(M({ role: 'notice', kind: 'added', subject: id })));
-      t.subjects.push(...s.add);
-      if (i > 0 && t.subjects.length === MAX) t.messages.push(M({ role: 'notice', kind: 'max' }));
-      t.messages.push(answerMsg(s.a));
-      t.tokens = s.tokens.slice();
-    });
+    ST.J2.slice(0, upTo).forEach((s) => { t.messages.push(M({ role: 'user', text: s.q }), answerMsg(s.a)); t.tokens = s.tokens.slice(); });
     return Object.assign(t, o);
   };
   ST.threadFromConv = (cid, o = {}) => {
     const c = ST.conv(cid);
     if (cid === 'cv1') return ST.j2Thread(3, Object.assign({ noteId: c.noteId, readOnly: c.archived ? 'archived' : null }, o));
-    const t = ST.newThread({ convId: c.id, title: c.title, subjects: c.subjects.slice(), noteId: c.noteId, tokens: c.tokens.slice(), readOnly: c.archived ? 'archived' : null });
-    t.messages.push(M({ role: 'user', text: c.title }), answerMsg(c.answer));
+    const t = ST.newThread({ convId: c.id, title: c.title, noteId: c.noteId, tokens: c.tokens.slice(), readOnly: c.archived ? 'archived' : null });
+    t.messages.push(M({ role: 'user', text: c.title }), answerMsg(c.answers[0]));
     return Object.assign(t, o);
   };
 
   /* ---------- rendering ---------- */
   const T = () => S.thread;
-  const noActiveDocs = (t) => t.subjects.length && !S.docs.some((d) => d.state === 'ready' && !d.archived && d.subjects.some((s) => t.subjects.includes(s)));
-  const hasNoDocs = () => !S.docs.some((d) => !d.archived);
+  const noActiveDocs = () => !S.docs.some((d) => d.state === 'ready' && !d.archived && !d.deleted);
+  const hasNoDocs = () => !S.docs.some((d) => !d.deleted);
 
   function citesHtml(m) {
     if (!S.citations || !m.cites.length) return '';
     return `<div class="cites"><span class="cites-label" id="cl-${m.id}">Sources</span>
-      <div class="cite-list" role="list" aria-labelledby="cl-${m.id}">${m.cites.map((c, i) => { const d = ST.doc(c.doc); return `<span role="listitem"><button class="cite" type="button" data-action="cite" data-mid="${m.id}" data-ci="${i}" data-fk="cite-${m.id}-${i}">
-        ${ic('doc')}<span><span class="doc-name">${esc(d ? d.title : 'Document')}</span><span class="page">, ${c.page ? 'p. ' + c.page : 'page unavailable'}</span></span>${d && d.archived ? `<span class="badge badge-archived">${ic('archive')}Archived</span>` : ''}</button></span>`; }).join('')}</div></div>`;
+      <div class="cite-list" role="list" aria-labelledby="cl-${m.id}">${m.cites.map((c, i) => {
+        const d = ST.doc(c.doc);
+        if (!d || d.deleted) return `<span role="listitem"><span class="cite cite-deleted" data-od-id="cite-deleted">${ic('doc')}<span><span class="doc-name">Deleted document</span></span></span></span>`;
+        return `<span role="listitem"><button class="cite" type="button" data-action="cite" data-mid="${m.id}" data-ci="${i}" data-fk="cite-${m.id}-${i}" aria-label="Open ${esc(d.title)} at ${c.page ? 'page ' + c.page : 'page 1, page unavailable'}">
+        ${ic('doc')}<span><span class="doc-name">${esc(d.title)}</span><span class="page">, ${c.page ? 'p. ' + c.page : 'page unavailable'}</span></span>${d.archived ? `<span class="badge badge-archived">${ic('archive')}Archived</span>` : ''}</button></span>`; }).join('')}</div></div>`;
   }
   function feedbackHtml(m) {
     let html = `<div class="feedback" role="group" aria-label="Rate this answer">
@@ -95,40 +85,27 @@
   }
   const tutorWrap = (m, inner, busy = false) => `<article class="msg-tutor msg-enter" id="m-${m.id}" aria-label="Smart Tutor">${ST.logo('logo')}
     <div class="msg-body" ${busy ? 'aria-busy="true"' : ''}><span class="msg-name">Smart Tutor</span>${inner}</div></article>`;
-  const quoteHtml = (q) => { const d = ST.doc(q.doc); return `<figure class="excerpt"><blockquote>“${esc(q.text)}”</blockquote><figcaption>${ic('quote', 'sm')}Quoted from <span style="text-transform:none;letter-spacing:0"><em>${esc(d ? d.title : '')}</em>, p. ${q.page}</span></figcaption></figure>`; };
-  const names = (ids) => { const n = ids.map((i) => ST.sname(i)); return n.length > 1 ? n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1] : n[0]; };
-  const catOrder = (ids) => ids.slice().sort((a, b) => S.catalog.findIndex((c) => c.id === a) - S.catalog.findIndex((c) => c.id === b));
-  const emNames = (ids) => { const n = catOrder(ids).map((i) => `<em>${esc(ST.sname(i))}</em>`); return n.length > 1 ? n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1] : n[0]; };
+  const quoteHtml = (q) => { const d = ST.doc(q.doc); if (!d || d.deleted) return ''; return `<figure class="excerpt"><blockquote>“${esc(q.text)}”</blockquote><figcaption>${ic('quote', 'sm')}Quoted from <span style="text-transform:none;letter-spacing:0"><em>${esc(d.title)}</em>, p. ${q.page}</span></figcaption></figure>`; };
 
   function msgHtml(m) {
     if (m.role === 'user') return `<div class="msg-user msg-enter"><span class="vh">You asked: </span>${esc(m.text)}</div>`;
-    if (m.role === 'notice') {
-      if (m.kind === 'added') return `<div class="notice" role="note"><div>${ic('plusCircle')}<span>Added <em>${esc(ST.sname(m.subject))}</em> to this conversation</span></div></div>`;
-      return `<div class="notice max" role="note"><div>${ic('info')}<span>This conversation now covers 3 subjects, the maximum. For other topics, start a new conversation.</span></div></div>`;
-    }
     if (m.kind === 'answer') {
       if (m.streaming) return tutorWrap(m, `<div class="stream" id="stream-${m.id}">${ST.mdParas(m.partial || '')}<span class="cursor" aria-hidden="true"></span></div>`, true);
       const text = m.stopped ? m.partial : m.text;
       return tutorWrap(m, `${ST.mdParas(text)}${m.quote && !m.stopped ? quoteHtml(m.quote) : ''}
         ${m.stopped ? `<p class="small muted">${ic('stop', 'sm')} You stopped this answer.</p>` : ''}${citesHtml(m)}${feedbackHtml(m)}`);
     }
-    if (m.kind === 'unsure') {
-      return tutorWrap(m, `<div class="tutor-card"><p>Which subjects is this about?</p>
-        <p class="small muted">Pick 1 to 3. I'll answer your question right after.</p>
-        <div class="pick-chips" role="group" aria-label="Your subjects">${ST.mySubjects().map((s) => { const on = m.picks.includes(s); return `<button type="button" class="schip" data-s="${ST.hueKey(s)}" aria-pressed="${on}" data-action="unsure-pick" data-mid="${m.id}" data-id="${s}" data-fk="up-${s}" ${m.done || (!on && m.picks.length >= MAX) ? 'disabled' : ''}>${ic('check', 'sm ck')}<span class="dot" aria-hidden="true"></span>${esc(ST.sname(s))}</button>`; }).join('')}</div>
-        <div class="tc-actions"><button class="btn btn-primary" type="button" data-action="unsure-go" data-mid="${m.id}" data-fk="unsure-go" ${m.done || !m.picks.length ? 'disabled' : ''}>Continue</button></div></div>`);
-    }
-    if (m.kind === 'refused') {
-      return tutorWrap(m, `<div class="tutor-card decline">
-        <p>This conversation already covers 3 subjects: ${emNames(T().subjects)}. Your question is about <em>${esc(ST.sname(m.subject))}</em>, so I haven't answered it here.</p>
-        <p class="small muted">A new conversation will answer it straight away.</p>
-        <div class="tc-actions"><button class="btn btn-primary" type="button" data-action="carry-over" data-mid="${m.id}" data-fk="carry">${ic('plus', 'sm')}New conversation</button></div></div>`);
-    }
     if (m.kind === 'decline') {
       return tutorWrap(m, `<div class="tutor-card decline">
-        <p>Your documents don't cover this. I answer only from your Library, and none of your subjects is about ${esc(m.topic || 'this topic')}.</p>
+        <p>Your documents don't cover this. I answer only from your Library, and none of your documents is about ${esc(m.topic || 'this topic')}.</p>
         <p class="small muted">To continue, upload a document on this topic.</p>
         <div class="tc-actions"><button class="btn btn-secondary" type="button" data-action="decline-upload" data-fk="decline-upload">${ic('upload', 'sm')}Upload a document</button></div></div>`);
+    }
+    if (m.kind === 'nodocs') {
+      return tutorWrap(m, `<div class="tutor-card decline">
+        <p>None of your documents can be used right now: they are all archived or deleted.</p>
+        <p class="small muted">Upload a document to get an answer. Your earlier answers stay readable.</p>
+        <div class="tc-actions"><button class="btn btn-secondary" type="button" data-action="decline-upload" data-fk="nodocs-upload">${ic('upload', 'sm')}Upload</button></div></div>`);
     }
     if (m.kind === 'error') {
       return tutorWrap(m, `<div class="tutor-card error" role="alert"><p class="tc-head">${ic('alertCircle', 'sm')}This answer didn't come through.</p>
@@ -142,19 +119,19 @@
     const t = T();
     const note = t.noteId ? ST.note(t.noteId) : null;
     const hasAnswer = t.messages.some((m) => m.kind === 'answer' && !m.streaming);
-    const chips = t.subjects.length
-      ? `<span class="chips" aria-label="Subjects in this conversation">${t.subjects.map((s) => ST.schip(s, t.highlight === s ? 'flash' : '')).join('')}</span>`
-      : `<span>Subjects appear after your first question.</span>`;
+    const used = ST.docsUsed(t).length;
     let summarize = '';
     if (hasAnswer && t.readOnly !== 'archived') {
       summarize = t.summarizing
         ? `<button class="btn btn-secondary" type="button" disabled data-fk="summ"><span class="spinner" aria-hidden="true"></span>Summarizing…</button>`
         : `<button class="btn btn-secondary" type="button" data-action="summarize" data-fk="summ" ${t.streaming || t.rateLimit ? 'disabled' : ''}>${ic('note', 'sm')}${note ? 'Update lesson note' : 'Summarize lesson'}</button>`;
     }
-    return `<header class="thread-head">
+    return `<header class="thread-head" data-od-id="thread-header">
       <div class="th-title"><h1 class="od-truncate">${esc(t.title)}</h1>
-        <div class="th-sub">${chips}${note ? `<span class="th-sep" aria-hidden="true"></span><a href="#/note/${note.id}" class="od-row" style="--od-gap:6px;min-width:0">${ic('note', 'sm')}<span class="od-truncate">Lesson note: ${esc(note.title)}</span></a>` : ''}</div></div>
+        ${note ? `<div class="th-sub"><a href="#/note/${note.id}" class="od-row" style="--od-gap:6px;min-width:0">${ic('note', 'sm')}<span class="od-truncate">Lesson note: ${esc(note.title)}</span></a></div>` : ''}</div>
       <div class="th-actions">
+        <button class="btn btn-quiet" type="button" data-action="docs-used" data-fk="docs-used" aria-haspopup="dialog" data-od-id="documents-used-button">${ic('layers', 'sm')}Documents used (${used})</button>
+        <span class="th-sep" aria-hidden="true"></span>
         <button class="switch" type="button" role="switch" aria-checked="${S.citations}" data-action="toggle-citations" data-fk="cit-switch"><span class="track" aria-hidden="true"></span>Show citations<span class="state" aria-hidden="true">${S.citations ? 'On' : 'Off'}</span></button>
         ${summarize ? '<span class="th-sep" aria-hidden="true"></span>' + summarize : ''}
         ${t.convId && !t.readOnly ? `<button class="icon-btn" type="button" data-action="archive-thread" aria-label="Archive conversation" title="Archive conversation">${ic('archive')}</button>` : ''}
@@ -175,9 +152,6 @@
     if (t.readOnly === 'archived') {
       disabled = true; placeholder = 'Archived conversation';
       banner = `<div class="banner">${ic('archive')}<div class="b-body"><strong>This conversation is archived.</strong><span>Restore it to keep asking.</span></div><button class="btn btn-primary btn-sm" type="button" data-action="restore-thread">${ic('restore', 'sm')}Restore</button></div>`;
-    } else if (noActiveDocs(t)) {
-      disabled = true; placeholder = 'No active documents in these subjects';
-      banner = `<div class="banner">${ic('archive')}<div class="b-body"><strong>There are no active documents in this conversation's subjects.</strong><span>The history stays readable. Restore a document to keep asking.</span></div><a class="btn btn-secondary btn-sm" href="#/library-archived">Open archived documents</a></div>`;
     } else if (t.rateLimit > 0) {
       disabled = true; placeholder = 'Sending is paused for a moment';
       banner = `<div class="banner banner-warn">${ic('clock')}<div class="b-body"><strong>You've sent 20 messages in the last minute.</strong><span>You can send again at 11:25 (${ST.TZ.short}), in <span id="rl-count" class="mono">${t.rateLimit}</span> seconds.</span><span class="b-variant">If it's the daily limit (500 per day): You can send again at 00:00 (${ST.TZ.short}).</span></div></div>`;
@@ -194,13 +168,11 @@
   const statusHtml = () => { const t = T(); return `<div class="status-wrap"><div class="status-line"><span class="tokens mono" id="token-line">Tokens: ${ST.num(t.tokens[0])} in · ${ST.num(t.tokens[1])} out</span><span>Enter to send · Shift + Enter for a new line</span></div></div>`; };
 
   function emptyHtml() {
-    const mine = ST.mySubjects();
     return `<div class="chat-empty">
       <div><h2>Ask about your documents</h2>
-        <p class="lede">I work out which of your subjects a question is about, answer only from your documents, and show the page each answer came from.</p></div>
-      <p class="your-subjects"><span>Your subjects:</span>${mine.map((s) => ST.schip(s, 'sm')).join('')}</p>
+        <p class="lede">I answer only from the documents in your Library and show the page each answer came from. There's nothing to choose first: just ask.</p></div>
       <section class="optional-slot" aria-labelledby="try-h"><h3 id="try-h">Try asking</h3>
-        ${['How does ReAct combine reasoning and acting?', 'How does self-attention work?', 'What problem does the PPO clipped objective solve?'].map((q) => `<button class="example" type="button" data-action="example" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</section>
+        ${['How does ReAct combine reasoning and acting?', 'How does retrieval reduce hallucination in that loop?', 'How does PPO clip the policy update?'].map((q) => `<button class="example" type="button" data-action="example" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</section>
     </div>`;
   }
 
@@ -210,11 +182,9 @@
       return ST.shell({ nav: 'chat', content: `<div class="page"><div style="margin-top:48px">${ST.emptyState({ icon: 'upload', title: 'Upload a document first', text: 'The tutor answers only from your documents. Add a PDF to your Library and you can start asking in a few minutes.', actions: `<a class="btn btn-primary" href="#/library-empty" data-autofocus>${ic('upload', 'sm')}Upload</a>` })}</div></div>` });
     }
     const fromNote = t.fromNote ? ST.note(t.fromNote) : null;
-    const carried = t.carriedFrom ? ST.conv(t.carriedFrom) : null;
-    const body = !t.messages.length && !fromNote && !carried ? emptyHtml()
+    const body = !t.messages.length && !fromNote ? emptyHtml()
       : `<div class="thread" id="thread">${fromNote ? `<div class="banner banner-info">${ic('note')}<div class="b-body">Started from note: <a href="#/note/${fromNote.id}"><em>${esc(fromNote.title)}</em></a></div></div>` : ''}
-          ${carried ? `<div class="banner banner-info">${ic('arrowRight')}<div class="b-body"><span>Your question was carried over from <a href="#/open/${carried.id}"><em>${esc(carried.title)}</em></a> and sent right away.</span></div></div>` : ''}
-          ${!t.messages.length ? `<p class="muted">Ask a question to discuss this note. This conversation starts with ${esc(names(t.subjects))}.</p>` : ''}
+          ${!t.messages.length ? `<p class="muted">Ask a question to discuss this note. The tutor answers from all of your documents.</p>` : ''}
           ${t.messages.map(msgHtml).join('')}${summaryCard()}</div>`;
     return ST.shell({ nav: t.convId ? 'conversations' : 'chat', currentConv: t.convId, content: `<div class="chat">${headerHtml()}
       <div class="thread-scroll" data-keep-scroll="thread" id="thread-scroll">${body}</div>${composerHtml()}${statusHtml()}</div>` });
@@ -238,7 +208,8 @@
     const t = T();
     t.tokens[0] += 2860 + t.messages.length * 140;
     t.tokens[1] += Math.round(((partial ? m.partial : m.text) || '').length / 4);
-    const c = t.convId && ST.conv(t.convId); if (c) { c.tokens = t.tokens.slice(); c.last = ST.TODAY + 'T11:24'; }
+    const c = t.convId && ST.conv(t.convId);
+    if (c) { c.tokens = t.tokens.slice(); c.last = ST.TODAY + 'T11:24'; if (!partial && !c.answers.includes(m.key)) c.answers.push(m.key); ST.syncConvSubjects(c); }
   }
   ST.streamAnswer = (key, { startAt = 0, speed = 45 } = {}) => {
     const t = T();
@@ -249,7 +220,6 @@
     m.partial = words.slice(0, i).join('');
     ST.render(); scrollBottom(true);
     ST.announce('Smart Tutor is answering.');
-    if (t.highlight) { const h = t.highlight; setTimeout(() => { if (T() === t && t.highlight === h) { t.highlight = null; document.querySelectorAll('.schip.flash').forEach((e) => e.classList.remove('flash')); } }, 2600); }
     streamTimer = setInterval(() => {
       i += 2; m.partial = words.slice(0, i).join('');
       const node = document.getElementById('stream-' + m.id);
@@ -263,47 +233,32 @@
     }, speed);
   };
 
-  /* ---------- asking ---------- */
+  /* ---------- asking: no subject detection (K1) ---------- */
   function ensureConv(q) {
     const t = T(); if (t.convId) return;
     const id = 'cv' + (S.convs.length + 10);
     t.convId = id; if (t.title === 'New conversation') t.title = q;
-    S.convs.push({ id, title: q, subjects: t.subjects, last: ST.TODAY + 'T11:24', noteId: null, archived: false, tokens: t.tokens });
+    S.convs.push({ id, title: q, answers: [], subjects: [], last: ST.TODAY + 'T11:24', noteId: null, archived: false, tokens: t.tokens });
   }
-  ST.ask = (q, { subjects = null } = {}) => {
+  ST.ask = (q) => {
     const t = T(); q = (q || '').trim();
-    if (!q || t.streaming || t.readOnly || t.rateLimit > 0 || noActiveDocs(t)) return;
+    if (!q || t.streaming || t.readOnly || t.rateLimit > 0) return;
     t.draft = '';
     t.messages.push(M({ role: 'user', text: q }));
     if (t.title === 'New conversation') t.title = q;
-    const det = subjects || ST.classify(q); // a carried question keeps the subject it was refused or declined for
-    if (!det.length) {
-      if (OFF_TOPIC.test(q)) {
-        t.messages.push(M({ role: 'tutor', kind: 'decline', question: q, topic: /laptop/i.test(q) ? 'choosing a laptop' : null }));
-        t.tokens[0] += 1240; t.tokens[1] += 46; ensureConv(q);
-        ST.render(); scrollBottom(true); ST.announce("Your documents don't cover this.");
-        return;
-      }
-      t.messages.push(M({ role: 'tutor', kind: 'unsure', question: q, picks: [] }));
-      ST.render(); scrollBottom(true); ST.announce('Which subjects is this about?');
-      return;
-    }
-    if (!t.subjects.length) { t.subjects = det.slice(0, MAX); ensureConv(q); ST.conv(t.convId).subjects = t.subjects; ST.streamAnswer(ST.pickAnswer(q, t.subjects)); return; }
     ensureConv(q);
-    const fresh = det.filter((s) => !t.subjects.includes(s));
-    if (t.subjects.length + fresh.length > MAX) {
-      t.messages.push(M({ role: 'tutor', kind: 'refused', question: q, subject: fresh[0] }));
-      t.tokens[0] += 980; t.tokens[1] += 52;
-      ST.render(); scrollBottom(true); ST.announce('This conversation already covers 3 subjects. Start a new conversation for this question.');
+    if (noActiveDocs()) {
+      t.messages.push(M({ role: 'tutor', kind: 'nodocs', question: q }));
+      ST.render(); scrollBottom(true); ST.announce('None of your documents can be used right now. Upload a document to get an answer.');
       return;
     }
-    fresh.forEach((s) => { t.subjects.push(s); t.messages.push(M({ role: 'notice', kind: 'added', subject: s })); t.highlight = s; });
-    if (fresh.length) {
-      ST.conv(t.convId).subjects = t.subjects;
-      ST.announce(`Added ${names(fresh)} to this conversation.` + (t.subjects.length === MAX ? ' This conversation now covers 3 subjects, the maximum.' : ''));
-      if (t.subjects.length === MAX) t.messages.push(M({ role: 'notice', kind: 'max' }));
+    if (OFF_TOPIC.test(q)) {
+      t.messages.push(M({ role: 'tutor', kind: 'decline', question: q, topic: /laptop/i.test(q) ? 'choosing a laptop' : null }));
+      t.tokens[0] += 1240; t.tokens[1] += 46;
+      ST.render(); scrollBottom(true); ST.announce("Your documents don't cover this.");
+      return;
     }
-    ST.streamAnswer(ST.pickAnswer(q, t.subjects));
+    ST.streamAnswer(ST.pickAnswer(q));
   };
 
   const findMsg = (el) => T().messages.find((m) => m.id === el.dataset.mid);
@@ -313,22 +268,16 @@
     example: (el) => ST.ask(el.dataset.q),
     stop: () => ST.stopStream(false),
     'toggle-citations': () => { S.citations = !S.citations; ST.ls.set('st3_citations', S.citations ? 'on' : 'off'); ST.render(); ST.announce(S.citations ? 'Citations shown.' : 'Citations hidden.'); },
-    cite: (el) => { const c = findMsg(el).cites[+el.dataset.ci]; ST.openDetails(c.doc, { cited: { page: c.page } }); },
+    cite: (el) => { const c = findMsg(el).cites[+el.dataset.ci]; ST.openViewer(c.doc, { page: c.page || 1, highlight: c.page ? c : null, from: 'chat' }); },
+    'docs-used': () => ST.openDocsUsed(),
     'fb-up': (el) => { const m = findMsg(el); m.fb = m.fb === 'up' ? null : 'up'; m.reasonOpen = false; ST.render(); },
     'fb-down': (el) => { const m = findMsg(el); if (m.fb === 'down') { m.fb = null; m.reasonOpen = false; m.reasonSent = false; } else { m.fb = 'down'; m.reasonOpen = true; m.reasonSent = false; } ST.render(); if (m.reasonOpen) { const r = document.querySelector(`[data-fk="r-${m.id}-0"]`); if (r) r.focus(); } },
     'fb-reason': (el) => { findMsg(el).reason = el.value; },
     'fb-text': (el) => { findMsg(el).reasonText = el.value; },
     'fb-skip': (el) => { const m = findMsg(el); m.reasonOpen = false; m.reasonSent = true; ST.render(); const b = document.querySelector(`[data-fk="down-${m.id}"]`); if (b) b.focus(); },
     'fb-send': (el) => { const m = findMsg(el); m.reasonOpen = false; m.reasonSent = true; ST.render(); ST.announce('Feedback sent.'); const b = document.querySelector(`[data-fk="down-${m.id}"]`); if (b) b.focus(); },
-    'unsure-pick': (el) => { const m = findMsg(el); const id = el.dataset.id; m.picks = m.picks.includes(id) ? m.picks.filter((x) => x !== id) : m.picks.length < MAX ? [...m.picks, id] : m.picks; ST.render(); },
-    'unsure-go': (el) => {
-      const t = T(); const m = findMsg(el); if (!m.picks.length) return;
-      m.done = true; t.subjects = m.picks.slice(); ensureConv(m.question); ST.conv(t.convId).subjects = t.subjects;
-      ST.streamAnswer(ST.pickAnswer(m.question, t.subjects));
-    },
-    'carry-over': (el) => { const m = findMsg(el); ST.pendingAsk = { q: m.question, subjects: [m.subject].filter(Boolean) }; /* only the fourth-subject refusal carries a question (E4) */ ST.pendingThread = ST.newThread({ carriedFrom: T().convId }); ST.goto('chat-new'); },
     'decline-upload': () => { ST.goto('library-default'); if (!S.uploadLimit) document.getElementById('file-input').click(); },
-    retry: (el) => { const t = T(); t.messages = t.messages.filter((m) => m.id !== el.dataset.mid); const q = [...t.messages].reverse().find((m) => m.role === 'user'); ST.streamAnswer(ST.pickAnswer(q.text, t.subjects)); },
+    retry: (el) => { const t = T(); t.messages = t.messages.filter((m) => m.id !== el.dataset.mid); const q = [...t.messages].reverse().find((m) => m.role === 'user'); ST.streamAnswer(ST.pickAnswer(q.text)); },
     summarize: () => {
       const t = T(); const n = t.noteId ? ST.note(t.noteId) : null;
       if (n && n.edited) {
@@ -341,20 +290,21 @@
   });
   document.addEventListener('keydown', (e) => { if (e.target.id === 'composer-input' && e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); ST.ask(T().draft); } });
 
-  /* ---------- lesson notes ---------- */
+  /* ---------- lesson notes (a note's subjects come from the documents used) ---------- */
   ST.makeNote = (t, kind) => {
     const c = t.convId && ST.conv(t.convId);
+    const subjects = ST.subjectsOfDocs(ST.docsUsed(t));
     if (!t.noteId) {
       if (t.convId === 'cv1') { t.noteId = 'n1'; }
       else {
         const id = 'n' + (S.notes.length + 10);
         const first = t.messages.find((m) => m.role === 'user');
-        S.notes.push({ id, title: first ? first.text.replace(/\?$/, '') : 'Lesson note', subjects: t.subjects.slice(), date: ST.TODAY + 'T11:30', convId: t.convId, archived: false, edited: false,
+        S.notes.push({ id, title: first ? first.text.replace(/\?$/, '') : 'Lesson note', subjects, date: ST.TODAY + 'T11:30', convId: t.convId, archived: false, edited: false,
           body: `# ${first ? first.text.replace(/\?$/, '') : 'Lesson note'}\n\n${t.messages.filter((m) => m.kind === 'answer').map((m) => m.text).join('\n\n')}` });
         t.noteId = id;
       }
     }
-    const n = ST.note(t.noteId); n.edited = false; n.subjects = t.subjects.slice(); n.date = ST.TODAY + 'T11:30';
+    const n = ST.note(t.noteId); n.edited = false; n.subjects = subjects; n.date = ST.TODAY + 'T11:30';
     if (c) c.noteId = t.noteId;
     t.summaryDone = kind;
   };

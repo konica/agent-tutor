@@ -1,4 +1,4 @@
-/* Smart Tutor v0.5 — core: helpers, icons, store, shell, overlays, upload tray, router, review chrome. */
+/* Smart Tutor v0.8 — core: helpers, icons, store, shell, overlays, upload tray, router, review chrome. */
 (function () {
   const ST = window.ST;
 
@@ -24,6 +24,8 @@
   const ICONS = {
     message: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    minus: '<path d="M5 12h14"/>',
+    trash: '<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/>',
     list: '<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
     note: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>',
     library: '<path d="M4 19.5V4.5A1.5 1.5 0 0 1 5.5 3H8v18H5.5A1.5 1.5 0 0 1 4 19.5z"/><path d="M8 3h4v18H8M12 4.5l4-1 4 16-4 1z"/>',
@@ -117,11 +119,12 @@
     S.docs = ST.clone(ST.DOCS);
     S.catalog = ST.clone(ST.CATALOG);
     S.convs = ST.clone(ST.CONVERSATIONS);
+    S.deletedNotice = null;
     S.notes = ST.clone(ST.NOTES);
     S.tray = []; S.trayCollapsed = false; S.uploadLimit = false;
     S.rowMenu = null; S.userMenu = false;
+    S.convs.forEach((c) => ST.syncConvSubjects(c));
   };
-  ST.resetData();
   ST.doc = (id) => ST.S.docs.find((d) => d.id === id);
   ST.conv = (id) => ST.S.convs.find((c) => c.id === id);
   ST.note = (id) => ST.S.notes.find((n) => n.id === id);
@@ -130,11 +133,16 @@
   ST.hueKey = (id) => (['llm', 'agents', 'rag', 'rl', 'tool'].includes(id) ? id : 'other');
   ST.schip = (id, cls = '') => `<span class="schip ${cls}" data-s="${ST.hueKey(id)}"><span class="dot" aria-hidden="true"></span>${ST.esc(ST.sname(id))}</span>`;
   ST.chips = (ids, cls = '') => `<span class="chips">${ids.map((i) => ST.schip(i, cls)).join('')}</span>`;
-  /* "My subjects": subjects of ready, non-archived documents */
-  ST.mySubjects = () => { const set = []; ST.S.docs.forEach((d) => { if (d.state === 'ready' && !d.archived) d.subjects.forEach((s) => { if (!set.includes(s)) set.push(s); }); }); return set; };
-  ST.needsAction = () => ST.S.docs.filter((d) => !d.archived && (d.state === 'choose' || d.state === 'failed')).length;
-  ST.stillProcessing = () => ST.S.docs.filter((d) => !d.archived && ['uploading', 'processing', 'choose'].includes(d.state)).length;
+  /* "My subjects": subjects of ready, non-archived, not deleted documents */
+  ST.mySubjects = () => { const set = []; ST.S.docs.forEach((d) => { if (d.state === 'ready' && !d.archived && !d.deleted) d.subjects.forEach((s) => { if (!set.includes(s)) set.push(s); }); }); return set; };
+  ST.needsAction = () => ST.S.docs.filter((d) => !d.archived && !d.deleted && (d.state === 'choose' || d.state === 'failed')).length;
+  ST.stillProcessing = () => ST.S.docs.filter((d) => !d.archived && !d.deleted && ['uploading', 'processing', 'choose'].includes(d.state)).length;
+  /* K1: a conversation's subjects (list chips, filters, Subjects counts) come from the documents it used. */
+  ST.subjectsOfDocs = (ids) => { const set = []; ids.forEach((id) => { const d = ST.doc(id); if (d) d.subjects.forEach((s) => { if (!set.includes(s)) set.push(s); }); }); return set; };
+  ST.convDocs = (c) => { const ids = []; (c.answers || []).forEach((k) => (ST.ANSWERS[k] ? ST.ANSWERS[k].cites : []).forEach((x) => { if (!ids.includes(x.doc)) ids.push(x.doc); })); return ids; };
+  ST.syncConvSubjects = (c) => { c.subjects = ST.subjectsOfDocs(ST.convDocs(c)); };
   ST.docTitle = (id) => { const d = ST.doc(id); return d ? d.title : ''; };
+  ST.resetData();
 
   ST.setTheme = (t) => {
     ST.S.theme = t;

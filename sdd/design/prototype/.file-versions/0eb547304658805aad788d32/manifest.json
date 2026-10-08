@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "fileName": "index.html",
-  "currentVersionId": "6dc3d683-fb5e-4f43-b754-b2613abf34fb",
+  "currentVersionId": "fc066bed-4c49-42e7-b278-3a2f21ce50b8",
   "entries": [
     {
       "id": "f36e6729-f195-4945-9c3c-52c32a4f64eb",
@@ -75,7 +75,22 @@
       "mime": "text/html; charset=utf-8",
       "kind": "html",
       "contentPath": "0005-6dc3d683-fb5e-4f43-b754-b2613abf34fb.html",
-      "contentDigest": "d0840ce778fad0aed1ca11a9e6f860d3d5c3d363e91fd9cc50cb4c8b0b701f7f",
+      "promptSource": "message",
+      "contentDigest": "d0840ce778fad0aed1ca11a9e6f860d3d5c3d363e91fd9cc50cb4c8b0b701f7f"
+    },
+    {
+      "id": "fc066bed-4c49-42e7-b278-3a2f21ce50b8",
+      "fileName": "index.html",
+      "version": 6,
+      "label": "Version 6",
+      "createdAt": 1791430709377,
+      "source": "ai",
+      "prompt": "You are designing **Smart Tutor**, a laptop web app (1440 px, light mode) where learners upload their own PDFs and ask a tutor that answers only from them, with citations. Follow the design brief **v0.8** in this project (`brief-v0.8.md`; it is the only brief now) exactly; it is the source of truth. Start with **§0 What changed** (K1–K5): this round updates the existing prototype in this project (round 7, brief v0.7, accepted), so change only what §0 lists, plus the brief text it points to (§1, §3, §5 J2–J4, §6.3, §6.5, §6.6, §6.7, §6.8, §6.10, new §6.12 Document viewer, §9 sample conversation, §10), and keep everything else as it is. Keep the four clickable flows in §5 working (J2, J3 and J4 are rewritten), every Release 1 screen and state in §6, the wireframes for §7 and §8, and the components page. Use the sample data in §9 and the quoted wording verbatim. Set `ST.BRIEF = 'v0.8'` and update the page title, the overview, and the questions page for brief v0.8. Follow the prototype contract in §11 item 6: every state in `window.ST.STATES` with one specific user story in `ref`, each state at `index.html#/<state-id>`, review chrome hidden with `?shot=1`.\n\nRules for this round:\n- Keep the Smart Tutor brand and tokens; no other design system.\n- Do not edit `brief-v0.8.md`, `history/`, `.file-versions/`, `.od-frames/`, `.od-skills/`, or `v0.2/`.\n- Keep every other state id and its `ref` unchanged.\n- K1: **remove** the states `chat-subjects-detected`, `chat-subjects-detected-multi`, `chat-detection-unsure`, `chat-subject-added`, `chat-maximum-reached`, `chat-fourth-subject-refused`, `chat-new-from-refused`, `chat-citation-opens-details`, and merge `chat-new-conversation` into `chat-new`, everywhere (state list, index, review-bar list, flows, overview). No subject chips in the chat header, no \"Your subjects\" line, no \"New conversation\" offers. Refs: chat states that remain use US-3, US-4, US-4b or US-5 (there is no US-3b any more).\n- K2/K3 new states (ref US-4b): `chat-documents-used`, `chat-documents-used-empty`, `chat-documents-used-deleted`, `viewer-document`, `viewer-citation-highlight`, `viewer-no-highlight`, `viewer-archived`, `viewer-loading`, `viewer-error`. Render the PDF pages as a realistic paper page mock (title, two-column text blocks); the highlighted passage in `viewer-citation-highlight` is the cited text from *ReAct…*, p. 3.\n- K4 new states (ref US-10c): `library-more-menu`, `library-delete-confirm`, `library-deleted`, `chat-citation-deleted`; redo `details-ready`, `details-archived`, `details-processing` per §6.5 and §0.\n- Citations everywhere open the document viewer (§6.12), not document details.\n- Keep the `main[tabindex=\"-1\"]` focus rule at the end of `v03.css`.\n\nEnd with a list of the states you changed, added, and removed, and questions or proposed changes to the brief.",
+      "size": 3226,
+      "mime": "text/html; charset=utf-8",
+      "kind": "html",
+      "contentPath": "0006-fc066bed-4c49-42e7-b278-3a2f21ce50b8.html",
+      "contentDigest": "aa9636d5546b1c00b60acdd36df92eeaa27b8d37fd932da015b3df328a209568",
       "promptSource": "message"
     }
   ]

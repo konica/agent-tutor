@@ -1,4 +1,4 @@
-/* Smart Tutor v0.7 — overview with what changed and the flows, R2 research map and R3 learning loop
+/* Smart Tutor v0.8 — overview with what changed and the flows, R2 research map and R3 learning loop
    wireframes, components page (§10), decisions and questions for the brief owner (§11.5). */
 (function () {
   const ST = window.ST;
@@ -8,15 +8,15 @@
   /* =========================================================
      Overview
      ========================================================= */
-  /* §0 What changed in v0.7: [source, change, states redone, states removed]. */
+  /* §0 What changed in v0.8: [source, change, states redone or added, states removed]. */
   ST.CHANGES = [
-    ['E4', 'A decline never offers “New conversation”', ['chat-decline'], ['chat-decline-other-subject']],
-    ['E6', 'The declined question is not kept', [], []],
-    ['E7', 'No changing subjects of archived documents; Restore first', ['library-archived', 'details-archived'], ['picker-change-subjects-archived']],
-    ['E8', 'Daily limits reset at 00:00 (GMT+7)', ['library-rate-limited', 'chat-rate-limited'], []],
-    ['F1', 'Registration uses the email as the username', ['auth-sign-up'], []]
+    ['K1', 'Conversations have no subjects', ['chat-new', 'chat-answer-citations', 'chat-first-answer', 'chat-no-active-documents'], ['chat-subjects-detected', 'chat-subjects-detected-multi', 'chat-detection-unsure', 'chat-subject-added', 'chat-maximum-reached', 'chat-fourth-subject-refused', 'chat-new-from-refused', 'chat-new-conversation']],
+    ['K2', 'Documents used', ['chat-documents-used', 'chat-documents-used-empty', 'chat-documents-used-deleted'], []],
+    ['K3', 'Document viewer with the cited passage highlighted', ['viewer-document', 'viewer-citation-highlight', 'viewer-no-highlight', 'viewer-archived', 'viewer-loading', 'viewer-error'], ['chat-citation-opens-details']],
+    ['K4', 'Delete a document', ['library-more-menu', 'library-delete-confirm', 'library-deleted', 'chat-citation-deleted', 'details-ready', 'details-archived', 'details-processing'], []],
+    ['K5', 'Same file, different learners: processed like any new file', ['usage-overview'], []]
   ];
-  ST.NEW_IDS = [];
+  ST.NEW_IDS = ['chat-documents-used', 'chat-documents-used-empty', 'chat-documents-used-deleted', 'viewer-document', 'viewer-citation-highlight', 'viewer-no-highlight', 'viewer-archived', 'viewer-loading', 'viewer-error', 'library-more-menu', 'library-delete-confirm', 'library-deleted', 'chat-citation-deleted'];
   const changed = () => { const set = new Set(); ST.CHANGES.forEach((c) => c[2].forEach((id) => set.add(id))); return set; };
   ST.indexView = () => {
     const groups = [];
@@ -25,21 +25,21 @@
     return `<main class="index-page" id="main-content" tabindex="-1">
       <section class="index-hero">
         <div><span class="brand" style="padding:0 0 24px">${ST.logo('logo', 'Smart Tutor logo')}<span class="word">Smart Tutor</span></span>
-          <h1>Round 6: the owner's answers</h1>
-          <p>Brief v0.7 settles E4, E6, E7, E8 and F1. Declines only ask for a document, archived documents must be restored before their subjects change, daily limits end at 00:00 (GMT+7), and registration has no Username field. Two states are gone. Everything else is the round 5 design. Review the changed states first, then walk the four flows. Every state is labelled <code class="mono">&lt;screen&gt;-&lt;state&gt;@v0.4</code> and opens at <code class="mono">index.html#/&lt;state-id&gt;</code>; add <code class="mono">?shot=1</code> to hide this review chrome.</p>
+          <h1>Round 8: check the source</h1>
+          <p>Brief v0.8 answers end-user feedback. Chat has no subjects any more: every question uses all of the learner's ready documents. Each conversation lists its documents used, citations open the PDF at the highlighted passage, and a document can be deleted after a confirmation. Everything else is the accepted v0.7 design.</p>
           <div class="od-cluster" style="margin-top:24px;--od-gap:12px">
             <button class="btn btn-primary btn-lg" type="button" data-action="start-flow" data-flow="J1">Start with J1 · First run${ic('arrowRight', 'sm')}</button>
             <a class="btn btn-secondary btn-lg" href="#/library-default">Open the Library</a>
             <a class="btn btn-ghost btn-lg" href="#/brief-questions">Questions for the brief</a>
           </div></div>
         <dl class="meta">
-          <div><dt>Brief</dt><dd>v0.7 · PRD v2.16</dd></div><div><dt>Owner</dt><dd>Thao Dinh</dd></div><div><dt>Date</dt><dd>6 Oct 2026</dd></div>
+          <div><dt>Brief</dt><dd>v0.8 · PRD v2.21</dd></div><div><dt>Owner</dt><dd>Thao Dinh</dd></div><div><dt>Date</dt><dd>8 Oct 2026</dd></div>
           <div><dt>Screens</dt><dd>Laptop, 1280–1920 px</dd></div><div><dt>Themes</dt><dd>Light and dark</dd></div><div><dt>States</dt><dd>${ST.STATES.length - 1}</dd></div>
           <div><dt>Round 1</dt><dd><a href="v0.2/index.html">v0.2 prototype</a></dd></div>
         </dl>
       </section>
 
-      <h2 class="section-title">What changed in v0.7</h2>
+      <h2 class="section-title">What changed in v0.8</h2>
       <div class="changes" role="table" aria-label="Decisions and the states they changed">
         ${ST.CHANGES.map(([id, title, states, removed]) => `<div class="change-row" role="row"><span class="qid" role="cell">${esc(id)}</span><span class="change-title" role="cell">${esc(title)}</span>
           <span class="change-states" role="cell">${states.length ? '' : '<span class="small muted">No state changes</span>'}${states.map((sid) => `<a href="#/${sid}"><code>${sid}</code>${ST.NEW_IDS.includes(sid) ? '<span class="badge badge-note">New</span>' : ''}</a>`).join('')}${(removed || []).map((sid) => `<span class="removed-id"><del><code>${sid}</code></del><span class="badge badge-archived">Removed</span></span>`).join('')}</span></div>`).join('')}
@@ -56,14 +56,14 @@
       <section class="direction" aria-label="Visual system additions">
         <div><h3>Subject chips</h3><div class="chips">${['llm', 'agents', 'rag', 'rl'].map((s) => ST.schip(s)).join('')}</div><p class="small muted">One chip everywhere, with a stable colour per subject. The text always meets AA contrast and the name is always shown.</p></div>
         <div><h3>Document states</h3><div class="od-stack" style="--od-gap:6px;align-items:flex-start">${['processing', 'choose', 'ready', 'failed'].map((st) => ST.stateBadge({ state: st, subjects: [], attempts: 1, failReason: '' }, false)).join('')}${ST.stateBadge({ archived: true }, false)}</div></div>
-        <div><h3>System notices</h3><div class="notice"><div>${ic('plusCircle')}<span>Added <em>Retrieval-Augmented Generation</em> to this conversation</span></div></div><p class="small muted">Centred and outlined, so they read differently from both the tutor's answers and your own messages.</p></div>
+        <div><h3>Cited passage</h3><div class="vw-hl" style="margin:8px 0 0"><span class="vw-hl-label" aria-hidden="true">Cited passage</span>Reasoning traces help the model induce, track, and update action plans.</div><p class="small muted">Soft accent fill plus an outline and a label, so the highlight never relies on colour alone.</p></div>
         <div><h3>Quoted material</h3><figure class="excerpt"><blockquote>“An attention function can be described as mapping a query and a set of key-value pairs to an output…”</blockquote><figcaption>Quoted from your document</figcaption></figure></div>
       </section>
 
       <h2 class="section-title">All states</h2>
       <div class="index-groups">${groups.map((g) => `<section class="index-group ${g.items.length > 12 ? 'span2' : ''}" aria-labelledby="g-${g.items[0].id}">
         <h2 id="g-${g.items[0].id}">${esc(g.name)}<span class="ig-ref">${esc(g.ref)}</span></h2>
-        <ul>${g.items.map((s) => `<li><a href="#/${s.id}"><code>${s.id}@${ST.BRIEF}</code>${ST.NEW_IDS.includes(s.id) ? '<span class="badge badge-note">New in v0.7</span>' : ch.has(s.id) ? '<span class="badge">Changed in v0.7</span>' : ''}<span>${esc(s.desc)}</span></a></li>`).join('')}</ul></section>`).join('')}</div>
+        <ul>${g.items.map((s) => `<li><a href="#/${s.id}"><code>${s.id}@${ST.BRIEF}</code>${ST.NEW_IDS.includes(s.id) ? '<span class="badge badge-note">New in v0.8</span>' : ch.has(s.id) ? '<span class="badge">Changed in v0.8</span>' : ''}<span>${esc(s.desc)}</span></a></li>`).join('')}</ul></section>`).join('')}</div>
     </main>`;
   };
   ST.actions['start-flow-at'] = (el, e) => { ST.flow = el.dataset.flow; try { sessionStorage.setItem('st3_flow', ST.flow); } catch (x) {} };
@@ -123,7 +123,7 @@
       <span>1 · Chain-of-Thought Prompting (2022): reasoning written out step by step <span class="wf-tag">[cite p. 2]</span></span>
       <span>2 · ReAct (2022): reasoning interleaved with tool actions <span class="wf-tag">[cite p. 3]</span></span>
       <span>3 · Toolformer (2023): the model learns when to call tools <span class="wf-tag">[cite p. 1]</span></span>
-      <span class="wf-note">Normal chat rules apply: the conversation's subjects, citations switch and status line.</span></div>`);
+      <span class="wf-note">Normal chat rules apply: documents used, citations switch and status line.</span></div>`);
   ST.r2Sparse = () => wfPage('map', 2, 'US-19', `
     <div class="page-head"><div><h1>Research map</h1></div></div>${subjSelect()}
     <div class="wf-box" style="justify-items:center;text-align:center;padding:48px">
@@ -192,7 +192,7 @@
   ST.componentsView = () => {
     const d = { id: 'dx', title: 'Toolformer: Language Models Can Teach Themselves to Use Tools', authors: 'Schick et al.', year: 2023, state: 'choose', subjects: [], attempts: 0 };
     return `<main class="index-page" id="main-content" tabindex="-1">
-    <div class="page-head" style="margin-bottom:48px"><div><h1 style="font-size:48px">Components</h1><p>The reusable set for v0.7. Tokens live once in <code class="mono">styles.css</code> and <code class="mono">v03.css</code>, for light and dark.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
+    <div class="page-head" style="margin-bottom:48px"><div><h1 style="font-size:48px">Components</h1><p>The reusable set for v0.8. Tokens live once in <code class="mono">styles.css</code> and <code class="mono">v03.css</code>, for light and dark.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
 
     <section class="cmp-section"><h2>Tokens</h2><p>The round 1 palette, plus an attention colour for “needs action” and one hue per subject. Chip text always uses the main text colour, so contrast holds whatever the hue.</p>
       <div class="cmp-grid">${tokenGrid('light')}${tokenGrid('dark')}</div></section>
@@ -240,13 +240,20 @@
       <div class="cmp-grid">
         ${spec('citation', `<div class="cite-list"><button class="cite" type="button">${ic('doc')}<span><span class="doc-name">ReAct: Synergizing Reasoning and Acting in Language Models</span><span class="page">, p. 3</span></span></button>
           <button class="cite" type="button">${ic('doc')}<span><span class="doc-name">Proximal Policy Optimization Algorithms</span><span class="page">, page unavailable</span></span></button>
-          <button class="cite" type="button">${ic('doc')}<span><span class="doc-name">Language Models are Few-Shot Learners</span><span class="page">, p. 8</span></span><span class="badge badge-archived">${ic('archive')}Archived</span></button></div>`)}
+          <button class="cite" type="button">${ic('doc')}<span><span class="doc-name">Language Models are Few-Shot Learners</span><span class="page">, p. 8</span></span><span class="badge badge-archived">${ic('archive')}Archived</span></button>
+          <span class="cite cite-deleted">${ic('doc')}<span><span class="doc-name">Deleted document</span></span></span></div>
+          <p class="small muted">A citation opens the document viewer at the cited page. A deleted document's citation reads “Deleted document” and isn't a link.</p>`)}
+        ${spec('documents used · row / archived / deleted', `<ol class="du-list">
+          <li><button class="du-row" type="button"><span class="du-icon">${ic('doc')}</span><span class="du-text"><span class="du-title">ReAct: Synergizing Reasoning and Acting in Language Models</span><span class="du-meta">Yao et al. · 2022</span></span></button></li>
+          <li><button class="du-row" type="button"><span class="du-icon">${ic('doc')}</span><span class="du-text"><span class="du-title">Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks</span><span class="du-meta">Lewis et al. · 2020</span></span><span class="badge badge-archived">${ic('archive')}Archived</span></button></li>
+          <li class="du-row is-deleted"><span class="du-icon">${ic('doc')}</span><span class="du-text"><span class="du-title">Chain-of-Thought Prompting Elicits Reasoning in Large Language Models</span><span class="du-meta">Wei et al. · 2022</span></span><span class="badge badge-deleted">${ic('x')}Deleted</span></li></ol>`)}
         ${spec('answer feedback · default / “Helpful” pressed / “Not helpful” pressed (D1)', `<div class="feedback" role="group" aria-label="Example, default"><button class="fb-btn" type="button" aria-pressed="false">${ic('thumb', 'sm')}Helpful</button><button class="fb-btn" type="button" aria-pressed="false">${ic('thumb', 'sm flip-y')}Not helpful</button></div>
           <div class="feedback" role="group" aria-label="Example, helpful pressed"><button class="fb-btn" type="button" aria-pressed="true">${ic('thumb', 'sm')}Helpful</button><button class="fb-btn" type="button" aria-pressed="false">${ic('thumb', 'sm flip-y')}Not helpful</button><span class="fb-thanks">Thanks — glad it helped.</span></div>
           <div class="feedback" role="group" aria-label="Example, not helpful pressed"><button class="fb-btn" type="button" aria-pressed="false">${ic('thumb', 'sm')}Helpful</button><button class="fb-btn" type="button" aria-pressed="true">${ic('thumb', 'sm flip-y')}Not helpful</button></div>
           <p class="small muted">Outline icons with a text label. Pressed adds a tinted fill, an accent border and a heavier label, so the state never relies on colour alone.</p>`)}
-        ${spec('system notice · added / maximum', `<div class="notice"><div>${ic('plusCircle')}<span>Added <em>Retrieval-Augmented Generation</em> to this conversation</span></div></div>
-          <div class="notice max"><div>${ic('info')}<span>This conversation now covers 3 subjects, the maximum. For other topics, start a new conversation.</span></div></div>`)}
+        ${spec('system notice · started from a note', `<div class="banner banner-info">${ic('note')}<div class="b-body">Started from note: <a href="#/note/n2"><em>Chain-of-thought prompting</em></a></div></div>`)}
+        ${spec('buttons · destructive', `<div class="od-cluster"><button class="btn btn-secondary" type="button">Cancel</button><button class="btn btn-danger" type="button">${ic('trash', 'sm')}Delete</button><button class="btn btn-danger-quiet" type="button">${ic('trash', 'sm')}Delete…</button></div>
+          <p class="small muted">Delete is never the default button: Cancel takes the initial focus, and Archive is offered first.</p>`)}
         ${spec('quoted material', `<figure class="excerpt"><blockquote>“reasoning traces help the model induce, track, and update action plans as well as handle exceptions”</blockquote><figcaption>${ic('quote', 'sm')}Quoted from <span style="text-transform:none;letter-spacing:0"><em>ReAct…</em>, p. 3</span></figcaption></figure>`)}
         ${spec('banner', `<div class="banner" style="background:var(--attn-soft);border-color:transparent">${ic('tag')}<div class="b-body"><strong>2 documents need subjects</strong><span>Processing has finished.</span></div><button class="btn btn-primary btn-sm" type="button">Choose subjects</button></div>
           <div class="banner">${ic('archive')}<div class="b-body"><strong>This conversation is archived.</strong></div><button class="btn btn-primary btn-sm" type="button">Restore</button></div>`)}
@@ -272,25 +279,27 @@
      Brief v0.5 decisions and questions
      ========================================================= */
   const DECISIONS = [
-    ['E4', 'A decline never offers “New conversation”', 'Every decline says a document on the topic is needed to continue, with “Upload a document” as the only action. “New conversation” stays only in the fourth-subject refusal. chat-decline-other-subject is removed.', ['chat-decline', 'chat-fourth-subject-refused']],
-    ['E6', 'The declined question is not kept', 'No reminder or “ask again” prompt after “Upload a document”; the prototype already behaved this way.', []],
-    ['E7', 'Archived documents: Restore first', 'No “Change subjects” on archived rows, in their More menu or in archived document details (reverses D7). picker-change-subjects-archived is removed.', ['library-archived', 'details-archived']],
-    ['E8', 'Daily limits reset at midnight GMT+7', '“You can upload again at 00:00 (GMT+7)” and “You can send again at 00:00 (GMT+7)” for the daily limits; the hourly and per-minute messages keep their own end time.', ['library-rate-limited', 'chat-rate-limited']],
-    ['F1', 'Sign up with an email address', 'Stock registration asks for the email, first and last name, and a new secret twice; there is no separate sign-in name.', ['auth-sign-up']],
-    ['F2, E3', 'Confirmed / settled', '“Sign in” stays for signed-in visitors. With one decline left, E3 (which decline id is which) no longer applies.', ['landing-default']]
+    ['K1', 'Conversations have no subjects', 'Every question uses all ready documents. Removed the subject chips in the chat header, “Your subjects”, detection, the 3-subject maximum and the “New conversation” refusal. Conversations and notes still show subject chips, taken from the documents used.', ['chat-new', 'chat-answer-citations', 'conversations-active']],
+    ['K2', 'Documents used', 'A “Documents used (N)” button in the header opens a side panel, in order of first use, with Archived and Deleted badges. Selecting a document opens the viewer at page 1; closing it returns to the panel.', ['chat-documents-used', 'chat-documents-used-empty', 'chat-documents-used-deleted']],
+    ['K3', 'Document viewer', 'A modal overlay about 720 px wide. Citations open it at the cited page with the passage highlighted (fill, outline and a “Cited passage” label); Close returns focus to what opened it.', ['viewer-citation-highlight', 'viewer-document', 'viewer-no-highlight', 'viewer-archived', 'viewer-loading', 'viewer-error']],
+    ['K4', 'Delete a document', '“Delete…” in the row’s More menu and in document details (not while processing), always confirmed with Cancel focused and “Archive instead”. Citations read “Deleted document”.', ['library-more-menu', 'library-delete-confirm', 'library-deleted', 'chat-citation-deleted', 'details-ready']],
+    ['K5', 'No cross-learner duplicates', 'ReAct is now processed like any new file in Usage; only “Already in your library” remains.', ['usage-overview', 'library-already-in-library']]
   ];
   const QUESTIONS = [
-    ['I1', 'Question', 'One state shows two limit messages', 'library-rate-limited and chat-rate-limited show the hourly or per-minute message with the daily one as a secondary line. In the product only one applies at a time.', 'Keep it as one state, or add library-rate-limited-daily and chat-rate-limited-daily so each message can be checked alone.'],
-    ['I2', 'Question', 'Restoring an archived document to change its subjects', 'With E7, a learner who only wants to fix a subject must restore the document, which makes it count for answers again.', 'Accept, as the owner decided. If it comes up in the pilot, allow the change without restoring.'],
-    ['F4', 'Open', 'Remember me and Forgot Password? on the login page', 'Both are stock and controlled by realm settings, not the theme.', 'Keep both on for the pilot.'],
-    ['H1', 'Open', 'Upload-rights line next to a disabled Upload', 'When the upload limit is reached the line still shows under the disabled button.', 'Keep it: it describes the upload area, not the action.'],
-    ['E5', 'Proposal', 'Chat hint counts documents waiting for subjects as “processing”', 'Under Q7 they have finished processing but can\'t be used yet.', '“2 documents can\'t be used yet: 1 is processing, 1 needs subjects.”'],
-    ['E10', 'Open', 'A separate state for D6', 'Renaming to a shared name the learner doesn\'t have shows no message.', 'No separate state unless you want one.'],
+    ['L1', 'Question', 'Where do a conversation’s subject chips come from?', '§6.7 shows the subjects of its documents used. If a document is deleted, its subjects still count for the conversation in the prototype.', 'Keep a deleted document’s subjects on its conversations, so filters keep finding them. Or drop them.'],
+    ['L2', 'Question', 'The Library row “Open” opens details, not the viewer', '§6.3 keeps one “Open” per ready row; §6.5 adds “Open” (viewer) in details. Two clicks to read a PDF from the Library.', 'Let the row “Open” go straight to the viewer, and move details to the title link and More.'],
+    ['L3', 'Question', 'Delete for failed documents', 'Delete is withheld only while processing, so a failed file (e.g. lecture-03-scan.pdf) can be deleted.', 'Keep: it is the main way to clear a scanned PDF from the list.'],
+    ['L4', 'Question', 'Deleting an archived document', '“Archive instead” makes no sense when it is already archived, so the dialog drops that line there.', 'Confirm.'],
+    ['L5', 'Note', 'Usage sample for a deleted document', '§6.10 asks for processing of a deleted document to stay in the totals; §9 has none, so Usage shows one sample row labeled “Deleted document” (22,400 in · 1,310 out).', 'Replace with real numbers once there are any.'],
+    ['L6', 'Question', 'Viewer page count', '§6.12 uses “Page 3 of 12” as an example; the prototype shows each document’s real page count (ReAct has 33).', 'Keep the real count.'],
+    ['I1', 'Open', 'One state shows two limit messages', 'library-rate-limited and chat-rate-limited show the hourly or per-minute message with the daily one as a secondary line.', 'Keep one state each, or add *-daily states.'],
+    ['F4', 'Open', 'Remember me and Forgot Password? on the login page', 'Both are realm settings.', 'Keep both on for the pilot.'],
+    ['H1, E5, E10', 'Open', 'Smaller items', 'Upload-rights line next to a disabled Upload; chat processing hint wording; a separate D6 state.', 'Unchanged.'],
     ['Q4, Q5, Q8', 'Defaults kept', 'Still open in §12', 'Q4 the citations switch also covers notes · Q5 several files at once · Q8 first suggestion pre-selected.', 'All shown as designed.']
   ];
   ST.questionsView = () => `<main class="index-page" id="main-content" tabindex="-1">
-    <div class="page-head" style="margin-bottom:32px"><div><h1 style="font-size:48px">Decisions &amp; questions</h1><p>For brief v0.7, round 6. First the owner's answers to E4, E6, E7, E8, F1 and F2 and where they are applied, then open questions: the new ones first, then those still open.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
-    <h2 class="section-title" style="margin-top:0">Answered and applied in v0.7</h2>
+    <div class="page-head" style="margin-bottom:32px"><div><h1 style="font-size:48px">Decisions &amp; questions</h1><p>For brief v0.8, round 8. First the end-user feedback applied (K1–K5) and where, then open questions: the new ones first, then those still open.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
+    <h2 class="section-title" style="margin-top:0">Applied in v0.8</h2>
     <ol class="qa-list">${DECISIONS.map(([id, title, what, states]) => `<li class="qa-item"><span class="qid">${esc(id)}</span>
       <div><h3>${esc(title)}</h3><p>${esc(what)}</p><p class="proposal"><strong>Applied in:</strong> ${states.length ? '' : 'no change needed'}${states.map((sid) => `<a href="#/${sid}"><code class="mono">${sid}</code></a>`).join(', ')}</p></div>
       <span class="badge qtype badge-ready-q">${ic('check')}Applied</span></li>`).join('')}</ol>

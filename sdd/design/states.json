@@ -3,7 +3,7 @@
     "id": "index",
     "group": "Overview",
     "ref": "§5 · review flows",
-    "desc": "Round 6 overview: what changed in v0.7, the four review flows and every state.",
+    "desc": "Round 8 overview: what changed in v0.8, the four review flows and every state.",
     "release": 1,
     "stories": []
   },
@@ -208,6 +208,36 @@
     ]
   },
   {
+    "id": "library-more-menu",
+    "group": "Library",
+    "ref": "§6.3 · US-10c",
+    "desc": "“More” menu with Delete (K4); a processing row offers no Delete.",
+    "release": 1,
+    "stories": [
+      "US-10"
+    ]
+  },
+  {
+    "id": "library-delete-confirm",
+    "group": "Library",
+    "ref": "§6.3 · US-10c",
+    "desc": "Delete confirmation: Cancel focused, Delete in danger style, “Archive instead” under the warning. The same dialog opens from details.",
+    "release": 1,
+    "stories": [
+      "US-10"
+    ]
+  },
+  {
+    "id": "library-deleted",
+    "group": "Library",
+    "ref": "§6.3 · US-10c",
+    "desc": "Deleted: the row is gone and “Chain-of-Thought Prompting… deleted.” confirms it. No undo.",
+    "release": 1,
+    "stories": [
+      "US-10"
+    ]
+  },
+  {
     "id": "library-rate-limited",
     "group": "Library",
     "ref": "§6.3 · US-2",
@@ -321,7 +351,7 @@
     "id": "details-ready",
     "group": "Document details",
     "ref": "§6.5 · US-10",
-    "desc": "Ready document: facts, summary, subjects, Archive. No download, no delete.",
+    "desc": "Ready document: facts, summary, subjects; Open (viewer), Archive and Delete. No download.",
     "release": 1,
     "stories": [
       "US-10"
@@ -341,7 +371,7 @@
     "id": "details-processing",
     "group": "Document details",
     "ref": "§6.5 · US-10",
-    "desc": "Processing a 424-page book: up to 15 minutes; subjects can be chosen when processing finishes.",
+    "desc": "Processing a 424-page book: up to 15 minutes; no Open and no Delete while processing.",
     "release": 1,
     "stories": [
       "US-10"
@@ -361,7 +391,7 @@
     "id": "details-archived",
     "group": "Document details",
     "ref": "§6.5 · US-10",
-    "desc": "Archived document with Restore (J4); no “Change subjects” until it is restored (E7).",
+    "desc": "Archived document (J4): Restore, Open read-only and Delete; no “Change subjects” until it is restored (E7).",
     "release": 1,
     "stories": [
       "US-10"
@@ -371,7 +401,7 @@
     "id": "chat-new",
     "group": "Chat",
     "ref": "§6.6 · US-3",
-    "desc": "Live chat: a new conversation (where navigation lands).",
+    "desc": "New conversation: placeholder and optional example questions; no subjects (K1). Where navigation lands.",
     "release": 1,
     "stories": [
       "US-3"
@@ -382,16 +412,6 @@
     "group": "Chat",
     "ref": "§6.6 · US-3",
     "desc": "No documents yet: chat is replaced by “Upload a document first”.",
-    "release": 1,
-    "stories": [
-      "US-3"
-    ]
-  },
-  {
-    "id": "chat-new-conversation",
-    "group": "Chat",
-    "ref": "§6.6 · US-3",
-    "desc": "New conversation: “Your subjects”, optional example questions, no subject picker.",
     "release": 1,
     "stories": [
       "US-3"
@@ -418,40 +438,10 @@
     ]
   },
   {
-    "id": "chat-subjects-detected",
-    "group": "Chat",
-    "ref": "§6.6 · US-3",
-    "desc": "Subjects detected: one chip in the header, cited answer with a quoted passage.",
-    "release": 1,
-    "stories": [
-      "US-3"
-    ]
-  },
-  {
-    "id": "chat-subjects-detected-multi",
-    "group": "Chat",
-    "ref": "§6.6 · US-3",
-    "desc": "First question covering two subjects: two chips.",
-    "release": 1,
-    "stories": [
-      "US-3"
-    ]
-  },
-  {
-    "id": "chat-detection-unsure",
-    "group": "Chat",
-    "ref": "§6.6 · US-3",
-    "desc": "Detection unsure: pick 1–3 subjects, then Continue; the question stays.",
-    "release": 1,
-    "stories": [
-      "US-3"
-    ]
-  },
-  {
     "id": "chat-answer-citations",
     "group": "Chat",
     "ref": "§6.6 · US-4",
-    "desc": "Answer with citations (one to an archived document shows “Archived”), and labelled “Helpful” / “Not helpful” thumbs.",
+    "desc": "Answers with citations; the follow-up is answered from another document (one archived, “Archived”). No subject chips; citations open the viewer.",
     "release": 1,
     "stories": [
       "US-4"
@@ -478,60 +468,50 @@
     ]
   },
   {
-    "id": "chat-citation-opens-details",
+    "id": "chat-documents-used",
     "group": "Chat",
-    "ref": "§6.6 · US-10",
-    "desc": "Clicking a citation opens the document details at the cited page.",
+    "ref": "§6.6 · US-4b",
+    "desc": "Documents used (3): ReAct, Retrieval-Augmented Generation and PPO, in order of first use.",
+    "release": 1,
+    "stories": [
+      "US-4b"
+    ]
+  },
+  {
+    "id": "chat-documents-used-empty",
+    "group": "Chat",
+    "ref": "§6.6 · US-4b",
+    "desc": "Documents used before the first answer: “Documents used to answer will appear here.”",
+    "release": 1,
+    "stories": [
+      "US-4b"
+    ]
+  },
+  {
+    "id": "chat-documents-used-deleted",
+    "group": "Chat",
+    "ref": "§6.6 · US-4b",
+    "desc": "A deleted document stays listed as “Deleted”, can't be opened; “Deleted documents can't be opened.”",
+    "release": 1,
+    "stories": [
+      "US-4b"
+    ]
+  },
+  {
+    "id": "chat-citation-deleted",
+    "group": "Chat",
+    "ref": "§6.6 · US-10c",
+    "desc": "A citation to a deleted document reads “Deleted document”, with no link.",
     "release": 1,
     "stories": [
       "US-10"
     ]
   },
   {
-    "id": "chat-subject-added",
-    "group": "Chat",
-    "ref": "§6.6 · US-3b",
-    "desc": "Subject added: inline notice, new chip highlighted in the header.",
-    "release": 1,
-    "stories": [
-      "US-3b"
-    ]
-  },
-  {
-    "id": "chat-maximum-reached",
-    "group": "Chat",
-    "ref": "§6.6 · US-3b",
-    "desc": "Maximum reached: the third subject is added and the learner is told.",
-    "release": 1,
-    "stories": [
-      "US-3b"
-    ]
-  },
-  {
-    "id": "chat-fourth-subject-refused",
-    "group": "Chat",
-    "ref": "§6.6 · US-3b",
-    "desc": "Fourth subject refused: no answer; “A new conversation will answer it straight away.”",
-    "release": 1,
-    "stories": [
-      "US-3b"
-    ]
-  },
-  {
-    "id": "chat-new-from-refused",
-    "group": "Chat",
-    "ref": "§6.6 · US-3b",
-    "desc": "The carried question was sent right away; the new conversation answers it (Reinforcement Learning).",
-    "release": 1,
-    "stories": [
-      "US-3b"
-    ]
-  },
-  {
     "id": "chat-decline",
     "group": "Chat",
     "ref": "§6.6 · US-5",
-    "desc": "Decline, no subject fits: a document on the topic is needed to continue; “Upload a document” is the only action.",
+    "desc": "Decline: a document on the topic is needed to continue; “Upload a document” is the only action. Adds nothing to Documents used.",
     "release": 1,
     "stories": [
       "US-5"
@@ -541,7 +521,7 @@
     "id": "chat-no-active-documents",
     "group": "Chat",
     "ref": "§6.6 · US-10",
-    "desc": "No active documents in these subjects: history readable, input disabled.",
+    "desc": "No active documents: all documents archived; history stays readable and a new question gets “Upload”.",
     "release": 1,
     "stories": [
       "US-10"
@@ -631,17 +611,77 @@
     "id": "chat-first-answer",
     "group": "Chat",
     "ref": "§6.6 · US-4",
-    "desc": "J1 ends here: the first cited answer from freshly uploaded papers.",
+    "desc": "J1 ends here: the first cited answer from freshly uploaded papers; no subjects to choose.",
     "release": 1,
     "stories": [
       "US-4"
     ]
   },
   {
+    "id": "viewer-document",
+    "group": "Document viewer",
+    "ref": "§6.12 · US-4b",
+    "desc": "Opened from Documents used: page 1 of ReAct…, no highlight.",
+    "release": 1,
+    "stories": [
+      "US-4b"
+    ]
+  },
+  {
+    "id": "viewer-citation-highlight",
+    "group": "Document viewer",
+    "ref": "§6.12 · US-4b",
+    "desc": "Opened from the citation “ReAct…, p. 3”: page 3, the cited passage highlighted and in view.",
+    "release": 1,
+    "stories": [
+      "US-4b"
+    ]
+  },
+  {
+    "id": "viewer-no-highlight",
+    "group": "Document viewer",
+    "ref": "§6.12 · US-4b",
+    "desc": "Cited page shown: “Couldn't highlight the passage on this page.”",
+    "release": 1,
+    "stories": [
+      "US-4b"
+    ]
+  },
+  {
+    "id": "viewer-archived",
+    "group": "Document viewer",
+    "ref": "§6.12 · US-4b",
+    "desc": "An archived document opens read-only with “Archived” and “Restore” in the header.",
+    "release": 1,
+    "stories": [
+      "US-4b"
+    ]
+  },
+  {
+    "id": "viewer-loading",
+    "group": "Document viewer",
+    "ref": "§6.12 · US-4b",
+    "desc": "Loading: page skeleton while the cited page loads first.",
+    "release": 1,
+    "stories": [
+      "US-4b"
+    ]
+  },
+  {
+    "id": "viewer-error",
+    "group": "Document viewer",
+    "ref": "§6.12 · US-4b",
+    "desc": "Error: “We couldn't open this document.” with Retry.",
+    "release": 1,
+    "stories": [
+      "US-4b"
+    ]
+  },
+  {
     "id": "conversations-active",
     "group": "Conversations",
     "ref": "§6.7 · US-13",
-    "desc": "Live list: subject chips (up to 3), last activity, note indicator.",
+    "desc": "Live list: subject chips of the documents used, number of documents used, last activity, note indicator.",
     "release": 1,
     "stories": [
       "US-13"
@@ -661,7 +701,7 @@
     "id": "conversations-filtered",
     "group": "Conversations",
     "ref": "§6.7 · US-13",
-    "desc": "Subject filter matches any of a conversation's subjects.",
+    "desc": "Subject filter matches any subject of a conversation's documents used.",
     "release": 1,
     "stories": [
       "US-13"

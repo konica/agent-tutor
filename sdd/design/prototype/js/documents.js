@@ -1,4 +1,4 @@
-/* Smart Tutor v0.7 — documents: sign-in theme, shared list pattern, Library, uploads,
+/* Smart Tutor v0.8 — documents: sign-in theme, shared list pattern, Library, uploads,
    subject picker (§6.4), document details (§6.5), Subjects (§6.9). */
 (function () {
   const ST = window.ST;
@@ -117,7 +117,7 @@
      §6.3 Library
      ========================================================= */
   ST.libraryView = () => {
-    const all = ST.emptyDemo ? [] : S.docs;
+    const all = ST.emptyDemo ? [] : S.docs.filter((d) => !d.deleted); // K4: a deleted document leaves the Library
     const counts = { active: all.filter((d) => !d.archived).length, archived: all.filter((d) => d.archived).length };
     const inTab = all.filter((d) => (ST.L.tab === 'archived') === d.archived);
     const rows = ST.applyFilters(inTab, 'uploaded').sort((a, b) => b.uploaded.localeCompare(a.uploaded));
@@ -151,8 +151,9 @@
         <div id="list-panel" role="tabpanel" aria-labelledby="tab-${ST.L.tab}">${list}</div>`;
     }
     return ST.shell({ nav: 'library', content: `<div class="page" style="max-width:1200px">
-      <div class="page-head"><div><h1>Library</h1><p>Your documents. They're private to you, and the tutor answers only from them.</p></div>${all.length ? `<div class="upload-area" data-od-id="library-upload-area">${uploadBtn}<p class="upload-rights" id="upload-rights">${esc(ST.RIGHTS)}</p></div>` : ''}</div>
+      <div class="page-head"><div><h1 id="lib-h" tabindex="-1">Library</h1><p>Your documents. They're private to you, and the tutor answers only from them.</p></div>${all.length ? `<div class="upload-area" data-od-id="library-upload-area">${uploadBtn}<p class="upload-rights" id="upload-rights">${esc(ST.RIGHTS)}</p></div>` : ''}</div>
       ${limit}
+      ${S.deletedNotice ? `<div class="banner banner-success" style="margin-bottom:16px" role="status" data-od-id="library-deleted-confirmation">${ic('checkCircle')}<div class="b-body"><span><em>${esc(S.deletedNotice)}</em> deleted.</span></div><button class="icon-btn sm" type="button" data-action="deleted-dismiss" aria-label="Dismiss">${ic('x', 'sm')}</button></div>` : ''}
       ${!S.convs.length && all.some((d) => d.state === 'ready' && !d.archived) && ST.L.tab === 'active' ? `<div class="banner banner-success" style="margin-bottom:16px" role="status">${ic('checkCircle')}<div class="b-body"><strong>Your documents are ready.</strong><span>Ask anything about them. Answers cite the document and page.</span></div>
         <a class="btn btn-primary btn-sm" href="#/chat-new" data-fk="ask-first">${ic('message', 'sm')}Ask a question</a></div>` : ''}
       ${processingFirst.length && !choose.length && ST.L.tab === 'active' ? `<div class="banner banner-info" style="margin-bottom:16px" role="status">${ic('clock')}<div class="b-body"><strong>Processing ${ST.plural(processingFirst.length, 'document')}</strong><span>Titles appear within about 30 seconds. Processing takes up to 5 minutes (15 for very long documents). You can choose subjects when processing finishes.</span></div></div>` : ''}
@@ -177,6 +178,7 @@
       ${!d.archived && d.state !== 'failed' ? `<button class="menu-item" role="menuitem" type="button" data-action="edit-title" data-id="${d.id}">${ic('pen')}Edit title</button>` : ''}
       ${d.state === 'failed' && (d.attempts || 0) < 3 && !d.archived ? `<button class="menu-item" role="menuitem" type="button" data-action="doc-retry" data-id="${d.id}">${ic('retry')}Retry</button>` : ''}
       ${d.archived ? `<button class="menu-item" role="menuitem" type="button" data-action="doc-restore" data-id="${d.id}">${ic('restore')}Restore</button>` : `<button class="menu-item" role="menuitem" type="button" data-action="doc-archive" data-id="${d.id}">${ic('archive')}Archive</button>`}
+      ${ST.canDelete(d) ? `<span class="menu-sep" role="separator"></span><button class="menu-item danger" role="menuitem" type="button" data-action="doc-delete" data-id="${d.id}" data-od-id="row-menu-delete">${ic('trash')}Delete…</button>` : ''}
     </div>` : '';
     return `<div class="lib-row ${needs ? 'needs' : ''} ${d.archived ? 'is-archived' : ''}" role="row">
       <div class="doc-cell" role="cell"><span class="doc-icon">${ic(d.book ? 'book' : 'doc')}</span>
@@ -206,7 +208,9 @@
       S.tray.forEach((t) => { if (t.docId === d.id && t.status === 'duplicate-archived') t.status = 'duplicate'; });
       ST.render(); ST.toast(`Restored “${d.title}”.`);
     },
-    'doc-retry': (el) => { S.rowMenu = null; ST.retryDoc(ST.doc(el.dataset.id)); }
+    'doc-retry': (el) => { S.rowMenu = null; ST.retryDoc(ST.doc(el.dataset.id)); },
+    'doc-delete': (el) => { S.rowMenu = null; ST.render(); ST.confirmDelete(el.dataset.id); },
+    'deleted-dismiss': () => { S.deletedNotice = null; ST.render(); const h = document.getElementById('lib-h'); if (h) h.focus(); }
   });
 
   /* ---------- simulated upload pipeline (background, survives navigation) ---------- */
@@ -438,6 +442,7 @@
     ST.DP = { id, editing, draft: draft != null ? draft : d.title, cited };
     ST.showOverlay(detailsView, { onClose: () => { ST.DP = null; } });
   };
+  const canOpen = (d) => ['ready', 'choose'].includes(d.state); // §6.12: ready, choose subjects, and archived (archived keeps its state)
   function detailsView() {
     const P = ST.DP; const d = ST.doc(P.id);
     const titleBlock = P.editing
@@ -474,13 +479,18 @@
             ${d.subjects.length && !d.archived && d.state === 'ready' ? `<button class="btn btn-secondary btn-sm" type="button" data-action="dp-change" data-fk="dp-change" style="justify-self:start">${ic('tag', 'sm')}Change subjects</button>` : ''}
           </section>
         </div>
-        <footer>${d.archived ? `<button class="btn btn-primary" type="button" data-action="dp-restore">${ic('restore', 'sm')}Restore</button>`
-          : `<button class="btn btn-secondary" type="button" data-action="dp-archive" data-fk="dp-archive">${ic('archive', 'sm')}Archive</button>`}
-          <button class="btn btn-quiet" type="button" data-action="dp-close">Close</button></footer>
+        <footer class="dp-foot">
+          ${ST.canDelete(d) ? `<button class="btn btn-danger-quiet" type="button" data-action="dp-delete" data-fk="dp-delete" data-od-id="details-delete">${ic('trash', 'sm')}Delete…</button>` : ''}
+          <span class="od-fill"></span>
+          ${d.archived ? `<button class="btn btn-${canOpen(d) ? 'secondary' : 'primary'}" type="button" data-action="dp-restore" data-od-id="details-restore">${ic('restore', 'sm')}Restore</button>`
+            : `<button class="btn btn-secondary" type="button" data-action="dp-archive" data-fk="dp-archive" data-od-id="details-archive">${ic('archive', 'sm')}Archive</button>`}
+          ${canOpen(d) ? `<button class="btn btn-primary" type="button" data-action="dp-open" data-fk="dp-open" data-od-id="details-open">${ic('doc', 'sm')}Open</button>` : ''}</footer>
       </aside>`;
   }
   Object.assign(ST.actions, {
     'dp-close': () => ST.hideOverlay(),
+    'dp-open': () => { const id = ST.DP.id; ST.hideOverlay(false); ST.openViewer(id, { page: 1, from: 'details' }); },
+    'dp-delete': () => { const id = ST.DP.id; ST.hideOverlay(false); ST.confirmDelete(id, { fromDetails: true }); },
     'dp-edit-title': () => { ST.DP.editing = true; ST.DP.draft = ST.doc(ST.DP.id).title; ST.redrawOverlay(); const i = document.getElementById('dp-title'); if (i) i.focus(); },
     'dp-draft': (el) => { ST.DP.draft = el.value; const b = document.querySelector('[data-action="dp-save-title"]'); if (b) b.disabled = !el.value.trim(); },
     'dp-cancel-title': () => { ST.DP.editing = false; ST.redrawOverlay(); const b = document.querySelector('[data-fk="dp-edit"]'); if (b) b.focus(); },
@@ -490,6 +500,41 @@
     'dp-archive': () => { const d = ST.doc(ST.DP.id); d.archived = true; ST.render(); ST.announce('Document archived.'); ST.toast(`Archived “${d.title}”. It won't be used for answers.`, { undo: () => { d.archived = false; ST.render(); } }); },
     'dp-restore': () => { const d = ST.doc(ST.DP.id); d.archived = false; ST.render(); ST.announce('Document restored.'); ST.toast(`Restored “${d.title}”.`); }
   });
+
+  /* =========================================================
+     K4 · Delete a document (§6.3): confirmed, permanent, not while processing
+     ========================================================= */
+  ST.canDelete = (d) => !['uploading', 'processing'].includes(d.state);
+  ST.deleteDoc = (d) => {
+    d.deleted = true; d.archived = false;
+    S.deletedNotice = d.title;
+    S.tray = S.tray.filter((t) => t.docId !== d.id);
+  };
+  ST.confirmDelete = (id, { fromDetails = false } = {}) => {
+    const d = ST.doc(id);
+    let done = false;
+    ST.openDialog({
+      title: `Delete <em>${esc(d.title)}</em>?`,
+      body: `<p>This can't be undone. Conversations and notes keep their text.</p>
+        ${d.archived ? '' : `<div class="del-alt"><p>Archive hides it and can be undone.</p><button class="btn btn-secondary btn-sm" type="button" data-action="del-archive-instead" data-id="${d.id}" data-od-id="delete-archive-instead">${ic('archive', 'sm')}Archive instead</button></div>`}`,
+      actions: [
+        { label: 'Cancel', autofocus: true },
+        { label: `${ic('trash', 'sm')}Delete`, cls: 'btn-danger', onClick: () => { done = true; ST.deleteDoc(d); } }
+      ],
+      onClose: () => {
+        if (done || d.deleted) {
+          if (ST.current && ST.current.id.startsWith('library')) ST.render(); else ST.goto('library-default');
+          setTimeout(() => { const h = document.getElementById('lib-h'); if (h) h.focus(); }, 0);
+          ST.announce(`${d.title} deleted.`);
+        } else if (fromDetails && !d.archived) setTimeout(() => ST.openDetails(d.id), 0);
+      }
+    });
+  };
+  ST.actions['del-archive-instead'] = (el) => {
+    const d = ST.doc(el.dataset.id); d.archived = true; ST.hideOverlay(false); ST.render();
+    ST.toast(`Archived “${d.title}”. It won't be used for answers.`, { undo: () => { d.archived = false; ST.render(); } });
+    const h = document.getElementById('lib-h'); if (h) h.focus();
+  };
 
   /* =========================================================
      §6.9 Subjects (personal rename)
