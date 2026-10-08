@@ -48,7 +48,9 @@ class DataStack(cdk.Stack):
             "Database",
             instance_identifier=name_prefix,
             engine=rds.DatabaseInstanceEngine.postgres(version=rds.PostgresEngineVersion.VER_17),
-            instance_type=ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE4_GRAVITON, ec2.InstanceSize.MICRO),
+            # Not db.t4g.micro: RDS offers it for PostgreSQL 16/17 in no us-east-1 AZ (CREATE_FAILED, 2026-10-08).
+            # db.t3.micro has the same 2 vCPU / 1 GiB and is orderable in both VPC AZs.
+            instance_type=ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE3, ec2.InstanceSize.MICRO),
             vpc=vpc,
             vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
             security_groups=[security_group],
