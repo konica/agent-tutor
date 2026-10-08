@@ -87,10 +87,10 @@ docker push "$Registry/smart-tutor/api:$Tag"
 ## 6. Install the app
 
 ```powershell
-helm upgrade --install smart-tutor deploy/helm/smart-tutor -n smart-tutor --create-namespace -f deploy/helm/smart-tutor/values-prod.yaml --set global.imageRegistry=$Registry --set global.imageTag=$Tag --set global.publicUrl=$Url --wait --timeout 15m
+helm upgrade --install smart-tutor deploy/helm/smart-tutor -n smart-tutor --create-namespace -f deploy/helm/smart-tutor/values-prod.yaml --set global.imageRegistry=$Registry --set global.imageTag=$Tag --set global.publicUrl=$Url --wait=legacy --timeout 15m
 ```
 
-`global.publicUrl` is the CloudFront address from step 2. Without it Keycloak refuses to start. The first install runs the `db-bootstrap` hook, which creates the database roles and databases. Keycloak's first start takes about 2 min (schema and realm import), so `--wait` is slow the first time; `--timeout 15m` (Helm's default is 5 min) covers the hook plus that first start. Before the API rolls out, the `migrate` hook brings the app database to the latest Alembic revision; if it fails, the release fails and the running API stays. A failed hook Job stays for debugging: `kubectl -n smart-tutor logs job/migrate`.
+`global.publicUrl` is the CloudFront address from step 2. Without it Keycloak refuses to start. The first install runs the `db-bootstrap` hook, which creates the database roles and databases. Keycloak's first start takes about 2 min (schema and realm import), so the wait is slow the first time; `--timeout 15m` (Helm's default is 5 min) covers the hook plus that first start. Use `--wait=legacy`: with Helm 4's default (`--wait`, the watcher strategy) Helm sits out the whole timeout on every hook that isn't a Job (the SecretStore, the ExternalSecrets, the ConfigMap), about an hour for a first install. Before the API rolls out, the `migrate` hook brings the app database to the latest Alembic revision; if it fails, the release fails and the running API stays. A failed hook Job stays for debugging: `kubectl -n smart-tutor logs job/migrate`.
 
 ## 7. Check
 
@@ -249,6 +249,12 @@ python deploy/pilot/smoke_test.py $Url
 ```powershell
 helm -n smart-tutor history smart-tutor
 helm -n smart-tutor rollback smart-tutor <last deployed revision>
+```
+
+If the only revision is a `pending-install` (the first install never finished), there is nothing to roll back to: uninstall it instead, then re-run the deploy. Nothing is lost, because the databases live in RDS and the hooks recreate what they need:
+
+```powershell
+helm -n smart-tutor uninstall smart-tutor
 ```
 
 **Roll back.**

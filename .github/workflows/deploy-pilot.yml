@@ -114,12 +114,15 @@ jobs:
           helm upgrade --install external-secrets external-secrets/external-secrets --version 2.11.0 -n external-secrets --create-namespace -f deploy/helm/addons/external-secrets.yaml --wait
           helm upgrade --install metrics-server metrics-server/metrics-server --version 3.14.0 -n kube-system -f deploy/helm/addons/metrics-server.yaml --wait
 
+      # --wait=legacy: Helm 4's default watcher strategy sits out the whole --timeout on every hook that isn't a Job
+      # (SecretStore, ExternalSecrets, ConfigMap), so the first install outran the job. Legacy still waits for the
+      # hook Jobs and the rollout, as Helm 3 did.
       - name: Release the app (Helm)
         run: |
           helm upgrade --install smart-tutor deploy/helm/smart-tutor -n smart-tutor --create-namespace \
             -f deploy/helm/smart-tutor/values-prod.yaml \
             --set global.imageRegistry="$REGISTRY" --set global.imageTag="$IMAGE_TAG" \
-            --set global.publicUrl="$CLOUDFRONT_URL" --wait --timeout 15m
+            --set global.publicUrl="$CLOUDFRONT_URL" --wait=legacy --timeout 15m
 
       - name: Smoke test the public address
         run: |
@@ -127,7 +130,7 @@ jobs:
           echo "Deployed \`$IMAGE_TAG\` to $CLOUDFRONT_URL" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Diagnostics
-        if: failure()
+        if: failure() || cancelled()
         run: |
           kubectl -n smart-tutor get pods,jobs,externalsecrets,targetgroupbindings || true
           kubectl -n smart-tutor logs job/migrate --tail=100 || true
