@@ -16,6 +16,9 @@ from aws_cdk import aws_elasticloadbalancingv2 as elbv2
 from constructs import Construct
 
 POD_PORT = 8080  # web, Keycloak, and the API all listen here, so one ALB → pod rule covers them
+# AWS-managed prefix list com.amazonaws.global.cloudfront.origin-facing in us-east-1. It counts as 55 rules against the
+# security group's limit of 60.
+CLOUDFRONT_ORIGIN_FACING_PREFIX_LIST = "pl-3b927c52"
 
 
 class EdgeStack(cdk.Stack):
@@ -31,7 +34,10 @@ class EdgeStack(cdk.Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # The VPC origin's ENIs live in this VPC's private subnets, so the ALB accepts HTTP only from inside the VPC.
+        # The ALB accepts HTTP only from CloudFront's VPC origin. Its ENIs live in this VPC's private subnets, but AWS
+        # requires the origin's security group to allow the CloudFront origin-facing prefix list (or CloudFront's own
+        # service security group): with only the VPC range, no request from CloudFront reaches the ALB (504 after 30 s).
+        # The description stays as first deployed, because changing it would replace the group.
         alb_sg = ec2.SecurityGroup(
             self,
             "LoadBalancerSecurityGroup",
@@ -40,6 +46,9 @@ class EdgeStack(cdk.Stack):
             allow_all_outbound=False,
         )
         alb_sg.add_ingress_rule(ec2.Peer.ipv4(vpc.vpc_cidr_block), ec2.Port.tcp(80), "CloudFront VPC origin")
+        alb_sg.add_ingress_rule(
+            ec2.Peer.prefix_list(CLOUDFRONT_ORIGIN_FACING_PREFIX_LIST), ec2.Port.tcp(80), "CloudFront origin-facing"
+        )
         alb_sg.add_egress_rule(
             ec2.Peer.security_group_id(cluster_security_group_id), ec2.Port.tcp(POD_PORT), "web, Keycloak, and API pods"
         )

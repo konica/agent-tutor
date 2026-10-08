@@ -258,6 +258,24 @@ def test_load_balancer_is_internal_and_has_no_internet_ingress() -> None:
     t.has_resource_properties("AWS::ElasticLoadBalancingV2::Listener", {"Port": 80, "Protocol": "HTTP"})
 
 
+def test_load_balancer_admits_cloudfront_origin_facing_traffic() -> None:
+    # VPC origin traffic doesn't match the VPC range rule: AWS requires the CloudFront origin-facing prefix list (or
+    # CloudFront's own security group) on the origin's security group. Without it no request reached the ALB.
+    t = template(make_app(), "Edge")
+
+    (alb_sg,) = t.find_resources("AWS::EC2::SecurityGroup")
+    t.has_resource_properties(
+        "AWS::EC2::SecurityGroupIngress",
+        {
+            "GroupId": {"Fn::GetAtt": [alb_sg, "GroupId"]},
+            "IpProtocol": "tcp",
+            "FromPort": 80,
+            "ToPort": 80,
+            "SourcePrefixListId": "pl-3b927c52",
+        },
+    )
+
+
 def test_web_target_group_takes_pod_ips_on_8080() -> None:
     t = template(make_app(), "Edge")
 
