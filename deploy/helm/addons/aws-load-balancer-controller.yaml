@@ -6,3 +6,7 @@ clusterName: smart-tutor-prod
 region: us-east-1
 serviceAccount:
   name: aws-load-balancer-controller
+# Reuse the webhook certificate on upgrade. The chart's default (false) makes a new CA on every `helm upgrade`, which
+# every deploy runs, and the app release right after fails with "x509: certificate signed by unknown authority" until
+# the running controller pods reload the new certificate.
+keepTLSSecret: true
