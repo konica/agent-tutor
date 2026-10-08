@@ -7,11 +7,11 @@ class ThreadSubjectsError(DomainError):
     """A thread holds 1 to 3 distinct subjects, and subjects are only ever added."""
 
 
-class ThreadNotFoundError(Exception):
+class ThreadNotFoundError(DomainError):
     """No such thread for this learner (another learner's thread looks the same)."""
 
 
-class ThreadNotPendingError(Exception):
+class ThreadNotPendingError(DomainError):
     """The thread already has its subjects."""
 
 

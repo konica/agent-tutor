@@ -27,6 +27,8 @@ async def _open(database_url: str) -> AsyncIterator[AsyncPostgresSaver]:
     )
     await pool.open()
     try:
+        # The pool's rows are dicts (row_factory=dict_row in kwargs), but mypy can't see kwargs, so it types the
+        # pool's connections as tuple rows.
         saver = AsyncPostgresSaver(pool)  # type: ignore[arg-type]
         await saver.setup()  # creates its tables idempotently
         yield saver

@@ -23,6 +23,8 @@ up-app:        ## dependencies + app services (same images as prod)
 	docker compose --profile app up -d --build
 
 # App services on the host, one terminal each, on the same ports as the app profile (needs `make up`, `make migrate`).
+# The agent runs on a selector event loop: psycopg's async pool (its checkpointer) can't use Windows' default
+# ProactorEventLoop, and uvicorn picks a selector loop by itself only with --reload. Linux images keep uvloop.
 api:           ## API at :10450, reloads on change
 	$(HOST) uvicorn smart_tutor.apps.api.main:app --reload --port 10450
 agent:         ## agent at :10451, reloads on change

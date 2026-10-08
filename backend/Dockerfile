@@ -35,7 +35,7 @@ CMD ["uvicorn", "smart_tutor.apps.api.main:app", "--host", "0.0.0.0", "--port", 
 FROM runtime AS agent
 COPY --from=deps /app/.venv /app/.venv
 EXPOSE 8080
-CMD ["uvicorn", "smart_tutor.apps.agent.server:app", "--loop", "asyncio:SelectorEventLoop", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "smart_tutor.apps.agent.server:app", "--host", "0.0.0.0", "--port", "8080"]
 
 FROM runtime AS mcp
 COPY --from=deps /app/.venv /app/.venv
