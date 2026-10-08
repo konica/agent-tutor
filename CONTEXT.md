@@ -43,7 +43,7 @@ The subjects of a learner's ready, non-archived documents. Detection and search 
 ## Tutoring
 
 **Thread**:
-One conversation. Starts with the subjects detected from its first question and grows to at most 3 subjects; subjects are never removed.
+One conversation. Starts with the subjects detected from its first question, or picked by the learner when detection is unsure, and grows to at most 3 subjects; subjects are never removed.
 _Avoid_: Chat, session, conversation (in code; "conversation" is fine in UI copy)
 
 **Citation**:
