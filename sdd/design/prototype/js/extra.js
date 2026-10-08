@@ -16,7 +16,7 @@
     ['P3', 'Outside chat the viewer stays the overlay', ['viewer-archived'], []]
   ];
   ST.CHANGES.push(['P4', 'Open in dialog from the pane, with a details strip', ['viewer-dialog'], []], ['P5', 'Choose the conversation\'s documents; Only search these documents', ['chat-documents-add', 'chat-scope-limited', 'chat-decline-limited', 'chat-documents-used'], []]);
-  ST.NEW_IDS = ['chat-panel-collapsed', 'viewer-dialog', 'chat-documents-add', 'chat-scope-limited', 'chat-decline-limited', 'chat-new-from-document'];
+  ST.NEW_IDS = ['chat-panel-collapsed', 'viewer-dialog', 'chat-documents-add', 'chat-scope-limited', 'chat-decline-limited', 'chat-new-from-document', 'chat-title-editing'];
   const changed = () => { const set = new Set(); ST.CHANGES.forEach((c) => c[2].forEach((id) => set.add(id))); return set; };
   ST.indexView = () => {
     const groups = [];

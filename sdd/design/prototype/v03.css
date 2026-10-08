@@ -873,5 +873,38 @@ button.cp-row:hover { background: var(--surface-2); color: var(--text); }
 .status-line .tokens { flex: none; margin-left: auto; white-space: nowrap; }
 @container (max-width: 640px) { .status-line .tk-label { display: none; } }
 
+/* ============ v0.10 · P6 chat header: panel toggle, editable title, no overflow ============ */
+.th-h1 { flex: 0 1 auto; min-width: 0; margin: 0; font-size: var(--fs-14); font-weight: 600; }
+.th-title { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 28px; padding: 0 6px; margin-left: -6px; background: transparent; border: 1px solid transparent; border-radius: var(--r-sm); font: inherit; font-size: var(--fs-14); font-weight: 600; color: var(--text); cursor: text; }
+.th-title-text { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.th-title .th-pen { flex: none; width: 14px; height: 14px; color: var(--text-2); opacity: 0; }
+.th-title:hover, .th-title:focus-visible { background: var(--surface-2); color: var(--text); }
+.th-title:hover .th-pen, .th-title:focus-visible .th-pen { opacity: 1; }
+.th-title-edit { position: relative; flex: 0 1 480px; min-width: 160px; }
+.th-title-input { box-sizing: border-box; width: 100%; height: 28px; padding: 0 6px; margin-left: -6px; background: var(--surface); border: 1px solid var(--focus); border-radius: var(--r-sm); font: inherit; font-size: var(--fs-14); font-weight: 600; color: var(--text); }
+.th-title-input:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.th-title-input[aria-invalid="true"] { border-color: var(--danger); }
+.th-title-err { position: absolute; left: -6px; top: calc(100% + 4px); z-index: 5; display: inline-flex; align-items: center; gap: 4px; margin: 0; padding: 2px 8px; background: var(--surface); border: 1px solid var(--danger); border-radius: var(--r-sm); font-size: var(--fs-13); color: var(--danger); white-space: nowrap; box-shadow: var(--shadow-sm); }
+.th-title-err .icon { width: 14px; height: 14px; }
+
+/* ============ P6 review fixes: centred header, full-width title, static edit field ============ */
+.chat-v10 .thread-head { display: flex; align-items: center; min-height: 40px; }
+.thread-head .th-h1 { display: flex; align-items: center; flex: 1 1 auto; min-width: 0; height: 32px; margin: 0; line-height: 1; }
+.th-title-btn { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; height: 28px; padding: 0 6px; margin-left: -2px; background: transparent; border: 1px solid transparent; border-radius: var(--r-sm); font: inherit; font-size: var(--fs-14); font-weight: 600; line-height: 1.2; color: var(--text); cursor: text; }
+.th-title-btn .th-title-text { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.th-title-btn .th-pen { flex: none; width: 14px; height: 14px; color: var(--text-2); opacity: 0; }
+.th-title-btn:hover, .th-title-btn:focus-visible { background: var(--surface-2); color: var(--text); }
+.th-title-btn:hover .th-pen, .th-title-btn:focus-visible .th-pen { opacity: 1; }
+.th-title-edit { flex: 1 1 auto; max-width: 640px; min-width: 160px; display: flex; align-items: center; }
+.th-title-input { height: 32px; margin-left: -2px; padding: 0 8px; border: 1px solid var(--focus); font-size: var(--fs-14); font-weight: 600; }
+.th-title-input:focus { outline: 2px solid var(--focus); outline-offset: 1px; }
+.th-title-hint { flex: none; font-size: var(--fs-12); color: var(--text-2); white-space: nowrap; }
+
+/* Header title uses the whole row. An older, more specific rule (.chat-v10 .thread-head h1 { flex: 0 1 auto })
+   kept the h1 from growing; this one wins and lets the title truncate only when it truly overflows. */
+.chat-v10 .thread-head h1.th-h1 { flex: 1 1 auto; min-width: 0; max-width: none; width: auto; }
+.chat-v10 .thread-head .th-title-btn { flex: 0 1 auto; min-width: 0; max-width: 100%; width: auto; }
+.chat-v10 .thread-head .th-title-text { flex: 0 1 auto; min-width: 0; max-width: none; }
+
 /* Programmatic focus on <main> after a route change is for screen readers; it needs no visible ring. */
 main[tabindex="-1"]:focus, main[tabindex="-1"]:focus-visible { outline: none; }

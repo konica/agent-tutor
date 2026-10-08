@@ -119,6 +119,8 @@
       const t = j2(1); t.added = ['d4']; t.scopeOn = true; const q = ST.J2[2].q;
       t.messages.push(ST.M({ role: 'user', text: q }), ST.M({ role: 'tutor', kind: 'decline', limited: true, question: q, count: 2 }));
     }, { id: 'chat-decline-limited', ref: '§6.6 · US-4c' }),
+    chat('US-13', 'Editing the conversation title inline: the field is open with the title selected (Enter or clicking away saves, Esc cancels, 1–120 characters).', () => { const t = j2(2); t.titleEdit = true; t.titleDraft = t.title; }, { id: 'chat-title-editing', ref: '§6.6 · US-13',
+      afterEnter: () => { ST.chatEnter(); const sel = () => { const i = document.getElementById('th-title-input'); if (i) { i.focus({ preventScroll: true }); if (i.select) i.select(); } }; sel(); ST.later(sel, 0); } }),
     chat('US-4b', 'Conversation panel collapsed with the header toggle: the conversation takes the full width (the choice is remembered).', () => { j2(2); S.chatPanel = false; }, { id: 'chat-panel-collapsed' }),
     chat('US-4b', 'Conversation panel: a deleted document stays listed as “Deleted”, can\'t be opened; “Deleted documents can\'t be opened.”', () => {
       const t = ST.newThread({ convId: 'cv2', title: ST.conv('cv2').title, tokens: [9870, 2140] });

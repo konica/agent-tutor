@@ -538,6 +538,16 @@
     ]
   },
   {
+    "id": "chat-title-editing",
+    "group": "Chat",
+    "ref": "§6.6 · US-13",
+    "desc": "Editing the conversation title inline: the field is open with the title selected (Enter or clicking away saves, Esc cancels, 1–120 characters).",
+    "release": 1,
+    "stories": [
+      "US-13"
+    ]
+  },
+  {
     "id": "chat-panel-collapsed",
     "group": "Chat",
     "ref": "§6.6 · US-4b",

@@ -1,4 +1,4 @@
-/* Smart Tutor v0.10 (P1–P5) — chat (§6.6): no subjects in conversations (K1); every question is answered from all
+/* Smart Tutor v0.10 (P1–P6) — chat (§6.6): no subjects in conversations (K1); every question is answered from all
    ready documents. Documents used (K2) and citations open the document viewer (K3, js/viewer.js). */
 (function () {
   const ST = window.ST;
@@ -133,20 +133,53 @@
   }
 
   /* P1: one 40px header row: panel toggle, title, overflow. Documents used and Summarize lesson live in the panel. */
+  /* P6: header = panel toggle (panel-left icon), editable title. No overflow menu: Show citations and Archive live in the panel. */
   function headerHtml() {
     const t = T();
-    const menuOpen = S.chatMenu;
+    const label = S.chatPanel ? 'Hide panel' : 'Show panel';
+    const editable = t.readOnly !== 'archived';
+    let title;
+    if (t.titleEdit) {
+      const empty = !(t.titleDraft || '').trim();
+      title = `<div class="th-title-edit" data-od-id="thread-title-edit"><label class="vh" for="th-title-input">Conversation title</label>
+        <input class="th-title-input" id="th-title-input" type="text" maxlength="120" value="${esc(t.titleDraft)}" data-input="title-draft" data-fk="title-input" aria-keyshortcuts="Enter Escape" title="Enter to save · Esc to cancel" ${empty ? 'aria-invalid="true" aria-describedby="th-title-err"' : ''}>
+        ${empty ? `<p class="th-title-err" id="th-title-err" role="alert">${ic('alertCircle', 'sm')}Enter a title</p>` : ''}</div>
+        <span class="th-title-hint" aria-hidden="true">Enter to save · Esc to cancel</span>`;
+    } else if (editable) {
+      title = `<h1 class="th-h1"><button class="th-title-btn" type="button" data-action="title-edit" data-fk="title-btn" title="${esc(t.title)}" aria-label="${esc(t.title)}. Edit title" data-od-id="thread-title"><span class="th-title-text">${esc(t.title)}</span>${ic('pen', 'sm th-pen')}</button></h1>`;
+    } else {
+      title = `<h1 class="th-h1 od-truncate" title="${esc(t.title)}">${esc(t.title)}</h1>`;
+    }
     return `<header class="thread-head" data-od-id="thread-header">
-      <button class="icon-btn sm" type="button" data-action="chat-panel" data-fk="chat-panel" aria-expanded="${!!S.chatPanel}" aria-controls="conv-panel" aria-label="${S.chatPanel ? 'Hide conversation panel' : 'Show conversation panel'}" data-tip="${S.chatPanel ? 'Hide conversation panel' : 'Show conversation panel'}" data-od-id="chat-panel-toggle">${ic('layers')}</button>
-      <h1 class="od-truncate" title="${esc(t.title)}">${esc(t.title)}</h1>
-      <span class="od-fill"></span>
-      <span class="row-menu-wrap th-more"><button class="icon-btn sm" type="button" data-action="chat-menu" data-fk="chat-menu" aria-haspopup="menu" aria-expanded="${!!menuOpen}" aria-label="More conversation actions" data-tip="More" data-od-id="thread-overflow">${ic('more')}</button>
-        ${menuOpen ? `<div class="row-menu" role="menu" aria-label="Conversation actions">
-          <button class="menu-item" role="menuitemcheckbox" aria-checked="${S.citations}" type="button" data-action="toggle-citations">${ic(S.citations ? 'check' : 'quote')}Show citations<span class="mi-state">${S.citations ? 'On' : 'Off'}</span></button>
-          ${t.convId && !t.readOnly ? `<button class="menu-item" role="menuitem" type="button" data-action="archive-thread">${ic('archive')}Archive conversation</button>` : ''}
-        </div>` : ''}</span>
+      <button class="icon-btn sm" type="button" data-action="chat-panel" data-fk="chat-panel" aria-expanded="${!!S.chatPanel}" aria-controls="conv-panel" aria-label="${label}" data-tip="${label}" data-od-id="chat-panel-toggle">${ic('panelLeft')}</button>
+      ${title}
     </header>`;
   }
+
+  /* P6: inline title editing: Enter or clicking away saves, Esc cancels, 1–120 characters. */
+  const saveTitle = (keepFocus) => {
+    const t = T(); if (!t || !t.titleEdit) return;
+    const v = (t.titleDraft || '').trim().slice(0, 120);
+    t.titleEdit = false;
+    if (v) { t.title = v; const c = t.convId && ST.conv(t.convId); if (c) c.title = v; ST.announce('Title saved.'); }
+    ST.render();
+    if (keepFocus) { const b = document.querySelector('[data-fk="title-btn"]'); if (b) b.focus(); }
+  };
+  const cancelTitle = () => { const t = T(); t.titleEdit = false; ST.render(); const b = document.querySelector('[data-fk="title-btn"]'); if (b) b.focus(); };
+  ST.startTitleEdit = () => {
+    const t = T(); if (!t || t.readOnly === 'archived') return;
+    t.titleEdit = true; t.titleDraft = t.title; ST.render();
+    const i = document.getElementById('th-title-input'); if (i) { i.focus(); if (i.select) i.select(); }
+  };
+  document.addEventListener('keydown', (e) => {
+    if (e.target.id !== 'th-title-input') return;
+    if (e.key === 'Enter') { e.preventDefault(); if ((T().titleDraft || '').trim()) saveTitle(true); }
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancelTitle(); }
+  }, true);
+  document.addEventListener('focusout', (e) => {
+    if (e.target.id !== 'th-title-input') return;
+    setTimeout(() => { const t = T(); const a = document.activeElement; if (!t || !t.titleEdit || (a && (a.id === 'th-title-input' || a.id === 'main-content'))) return; if ((t.titleDraft || '').trim()) saveTitle(false); else cancelTitle(); }, 0);
+  });
 
   /* P1: conversation panel (260px): Documents used, Lesson Note, Actions. */
   function panelHtml() {
@@ -336,6 +369,8 @@
     'toggle-citations': () => { S.chatMenu = false; S.citations = !S.citations; ST.ls.set('st3_citations', S.citations ? 'on' : 'off'); ST.render(); ST.announce(S.citations ? 'Citations shown.' : 'Citations hidden.'); },
     cite: (el) => { const c = findMsg(el).cites[+el.dataset.ci]; ST.openPane(c.doc, { page: c.page || 1, highlight: c.page ? c : null, chip: { mid: el.dataset.mid, ci: +el.dataset.ci } }); return; ST.openViewer(c.doc, { page: c.page || 1, highlight: c.page ? c : null, from: 'chat' }); },
     'docs-used': () => ST.openDocsUsed(),
+    'title-edit': () => ST.startTitleEdit(),
+    'title-draft': (el) => { const t = T(); t.titleDraft = el.value; const empty = !el.value.trim(); const box = el.closest('.th-title-edit'); if (!box) return; el.toggleAttribute('aria-invalid', empty); if (empty) el.setAttribute('aria-describedby', 'th-title-err'); else el.removeAttribute('aria-describedby'); let err = box.querySelector('.th-title-err'); if (empty && !err) box.insertAdjacentHTML('beforeend', `<p class="th-title-err" id="th-title-err" role="alert">${ic('alertCircle', 'sm')}Enter a title</p>`); if (!empty && err) err.remove(); },
     'chat-panel': () => { S.chatPanel = !S.chatPanel; if (!ST.VW || ST.VW.mode !== 'pane') ST.ls.set('st10_panel', S.chatPanel ? 'open' : 'closed'); ST.render(); const b = document.querySelector('[data-fk="chat-panel"]'); if (b) b.focus(); },
     'cp-open': (el) => ST.openPane(el.dataset.id, { page: 1, row: el.dataset.id }),
     'cp-remove': (el) => { const t = T(); const id = el.dataset.id; t.added = (t.added || []).filter((x) => x !== id); if (ST.docsUsed(t).includes(id)) t.removed = [...(t.removed || []), id]; if (!ST.convDocList(t).length) t.scopeOn = false; ST.render(); ST.announce(`${ST.docTitle(id)} removed from this conversation.`); const a = document.querySelector('[data-fk="docs-add"]'); if (a) a.focus(); },
