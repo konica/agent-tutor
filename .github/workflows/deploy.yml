@@ -1,0 +1,21 @@
+# Every push to main: the CI checks, then the pilot deploy (PRD §9.12, #59). Runbook: docs/runbooks/pilot-deploy.md.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write  # OIDC sign-in to AWS, used only inside the `pilot` environment
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: checks
+    uses: ./.github/workflows/deploy-pilot.yml
+    with:
+      image_tag: ${{ github.sha }}
+      build: true

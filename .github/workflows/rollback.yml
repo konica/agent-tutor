@@ -1,0 +1,22 @@
+# Redeploys an earlier commit's images and chart, without CDK or a build (#59). Runbook: docs/runbooks/pilot-deploy.md.
+# The `pilot` environment only accepts runs from main: start it from main with the SHA to go back to.
+name: rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Full commit SHA of an earlier deploy (its images must still be in ECR)
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  id-token: write  # OIDC sign-in to AWS, used only inside the `pilot` environment
+
+jobs:
+  rollback:
+    uses: ./.github/workflows/deploy-pilot.yml
+    with:
+      image_tag: ${{ inputs.image_tag }}
+      build: false
