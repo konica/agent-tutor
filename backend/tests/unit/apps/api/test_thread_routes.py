@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from fakes import (
     FakeTokenVerifier,
+    FixedClock,
     InMemoryLibrary,
     InMemorySubjects,
     InMemoryThreads,
@@ -20,7 +21,7 @@ from fakes import (
 from smart_tutor.apps.api.main import create_app
 from smart_tutor.apps.api.services import ApiServices
 from smart_tutor.shared.config import Settings
-from smart_tutor.shared.domain.ids import SubjectId, UserId
+from smart_tutor.shared.domain.ids import SubjectId, ThreadId, UserId
 from smart_tutor.shared.domain.principal import Principal
 from smart_tutor.subjects.application import SubjectNames
 from smart_tutor.tutoring.application import Thread
@@ -574,6 +575,18 @@ def test_an_agent_with_nothing_waiting_is_409_and_the_thread_stays_pending() -> 
     response = client.post(f"/threads/{thread_id}/subjects", json={"subject_ids": [S2]}, headers=AUTH)
 
     assert response.status_code == 409 and threads.threads[thread_id].awaiting_subjects
+    assert agent_paths(seen) == ["/ask", "/resume"]  # the agent was asked, and refused
+
+
+def test_resume_without_ready_documents_is_409_and_the_agent_is_not_called() -> None:
+    seen: list[httpx.Request] = []
+    client, threads = setup(recording(seen), ready_document=False)[:2]
+    threads.add(Thread.pending(ThreadId("t-1"), UserId("ada"), "What is attention?", FixedClock().now()))
+
+    response = client.post("/threads/t-1/subjects", json={"subject_ids": [GENERAL]}, headers=AUTH)
+
+    assert response.status_code == 409 and response.json() == {"detail": "Upload a document first"}
+    assert seen == [] and threads.threads["t-1"].awaiting_subjects
 
 
 def test_an_agent_that_resumes_with_other_subjects_is_unavailable_and_binds_nothing() -> None:

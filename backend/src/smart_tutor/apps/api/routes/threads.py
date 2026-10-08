@@ -264,6 +264,9 @@ async def choose_thread_subjects(
     try:
         await run_in_threadpool(conversations.pending_thread, principal.user_id, ThreadId(thread_id))
         await run_in_threadpool(conversations.check_choice, principal.user_id, picked)
+        named = await _named_subjects(conversations, subjects, principal.user_id)
+    except NoDocumentsError as e:
+        raise HTTPException(409, str(e)) from None
     except ThreadNotFoundError:
         raise HTTPException(404, "No such conversation") from None
     except ThreadNotPendingError as e:
@@ -271,10 +274,7 @@ async def choose_thread_subjects(
     except ThreadSubjectsError as e:
         raise HTTPException(422, str(e)) from None
     try:
-        named = await _named_subjects(conversations, subjects, principal.user_id)
         answer = await agent.resume_answer(token, thread_id, body.subject_ids)
-    except NoDocumentsError as e:
-        raise HTTPException(409, str(e)) from None
     except UnauthenticatedError:
         raise _unauthenticated() from None
     except AgentConflictError as e:
