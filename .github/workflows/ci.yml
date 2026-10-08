@@ -2,8 +2,8 @@ name: ci
 
 on:
   pull_request:
-  push:
-    branches: [main]
+  # deploy.yml calls this on every push to main, before it deploys.
+  workflow_call:
 
 jobs:
   backend:
@@ -85,4 +85,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
+        with:
+          version: v4.2.1
       - run: helm lint deploy/helm/smart-tutor
+      - name: Production values lint
+        run: helm lint deploy/helm/smart-tutor -f deploy/helm/smart-tutor/values-prod.yaml --set global.publicUrl=https://d111.cloudfront.net
+
+  infra:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra
+    env:
+      JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: azure/setup-helm@v4
+        with:
+          version: v4.2.1
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - name: CDK, chart, workflow, and smoke-test tests
+        run: uv run pytest -q
