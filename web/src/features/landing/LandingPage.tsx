@@ -5,13 +5,12 @@ import { BrandMark } from "../../components/BrandMark/BrandMark";
 import { Button } from "../../components/Button/Button";
 import styles from "./LandingPage.module.css";
 
-// Brief §9 landing copy, verbatim.
+// Brief §9 landing copy, verbatim. Three trust points, each with a lead, so the row lines up with the three steps.
 const STEPS = ["Upload your PDFs", "Ask a question", "Check the page it came from"];
 const TRUST: [lead: string, rest: string][] = [
   ["Only your documents:", "the tutor never answers from anything else."],
   ["Private to you:", "no one else sees your documents, conversations, or notes."],
-  ["", "Every answer cites the document title and page."],
-  ["", "A pilot for laptop browsers."],
+  ["Cited answers:", "every answer cites the document title and page."],
 ];
 
 type Props = { signIn: AuthClient["signIn"] };
@@ -72,9 +71,7 @@ export function LandingPage({ signIn }: Props) {
           <ul className={styles.trust} aria-label="What you can rely on">
             {TRUST.map(([lead, rest]) => (
               <li key={rest}>
-                {lead && <strong>{lead}</strong>}
-                {lead && " "}
-                {rest}
+                <strong>{lead}</strong> {rest}
               </li>
             ))}
           </ul>

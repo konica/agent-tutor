@@ -24,9 +24,9 @@ describe("LandingPage", () => {
     expect(trust.map((li) => li.textContent)).toEqual([
       "Only your documents: the tutor never answers from anything else.",
       "Private to you: no one else sees your documents, conversations, or notes.",
-      "Every answer cites the document title and page.",
-      "A pilot for laptop browsers.",
+      "Cited answers: every answer cites the document title and page.",
     ]);
+    expect(trust).toHaveLength(steps.length);
     expect(screen.getByRole("heading", { level: 2, name: "Ask your own documents." })).toBeInTheDocument();
   });
 
