@@ -18,6 +18,7 @@ from fakes import (
     ingest_ready,
 )
 from smart_tutor.apps.api.main import create_app
+from smart_tutor.apps.api.services import ApiServices
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import SubjectId, UserId
 from smart_tutor.shared.domain.principal import Principal
@@ -87,7 +88,9 @@ def test_starts_a_thread_and_relays_the_agents_answer_after_a_thread_event() -> 
     [request] = seen
     assert request.url == "http://agent.test/ask"
     assert request.headers["authorization"] == "Bearer t-ada"  # the same token, forwarded (ADR 0007)
-    assert json.loads(request.content) == {
+    sent = json.loads(request.content)
+    assert sent.pop("thread_id") == thread.thread_id and thread.title == "What is attention?"
+    assert sent == {
         "question": "What is attention?",
         "learner_subjects": [{"subject_id": "00000000-0000-4000-8000-000000000001", "name": "General"}],
     }
@@ -429,3 +432,202 @@ def test_openapi_names_the_operation_and_declares_the_event_stream() -> None:
     operation = client.get("/openapi.json").json()["paths"]["/threads"]["post"]
     assert operation["operationId"] == "ask_in_new_thread"
     assert "text/event-stream" in operation["responses"]["200"]["content"]
+
+
+S3 = "00000000-0000-4000-8000-000000000003"
+DONE = "event: done\ndata: {}\n\n"
+CHOOSE = f'event: choose_subjects\ndata: {{"subject_ids": ["{GENERAL}", "{S2}"]}}\n\n{DONE}'.encode()
+CATALOG = {SubjectId(GENERAL): "General", SubjectId(S2): "LLMs"}
+
+
+def two_subject_setup(handler: Handler) -> tuple[TestClient, InMemoryThreads, ApiServices]:
+    verifier = FakeTokenVerifier()
+    verifier.add("t-ada", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
+    library, threads = InMemoryLibrary(), InMemoryThreads()
+    ingest_ready(library, "ada", "Attention weighs tokens.")
+    ingest_ready(library, "ada", "Language models predict tokens.", subject_ids=(SubjectId(S2),))
+    services = api_services(library, threads=threads, catalog=InMemorySubjects(CATALOG), agent=fake_agent(handler))
+    return TestClient(create_app(Settings(), verifier=verifier, services=services)), threads, services
+
+
+def open_pending(client: TestClient, threads: InMemoryThreads) -> str:
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+    assert response.text.startswith("event: choose_subjects\n")
+    [thread] = threads.threads.values()
+    return thread.thread_id
+
+
+def resume_sse(*ids: str) -> bytes:
+    return f'event: subjects\ndata: {{"subject_ids": {json.dumps(list(ids))}}}\n\n'.encode() + AGENT_ANSWER
+
+
+def pick_handler(seen: list[httpx.Request], resume: Handler) -> Handler:
+    """/ask is unsure; /resume is answered by `resume`."""
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if request.url.path == "/ask":
+            return event_stream(CHOOSE)(request)
+        return resume(request)
+
+    return handle
+
+
+def test_an_unsure_detection_stores_a_pending_thread_and_asks_the_learner_to_choose() -> None:
+    client, threads, _ = two_subject_setup(event_stream(CHOOSE))
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    [thread] = threads.threads.values()
+    assert thread.subject_ids == () and thread.awaiting_subjects and thread.title == "What is attention?"
+    first, rest = response.text.split("\n\n", 1)
+    assert first.startswith("event: choose_subjects\n")
+    assert json.loads(first.split("data: ", 1)[1]) == {
+        "thread_id": thread.thread_id,
+        "question": "What is attention?",
+        "subjects": [{"subject_id": GENERAL, "name": "General"}, {"subject_id": S2, "name": "LLMs"}],
+    }
+    assert rest == DONE
+
+
+def test_a_choice_the_learner_does_not_have_is_left_out_and_logged(caplog: pytest.LogCaptureFixture) -> None:
+    odd = f'event: choose_subjects\ndata: {{"subject_ids": ["{GENERAL}", "{S3}"]}}\n\n{DONE}'
+    client, _, _ = two_subject_setup(event_stream(odd.encode()))
+    caplog.set_level(logging.DEBUG)
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    first = json.loads(response.text.split("\n\n", 1)[0].split("data: ", 1)[1])
+    assert first["subjects"] == [{"subject_id": GENERAL, "name": "General"}]
+    assert S3 in caplog.text and "What is attention?" not in caplog.text
+
+
+def test_resume_sends_the_pick_to_the_agent_binds_it_and_relays_the_answer() -> None:
+    seen: list[httpx.Request] = []
+    client, threads, _ = two_subject_setup(pick_handler(seen, event_stream(resume_sse(S2))))
+    thread_id = open_pending(client, threads)
+
+    response = client.post(f"/threads/{thread_id}/subjects", json={"subject_ids": [S2]}, headers=AUTH)
+
+    assert response.status_code == 200 and response.headers["content-type"].startswith("text/event-stream")
+    resume = seen[-1]
+    assert resume.url == "http://agent.test/resume" and resume.headers["authorization"] == "Bearer t-ada"
+    assert json.loads(resume.content) == {"thread_id": thread_id, "subject_ids": [S2]}
+    first, rest = response.text.split("\n\n", 1)
+    assert first.startswith("event: thread\n")
+    assert json.loads(first.split("data: ", 1)[1]) == {
+        "thread_id": thread_id,
+        "subjects": [{"subject_id": S2, "name": "LLMs"}],
+    }
+    assert rest == AGENT_ANSWER.decode()
+    assert threads.threads[thread_id].subject_ids == (S2,)
+
+
+def agent_paths(seen: list[httpx.Request]) -> list[str]:
+    return [r.url.path for r in seen]
+
+
+@pytest.mark.parametrize(
+    "ids",
+    [[], [GENERAL, S2, S3, "x"], [S3], [S2, S2]],
+    ids=["none", "four", "not-the-learners", "duplicates"],
+)
+def test_an_invalid_pick_is_422_and_the_agent_is_not_called(ids: list[str]) -> None:
+    seen: list[httpx.Request] = []
+    client, threads, _ = two_subject_setup(pick_handler(seen, event_stream(resume_sse(S2))))
+    thread_id = open_pending(client, threads)
+
+    response = client.post(f"/threads/{thread_id}/subjects", json={"subject_ids": ids}, headers=AUTH)
+
+    assert response.status_code == 422
+    assert agent_paths(seen) == ["/ask"] and threads.threads[thread_id].awaiting_subjects
+
+
+def test_resume_of_an_unknown_thread_is_404_and_the_agent_is_not_called() -> None:
+    seen: list[httpx.Request] = []
+    client, _, _ = two_subject_setup(pick_handler(seen, event_stream(resume_sse(S2))))
+
+    response = client.post("/threads/nope/subjects", json={"subject_ids": [S2]}, headers=AUTH)
+
+    assert response.status_code == 404 and seen == []
+
+
+def test_resume_of_a_bound_thread_is_409_and_the_agent_is_not_called() -> None:
+    seen: list[httpx.Request] = []
+    client, threads, _ = two_subject_setup(pick_handler(seen, event_stream(resume_sse(S2))))
+    thread_id = open_pending(client, threads)
+    threads.threads[thread_id].subject_ids = (GENERAL,)
+
+    response = client.post(f"/threads/{thread_id}/subjects", json={"subject_ids": [S2]}, headers=AUTH)
+
+    assert response.status_code == 409
+    assert agent_paths(seen) == ["/ask"] and threads.threads[thread_id].subject_ids == (GENERAL,)
+
+
+def test_an_agent_with_nothing_waiting_is_409_and_the_thread_stays_pending() -> None:
+    seen: list[httpx.Request] = []
+    client, threads, _ = two_subject_setup(
+        pick_handler(seen, lambda request: httpx.Response(409, json={"detail": "nothing waits"}))
+    )
+    thread_id = open_pending(client, threads)
+
+    response = client.post(f"/threads/{thread_id}/subjects", json={"subject_ids": [S2]}, headers=AUTH)
+
+    assert response.status_code == 409 and threads.threads[thread_id].awaiting_subjects
+
+
+def test_an_agent_that_resumes_with_other_subjects_is_unavailable_and_binds_nothing() -> None:
+    client, threads, _ = two_subject_setup(pick_handler([], event_stream(resume_sse(GENERAL))))
+    thread_id = open_pending(client, threads)
+
+    response = client.post(f"/threads/{thread_id}/subjects", json={"subject_ids": [S2]}, headers=AUTH)
+
+    assert response.text == UNAVAILABLE_EVENT and threads.threads[thread_id].awaiting_subjects
+
+
+def test_a_concurrent_resume_that_bound_first_is_unavailable_and_changes_nothing() -> None:
+    holder: list[InMemoryThreads] = []
+    thread_ids: list[str] = []
+
+    def bound_meanwhile(request: httpx.Request) -> httpx.Response:
+        holder[0].threads[thread_ids[0]].subject_ids = (GENERAL,)  # another resume got there first
+        return event_stream(resume_sse(S2))(request)
+
+    client, threads, _ = two_subject_setup(pick_handler([], bound_meanwhile))
+    holder.append(threads)
+    thread_ids.append(open_pending(client, threads))
+
+    response = client.post(f"/threads/{thread_ids[0]}/subjects", json={"subject_ids": [S2]}, headers=AUTH)
+
+    assert response.text == UNAVAILABLE_EVENT and threads.threads[thread_ids[0]].subject_ids == (GENERAL,)
+
+
+def test_get_thread_reads_a_pending_thread() -> None:
+    client, threads, _ = two_subject_setup(event_stream(CHOOSE))
+    thread_id = open_pending(client, threads)
+
+    response = client.get(f"/threads/{thread_id}", headers=AUTH)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "thread_id": thread_id,
+        "question": "What is attention?",
+        "subjects": [],
+        "awaiting_subjects": True,
+    }
+
+
+def test_get_thread_reads_a_bound_thread_with_named_subjects() -> None:
+    client, threads, _ = two_subject_setup(event_stream(resume_sse(S2)))
+    client.post("/threads", json=QUESTION, headers=AUTH)
+    [thread_id] = threads.threads
+
+    response = client.get(f"/threads/{thread_id}", headers=AUTH)
+
+    assert response.json()["awaiting_subjects"] is False
+    assert response.json()["subjects"] == [{"subject_id": S2, "name": "LLMs"}]
+
+
+def test_get_unknown_thread_is_404() -> None:
+    client, _, _ = two_subject_setup(event_stream(CHOOSE))
+    assert client.get("/threads/nope", headers=AUTH).status_code == 404

@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponse, AskInNewThreadResponses, CheckDuplicateData, CheckDuplicateErrors, CheckDuplicateResponses, ChooseSubjectsData, ChooseSubjectsErrors, ChooseSubjectsResponses, GetMeData, GetMeResponses, GetSubjectSuggestionsData, GetSubjectSuggestionsErrors, GetSubjectSuggestionsResponses, GetUploadLimitsData, GetUploadLimitsResponses, ListDocumentsData, ListDocumentsResponses, ListMySubjectsData, ListMySubjectsResponses, RetryDocumentData, RetryDocumentErrors, RetryDocumentResponses, SearchSubjectsData, SearchSubjectsErrors, SearchSubjectsResponses, StartUploadData, StartUploadErrors, StartUploadResponses } from './types.gen';
+import type { AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponse, AskInNewThreadResponses, CheckDuplicateData, CheckDuplicateErrors, CheckDuplicateResponses, ChooseSubjectsData, ChooseSubjectsErrors, ChooseSubjectsResponses, ChooseThreadSubjectsData, ChooseThreadSubjectsErrors, ChooseThreadSubjectsResponse, ChooseThreadSubjectsResponses, GetMeData, GetMeResponses, GetSubjectSuggestionsData, GetSubjectSuggestionsErrors, GetSubjectSuggestionsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUploadLimitsData, GetUploadLimitsResponses, ListDocumentsData, ListDocumentsResponses, ListMySubjectsData, ListMySubjectsResponses, RetryDocumentData, RetryDocumentErrors, RetryDocumentResponses, SearchSubjectsData, SearchSubjectsErrors, SearchSubjectsResponses, StartUploadData, StartUploadErrors, StartUploadResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -116,6 +116,30 @@ export const searchSubjects = <ThrowOnError extends boolean = false>(options: Op
 export const askInNewThread = <ThrowOnError extends boolean = false>(options: Options<AskInNewThreadData, ThrowOnError, AskInNewThreadResponse>): Promise<ServerSentEventsResult<AskInNewThreadResponses>> => (options.client ?? client).sse.post<AskInNewThreadResponses, AskInNewThreadErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/threads',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Get Thread
+ */
+export const getThread = <ThrowOnError extends boolean = false>(options: Options<GetThreadData, ThrowOnError>): RequestResult<GetThreadResponses, GetThreadErrors, ThrowOnError> => (options.client ?? client).get<GetThreadResponses, GetThreadErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/threads/{thread_id}',
+    ...options
+});
+
+/**
+ * Choose Thread Subjects
+ *
+ * The learner's pick for a thread waiting for its subjects; the agent then answers the first question.
+ */
+export const chooseThreadSubjects = <ThrowOnError extends boolean = false>(options: Options<ChooseThreadSubjectsData, ThrowOnError, ChooseThreadSubjectsResponse>): Promise<ServerSentEventsResult<ChooseThreadSubjectsResponses>> => (options.client ?? client).sse.post<ChooseThreadSubjectsResponses, ChooseThreadSubjectsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/threads/{thread_id}/subjects',
     ...options,
     headers: {
         'Content-Type': 'application/json',

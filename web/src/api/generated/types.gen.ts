@@ -15,20 +15,6 @@ export type AskRequest = {
 };
 
 /**
- * ChooseSubjectsRequest
- */
-export type ChooseSubjectsRequest = {
-    /**
-     * New Names
-     */
-    new_names?: Array<string>;
-    /**
-     * Subject Ids
-     */
-    subject_ids?: Array<string>;
-};
-
-/**
  * DocumentResponse
  */
 export type DocumentResponse = {
@@ -225,6 +211,28 @@ export type SuggestionResponse = {
 };
 
 /**
+ * ThreadResponse
+ */
+export type ThreadResponse = {
+    /**
+     * Awaiting Subjects
+     */
+    awaiting_subjects: boolean;
+    /**
+     * Question
+     */
+    question: string;
+    /**
+     * Subjects
+     */
+    subjects: Array<SubjectResponse>;
+    /**
+     * Thread Id
+     */
+    thread_id: string;
+};
+
+/**
  * UploadLimitsResponse
  */
 export type UploadLimitsResponse = {
@@ -264,6 +272,30 @@ export type ValidationError = {
      * Error Type
      */
     type: string;
+};
+
+/**
+ * ChooseSubjectsRequest
+ */
+export type SmartTutorAppsApiRoutesKnowledgeChooseSubjectsRequest = {
+    /**
+     * New Names
+     */
+    new_names?: Array<string>;
+    /**
+     * Subject Ids
+     */
+    subject_ids?: Array<string>;
+};
+
+/**
+ * ChooseSubjectsRequest
+ */
+export type SmartTutorAppsApiRoutesThreadsChooseSubjectsRequest = {
+    /**
+     * Subject Ids
+     */
+    subject_ids: Array<string>;
 };
 
 export type ListDocumentsData = {
@@ -370,7 +402,7 @@ export type GetSubjectSuggestionsResponses = {
 export type GetSubjectSuggestionsResponse = GetSubjectSuggestionsResponses[keyof GetSubjectSuggestionsResponses];
 
 export type ChooseSubjectsData = {
-    body: ChooseSubjectsRequest;
+    body: SmartTutorAppsApiRoutesKnowledgeChooseSubjectsRequest;
     path: {
         /**
          * Document Id
@@ -487,12 +519,78 @@ export type AskInNewThreadError = AskInNewThreadErrors[keyof AskInNewThreadError
 
 export type AskInNewThreadResponses = {
     /**
-     * Server-sent events: thread, then delta*, citations, done (or error).
+     * Server-sent events: thread, then delta*, citations, done (or error). A new thread may instead open with choose_subjects, then done.
      */
     200: string;
 };
 
 export type AskInNewThreadResponse = AskInNewThreadResponses[keyof AskInNewThreadResponses];
+
+export type GetThreadData = {
+    body?: never;
+    path: {
+        /**
+         * Thread Id
+         */
+        thread_id: string;
+    };
+    query?: never;
+    url: '/threads/{thread_id}';
+};
+
+export type GetThreadErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetThreadError = GetThreadErrors[keyof GetThreadErrors];
+
+export type GetThreadResponses = {
+    /**
+     * Successful Response
+     */
+    200: ThreadResponse;
+};
+
+export type GetThreadResponse = GetThreadResponses[keyof GetThreadResponses];
+
+export type ChooseThreadSubjectsData = {
+    body: SmartTutorAppsApiRoutesThreadsChooseSubjectsRequest;
+    path: {
+        /**
+         * Thread Id
+         */
+        thread_id: string;
+    };
+    query?: never;
+    url: '/threads/{thread_id}/subjects';
+};
+
+export type ChooseThreadSubjectsErrors = {
+    /**
+     * No such conversation.
+     */
+    404: unknown;
+    /**
+     * The conversation already has its subjects, or the tutor has no question waiting.
+     */
+    409: unknown;
+    /**
+     * The pick is not 1 to 3 distinct subjects of the learner's own.
+     */
+    422: unknown;
+};
+
+export type ChooseThreadSubjectsResponses = {
+    /**
+     * Server-sent events: thread, then delta*, citations, done (or error).
+     */
+    200: string;
+};
+
+export type ChooseThreadSubjectsResponse = ChooseThreadSubjectsResponses[keyof ChooseThreadSubjectsResponses];
 
 export type StartUploadData = {
     body: StartUploadRequest;

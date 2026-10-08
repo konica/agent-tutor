@@ -17,32 +17,6 @@
         "title": "AskRequest",
         "type": "object"
       },
-      "ChooseSubjectsRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "new_names": {
-            "items": {
-              "maxLength": 60,
-              "minLength": 1,
-              "type": "string"
-            },
-            "maxItems": 3,
-            "title": "New Names",
-            "type": "array"
-          },
-          "subject_ids": {
-            "items": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "maxItems": 3,
-            "title": "Subject Ids",
-            "type": "array"
-          }
-        },
-        "title": "ChooseSubjectsRequest",
-        "type": "object"
-      },
       "DocumentResponse": {
         "properties": {
           "attempt": {
@@ -359,6 +333,37 @@
         "title": "SuggestionResponse",
         "type": "object"
       },
+      "ThreadResponse": {
+        "properties": {
+          "awaiting_subjects": {
+            "title": "Awaiting Subjects",
+            "type": "boolean"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "subjects": {
+            "items": {
+              "$ref": "#/components/schemas/SubjectResponse"
+            },
+            "title": "Subjects",
+            "type": "array"
+          },
+          "thread_id": {
+            "title": "Thread Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "thread_id",
+          "question",
+          "subjects",
+          "awaiting_subjects"
+        ],
+        "title": "ThreadResponse",
+        "type": "object"
+      },
       "UploadLimitsResponse": {
         "properties": {
           "max_bytes": {
@@ -415,6 +420,51 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "smart_tutor__apps__api__routes__knowledge__ChooseSubjectsRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "new_names": {
+            "items": {
+              "maxLength": 60,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 3,
+            "title": "New Names",
+            "type": "array"
+          },
+          "subject_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 3,
+            "title": "Subject Ids",
+            "type": "array"
+          }
+        },
+        "title": "ChooseSubjectsRequest",
+        "type": "object"
+      },
+      "smart_tutor__apps__api__routes__threads__ChooseSubjectsRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "subject_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "Subject Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "subject_ids"
+        ],
+        "title": "ChooseSubjectsRequest",
         "type": "object"
       }
     },
@@ -619,7 +669,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ChooseSubjectsRequest"
+                "$ref": "#/components/schemas/smart_tutor__apps__api__routes__knowledge__ChooseSubjectsRequest"
               }
             }
           },
@@ -790,7 +840,7 @@
                 }
               }
             },
-            "description": "Server-sent events: thread, then delta*, citations, done (or error)."
+            "description": "Server-sent events: thread, then delta*, citations, done (or error). A new thread may instead open with choose_subjects, then done."
           },
           "409": {
             "description": "The learner has no ready documents."
@@ -812,6 +862,110 @@
           }
         ],
         "summary": "Ask In New Thread",
+        "tags": [
+          "tutoring"
+        ]
+      }
+    },
+    "/threads/{thread_id}": {
+      "get": {
+        "operationId": "get_thread",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "thread_id",
+            "required": true,
+            "schema": {
+              "title": "Thread Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Thread",
+        "tags": [
+          "tutoring"
+        ]
+      }
+    },
+    "/threads/{thread_id}/subjects": {
+      "post": {
+        "description": "The learner's pick for a thread waiting for its subjects; the agent then answers the first question.",
+        "operationId": "choose_thread_subjects",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "thread_id",
+            "required": true,
+            "schema": {
+              "title": "Thread Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/smart_tutor__apps__api__routes__threads__ChooseSubjectsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Server-sent events: thread, then delta*, citations, done (or error)."
+          },
+          "404": {
+            "description": "No such conversation."
+          },
+          "409": {
+            "description": "The conversation already has its subjects, or the tutor has no question waiting."
+          },
+          "422": {
+            "description": "The pick is not 1 to 3 distinct subjects of the learner's own."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Choose Thread Subjects",
         "tags": [
           "tutoring"
         ]
