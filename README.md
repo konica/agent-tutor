@@ -72,7 +72,7 @@ cd backend; uv sync; uv run python -m smart_tutor.apps.jobs.migrate; cd ..
 cd backend; uv run --env-file ../.env uvicorn smart_tutor.apps.api.main:app --reload --port 10450
 cd backend; uv run --env-file ../.env --extra ingest python -m smart_tutor.apps.worker.main
 cd web; npm ci; npm run dev
-cd backend; uv run --env-file ../.env uvicorn smart_tutor.apps.agent.server:app --reload --port 10451
+cd backend; uv run --env-file ../.env uvicorn smart_tutor.apps.agent.server:app --loop asyncio:SelectorEventLoop --reload --port 10451
 cd backend; $env:SMART_TUTOR_KEYCLOAK_CLIENT_ID="rag-mcp"; $env:SMART_TUTOR_KEYCLOAK_CLIENT_SECRET="local-mcp-secret"; $env:SMART_TUTOR_KEYCLOAK_AUDIENCE="rag-mcp"; uv run --env-file ../.env python -m smart_tutor.apps.mcp_server.server
 ```
 
@@ -110,7 +110,7 @@ cd backend; uv run --env-file ../.env python -m debugpy --listen 127.0.0.1:10460
 # Worker: debugger at :10463
 cd backend; uv run --env-file ../.env --extra ingest python -m debugpy --listen 127.0.0.1:10463 -m smart_tutor.apps.worker.main
 # Agent: app at :10451, debugger at :10461
-cd backend; uv run --env-file ../.env python -m debugpy --listen 127.0.0.1:10461 -m uvicorn smart_tutor.apps.agent.server:app --port 10451
+cd backend; uv run --env-file ../.env python -m debugpy --listen 127.0.0.1:10461 -m uvicorn smart_tutor.apps.agent.server:app --loop asyncio:SelectorEventLoop --port 10451
 # MCP server: app at :10452/mcp, debugger at :10462
 cd backend; $env:SMART_TUTOR_KEYCLOAK_CLIENT_ID="rag-mcp"; $env:SMART_TUTOR_KEYCLOAK_CLIENT_SECRET="local-mcp-secret"; $env:SMART_TUTOR_KEYCLOAK_AUDIENCE="rag-mcp"; uv run --env-file ../.env python -m debugpy --listen 127.0.0.1:10462 -m smart_tutor.apps.mcp_server.server
 ```

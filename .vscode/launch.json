@@ -30,7 +30,7 @@
       "type": "debugpy",
       "request": "launch",
       "module": "uvicorn",
-      "args": ["smart_tutor.apps.agent.server:app", "--port", "10451"],
+      "args": ["smart_tutor.apps.agent.server:app", "--loop", "asyncio:SelectorEventLoop", "--port", "10451"],
       "cwd": "${workspaceFolder}/backend",
       "envFile": "${workspaceFolder}/.env",
       "python": "${workspaceFolder}/backend/.venv/bin/python",

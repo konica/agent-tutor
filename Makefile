@@ -26,7 +26,7 @@ up-app:        ## dependencies + app services (same images as prod)
 api:           ## API at :10450, reloads on change
 	$(HOST) uvicorn smart_tutor.apps.api.main:app --reload --port 10450
 agent:         ## agent at :10451, reloads on change
-	$(HOST) uvicorn smart_tutor.apps.agent.server:app --reload --port 10451
+	$(HOST) uvicorn smart_tutor.apps.agent.server:app --loop asyncio:SelectorEventLoop --reload --port 10451
 mcp:           ## RAG MCP server at :10452/mcp (SMART_TUTOR_MCP_PORT in .env)
 	$(MCP_HOST) python -m smart_tutor.apps.mcp_server.server
 worker:        ## ingestion worker (no port); restart it after code changes
@@ -38,7 +38,7 @@ DEBUG := $(HOST) python -m debugpy --listen 127.0.0.1
 api-debug:     ## API at :10450, debugger at :10460
 	$(DEBUG):10460 -m uvicorn smart_tutor.apps.api.main:app --port 10450
 agent-debug:   ## agent at :10451, debugger at :10461
-	$(DEBUG):10461 -m uvicorn smart_tutor.apps.agent.server:app --port 10451
+	$(DEBUG):10461 -m uvicorn smart_tutor.apps.agent.server:app --loop asyncio:SelectorEventLoop --port 10451
 mcp-debug:     ## RAG MCP server at :10452/mcp, debugger at :10462
 	$(MCP_HOST) python -m debugpy --listen 127.0.0.1:10462 -m smart_tutor.apps.mcp_server.server
 worker-debug:  ## ingestion worker, debugger at :10463

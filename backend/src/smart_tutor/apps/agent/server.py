@@ -27,6 +27,7 @@ from langgraph.types import Command
 from pydantic import BaseModel, ConfigDict, Field
 
 from smart_tutor.apps.agent.graph import AskGraph, build_graph
+from smart_tutor.apps.agent.nodes.choose_subjects import InvalidPickError, check_pick
 from smart_tutor.apps.agent.state import AgentContext, AskState
 from smart_tutor.knowledge.application import MAX_SEARCH_SUBJECTS
 from smart_tutor.shared.adapters.auth.bearer import BearerToken, CurrentPrincipal
@@ -186,10 +187,10 @@ def create_app(
         if not pending:
             raise HTTPException(409, "Nothing is waiting for subjects in this thread")
         # Refuse a bad pick before resuming: a pick the node rejects stays in the checkpoint and would be replayed.
-        if len(set(body.subject_ids)) != len(body.subject_ids) or not set(body.subject_ids) <= set(
-            pending[0].value["subject_ids"]
-        ):
-            logger.info("resume refused: the pick is not among the choices offered")
+        try:
+            check_pick(pending[0].value["subject_ids"], body.subject_ids)
+        except InvalidPickError as e:
+            logger.info("resume refused: %s", e)
             return StreamingResponse(unavailable_events(), media_type="text/event-stream", headers=SSE_HEADERS)
         return StreamingResponse(
             answer_events(graph, Command(resume={"subject_ids": body.subject_ids}), config, token),
