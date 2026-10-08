@@ -180,4 +180,4 @@ Delete old snapshots you don't need, because they cost storage. A fresh deploy s
 
 ## 11. Costs
 
-About **$250–300 a month** while idle, including RDS (`db.t4g.micro` with 20 GiB, about $15 a month). During the testing phase the budget is **$20 a month** (`smart-tutor:budget-monthly-usd` in `infra/cdk.json`), with alerts. That is below the idle cost, so expect the 80% alert email within the first days the environment runs. Raise the value and run `npx aws-cdk@latest deploy SmartTutor-prod-Budgets` from `infra/` when the pilot starts.
+About **$250–300 a month** while idle, including RDS (`db.t3.micro` with 20 GiB, about $15 a month). During the testing phase the budget is **$20 a month** (`smart-tutor:budget-monthly-usd` in `infra/cdk.json`), with alerts. That is below the idle cost, so expect the 80% alert email within the first days the environment runs. Raise the value and run `npx aws-cdk@latest deploy SmartTutor-prod-Budgets` from `infra/` when the pilot starts.
