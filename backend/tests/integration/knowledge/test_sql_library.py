@@ -296,6 +296,48 @@ def test_get_readable_is_owner_only_and_includes_archived(engine: Engine) -> Non
     assert found_archived is not None and found_archived.archived
 
 
+def test_archive_and_restore_round_trip(engine: Engine) -> None:
+    owner = UserId(f"ada-{uid()}")
+    doc = start(engine, owner)
+    at = datetime(2026, 10, 9, 8, 30, tzinfo=UTC)
+    doc.archive(at)
+    with SqlLibraryUnitOfWork(engine) as tx:
+        tx.documents.save(doc)
+        tx.commit()
+    with SqlLibraryUnitOfWork(engine) as tx:
+        archived = tx.documents.get_readable(owner, doc.document_id)
+    assert archived is not None and archived.archived is True and archived.archived_at == at
+    archived.restore()
+    with SqlLibraryUnitOfWork(engine) as tx:
+        tx.documents.save(archived)
+        tx.commit()
+    with SqlLibraryUnitOfWork(engine) as tx:
+        restored = tx.documents.get_readable(owner, doc.document_id)
+    assert restored is not None and (restored.archived, restored.archived_at) == (False, None)
+
+
+def test_a_processing_document_stays_archived_when_the_worker_saves_it(engine: Engine) -> None:
+    owner = UserId(f"ada-{uid()}")
+    doc = start(engine, owner)
+    content = Content.first_upload(ContentId(uid()), hashlib.sha256(uid().encode()).hexdigest(), 10, owner)
+    at = datetime(2026, 10, 9, 8, 30, tzinfo=UTC)
+    doc.link_content(content.content_id)
+    doc.archive(at)
+    with SqlLibraryUnitOfWork(engine) as tx:
+        tx.contents.insert_or_get(content)
+        tx.documents.save(doc)
+        tx.commit()
+    with SqlLibraryUnitOfWork(engine) as tx:  # the worker's path
+        [loaded] = tx.documents.list_processing_for_content_for_update(content.content_id)
+        loaded.await_subjects()
+        tx.documents.save(loaded)
+        tx.commit()
+    with SqlLibraryUnitOfWork(engine) as tx:
+        after = tx.documents.get_readable(owner, doc.document_id)
+    assert after is not None
+    assert (after.state, after.archived, after.archived_at) == (DocumentState.AWAITING_SUBJECTS, True, at)
+
+
 def test_subject_ids_readable_by_counts_only_ready_documents(engine: Engine) -> None:
     owner, other = f"ada-{uid()}", f"bob-{uid()}"
     waiting, chosen, theirs = start(engine, owner), start(engine, owner), start(engine, other)

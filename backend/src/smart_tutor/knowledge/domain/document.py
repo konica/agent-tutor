@@ -60,6 +60,7 @@ class Document:
     content_year: int | None = None  # contents.year, filled when listing; never saved
     subject_ids: list[SubjectId] = field(default_factory=list)
     archived: bool = False
+    archived_at: datetime | None = None
 
     @classmethod
     def start_upload(
@@ -96,6 +97,14 @@ class Document:
             and (f.archived is None or self.archived is f.archived)
         )
 
+    def archive(self, at: datetime) -> None:
+        """Hide from search and My subjects; content, chunks, subjects, and state stay (PRD §9.5). Idempotent."""
+        if not self.archived:
+            self.archived, self.archived_at = True, at
+
+    def restore(self) -> None:
+        self.archived, self.archived_at = False, None
+
     def link_content(self, content_id: ContentId) -> None:
         if not self.awaiting_upload:
             raise DocumentStateError("This document already has its content")
@@ -118,6 +127,8 @@ class Document:
 
     def choose_subjects(self, subject_ids: list[SubjectId]) -> None:
         """awaiting_subjects (or ready, to change them) → ready with 1-3 different subjects (PRD §9.4, US-2b)."""
+        if self.archived:
+            raise DocumentStateError("Restore this document to change its subjects")
         if self.state not in (DocumentState.AWAITING_SUBJECTS, DocumentState.READY):
             raise DocumentStateError("Subjects can be chosen once processing has finished")
         if not 1 <= len(subject_ids) <= MAX_SUBJECTS or len(set(subject_ids)) != len(subject_ids):

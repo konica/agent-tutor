@@ -97,8 +97,10 @@ class SubjectChoiceService:
         tx: LibraryUnitOfWork, user_id: UserId, document_id: DocumentId, *, for_update: bool = False
     ) -> Document:
         document = tx.documents.get_readable(user_id, document_id, for_update=for_update)
-        if document is None or document.archived:
+        if document is None:
             raise DocumentNotFoundError("This document isn't in your library")
+        if document.archived:
+            raise DocumentStateError("Restore this document to change its subjects")
         if document.state not in CHOOSABLE:
             raise DocumentStateError("Subjects can be chosen once processing has finished")
         return document

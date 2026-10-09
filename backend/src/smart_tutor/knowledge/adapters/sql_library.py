@@ -71,6 +71,7 @@ def _document(row: Any, subject_ids: list[SubjectId]) -> Document:
         content_year=getattr(row, "content_year", None),
         subject_ids=subject_ids,
         archived=row.archived,
+        archived_at=row.archived_at,
     )
 
 
@@ -167,7 +168,13 @@ class _Documents(DocumentRepository):
         self._conn.execute(
             update(documents)
             .where(documents.c.document_id == document.document_id)
-            .values(content_id=document.content_id, state=document.state.value, failure_reason=document.failure_reason)
+            .values(
+                content_id=document.content_id,
+                state=document.state.value,
+                failure_reason=document.failure_reason,
+                archived=document.archived,
+                archived_at=document.archived_at,
+            )
         )
         self._conn.execute(delete(document_subjects).where(document_subjects.c.document_id == document.document_id))
         if document.subject_ids:
