@@ -96,7 +96,7 @@ foreach ($t in "agent", "mcp", "worker") {
 helm upgrade --install smart-tutor deploy/helm/smart-tutor -n smart-tutor --create-namespace -f deploy/helm/smart-tutor/values-prod.yaml --set global.imageRegistry=$Registry --set global.imageTag=$Tag --set global.publicUrl=$Url --set global.documentsBucket=$Bucket --set global.ingestQueueUrl=$Queue --wait=legacy --timeout 15m
 ```
 
-`global.publicUrl` is the CloudFront address from step 2. Without it Keycloak refuses to start. `global.documentsBucket` and `global.ingestQueueUrl` are the Storage outputs from step 2; the chart refuses to render without them. The first install runs the `db-bootstrap` hook, which creates the database roles and databases. Keycloak's first start takes about 2 min (schema and realm import), so the wait is slow the first time; `--timeout 15m` (Helm's default is 5 min) covers the hook plus that first start. Use `--wait=legacy`: with Helm 4's default (`--wait`, the watcher strategy) Helm sits out the whole timeout on every hook that isn't a Job (the SecretStore, the ExternalSecrets, the ConfigMap), about an hour for a first install. Before the API rolls out, the `migrate` hook brings the app database to the latest Alembic revision; if it fails, the release fails and the running API stays. A failed hook Job stays for debugging: `kubectl -n smart-tutor logs job/migrate`.
+`global.publicUrl` is the CloudFront address from step 2. Without it Keycloak refuses to start. `global.documentsBucket` and `global.ingestQueueUrl` are the Storage outputs from step 2; the production chart (it applies when `global.secretStore` is set) refuses to render without them. The first install runs the `db-bootstrap` hook, which creates the database roles and databases. Keycloak's first start takes about 2 min (schema and realm import), so the wait is slow the first time; `--timeout 15m` (Helm's default is 5 min) covers the hook plus that first start. Use `--wait=legacy`: with Helm 4's default (`--wait`, the watcher strategy) Helm sits out the whole timeout on every hook that isn't a Job (the SecretStore, the ExternalSecrets, the ConfigMap), about an hour for a first install. Before the API rolls out, the `migrate` hook brings the app database to the latest Alembic revision; if it fails, the release fails and the running API stays. A failed hook Job stays for debugging: `kubectl -n smart-tutor logs job/migrate`.
 
 ## 7. Check
 
@@ -209,7 +209,7 @@ curl.exe -s -o NUL -w "%{http_code}" -H "Authorization: Bearer $Tok2" "$Url/api/
 Use two learner accounts from step 8 (learner A and learner B), and a PDF from the seed corpus. Use private windows so the sessions stay apart.
 
 1. As learner A, upload the PDF in the Library. It shows *processing*, then reaches *ready* with a title and subjects (choose subjects if asked). The upload goes from the browser straight to the bucket, so a failure here that mentions CORS is a bucket setting (see Troubleshooting).
-2. Ask a question about the document. The answer streams in and cites the document; the conversation lists it under the documents used. Open a citation: the PDF opens at the page with the passage highlighted.
+2. Ask a question about the document. The answer streams in and cites the document; the conversation lists it under the documents used. The answer shows citations with the document, page, and passage. (Opening the PDF at the passage comes with the PDF viewer, US-4b, which is not built yet.)
 3. As learner B, the document is not in the Library. Ask a question about the same topic: the answer does not cite it.
 4. Retry (#95): make a document fail (for example, upload a PDF with more than 500 pages, or one that is not a real PDF renamed to `.pdf`), then choose **Retry** on the failed document. It returns to *processing*.
 
@@ -225,7 +225,8 @@ aws sqs get-queue-attributes --queue-url $Dlq --attribute-names ApproximateNumbe
 ```
 
 - **A CORS error on upload.** The browser posts straight to the bucket, so the bucket's CORS must name the CloudFront address: `aws s3api get-bucket-cors --bucket $Bucket`. The allowed origin must equal `$Url`.
-- **Bedrock `AccessDeniedException`** in the worker or agent logs. Turn on model access for the two models (the embedding model and the chat model) in the Bedrock console, in us-east-1.
+- **Bedrock `AccessDeniedException`** in the worker or agent logs. Check the role policy first: this error usually means a wrong model ARN or region in the Pod Identity role, or a service control policy (SCP) that blocks the call. The two models are the chat model `us.amazon.nova-2-lite-v1:0` (an inference profile that routes to `amazon.nova-2-lite-v1:0` in us-east-1, us-east-2, and us-west-2) and the embedding model `amazon.nova-2-multimodal-embeddings-v1:0`. As a last step, check that model access is on for both in the Bedrock console, in us-east-1.
+- **Replacing the CloudFront distribution.** The Storage stack imports Edge's CloudFront URL export for its CORS rule. If the distribution is ever replaced, deploy in two steps, because CloudFormation can't change an export that another stack imports.
 
 ## 9. Update after a change
 
@@ -251,7 +252,7 @@ npx aws-cdk@latest destroy SmartTutor-prod-Storage SmartTutor-prod-Edge SmartTut
 Pop-Location
 ```
 
-Destroy `SmartTutor-prod-Storage` **before** `SmartTutor-prod-Edge`, because Storage imports Edge's domain for its CORS rule. The command below lists it first. Never use `--all` here: it would delete the GitHub deploy role. CloudFront takes about 15 min to disable and delete. If `Network` fails because the VPC origin's network interfaces are still being released, wait 10 minutes and run the destroy for `SmartTutor-prod-Network` again.
+Destroy `SmartTutor-prod-Storage` **before** `SmartTutor-prod-Edge`, because Storage imports Edge's domain for its CORS rule. The command above lists it first. Never use `--all` here: it would delete the GitHub deploy role. CloudFront takes about 15 min to disable and delete. If `Network` fails because the VPC origin's network interfaces are still being released, wait 10 minutes and run the destroy for `SmartTutor-prod-Network` again.
 
 If it still fails, CloudFront may have left its `CloudFront-VPCOrigins-Service-SG` security group in the VPC. Find and delete it, then run the `Network` destroy again:
 
@@ -312,6 +313,7 @@ gh workflow run rollback.yml --ref main -f image_tag=<full SHA of an earlier suc
 Find the SHA with `gh run list --workflow deploy.yml --status success --limit 10 --json headSha,displayTitle,createdAt`. The workflow checks the images are still in ECR (the last 30 per repository), checks out that commit's chart, and runs the add-ons, `helm upgrade`, and the smoke test, without CDK or a build. It doesn't undo infrastructure changes.
 
 - It runs the old commit's chart, add-on values, and smoke test. Commits from before deploy on merge (no `deploy/pilot/smoke_test.py`, images not tagged with the full SHA) can't be rolled back to with the workflow; use the laptop path.
+- The workflow also can't roll back to a commit from before #139. Those commits never pushed the `smart-tutor/agent`, `mcp`, or `worker` images, and their chart has no agent or MCP server for the in-cluster check. To go back that far, use `helm -n smart-tutor rollback smart-tutor <revision>`; find the revision with `helm -n smart-tutor history smart-tutor`.
 - Rollback across a migration doesn't work: the old image's `migrate` hook can't find the newer Alembic revision in the database, so the release stops before anything rolls out. Fix forward instead (revert the PR and merge).
 
 **By hand (laptop) instead:** steps 3 and 6 with `$Tag` set to the tag the images were pushed with: the full SHA for workflow deploys, the 12-character short SHA for manual step 5 builds.
