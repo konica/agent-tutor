@@ -172,7 +172,8 @@ infra/
 ├── smart_tutor_infra/stacks/   # network, data (RDS + database secrets), storage (S3 + SQS/DLQ + lifecycle), cluster (EKS + Pod Identity),
 │                               # registry (ECR), edge (internal ALB + CloudFront), config (SSM, Keycloak secrets), budgets,
 │                               # github_deploy (GitHub OIDC provider + CI deploy role; admin deploys it once),
-│                               # host (on-premise VPC, VM, Elastic IP, data volume, deploy document; #148)
+│                               # host (on-premise VPC, VM, Elastic IP, data volume, deploy document; #148;
+│                               # snapshot policy, backup and snapshot alarms, alerts topic; #151)
 ├── smart_tutor_infra/names.py  # per-mode names; context smart-tutor:mode picks on-premise (default: storage, config,
 │                               # budgets, github_deploy, host; ECR shared) or native-cloud (all but host)
 └── tests/                      # CDK assertion tests
@@ -180,7 +181,8 @@ infra/
 deploy/
 ├── keycloak/Dockerfile         # optimized Keycloak image (#57)
 ├── on-premise/                 # what the on-premise VM runs (#148): compose.yaml, Caddyfile, deploy.sh (SSM Run Command);
-│                               # it reuses the realm and db-bootstrap.sql from the Helm chart
+│                               # it reuses the realm and db-bootstrap.sql from the Helm chart. Scheduled jobs are
+│                               # systemd/ timers that call `docker compose run` (#151): backup.sh, restore.sh, report-failure.sh
 └── helm/
     ├── smart-tutor/                # umbrella chart: Chart.yaml, values.yaml, values-prod.yaml
     │   ├── templates/              # SecretStore and the db-bootstrap hook (files/db-bootstrap.sql)

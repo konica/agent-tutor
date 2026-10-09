@@ -1,6 +1,6 @@
 # On-premise deploy (#148)
 
-Deploys on-premise mode (ADR 0012, PRD §9.12): one EC2 VM runs Smart Tutor with Docker Compose, and Caddy serves it over HTTPS at `https://<Elastic IP>.sslip.io` with a Let's Encrypt certificate. This runbook covers the first deploy and a manual redeploy. It currently brings up Postgres, Keycloak, the API, the web app, and Caddy, so a learner can sign in. The worker, agent, and MCP server, and with them upload and ask, come in #149. Deploy on merge is #150, backups #151, and monitoring and patching #152.
+Deploys on-premise mode (ADR 0012, PRD §9.12): one EC2 VM runs Smart Tutor with Docker Compose, and Caddy serves it over HTTPS at `https://<Elastic IP>.sslip.io` with a Let's Encrypt certificate. This runbook covers the first deploy and a manual redeploy. It currently brings up Postgres, Keycloak, the API, the web app, and Caddy, so a learner can sign in. The worker, agent, and MCP server, and with them upload and ask, come in #149. Deploy on merge is #150, and monitoring and patching #152. Backups and restore: `on-premise-backups.md` (#151).
 
 Commands are for **PowerShell 7** (`pwsh`). Run them from the repository root with your admin profile. No command here prints a secret. Don't paste the values you read in step 4 anywhere.
 
@@ -119,7 +119,7 @@ Run step 3 again with another `$Tag`.
 - **A new tag:** it pulls the new images and migrates, then Compose recreates only the services whose image or settings changed. Postgres and Caddy keep running (unless their settings changed). Expect a short gap in sign-in while Keycloak restarts.
 - **The same tag:** nothing changes. Migrations are already at head, every container keeps running, and the test learner already exists.
 - **A rotated secret** (for example `smart-tutor-on-premise/db/app`): the redeploy resets the role's password to the new value and recreates the services that read it.
-- **To roll back:** deploy an older SHA. Migrations don't run backwards, so only roll back across commits without a schema change, or restore the database (#151).
+- **To roll back:** deploy an older SHA. Migrations don't run backwards, so only roll back across commits without a schema change, or restore the database (`on-premise-backups.md`).
 
 ## 6. Operate the VM
 
@@ -150,7 +150,7 @@ Never run `dc config` or `cat` on the env file in a session that someone records
 2. Once it has the volume, the new instance mounts it (it doesn't format a volume that has a file system) and installs Docker.
 3. Then run step 3. The database, Keycloak's users, and Caddy's certificates are as they were. The deploy waits up to 15 minutes for `/data`.
 
-The data volume keeps a snapshot if the stack is deleted (`DeletionPolicy: Snapshot`).
+The data volume keeps a snapshot if the stack is deleted (`DeletionPolicy: Snapshot`). The instance is also replaced when its user data changes, for example a new Compose version or a data volume restored from a snapshot (`on-premise-backups.md`).
 
 ## 7. Tear down
 
