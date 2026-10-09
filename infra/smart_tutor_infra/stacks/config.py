@@ -10,6 +10,9 @@ from constructs import Construct
 
 from smart_tutor_infra.names import ModeNames
 
+# The app time zone (D27); the on-premise patching window is scheduled in it too.
+APP_TIME_ZONE = "Asia/Ho_Chi_Minh"
+
 
 class ConfigStack(cdk.Stack):
     def __init__(self, scope: Construct, construct_id: str, *, names: ModeNames, **kwargs: Any) -> None:
@@ -21,7 +24,7 @@ class ConfigStack(cdk.Stack):
             ("max-upload-mb", "50"),
             ("max-pages", "500"),
             ("max-processing-attempts", "3"),
-            ("app-time-zone", "Asia/Ho_Chi_Minh"),
+            ("app-time-zone", APP_TIME_ZONE),
         ):
             ssm.StringParameter(self, f"Param-{name}", parameter_name=f"{names.ssm_path}/{name}", string_value=value)
 

@@ -25,7 +25,7 @@ The product behaves the same in both modes.
 - **Delivery:** every push to `main` runs the checks, pushes images to ECR, runs `cdk deploy`, and then uses **SSM Run Command** to pull images, migrate, and run `docker compose up -d`. A smoke test follows. Brief downtime during a deploy is acceptable.
 - **Native-cloud deploys only when chosen:** by `workflow_dispatch`, or automatically when the repository variable `NATIVE_CLOUD_AUTO_DEPLOY=true`. CI still runs `cdk synth` and `helm lint` for native-cloud, so it doesn't rot. The running pilot stays up, deployed only by hand, until on-premise passes its smoke test. Then the product owner decides what to do with it.
 - **Worker isolation on the VM:** the worker runs as non-root with a read-only filesystem, `cap_drop: [ALL]`, CPU and memory limits, and a per-file timeout. It has no **egress allowlist** yet; that known gap has its own ticket and must land before "pilot starts" (M4).
-- **Operations:** daily EBS snapshots kept 7 days, a nightly `pg_dump` to S3, a restore runbook, and one restore drill. Docker health checks and restart policies, log rotation, an EC2 status-check recovery alarm, an uptime check on `/api/health`, Budgets, and weekly SSM patching.
+- **Operations:** daily EBS snapshots kept 7 days, a nightly `pg_dump` to S3, a restore runbook, and one restore drill. Docker health checks and restart policies, log rotation, an EC2 status-check recovery alarm, an uptime check on `/api/healthz`, Budgets, and weekly SSM patching.
 - **Data:** on-premise starts with an empty database. Nothing is migrated from the pilot.
 
 ### What still holds from 0009 and 0010

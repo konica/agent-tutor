@@ -65,6 +65,8 @@ def _on_premise(app: cdk.App, env: cdk.Environment, names: ModeNames) -> list[cd
             instance_type=app.node.get_context("smart-tutor:on-premise-instance-type"),
             # Empty: <Elastic IP>.sslip.io until the DuckDNS name is claimed (#154).
             domain=app.node.try_get_context("smart-tutor:on-premise-domain") or None,
+            # The recovery, uptime, and patching alarms email the budget's recipients (#152).
+            alert_emails=app.node.get_context("smart-tutor:budget-alert-emails"),
         ),
     ]
 

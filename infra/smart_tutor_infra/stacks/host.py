@@ -10,6 +10,11 @@
 - Deploy: `cdk deploy` uploads `deploy/` as an asset; the SSM document `<prefix>-deploy` downloads it and runs
   `deploy/on-premise/deploy.sh <image tag>`, which renders settings and secrets into a root-only env file on the VM.
   No secret is in the template, the outputs, or the user data.
+- Monitoring (#152): the topic `<prefix>-alarms` emails the budget recipients. An alarm on the EC2 system status check
+  recovers the instance; a Route 53 health check on `https://<domain>/api/healthz` alarms when the product is down; a
+  failed patching window emails too. Runbook: docs/runbooks/on-premise-monitoring.md.
+- Patching (#152): a weekly maintenance window installs security patches (rebooting if needed), then runs
+  `deploy/on-premise/ensure-healthy.sh` so every service is back and healthy.
 
 ECR is native-cloud's RegistryStack; the Host only references it.
 """
@@ -19,15 +24,23 @@ from pathlib import Path
 from typing import Any
 
 import aws_cdk as cdk
+from aws_cdk import aws_cloudwatch as cloudwatch
+from aws_cdk import aws_cloudwatch_actions as cloudwatch_actions
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_ecr as ecr
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as events_targets
 from aws_cdk import aws_iam as iam
+from aws_cdk import aws_route53 as route53
 from aws_cdk import aws_s3_assets as s3_assets
 from aws_cdk import aws_secretsmanager as secretsmanager
+from aws_cdk import aws_sns as sns
+from aws_cdk import aws_sns_subscriptions as sns_subscriptions
 from aws_cdk import aws_ssm as ssm
 from constructs import Construct
 
 from smart_tutor_infra.names import ModeNames
+from smart_tutor_infra.stacks.config import APP_TIME_ZONE
 from smart_tutor_infra.stacks.registry import SERVICES
 
 DEFAULT_INSTANCE_TYPE = "t3.large"
@@ -42,6 +55,16 @@ COMPOSE_SHA256 = "db1889184726840f75c4f9c001048430d4f25b3be3cb084d3ddd762bc0aed5
 BUNDLE_DIR = Path(__file__).parents[3] / "deploy"
 # Only the instance with this tag may attach the volume with this tag.
 HOST_TAG = "smart-tutor:host"
+# The API's health route as the public sees it (Caddy forwards /api/* unchanged); the uptime check probes it.
+HEALTH_PATH = "/api/healthz"
+# Weekly patching: Sunday 03:00 in the app time zone, when learners are least likely to be studying.
+PATCH_SCHEDULE = "cron(0 3 ? * SUN *)"
+# Run after the patching. The script reaches the VM with the bundle, i.e. with a deploy, not with `cdk deploy`.
+ENSURE_HEALTHY = "/opt/smart-tutor/on-premise/ensure-healthy.sh"
+ENSURE_HEALTHY_COMMAND = (
+    f"[ -f {ENSURE_HEALTHY} ] || {{ echo 'ensure-healthy.sh is missing: redeploy the current tag"
+    f" (docs/runbooks/on-premise-deploy.md §3)' >&2; exit 1; }}; bash {ENSURE_HEALTHY}"
+)
 
 
 class HostStack(cdk.Stack):
@@ -53,6 +76,7 @@ class HostStack(cdk.Stack):
         names: ModeNames,
         instance_type: str = DEFAULT_INSTANCE_TYPE,
         domain: str | None = None,
+        alert_emails: Sequence[str] = (),
         services: Sequence[str] = SERVICES,
         **kwargs: Any,
     ) -> None:
@@ -178,6 +202,8 @@ class HostStack(cdk.Stack):
         )
         cdk.Tags.of(instance).add(HOST_TAG, names.resource_prefix)
         cdk.Tags.of(instance).add("Name", names.resource_prefix)
+        # Selects the patch baseline below (the tag key without a space also works with instance metadata tags).
+        cdk.Tags.of(instance).add("PatchGroup", names.resource_prefix)
 
         address = ec2.CfnEIP(self, "Address", domain="vpc")
         ec2.CfnEIPAssociation(
@@ -257,6 +283,17 @@ class HostStack(cdk.Stack):
             },
         )
 
+        topic = sns.Topic(
+            self,
+            "AlarmTopic",
+            topic_name=f"{names.resource_prefix}-alarms",
+            display_name="Smart Tutor on-premise alarms",
+        )
+        for email in alert_emails:
+            topic.add_subscription(sns_subscriptions.EmailSubscription(email))
+        _alarms(self, names, instance, domain, topic)
+        _patching(self, names, instance, topic)
+
         cdk.CfnOutput(self, "InstanceId", value=instance.instance_id)
         cdk.CfnOutput(self, "PublicIp", value=address.attr_public_ip)
         cdk.CfnOutput(self, "PublicUrl", value=f"https://{domain}")
@@ -317,3 +354,164 @@ def _deploy_commands(names: ModeNames, region: str) -> list[str]:
         "mv /opt/smart-tutor.new /opt/smart-tutor",
         f"SMART_TUTOR_PREFIX={names.data_prefix} bash /opt/smart-tutor/on-premise/deploy.sh '{{{{ ImageTag }}}}'",
     ]
+
+
+def _alarms(scope: Construct, names: ModeNames, instance: ec2.Instance, domain: str, topic: sns.ITopic) -> None:
+    """The recovery alarm and the uptime check; both email the alarm topic when they fire and when they clear."""
+    notify = cloudwatch_actions.SnsAction(topic)
+
+    # A failed system status check means AWS hardware or networking: recovery moves the instance to a healthy host,
+    # keeping its id, Elastic IP, and data volume. Docker then starts the services (restart: unless-stopped).
+    recovery = cloudwatch.Alarm(
+        scope,
+        "RecoveryAlarm",
+        alarm_name=f"{names.resource_prefix}-recover",
+        alarm_description="The EC2 system status check failed: the instance is being recovered"
+        " (docs/runbooks/on-premise-monitoring.md)",
+        metric=cloudwatch.Metric(
+            namespace="AWS/EC2",
+            metric_name="StatusCheckFailed_System",
+            dimensions_map={"InstanceId": instance.instance_id},
+            statistic="Maximum",
+            period=cdk.Duration.minutes(1),
+        ),
+        comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+        threshold=1,
+        evaluation_periods=2,
+    )
+    recovery.add_alarm_action(cloudwatch_actions.Ec2Action(cloudwatch_actions.Ec2InstanceAction.RECOVER), notify)
+    recovery.add_ok_action(notify)
+
+    # Through DNS and Caddy, as a learner reaches the API. Route 53 publishes its metric in us-east-1 only, which is
+    # where the stacks deploy (smart-tutor:region).
+    check = route53.CfnHealthCheck(
+        scope,
+        "UptimeCheck",
+        health_check_config=route53.CfnHealthCheck.HealthCheckConfigProperty(
+            type="HTTPS",
+            fully_qualified_domain_name=domain,
+            port=443,
+            resource_path=HEALTH_PATH,
+            enable_sni=True,
+            request_interval=30,
+            failure_threshold=3,
+        ),
+        health_check_tags=[route53.CfnHealthCheck.HealthCheckTagProperty(key="Name", value=names.resource_prefix)],
+    )
+    # Three minutes down before an email, so a deploy's restart of the API (seconds) doesn't page anyone.
+    uptime = cloudwatch.Alarm(
+        scope,
+        "UptimeAlarm",
+        alarm_name=f"{names.resource_prefix}-uptime",
+        alarm_description=f"https://<domain>{HEALTH_PATH} is failing (docs/runbooks/on-premise-monitoring.md)",
+        metric=cloudwatch.Metric(
+            namespace="AWS/Route53",
+            metric_name="HealthCheckStatus",
+            dimensions_map={"HealthCheckId": check.ref},
+            statistic="Minimum",
+            period=cdk.Duration.minutes(1),
+        ),
+        comparison_operator=cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+        threshold=1,
+        evaluation_periods=3,
+    )
+    uptime.add_alarm_action(notify)
+    uptime.add_ok_action(notify)
+
+
+def _patching(scope: Construct, names: ModeNames, instance: ec2.Instance, topic: sns.ITopic) -> None:
+    """Weekly security patching through SSM Patch Manager, then a check that every service is healthy again."""
+    # Security updates of every severity, as soon as they are released; the weekly window is the only delay. On Amazon
+    # Linux 2023, Patch Manager reads the latest repository version, not the one the instance's image pinned.
+    ssm.CfnPatchBaseline(
+        scope,
+        "PatchBaseline",
+        name=f"{names.resource_prefix}-security",
+        description="Security updates for the Smart Tutor on-premise host",
+        operating_system="AMAZON_LINUX_2023",
+        patch_groups=[names.resource_prefix],
+        approval_rules=ssm.CfnPatchBaseline.RuleGroupProperty(
+            patch_rules=[
+                ssm.CfnPatchBaseline.RuleProperty(
+                    approve_after_days=0,
+                    compliance_level="HIGH",
+                    patch_filter_group=ssm.CfnPatchBaseline.PatchFilterGroupProperty(
+                        patch_filters=[
+                            ssm.CfnPatchBaseline.PatchFilterProperty(key="CLASSIFICATION", values=["Security"])
+                        ]
+                    ),
+                )
+            ]
+        ),
+    )
+
+    window = ssm.CfnMaintenanceWindow(
+        scope,
+        "PatchWindow",
+        name=f"{names.resource_prefix}-patching",
+        description="Weekly security patching of the Smart Tutor on-premise host (docs/runbooks/on-premise-monitoring.md)",
+        schedule=PATCH_SCHEDULE,
+        schedule_timezone=APP_TIME_ZONE,
+        duration=3,
+        cutoff=1,
+        allow_unassociated_targets=False,
+    )
+    target = ssm.CfnMaintenanceWindowTarget(
+        scope,
+        "PatchWindowTarget",
+        window_id=window.ref,
+        resource_type="INSTANCE",
+        targets=[ssm.CfnMaintenanceWindowTarget.TargetsProperty(key="InstanceIds", values=[instance.instance_id])],
+    )
+
+    def task(construct_id: str, priority: int, document: str, parameters: dict[str, list[str]]) -> None:
+        ssm.CfnMaintenanceWindowTask(
+            scope,
+            construct_id,
+            window_id=window.ref,
+            priority=priority,  # lower runs first
+            task_type="RUN_COMMAND",
+            task_arn=document,
+            targets=[ssm.CfnMaintenanceWindowTask.TargetProperty(key="WindowTargetIds", values=[target.ref])],
+            max_concurrency="1",
+            max_errors="1",
+            cutoff_behavior="CONTINUE_TASK",
+            task_invocation_parameters=ssm.CfnMaintenanceWindowTask.TaskInvocationParametersProperty(
+                maintenance_window_run_command_parameters=ssm.CfnMaintenanceWindowTask.MaintenanceWindowRunCommandParametersProperty(
+                    parameters=parameters
+                )
+            ),
+        )
+
+    # Installs what the baseline approves and reboots when a patch needs it (a new kernel, glibc, Docker).
+    task("PatchTask", 1, "AWS-RunPatchBaseline", {"Operation": ["Install"], "RebootOption": ["RebootIfNeeded"]})
+    # After the reboot, Docker starts the services by itself; this waits until they are healthy and starts any that
+    # aren't. It fails, and with it the window, if one stays unhealthy.
+    task(
+        "HealthTask",
+        2,
+        "AWS-RunShellScript",
+        {"commands": [ENSURE_HEALTHY_COMMAND], "executionTimeout": ["1200"]},
+    )
+
+    events.Rule(
+        scope,
+        "PatchWindowFailedRule",
+        description="Email when the on-premise patching window fails or times out",
+        event_pattern=events.EventPattern(
+            source=["aws.ssm"],
+            detail_type=["Maintenance Window Execution State-change Notification"],
+            detail={"window-id": [window.ref], "status": ["FAILED", "TIMED_OUT"]},
+        ),
+        targets=[
+            events_targets.SnsTopic(
+                topic,
+                message=events.RuleTargetInput.from_text(
+                    f"The patching window {names.resource_prefix}-patching ended"
+                    f" {events.EventField.from_path('$.detail.status')}"
+                    f" (execution {events.EventField.from_path('$.detail.window-execution-id')})."
+                    " See docs/runbooks/on-premise-monitoring.md."
+                ),
+            )
+        ],
+    )

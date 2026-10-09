@@ -1,6 +1,6 @@
 # On-premise deploy (#148)
 
-Deploys on-premise mode (ADR 0012, PRD §9.12): one EC2 VM runs Smart Tutor with Docker Compose, and Caddy serves it over HTTPS at `https://<Elastic IP>.sslip.io` with a Let's Encrypt certificate. This runbook covers the first deploy and a manual redeploy. It currently brings up Postgres, Keycloak, the API, the web app, and Caddy, so a learner can sign in. The worker, agent, and MCP server, and with them upload and ask, come in #149. Deploy on merge is #150, backups #151, and monitoring and patching #152.
+Deploys on-premise mode (ADR 0012, PRD §9.12): one EC2 VM runs Smart Tutor with Docker Compose, and Caddy serves it over HTTPS at `https://<Elastic IP>.sslip.io` with a Let's Encrypt certificate. This runbook covers the first deploy and a manual redeploy. It currently brings up Postgres, Keycloak, the API, the web app, and Caddy, so a learner can sign in. The worker, agent, and MCP server, and with them upload and ask, come in #149. Deploy on merge is #150 and backups #151. Alarms and weekly patching are in `on-premise-monitoring.md`; after the first deploy, every alarm recipient confirms the subscription email.
 
 Commands are for **PowerShell 7** (`pwsh`). Run them from the repository root with your admin profile. No command here prints a secret. Don't paste the values you read in step 4 anywhere.
 

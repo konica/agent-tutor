@@ -131,3 +131,12 @@ def test_native_cloud_access_patterns_match_none_of_on_premise_names() -> None:
     assert onprem.documents_bucket("1") != native.documents_bucket("1")
     assert onprem.ingest_queue != native.ingest_queue
     assert onprem.deploy_role != native.deploy_role
+
+
+def test_on_premise_budget_alerts_the_same_recipients_as_native_cloud() -> None:
+    def subscribers(t: Template) -> list[object]:
+        (budget,) = t.find_resources("AWS::Budgets::Budget").values()
+        return [n["Subscribers"] for n in budget["Properties"]["NotificationsWithSubscribers"]]
+
+    native = subscribers(template(make_app(), "Budgets"))
+    assert native and subscribers(on_premise("Budgets")) == native
