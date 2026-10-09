@@ -24,6 +24,18 @@
       "AskRequest": {
         "additionalProperties": false,
         "properties": {
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
           "question": {
             "maxLength": 4000,
             "minLength": 1,
@@ -1502,6 +1514,9 @@
               }
             },
             "description": "Server-sent events: thread, then delta*, citations, done (or error)."
+          },
+          "404": {
+            "description": "A document that isn't the caller's ready one."
           },
           "409": {
             "description": "The learner has no ready documents."

@@ -1,5 +1,6 @@
 import { AlertCircle, Archive, Filter, Info, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useNavigate } from "react-router";
 
 import { SessionExpiredError } from "../../auth/authClient";
 import { archiveDocument, deleteDocument, DocumentGoneError, DocumentProcessingError, findInLibrary, loadDocumentDetails, loadDocuments, loadSubjectSuggestions, loadUploadLimits, loadUploadStatus, megabytes, rejectionReason, restoreDocument, RetriesUsedUpError, retryProcessing, saveDocumentTitle, saveSubjects as saveChosenSubjects, uploadPdf, type DocumentDetails, type DocumentFilters, type DocumentResponse, type SubjectSuggestions, type UploadEvents, type UploadLimits, type UploadStatus } from "../../api/documents";
@@ -70,6 +71,7 @@ const defaultSaveSubjects = (id: string, choice: { subject_ids: string[]; new_na
 
 // Library: upload by picking or dropping PDFs (US-2), the upload tray, and the Active and Archived lists narrowed by subject, upload dates and state (US-10).
 export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSubjects, upload = defaultUpload, retry = defaultRetry, loadLimits = defaultLoadLimits, check = defaultCheck, loadSuggestions = defaultLoadSuggestions, saveSubjects = defaultSaveSubjects, loadUpload = defaultLoadUpload, archive = defaultArchive, restore = defaultRestore, loadDetails = defaultLoadDetails, saveTitle = defaultSaveTitle, remove = defaultRemove, pollMs = 2000 }: Props) {
+  const navigate = useNavigate();
   const [filters, setFilters] = useState<DocumentFilters>({});
   const [view, setView] = useState<View>("active");
   const archivedView = view === "archived";
@@ -618,6 +620,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
           uploading={uploading}
           onArchive={(d) => void changeArchived(d, true)}
           onRestore={(d) => void changeArchived(d, false)}
+          onChat={(d) => navigate(`/chat?document=${d.document_id}`)}
           onOpen={(d, o) => setDetails({ id: d.document_id, editing: Boolean(o?.editTitle) })}
           onDelete={openDelete}
           busy={busy}
