@@ -3,24 +3,14 @@ import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { DocumentNotOpenableError, type DocumentFile, type DocumentResponse } from "../../api/documents";
+import { DocumentNotOpenableError, type DocumentResponse } from "../../api/documents";
 import { DocumentViewer } from "./DocumentViewer";
 import type { PdfDoc } from "./pdf";
+import { fakeDocument, fakeFile, fakePdf } from "./testFakes";
 
-const doc = (extra: Partial<DocumentResponse> = {}): DocumentResponse =>
-  ({ document_id: "d1", title: "ReAct", state: "ready", archived: false, authors: ["Yao"], year: 2022, subjects: [], ...extra }) as unknown as DocumentResponse;
-
-const file = (extra: Partial<DocumentResponse> = {}, url = "u1", expiresAt = Date.now() + 300_000): DocumentFile => ({
-  url,
-  expiresAt,
-  document: doc(extra),
-});
-
-const pdf = (numPages = 3): PdfDoc => ({
-  numPages,
-  destroy: vi.fn(),
-  page: vi.fn(async () => ({ width: 600, height: 800, render: vi.fn(async () => {}) })),
-});
+const doc = fakeDocument;
+const file = fakeFile;
+const pdf = fakePdf;
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -145,6 +135,19 @@ describe("DocumentViewer", () => {
   it("opens at initialPage", async () => {
     renderViewer({ initialPage: 3 });
     expect(await screen.findByText("p. 3 / 3")).toBeInTheDocument();
+  });
+
+  it("moves to the page of each new jumpTo, keeping the loaded PDF", async () => {
+    const { rerender, props, loadPdfDoc } = renderViewer();
+    await ready();
+    rerender(<DocumentViewer {...props} jumpTo={{ page: 3 }} />);
+    expect(screen.getByText("p. 3 / 3")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Previous page" }));
+    rerender(<DocumentViewer {...props} jumpTo={{ page: 3 }} />);
+    expect(screen.getByText("p. 3 / 3")).toBeInTheDocument();
+    rerender(<DocumentViewer {...props} jumpTo={{ page: 9 }} />);
+    expect(screen.getByText("p. 3 / 3")).toBeInTheDocument();
+    expect(loadPdfDoc).toHaveBeenCalledTimes(1);
   });
 
   it("ignores a late load of a document that was swapped out", async () => {

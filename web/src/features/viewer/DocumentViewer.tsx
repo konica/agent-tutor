@@ -14,6 +14,7 @@ type Props = {
   /** "pane": toolbar ends with Open in dialog + Close (X). "dialog": toolbar starts with a back/close text button. */
   mode: "pane" | "dialog";
   initialPage?: number; // default 1
+  jumpTo?: { page: number }; // each new object moves to that page, keeping the loaded PDF (the pane, back from the dialog)
   titleRef?: Ref<HTMLHeadingElement>; // the parent focuses it on open
   titleId?: string; // for aria-labelledby on the region/dialog
   onClose: () => void;
@@ -43,6 +44,7 @@ function Viewer({
   documentId,
   mode,
   initialPage = 1,
+  jumpTo,
   titleRef,
   titleId,
   onClose,
@@ -123,6 +125,12 @@ function Viewer({
   }, [doc, page, zoom]);
 
   const numPages = doc?.numPages ?? null;
+
+  const [jumped, setJumped] = useState(jumpTo);
+  if (jumpTo !== jumped) {
+    setJumped(jumpTo);
+    if (jumpTo) setPage(Math.min(Math.max(1, jumpTo.page), numPages ?? Infinity));
+  }
 
   const goTo = (next: number) => {
     if (numPages === null) return;
