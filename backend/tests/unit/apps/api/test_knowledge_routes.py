@@ -173,7 +173,9 @@ def test_duplicate_check_needs_a_token(client: TestClient) -> None:
 def awaiting_document(client: TestClient) -> str:
     started = client.post("/uploads", json={"file_name": "paper.pdf"}, headers=AUTH).json()
     key = started["fields"]["key"]
-    client.app.state.objects.objects[key] = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()  # type: ignore[attr-defined]
+    # Distinct bytes per call: the learner's own identical file would be a duplicate (US-11).
+    pdf = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode() + started["upload_id"].encode()
+    client.app.state.objects.objects[key] = pdf  # type: ignore[attr-defined]
     client.app.state.ingestion.ingest_upload(key)  # type: ignore[attr-defined]
     return str(started["document_id"])
 

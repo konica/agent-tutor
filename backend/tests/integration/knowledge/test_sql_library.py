@@ -12,7 +12,7 @@ from smart_tutor.knowledge.adapters.sql_library import SqlLibraryUnitOfWork
 from smart_tutor.knowledge.domain.chunk import Chunk
 from smart_tutor.knowledge.domain.content import UNREADABLE_PDF, Content
 from smart_tutor.knowledge.domain.description import DocumentDescription, parse_description
-from smart_tutor.knowledge.domain.document import DUPLICATE_UPLOAD, Document, DocumentFilter, DocumentState
+from smart_tutor.knowledge.domain.document import Document, DocumentFilter, DocumentState
 from smart_tutor.knowledge.domain.search import ChunkHit
 from smart_tutor.knowledge.domain.upload import Upload, UploadOutcome
 from smart_tutor.shared.adapters.postgres.engine import create_db_engine
@@ -97,14 +97,14 @@ def test_duplicate_document_keeps_content_id_null(engine: Engine) -> None:
         assert doc is not None
         doc.link_content(content.content_id)
         tx.documents.save(doc)
-        tx.uploads.record_outcome(first.upload_id, 10, UploadOutcome.STORED)
+        tx.uploads.record_outcome(first.upload_id, 10, UploadOutcome.STORED, first.document_id)
         tx.commit()
     with SqlLibraryUnitOfWork(engine) as tx:
         _, created = tx.contents.insert_or_get(Content.first_upload(ContentId(uid()), sha, 10, UserId(owner)))
         assert not created
         dup = tx.documents.get_by_upload_for_update(second.upload_id)
         assert dup is not None
-        dup.fail(DUPLICATE_UPLOAD)
+        dup.fail("This file isn't a readable PDF")
         tx.documents.save(dup)
         tx.commit()
     with SqlLibraryUnitOfWork(engine) as tx:

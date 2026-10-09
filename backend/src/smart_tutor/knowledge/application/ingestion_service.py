@@ -1,4 +1,4 @@
-"""Hash an uploaded file on the server, store its content once, and process it (PRD §9.5; ADR 0002, 0008).
+"""Hash an uploaded file on the server, store it as the learner's content, and process it (PRD §9.5; ADR 0002, 0008).
 
 Processing: describe the first pages (title, metadata, summary embedding, work key; committed at once so the
 Library shows the title), extract the page text, save it as JSON, chunk, embed, then make the content and the
@@ -28,7 +28,7 @@ from smart_tutor.knowledge.domain.content import (
     pages_key,
     too_many_pages,
 )
-from smart_tutor.knowledge.domain.document import DUPLICATE_UPLOAD, DocumentState
+from smart_tutor.knowledge.domain.document import DocumentState
 from smart_tutor.knowledge.domain.limits import FileLimits
 from smart_tutor.knowledge.domain.upload import UploadOutcome, parse_upload_key
 from smart_tutor.knowledge.ports.library import LibraryUnitOfWork
@@ -88,7 +88,13 @@ class IngestionService:
         with self._uow() as tx:
             document = tx.documents.get_by_upload_for_update(upload_id)
             if document is None or not document.can_be_read_by(user_id):
-                logger.warning("no document for upload %s under this learner; ignoring", upload_id)
+                upload = tx.uploads.get(upload_id)
+                if upload is not None and upload.user_id == user_id and upload.outcome is not None:
+                    # A redelivered duplicate: its placeholder document is gone; only the copy may be left.
+                    logger.info("upload %s was already handled", upload_id)
+                    self._objects.delete(key)
+                else:
+                    logger.warning("no document for upload %s under this learner; ignoring", upload_id)
                 return None, None
             if not document.awaiting_upload:
                 logger.info("upload %s was already handled", upload_id)
@@ -101,19 +107,22 @@ class IngestionService:
                 logger.warning("upload %s has no object", upload_id)
                 return None, None
             sha256 = hashlib.sha256(data).hexdigest()
+            # Only this learner's contents are looked up (D18, D19): another learner's copy is never found.
             content, created = tx.contents.insert_or_get(
                 Content.first_upload(ContentId(self._new_id()), sha256, len(data), user_id)
             )
             if created:
                 self._objects.copy(key, content.s3_key)
                 document.link_content(content.content_id)
-                outcome = UploadOutcome.STORED
+                tx.documents.save(document)
+                target, outcome = document.document_id, UploadOutcome.STORED
             else:
-                # Until US-11 links duplicates. content_id stays null: (owner_id, content_id) is unique.
-                document.fail(DUPLICATE_UPLOAD)
-                outcome = UploadOutcome.DUPLICATE
-            tx.documents.save(document)
-            tx.uploads.record_outcome(upload_id, len(data), outcome)
+                existing = tx.documents.get_by_content(content.content_id)
+                if existing is None:
+                    raise LookupError(f"content {content.content_id} has no document")  # redelivered, then DLQ
+                tx.documents.remove(document.document_id)  # no second document (US-11)
+                target, outcome = existing.document_id, UploadOutcome.DUPLICATE
+            tx.uploads.record_outcome(upload_id, len(data), outcome, target)
             tx.commit()
         self._objects.delete(key)
         logger.info("upload %s: %s", upload_id, outcome.value)
@@ -146,7 +155,7 @@ class IngestionService:
         chunks = self._chunks(content_id, pages)
         if not chunks:
             return self._fail(content_id, NO_TEXT_LAYER)
-        text_key = pages_key(content.sha256)
+        text_key = pages_key(content.owner_id, content.content_id)
         listing = {"pages": [{"page": number, "text": text} for number, text in enumerate(pages, start=1)]}
         self._objects.put(text_key, json.dumps(listing, ensure_ascii=False).encode(), "application/json")
 
