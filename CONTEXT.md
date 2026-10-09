@@ -73,6 +73,20 @@ _Avoid_: Summary, notes
 A lifetime entry describing what was learned in a thread (subjects, topics, key points). At most one per thread, written on "Summarize lesson" or after the thread goes idle.
 _Avoid_: Memory, history
 
+## Deployment
+
+**Deployment mode**:
+How one installation of Smart Tutor is hosted: **on-premise** (the default) or **native-cloud** (opt-in). The product behaves the same in both.
+_Avoid_: Environment, flavor, target
+
+**On-premise mode**:
+Smart Tutor's own services (web, API, agent, MCP server, worker, sign-in) run on a virtual machine we operate instead of managed Kubernetes. File storage, the ingest queue, settings, and the image registry stay on the cloud provider's managed services; the model provider and the tracing service are external. It is the default and is deployed on every merge to `main`.
+_Avoid_: Self-host, local, EC2 mode
+
+**Native-cloud mode**:
+Smart Tutor on the cloud provider's managed services end to end (managed Kubernetes, database, file storage, queue, CDN). Deployed only when explicitly chosen.
+_Avoid_: AWS mode, pilot, production
+
 ## Later releases
 
 **Research map** *(R2)*:
