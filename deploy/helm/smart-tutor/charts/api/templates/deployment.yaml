@@ -43,6 +43,8 @@ spec:
               value: {{ .Values.keycloakClientId | quote }}
             - name: SMART_TUTOR_KEYCLOAK_CLIENT_SECRET
               valueFrom: {secretKeyRef: {name: api-keycloak, key: client-secret}}
+            - name: SMART_TUTOR_AGENT_URL
+              value: {{ .Values.agentUrl | quote }}
             - name: SMART_TUTOR_DATABASE_URL
               valueFrom: {secretKeyRef: {name: api-db, key: url}}
             - name: SMART_TUTOR_CORS_ORIGINS

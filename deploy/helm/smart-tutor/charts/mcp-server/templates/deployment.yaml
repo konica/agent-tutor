@@ -1,0 +1,75 @@
+{{- if and .Values.global.secretStore (not .Values.global.publicUrl) }}
+{{- fail "mcp-server needs global.publicUrl on AWS: without it the issuer is wrong and every token is rejected" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-server
+  labels:
+    {{- include "mcp-server.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "mcp-server.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "mcp-server.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: mcp-server  # Pod Identity (ClusterStack) gives it its IAM role
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: mcp-server
+          image: {{ include "mcp-server.image" . }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.port }}
+          env:
+            - name: SMART_TUTOR_ENVIRONMENT
+              value: prod
+            - name: SMART_TUTOR_AWS_REGION
+              value: {{ .Values.awsRegion | quote }}
+            - name: SMART_TUTOR_KEYCLOAK_ISSUER
+              value: {{ printf "%s/auth/realms/smart-tutor" (trimSuffix "/" (.Values.global.publicUrl | default "")) | quote }}
+            - name: SMART_TUTOR_KEYCLOAK_INTERNAL_URL
+              value: {{ .Values.keycloakInternalUrl | quote }}
+            - name: SMART_TUTOR_KEYCLOAK_CLIENT_ID
+              value: {{ .Values.keycloakClientId | quote }}
+            - name: SMART_TUTOR_KEYCLOAK_CLIENT_SECRET
+              valueFrom: {secretKeyRef: {name: mcp-keycloak, key: client-secret}}
+            - name: SMART_TUTOR_DATABASE_URL
+              valueFrom: {secretKeyRef: {name: mcp-db, key: url}}
+            - name: SMART_TUTOR_KEYCLOAK_AUDIENCE
+              value: {{ .Values.keycloakClientId | quote }}
+            - name: SMART_TUTOR_MCP_PORT
+              value: {{ .Values.port | quote }}
+            - name: SMART_TUTOR_MCP_URL
+              value: {{ .Values.mcpUrl | quote }}
+            - name: HOME
+              value: /tmp  # botocore looks for ~/.aws; the root filesystem is read-only
+          # No health endpoint (an unauthenticated /mcp answers 401), so probe the port.
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.port }}
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.port }}
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
