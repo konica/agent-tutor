@@ -17,3 +17,11 @@ class RetrievalError(Exception):
 
 class ThreadNotFoundError(DomainError):
     """The thread doesn't exist or isn't the learner's."""
+
+
+class InvalidTitleError(DomainError):
+    """A conversation title must be 1-120 characters once trimmed (PRD §8 US-13)."""
+
+
+class ThreadArchivedError(DomainError):
+    """An archived conversation is read-only until it is restored (PRD §8 US-13)."""

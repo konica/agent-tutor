@@ -9,6 +9,7 @@ import {
   loadDocumentsUsed,
   NoDocumentsError,
   removeThreadDocument,
+  renameConversation,
   type ChatCitation,
   type ChatEvent,
 } from "../../api/chat";
@@ -22,6 +23,7 @@ import { PageHeader } from "../../components/PageHeader/PageHeader";
 import styles from "./ChatPage.module.css";
 import { ConversationPanel } from "./ConversationPanel";
 import { DocumentPicker } from "./DocumentPicker";
+import { ThreadTitle } from "./ThreadTitle";
 import { usePanelOpen } from "./usePanelOpen";
 
 type Props = {
@@ -31,6 +33,8 @@ type Props = {
   loadReady?: () => Promise<DocumentResponse[]>;
   addDocs?: (threadId: string, documentIds: string[]) => Promise<ThreadDocumentResponse[]>;
   removeDoc?: (threadId: string, documentId: string) => Promise<void>;
+  /** Resolves with the saved title. */
+  rename?: (threadId: string, title: string) => Promise<string>;
 };
 
 type Exchange = {
@@ -54,6 +58,7 @@ const defaultLoadUsed = (threadId: string) => loadDocumentsUsed(threadId);
 const defaultLoadReady = () => loadDocuments({ state: "ready" });
 const defaultAddDocs = (threadId: string, documentIds: string[]) => addThreadDocuments(threadId, documentIds);
 const defaultRemoveDoc = (threadId: string, documentId: string) => removeThreadDocument(threadId, documentId);
+const defaultRename = (threadId: string, title: string) => renameConversation(threadId, title);
 
 function processingHint(count: number) {
   return count === 1
@@ -69,6 +74,7 @@ export function ChatPage({
   loadReady = defaultLoadReady,
   addDocs = defaultAddDocs,
   removeDoc = defaultRemoveDoc,
+  rename = defaultRename,
 }: Props) {
   const [question, setQuestion] = useState("");
   const [answering, setAnswering] = useState(false);
@@ -80,6 +86,7 @@ export function ChatPage({
   const [used, setUsed] = useState<ThreadDocumentResponse[]>([]);
   const [usedFailed, setUsedFailed] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
+  const [renamed, setRenamed] = useState<string | null>(null);
   const [answered, setAnswered] = useState(false);
   const [showCitations, setShowCitations] = useState(true);
   const [panelOpen, togglePanel] = usePanelOpen();
@@ -132,6 +139,7 @@ export function ChatPage({
     setUsed([]);
     setUsedFailed(false);
     setThreadId(null);
+    setRenamed(null);
     setAnswered(false);
     setPickerOpen(false);
     // The protocol always ends with done or error; a stream that just stops (dropped connection) failed.
@@ -211,6 +219,14 @@ export function ChatPage({
     }
   }
 
+  // A refusal rejects with the server's message, which the title field shows.
+  async function renameTitle(newTitle: string) {
+    if (threadId === null) return;
+    const forTurn = turn.current;
+    const saved = await rename(threadId, newTitle);
+    if (alive.current && turn.current === forTurn) setRenamed(saved);
+  }
+
   function onSubmit(event: FormEvent) {
     event.preventDefault();
     void submit();
@@ -262,7 +278,8 @@ export function ChatPage({
     );
   }
 
-  const title = exchange ? exchange.question : "New conversation";
+  // The title starts as the first question until the learner renames it (PRD §9.4).
+  const title = renamed ?? (exchange ? exchange.question : "New conversation");
   const toggleLabel = panelOpen ? "Hide panel" : "Show panel";
 
   return (
@@ -280,10 +297,8 @@ export function ChatPage({
         >
           <PanelLeft className={styles.toggleIcon} strokeWidth={1.5} aria-hidden="true" />
         </button>
-        {/* One line; a long question is cut with an ellipsis, and the full text is in the tooltip and the bubble. */}
-        <h1 className={styles.title} title={title}>
-          {title}
-        </h1>
+        {/* Editable once the server has started the conversation (US-13). */}
+        <ThreadTitle title={title} editable={threadId !== null} onRename={renameTitle} />
       </header>
 
       <p role="status" className="visually-hidden">

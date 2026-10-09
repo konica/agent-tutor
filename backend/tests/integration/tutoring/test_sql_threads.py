@@ -32,6 +32,18 @@ def test_a_thread_round_trips_for_its_owner_only(engine: Engine) -> None:
     assert repo.get_owned(thread.thread_id, UserId("bob")) is None
 
 
+def test_set_title_stores_the_title(engine: Engine) -> None:
+    repo = SqlThreadRepository(engine)
+    owner = UserId(f"ada-{uuid.uuid4()}")
+    thread = Thread.start(ThreadId(str(uuid.uuid4())), owner, datetime.now(UTC), title="What is attention?")
+    repo.add(thread)
+
+    repo.set_title(thread.thread_id, "Attention basics")
+
+    stored = repo.get_owned(thread.thread_id, owner)
+    assert stored is not None and stored.title == "Attention basics"
+
+
 def test_the_table_has_no_subject_column(engine: Engine) -> None:
     assert "subject_ids" not in {column["name"] for column in inspect(engine).get_columns("threads")}
 

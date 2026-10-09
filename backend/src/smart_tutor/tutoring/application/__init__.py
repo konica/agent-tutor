@@ -5,8 +5,10 @@ from smart_tutor.tutoring.application.conversation_service import ConversationSe
 from smart_tutor.tutoring.domain.document_used import DELETED_DOCUMENT, DocumentUsed
 from smart_tutor.tutoring.domain.errors import (
     DocumentNotAvailableError,
+    InvalidTitleError,
     NoDocumentsError,
     RetrievalError,
+    ThreadArchivedError,
     ThreadNotFoundError,
 )
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
@@ -20,11 +22,13 @@ __all__ = [
     "ConversationService",
     "DocumentNotAvailableError",
     "DocumentUsed",
+    "InvalidTitleError",
     "NoDocumentsError",
     "RetrievalError",
     "RetrievedChunk",
     "Retriever",
     "Thread",
+    "ThreadArchivedError",
     "ThreadNotFoundError",
     "ThreadRepository",
     "answer_messages",

@@ -19,6 +19,10 @@ class ThreadRepository(ABC):
         """The thread if it exists and belongs to this learner; None otherwise."""
 
     @abstractmethod
+    def set_title(self, thread_id: ThreadId, title: str) -> None:
+        """Store the thread's title (committed when this returns). (Callers check ownership first with `get_owned`.)"""
+
+    @abstractmethod
     def add_documents_used(self, thread_id: ThreadId, document_ids: Sequence[DocumentId], at: datetime) -> None:
         """Append the documents not listed yet, in this order, added and first used `at`.
 

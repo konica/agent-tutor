@@ -12,9 +12,12 @@ from smart_tutor.tutoring.application import (
     ConversationService,
     DocumentNotAvailableError,
     DocumentUsed,
+    InvalidTitleError,
     NoDocumentsError,
+    ThreadArchivedError,
     ThreadNotFoundError,
 )
+from smart_tutor.tutoring.domain.thread import ThreadStatus
 
 
 def service(library: InMemoryLibrary, threads: InMemoryThreads, clock: FixedClock) -> ConversationService:
@@ -140,6 +143,48 @@ def test_a_deleted_document_keeps_the_title_copied_when_it_was_deleted() -> None
     [only] = svc.documents_used(thread.thread_id, LEARNER)
 
     assert only.title == "Old paper" and only.deleted
+
+
+def test_start_thread_titles_it_with_the_first_question() -> None:
+    library = InMemoryLibrary()
+    svc, threads, _, _, _ = started(library)
+
+    thread = svc.start_thread(LEARNER, "What is attention?")
+
+    assert threads.threads[thread.thread_id].title == "What is attention?"
+
+
+def test_rename_thread_saves_the_trimmed_title() -> None:
+    library = InMemoryLibrary()
+    svc, threads, _, _, _ = started(library)
+    thread = svc.start_thread(LEARNER, "What is attention?")
+
+    renamed = svc.rename_thread(thread.thread_id, LEARNER, " Attention basics ")
+
+    assert renamed.title == threads.threads[thread.thread_id].title == "Attention basics"
+
+
+def test_a_refused_rename_saves_nothing() -> None:
+    library = InMemoryLibrary()
+    svc, threads, _, _, _ = started(library)
+    thread = svc.start_thread(LEARNER, "What is attention?")
+
+    with pytest.raises(InvalidTitleError):
+        svc.rename_thread(thread.thread_id, LEARNER, "x" * 121)
+    threads.threads[thread.thread_id].status = ThreadStatus.ARCHIVED
+    with pytest.raises(ThreadArchivedError):
+        svc.rename_thread(thread.thread_id, LEARNER, "New")
+    assert threads.threads[thread.thread_id].title == "What is attention?"
+
+
+def test_another_learner_cannot_rename() -> None:
+    library = InMemoryLibrary()
+    svc, threads, _, _, _ = started(library)
+    thread = svc.start_thread(LEARNER, "What is attention?")
+
+    with pytest.raises(ThreadNotFoundError, match="Conversation not found"):
+        svc.rename_thread(thread.thread_id, OTHER, "Mine now")
+    assert threads.threads[thread.thread_id].title == "What is attention?"
 
 
 def test_another_learner_can_neither_record_nor_read() -> None:
