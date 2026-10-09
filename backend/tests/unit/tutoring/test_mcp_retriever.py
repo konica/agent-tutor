@@ -29,10 +29,11 @@ def verifier_for_ada() -> FakeTokenVerifier:
 
 async def test_returns_retrieved_chunks_for_the_tokens_learner() -> None:
     library = InMemoryLibrary()
-    ingest_ready(library, "ada", "Attention is all you need.")
+    document_id = ingest_ready(library, "ada", "Attention is all you need.")
     async with in_process_mcp(build(library, verifier_for_ada())) as transport:
         retriever = McpRetriever(MCP_TEST_URL, "t-ada", transport)
         [found] = await retriever.search("Attention is all you need.")
+    assert found.document_id == document_id
     assert found.text == "Attention is all you need."
     assert found.page == 1
     assert found.document_title.endswith(".pdf")

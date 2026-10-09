@@ -1,10 +1,13 @@
 """In-memory threads and a fake retriever."""
 
 import copy
+from collections.abc import Sequence
+from datetime import datetime
 
-from smart_tutor.shared.domain.ids import ThreadId, UserId
+from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 from smart_tutor.tutoring.domain.thread import Thread
+from smart_tutor.tutoring.domain.thread_document import ThreadDocument
 from smart_tutor.tutoring.ports.retriever import Retriever
 from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
 
@@ -12,6 +15,7 @@ from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
 class InMemoryThreads(ThreadRepository):
     def __init__(self) -> None:
         self.threads: dict[str, Thread] = {}
+        self.documents_used_rows: dict[str, list[ThreadDocument]] = {}
 
     def add(self, thread: Thread) -> None:
         self.threads[thread.thread_id] = copy.deepcopy(thread)
@@ -19,6 +23,15 @@ class InMemoryThreads(ThreadRepository):
     def get_owned(self, thread_id: ThreadId, user_id: UserId) -> Thread | None:
         found = self.threads.get(thread_id)
         return copy.deepcopy(found) if found and found.is_owned_by(user_id) else None
+
+    def add_documents_used(self, thread_id: ThreadId, document_ids: Sequence[DocumentId], at: datetime) -> None:
+        rows = self.documents_used_rows.setdefault(thread_id, [])
+        for document_id in document_ids:
+            if all(row.document_id != document_id for row in rows):
+                rows.append(ThreadDocument(thread_id, document_id, at))
+
+    def documents_used(self, thread_id: ThreadId) -> list[ThreadDocument]:
+        return list(self.documents_used_rows.get(thread_id, []))
 
 
 class FakeRetriever(Retriever):

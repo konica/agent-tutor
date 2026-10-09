@@ -28,7 +28,7 @@ class DocumentView:
     attempt: int | None  # of the learner's own content; None until the upload is hashed
     max_attempts: int
     can_retry: bool
-    archived: bool
+    archived: bool = False
 
 
 def document_view(d: Document, max_attempts: int) -> DocumentView:
@@ -82,6 +82,14 @@ class DocumentService:
         with self._uow() as tx:
             documents = tx.documents.list_readable_by(user_id, document_filter)
         return [document_view(d, self._max_attempts) for d in documents]
+
+    def documents_by_id(self, user_id: UserId, document_ids: Collection[DocumentId]) -> dict[DocumentId, DocumentView]:
+        """The learner's documents among these ids, archived included; others' and unknown ids are absent."""
+        if not document_ids:
+            return {}
+        with self._uow() as tx:
+            documents = tx.documents.list_readable_by_ids(user_id, document_ids)
+        return {d.document_id: document_view(d, self._max_attempts) for d in documents}
 
     def learner_subjects(self, user_id: UserId) -> frozenset[SubjectId]:
         """My subjects: those of the learner's ready, non-archived documents (PRD §9.4)."""

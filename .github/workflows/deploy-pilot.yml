@@ -60,7 +60,7 @@ jobs:
         working-directory: infra
         run: |
           uv sync --frozen
-          npx --yes aws-cdk@2.1145.0 deploy --all --require-approval never
+          npx --yes aws-cdk@2.1145.0 deploy --all --require-approval never -c smart-tutor:mode=native-cloud
 
       - name: Read the stack outputs
         run: |

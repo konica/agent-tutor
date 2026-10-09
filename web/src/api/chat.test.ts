@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { SessionExpiredError } from "../auth/authClient";
-import { askInNewThread, AskRefusedError, formatCitation, NoDocumentsError, type ChatEvent } from "./chat";
+import { askInNewThread, AskRefusedError, formatCitation, loadDocumentsUsed, NoDocumentsError, type ChatEvent } from "./chat";
 import { configureApiClient } from "./client";
 import { createClient, createConfig } from "./generated/client";
 
@@ -36,7 +36,7 @@ const answer = [
   'event: thread\ndata: {"thread_id": "t1"}\n\n',
   'event: delta\ndata: {"text": "It weighs "}\n\n',
   'event: delta\ndata: {"text": "tokens [1]."}\n\n',
-  'event: citations\ndata: {"citations": [{"n": 1, "chunk_id": "c1", "document_title": "a.pdf", "page": 3}]}\n\n',
+  'event: citations\ndata: {"citations": [{"n": 1, "chunk_id": "c1", "document_id": "d1", "document_title": "a.pdf", "page": 3}]}\n\n',
   "event: done\ndata: {}\n\n",
 ].join("");
 
@@ -50,7 +50,7 @@ describe("askInNewThread", () => {
       { type: "thread", thread_id: "t1" },
       { type: "delta", text: "It weighs " },
       { type: "delta", text: "tokens [1]." },
-      { type: "citations", citations: [{ n: 1, chunk_id: "c1", document_title: "a.pdf", page: 3 }] },
+      { type: "citations", citations: [{ n: 1, chunk_id: "c1", document_id: "d1", document_title: "a.pdf", page: 3 }] },
       { type: "done" },
     ]);
     const request = fetch.mock.calls[0]![0] as Request;
@@ -93,11 +93,11 @@ describe("askInNewThread", () => {
   it("parses the marker number of each citation", async () => {
     const { apiClient } = api(() =>
       eventStream(
-        'event: citations\ndata: {"citations": [{"n": 2, "chunk_id": "c2", "document_title": "b.pdf", "page": null}]}\n\n',
+        'event: citations\ndata: {"citations": [{"n": 2, "chunk_id": "c2", "document_id": "d2", "document_title": "b.pdf", "page": null}]}\n\n',
       ),
     );
     expect(await collect(askInNewThread("q", apiClient))).toEqual([
-      { type: "citations", citations: [{ n: 2, chunk_id: "c2", document_title: "b.pdf", page: null }] },
+      { type: "citations", citations: [{ n: 2, chunk_id: "c2", document_id: "d2", document_title: "b.pdf", page: null }] },
     ]);
   });
 
@@ -116,7 +116,35 @@ describe("askInNewThread", () => {
 
 describe("formatCitation", () => {
   it("shows the title and page, or says the page is unavailable", () => {
-    expect(formatCitation({ n: 1, chunk_id: "c1", document_title: "a.pdf", page: 3 })).toBe("a.pdf, p. 3");
-    expect(formatCitation({ n: 1, chunk_id: "c2", document_title: "a.pdf", page: null })).toBe("a.pdf, page unavailable");
+    expect(formatCitation({ n: 1, chunk_id: "c1", document_id: "d1", document_title: "a.pdf", page: 3 })).toBe("a.pdf, p. 3");
+    expect(formatCitation({ n: 1, chunk_id: "c2", document_id: "d1", document_title: "a.pdf", page: null })).toBe("a.pdf, page unavailable");
+  });
+});
+
+describe("loadDocumentsUsed", () => {
+  const used = [
+    { document_id: "d1", title: "ReAct", authors: ["Yao"], year: 2023, archived: false, deleted: false },
+    { document_id: "d2", title: "RAG", authors: [], year: null, archived: true, deleted: false },
+  ];
+
+  it("gets the thread's documents used with the token", async () => {
+    const { apiClient, fetch } = api(() => json(used));
+    expect(await loadDocumentsUsed("t1", apiClient)).toEqual(used);
+    const request = fetch.mock.calls[0]![0] as Request;
+    expect(request.method).toBe("GET");
+    expect(request.url).toBe("http://api.test/threads/t1/documents");
+    expect(request.headers.get("Authorization")).toBe("Bearer t");
+  });
+
+  it("rejects with SessionExpiredError on 401", async () => {
+    const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
+    await expect(loadDocumentsUsed("t1", apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+
+  it("rejects with a plain Error on 404", async () => {
+    const { apiClient } = api(() => json({ detail: "Not found" }, 404));
+    const failure = loadDocumentsUsed("t1", apiClient);
+    await expect(failure).rejects.toThrow("404");
+    await expect(failure).rejects.not.toBeInstanceOf(SessionExpiredError);
   });
 });

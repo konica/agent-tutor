@@ -171,7 +171,10 @@ infra/
 ├── app.py  cdk.json  pyproject.toml
 ├── smart_tutor_infra/stacks/   # network, data (RDS + database secrets), storage (S3 + SQS/DLQ + lifecycle), cluster (EKS + Pod Identity),
 │                               # registry (ECR), edge (internal ALB + CloudFront), config (SSM, Keycloak secrets), budgets,
-│                               # github_deploy (GitHub OIDC provider + CI deploy role; admin deploys it once)
+│                               # github_deploy (GitHub OIDC provider + CI deploy role; admin deploys it once),
+│                               # host (on-premise VM; empty until #148)
+├── smart_tutor_infra/names.py  # per-mode names; context smart-tutor:mode picks on-premise (default: storage, config,
+│                               # budgets, github_deploy, host; ECR shared) or native-cloud (all but host)
 └── tests/                      # CDK assertion tests
 
 deploy/

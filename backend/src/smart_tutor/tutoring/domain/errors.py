@@ -9,3 +9,7 @@ class NoDocumentsError(DomainError):
 
 class RetrievalError(Exception):
     """Search failed for a reason other than the token (MCP unreachable, tool error). Never holds the token."""
+
+
+class ThreadNotFoundError(DomainError):
+    """The thread doesn't exist or isn't the learner's."""

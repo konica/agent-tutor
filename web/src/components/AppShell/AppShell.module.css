@@ -4,3 +4,5 @@
 .main:focus { outline: none; }
 .page { max-width: var(--page-w); margin: 0 auto; padding: var(--sp-3) var(--sp-4) var(--sp-6); }
 .wide { max-width: min(var(--page-w-wide), 100%); }
+/* A bleed page fills main edge to edge, with no column or padding, and scrolls its own panes. */
+.bleed { height: 100%; min-height: 0; }

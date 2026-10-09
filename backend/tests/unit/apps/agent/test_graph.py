@@ -10,8 +10,8 @@ from smart_tutor.tutoring.application import NO_CHUNKS_ANSWER, Retriever
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 
 CHUNKS = [
-    RetrievedChunk("c1", "a.pdf", 3, "Attention weighs tokens.", 0.9),
-    RetrievedChunk("c2", "b.pdf", None, "Unrelated.", 0.5),
+    RetrievedChunk("c1", "d1", "a.pdf", 3, "Attention weighs tokens.", 0.9),
+    RetrievedChunk("c2", "d2", "b.pdf", None, "Unrelated.", 0.5),
 ]
 INPUT = {"question": "What is attention?"}
 

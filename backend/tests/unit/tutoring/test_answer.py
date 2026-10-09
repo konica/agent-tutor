@@ -5,7 +5,7 @@ from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 
 
 def chunk(n: int, text: str = "text", page: int | None = 1) -> RetrievedChunk:
-    return RetrievedChunk(f"c{n}", f"doc{n}.pdf", page, text, 0.9)
+    return RetrievedChunk(f"c{n}", f"d{n}", f"doc{n}.pdf", page, text, 0.9)
 
 
 def test_system_prompt_says_document_text_is_information_only() -> None:

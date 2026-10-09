@@ -18,7 +18,7 @@ from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 
 BODY = {"question": "What is attention?"}
 AUTH = {"Authorization": "Bearer t-ada"}
-CHUNK = RetrievedChunk("c1", "a.pdf", 3, "Attention weighs tokens.", 0.9)
+CHUNK = RetrievedChunk("c1", "d1", "a.pdf", 3, "Attention weighs tokens.", 0.9)
 
 
 def client(retriever: FakeRetriever, reply: str = "It weighs tokens [1].") -> tuple[TestClient, FakeTokenVerifier]:
@@ -45,8 +45,27 @@ def test_streams_deltas_then_citations_then_done() -> None:
     got = events(response.text)
     assert "".join(d["text"] for e, d in got if e == "delta") == "It weighs tokens [1]."
     assert len([e for e, _ in got if e == "delta"]) > 1  # streamed, not one block
-    assert got[-2] == ("citations", {"citations": [{"n": 1, "chunk_id": "c1", "document_title": "a.pdf", "page": 3}]})
+    assert got[-3] == ("sources", {"document_ids": ["d1"]})
+    assert got[-2] == (
+        "citations",
+        {"citations": [{"n": 1, "chunk_id": "c1", "document_id": "d1", "document_title": "a.pdf", "page": 3}]},
+    )
     assert got[-1] == ("done", {})
+
+
+def test_sources_names_the_distinct_documents_given_to_the_model_in_rank_order() -> None:
+    chunks = [
+        CHUNK,
+        RetrievedChunk("c2", "d2", "b.pdf", 1, "Other text.", 0.8),
+        RetrievedChunk("c3", "d1", "a.pdf", 4, "More attention.", 0.7),
+    ]
+    c, _ = client(FakeRetriever(chunks), reply="Both [1] and [2].")
+    got = events(c.post("/ask", json=BODY, headers=AUTH).text)
+    names = [e for e, _ in got]
+    assert set(names[:-3]) == {"delta"}
+    assert names[-3:] == ["sources", "citations", "done"]
+    assert got[-3][1] == {"document_ids": ["d1", "d2"]}
+    assert [c["document_id"] for c in got[-2][1]["citations"]] == ["d1", "d2"]
 
 
 def test_the_stream_starts_with_a_delta_and_has_no_subjects_event() -> None:
@@ -65,12 +84,12 @@ def test_a_retrieval_failure_is_the_only_event() -> None:
 
 
 def test_citations_carry_the_marker_number_the_answer_uses() -> None:
-    other = RetrievedChunk("c2", "b.pdf", None, "Other text.", 0.8)
+    other = RetrievedChunk("c2", "d2", "b.pdf", None, "Other text.", 0.8)
     c, _ = client(FakeRetriever([CHUNK, other]), reply="Only the second [2].")
     got = events(c.post("/ask", json=BODY, headers=AUTH).text)
     assert got[-2] == (
         "citations",
-        {"citations": [{"n": 2, "chunk_id": "c2", "document_title": "b.pdf", "page": None}]},
+        {"citations": [{"n": 2, "chunk_id": "c2", "document_id": "d2", "document_title": "b.pdf", "page": None}]},
     )
 
 
@@ -81,7 +100,7 @@ def test_no_chunks_streams_the_fixed_answer() -> None:
         ("delta", {"text": "I couldn't find anything about that in your documents."}),
         ("citations", {"citations": []}),
         ("done", {}),
-    ]
+    ]  # no `sources`: nothing was given to the model
 
 
 def test_a_token_refused_mid_turn_ends_with_an_unauthenticated_error() -> None:

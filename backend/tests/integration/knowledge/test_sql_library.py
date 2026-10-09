@@ -338,6 +338,19 @@ def test_a_processing_document_stays_archived_when_the_worker_saves_it(engine: E
     assert (after.state, after.archived, after.archived_at) == (DocumentState.AWAITING_SUBJECTS, True, at)
 
 
+def test_list_readable_by_ids_includes_archived_and_is_owner_only(engine: Engine) -> None:
+    owner, other = f"ada-{uid()}", f"bob-{uid()}"
+    doc = start(engine, owner)
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE documents SET archived = true WHERE document_id = :d"), {"d": doc.document_id})
+    with SqlLibraryUnitOfWork(engine) as tx:
+        mine = tx.documents.list_readable_by_ids(UserId(owner), [doc.document_id, DocumentId(uid())])
+        theirs = tx.documents.list_readable_by_ids(UserId(other), [doc.document_id])
+        nothing = tx.documents.list_readable_by_ids(UserId(owner), [])
+    assert [(d.document_id, d.archived) for d in mine] == [(doc.document_id, True)]
+    assert theirs == [] and nothing == []
+
+
 def test_subject_ids_readable_by_counts_only_ready_documents(engine: Engine) -> None:
     owner, other = f"ada-{uid()}", f"bob-{uid()}"
     waiting, chosen, theirs = start(engine, owner), start(engine, owner), start(engine, other)
