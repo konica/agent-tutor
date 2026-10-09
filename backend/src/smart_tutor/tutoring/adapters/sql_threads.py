@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, Column, DateTime, Engine, Identity, MetaData, Table, Text, Uuid, select
+from sqlalchemy import BigInteger, Column, DateTime, Engine, Identity, MetaData, Table, Text, Uuid, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
@@ -79,6 +79,15 @@ class SqlThreadRepository(ThreadRepository):
                     .values(thread_id=thread_id, document_id=document_id, first_used_at=at)
                     .on_conflict_do_nothing(index_elements=["thread_id", "document_id"])
                 )
+
+    def keep_deleted_title(self, user_id: UserId, document_id: DocumentId, title: str) -> None:
+        owned = select(threads.c.thread_id).where(threads.c.user_id == user_id)
+        with self._engine.begin() as conn:
+            conn.execute(
+                update(thread_documents)
+                .where(thread_documents.c.document_id == document_id, thread_documents.c.thread_id.in_(owned))
+                .values(deleted_title=title)
+            )
 
     def documents_used(self, thread_id: ThreadId) -> list[ThreadDocument]:
         with self._engine.connect() as conn:

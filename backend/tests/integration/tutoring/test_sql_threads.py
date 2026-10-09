@@ -52,3 +52,24 @@ def test_documents_used_keep_first_use_order_without_duplicates(engine: Engine) 
     assert [u.document_id for u in used] == [d1, d2, d3]
     assert [u.first_used_at for u in used] == [t0, t0, t1]
     assert all(u.deleted_title is None and u.thread_id == thread.thread_id for u in used)
+
+
+def test_keep_deleted_title_sets_the_title_on_the_owners_rows_only(engine: Engine) -> None:
+    repo = SqlThreadRepository(engine)
+    now = datetime.now(UTC)
+    ada, bob = UserId(f"ada-{uuid.uuid4()}"), UserId(f"bob-{uuid.uuid4()}")
+    thread_a = Thread.start(ThreadId(str(uuid.uuid4())), ada, now)
+    thread_b = Thread.start(ThreadId(str(uuid.uuid4())), bob, now)
+    repo.add(thread_a)
+    repo.add(thread_b)
+    doc, other = DocumentId(str(uuid.uuid4())), DocumentId(str(uuid.uuid4()))
+    repo.add_documents_used(thread_a.thread_id, [doc, other], now)
+    repo.add_documents_used(thread_b.thread_id, [doc], now)
+
+    repo.keep_deleted_title(ada, doc, "Chain-of-Thought Prompting")
+
+    assert [(u.document_id, u.deleted_title) for u in repo.documents_used(thread_a.thread_id)] == [
+        (doc, "Chain-of-Thought Prompting"),
+        (other, None),
+    ]
+    assert [u.deleted_title for u in repo.documents_used(thread_b.thread_id)] == [None]

@@ -38,6 +38,10 @@ class ConversationService:
             return
         self._threads.add_documents_used(thread_id, list(dict.fromkeys(document_ids)), self._clock.now())
 
+    def keep_deleted_title(self, user_id: UserId, document_id: DocumentId, title: str) -> None:
+        """Called by the document delete before it commits, so documents used keep the title (US-10c)."""
+        self._threads.keep_deleted_title(user_id, document_id, title)
+
     def documents_used(self, thread_id: ThreadId, user_id: UserId) -> list[DocumentUsed]:
         """The thread's documents in order of first use; one that no longer exists reads as deleted."""
         if self._threads.get_owned(thread_id, user_id) is None:

@@ -26,5 +26,9 @@ class ThreadRepository(ABC):
         """
 
     @abstractmethod
+    def keep_deleted_title(self, user_id: UserId, document_id: DocumentId, title: str) -> None:
+        """Copy a document's display title onto its rows in the user's threads, before the document is deleted."""
+
+    @abstractmethod
     def documents_used(self, thread_id: ThreadId) -> list[ThreadDocument]:
         """In order of first use. (Callers check ownership first with `get_owned`.)"""
