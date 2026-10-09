@@ -443,7 +443,7 @@ def compose() -> dict[str, Any]:
     return yaml.safe_load((ON_PREMISE_DIR / "compose.yaml").read_text(encoding="utf-8"))
 
 
-LONG_RUNNING = {"postgres", "keycloak", "api", "web", "caddy"}
+LONG_RUNNING = {"postgres", "keycloak", "api", "web", "caddy", "agent", "mcp", "worker"}
 
 
 def test_compose_runs_the_production_services_and_no_local_emulators(compose: dict[str, Any]) -> None:
@@ -469,7 +469,8 @@ def test_only_caddy_publishes_ports_80_and_443(compose: dict[str, Any]) -> None:
 
 
 def test_app_images_come_from_ecr_by_commit_tag(compose: dict[str, Any]) -> None:
-    for name, repo in (("keycloak", "keycloak"), ("api", "api"), ("migrate", "api"), ("web", "web")):
+    images = {"keycloak": "keycloak", "api": "api", "migrate": "api", "web": "web", "agent": "agent", "mcp": "mcp"}
+    for name, repo in {**images, "worker": "worker"}.items():
         assert compose["services"][name]["image"] == f"${{REGISTRY:?}}/smart-tutor/{repo}:${{IMAGE_TAG:?}}"
 
 
@@ -495,6 +496,71 @@ def test_api_reads_the_on_premise_ssm_path(compose: dict[str, Any]) -> None:
     assert params and all(v.startswith("${SSM_PATH:?}/") for v in params.values())
     assert env["SMART_TUTOR_KEYCLOAK_ISSUER"] == "https://${DOMAIN:?}/auth/realms/smart-tutor"
     assert env["SMART_TUTOR_ROOT_PATH"] == "/api"
+
+
+def test_agent_mcp_and_worker_read_the_on_premise_ssm_path(compose: dict[str, Any]) -> None:
+    for name in ("agent", "mcp", "worker"):
+        env = compose["services"][name]["environment"]
+        params = {k: v for k, v in env.items() if k.endswith("_PARAM")}
+        assert all(v.startswith("${SSM_PATH:?}/") for v in params.values()), name
+        assert env["SMART_TUTOR_AWS_REGION"] == "${AWS_REGION:?}", name
+        assert env["HOME"] == "/tmp", name
+    worker = compose["services"]["worker"]["environment"]
+    assert worker["SMART_TUTOR_MAX_UPLOAD_MB_PARAM"] == "${SSM_PATH:?}/max-upload-mb"
+    assert worker["SMART_TUTOR_MAX_PAGES_PARAM"] == "${SSM_PATH:?}/max-pages"
+
+
+def test_worker_reads_the_on_premise_bucket_queue_and_database(compose: dict[str, Any]) -> None:
+    env = compose["services"]["worker"]["environment"]
+    assert env["SMART_TUTOR_DOCUMENTS_BUCKET"] == "${DOCUMENTS_BUCKET:?}"
+    assert env["SMART_TUTOR_INGEST_QUEUE_URL"] == "${INGEST_QUEUE_URL:?}"
+    assert env["SMART_TUTOR_DATABASE_URL"] == "${APP_DATABASE_URL:?}"
+    assert env["SMART_TUTOR_EXTRACTION_TIMEOUT_SECONDS"] == "300"
+
+
+def test_agent_and_mcp_reach_keycloak_and_each_other_inside_the_network(compose: dict[str, Any]) -> None:
+    agent = compose["services"]["agent"]["environment"]
+    mcp = compose["services"]["mcp"]["environment"]
+    for env in (agent, mcp):
+        assert env["SMART_TUTOR_KEYCLOAK_ISSUER"] == "https://${DOMAIN:?}/auth/realms/smart-tutor"
+        assert env["SMART_TUTOR_KEYCLOAK_INTERNAL_URL"] == "http://keycloak:8080/auth/realms/smart-tutor"
+        assert env["SMART_TUTOR_MCP_URL"] == "http://mcp:8000/mcp"
+    assert (agent["SMART_TUTOR_KEYCLOAK_CLIENT_ID"], agent["SMART_TUTOR_KEYCLOAK_CLIENT_SECRET"]) == (
+        "smart-tutor-api",
+        "${API_CLIENT_SECRET:?}",
+    )
+    assert (mcp["SMART_TUTOR_KEYCLOAK_CLIENT_ID"], mcp["SMART_TUTOR_KEYCLOAK_CLIENT_SECRET"]) == (
+        "rag-mcp",
+        "${MCP_CLIENT_SECRET:?}",
+    )
+    assert mcp["SMART_TUTOR_KEYCLOAK_AUDIENCE"] == "rag-mcp"
+    assert mcp["SMART_TUTOR_MCP_PORT"] == "8000"
+    assert compose["services"]["api"]["depends_on"]["agent"] == {"condition": "service_started"}
+    assert compose["services"]["agent"]["depends_on"]["mcp"] == {"condition": "service_started"}
+
+
+def test_worker_runs_isolated_as_non_root_on_a_read_only_root(compose: dict[str, Any]) -> None:
+    worker = compose["services"]["worker"]
+    assert worker["user"] == "10001:10001"
+    assert worker["read_only"] is True
+    assert worker["tmpfs"] == ["/tmp:size=64m"]
+    assert worker["cap_drop"] == ["ALL"]
+    assert worker["security_opt"] == ["no-new-privileges:true"]
+    assert worker["cpus"] == 1.0
+    assert worker["mem_limit"] == "1536m"
+    assert worker["pids_limit"] == 256  # room for one extraction child process per PDF
+    assert worker["stop_grace_period"] == "60s"
+    assert "smart_tutor.apps.worker" in " ".join(worker["healthcheck"]["test"])
+
+
+def test_agent_and_mcp_run_on_a_read_only_root_without_capabilities(compose: dict[str, Any]) -> None:
+    for name in ("agent", "mcp"):
+        service = compose["services"][name]
+        assert service["read_only"] is True, name
+        assert service["tmpfs"] == ["/tmp:size=64m"], name
+        assert service["cap_drop"] == ["ALL"], name
+        assert service["security_opt"] == ["no-new-privileges:true"], name
+        assert service["mem_limit"] == "512m", name
 
 
 def test_caddy_routes_one_origin_by_path() -> None:
@@ -528,6 +594,18 @@ def test_no_credential_shaped_url_is_in_the_repository() -> None:
 def test_deploy_script_migrates_before_it_starts_the_new_tag() -> None:
     script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
     assert script.index("run --rm migrate") < script.index("up -d --wait --wait-timeout")
+
+
+def test_deploy_script_asserts_the_running_workers_isolation_and_the_inner_services() -> None:
+    script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
+    started = script.index("up -d --wait --wait-timeout")
+    check = script[started:]
+    assert "ps -q worker" in check
+    for fragment in ("docker inspect", ".Config.User", "10001:10001", "ReadonlyRootfs", "CapDrop", "no-new-privileges"):
+        assert fragment in check, fragment
+    assert "exec -T api python" in check
+    assert "http://agent:8080/healthz" in check
+    assert "http://mcp:8000/mcp" in check and "401" in check
 
 
 ENSURE_HEALTHY = ON_PREMISE_DIR / "ensure-healthy.sh"

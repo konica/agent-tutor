@@ -2,7 +2,8 @@
 # Secrets Manager (/etc/smart-tutor/smart-tutor.env, root only); runbook: docs/runbooks/on-premise-deploy.md.
 #   docker compose -f /opt/smart-tutor/on-premise/compose.yaml --env-file /etc/smart-tutor/smart-tutor.env ps
 # Our images come from ECR by commit tag. Caddy is the only service with public ports. Data lives on the data volume
-# (/data). The worker, agent, and MCP server join in #149.
+# (/data). The worker, agent, and MCP server (#149) run as the image's non-root user on a read-only root filesystem,
+# like the Helm charts; deploy.sh checks the running worker's isolation after every deploy.
 
 name: smart-tutor
 
@@ -127,6 +128,115 @@ services:
     depends_on:
       postgres: {condition: service_healthy}
       keycloak: {condition: service_started}
+      agent: {condition: service_started}
+
+  # The tutoring agent (LangGraph); the API proxies chat to it and it calls the MCP server for retrieval.
+  agent:
+    image: ${REGISTRY:?}/smart-tutor/agent:${IMAGE_TAG:?}
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      SMART_TUTOR_ENVIRONMENT: prod
+      SMART_TUTOR_AWS_REGION: ${AWS_REGION:?}
+      AWS_REGION: ${AWS_REGION:?}
+      SMART_TUTOR_KEYCLOAK_ISSUER: https://${DOMAIN:?}/auth/realms/smart-tutor
+      SMART_TUTOR_KEYCLOAK_INTERNAL_URL: http://keycloak:8080/auth/realms/smart-tutor
+      SMART_TUTOR_KEYCLOAK_CLIENT_ID: smart-tutor-api
+      SMART_TUTOR_KEYCLOAK_CLIENT_SECRET: ${API_CLIENT_SECRET:?}
+      SMART_TUTOR_DATABASE_URL: ${APP_DATABASE_URL:?}  # built by deploy.sh (see there)
+      SMART_TUTOR_MCP_URL: http://mcp:8000/mcp
+      HOME: /tmp  # botocore looks for ~/.aws; the root filesystem is read-only
+    read_only: true
+    tmpfs: [/tmp:size=64m]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8080/healthz', timeout=5)"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      postgres: {condition: service_healthy}
+      keycloak: {condition: service_started}
+      mcp: {condition: service_started}
+
+  # The RAG MCP server: retrieval over the learner's own chunks, enforcing can_read on every call.
+  mcp:
+    image: ${REGISTRY:?}/smart-tutor/mcp:${IMAGE_TAG:?}
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      SMART_TUTOR_ENVIRONMENT: prod
+      SMART_TUTOR_AWS_REGION: ${AWS_REGION:?}
+      AWS_REGION: ${AWS_REGION:?}
+      SMART_TUTOR_KEYCLOAK_ISSUER: https://${DOMAIN:?}/auth/realms/smart-tutor
+      SMART_TUTOR_KEYCLOAK_INTERNAL_URL: http://keycloak:8080/auth/realms/smart-tutor
+      SMART_TUTOR_KEYCLOAK_CLIENT_ID: rag-mcp
+      SMART_TUTOR_KEYCLOAK_CLIENT_SECRET: ${MCP_CLIENT_SECRET:?}
+      SMART_TUTOR_KEYCLOAK_AUDIENCE: rag-mcp
+      SMART_TUTOR_DATABASE_URL: ${APP_DATABASE_URL:?}  # built by deploy.sh (see there)
+      SMART_TUTOR_MCP_PORT: "8000"
+      SMART_TUTOR_MCP_URL: http://mcp:8000/mcp
+      HOME: /tmp  # botocore looks for ~/.aws; the root filesystem is read-only
+    read_only: true
+    tmpfs: [/tmp:size=64m]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m
+    healthcheck:
+      # No health endpoint (an unauthenticated /mcp answers 401), so check that the port accepts connections.
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8000), timeout=5).close()"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      postgres: {condition: service_healthy}
+      keycloak: {condition: service_started}
+
+  # The ingestion worker: polls the ingest queue, extracts and embeds each uploaded PDF. It parses untrusted files, so
+  # it runs with the least it needs: the image's uid 10001, a read-only root, no capabilities, and bounded CPU, memory,
+  # and processes. Each PDF is extracted in a child process (SMART_TUTOR_EXTRACTION_TIMEOUT_SECONDS), which pids_limit
+  # and the /tmp tmpfs leave room for.
+  worker:
+    image: ${REGISTRY:?}/smart-tutor/worker:${IMAGE_TAG:?}
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      SMART_TUTOR_ENVIRONMENT: prod
+      SMART_TUTOR_AWS_REGION: ${AWS_REGION:?}
+      AWS_REGION: ${AWS_REGION:?}
+      SMART_TUTOR_DOCUMENTS_BUCKET: ${DOCUMENTS_BUCKET:?}
+      SMART_TUTOR_INGEST_QUEUE_URL: ${INGEST_QUEUE_URL:?}
+      SMART_TUTOR_DATABASE_URL: ${APP_DATABASE_URL:?}  # built by deploy.sh (see there)
+      SMART_TUTOR_MAX_UPLOAD_MB_PARAM: ${SSM_PATH:?}/max-upload-mb
+      SMART_TUTOR_MAX_PAGES_PARAM: ${SSM_PATH:?}/max-pages
+      SMART_TUTOR_EXTRACTION_TIMEOUT_SECONDS: "300"
+      HOME: /tmp  # botocore looks for ~/.aws; the root filesystem is read-only
+    user: "10001:10001"
+    read_only: true
+    tmpfs: [/tmp:size=64m]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: 1.0
+    mem_limit: 1536m
+    pids_limit: 256
+    stop_grace_period: 60s  # it finishes the current poll on SIGTERM
+    healthcheck:
+      # No HTTP server: check that PID 1 is still the worker.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import sys; sys.exit(b'smart_tutor.apps.worker' not in open('/proc/1/cmdline', 'rb').read())"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      postgres: {condition: service_healthy}
 
   web:
     image: ${REGISTRY:?}/smart-tutor/web:${IMAGE_TAG:?}
