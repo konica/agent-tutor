@@ -354,10 +354,21 @@ class _Chunks(ChunkRepository):
                 ],
             )
 
-    def search(self, user_id: UserId, embedding: list[float], k: int) -> list[ChunkHit]:
+    def search(
+        self, user_id: UserId, embedding: list[float], k: int, document_ids: Collection[DocumentId] | None = None
+    ) -> list[ChunkHit]:
+        if document_ids is not None and not document_ids:
+            return []
         # Exact search (#31): with index scans off, Postgres can't use HNSW and drop filtered-out rows after the scan.
         self._conn.execute(text("SET LOCAL enable_indexscan = off"))
         distance = chunks.c.embedding.cosine_distance(embedding)
+        conditions = [
+            readable_by(user_id),
+            documents.c.state == DocumentState.READY.value,
+            documents.c.archived.is_(False),
+        ]
+        if document_ids is not None:
+            conditions.append(documents.c.document_id.in_(list(document_ids)))
         rows = self._conn.execute(
             select(
                 chunks.c.chunk_id,
@@ -370,11 +381,7 @@ class _Chunks(ChunkRepository):
             )
             .join(documents, documents.c.content_id == chunks.c.content_id)
             .join(contents, contents.c.content_id == chunks.c.content_id)
-            .where(
-                readable_by(user_id),
-                documents.c.state == DocumentState.READY.value,
-                documents.c.archived.is_(False),
-            )
+            .where(*conditions)
             .order_by(distance, chunks.c.chunk_id)
             .limit(k)
         )

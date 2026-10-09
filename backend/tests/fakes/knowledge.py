@@ -202,7 +202,9 @@ class _Chunks(ChunkRepository):
     def remove_for_content(self, content_id: ContentId) -> None:
         self._s.chunks.pop(content_id, None)
 
-    def search(self, user_id: UserId, embedding: list[float], k: int) -> list[ChunkHit]:
+    def search(
+        self, user_id: UserId, embedding: list[float], k: int, document_ids: Collection[DocumentId] | None = None
+    ) -> list[ChunkHit]:
         def title(d: Document) -> str:
             content = self._s.contents.get(d.content_id) if d.content_id is not None else None
             return d.title_override or (content.title if content else None) or d.file_name
@@ -217,7 +219,9 @@ class _Chunks(ChunkRepository):
                 _cosine(embedding, c.embedding),
             )
             for d in self._s.documents.values()
-            if d.content_id is not None and d.searchable_by(user_id)
+            if d.content_id is not None
+            and d.searchable_by(user_id)
+            and (document_ids is None or d.document_id in document_ids)
             for c in self._s.chunks.get(d.content_id, [])
         ]
         return sorted(hits, key=lambda h: (-h.score, h.chunk_id))[:k]

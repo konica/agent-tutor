@@ -443,9 +443,11 @@ def searchable_document(engine: Engine, owner: str, hot: list[int], *, ready: bo
     return doc
 
 
-def search(engine: Engine, user: str, i: int, k: int = 5) -> list[ChunkHit]:
+def search(
+    engine: Engine, user: str, i: int, k: int = 5, document_ids: list[DocumentId] | None = None
+) -> list[ChunkHit]:
     with SqlLibraryUnitOfWork(engine) as tx:
-        return tx.chunks.search(UserId(user), one_hot(i), k)
+        return tx.chunks.search(UserId(user), one_hot(i), k, document_ids)
 
 
 def test_search_returns_the_owners_chunk_with_title_page_and_score(engine: Engine) -> None:
@@ -493,6 +495,29 @@ def test_search_skips_a_document_still_processing(engine: Engine) -> None:
     owner = f"ada-{uid()}"
     searchable_document(engine, owner, [11], ready=False)
     assert search(engine, owner, 11) == []
+
+
+def test_search_with_document_ids_returns_only_those_documents(engine: Engine) -> None:
+    owner = f"ada-{uid()}"
+    first = searchable_document(engine, owner, [30])
+    searchable_document(engine, owner, [31])
+    hits = search(engine, owner, 31, document_ids=[first.document_id])
+    assert {h.document_id for h in hits} == {first.document_id}
+    assert search(engine, owner, 30, document_ids=[]) == []
+
+
+def test_search_with_document_ids_skips_an_archived_document(engine: Engine) -> None:
+    owner = f"ada-{uid()}"
+    doc = searchable_document(engine, owner, [32])
+    with engine.begin() as conn:
+        conn.execute(text("update documents set archived = true where document_id = :d"), {"d": doc.document_id})
+    assert search(engine, owner, 32, document_ids=[doc.document_id]) == []
+
+
+def test_search_with_another_learners_document_id_returns_nothing(engine: Engine) -> None:
+    owner = f"ada-{uid()}"
+    doc = searchable_document(engine, owner, [33])
+    assert search(engine, f"bob-{uid()}", 33, document_ids=[doc.document_id]) == []
 
 
 def test_search_orders_nearest_first_and_limits_to_k(engine: Engine) -> None:
