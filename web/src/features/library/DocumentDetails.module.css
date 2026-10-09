@@ -24,4 +24,5 @@
 .summary { margin: 0; font-size: var(--fs-14); line-height: var(--lh-body); }
 .muted { margin: 0; font-size: var(--fs-13); color: var(--text-2); }
 .chips { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.changeSubjects { justify-self: start; }
 .footer { display: flex; gap: var(--sp-2); justify-content: flex-end; }

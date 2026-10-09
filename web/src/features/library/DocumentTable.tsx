@@ -1,4 +1,4 @@
-import { Archive, CircleAlert, FileText, Info, Pencil, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { Archive, CircleAlert, FileText, Info, Pencil, RefreshCw, RotateCcw, Tag, Trash2 } from "lucide-react";
 
 import type { DocumentResponse } from "../../api/documents";
 import { Button } from "../../components/Button/Button";
@@ -60,6 +60,7 @@ type Props = {
 };
 
 // An archived row offers Restore and Delete…: its subjects can't change until restored (PRD US-10), and it isn't processed again.
+// A ready row's More menu offers Change subjects (the picker opens with its subjects selected).
 function Actions({ doc, onRetry, retrying, onChooseSubjects, uploading, onArchive, onRestore, onOpen, onDelete, busy }: Omit<Props, "documents" | "uploading" | "busy"> & { doc: DocumentResponse; uploading: boolean; busy: boolean }) {
   const canDelete = onDelete && doc.state !== "processing"; // the worker is still writing a processing document's content, archived or not
   const label = `More actions for ${doc.title}`;
@@ -75,13 +76,14 @@ function Actions({ doc, onRetry, retrying, onChooseSubjects, uploading, onArchiv
         {canDelete && <RowMenu label={label} disabled={busy} items={[deleteItem]} />}
       </>
     );
-  const details = onOpen
-    ? [
-        { label: "Details", icon: Info, onSelect: () => onOpen(doc) },
-        ...(doc.state !== "failed" ? [{ label: "Edit title", icon: Pencil, onSelect: () => onOpen(doc, { editTitle: true }) }] : []),
-      ]
-    : [];
-  const items = [...details, { label: "Archive", icon: Archive, onSelect: () => onArchive?.(doc) }, ...(canDelete ? [deleteItem] : [])];
+  const changeSubjects = doc.state === "ready" && onChooseSubjects ? [{ label: "Change subjects", icon: Tag, onSelect: () => onChooseSubjects(doc) }] : [];
+  const items = [
+    ...(onOpen ? [{ label: "Details", icon: Info, onSelect: () => onOpen(doc) }] : []),
+    ...changeSubjects,
+    ...(onOpen && doc.state !== "failed" ? [{ label: "Edit title", icon: Pencil, onSelect: () => onOpen(doc, { editTitle: true }) }] : []),
+    { label: "Archive", icon: Archive, onSelect: () => onArchive?.(doc) },
+    ...(canDelete ? [deleteItem] : []),
+  ];
   return (
     <>
       {doc.state === "awaiting_subjects" && onChooseSubjects && (

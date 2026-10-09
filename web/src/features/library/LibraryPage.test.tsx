@@ -623,7 +623,8 @@ describe("LibraryPage choose subjects", () => {
     const load = vi.fn().mockResolvedValueOnce([waiting]).mockResolvedValue([ready]);
     const loadSuggestions = vi.fn(async () => suggestions);
     const saveSubjects = vi.fn(async () => ready);
-    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} loadSuggestions={loadSuggestions} saveSubjects={saveSubjects} />);
+    // No poll: the second load already answers "ready", which would remove the button on a slow run.
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} loadSuggestions={loadSuggestions} saveSubjects={saveSubjects} pollMs={600_000} />);
     await userEvent.click(await screen.findByRole("button", { name: "Choose subjects for Toolformer" }));
     expect(screen.getByRole("dialog", { name: "Choose subjects" })).toBeVisible();
     await userEvent.click(await screen.findByRole("button", { name: "Save" }));
@@ -1195,5 +1196,62 @@ describe("LibraryPage document details", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Archive" }));
     expect(archive).toHaveBeenCalledWith("d1");
     await waitFor(() => expect(load.mock.calls.length).toBeGreaterThan(before));
+  });
+});
+
+describe("LibraryPage change subjects", () => {
+  const ready: DocumentResponse = { ...processing, document_id: "d1", title: "Toolformer", state: "ready", subjects: [{ subject_id: "s1", name: "AI Agents" }] };
+  const changed: DocumentResponse = { ...ready, subjects: [{ subject_id: "s2", name: "LLMs" }] };
+  const suggestions = { document_id: "d1", title: "Toolformer", summary: null, suggestions: [{ subject_id: "s2", name: "LLMs", origin: "shared" as const }] };
+  const details = (doc: DocumentResponse) => ({ ...doc, extracted_title: "Toolformer", title_overridden: false, doi: null, file_name: "toolformer.pdf", pages: 10, summary: null });
+  const pageStatus = () => screen.getAllByRole("status").find((el) => el.tagName === "P" && el.closest("[role=dialog]") === null)!;
+
+  function setup() {
+    let current = ready;
+    const load = vi.fn(async (f: DocumentFilters) => (f.archived ? [] : [current]));
+    const saveSubjects = vi.fn(async () => (current = changed));
+    const loadDetails = vi.fn(async (_id: string) => details(current));
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} loadSuggestions={async () => suggestions} saveSubjects={saveSubjects} loadDetails={loadDetails} />);
+    return { saveSubjects };
+  }
+
+  it("changes a ready document's subjects from its More menu and announces them", async () => {
+    const { saveSubjects } = setup();
+    await userEvent.click(await screen.findByRole("button", { name: "More actions for Toolformer" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Change subjects" }));
+    expect(screen.getByRole("dialog", { name: "Change subjects" })).toBeVisible();
+    expect(await screen.findByRole("button", { name: /AI Agents/ })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(screen.getByRole("button", { name: /AI Agents/ }));
+    await userEvent.click(screen.getByRole("button", { name: /LLMs/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(saveSubjects).toHaveBeenCalledWith("d1", { subject_ids: ["s2"], new_names: [] });
+    await waitFor(() => expect(pageStatus()).toHaveTextContent("Subjects saved. Toolformer now uses LLMs."));
+    await userEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect((await screen.findByRole("button", { name: "Toolformer" })).closest("tr")).toHaveTextContent("LLMs");
+  });
+
+  it("opens the picker from details prefilled, and goes back to details when it closes", async () => {
+    setup();
+    await userEvent.click(await screen.findByRole("button", { name: "Toolformer" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Change subjects" }));
+    expect(screen.queryByRole("dialog", { name: "Toolformer" })).toBeNull();
+    expect(screen.getByRole("dialog", { name: "Change subjects" })).toBeVisible();
+    expect(await screen.findByRole("button", { name: /AI Agents/ })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(await screen.findByRole("dialog", { name: "Toolformer" })).toBeVisible();
+    expect(screen.queryByRole("dialog", { name: "Change subjects" })).toBeNull();
+  });
+
+  it("shows details with the new subjects after saving from them", async () => {
+    setup();
+    await userEvent.click(await screen.findByRole("button", { name: "Toolformer" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Change subjects" }));
+    await userEvent.click(await screen.findByRole("button", { name: /AI Agents/ }));
+    await userEvent.click(screen.getByRole("button", { name: /LLMs/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Done" }));
+    const panel = await screen.findByRole("dialog", { name: "Toolformer" });
+    expect(await within(panel).findByText("LLMs")).toBeVisible();
+    expect(within(panel).queryByText("AI Agents")).toBeNull();
   });
 });

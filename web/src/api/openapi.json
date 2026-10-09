@@ -1253,7 +1253,7 @@
     },
     "/documents/{document_id}/subjects": {
       "put": {
-        "description": "Save the learner's 1-3 subjects; the document becomes ready to use (PRD \u00a78 US-2b).",
+        "description": "Save the learner's 1-3 subjects; the document becomes ready to use (PRD \u00a78 US-2b).\n\nA ready document's subjects change without processing it again; an archived document's are refused (409) until it\nis restored (PRD \u00a78 US-10).",
         "operationId": "choose_subjects",
         "parameters": [
           {

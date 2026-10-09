@@ -124,6 +124,9 @@ export const getSubjectSuggestions = <ThrowOnError extends boolean = false>(opti
  * Choose Subjects
  *
  * Save the learner's 1-3 subjects; the document becomes ready to use (PRD §8 US-2b).
+ *
+ * A ready document's subjects change without processing it again; an archived document's are refused (409) until it
+ * is restored (PRD §8 US-10).
  */
 export const chooseSubjects = <ThrowOnError extends boolean = false>(options: Options<ChooseSubjectsData, ThrowOnError>): RequestResult<ChooseSubjectsResponses, ChooseSubjectsErrors, ThrowOnError> => (options.client ?? client).put<ChooseSubjectsResponses, ChooseSubjectsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

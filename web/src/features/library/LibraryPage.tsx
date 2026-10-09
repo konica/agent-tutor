@@ -15,7 +15,7 @@ import { DocumentDetailsPanel } from "./DocumentDetails";
 import { DocumentTable } from "./DocumentTable";
 import { DropOverlay } from "./DropOverlay";
 import { hasFilters, LibraryFilters } from "./LibraryFilters";
-import { SubjectPicker } from "./SubjectPicker";
+import { SubjectPicker, type PickerDocument } from "./SubjectPicker";
 import styles from "./LibraryPage.module.css";
 import { useDocuments } from "./useDocuments";
 import { useLibraryCounts } from "./useLibraryCounts";
@@ -102,7 +102,8 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
   const [alreadyIn, setAlreadyIn] = useState<{ name: string; documentId: string }[]>([]);
   const seen = useRef<Map<string, DocumentResponse["state"]> | null>(null);
   const justSaved = useRef(new Set<string>()); // saved here, so the poll must not announce "is ready." over "Subjects saved."
-  const [picking, setPicking] = useState<DocumentResponse | null>(null);
+  const [picking, setPicking] = useState<PickerDocument | null>(null);
+  const pickerFromDetails = useRef<string | null>(null); // the details panel to reopen when the picker closes
   const statusRegion = useRef<HTMLParagraphElement>(null);
   const wasPicking = useRef(false);
   const [details, setDetails] = useState<{ id: string; editing: boolean } | null>(null);
@@ -150,11 +151,25 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
     subjectSelect.current?.focus(); // the Clear button disappears
   }
 
-  async function onSaved(doc: DocumentResponse) {
+  async function onSaved(doc: DocumentResponse, changed: boolean) {
     justSaved.current.add(doc.document_id);
     seen.current?.set(doc.document_id, "ready");
-    setStatus(`Subjects saved. ${doc.title} is ready to use.`);
+    setStatus(changed ? `Subjects saved. ${doc.title} now uses ${doc.subjects.map((s) => s.name).join(", ")}.` : `Subjects saved. ${doc.title} is ready to use.`);
     await Promise.all([refresh(), refreshSubjects()]);
+  }
+
+  // From details, the picker replaces the panel (both are modal) and gives it back when it closes.
+  function changeFromDetails(doc: DocumentDetails) {
+    pickerFromDetails.current = doc.document_id;
+    setDetails(null);
+    setPicking(doc);
+  }
+
+  function closePicker() {
+    setPicking(null);
+    const back = pickerFromDetails.current;
+    pickerFromDetails.current = null;
+    if (back) setDetails({ id: back, editing: false });
   }
 
   // One polite live region carries upload results and processing-state changes (DESIGN.md → Accessibility).
@@ -623,7 +638,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
           busy={busy}
         />
       )}
-      {picking && <SubjectPicker document={picking} load={loadSuggestions} save={saveSubjects} onClose={() => setPicking(null)} onSaved={(doc) => void onSaved(doc)} />}
+      {picking && <SubjectPicker document={picking} load={loadSuggestions} save={saveSubjects} onClose={closePicker} onSaved={(doc) => void onSaved(doc, picking.state === "ready")} />}
       {details && (
         <DocumentDetailsPanel
           key={details.id}
@@ -634,6 +649,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
           archive={archive}
           restore={restore}
           onChanged={() => void Promise.all([refresh(), counts.refresh(), refreshSubjects()])}
+          onChangeSubjects={changeFromDetails}
           onClose={() => setDetails(null)}
         />
       )}

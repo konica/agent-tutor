@@ -236,3 +236,50 @@ def test_an_archived_document_cant_get_suggestions_or_subjects_until_restored() 
     assert w.state() == []  # the active tab shows nothing; the document keeps no subjects
     [archived] = w.documents.list_documents(ADA, archived=True)
     assert (archived.state, archived.subject_ids) == ("awaiting_subjects", ())
+
+
+def test_a_ready_documents_subjects_change_and_the_library_and_my_subjects_follow() -> None:
+    w = World()
+    document_id = w.upload()
+    w.choice.choose(ADA, document_id, [GENERAL_SUBJECT_ID], [])
+
+    view = w.choice.choose(ADA, document_id, [], ["Machine Translation", "Tool Use"])
+
+    assert view.state == "ready"  # no state change, so nothing is processed again
+    assert GENERAL_SUBJECT_ID not in view.subject_ids and len(view.subject_ids) == 2
+    assert w.state() == [("ready", view.subject_ids)]
+    with w.library.unit_of_work() as tx:
+        assert tx.documents.subject_ids_readable_by(ADA) == set(view.subject_ids)  # My subjects
+    assert w.documents.list_documents(ADA, subject_ids=[GENERAL_SUBJECT_ID]) == []
+    assert [d.document_id for d in w.documents.list_documents(ADA, subject_ids=view.subject_ids[:1])] == [document_id]
+
+
+@pytest.mark.parametrize(("ids", "names"), [([], []), ([GENERAL_SUBJECT_ID], ["A", "B", "C"])])
+def test_a_ready_document_keeps_its_subjects_when_zero_or_more_than_three_are_chosen(
+    ids: list[SubjectId], names: list[str]
+) -> None:
+    w = World()
+    document_id = w.upload()
+    w.choice.choose(ADA, document_id, [GENERAL_SUBJECT_ID], [])
+
+    with pytest.raises(InvalidSubjectsError):
+        w.choice.choose(ADA, document_id, ids, names)
+
+    assert w.state() == [("ready", (GENERAL_SUBJECT_ID,))]
+
+
+def test_an_archived_ready_documents_subjects_cant_change_until_restored() -> None:
+    w = World()
+    document_id = w.upload()
+    w.choice.choose(ADA, document_id, [GENERAL_SUBJECT_ID], [])
+    archive = ArchiveService(w.library.unit_of_work, FixedClock(), max_attempts=3)
+    archive.archive(ADA, document_id)
+
+    with pytest.raises(DocumentStateError, match="Restore"):
+        w.choice.choose(ADA, document_id, [], ["Tool Use"])
+    [archived] = w.documents.list_documents(ADA, archived=True)
+    assert archived.subject_ids == (GENERAL_SUBJECT_ID,)
+
+    archive.restore(ADA, document_id)
+    view = w.choice.choose(ADA, document_id, [], ["Tool Use"])
+    assert view.state == "ready" and GENERAL_SUBJECT_ID not in view.subject_ids
