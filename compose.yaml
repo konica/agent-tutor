@@ -6,7 +6,7 @@
 name: smart-tutor
 
 # The api (subject-name embeddings), worker, agent (chat model) and mcp (query embeddings) call Bedrock: they
-# mount your AWS config read-only. The api, agent and worker sign S3/SSM/SQS with dummy keys (SMART_TUTOR_LOCALSTACK),
+# mount your AWS config read-only. The api and worker sign S3/SSM/SQS with dummy keys (SMART_TUTOR_LOCALSTACK),
 # so your real keys never reach LocalStack.
 
 services:
@@ -56,10 +56,10 @@ services:
     ports: ["10402:4566"]
     volumes:
       - ./local/localstack/init/ready.d:/etc/localstack/init/ready.d:ro
-    # Healthy only once the ready.d init script has seeded settings (it sets multi-margin last);
-    # the api, worker, and agent read SSM at startup and exit when a parameter is missing.
+    # Healthy only once the ready.d init script has seeded settings (it sets app-time-zone last);
+    # the api and worker read SSM at startup and exit when a parameter is missing.
     healthcheck:
-      test: ["CMD", "awslocal", "ssm", "get-parameter", "--name", "/smart-tutor/multi-margin"]
+      test: ["CMD", "awslocal", "ssm", "get-parameter", "--name", "/smart-tutor/app-time-zone"]
       interval: 3s
       timeout: 10s
       retries: 40
@@ -125,10 +125,6 @@ services:
       SMART_TUTOR_KEYCLOAK_CLIENT_ID: smart-tutor-api
       SMART_TUTOR_KEYCLOAK_CLIENT_SECRET: local-api-secret
       SMART_TUTOR_MCP_URL: http://mcp:8000/mcp
-      # The agent reads the detection thresholds from SSM at startup, so it uses the in-network endpoint.
-      AWS_ENDPOINT_URL_SSM: http://localstack:4566
-      # It signs SSM with dummy keys (SMART_TUTOR_LOCALSTACK), so your real keys never reach LocalStack.
-      SMART_TUTOR_LOCALSTACK: "true"
       # Bedrock (chat model) with your AWS profile: same setup as the worker below.
       HOME: /home/app
     volumes: ["~/.aws:/home/app/.aws:ro"]
@@ -136,7 +132,6 @@ services:
     depends_on:
       postgres: {condition: service_started}
       mcp: {condition: service_started}
-      localstack: {condition: service_healthy}
 
   mcp:
     profiles: [app]

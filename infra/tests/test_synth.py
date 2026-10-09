@@ -557,7 +557,7 @@ def test_each_service_gets_only_its_own_s3_sqs_and_bedrock_access() -> None:
     assert "nova-2-lite" in worker["bedrock:InvokeModel"] and "embeddings" in worker["bedrock:InvokeModel"]
 
     # The agent only chats; the MCP server only embeds queries.
-    assert not any(a.startswith(("s3:", "sqs:")) for a in agent)
+    assert not any(a.startswith(("s3:", "sqs:", "ssm:")) for a in agent)
     assert "inference-profile/us.amazon.nova-2-lite-v1:0" in agent["bedrock:InvokeModel"]
     for region in ("us-east-1", "us-east-2", "us-west-2"):
         assert f"arn:aws:bedrock:{region}::foundation-model/amazon.nova-2-lite-v1:0" in agent["bedrock:InvokeModel"]

@@ -5,7 +5,7 @@ Datasets live in **LangSmith** (versioned there; never edit a version a release 
 | Path | What |
 |---|---|
 | `seed_corpus/` | Manifest of the openly licensed documents every eval uses, with labels (PDFs downloaded to `data/seed_corpus/`, not committed) |
-| `generators/` | Synthetic Q&A from the corpus, off-topic and near-scope negatives, detection/ambiguous items, multi-turn subject switches, (R2) learning-loop fixtures |
+| `generators/` | Synthetic Q&A from the corpus, off-topic and near-scope negatives, (R2) learning-loop fixtures |
 | `adversarial/taxonomy.yaml` | Injection categories × seeds |
 | `evaluators/` | One module per PRD §10.1 evaluator; `rubrics/` holds the Qwen judge prompts |
 | `targets.py` | How an evaluation run invokes the agent |
