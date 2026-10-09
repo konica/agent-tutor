@@ -3,7 +3,8 @@
 Processing: describe the first pages (title, metadata, summary embedding, work key; committed at once so the
 Library shows the title), extract the page text, save it as JSON, chunk, embed, then make the content and the
 learner's document wait for subjects. Crashes (S3, Bedrock, database) are raised so SQS redelivers the message;
-only a file over the page limit, one we can't read, or one with no text layer ends failed.
+only a file over the page limit, one we can't read, one that takes too long to read, or one with no text layer
+ends failed.
 """
 
 import hashlib
@@ -20,6 +21,7 @@ from langchain_core.embeddings import Embeddings
 from smart_tutor.knowledge.application.describer import FIRST_PAGES, DocumentDescriber
 from smart_tutor.knowledge.domain.chunk import Chunk, validate_chunk
 from smart_tutor.knowledge.domain.content import (
+    EXTRACTION_TIMED_OUT,
     NO_TEXT_LAYER,
     UNREADABLE_PDF,
     Content,
@@ -33,7 +35,12 @@ from smart_tutor.knowledge.domain.limits import FileLimits
 from smart_tutor.knowledge.domain.upload import UploadOutcome, parse_upload_key
 from smart_tutor.knowledge.ports.library import LibraryUnitOfWork
 from smart_tutor.knowledge.ports.object_store import ObjectNotFoundError, ObjectStore
-from smart_tutor.knowledge.ports.pdf_extractor import PdfExtractor, TooManyPagesError, UnreadablePdfError
+from smart_tutor.knowledge.ports.pdf_extractor import (
+    ExtractionTimeoutError,
+    PdfExtractor,
+    TooManyPagesError,
+    UnreadablePdfError,
+)
 from smart_tutor.shared.domain.ids import ContentId, UploadId, UserId
 
 logger = logging.getLogger(__name__)
@@ -155,6 +162,8 @@ class IngestionService:
             return self._fail(content_id, too_many_pages(error.pages, self._limits.max_pages))
         except UnreadablePdfError:
             return self._fail(content_id, UNREADABLE_PDF)
+        except ExtractionTimeoutError:
+            return self._fail(content_id, EXTRACTION_TIMED_OUT)
         if not has_text_layer(pages):
             return self._fail(content_id, NO_TEXT_LAYER)
         chunks = self._chunks(content_id, pages)
