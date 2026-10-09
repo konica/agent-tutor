@@ -16,7 +16,7 @@ export function subjectHue(hueKey: string): SubjectHue {
 type Props = {
   name: string;
   hueKey: string;
-  size?: "sm" | "md" | "lg"; // lg is the picker's 40px touch size
+  size?: "sm" | "md" | "lg"; // lg is the picker's 32px size
   origin?: string;
   pressed?: boolean;
   disabled?: boolean;

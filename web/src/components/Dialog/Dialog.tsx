@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from "react";
 
+import { IconButton } from "../Button/IconButton";
 import styles from "./Dialog.module.css";
 
 const FOCUSABLE = 'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
@@ -49,9 +50,7 @@ export function Dialog({ title, kicker, wide, onClose, children, footer }: Props
               {title}
             </h2>
           </div>
-          <button type="button" className={styles.close} aria-label="Close" onClick={onClose}>
-            <X className={styles.closeIcon} strokeWidth={1.5} aria-hidden="true" />
-          </button>
+          <IconButton label="Close" icon={X} tip={false} onClick={onClose} />
         </header>
         <div className={styles.body}>{children}</div>
         <footer className={styles.footer}>{footer}</footer>

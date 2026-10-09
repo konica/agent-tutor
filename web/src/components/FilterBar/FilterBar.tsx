@@ -34,7 +34,7 @@ export function FilterBar({ label, noun, count, active, onClear, children }: Pro
 export function FilterField({ id, label, children }: { id: string; label: string; children: ReactNode }) {
   return (
     <div className={styles.field}>
-      <label htmlFor={id}>{label}</label>
+      <label htmlFor={id} className="visually-hidden">{label}</label>
       {children}
     </div>
   );

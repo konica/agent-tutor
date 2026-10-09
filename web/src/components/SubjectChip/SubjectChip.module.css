@@ -1,17 +1,18 @@
 .chip {
-  --pad: 10px; /* no space token between --sp-2 and --sp-3; the gap below is 6px for the same reason */
-  display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 var(--pad);
+  --pad: var(--sp-2);
+  display: inline-flex; align-items: center; gap: 5px; min-height: 20px; padding: 0 var(--pad);
   border: 1px solid color-mix(in oklab, var(--h) 45%, var(--border)); border-radius: var(--r-pill);
   background: color-mix(in oklab, var(--h) 12%, var(--surface)); color: var(--text);
-  font-size: var(--fs-14); font-weight: 600; line-height: 1.2; white-space: nowrap;
+  font-size: var(--fs-12); font-weight: 600; line-height: 1.2; white-space: nowrap;
   transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
 }
-.sm { --pad: var(--sp-2); min-height: 24px; font-size: var(--fs-12); }
-.lg { --pad: var(--sp-3); min-height: 40px; }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--h); flex: none; }
+.sm { --pad: var(--sp-2); min-height: 20px; font-size: var(--fs-12); }
+.lg { --pad: 10px; min-height: 32px; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--h); flex: none; }
 .check { width: 14px; height: 14px; flex: none; }
 .origin { color: var(--text-2); font-size: var(--fs-12); font-weight: 500; }
-button.chip { cursor: pointer; }
+button.chip { --pad: 10px; min-height: 28px; font-size: var(--fs-13); cursor: pointer; }
+button.chip.lg { min-height: 32px; }
 button.chip:hover:enabled { background: color-mix(in oklab, var(--h) 22%, var(--surface)); }
 /* The 2px border replaces the 1px one, so the padding shrinks by 1px and the size stays put. */
 button.chip[aria-pressed="true"] {

@@ -1,9 +1,18 @@
 .banner {
-  display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4);
-  border-radius: var(--r-md); border: 1px solid transparent; font-size: var(--fs-14); color: var(--text);
+  display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md); border: 1px solid transparent; font-size: var(--fs-13); color: var(--text);
 }
 .icon { width: 18px; height: 18px; flex: none; }
 .body { flex: 1 1 0; min-width: 0; }
 .body strong { display: block; }
+.inline { min-height: 32px; padding: 2px 4px 2px 10px; }
+.inline .icon { width: 16px; height: 16px; }
+.inline .body strong { display: inline; }
 .success { background: var(--success-soft); }
 .success .icon { color: var(--success); }
+.info { background: var(--accent-soft); }
+.info .icon { color: var(--accent-text); }
+.attn { background: var(--attn-soft); }
+.attn .icon { color: var(--attn); }
+.danger { background: var(--danger-soft); }
+.danger .icon { color: var(--danger); }
