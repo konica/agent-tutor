@@ -1,5 +1,5 @@
-"""Library routes (knowledge module): start an upload, list the caller's documents, check a file hash against them,
-retry a failed one, suggest and save its subjects."""
+"""Library routes (knowledge module): start an upload, report what became of it (US-11), list the caller's
+documents, check a file hash against them, retry a failed one, suggest and save its subjects."""
 
 from datetime import date, datetime
 from typing import Annotated, Literal
@@ -17,7 +17,7 @@ from smart_tutor.knowledge.application import (
     InvalidSubjectsError,
     RetryLimitError,
 )
-from smart_tutor.shared.domain.ids import DocumentId, SubjectId
+from smart_tutor.shared.domain.ids import DocumentId, SubjectId, UploadId
 
 router = APIRouter(tags=["knowledge"])
 
@@ -38,6 +38,13 @@ class StartUploadResponse(BaseModel):
 class UploadLimitsResponse(BaseModel):
     max_bytes: int
     max_pages: int
+
+
+class UploadStatusResponse(BaseModel):
+    upload_id: str
+    outcome: Literal["stored", "duplicate"] | None  # null until the worker has hashed the file
+    document_id: str | None  # the upload's document, or the learner's existing one for a duplicate
+    archived: bool
 
 
 class DuplicateCheckRequest(BaseModel):
@@ -109,6 +116,20 @@ def start_upload(body: StartUploadRequest, principal: CurrentPrincipal, uploads:
 def get_upload_limits(uploads: Uploads) -> UploadLimitsResponse:
     """The per-file limits, so the browser can refuse a file before uploading it (PRD §8 US-2)."""
     return UploadLimitsResponse(max_bytes=uploads.limits.max_bytes, max_pages=uploads.limits.max_pages)
+
+
+@router.get("/uploads/{upload_id}", operation_id="get_upload")
+def get_upload(upload_id: UUID, principal: CurrentPrincipal, uploads: Uploads) -> UploadStatusResponse:
+    """What became of the caller's upload; a duplicate points to the document they already have (PRD §8 US-11)."""
+    found = uploads.upload_status(principal.user_id, UploadId(str(upload_id)))
+    if found is None:
+        raise HTTPException(404, "Upload not found")
+    return UploadStatusResponse(
+        upload_id=str(upload_id),
+        outcome=found.outcome.value if found.outcome else None,
+        document_id=found.document_id,
+        archived=found.archived,
+    )
 
 
 @router.post("/documents/duplicate-check", operation_id="check_duplicate")

@@ -397,6 +397,52 @@
         "title": "UploadLimitsResponse",
         "type": "object"
       },
+      "UploadStatusResponse": {
+        "properties": {
+          "archived": {
+            "title": "Archived",
+            "type": "boolean"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "enum": [
+                  "stored",
+                  "duplicate"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "upload_id": {
+            "title": "Upload Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "upload_id",
+          "outcome",
+          "document_id",
+          "archived"
+        ],
+        "title": "UploadStatusResponse",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -986,6 +1032,55 @@
           }
         ],
         "summary": "Get Upload Limits",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/uploads/{upload_id}": {
+      "get": {
+        "description": "What became of the caller's upload; a duplicate points to the document they already have (PRD \u00a78 US-11).",
+        "operationId": "get_upload",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "upload_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Upload Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Upload",
         "tags": [
           "knowledge"
         ]
