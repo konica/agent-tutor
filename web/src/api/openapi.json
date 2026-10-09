@@ -718,6 +718,48 @@
         ]
       }
     },
+    "/documents/{document_id}": {
+      "delete": {
+        "description": "Delete the caller's document for good: its PDF, page text, and chunks (PRD \u00a78 US-10c).\n\nRefused while processing (409). Conversations keep their text and list it as deleted.",
+        "operationId": "delete_document",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Document",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
     "/documents/{document_id}/archive": {
       "post": {
         "description": "Archive the caller's document: it leaves search and My subjects; content and chunks stay (PRD \u00a78 US-10).\n\nArchiving an archived document changes nothing.",
