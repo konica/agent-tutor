@@ -745,6 +745,15 @@ describe("ChatPage", () => {
       expect(localStorage.getItem("smart-tutor.chat-panel-open")).toBe("false");
     });
 
+    it("closes the panel in one click when it was already open, saving the choice", async () => {
+      startChat();
+      await question();
+      expect(await within(panel()!).findByText(TITLE)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Hide panel" }));
+      expect(panel()).not.toBeInTheDocument();
+      expect(localStorage.getItem("smart-tutor.chat-panel-open")).toBe("false");
+    });
+
     function Location() {
       const location = useLocation();
       return <output data-testid="location">{location.pathname + location.search}</output>;

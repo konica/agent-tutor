@@ -154,15 +154,16 @@ export function ChatPage({
   const hasStarting = starting !== null && library.status === "ready";
   useEffect(() => {
     if (!hasStarting) return;
-    setForceOpen(true);
+    if (!storedOpen) setForceOpen(true);
     input.current?.focus();
     // Only when a starting document appears: closing the panel afterwards is the learner's choice.
   }, [hasStarting]);
 
   // The learner's toggle is remembered as before. Closing a panel the page opened for them keeps the saved "closed".
   function toggle() {
-    if (forceOpen) setForceOpen(false);
-    else togglePanel();
+    const overridden = forceOpen && !storedOpen;
+    setForceOpen(false);
+    if (!overridden) togglePanel();
   }
 
   // Once the starting document is used or dropped, a reload or Back doesn't bring it back.
