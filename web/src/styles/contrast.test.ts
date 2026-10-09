@@ -1,8 +1,6 @@
-// @vitest-environment node
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const css = readFileSync(new URL("./tokens.css", import.meta.url), "utf8");
+import css from "./tokens.css?raw";
 
 const block = (selector: string) => {
   const start = css.indexOf(selector);

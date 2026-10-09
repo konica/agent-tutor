@@ -1,5 +1,5 @@
 .landing { font-size: var(--fs-16); line-height: var(--lh-read); min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; background: var(--bg); color: var(--text); }
-.head, .main, .foot { width: min(var(--page-w), 100% - 2 * var(--sp-8)); margin-inline: auto; }
+.head, .main, .foot { width: min(var(--landing-w), 100% - 2 * var(--sp-8)); margin-inline: auto; }
 .head { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-6) 0; }
 .textLink { display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--sp-2); background: none; border: 0; border-radius: var(--r-sm); color: var(--accent-text); font: inherit; font-size: var(--fs-16); font-weight: 600; cursor: pointer; }
 .textLink:hover { text-decoration: underline; }
