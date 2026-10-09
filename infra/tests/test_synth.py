@@ -515,24 +515,61 @@ def test_cloudfront_sends_api_uncached_with_every_method() -> None:
     )
 
 
-def test_api_reads_only_the_smart_tutor_parameters_through_pod_identity() -> None:
-    t = template(make_app(), "Cluster")
-
-    t.has_resource_properties(
-        "AWS::EKS::PodIdentityAssociation",
-        {"Namespace": "smart-tutor", "ServiceAccount": "api"},
+def _policy_for(t: Template, service_account: str) -> list[dict[str, Any]]:
+    """The statements of the managed policy on the role associated with `smart-tutor/<service_account>`."""
+    assoc = next(
+        a for a in t.find_resources("AWS::EKS::PodIdentityAssociation").values()
+        if a["Properties"]["Namespace"] == "smart-tutor" and a["Properties"]["ServiceAccount"] == service_account
     )
-    policies = [
-        p
-        for p in t.find_resources("AWS::IAM::ManagedPolicy").values()
-        if "ssm:" in json.dumps(p["Properties"]["PolicyDocument"])
-    ]
-    assert len(policies) == 1
-    statements = policies[0]["Properties"]["PolicyDocument"]["Statement"]
-    assert [s["Action"] for s in statements] == [
-        ["ssm:GetParameter", "ssm:GetParameters"]
-    ]
-    assert "parameter/smart-tutor/*" in json.dumps(statements[0]["Resource"])
+    role_id = assoc["Properties"]["RoleArn"]["Fn::GetAtt"][0]
+    role = t.find_resources("AWS::IAM::Role")[role_id]
+    policy_id = role["Properties"]["ManagedPolicyArns"][0]["Ref"]
+    return t.find_resources("AWS::IAM::ManagedPolicy")[policy_id]["Properties"]["PolicyDocument"]["Statement"]
+
+
+def _grants(statements: list[dict[str, Any]]) -> dict[str, str]:
+    """action → JSON of its resources, for compact assertions."""
+    out: dict[str, str] = {}
+    for s in statements:
+        actions = s["Action"] if isinstance(s["Action"], list) else [s["Action"]]
+        for a in actions:
+            out[a] = out.get(a, "") + json.dumps(s["Resource"])
+    return out
+
+
+def test_each_service_gets_only_its_own_s3_sqs_and_bedrock_access() -> None:
+    t = template(make_app(), "Cluster")
+    api, worker, agent, mcp = (_grants(_policy_for(t, sa)) for sa in ("api", "worker", "agent", "mcp-server"))
+
+    # The API only signs uploads into uploads/ and sends Retry messages; it never reads documents.
+    assert "s3:GetObject" not in api and "s3:DeleteObject" not in api
+    assert "uploads/*" in api["s3:PutObject"] and "contents/" not in api["s3:PutObject"]
+    assert "smart-tutor-ingest" in api["sqs:SendMessage"]
+    assert "amazon.nova-2-multimodal-embeddings-v1:0" in api["bedrock:InvokeModel"]
+    assert "parameter/smart-tutor/*" in api["ssm:GetParameter"]
+
+    # The worker moves uploads into contents and never deletes a content.
+    assert "uploads/*" in worker["s3:GetObject"] and "contents/*" in worker["s3:GetObject"]
+    assert "contents/*" in worker["s3:PutObject"] and "uploads/" not in worker["s3:PutObject"]
+    assert "uploads/*" in worker["s3:DeleteObject"] and "contents/" not in worker["s3:DeleteObject"]
+    for action in ("sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:ChangeMessageVisibility"):
+        assert "smart-tutor-ingest" in worker[action] and "dlq" not in worker[action]
+    assert "nova-2-lite" in worker["bedrock:InvokeModel"] and "embeddings" in worker["bedrock:InvokeModel"]
+
+    # The agent only chats; the MCP server only embeds queries.
+    assert not any(a.startswith(("s3:", "sqs:")) for a in agent)
+    assert "inference-profile/us.amazon.nova-2-lite-v1:0" in agent["bedrock:InvokeModel"]
+    for region in ("us-east-1", "us-east-2", "us-west-2"):
+        assert f"arn:aws:bedrock:{region}::foundation-model/amazon.nova-2-lite-v1:0" in agent["bedrock:InvokeModel"]
+    assert "embeddings" not in agent["bedrock:InvokeModel"]
+    assert set(mcp) == {"bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"}
+    assert "nova-2-lite" not in mcp["bedrock:InvokeModel"]
+
+    # No wildcard actions or resources on any service.
+    for grants in (api, worker, agent, mcp):
+        assert not any(a.endswith(":*") or a == "*" for a in grants)
+        assert not any(r == '"*"' for r in grants.values())
+
 
 def test_origin_waits_60_seconds_between_bytes() -> None:
     # Answers stream as SSE without heartbeats; CloudFront's default 30 s would cut a slow one with a 504.
