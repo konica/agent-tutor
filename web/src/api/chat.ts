@@ -29,6 +29,7 @@ export type ChatEvent =
   | { type: "done" };
 
 export const NO_DOCUMENTS = "Upload a document first";
+const DOCUMENT_UNUSABLE = "That document can't be used. Start a new conversation.";
 
 /** 409 from POST /threads: the learner has no ready documents yet. */
 export class NoDocumentsError extends Error {
@@ -38,7 +39,7 @@ export class NoDocumentsError extends Error {
   }
 }
 
-/** Another 409 from POST /threads: its message is for the learner. */
+/** Another 409 from POST /threads, or a 404 for a starting document the learner can't use: its message is for the learner. */
 export class AskRefusedError extends Error {
   constructor(message: string) {
     super(message);
@@ -73,8 +74,10 @@ function toEvent(event: string, data: string): ChatEvent | null {
 // POST /threads streams the answer as server-sent events. This is a plain request through the configured
 // client, not the generated SSE helper: the helper skips response interceptors (so a 401 would not end the
 // session) and retries failed connections, which would post the question again and start another thread.
-export async function* askInNewThread(question: string, apiClient: Client = client): AsyncGenerator<ChatEvent> {
-  const body: AskInNewThreadData["body"] = { question };
+// `documentId` is the document the conversation starts from (listed first in its documents); a 404 means it isn't
+// the learner's ready, non-archived document, and nothing was started.
+export async function* askInNewThread(question: string, documentId?: string, apiClient: Client = client): AsyncGenerator<ChatEvent> {
+  const body: AskInNewThreadData["body"] = documentId === undefined ? { question } : { question, document_id: documentId };
   const { error, response } = await apiClient.post<AskInNewThreadResponses, AskInNewThreadErrors, false>({
     security: [{ scheme: "bearer", type: "http" }],
     url: "/threads",
@@ -89,6 +92,7 @@ export async function* askInNewThread(question: string, apiClient: Client = clie
     if (message === NO_DOCUMENTS) throw new NoDocumentsError(message);
     if (message !== null) throw new AskRefusedError(message);
   }
+  if (response?.status === 404) throw new AskRefusedError(detail(error) ?? DOCUMENT_UNUSABLE);
   if (!response?.ok || !response.body) throw new Error(`POST /threads failed (${response?.status ?? "no response"})`);
   for await (const message of parseSse(response.body)) {
     const event = toEvent(message.event, message.data);

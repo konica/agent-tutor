@@ -54,7 +54,7 @@ describe("askInNewThread", () => {
   it("posts the question with the token and yields the streamed events", async () => {
     const { apiClient, fetch } = api(() => eventStream(answer));
 
-    const events = await collect(askInNewThread("What is attention?", apiClient));
+    const events = await collect(askInNewThread("What is attention?", undefined, apiClient));
 
     expect(events).toEqual([
       { type: "thread", thread_id: "t1" },
@@ -70,31 +70,59 @@ describe("askInNewThread", () => {
     expect(await request.json()).toEqual({ question: "What is attention?" });
   });
 
+  it("sends the starting document with the question when given one", async () => {
+    const { apiClient, fetch } = api(() => eventStream(answer));
+    await collect(askInNewThread("What is attention?", "d1", apiClient));
+    const request = fetch.mock.calls[0]![0] as Request;
+    expect(await request.json()).toEqual({ question: "What is attention?", document_id: "d1" });
+  });
+
+  it("sends no document_id key without a starting document", async () => {
+    const { apiClient, fetch } = api(() => eventStream(answer));
+    await collect(askInNewThread("q", undefined, apiClient));
+    const body = (await (fetch.mock.calls[0]![0] as Request).json()) as Record<string, unknown>;
+    expect("document_id" in body).toBe(false);
+  });
+
+  it("rejects with AskRefusedError carrying the detail on 404", async () => {
+    const { apiClient } = api(() => json({ detail: "Document not found" }, 404));
+    const failure = collect(askInNewThread("q", "d9", apiClient));
+    await expect(failure).rejects.toBeInstanceOf(AskRefusedError);
+    await expect(failure).rejects.toThrow("Document not found");
+  });
+
+  it("rejects with AskRefusedError and a fallback message on a 404 without detail", async () => {
+    const { apiClient } = api(() => json({}, 404));
+    const failure = collect(askInNewThread("q", "d9", apiClient));
+    await expect(failure).rejects.toBeInstanceOf(AskRefusedError);
+    await expect(failure).rejects.toThrow("That document can't be used. Start a new conversation.");
+  });
+
   it("yields an error event that ends the stream", async () => {
     const { apiClient } = api(() =>
       eventStream('event: error\ndata: {"code": "unauthenticated", "message": "Please sign in again."}\n\n'),
     );
-    expect(await collect(askInNewThread("q", apiClient))).toEqual([
+    expect(await collect(askInNewThread("q", undefined, apiClient))).toEqual([
       { type: "error", code: "unauthenticated", message: "Please sign in again." },
     ]);
   });
 
   it("rejects with SessionExpiredError on 401 and reports it", async () => {
     const { apiClient, onUnauthorized } = api(() => json({ detail: "Not authenticated" }, 401));
-    await expect(collect(askInNewThread("q", apiClient))).rejects.toBeInstanceOf(SessionExpiredError);
+    await expect(collect(askInNewThread("q", undefined, apiClient))).rejects.toBeInstanceOf(SessionExpiredError);
     expect(onUnauthorized).toHaveBeenCalled();
   });
 
   it("rejects with NoDocumentsError carrying the API's message on 409", async () => {
     const { apiClient } = api(() => json({ detail: "Upload a document first" }, 409));
-    const failure = collect(askInNewThread("q", apiClient));
+    const failure = collect(askInNewThread("q", undefined, apiClient));
     await expect(failure).rejects.toBeInstanceOf(NoDocumentsError);
     await expect(failure).rejects.toThrow("Upload a document first");
   });
 
   it("rejects with AskRefusedError carrying the detail on any other 409", async () => {
     const { apiClient } = api(() => json({ detail: "The tutor can't answer that right now" }, 409));
-    const failure = collect(askInNewThread("q", apiClient));
+    const failure = collect(askInNewThread("q", undefined, apiClient));
     await expect(failure).rejects.toBeInstanceOf(AskRefusedError);
     await expect(failure).rejects.toThrow("The tutor can't answer that right now");
     await expect(failure).rejects.not.toBeInstanceOf(NoDocumentsError);
@@ -106,19 +134,19 @@ describe("askInNewThread", () => {
         'event: citations\ndata: {"citations": [{"n": 2, "chunk_id": "c2", "document_id": "d2", "document_title": "b.pdf", "page": null}]}\n\n',
       ),
     );
-    expect(await collect(askInNewThread("q", apiClient))).toEqual([
+    expect(await collect(askInNewThread("q", undefined, apiClient))).toEqual([
       { type: "citations", citations: [{ n: 2, chunk_id: "c2", document_id: "d2", document_title: "b.pdf", page: null }] },
     ]);
   });
 
   it("skips an unknown event even when its data is not JSON", async () => {
     const { apiClient } = api(() => eventStream('event: ping\ndata: ok\n\nevent: delta\ndata: {"text": "Hi"}\n\n'));
-    expect(await collect(askInNewThread("q", apiClient))).toEqual([{ type: "delta", text: "Hi" }]);
+    expect(await collect(askInNewThread("q", undefined, apiClient))).toEqual([{ type: "delta", text: "Hi" }]);
   });
 
   it("rejects with a plain Error on 503", async () => {
     const { apiClient } = api(() => json({ detail: "The tutor is unavailable. Try again in a moment." }, 503));
-    const failure = collect(askInNewThread("q", apiClient));
+    const failure = collect(askInNewThread("q", undefined, apiClient));
     await expect(failure).rejects.toThrow("503");
     await expect(failure).rejects.not.toBeInstanceOf(NoDocumentsError);
   });
