@@ -125,3 +125,27 @@ describe("DocumentTable archive and restore", () => {
     expect(screen.getByRole("button", { name: "Restore Old" })).toBeDisabled();
   });
 });
+
+describe("DocumentTable Chat", () => {
+  const props = { onRetry: () => {}, retrying: new Set<string>() };
+
+  it("offers Chat on a ready row and passes the row to onChat", async () => {
+    const onChat = vi.fn();
+    render(<DocumentTable documents={[doc]} {...props} onChat={onChat} />);
+    const button = screen.getByRole("button", { name: "Chat about Toolformer" });
+    expect(button).toHaveTextContent("Chat");
+    await userEvent.click(button);
+    expect(onChat).toHaveBeenCalledExactlyOnceWith(doc);
+  });
+
+  it.each([
+    ["an archived ready", { archived: true }, false],
+    ["a processing", { state: "processing" as const }, false],
+    ["a failed", { state: "failed" as const, failure_reason: "x" }, false],
+    ["an awaiting-subjects", { state: "awaiting_subjects" as const }, false],
+    ["an uploading", {}, true],
+  ])("offers no Chat on %s row", (_name, patch, uploading) => {
+    render(<DocumentTable documents={[{ ...doc, ...patch }]} {...props} onChat={vi.fn()} onArchive={vi.fn()} onRestore={vi.fn()} uploading={uploading ? new Set(["d1"]) : undefined} />);
+    expect(screen.queryByRole("button", { name: "Chat about Toolformer" })).toBeNull();
+  });
+});

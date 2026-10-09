@@ -1,10 +1,29 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render as renderBare, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 
 import { RetriesUsedUpError, type DocumentFilters, type DocumentResponse, type UploadEvents, type UploadStatus } from "../../api/documents";
 import { SessionExpiredError } from "../../auth/authClient";
 import { LibraryPage } from "./LibraryPage";
+
+// The page navigates (Chat on a row), so every render sits in a router.
+const inRouter = (ui: React.ReactElement) => (
+  <MemoryRouter initialEntries={["/library"]}>
+    <Routes>
+      <Route path="/library" element={ui} />
+      <Route path="/chat" element={<ChatStub />} />
+    </Routes>
+  </MemoryRouter>
+);
+const render = (ui: React.ReactElement) => {
+  const result = renderBare(inRouter(ui));
+  return { ...result, rerender: (next: React.ReactElement) => result.rerender(inRouter(next)) };
+};
+function ChatStub() {
+  const { pathname, search } = useLocation();
+  return <p>{`${pathname}${search}`}</p>;
+}
 
 const today = new Date().toISOString();
 const processing: DocumentResponse = { document_id: "d1", title: "lewis-rag-2020.pdf", state: "processing", failure_reason: null, created_at: today, subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: [], year: null, archived: false };
@@ -981,5 +1000,14 @@ describe("LibraryPage archive and restore", () => {
     const calls = load.mock.calls.length;
     await waitFor(() => expect(load.mock.calls.length).toBeGreaterThan(calls + 3));
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  });
+});
+
+describe("LibraryPage Chat on a row", () => {
+  it("opens a new conversation that starts from the document", async () => {
+    const ready: DocumentResponse = { ...processing, document_id: "d1", title: "Toolformer", state: "ready" };
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => [ready]} upload={vi.fn()} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Chat about Toolformer" }));
+    expect(await screen.findByText("/chat?document=d1")).toBeVisible();
   });
 });
