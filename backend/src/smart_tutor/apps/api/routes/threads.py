@@ -1,24 +1,29 @@
 """Thread routes (tutoring module): ask the first question of a new thread; it answers from all of the learner's
 ready documents. Answered as SSE (PRD §9.2); the documents an answer drew on are recorded when it is done and
-listed per thread."""
+listed per thread; the learner adds documents to that list and removes them (US-4c)."""
 
 import json
 import logging
 import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
-from typing import Annotated
+from typing import Annotated, Literal
 
 import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, ConfigDict, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from smart_tutor.apps.api.agent_client import AgentAnswer, AgentUnavailableError
 from smart_tutor.apps.api.deps import Agent, BearerToken, Conversations, CurrentPrincipal
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId
-from smart_tutor.tutoring.application import NoDocumentsError, ThreadNotFoundError
+from smart_tutor.tutoring.application import (
+    DocumentNotAvailableError,
+    DocumentUsed,
+    NoDocumentsError,
+    ThreadNotFoundError,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["tutoring"])
@@ -201,6 +206,26 @@ class ThreadDocumentResponse(BaseModel):
     year: int | None
     archived: bool
     deleted: bool
+    added_by: Literal["answer", "learner"]
+    used: bool
+
+
+class AddThreadDocumentsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    document_ids: Annotated[list[uuid.UUID], Field(min_length=1, max_length=50)]
+
+
+def _response(d: DocumentUsed) -> ThreadDocumentResponse:
+    return ThreadDocumentResponse(
+        document_id=d.document_id,
+        title=d.title,
+        authors=list(d.authors),
+        year=d.year,
+        archived=d.archived,
+        deleted=d.deleted,
+        added_by=d.added_by,
+        used=d.used,
+    )
 
 
 @router.get(
@@ -211,19 +236,43 @@ class ThreadDocumentResponse(BaseModel):
 def list_thread_documents(
     thread_id: uuid.UUID, principal: CurrentPrincipal, conversations: Conversations
 ) -> list[ThreadDocumentResponse]:
-    """The documents the conversation's answers drew on, in order of first use (PRD US-4b)."""
+    """The conversation's documents: those its answers drew on and those the learner added (PRD US-4b, US-4c)."""
     try:
         used = conversations.documents_used(ThreadId(str(thread_id)), principal.user_id)
     except ThreadNotFoundError as e:
         raise HTTPException(404, str(e)) from None
-    return [
-        ThreadDocumentResponse(
-            document_id=d.document_id,
-            title=d.title,
-            authors=list(d.authors),
-            year=d.year,
-            archived=d.archived,
-            deleted=d.deleted,
+    return [_response(d) for d in used]
+
+
+@router.post(
+    "/threads/{thread_id}/documents",
+    operation_id="add_thread_documents",
+    responses={404: {"description": "Not the caller's conversation, or a document that isn't their ready one."}},
+)
+def add_thread_documents(
+    thread_id: uuid.UUID, body: AddThreadDocumentsRequest, principal: CurrentPrincipal, conversations: Conversations
+) -> list[ThreadDocumentResponse]:
+    """Add the learner's ready, non-archived documents to the conversation's list (PRD US-4c); returns the list."""
+    try:
+        listed = conversations.add_documents(
+            ThreadId(str(thread_id)), principal.user_id, [DocumentId(str(d)) for d in body.document_ids]
         )
-        for d in used
-    ]
+    except (ThreadNotFoundError, DocumentNotAvailableError) as e:
+        raise HTTPException(404, str(e)) from None
+    return [_response(d) for d in listed]
+
+
+@router.delete(
+    "/threads/{thread_id}/documents/{document_id}",
+    operation_id="remove_thread_document",
+    status_code=204,
+    responses={404: {"description": "Not the caller's conversation."}},
+)
+def remove_thread_document(
+    thread_id: uuid.UUID, document_id: uuid.UUID, principal: CurrentPrincipal, conversations: Conversations
+) -> None:
+    """Take a document off the conversation's list (PRD US-4c); the document and old citations are unchanged."""
+    try:
+        conversations.remove_document(ThreadId(str(thread_id)), principal.user_id, DocumentId(str(document_id)))
+    except ThreadNotFoundError as e:
+        raise HTTPException(404, str(e)) from None
