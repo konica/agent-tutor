@@ -610,3 +610,41 @@ def test_openapi_names_the_rename() -> None:
     client, _, _ = setup()
     operation = client.get("/openapi.json").json()["paths"]["/threads/{thread_id}"]["patch"]
     assert operation["operationId"] == "rename_thread"
+
+
+# Started from a document (US-4c): listed as added by the learner; the answer marks it used.
+
+
+def test_a_thread_started_from_a_document_lists_it_once_as_used_when_the_answer_cites_it() -> None:
+    client, _, threads, ids = ask_with(lambda ids: DELTA + sources(ids[0]) + NO_CITATIONS + DONE)
+
+    response = client.post("/threads", json={**QUESTION, "document_id": ids[0]}, headers=AUTH)
+
+    assert response.status_code == 200
+    [row] = documents_of(client, threads)
+    assert (row["document_id"], row["added_by"], row["used"]) == (ids[0], "learner", True)
+
+
+def test_a_thread_started_from_a_document_lists_it_unused_when_the_answer_names_no_sources() -> None:
+    client, _, threads, ids = ask_with(lambda ids: DELTA + NO_CITATIONS + DONE)
+
+    assert client.post("/threads", json={**QUESTION, "document_id": ids[0]}, headers=AUTH).status_code == 200
+
+    [row] = documents_of(client, threads)
+    assert (row["document_id"], row["added_by"], row["used"]) == (ids[0], "learner", False)
+
+
+def test_a_starting_document_id_must_be_a_uuid() -> None:
+    client, _, _ = setup()
+
+    response = client.post("/threads", json={**QUESTION, "document_id": "not-a-uuid"}, headers=AUTH)
+
+    assert response.status_code == 422
+
+
+def test_openapi_declares_the_starting_document_and_its_404() -> None:
+    client, _, _ = setup()
+    spec = client.get("/openapi.json").json()
+    operation = spec["paths"]["/threads"]["post"]
+    assert "404" in operation["responses"]
+    assert "document_id" in spec["components"]["schemas"]["AskRequest"]["properties"]

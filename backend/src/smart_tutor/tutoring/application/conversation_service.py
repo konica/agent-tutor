@@ -24,11 +24,25 @@ class ConversationService:
         if not self._documents.has_ready_documents(user_id):
             raise NoDocumentsError("Upload a document first")
 
-    def start_thread(self, user_id: UserId, question: str | None = None) -> Thread:
-        """A new thread owned by the learner, persisted; its title starts as the first question."""
+    def require_readable(self, user_id: UserId, document_id: DocumentId) -> None:
+        """The document is the learner's ready, non-archived one (`can_read`), else "Document not found"."""
+        view = self._documents.documents_by_id(user_id, [document_id]).get(document_id)
+        if view is None or view.state != "ready" or view.archived:
+            raise DocumentNotAvailableError("Document not found")
+
+    def start_thread(
+        self, user_id: UserId, question: str | None = None, document_id: DocumentId | None = None
+    ) -> Thread:
+        """A new thread owned by the learner, persisted; its title starts as the first question. Started from a
+        document (US-4c), it lists that document as added by the learner; answers still search all documents."""
         self.require_documents(user_id)
-        thread = Thread.start(ThreadId(str(uuid.uuid4())), user_id, self._clock.now(), title=question)
+        if document_id is not None:
+            self.require_readable(user_id, document_id)
+        now = self._clock.now()
+        thread = Thread.start(ThreadId(str(uuid.uuid4())), user_id, now, title=question)
         self._threads.add(thread)
+        if document_id is not None:
+            self._threads.add_documents(ThreadId(thread.thread_id), [document_id], now)
         return thread
 
     def rename_thread(self, thread_id: ThreadId, user_id: UserId, title: str) -> Thread:
