@@ -32,7 +32,7 @@ export function UserMenu({ name, detail, onSignOut, compact = false }: Props) {
   return (
     <div className={styles.foot} ref={root} onKeyDown={onKeyDown} onBlur={onBlur}>
       {open && (
-        <div className={`${styles.menu} ${compact ? styles.compactMenu : ""}`} id={menuId}>
+        <div className={compact ? `${styles.menu} ${styles.compactMenu}` : styles.menu} id={menuId}>
           <div className={styles.head}>
             <strong>{name}</strong>
           </div>
@@ -47,7 +47,7 @@ export function UserMenu({ name, detail, onSignOut, compact = false }: Props) {
       <button
         type="button"
         ref={toggle}
-        className={`${styles.user} ${compact ? styles.compact : ""}`}
+        className={compact ? `${styles.user} ${styles.compact}` : styles.user}
         aria-label={compact ? name : undefined}
         data-tip={compact ? name : undefined}
         aria-expanded={open}

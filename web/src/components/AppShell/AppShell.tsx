@@ -30,7 +30,7 @@ export function AppShell() {
       {/* recent is filled when the conversations list exists (US-5) */}
       <SideNav collapsed={collapsed} onToggle={toggle} recent={[]} />
       <main ref={main} className={styles.main} id="main-content" tabIndex={-1}>
-        <div className={`${styles.page} ${wide ? styles.wide : ""}`}>
+        <div className={wide ? `${styles.page} ${styles.wide}` : styles.page}>
           <Outlet />
         </div>
       </main>

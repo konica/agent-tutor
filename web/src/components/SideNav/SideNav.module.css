@@ -24,7 +24,7 @@
 .foot { margin-top: auto; display: grid; gap: var(--sp-1); padding-top: var(--sp-2); border-top: 1px solid var(--border); }
 .collapse { justify-self: end; }
 /* Expanded: the button sits at the nav's right edge, so its tooltip opens leftward to stay inside the nav. */
-.collapse[data-tip]:hover::after, .collapse[data-tip]:focus-visible::after { left: auto; right: 0; transform: none; }
+.sidenav:not(.collapsed) .collapse[data-tip]:hover::after, .sidenav:not(.collapsed) .collapse[data-tip]:focus-visible::after { left: auto; right: 0; transform: none; }
 
 /* The icon rail: tooltips replace the labels and open to the right, so the rail must not clip them. */
 .collapsed { overflow: visible; }
@@ -33,5 +33,5 @@
 .collapsed .collapse { justify-self: center; }
 .collapsed .hr { margin: var(--sp-2) var(--sp-1); }
 .collapsed [data-tip]:hover::after, .collapsed [data-tip]:focus-visible::after {
-  left: calc(100% + 10px); top: 50%; transform: translateY(-50%);
+  left: calc(100% + 10px); right: auto; top: 50%; transform: translateY(-50%);
 }
