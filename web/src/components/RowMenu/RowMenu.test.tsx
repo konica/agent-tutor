@@ -31,6 +31,14 @@ describe("RowMenu", () => {
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
+  it("does not open while disabled", async () => {
+    render(<RowMenu label="More actions for Notes" items={[{ label: "Archive", icon: Archive, onSelect: vi.fn() }]} disabled />);
+    const button = screen.getByRole("button", { name: "More actions for Notes" });
+    expect(button).toBeDisabled();
+    await userEvent.click(button);
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
   it("opens the menu and focuses the first item", async () => {
     const { button } = setup();
     await userEvent.click(button);

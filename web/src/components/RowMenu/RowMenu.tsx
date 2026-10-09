@@ -5,10 +5,10 @@ import { IconButton } from "../Button/IconButton";
 import styles from "./RowMenu.module.css";
 
 type Item = { label: string; icon: LucideIcon; onSelect: () => void; danger?: boolean };
-type Props = { label: string; items: Item[] };
+type Props = { label: string; items: Item[]; disabled?: boolean };
 
 // The "More" menu at the end of a list row.
-export function RowMenu({ label, items }: Props) {
+export function RowMenu({ label, items, disabled = false }: Props) {
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const root = useRef<HTMLDivElement>(null);
@@ -47,6 +47,7 @@ export function RowMenu({ label, items }: Props) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
+        disabled={disabled}
         onClick={() => setOpen((v) => !v)}
       />
       {open && (

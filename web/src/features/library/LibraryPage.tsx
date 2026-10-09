@@ -1,13 +1,14 @@
-import { AlertCircle, Filter, Info, Upload } from "lucide-react";
+import { AlertCircle, Archive, Filter, Info, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import { SessionExpiredError } from "../../auth/authClient";
-import { findInLibrary, loadDocuments, loadSubjectSuggestions, loadUploadLimits, loadUploadStatus, megabytes, rejectionReason, RetriesUsedUpError, retryProcessing, saveSubjects as saveChosenSubjects, uploadPdf, type DocumentFilters, type DocumentResponse, type SubjectSuggestions, type UploadEvents, type UploadLimits, type UploadStatus } from "../../api/documents";
+import { archiveDocument, findInLibrary, loadDocuments, loadSubjectSuggestions, loadUploadLimits, loadUploadStatus, megabytes, rejectionReason, restoreDocument, RetriesUsedUpError, retryProcessing, saveSubjects as saveChosenSubjects, uploadPdf, type DocumentFilters, type DocumentResponse, type SubjectSuggestions, type UploadEvents, type UploadLimits, type UploadStatus } from "../../api/documents";
 import type { SubjectResponse } from "../../api/generated/types.gen";
 import { loadMySubjects } from "../../api/subjects";
 import { Button } from "../../components/Button/Button";
 import { EmptyState } from "../../components/EmptyState/EmptyState";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
+import { Tabs } from "../../components/Tabs/Tabs";
 import { UploadTray, type TrayItem } from "../../components/UploadTray/UploadTray";
 import { DropOverlay } from "./DropOverlay";
 import { DocumentTable } from "./DocumentTable";
@@ -15,6 +16,7 @@ import { hasFilters, LibraryFilters } from "./LibraryFilters";
 import { SubjectPicker } from "./SubjectPicker";
 import styles from "./LibraryPage.module.css";
 import { useDocuments } from "./useDocuments";
+import { useLibraryCounts } from "./useLibraryCounts";
 import { usePageDrop } from "./usePageDrop";
 
 type Props = {
@@ -27,8 +29,14 @@ type Props = {
   loadSuggestions?: (documentId: string) => Promise<SubjectSuggestions>;
   saveSubjects?: (documentId: string, choice: { subject_ids: string[]; new_names: string[] }) => Promise<DocumentResponse>;
   loadUpload?: (uploadId: string) => Promise<UploadStatus>;
+  archive?: (documentId: string) => Promise<DocumentResponse>;
+  restore?: (documentId: string) => Promise<DocumentResponse>;
   pollMs?: number;
 };
+
+type View = "active" | "archived";
+
+const ARCHIVED_NOTICE = "Archived documents aren't used for answers, but citations to them in past conversations still work. Restore a document to change its subjects.";
 
 function announceChange(doc: DocumentResponse): string | null {
   if (doc.state === "failed") return `${doc.title} failed${doc.failure_reason ? `: ${doc.failure_reason}` : ""}.`;
@@ -45,17 +53,28 @@ const defaultRetry = (id: string) => retryProcessing(id);
 const defaultLoadLimits = () => loadUploadLimits();
 const defaultCheck = (file: File) => findInLibrary(file);
 const defaultLoadUpload = (uploadId: string) => loadUploadStatus(uploadId);
+const defaultArchive = (id: string) => archiveDocument(id);
+const defaultRestore = (id: string) => restoreDocument(id);
 
 const defaultLoadSubjects = () => loadMySubjects();
 const defaultLoadSuggestions = (id: string) => loadSubjectSuggestions(id);
 const defaultSaveSubjects = (id: string, choice: { subject_ids: string[]; new_names: string[] }) => saveChosenSubjects(id, choice);
 
-// Library: upload by picking or dropping PDFs (US-2), the upload tray, and the document list narrowed by subject, upload dates and state (US-10). Tabs come later.
-export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSubjects, upload = defaultUpload, retry = defaultRetry, loadLimits = defaultLoadLimits, check = defaultCheck, loadSuggestions = defaultLoadSuggestions, saveSubjects = defaultSaveSubjects, loadUpload = defaultLoadUpload, pollMs = 2000 }: Props) {
+// Library: upload by picking or dropping PDFs (US-2), the upload tray, and the Active and Archived lists narrowed by subject, upload dates and state (US-10).
+export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSubjects, upload = defaultUpload, retry = defaultRetry, loadLimits = defaultLoadLimits, check = defaultCheck, loadSuggestions = defaultLoadSuggestions, saveSubjects = defaultSaveSubjects, loadUpload = defaultLoadUpload, archive = defaultArchive, restore = defaultRestore, pollMs = 2000 }: Props) {
   const [filters, setFilters] = useState<DocumentFilters>({});
-  const { documents, applied, unavailable, refresh } = useDocuments(load, pollMs, filters);
+  const [view, setView] = useState<View>("active");
+  const archivedView = view === "archived";
+  const { documents, applied, unavailable, refresh } = useDocuments(load, pollMs, archivedView ? { ...filters, archived: true } : filters);
+  const counts = useLibraryCounts(load);
+  // Until the selected tab's list arrives, the other tab's rows are not shown under it.
+  const list = documents !== null && Boolean(applied.archived) === archivedView ? documents : null;
   // The empty states follow the filters the list was loaded with, so clearing never flashes the upload card before the full list arrives.
   const filtered = hasFilters(filters) || hasFilters(applied);
+  const firstRun = !archivedView && list?.length === 0 && !filtered;
+  // The tabs stay while anything is archived, so an all-archived library can still reach its documents.
+  const showToolbar = documents !== null && !(firstRun && !counts.archived);
+  const [busy, setBusy] = useState<ReadonlySet<string>>(new Set()); // document ids whose archive or restore is running
   const [subjects, setSubjects] = useState<SubjectResponse[]>([]);
   const subjectSelect = useRef<HTMLSelectElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -247,6 +266,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
           started.uploadId = uploadId;
           setSending(documentId, true);
           void refresh();
+          void counts.refresh();
         },
         onProgress: (progress) => updateTray(id, { progress }),
       });
@@ -282,7 +302,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
         // Without a document id the row still says "Already in your library", just with no link.
         updateTray(trayId, { status: "already", documentId: found.document_id ?? undefined, archived: found.archived });
         setStatus(`${name}: Already in your library${found.archived ? ", archived" : ""}.`);
-        await refresh();
+        await Promise.all([refresh(), counts.refresh()]);
       }
       return;
     }
@@ -321,16 +341,61 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
     });
   }
 
+  // Switching tabs keeps the subject and date filters; the Archived tab has no State filter.
+  function changeView(next: View) {
+    if (next === view) return; // a click on the selected tab keeps its filters
+    setView(next);
+    setFilters(({ state: _state, ...rest }) => rest);
+    void counts.refresh();
+  }
+
+  const markBusy = (documentId: string, on: boolean) =>
+    setBusy((ids) => {
+      const next = new Set(ids);
+      if (on) next.add(documentId);
+      else next.delete(documentId);
+      return next;
+    });
+
+  async function changeArchived(doc: DocumentResponse, archiving: boolean) {
+    markBusy(doc.document_id, true);
+    try {
+      await (archiving ? archive : restore)(doc.document_id);
+      setStatus(archiving ? `${doc.title} archived. Find it under Archived.` : `${doc.title} restored.`);
+      statusRegion.current?.focus(); // the row leaves this list, and its buttons with it
+    } catch (error) {
+      // A 401 is left to the session screen.
+      if (!(error instanceof SessionExpiredError)) setStatus(`Couldn't ${archiving ? "archive" : "restore"} ${doc.title}. Try again.`);
+    }
+    await Promise.all([refresh(), counts.refresh(), refreshSubjects()]);
+    markBusy(doc.document_id, false);
+    if (document.activeElement === document.body) statusRegion.current?.focus(); // the disabled button lost focus
+  }
+
+  // An archived duplicate found by the server: restoring it turns the tray row into "Already in your library" with its link.
+  async function restoreFromTray(item: TrayItem) {
+    if (!item.documentId) return;
+    try {
+      await restore(item.documentId);
+      updateTray(item.id, { archived: false });
+      setStatus(`${item.name} restored.`);
+    } catch (error) {
+      if (!(error instanceof SessionExpiredError)) setStatus(`Couldn't restore ${item.name}. Try again.`);
+    }
+    if (document.activeElement === document.body) statusRegion.current?.focus(); // the Restore button is gone
+    await Promise.all([refresh(), counts.refresh(), refreshSubjects()]);
+  }
+
   const pick = () => input.current?.click();
 
   return (
     <>
       <PageHeader
         title="Library"
-        count={documents && documents.length > 0 && !filtered ? `${documents.length} ${documents.length === 1 ? "document" : "documents"}` : undefined}
+        count={counts.active ? `${counts.active} active ${counts.active === 1 ? "document" : "documents"}` : undefined}
         description="Your documents. They're private to you, and the tutor answers only from them."
         actions={
-          documents && (documents.length > 0 || filtered) ? (
+          documents !== null && !firstRun ? (
             <>
               <p className={styles.rights}>Only upload documents you have the right to use.</p>
               <Button variant="primary" icon={Upload} onClick={pick}>Upload</Button>
@@ -387,17 +452,37 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
           Can't load your library. Retrying…
         </p>
       )}
-      {documents && (documents.length > 0 || filtered) && (
+      {showToolbar && (
         <div className={styles.toolbar}>
-          <LibraryFilters ref={subjectSelect} filters={filters} onChange={setFilters} subjects={subjects} count={documents.length} needsSubjects={documents.filter((d) => d.state === "awaiting_subjects").length} onClear={clearFilters} />
+          <Tabs
+            label="Library view"
+            tabs={[
+              { value: "active", label: "Active", count: counts.active ?? undefined },
+              { value: "archived", label: "Archived", count: counts.archived ?? undefined },
+            ]}
+            value={view}
+            onChange={changeView}
+          />
+          <LibraryFilters ref={subjectSelect} filters={filters} onChange={setFilters} subjects={subjects} count={list ? list.length : null} needsSubjects={list ? list.filter((d) => d.state === "awaiting_subjects").length : 0} onClear={clearFilters} showState={!archivedView} />
         </div>
       )}
-      {documents?.length === 0 && filtered && (
+      {showToolbar && archivedView && (
+        <p className={styles.notice}>
+          <Info aria-hidden="true" strokeWidth={1.5} />
+          {ARCHIVED_NOTICE}
+        </p>
+      )}
+      {list?.length === 0 && filtered && (
         <EmptyState icon={Filter} title="No documents match these filters" actions={<Button onClick={clearFilters}>Clear filters</Button>}>
           <p>Try another subject, state or a wider date range.</p>
         </EmptyState>
       )}
-      {documents?.length === 0 && !filtered && (
+      {archivedView && list?.length === 0 && !filtered && (
+        <EmptyState icon={Archive} title="No archived documents">
+          <p>Archived documents leave search until you restore them.</p>
+        </EmptyState>
+      )}
+      {firstRun && (
         <EmptyState
           variant="dropzone"
           icon={Upload}
@@ -419,10 +504,21 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
           <p>Only upload documents you have the right to use.</p>
         </EmptyState>
       )}
-      {documents && documents.length > 0 && <DocumentTable documents={documents} onRetry={(d) => void onRetry(d)} retrying={retrying} onChooseSubjects={setPicking} uploading={uploading} />}
+      {list && list.length > 0 && (
+        <DocumentTable
+          documents={list}
+          onRetry={(d) => void onRetry(d)}
+          retrying={retrying}
+          onChooseSubjects={setPicking}
+          uploading={uploading}
+          onArchive={(d) => void changeArchived(d, true)}
+          onRestore={(d) => void changeArchived(d, false)}
+          busy={busy}
+        />
+      )}
       {picking && <SubjectPicker document={picking} load={loadSuggestions} save={saveSubjects} onClose={() => setPicking(null)} onSaved={(doc) => void onSaved(doc)} />}
       {dragging && !picking && <DropOverlay />}
-      <UploadTray items={tray} onClose={closeTray} />
+      <UploadTray items={tray} onClose={closeTray} onRestore={(item) => void restoreFromTray(item)} />
     </>
   );
 }
