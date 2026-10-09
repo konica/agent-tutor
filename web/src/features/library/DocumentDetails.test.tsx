@@ -201,4 +201,62 @@ describe("DocumentDetailsPanel", () => {
     await user.click(screen.getByRole("button", { name: "Close document details" }));
     expect(props.onClose).toHaveBeenCalled();
   });
+
+  it("does not refetch or lose the draft when the parent passes a new load function", async () => {
+    const user = userEvent.setup();
+    const props = {
+      documentId: "d1",
+      load: vi.fn(async (_id: string) => details()),
+      saveTitle: vi.fn(async () => details()),
+      archive: vi.fn(async () => ({})),
+      restore: vi.fn(async () => ({})),
+      onChanged: vi.fn(),
+      onClose: vi.fn(),
+    };
+    const { rerender } = render(<DocumentDetailsPanel {...props} />);
+    await user.click(await screen.findByRole("button", { name: "Edit title" }));
+    await user.type(field(), " draft");
+    const nextLoad = vi.fn(async (_id: string) => details());
+    rerender(<DocumentDetailsPanel {...props} load={nextLoad} />);
+    expect(props.load).toHaveBeenCalledTimes(1);
+    expect(nextLoad).not.toHaveBeenCalled();
+    expect(field()).toHaveValue("ReAct draft");
+  });
+
+  it("returns focus to Edit title after Cancel, Escape and a view-mode reset", async () => {
+    const user = userEvent.setup();
+    setup(details({ title: "Mine", title_overridden: true }));
+    await user.click(await screen.findByRole("button", { name: "Edit title" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("button", { name: "Edit title" })).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: "Edit title" }));
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("button", { name: "Edit title" })).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: "Reset to extracted title" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Edit title" })).toHaveFocus());
+  });
+
+  it("disables Archive while the title is being edited", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(await screen.findByRole("button", { name: "Edit title" }));
+    expect(screen.getByRole("button", { name: "Archive" })).toBeDisabled();
+  });
+
+  it("still reports the change when archiving worked but the reload failed", async () => {
+    const user = userEvent.setup();
+    const load = vi.fn().mockResolvedValueOnce(details()).mockRejectedValue(new Error("boom"));
+    const props = setup(details(), { load });
+    await user.click(await screen.findByRole("button", { name: "Archive" }));
+    await waitFor(() => expect(props.onChanged).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole("alert")).not.toHaveTextContent("Couldn't archive");
+  });
+
+  it("shows an archive failure and does not report a change", async () => {
+    const user = userEvent.setup();
+    const props = setup(details(), { archive: vi.fn(async () => { throw new Error(""); }) });
+    await user.click(await screen.findByRole("button", { name: "Archive" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't archive this document. Try again.");
+    expect(props.onChanged).not.toHaveBeenCalled();
+  });
 });

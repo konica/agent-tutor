@@ -40,6 +40,8 @@ export function DocumentDetailsPanel({ documentId, startEditing = false, load, s
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [refocus, setRefocus] = useState(0);
+  const pendingFocus = useRef(false);
   const [status, setStatus] = useState("");
   const headingId = useId();
   const labelId = useId();
@@ -48,11 +50,15 @@ export function DocumentDetailsPanel({ documentId, startEditing = false, load, s
   const errorId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const titleRowRef = useRef<HTMLDivElement>(null);
-  const refocusEdit = useRef(false);
+  const loadRef = useRef(load);
+
+  useEffect(() => {
+    loadRef.current = load;
+  });
 
   useEffect(() => {
     let live = true;
-    load(documentId).then(
+    loadRef.current(documentId).then(
       (loaded) => {
         if (!live) return;
         setDetails(loaded);
@@ -63,20 +69,25 @@ export function DocumentDetailsPanel({ documentId, startEditing = false, load, s
     return () => {
       live = false;
     };
-  }, [documentId, load]);
+  }, [documentId]); // load is read through a ref: a new function from the parent must not refetch or reset the draft
 
   const isEditing = editing && details !== null;
   useEffect(() => {
     if (isEditing) inputRef.current?.focus();
-    else if (refocusEdit.current) {
-      refocusEdit.current = false;
-      titleRowRef.current?.querySelector("button")?.focus(); // back to "Edit title"
-    }
   }, [isEditing]);
+
+  // Back to "Edit title" (or the heading when there is none) after an edit ends or a reset removes the focused button.
+  useEffect(() => {
+    if (!pendingFocus.current || busy || isEditing) return; // a disabled button can't take focus yet
+    pendingFocus.current = false;
+    const row = titleRowRef.current;
+    (row?.querySelector<HTMLElement>("button") ?? row?.querySelector<HTMLElement>("h2"))?.focus();
+  }, [refocus, busy, isEditing]);
 
   async function run(work: () => Promise<void>, message: string, failed: string) {
     setBusy(true);
     setError(null);
+    setStatus(""); // so a repeated message is announced again
     try {
       await work();
       setStatus(message);
@@ -96,17 +107,19 @@ export function DocumentDetailsPanel({ documentId, startEditing = false, load, s
   };
 
   const cancelEdit = () => {
-    refocusEdit.current = true;
     setError(null);
     setEditing(false);
+    pendingFocus.current = true;
+    setRefocus((n) => n + 1);
   };
 
   const store = (title: string | null, message: string, failed: string) => {
-    refocusEdit.current = true;
     void run(
       async () => {
         setDetails(await saveTitle(documentId, title));
         setEditing(false);
+        pendingFocus.current = true;
+        setRefocus((n) => n + 1);
       },
       message,
       failed,
@@ -123,15 +136,28 @@ export function DocumentDetailsPanel({ documentId, startEditing = false, load, s
 
   const resetTitle = () => store(null, "Title reset to the extracted title.", "Couldn't reset the title. Try again.");
 
-  const changeArchive = (archiving: boolean) =>
-    void run(
-      async () => {
-        await (archiving ? archive : restore)(documentId);
-        setDetails(await load(documentId));
-      },
-      archiving ? "Document archived." : "Document restored.",
-      archiving ? "Couldn't archive this document. Try again." : "Couldn't restore this document. Try again.",
-    );
+  // onChanged fires as soon as the mutation succeeds; a failed reload afterwards doesn't undo it.
+  async function changeArchive(archiving: boolean) {
+    setBusy(true);
+    setError(null);
+    setStatus(""); // so a repeated message is announced again
+    try {
+      await (archiving ? archive : restore)(documentId);
+    } catch (caught) {
+      if (!(caught instanceof SessionExpiredError)) setError((caught as Error).message || (archiving ? "Couldn't archive this document. Try again." : "Couldn't restore this document. Try again."));
+      setBusy(false);
+      return;
+    }
+    setStatus(archiving ? "Document archived." : "Document restored.");
+    onChanged();
+    try {
+      setDetails(await loadRef.current(documentId));
+    } catch (caught) {
+      if (!(caught instanceof SessionExpiredError)) setError("Couldn't refresh this document. Close and reopen it.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function onTitleKeyDown(event: KeyboardEvent) {
     if (event.key !== "Escape") return;
@@ -178,11 +204,11 @@ export function DocumentDetailsPanel({ documentId, startEditing = false, load, s
       footer={
         <div className={styles.footer}>
           {details.archived ? (
-            <Button variant="primary" icon={RotateCcw} disabled={busy} onClick={() => changeArchive(false)}>
+            <Button variant="primary" icon={RotateCcw} disabled={busy || isEditing} onClick={() => void changeArchive(false)}>
               Restore
             </Button>
           ) : (
-            <Button icon={Archive} disabled={busy} onClick={() => changeArchive(true)}>
+            <Button icon={Archive} disabled={busy || isEditing} onClick={() => void changeArchive(true)}>
               Archive
             </Button>
           )}
@@ -238,7 +264,7 @@ export function DocumentDetailsPanel({ documentId, startEditing = false, load, s
         ) : (
           <div className={styles.titleBlock}>
             <div className={styles.titleRow} ref={titleRowRef}>
-              <h2 id={headingId} className={styles.title}>
+              <h2 id={headingId} className={styles.title} tabIndex={-1}>
                 {details.title}
               </h2>
               {canRename && (
