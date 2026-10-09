@@ -11,7 +11,8 @@ import yaml
 CHART = Path(__file__).parents[2] / "deploy/helm/smart-tutor"
 PROD = ["-f", str(CHART / "values-prod.yaml")]
 DEPLOY = ["--set", "global.publicUrl=https://d111.cloudfront.net", "--set", "global.imageRegistry=reg.example",
-          "--set", "global.imageTag=abc123"]
+          "--set", "global.imageTag=abc123", "--set", "global.documentsBucket=docs-bucket",
+          "--set", "global.ingestQueueUrl=https://sqs.us-east-1.amazonaws.com/123/smart-tutor-ingest"]
 
 
 def render(*args: str) -> list[dict[str, Any]]:

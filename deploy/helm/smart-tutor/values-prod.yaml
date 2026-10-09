@@ -24,4 +24,4 @@ agent:
 mcp-server:
   enabled: true
 worker:
-  enabled: false
+  enabled: true

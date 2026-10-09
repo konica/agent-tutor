@@ -7,6 +7,10 @@ global:
   publicUrl: ""
   # SecretStore that ExternalSecrets read from (AWS Secrets Manager); empty renders no SecretStore or ExternalSecrets.
   secretStore: ""
+  # SmartTutor-prod-Storage outputs DocumentsBucketName and IngestQueueUrl, set at deploy time with --set. The API
+  # and worker won't render for AWS without them.
+  documentsBucket: ""
+  ingestQueueUrl: ""
 
 awsRegion: us-east-1
 

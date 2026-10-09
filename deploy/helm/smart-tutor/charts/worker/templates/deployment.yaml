@@ -1,0 +1,57 @@
+{{- if and .Values.global.secretStore (not .Values.global.documentsBucket) }}
+{{- fail "worker needs global.documentsBucket on AWS (SmartTutor-prod-Storage output DocumentsBucketName)" }}
+{{- end }}
+{{- if and .Values.global.secretStore (not .Values.global.ingestQueueUrl) }}
+{{- fail "worker needs global.ingestQueueUrl on AWS (SmartTutor-prod-Storage output IngestQueueUrl)" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  labels:
+    {{- include "worker.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "worker.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "worker.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: worker  # Pod Identity (ClusterStack) gives it the S3, SQS, SSM, and Bedrock access
+      terminationGracePeriodSeconds: 60  # it finishes the current poll on SIGTERM
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: {{ include "worker.image" . }}
+          env:
+            - name: SMART_TUTOR_ENVIRONMENT
+              value: prod
+            - name: SMART_TUTOR_AWS_REGION
+              value: {{ .Values.awsRegion | quote }}
+            - name: SMART_TUTOR_DOCUMENTS_BUCKET
+              value: {{ .Values.global.documentsBucket | quote }}
+            - name: SMART_TUTOR_INGEST_QUEUE_URL
+              value: {{ .Values.global.ingestQueueUrl | quote }}
+            - name: SMART_TUTOR_DATABASE_URL
+              valueFrom: {secretKeyRef: {name: worker-db, key: url}}
+            - name: HOME
+              value: /tmp  # botocore looks for ~/.aws; the root filesystem is read-only
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
