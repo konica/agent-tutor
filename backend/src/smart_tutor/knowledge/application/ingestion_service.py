@@ -9,6 +9,7 @@ only a file over the page limit, one we can't read, or one with no text layer en
 import hashlib
 import json
 import logging
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -17,7 +18,6 @@ from langchain_core.documents import Document as TextDocument
 from langchain_core.embeddings import Embeddings
 
 from smart_tutor.knowledge.application.describer import FIRST_PAGES, DocumentDescriber
-from smart_tutor.knowledge.application.upload_service import new_uuid
 from smart_tutor.knowledge.domain.chunk import Chunk, validate_chunk
 from smart_tutor.knowledge.domain.content import (
     NO_TEXT_LAYER,
@@ -37,6 +37,13 @@ from smart_tutor.knowledge.ports.pdf_extractor import PdfExtractor, TooManyPages
 from smart_tutor.shared.domain.ids import ContentId, UploadId, UserId
 
 logger = logging.getLogger(__name__)
+
+# Derived from the upload id so a redelivery reuses the contents/ key; the worker can't delete an orphan PDF there.
+CONTENT_ID_NAMESPACE = uuid.UUID("6f1c2a5e-8d3b-4e7a-9c41-2b5d7e9f0a13")
+
+
+def content_id_for(upload_id: UploadId) -> ContentId:
+    return ContentId(str(uuid.uuid5(CONTENT_ID_NAMESPACE, upload_id)))
 
 
 @dataclass(frozen=True)
@@ -59,10 +66,8 @@ class IngestionService:
         objects: ObjectStore,
         tools: ProcessingTools,
         limits: FileLimits,
-        new_id: Callable[[], str] = new_uuid,
     ) -> None:
         self._uow, self._objects, self._tools, self._limits = uow, objects, tools, limits
-        self._new_id = new_id
 
     def ingest_upload(self, key: str) -> UploadOutcome | None:
         """Store or reject one uploaded file. None means there was nothing new to store (not ours, or already handled).
@@ -109,7 +114,7 @@ class IngestionService:
             sha256 = hashlib.sha256(data).hexdigest()
             # Only this learner's contents are looked up (D18, D19): another learner's copy is never found.
             content, created = tx.contents.insert_or_get(
-                Content.first_upload(ContentId(self._new_id()), sha256, len(data), user_id)
+                Content.first_upload(content_id_for(upload_id), sha256, len(data), user_id)
             )
             if created:
                 self._objects.copy(key, content.s3_key)
