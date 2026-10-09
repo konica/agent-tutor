@@ -7,7 +7,7 @@ import { LibraryPage } from "./LibraryPage";
 
 const today = new Date().toISOString();
 const processing: DocumentResponse = { document_id: "d1", title: "lewis-rag-2020.pdf", state: "processing", failure_reason: null, created_at: today, subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: [], year: null };
-const duplicate: DocumentResponse = { document_id: "d2", title: "copy.pdf", state: "failed", failure_reason: "Duplicate uploads aren't supported yet", created_at: today, subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: [], year: null };
+const duplicate: DocumentResponse = { document_id: "d2", title: "copy.pdf", state: "failed", failure_reason: "This file isn't a readable PDF", created_at: today, subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: [], year: null };
 
 const notInLibrary = async () => null;
 const noSubjects = async () => [];
@@ -44,7 +44,7 @@ describe("LibraryPage", () => {
     render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => [duplicate]} upload={vi.fn()} />);
     const row = (await screen.findByText("copy.pdf")).closest("tr")!;
     expect(within(row).getByText("Failed")).toBeVisible();
-    expect(within(row).getByText("Duplicate uploads aren't supported yet")).toBeVisible();
+    expect(within(row).getByText("This file isn't a readable PDF")).toBeVisible();
   });
 
   it("uploads the picked PDF and refreshes the list", async () => {
@@ -151,7 +151,7 @@ describe("LibraryPage", () => {
   });
 
   it("announces a processing state change in the status region, but not the first load", async () => {
-    const failedNow: DocumentResponse = { ...processing, state: "failed", failure_reason: "Duplicate uploads aren't supported yet" };
+    const failedNow: DocumentResponse = { ...processing, state: "failed", failure_reason: "This file isn't a readable PDF" };
     let release!: () => void;
     const gate = new Promise<void>((resolve) => (release = resolve)); // the change arrives only after the first-load check
     const load = vi
@@ -166,7 +166,7 @@ describe("LibraryPage", () => {
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
     release();
     await waitFor(() =>
-      expect(screen.getByRole("status")).toHaveTextContent("lewis-rag-2020.pdf failed: Duplicate uploads aren't supported yet."),
+      expect(screen.getByRole("status")).toHaveTextContent("lewis-rag-2020.pdf failed: This file isn't a readable PDF."),
     );
   });
 
@@ -389,12 +389,42 @@ describe("LibraryPage drop zone and upload tray", () => {
     await screen.findByText("Upload your first document");
     drop([pdf("a.pdf")]);
     await waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
-    act(() => pending.get("a.pdf")!.events.onStarted!("d9"));
+    act(() => pending.get("a.pdf")!.events.onStarted!("d9", "u9"));
     const tr = (await screen.findByRole("cell", { name: /a\.pdf/ })).closest("tr")!;
     expect(within(tr).getByText("Uploading")).toBeVisible();
     expect(within(tr).queryByText("You can choose subjects when processing finishes.")).toBeNull();
     await act(async () => pending.get("a.pdf")!.resolve());
     expect(await within(tr).findByText("Processing")).toBeVisible();
+  });
+
+  it("turns the tray row into Already in your library when the server finds a duplicate", async () => {
+    const upload = vi.fn(async (_file: File, events: UploadEvents) => events.onStarted?.("d9", "u9"));
+    const loadUpload = vi
+      .fn()
+      .mockResolvedValueOnce({ upload_id: "u9", outcome: null, document_id: null, archived: false })
+      .mockResolvedValue({ upload_id: "u9", outcome: "duplicate", document_id: "d1", archived: false });
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => [processing]} upload={upload} loadUpload={loadUpload} pollMs={20} />);
+    await screen.findByText("lewis-rag-2020.pdf");
+    drop([pdf("copy.pdf")]);
+    const tray = await screen.findByRole("region", { name: "Uploads · 1 file" });
+    expect(await within(tray).findByText("Already in your library")).toBeVisible();
+    expect(within(tray).getByRole("link", { name: "Open document" })).toHaveAttribute("href", "#document-d1");
+    expect(loadUpload).toHaveBeenCalledWith("u9");
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("copy.pdf: Already in your library."));
+  });
+
+  it("keeps a stored upload as Uploaded and stops asking", async () => {
+    const upload = vi.fn(async (_file: File, events: UploadEvents) => events.onStarted?.("d9", "u9"));
+    const loadUpload = vi.fn(async () => ({ upload_id: "u9", outcome: "stored" as const, document_id: "d9", archived: false }));
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => [processing]} upload={upload} loadUpload={loadUpload} pollMs={20} />);
+    await screen.findByText("lewis-rag-2020.pdf");
+    drop([pdf("fresh.pdf")]);
+    await waitFor(() => expect(loadUpload).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+    expect(loadUpload).toHaveBeenCalledTimes(1);
+    expect(within(screen.getByRole("region", { name: "Uploads · 1 file" })).getByText("Uploaded · processing")).toBeVisible();
   });
 
   it("uploads by keyboard from the Upload button", async () => {

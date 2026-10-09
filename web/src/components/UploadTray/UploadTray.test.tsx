@@ -42,6 +42,19 @@ describe("UploadTray", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it("says a server-found duplicate is already in the library and links to it", () => {
+    render(<UploadTray items={[{ ...uploaded, status: "already", documentId: "d1", archived: false }]} onClose={vi.fn()} />);
+    const tray = screen.getByRole("region", { name: "Uploads · 1 file" });
+    expect(within(tray).getByText("Already in your library")).toBeVisible();
+    expect(within(tray).getByRole("link", { name: "Open document" })).toHaveAttribute("href", "#document-d1");
+  });
+
+  it("says an archived duplicate is archived, without a link", () => {
+    render(<UploadTray items={[{ ...uploaded, status: "already", documentId: "d1", archived: true }]} onClose={vi.fn()} />);
+    expect(screen.getByText("Already in your library, archived")).toBeVisible();
+    expect(screen.queryByRole("link")).toBeNull();
+  });
+
   it("collapses and expands the list by keyboard", async () => {
     render(<UploadTray items={[uploaded]} onClose={vi.fn()} />);
     const toggle = screen.getByRole("button", { name: "Collapse uploads" });
