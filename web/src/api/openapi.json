@@ -63,6 +63,28 @@
         "title": "ChooseSubjectsRequest",
         "type": "object"
       },
+      "DocumentFileResponse": {
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/DocumentResponse"
+          },
+          "expires_in": {
+            "title": "Expires In",
+            "type": "integer"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "expires_in",
+          "document"
+        ],
+        "title": "DocumentFileResponse",
+        "type": "object"
+      },
       "DocumentResponse": {
         "properties": {
           "archived": {
@@ -877,6 +899,61 @@
           }
         ],
         "summary": "Archive Document",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/documents/{document_id}/file": {
+      "get": {
+        "description": "A 5-minute link to the PDF for the document viewer (PRD \u00a78 US-4b, \u00a79.3 step 5); archived documents open too.",
+        "operationId": "get_document_file",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentFileResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not the caller's document."
+          },
+          "409": {
+            "description": "Still processing or failed."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Document File",
         "tags": [
           "knowledge"
         ]

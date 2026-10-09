@@ -15,6 +15,7 @@ from smart_tutor.knowledge.application import (
     RetryService,
     SubjectChoiceService,
     UploadService,
+    ViewerService,
     load_file_limits,
     load_max_attempts,
 )
@@ -39,6 +40,7 @@ class ApiServices:
     retries: RetryService
     archive: ArchiveService
     deletion: DeleteService
+    viewer: ViewerService
     subject_choice: SubjectChoiceService
     conversations: ConversationService
     agent: AgentClient
@@ -66,6 +68,7 @@ def build_services(settings: Settings) -> ApiServices:
         retries=RetryService(library, queue, max_attempts),
         archive=ArchiveService(library, SystemClock(), max_attempts),
         deletion=DeleteService(library, objects, conversations.keep_deleted_title),
+        viewer=ViewerService(library, objects, max_attempts),
         subject_choice=SubjectChoiceService(
             library,
             SubjectSuggester(subject_repo, names),

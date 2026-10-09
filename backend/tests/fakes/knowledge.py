@@ -251,10 +251,15 @@ class FakeObjectStore(ObjectStore):
         self.content_types: dict[str, str] = {}  # of objects stored with `put`
         self.presigned: list[tuple[str, str, int, int]] = []  # key, content type, max bytes, expires in
         self.versions_deleted: list[str] = []  # keys passed to delete_all_versions
+        self.presigned_gets: list[tuple[str, int]] = []  # key, expires in
 
     def presign_post(self, key: str, *, content_type: str, max_bytes: int, expires_in: int) -> PresignedPost:
         self.presigned.append((key, content_type, max_bytes, expires_in))
         return PresignedPost(url="http://s3.test/bucket", fields={"key": key, "Content-Type": content_type})
+
+    def presign_get(self, key: str, *, expires_in: int) -> str:
+        self.presigned_gets.append((key, expires_in))
+        return f"https://s3.test/{key}?expires={expires_in}"
 
     def read(self, key: str) -> bytes:
         try:
