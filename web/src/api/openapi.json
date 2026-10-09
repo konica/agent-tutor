@@ -1,6 +1,26 @@
 {
   "components": {
     "schemas": {
+      "AddThreadDocumentsRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "document_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Document Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "document_ids"
+        ],
+        "title": "AddThreadDocumentsRequest",
+        "type": "object"
+      },
       "AskRequest": {
         "additionalProperties": false,
         "properties": {
@@ -582,6 +602,14 @@
       },
       "ThreadDocumentResponse": {
         "properties": {
+          "added_by": {
+            "enum": [
+              "answer",
+              "learner"
+            ],
+            "title": "Added By",
+            "type": "string"
+          },
           "archived": {
             "title": "Archived",
             "type": "boolean"
@@ -605,6 +633,10 @@
             "title": "Title",
             "type": "string"
           },
+          "used": {
+            "title": "Used",
+            "type": "boolean"
+          },
           "year": {
             "anyOf": [
               {
@@ -623,7 +655,9 @@
           "authors",
           "year",
           "archived",
-          "deleted"
+          "deleted",
+          "added_by",
+          "used"
         ],
         "title": "ThreadDocumentResponse",
         "type": "object"
@@ -940,6 +974,46 @@
       }
     },
     "/documents/{document_id}": {
+      "delete": {
+        "description": "Delete the caller's document for good: its PDF, page text, and chunks (PRD \u00a78 US-10c).\n\nRefused while processing (409). Conversations keep their text and list it as deleted.",
+        "operationId": "delete_document",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Document",
+        "tags": [
+          "knowledge"
+        ]
+      },
       "get": {
         "description": "The caller's document with its facts, summary, and subjects, archived or not (PRD \u00a78 US-10).",
         "operationId": "get_document",
@@ -1514,7 +1588,7 @@
     },
     "/threads/{thread_id}/documents": {
       "get": {
-        "description": "The documents the conversation's answers drew on, in order of first use (PRD US-4b).",
+        "description": "The conversation's documents: those its answers drew on and those the learner added (PRD US-4b, US-4c).",
         "operationId": "list_thread_documents",
         "parameters": [
           {
@@ -1563,6 +1637,125 @@
           }
         ],
         "summary": "List Thread Documents",
+        "tags": [
+          "tutoring"
+        ]
+      },
+      "post": {
+        "description": "Add the learner's ready, non-archived documents to the conversation's list (PRD US-4c); returns the list.",
+        "operationId": "add_thread_documents",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "thread_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Thread Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddThreadDocumentsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ThreadDocumentResponse"
+                  },
+                  "title": "Response Add Thread Documents",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not the caller's conversation, or a document that isn't their ready one."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Add Thread Documents",
+        "tags": [
+          "tutoring"
+        ]
+      }
+    },
+    "/threads/{thread_id}/documents/{document_id}": {
+      "delete": {
+        "description": "Take a document off the conversation's list (PRD US-4c); the document and old citations are unchanged.",
+        "operationId": "remove_thread_document",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "thread_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Thread Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not the caller's conversation."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Remove Thread Document",
         "tags": [
           "tutoring"
         ]

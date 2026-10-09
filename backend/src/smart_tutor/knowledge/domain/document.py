@@ -129,6 +129,11 @@ class Document:
         title = None if raw is None else clean_title(raw)
         self.title_override = None if title == self.content_title else title
 
+    def check_deletable(self) -> None:
+        """Delete is refused only while processing (PRD §9.5); archived and failed documents can go."""
+        if self.state is DocumentState.PROCESSING:
+            raise DocumentStateError("This document is still processing")
+
     def link_content(self, content_id: ContentId) -> None:
         if not self.awaiting_upload:
             raise DocumentStateError("This document already has its content")

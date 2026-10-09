@@ -80,6 +80,9 @@ class _Contents(ContentRepository):
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
+    def remove(self, content_id: ContentId) -> None:
+        self._conn.execute(delete(contents).where(contents.c.content_id == content_id))
+
     def insert_or_get(self, content: Content) -> tuple[Content, bool]:
         inserted = self._conn.execute(
             insert(contents)
@@ -330,6 +333,9 @@ class _Uploads(UploadRepository):
 class _Chunks(ChunkRepository):
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
+
+    def remove_for_content(self, content_id: ContentId) -> None:
+        self._conn.execute(delete(chunks).where(chunks.c.content_id == content_id))
 
     def replace(self, content_id: ContentId, new_chunks: list[Chunk]) -> None:
         self._conn.execute(delete(chunks).where(chunks.c.content_id == content_id))

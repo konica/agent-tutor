@@ -1,7 +1,7 @@
 import { SessionExpiredError } from "../auth/authClient";
 import type { Client } from "./generated/client";
 import { client } from "./generated/client.gen";
-import { archiveDocument as postArchive, checkDuplicate, chooseSubjects, getDocument, getSubjectSuggestions, getUpload, getUploadLimits, listDocuments, restoreDocument as postRestore, retryDocument, setDocumentTitle, startUpload } from "./generated/sdk.gen";
+import { archiveDocument as postArchive, checkDuplicate, chooseSubjects, deleteDocument as sendDelete, getDocument, getSubjectSuggestions, getUpload, getUploadLimits, listDocuments, restoreDocument as postRestore, retryDocument, setDocumentTitle, startUpload } from "./generated/sdk.gen";
 import type { DocumentDetailsResponse, DocumentResponse, SubjectSuggestionsResponse, SuggestionResponse, UploadLimitsResponse, UploadStatusResponse } from "./generated/types.gen";
 
 export type { DocumentResponse };
@@ -94,6 +94,31 @@ export async function saveDocumentTitle(documentId: string, title: string | null
   if (sessionOver(error, response)) throw new SessionExpiredError();
   if (!data) throw failure(error);
   return data;
+}
+
+// 404 on delete: the document is already gone (deleted in another tab), which is what the learner wanted.
+export class DocumentGoneError extends Error {
+  constructor() {
+    super("Document not found");
+    this.name = "DocumentGoneError";
+  }
+}
+
+// 409 on delete: the document is processing again (a retry); the message is the server's.
+export class DocumentProcessingError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DocumentProcessingError";
+  }
+}
+
+// Deleting removes the PDF, its text and chunks for good (PRD US-10c).
+export async function deleteDocument(documentId: string, apiClient: Client = client): Promise<void> {
+  const { error, response } = await sendDelete({ client: apiClient, path: { document_id: documentId }, throwOnError: false });
+  if (sessionOver(error, response)) throw new SessionExpiredError();
+  if (response?.status === 404) throw new DocumentGoneError();
+  if (response?.status === 409) throw new DocumentProcessingError(failure(error).message);
+  if (!response?.ok) throw failure(error);
 }
 
 export async function loadUploadLimits(apiClient: Client = client): Promise<UploadLimits> {

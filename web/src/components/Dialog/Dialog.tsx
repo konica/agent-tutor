@@ -5,7 +5,7 @@ import { IconButton } from "../Button/IconButton";
 import styles from "./Dialog.module.css";
 import { useModal } from "./useModal";
 
-type Props = { title: string; kicker?: string; wide?: boolean; onClose: () => void; children: ReactNode; footer: ReactNode };
+type Props = { title: ReactNode; kicker?: string; wide?: boolean; onClose: () => void; children: ReactNode; footer: ReactNode };
 
 // A modal over the page (DESIGN.md → Accessibility): focus moves in, Tab stays in, Escape closes, focus goes back.
 export function Dialog({ title, kicker, wide, onClose, children, footer }: Props) {

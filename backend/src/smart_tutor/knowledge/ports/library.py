@@ -33,6 +33,10 @@ class ContentRepository(ABC):
     def save(self, content: Content) -> None:
         """Write back state, failure_reason, attempts, and how it was processed (pages, text_key, chunker, ...)."""
 
+    @abstractmethod
+    def remove(self, content_id: ContentId) -> None:
+        """Delete the content row; its chunks must be gone first."""
+
 
 class DocumentRepository(ABC):
     @abstractmethod
@@ -117,6 +121,10 @@ class ChunkRepository(ABC):
     @abstractmethod
     def replace(self, content_id: ContentId, chunks: list[Chunk]) -> None:
         """Make these the content's only chunks (idempotent: processing twice never duplicates)."""
+
+    @abstractmethod
+    def remove_for_content(self, content_id: ContentId) -> None:
+        """Delete every chunk of the content."""
 
     @abstractmethod
     def search(self, user_id: UserId, embedding: list[float], k: int) -> list[ChunkHit]:

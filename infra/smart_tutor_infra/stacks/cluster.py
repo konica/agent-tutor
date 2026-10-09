@@ -118,7 +118,7 @@ class ClusterStack(cdk.Stack):
         )
 
         # The API signs uploads into uploads/ (the browser's POST is authorised as this role), sends Retry messages
-        # (#95), reads its startup parameters, and embeds subject names.
+        # (#95), reads its startup parameters, embeds subject names, and deletes a document's files, every version.
         self._pod_identity(
             "Api",
             "smart-tutor",
@@ -127,6 +127,12 @@ class ClusterStack(cdk.Stack):
                 statements=[
                     ssm,
                     iam.PolicyStatement(actions=["s3:PutObject"], resources=[f"{bucket_arn}/uploads/*"]),
+                    iam.PolicyStatement(
+                        actions=["s3:ListBucketVersions"],
+                        resources=[bucket_arn],
+                        conditions={"StringLike": {"s3:prefix": ["contents/*"]}},
+                    ),
+                    iam.PolicyStatement(actions=["s3:DeleteObjectVersion"], resources=[f"{bucket_arn}/contents/*"]),
                     iam.PolicyStatement(actions=["sqs:SendMessage"], resources=[queue_arn]),
                     embed,
                 ]

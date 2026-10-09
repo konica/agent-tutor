@@ -222,6 +222,34 @@ def test_replace_with_no_chunks_only_deletes(engine: Engine) -> None:
         assert count.scalar_one() == 0
 
 
+def test_removing_a_content_and_its_chunks_leaves_other_contents(engine: Engine) -> None:
+    owner = f"ada-{uid()}"
+    gone_doc, kept_doc = start(engine, owner), start(engine, owner)
+    gone, kept = stored_content(engine, owner), stored_content(engine, owner)
+    link(engine, gone_doc, gone)
+    link(engine, kept_doc, kept)
+    with SqlLibraryUnitOfWork(engine) as tx:
+        tx.chunks.replace(gone.content_id, [chunk(gone, 0, 1, 0.1), chunk(gone, 1, 2, 0.2)])
+        tx.chunks.replace(kept.content_id, [chunk(kept, 0, 1, 0.3)])
+        tx.commit()
+
+    with SqlLibraryUnitOfWork(engine) as tx:
+        tx.chunks.remove_for_content(gone.content_id)
+        tx.documents.remove(gone_doc.document_id)
+        tx.contents.remove(gone.content_id)
+        tx.commit()
+
+    def count(table: str, content: Content) -> int:
+        with engine.connect() as conn:
+            query = text(f"select count(*) from {table} where content_id = :c")
+            return conn.execute(query, {"c": content.content_id}).scalar_one()
+
+    assert count("chunks", gone) == 0
+    assert count("contents", gone) == 0
+    assert count("chunks", kept) > 0
+    assert count("contents", kept) == 1
+
+
 def test_ready_content_fields_round_trip(engine: Engine) -> None:
     content = stored_content(engine, f"ada-{uid()}")
     with SqlLibraryUnitOfWork(engine) as tx:

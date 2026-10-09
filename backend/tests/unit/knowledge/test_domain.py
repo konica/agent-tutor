@@ -428,3 +428,14 @@ def test_set_title_refusal_keeps_the_old_override() -> None:
     with pytest.raises(InvalidTitleError):
         doc.set_title("   ")
     assert doc.title_override == "Mine"
+
+
+def test_only_a_processing_document_cant_be_deleted() -> None:
+    doc = new_document()
+    with pytest.raises(DocumentStateError):
+        doc.check_deletable()
+    for state in (DocumentState.AWAITING_SUBJECTS, DocumentState.READY, DocumentState.FAILED):
+        doc.state = state
+        doc.check_deletable()
+    doc.archived = True
+    doc.check_deletable()

@@ -534,3 +534,46 @@ def test_set_title_refuses_a_bad_body(client: TestClient, body: dict[str, object
 def test_set_title_of_an_unknown_document_is_404(client: TestClient) -> None:
     unknown = "00000000-0000-4000-8000-0000000000aa"
     assert client.put(f"/documents/{unknown}/title", json={"title": "x"}, headers=AUTH).status_code == 404
+
+
+def test_delete_answers_204_and_the_document_leaves_both_lists(client: TestClient) -> None:
+    active, archived = ready_document(client), ready_document(client)
+    client.post(f"/documents/{archived}/archive", headers=AUTH)
+
+    for doc in (active, archived):
+        r = client.delete(f"/documents/{doc}", headers=AUTH)
+        assert (r.status_code, r.content) == (204, b"")
+
+    assert listed_ids(client, {}) == set()
+    assert listed_ids(client, {"archived": "true"}) == set()
+
+
+def test_delete_of_a_processing_document_is_409(client: TestClient) -> None:
+    doc = client.post("/uploads", json={"file_name": "paper.pdf"}, headers=AUTH).json()["document_id"]
+
+    r = client.delete(f"/documents/{doc}", headers=AUTH)
+
+    assert (r.status_code, r.json()["detail"]) == (409, "This document is still processing")
+    assert listed_ids(client, {}) == {doc}
+
+
+def test_delete_of_an_unknown_document_is_404(client: TestClient) -> None:
+    r = client.delete("/documents/00000000-0000-4000-8000-0000000000aa", headers=AUTH)
+
+    assert (r.status_code, r.json()["detail"]) == (404, "Document not found")
+
+
+def test_delete_needs_a_token(client: TestClient) -> None:
+    assert client.delete("/documents/00000000-0000-4000-8000-0000000000aa").status_code == 401
+
+
+def test_a_deleted_documents_subject_leaves_my_subjects_unless_another_document_has_it(client: TestClient) -> None:
+    shared, other = ready_document(client), awaiting_document(client)
+    client.put(f"/documents/{other}/subjects", json={"new_names": ["Topology"]}, headers=AUTH)
+    names = {s["name"] for s in client.get("/me/subjects", headers=AUTH).json()}
+    assert names == {"General", "Topology"}
+
+    assert client.delete(f"/documents/{other}", headers=AUTH).status_code == 204
+
+    assert [s["subject_id"] for s in client.get("/me/subjects", headers=AUTH).json()] == [GENERAL]
+    assert listed_ids(client, {}) == {shared}

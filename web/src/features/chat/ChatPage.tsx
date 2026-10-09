@@ -2,11 +2,13 @@ import { ArrowUp, CircleAlert, Clock, FileText, PanelLeft, Upload } from "lucide
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import {
+  addThreadDocuments,
   askInNewThread,
   AskRefusedError,
   formatCitation,
   loadDocumentsUsed,
   NoDocumentsError,
+  removeThreadDocument,
   renameConversation,
   type ChatCitation,
   type ChatEvent,
@@ -20,6 +22,7 @@ import { EmptyState } from "../../components/EmptyState/EmptyState";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
 import styles from "./ChatPage.module.css";
 import { ConversationPanel } from "./ConversationPanel";
+import { DocumentPicker } from "./DocumentPicker";
 import { ThreadTitle } from "./ThreadTitle";
 import { usePanelOpen } from "./usePanelOpen";
 
@@ -27,6 +30,9 @@ type Props = {
   ask?: (question: string) => AsyncIterable<ChatEvent>;
   loadDocs?: () => Promise<DocumentResponse[]>;
   loadUsed?: (threadId: string) => Promise<ThreadDocumentResponse[]>;
+  loadReady?: () => Promise<DocumentResponse[]>;
+  addDocs?: (threadId: string, documentIds: string[]) => Promise<ThreadDocumentResponse[]>;
+  removeDoc?: (threadId: string, documentId: string) => Promise<void>;
   /** Resolves with the saved title. */
   rename?: (threadId: string, title: string) => Promise<string>;
 };
@@ -49,6 +55,9 @@ const GENERIC_FAILURE = "The tutor couldn't answer right now. Try again in a mom
 const defaultAsk = (question: string) => askInNewThread(question);
 const defaultLoadDocs = () => loadDocuments();
 const defaultLoadUsed = (threadId: string) => loadDocumentsUsed(threadId);
+const defaultLoadReady = () => loadDocuments({ state: "ready" });
+const defaultAddDocs = (threadId: string, documentIds: string[]) => addThreadDocuments(threadId, documentIds);
+const defaultRemoveDoc = (threadId: string, documentId: string) => removeThreadDocument(threadId, documentId);
 const defaultRename = (threadId: string, title: string) => renameConversation(threadId, title);
 
 function processingHint(count: number) {
@@ -62,6 +71,9 @@ export function ChatPage({
   ask = defaultAsk,
   loadDocs = defaultLoadDocs,
   loadUsed = defaultLoadUsed,
+  loadReady = defaultLoadReady,
+  addDocs = defaultAddDocs,
+  removeDoc = defaultRemoveDoc,
   rename = defaultRename,
 }: Props) {
   const [question, setQuestion] = useState("");
@@ -78,6 +90,9 @@ export function ChatPage({
   const [answered, setAnswered] = useState(false);
   const [showCitations, setShowCitations] = useState(true);
   const [panelOpen, togglePanel] = usePanelOpen();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  // Said by the status region once a document is added or removed (DESIGN.md → Accessibility).
+  const [announcement, setAnnouncement] = useState("");
   const alive = useRef(true);
   const busy = useRef(false);
   const sourcesId = useId();
@@ -126,6 +141,7 @@ export function ChatPage({
     setThreadId(null);
     setRenamed(null);
     setAnswered(false);
+    setPickerOpen(false);
     // The protocol always ends with done or error; a stream that just stops (dropped connection) failed.
     let ended = false;
     let done = false;
@@ -174,6 +190,32 @@ export function ChatPage({
     } catch {
       // The answer is complete either way; only the panel's list is missing.
       if (alive.current && turn.current === forTurn) setUsedFailed(true);
+    }
+  }
+
+  // Rejecting keeps the picker open with its error; a SessionExpiredError was already reported by the API client.
+  async function addDocuments(threadId: string, documentIds: string[]) {
+    const forTurn = turn.current;
+    const documents = await addDocs(threadId, documentIds);
+    if (!alive.current || turn.current !== forTurn) return;
+    setUsed(documents);
+    setUsedFailed(false);
+    setPickerOpen(false);
+    const n = documentIds.length;
+    setAnnouncement(`${n === 1 ? "1 document" : `${n} documents`} added to this conversation.`);
+  }
+
+  // Optimistic: the row goes at once (the panel moves focus to the next row); a failure reloads the list so the panel
+  // shows the truth. A SessionExpiredError was already reported; the session screen replaces this page.
+  async function removeDocument(threadId: string, documentId: string) {
+    const forTurn = turn.current;
+    const removed = used.find((d) => d.document_id === documentId);
+    setUsed((list) => list.filter((d) => d.document_id !== documentId));
+    if (removed) setAnnouncement(`${removed.title} removed from this conversation.`);
+    try {
+      await removeDoc(threadId, documentId);
+    } catch (error) {
+      if (alive.current && turn.current === forTurn && !(error instanceof SessionExpiredError)) void showDocumentsUsed(threadId, forTurn);
     }
   }
 
@@ -236,6 +278,8 @@ export function ChatPage({
     );
   }
 
+  // A citation to a deleted document keeps its [n] but loses the title and page: references read "Deleted document".
+  const deletedIds = new Set(used.filter((d) => d.deleted).map((d) => d.document_id));
   // The title starts as the first question until the learner renames it (PRD §9.4).
   const title = renamed ?? (exchange ? exchange.question : "New conversation");
   const toggleLabel = panelOpen ? "Hide panel" : "Show panel";
@@ -259,6 +303,10 @@ export function ChatPage({
         <ThreadTitle title={title} editable={threadId !== null} onRename={renameTitle} />
       </header>
 
+      <p role="status" className="visually-hidden">
+        {announcement}
+      </p>
+
       <div className={`${styles.body} ${panelOpen ? styles.withPanel : ""}`}>
         {panelOpen && (
           <ConversationPanel
@@ -269,6 +317,16 @@ export function ChatPage({
             answered={answered}
             showCitations={showCitations}
             onShowCitationsChange={setShowCitations}
+            onAddDocuments={() => setPickerOpen(true)}
+            onRemoveDocument={threadId === null ? undefined : (documentId) => void removeDocument(threadId, documentId)}
+          />
+        )}
+        {pickerOpen && threadId !== null && (
+          <DocumentPicker
+            listedIds={new Set(used.map((d) => d.document_id))}
+            loadReady={loadReady}
+            onAdd={(documentIds) => addDocuments(threadId, documentIds)}
+            onClose={() => setPickerOpen(false)}
           />
         )}
 
@@ -303,16 +361,25 @@ export function ChatPage({
                     </span>
                     {/* Each source shows the [n] the answer's text uses for it; an answer may cite [2] without [1]. */}
                     <ul className={styles.sourceList} aria-labelledby={sourcesId}>
-                      {exchange.citations.map((c) => (
-                        <li key={c.chunk_id}>
-                          <span className={styles.source} title={formatCitation(c)}>
-                            <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
-                            <span className={styles.sourceMarker}>[{c.n}]</span>{" "}
-                            <span className={styles.sourceTitle}>{c.document_title}</span>{" "}
-                            <span>· {c.page === null ? "page unavailable" : `p. ${c.page}`}</span>
-                          </span>
-                        </li>
-                      ))}
+                      {exchange.citations.map((c) =>
+                        deletedIds.has(c.document_id) ? (
+                          <li key={c.chunk_id}>
+                            <span className={`${styles.source} ${styles.sourceDeleted}`} title="Deleted document">
+                              <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
+                              <span className={styles.sourceMarker}>[{c.n}]</span> Deleted document
+                            </span>
+                          </li>
+                        ) : (
+                          <li key={c.chunk_id}>
+                            <span className={styles.source} title={formatCitation(c)}>
+                              <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
+                              <span className={styles.sourceMarker}>[{c.n}]</span>{" "}
+                              <span className={styles.sourceTitle}>{c.document_title}</span>{" "}
+                              <span>· {c.page === null ? "page unavailable" : `p. ${c.page}`}</span>
+                            </span>
+                          </li>
+                        ),
+                      )}
                     </ul>
                   </div>
                 )}

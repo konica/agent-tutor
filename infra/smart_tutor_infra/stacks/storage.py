@@ -3,7 +3,7 @@
 `uploads/<user>/<id>.pdf` (browser presigned POST, expires after 1 day; each upload notifies the ingest queue) and
 `contents/<owner_id>/<content_id>.pdf` and `.pages.json` (the worker's per-learner copies and page text). Versioned and
 retained on teardown. CORS lets only the web app's address POST (the upload); on-premise has none until its Host stack
-has an address (#149).
+has an address (#149). On-premise also keeps its nightly database dumps under `backups/` (#151), which expire.
 """
 
 from typing import Any
@@ -19,11 +19,20 @@ from smart_tutor_infra.names import ModeNames
 # A 500-page PDF is extracted, described, chunked, and embedded in one receive; the SQS default (30 s) would hand the
 # same upload to the worker again while it's still working.
 INGEST_VISIBILITY = cdk.Duration.minutes(15)
+# The on-premise host's nightly pg_dump (HostStack may write only here).
+BACKUPS_PREFIX = "backups/"
 
 
 class StorageStack(cdk.Stack):
     def __init__(
-        self, scope: Construct, construct_id: str, *, names: ModeNames, web_origin: str | None, **kwargs: Any
+        self,
+        scope: Construct,
+        construct_id: str,
+        *,
+        names: ModeNames,
+        web_origin: str | None,
+        backups_retention: cdk.Duration | None = None,
+        **kwargs: Any,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
@@ -45,6 +54,24 @@ class StorageStack(cdk.Stack):
             removal_policy=cdk.RemovalPolicy.DESTROY,
         )
 
+        lifecycle_rules = [
+            s3.LifecycleRule(
+                prefix="uploads/",
+                expiration=cdk.Duration.days(1),
+                noncurrent_version_expiration=cdk.Duration.days(1),
+                abort_incomplete_multipart_upload_after=cdk.Duration.days(1),
+            )
+        ]
+        if backups_retention:
+            lifecycle_rules.append(
+                s3.LifecycleRule(
+                    prefix=BACKUPS_PREFIX,
+                    expiration=backups_retention,
+                    noncurrent_version_expiration=cdk.Duration.days(1),
+                    abort_incomplete_multipart_upload_after=cdk.Duration.days(1),
+                )
+            )
+
         bucket = s3.Bucket(
             self,
             "DocumentsBucket",
@@ -54,14 +81,7 @@ class StorageStack(cdk.Stack):
             enforce_ssl=True,
             versioned=True,
             removal_policy=cdk.RemovalPolicy.RETAIN,
-            lifecycle_rules=[
-                s3.LifecycleRule(
-                    prefix="uploads/",
-                    expiration=cdk.Duration.days(1),
-                    noncurrent_version_expiration=cdk.Duration.days(1),
-                    abort_incomplete_multipart_upload_after=cdk.Duration.days(1),
-                )
-            ],
+            lifecycle_rules=lifecycle_rules,
             cors=[
                 s3.CorsRule(allowed_methods=[s3.HttpMethods.POST], allowed_origins=[web_origin], allowed_headers=["*"])
             ]

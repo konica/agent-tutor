@@ -7,6 +7,7 @@ and links nothing.
 
 import hashlib
 
+import httpx
 from fastapi.testclient import TestClient
 
 from fakes import (
@@ -16,11 +17,15 @@ from fakes import (
     FakeQueue,
     FakeTokenVerifier,
     InMemoryLibrary,
+    InMemoryThreads,
     api_services,
+    fake_agent,
     fake_tools,
+    ingest_ready,
 )
 from smart_tutor.apps.api.main import create_app
 from smart_tutor.knowledge.application import IngestionService, UploadOutcome
+from smart_tutor.knowledge.domain.content import content_key, pages_key
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.domain.principal import Principal
@@ -29,14 +34,19 @@ A = {"Authorization": "Bearer token-a"}
 B = {"Authorization": "Bearer token-b"}
 
 
-def setup() -> tuple[TestClient, FakeObjectStore, IngestionService]:
+def setup_with_library() -> tuple[TestClient, FakeObjectStore, IngestionService, InMemoryLibrary]:
     verifier = FakeTokenVerifier()
     verifier.add("token-a", Principal(UserId("learner-a"), "A", frozenset({"learner"})))
     verifier.add("token-b", Principal(UserId("learner-b"), "B", frozenset({"learner"})))
     library, objects = InMemoryLibrary(), FakeObjectStore()
     services = api_services(library, objects, queue=FakeQueue())
     client = TestClient(create_app(Settings(), verifier=verifier, services=services))
-    return client, objects, IngestionService(library.unit_of_work, objects, fake_tools(), TEST_LIMITS)
+    return client, objects, IngestionService(library.unit_of_work, objects, fake_tools(), TEST_LIMITS), library
+
+
+def setup() -> tuple[TestClient, FakeObjectStore, IngestionService]:
+    client, objects, ingestion, _ = setup_with_library()
+    return client, objects, ingestion
 
 
 def test_b_never_sees_documents_in_any_state() -> None:
@@ -208,3 +218,60 @@ def test_b_cannot_see_or_rename_as_document_and_keeps_own_title_for_same_file() 
     assert client.put(f"/documents/{docs['a']}/title", json={"title": "A's"}, headers=A).json()["title"] == "A's"
     assert client.get(f"/documents/{docs['b']}", headers=B).json()["title"] == b_title
     assert client.get(f"/documents/{docs['a']}", headers=A).json()["title"] == "A's"
+
+
+def test_b_cant_delete_as_document_and_as_copy_of_the_same_file_is_untouched() -> None:
+    client, objects, ingestion, library = setup_with_library()
+    pdf = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
+    a = client.post("/uploads", json={"file_name": "a.pdf"}, headers=A).json()
+    b = client.post("/uploads", json={"file_name": "b.pdf"}, headers=B).json()
+    for started in (a, b):
+        objects.objects[started["fields"]["key"]] = pdf
+        ingestion.ingest_upload(started["fields"]["key"])
+    state = library.state
+    content_of = {d.document_id: d.content_id for d in state.documents.values()}
+    a_content, b_content = content_of[a["document_id"]], content_of[b["document_id"]]
+    assert a_content != b_content  # two contents (ADR 0011)
+    assert state.chunks[a_content] and state.chunks[b_content]
+
+    assert client.delete(f"/documents/{a['document_id']}", headers=B).status_code == 404
+    assert [d["document_id"] for d in client.get("/documents", headers=A).json()] == [a["document_id"]]
+    assert objects.versions_deleted == []
+
+    assert client.delete(f"/documents/{a['document_id']}", headers=A).status_code == 204
+
+    state = library.state  # committed work replaces the state object
+    assert client.get("/documents", headers=A).json() == []
+    assert a["document_id"] not in state.documents and a_content not in state.contents
+    assert not state.chunks.get(a_content)
+    assert sorted(objects.versions_deleted) == sorted(
+        [content_key(UserId("learner-a"), a_content), pages_key(UserId("learner-a"), a_content)]
+    )
+    assert [d["document_id"] for d in client.get("/documents", headers=B).json()] == [b["document_id"]]
+    assert b["document_id"] in state.documents and b_content in state.contents and state.chunks[b_content]
+    assert content_key(UserId("learner-b"), b_content) in objects.objects
+
+
+def test_after_a_delete_as_conversation_lists_it_as_deleted() -> None:
+    library, threads = InMemoryLibrary(), InMemoryThreads()
+    doc = ingest_ready(library, "learner-a", "Attention weighs tokens.")
+    title = library.state.documents[doc].file_name
+    body = (
+        b'event: delta\ndata: {"text": "Hi"}\n\n'
+        + f'event: sources\ndata: {{"document_ids": ["{doc}"]}}\n\n'.encode()
+        + b"event: done\ndata: {}\n\n"
+    )
+    agent = fake_agent(lambda request: httpx.Response(200, content=body, headers={"content-type": "text/event-stream"}))
+    verifier = FakeTokenVerifier()
+    verifier.add("token-a", Principal(UserId("learner-a"), "A", frozenset({"learner"})))
+    verifier.add("token-b", Principal(UserId("learner-b"), "B", frozenset({"learner"})))
+    services = api_services(library, threads=threads, agent=agent)
+    client = TestClient(create_app(Settings(), verifier=verifier, services=services))
+    assert client.post("/threads", json={"question": "What is attention?"}, headers=A).status_code == 200
+    [thread] = threads.threads.values()
+
+    assert client.delete(f"/documents/{doc}", headers=A).status_code == 204
+
+    listed = client.get(f"/threads/{thread.thread_id}/documents", headers=A).json()
+    assert [(d["title"], d["deleted"]) for d in listed] == [(title, True)]
+    assert client.get(f"/threads/{thread.thread_id}/documents", headers=B).status_code == 404

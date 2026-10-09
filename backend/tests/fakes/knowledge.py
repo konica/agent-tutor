@@ -63,6 +63,9 @@ class _Contents(ContentRepository):
     def save(self, content: Content) -> None:
         self._s.contents[content.content_id] = copy.deepcopy(content)
 
+    def remove(self, content_id: ContentId) -> None:
+        self._s.contents.pop(content_id, None)
+
 
 class _Documents(DocumentRepository):
     def __init__(self, state: _State) -> None:
@@ -196,6 +199,9 @@ class _Chunks(ChunkRepository):
     def replace(self, content_id: ContentId, chunks: list[Chunk]) -> None:
         self._s.chunks[content_id] = copy.deepcopy(chunks)
 
+    def remove_for_content(self, content_id: ContentId) -> None:
+        self._s.chunks.pop(content_id, None)
+
     def search(self, user_id: UserId, embedding: list[float], k: int) -> list[ChunkHit]:
         def title(d: Document) -> str:
             content = self._s.contents.get(d.content_id) if d.content_id is not None else None
@@ -244,6 +250,7 @@ class FakeObjectStore(ObjectStore):
         self.objects: dict[str, bytes] = {}
         self.content_types: dict[str, str] = {}  # of objects stored with `put`
         self.presigned: list[tuple[str, str, int, int]] = []  # key, content type, max bytes, expires in
+        self.versions_deleted: list[str] = []  # keys passed to delete_all_versions
 
     def presign_post(self, key: str, *, content_type: str, max_bytes: int, expires_in: int) -> PresignedPost:
         self.presigned.append((key, content_type, max_bytes, expires_in))
@@ -264,3 +271,8 @@ class FakeObjectStore(ObjectStore):
 
     def delete(self, key: str) -> None:
         self.objects.pop(key, None)
+
+    def delete_all_versions(self, key: str) -> None:
+        self.versions_deleted.append(key)
+        self.objects.pop(key, None)
+        self.content_types.pop(key, None)

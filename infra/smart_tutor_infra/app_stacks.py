@@ -53,11 +53,25 @@ def _on_premise(app: cdk.App, env: cdk.Environment, names: ModeNames) -> list[cd
         or f"arn:aws:iam::{cdk.Aws.ACCOUNT_ID}:oidc-provider/{GITHUB_OIDC_HOST}",
     )
     return [
-        StorageStack(app, f"{prefix}-Storage", env=env, names=names, web_origin=None),
+        StorageStack(
+            app, f"{prefix}-Storage", env=env, names=names, web_origin=None, backups_retention=cdk.Duration.days(30)
+        ),
         ConfigStack(app, f"{prefix}-Config", env=env, names=names),
         _budgets(app, env, names),
         deploy,
-        HostStack(app, f"{prefix}-Host", env=env),
+        HostStack(
+            app,
+            f"{prefix}-Host",
+            env=env,
+            names=names,
+            instance_type=app.node.get_context("smart-tutor:on-premise-instance-type"),
+            # Empty: <Elastic IP>.sslip.io until the DuckDNS name is claimed (#154).
+            domain=app.node.try_get_context("smart-tutor:on-premise-domain") or None,
+            # Empty: a blank data volume. Set only to restore one (docs/runbooks/on-premise-backups.md); clearing it
+            # again replaces the restored volume with a blank one.
+            data_snapshot_id=app.node.try_get_context("smart-tutor:on-premise-data-snapshot-id") or None,
+            alert_emails=app.node.get_context("smart-tutor:budget-alert-emails"),
+        ),
     ]
 
 

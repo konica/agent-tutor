@@ -89,6 +89,40 @@ describe("DocumentTable archive and restore", () => {
     expect(onArchive).toHaveBeenCalledExactlyOnceWith(doc);
   });
 
+  it("lists Delete… after Archive in a ready row's menu and calls onDelete", async () => {
+    const onDelete = vi.fn();
+    render(<DocumentTable documents={[doc]} {...props} onArchive={vi.fn()} onDelete={onDelete} />);
+    await userEvent.click(screen.getByRole("button", { name: "More actions for Toolformer" }));
+    const menu = screen.getByRole("menu", { name: "More actions for Toolformer" });
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Archive", "Delete…"]);
+    await userEvent.click(within(menu).getByRole("menuitem", { name: "Delete…" }));
+    expect(onDelete).toHaveBeenCalledExactlyOnceWith(doc);
+  });
+
+  it("offers no Delete… while a document is processing", async () => {
+    render(<DocumentTable documents={[{ ...doc, state: "processing" }]} {...props} onArchive={vi.fn()} onDelete={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "More actions for Toolformer" }));
+    expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Archive"]);
+  });
+
+  it("offers an archived processing row Restore and no More menu", () => {
+    render(<DocumentTable documents={[{ ...doc, state: "processing", archived: true }]} {...props} onRestore={vi.fn()} onDelete={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Restore Toolformer" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "More actions for Toolformer" })).toBeNull();
+  });
+
+  it("gives an archived row Restore and a More menu with only Delete…", async () => {
+    const onDelete = vi.fn();
+    const archived = { ...doc, archived: true };
+    render(<DocumentTable documents={[archived]} {...props} onRestore={vi.fn()} onDelete={onDelete} />);
+    const row = screen.getByText("Toolformer").closest("tr")!;
+    expect(within(row).getByRole("button", { name: "Restore Toolformer" })).toBeVisible();
+    await userEvent.click(within(row).getByRole("button", { name: "More actions for Toolformer" }));
+    expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Delete…"]);
+    await userEvent.click(screen.getByRole("menuitem", { name: "Delete…" }));
+    expect(onDelete).toHaveBeenCalledExactlyOnceWith(archived);
+  });
+
   it("gives a row still uploading no More menu", () => {
     render(<DocumentTable documents={[doc]} {...props} onArchive={vi.fn()} uploading={new Set(["d1"])} />);
     expect(screen.queryByRole("button", { name: "More actions for Toolformer" })).toBeNull();

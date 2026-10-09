@@ -5,6 +5,16 @@ export type ClientOptions = {
 };
 
 /**
+ * AddThreadDocumentsRequest
+ */
+export type AddThreadDocumentsRequest = {
+    /**
+     * Document Ids
+     */
+    document_ids: Array<string>;
+};
+
+/**
  * AskRequest
  */
 export type AskRequest = {
@@ -339,6 +349,10 @@ export type SuggestionResponse = {
  */
 export type ThreadDocumentResponse = {
     /**
+     * Added By
+     */
+    added_by: 'answer' | 'learner';
+    /**
      * Archived
      */
     archived: boolean;
@@ -358,6 +372,10 @@ export type ThreadDocumentResponse = {
      * Title
      */
     title: string;
+    /**
+     * Used
+     */
+    used: boolean;
     /**
      * Year
      */
@@ -514,6 +532,36 @@ export type CheckDuplicateResponses = {
 };
 
 export type CheckDuplicateResponse = CheckDuplicateResponses[keyof CheckDuplicateResponses];
+
+export type DeleteDocumentData = {
+    body?: never;
+    path: {
+        /**
+         * Document Id
+         */
+        document_id: string;
+    };
+    query?: never;
+    url: '/documents/{document_id}';
+};
+
+export type DeleteDocumentErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteDocumentError = DeleteDocumentErrors[keyof DeleteDocumentErrors];
+
+export type DeleteDocumentResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteDocumentResponse = DeleteDocumentResponses[keyof DeleteDocumentResponses];
 
 export type GetDocumentData = {
     body?: never;
@@ -891,6 +939,80 @@ export type ListThreadDocumentsResponses = {
 };
 
 export type ListThreadDocumentsResponse = ListThreadDocumentsResponses[keyof ListThreadDocumentsResponses];
+
+export type AddThreadDocumentsData = {
+    body: AddThreadDocumentsRequest;
+    path: {
+        /**
+         * Thread Id
+         */
+        thread_id: string;
+    };
+    query?: never;
+    url: '/threads/{thread_id}/documents';
+};
+
+export type AddThreadDocumentsErrors = {
+    /**
+     * Not the caller's conversation, or a document that isn't their ready one.
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AddThreadDocumentsError = AddThreadDocumentsErrors[keyof AddThreadDocumentsErrors];
+
+export type AddThreadDocumentsResponses = {
+    /**
+     * Response Add Thread Documents
+     *
+     * Successful Response
+     */
+    200: Array<ThreadDocumentResponse>;
+};
+
+export type AddThreadDocumentsResponse = AddThreadDocumentsResponses[keyof AddThreadDocumentsResponses];
+
+export type RemoveThreadDocumentData = {
+    body?: never;
+    path: {
+        /**
+         * Thread Id
+         */
+        thread_id: string;
+        /**
+         * Document Id
+         */
+        document_id: string;
+    };
+    query?: never;
+    url: '/threads/{thread_id}/documents/{document_id}';
+};
+
+export type RemoveThreadDocumentErrors = {
+    /**
+     * Not the caller's conversation.
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RemoveThreadDocumentError = RemoveThreadDocumentErrors[keyof RemoveThreadDocumentErrors];
+
+export type RemoveThreadDocumentResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type RemoveThreadDocumentResponse = RemoveThreadDocumentResponses[keyof RemoveThreadDocumentResponses];
 
 export type StartUploadData = {
     body: StartUploadRequest;

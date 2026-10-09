@@ -1,6 +1,6 @@
 """Library routes (knowledge module): start an upload, report what became of it (US-11), list the caller's
 documents, check a file hash against them, retry a failed one, suggest and save its subjects, archive and restore a
-document, show a document's details and set its display title."""
+document, show a document's details and set its display title, delete one for good."""
 
 from datetime import date, datetime
 from typing import Annotated, Literal
@@ -9,7 +9,16 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-from smart_tutor.apps.api.deps import Archive, CurrentPrincipal, Documents, Retries, SubjectChoice, Subjects, Uploads
+from smart_tutor.apps.api.deps import (
+    Archive,
+    CurrentPrincipal,
+    Deletion,
+    Documents,
+    Retries,
+    SubjectChoice,
+    Subjects,
+    Uploads,
+)
 from smart_tutor.knowledge.application import (
     DocumentDetails,
     DocumentNotFoundError,
@@ -327,4 +336,18 @@ def retry_document(document_id: UUID, principal: CurrentPrincipal, retries: Retr
     except DocumentNotFoundError:
         raise HTTPException(404, "Document not found") from None
     except RetryLimitError as e:
+        raise HTTPException(409, str(e)) from None
+
+
+@router.delete("/documents/{document_id}", operation_id="delete_document", status_code=status.HTTP_204_NO_CONTENT)
+def delete_document(document_id: UUID, principal: CurrentPrincipal, deletion: Deletion) -> None:
+    """Delete the caller's document for good: its PDF, page text, and chunks (PRD §8 US-10c).
+
+    Refused while processing (409). Conversations keep their text and list it as deleted.
+    """
+    try:
+        deletion.delete(principal.user_id, DocumentId(str(document_id)))
+    except DocumentNotFoundError:
+        raise HTTPException(404, "Document not found") from None
+    except DocumentStateError as e:
         raise HTTPException(409, str(e)) from None

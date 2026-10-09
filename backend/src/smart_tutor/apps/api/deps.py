@@ -8,6 +8,7 @@ from smart_tutor.apps.api.agent_client import AgentClient
 from smart_tutor.apps.api.services import ApiServices
 from smart_tutor.knowledge.application import (
     ArchiveService,
+    DeleteService,
     DocumentService,
     RetryService,
     SubjectChoiceService,
@@ -20,6 +21,7 @@ from smart_tutor.tutoring.application import ConversationService
 __all__ = [
     "Agent",
     "Archive",
+    "Deletion",
     "BearerToken",
     "Conversations",
     "CurrentPrincipal",
@@ -53,6 +55,10 @@ def _archive(request: Request) -> ArchiveService:
     return _services(request).archive
 
 
+def _deletion(request: Request) -> DeleteService:
+    return _services(request).deletion
+
+
 def _subject_choice(request: Request) -> SubjectChoiceService:
     return _services(request).subject_choice
 
@@ -73,6 +79,7 @@ Uploads = Annotated[UploadService, Depends(_uploads)]
 Documents = Annotated[DocumentService, Depends(_documents)]
 Retries = Annotated[RetryService, Depends(_retries)]
 Archive = Annotated[ArchiveService, Depends(_archive)]
+Deletion = Annotated[DeleteService, Depends(_deletion)]
 Subjects = Annotated[SubjectNames, Depends(_subject_names)]
 SubjectChoice = Annotated[SubjectChoiceService, Depends(_subject_choice)]
 Conversations = Annotated[ConversationService, Depends(_conversations)]

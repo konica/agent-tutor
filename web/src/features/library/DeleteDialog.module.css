@@ -1,0 +1,6 @@
+.text { margin: 0; }
+.alternative {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+  padding: var(--sp-3); background: var(--surface-2); border-radius: var(--r-md);
+}
+.error { margin: 0; color: var(--danger); font-size: var(--fs-13); }

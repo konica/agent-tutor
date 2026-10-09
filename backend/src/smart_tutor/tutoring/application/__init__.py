@@ -4,6 +4,7 @@ from smart_tutor.tutoring.application.answer import NO_CHUNKS_ANSWER, answer_mes
 from smart_tutor.tutoring.application.conversation_service import ConversationService
 from smart_tutor.tutoring.domain.document_used import DELETED_DOCUMENT, DocumentUsed
 from smart_tutor.tutoring.domain.errors import (
+    DocumentNotAvailableError,
     InvalidTitleError,
     NoDocumentsError,
     RetrievalError,
@@ -19,6 +20,7 @@ __all__ = [
     "DELETED_DOCUMENT",
     "NO_CHUNKS_ANSWER",
     "ConversationService",
+    "DocumentNotAvailableError",
     "DocumentUsed",
     "InvalidTitleError",
     "NoDocumentsError",

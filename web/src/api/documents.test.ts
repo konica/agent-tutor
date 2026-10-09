@@ -4,6 +4,9 @@ import { SessionExpiredError } from "../auth/authClient";
 import { configureApiClient } from "./client";
 import {
   archiveDocument,
+  DocumentGoneError,
+  deleteDocument,
+  DocumentProcessingError,
   findInLibrary,
   loadDocumentDetails,
   loadDocuments,
@@ -409,5 +412,40 @@ describe("document details", () => {
   it("rejects with SessionExpiredError on 401 when saving", async () => {
     const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
     await expect(saveDocumentTitle("d1", "x", apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+});
+
+describe("deleteDocument", () => {
+  it("sends DELETE to the document's path and resolves on 204", async () => {
+    const { apiClient, fetch } = api(() => new Response(null, { status: 204 }));
+    await expect(deleteDocument("d3", apiClient)).resolves.toBeUndefined();
+    const request = fetch.mock.calls[0]![0] as Request;
+    expect(request.method).toBe("DELETE");
+    expect(request.url).toBe("http://api.test/documents/d3");
+  });
+
+  it("rejects with SessionExpiredError on 401", async () => {
+    const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
+    await expect(deleteDocument("d3", apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+
+  it("rejects with DocumentGoneError on 404 (already deleted)", async () => {
+    const { apiClient } = api(() => json({ detail: "Document not found" }, 404));
+    await expect(deleteDocument("d3", apiClient)).rejects.toBeInstanceOf(DocumentGoneError);
+  });
+
+  it("rejects with DocumentProcessingError carrying the server's message on 409", async () => {
+    const { apiClient } = api(() => json({ detail: "This document is still processing" }, 409));
+    const rejection = deleteDocument("d3", apiClient);
+    await expect(rejection).rejects.toBeInstanceOf(DocumentProcessingError);
+    await expect(rejection).rejects.toThrow("This document is still processing");
+  });
+
+  it("rejects with a plain error on other failures", async () => {
+    const { apiClient } = api(() => json({ detail: "boom" }, 500));
+    const rejection = deleteDocument("d3", apiClient);
+    await expect(rejection).rejects.toThrow("boom");
+    await expect(rejection).rejects.not.toBeInstanceOf(DocumentGoneError);
+    await expect(rejection).rejects.not.toBeInstanceOf(DocumentProcessingError);
   });
 });

@@ -6,6 +6,9 @@
     "smart-tutor:github-environment": "pilot",
     "smart-tutor:eks-admin-principal-arns": ["arn:aws:iam::685394474162:user/poweruser"],
     "smart-tutor:budget-monthly-usd": 20,
-    "smart-tutor:budget-alert-emails": ["dtrungthao@gmail.com"]
+    "smart-tutor:budget-alert-emails": ["dtrungthao@gmail.com"],
+    "smart-tutor:on-premise-instance-type": "t3.large",
+    "smart-tutor:on-premise-domain": "",
+    "smart-tutor:on-premise-data-snapshot-id": ""
   }
 }

@@ -1,0 +1,165 @@
+# On-premise mode (#148, ADR 0012): Smart Tutor on one VM. deploy.sh runs it with the env file it renders from SSM and
+# Secrets Manager (/etc/smart-tutor/smart-tutor.env, root only); runbook: docs/runbooks/on-premise-deploy.md.
+#   docker compose -f /opt/smart-tutor/on-premise/compose.yaml --env-file /etc/smart-tutor/smart-tutor.env ps
+# Our images come from ECR by commit tag. Caddy is the only service with public ports. Data lives on the data volume
+# (/data). The worker, agent, and MCP server join in #149.
+
+name: smart-tutor
+
+x-logging: &logging
+  driver: json-file
+  options: {max-size: 10m, max-file: "5"}
+
+services:
+  postgres:
+    image: &postgres-image pgvector/pgvector:0.8.7-pg17
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      # Read only by deploy.sh's role bootstrap (psql \getenv), so the passwords never appear on a command line.
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
+    volumes:
+      - /data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  keycloak:
+    image: ${REGISTRY:?}/smart-tutor/keycloak:${IMAGE_TAG:?}
+    restart: unless-stopped
+    logging: *logging
+    command: [start, --optimized, --import-realm]
+    environment:
+      # The public address with /auth (ADR 0012); without it Keycloak refuses to start.
+      KC_HOSTNAME: https://${DOMAIN:?}/auth
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"  # the API introspects at keycloak:8080 (ADR 0007)
+      KC_HTTP_ENABLED: "true"  # TLS ends at Caddy
+      KC_PROXY_HEADERS: xforwarded  # Caddy sets X-Forwarded-Proto and -Host itself, so cookies are Secure
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:?}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
+      # Read by the realm import (the Helm chart's realm file).
+      SMART_TUTOR_PUBLIC_URL: https://${DOMAIN:?}
+      SMART_TUTOR_API_CLIENT_SECRET: ${API_CLIENT_SECRET:?}
+      SMART_TUTOR_MCP_CLIENT_SECRET: ${MCP_CLIENT_SECRET:?}
+    volumes:
+      - ../helm/smart-tutor/charts/keycloak/files/realm-smart-tutor.json:/opt/keycloak/data/import/realm-smart-tutor.json:ro
+    mem_limit: 1536m  # the JVM sizes its heap from the limit, not from the VM
+    healthcheck:
+      # The image has no curl: speak HTTP over bash's /dev/tcp to the management port.
+      test:
+        - CMD
+        - bash
+        - -c
+        - "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /auth/health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q ' 200 ' <&3"
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 180s  # the first start creates the schema and imports the realm
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  # Alembic to head; deploy.sh runs it before starting a new tag (`docker compose run --rm migrate`).
+  migrate:
+    image: ${REGISTRY:?}/smart-tutor/api:${IMAGE_TAG:?}
+    profiles: [tools]
+    logging: *logging
+    command: ["python", "-m", "smart_tutor.apps.jobs.migrate"]
+    environment:
+      SMART_TUTOR_DATABASE_URL: ${APP_DATABASE_URL:?}  # built by deploy.sh (see there)
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  # Scheduled jobs (profile `jobs`) are one-off containers a systemd timer starts with `docker compose run --rm`
+  # (docs/runbooks/on-premise-backups.md, "Scheduled jobs"). This one dumps one database to /data/backups for
+  # backup.sh: `run --rm -T pg-dump --file=/backups/<file> <database>`. The server's image, so pg_dump matches it.
+  pg-dump:
+    image: *postgres-image
+    profiles: [jobs]
+    logging: *logging
+    entrypoint: [pg_dump, --host=postgres, --username=postgres, --format=custom]
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?}
+    volumes:
+      - /data/backups:/backups
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  api:
+    image: ${REGISTRY:?}/smart-tutor/api:${IMAGE_TAG:?}
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      SMART_TUTOR_ENVIRONMENT: prod
+      SMART_TUTOR_ROOT_PATH: /api
+      SMART_TUTOR_AWS_REGION: ${AWS_REGION:?}
+      AWS_REGION: ${AWS_REGION:?}
+      SMART_TUTOR_KEYCLOAK_ISSUER: https://${DOMAIN:?}/auth/realms/smart-tutor
+      SMART_TUTOR_KEYCLOAK_INTERNAL_URL: http://keycloak:8080/auth/realms/smart-tutor
+      SMART_TUTOR_KEYCLOAK_CLIENT_ID: smart-tutor-api
+      SMART_TUTOR_KEYCLOAK_CLIENT_SECRET: ${API_CLIENT_SECRET:?}
+      SMART_TUTOR_AGENT_URL: http://agent:8080
+      SMART_TUTOR_DATABASE_URL: ${APP_DATABASE_URL:?}  # built by deploy.sh (see there)
+      SMART_TUTOR_CORS_ORIGINS: "[]"  # the web app calls /api on its own origin
+      SMART_TUTOR_DOCUMENTS_BUCKET: ${DOCUMENTS_BUCKET:?}
+      SMART_TUTOR_INGEST_QUEUE_URL: ${INGEST_QUEUE_URL:?}
+      # On-premise has its own SSM path (ConfigStack); the defaults name native-cloud's.
+      SMART_TUTOR_MAX_UPLOAD_MB_PARAM: ${SSM_PATH:?}/max-upload-mb
+      SMART_TUTOR_MAX_PAGES_PARAM: ${SSM_PATH:?}/max-pages
+      SMART_TUTOR_MAX_PROCESSING_ATTEMPTS_PARAM: ${SSM_PATH:?}/max-processing-attempts
+      SMART_TUTOR_APP_TIME_ZONE_PARAM: ${SSM_PATH:?}/app-time-zone
+      SMART_TUTOR_LEARNING_RECORD_IDLE_MINUTES_PARAM: ${SSM_PATH:?}/learning-record-idle-minutes
+      HOME: /tmp  # botocore looks for ~/.aws; the image user has no home. Credentials come from the instance profile.
+    mem_limit: 512m
+    healthcheck:
+      # /healthz needs neither a token nor Keycloak.
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8080/healthz', timeout=5)"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      postgres: {condition: service_healthy}
+      keycloak: {condition: service_started}
+
+  web:
+    image: ${REGISTRY:?}/smart-tutor/web:${IMAGE_TAG:?}
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 128m
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # One origin: `/` → web, `/api/*` → API, `/auth/*` → Keycloak; a Let's Encrypt certificate for DOMAIN (ADR 0012).
+  caddy:
+    image: caddy:2.11-alpine
+    restart: unless-stopped
+    logging: *logging
+    ports: ["80:80", "443:443"]
+    environment:
+      SMART_TUTOR_DOMAIN: ${DOMAIN:?}
+    labels:
+      # A bind-mounted file keeps its old contents after a redeploy; a changed digest recreates the container.
+      smart-tutor.caddyfile-sha256: ${CADDYFILE_SHA256:?}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /data/caddy/data:/data  # certificates and the ACME account survive replacing the VM
+      - /data/caddy/config:/config
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      web: {condition: service_started}
+      api: {condition: service_started}
+      keycloak: {condition: service_started}

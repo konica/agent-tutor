@@ -1,0 +1,26 @@
+/* The Add documents picker (DESIGN.md → Density): a full-width search over a scrolling list of 36px rows. */
+.search {
+  width: 100%; min-height: var(--control-h); padding: 0 var(--sp-3); border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--text); font-size: var(--fs-14);
+}
+
+.list {
+  max-height: 320px; overflow-y: auto; margin: 0; padding: 0; list-style: none;
+  border: 1px solid var(--border); border-radius: var(--r-md);
+}
+.list > li + li { border-top: 1px solid var(--border); }
+/* Checkbox, title (truncated; the full title is its tooltip), then authors · year or "In this conversation". */
+.row {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--sp-2);
+  min-height: 36px; padding: 0 var(--sp-3); font-size: var(--fs-13); color: var(--text); cursor: pointer;
+}
+.row:hover { background: var(--surface-2); }
+.row input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.row:has(input:disabled) { color: var(--text-2); cursor: default; }
+.title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.meta { font-size: var(--fs-12); color: var(--text-2); white-space: nowrap; }
+.empty { display: flex; align-items: center; min-height: 36px; margin: 0; padding: 0 var(--sp-3); font-size: var(--fs-13); color: var(--text-2); }
+
+/* Never truncated, with an icon (DESIGN.md → Never smaller). */
+.error { display: flex; align-items: flex-start; gap: var(--sp-2); margin: 0; color: var(--danger); font-size: var(--fs-13); }
+.errorIcon { width: 16px; height: 16px; flex: none; margin-top: 1px; }
