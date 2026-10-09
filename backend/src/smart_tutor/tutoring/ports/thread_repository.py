@@ -24,11 +24,23 @@ class ThreadRepository(ABC):
 
     @abstractmethod
     def add_documents_used(self, thread_id: ThreadId, document_ids: Sequence[DocumentId], at: datetime) -> None:
-        """Append the documents not listed yet, in this order, first used `at`.
+        """Append the documents not listed yet, in this order, added and first used `at`.
 
-        Already listed ones keep their place (committed when this returns).
+        A listed one keeps its place and is marked first used `at` if it wasn't used yet
+        (committed when this returns).
         """
 
     @abstractmethod
+    def add_documents(self, thread_id: ThreadId, document_ids: Sequence[DocumentId], at: datetime) -> None:
+        """The learner adds these documents, in this order, not used yet; listed ones are unchanged (committed)."""
+
+    @abstractmethod
+    def remove_document(self, thread_id: ThreadId, document_id: DocumentId) -> None:
+        """Take the document off the list, if listed (committed). The document itself is untouched."""
+
+    @abstractmethod
     def documents_used(self, thread_id: ThreadId) -> list[ThreadDocument]:
-        """In order of first use. (Callers check ownership first with `get_owned`.)"""
+        """The thread's document list in the order documents joined it.
+
+        (Callers check ownership first with `get_owned`.)
+        """

@@ -454,7 +454,8 @@ def test_documents_list_marks_archived_and_deleted() -> None:
     archived, deleted = documents_of(client, threads)
 
     assert archived["document_id"] == ids[0] and archived["archived"] is True and archived["deleted"] is False
-    assert set(archived) == {"document_id", "title", "authors", "year", "archived", "deleted"}
+    assert set(archived) == {"document_id", "title", "authors", "year", "archived", "deleted", "added_by", "used"}
+    assert archived["added_by"] == "answer" and archived["used"] is True
     assert deleted == {
         "document_id": UNKNOWN_DOCUMENT,
         "title": "Deleted document",
@@ -462,6 +463,8 @@ def test_documents_list_marks_archived_and_deleted() -> None:
         "year": None,
         "archived": False,
         "deleted": True,
+        "added_by": "answer",
+        "used": True,
     }
 
 
@@ -485,6 +488,62 @@ def test_openapi_names_the_documents_list() -> None:
     client, _, _ = setup()
     operation = client.get("/openapi.json").json()["paths"]["/threads/{thread_id}/documents"]["get"]
     assert operation["operationId"] == "list_thread_documents"
+
+
+# Add and remove documents (PRD US-4c).
+
+
+def test_adding_documents_lists_them_as_learner_added_and_unused() -> None:
+    client, _, threads, ids = ask_with(lambda ids: DELTA + NO_CITATIONS + DONE)
+    client.post("/threads", json=QUESTION, headers=AUTH)
+    [thread] = threads.threads.values()
+
+    response = client.post(f"/threads/{thread.thread_id}/documents", json={"document_ids": ids}, headers=AUTH)
+
+    assert response.status_code == 200
+    assert [(d["document_id"], d["added_by"], d["used"]) for d in response.json()] == [
+        (ids[0], "learner", False),
+        (ids[1], "learner", False),
+    ]
+    assert documents_of(client, threads) == response.json()
+
+
+def test_a_bad_add_body_is_422() -> None:
+    client, _, threads, ids = ask_with(lambda ids: DELTA + NO_CITATIONS + DONE)
+    client.post("/threads", json=QUESTION, headers=AUTH)
+    [thread] = threads.threads.values()
+    url = f"/threads/{thread.thread_id}/documents"
+
+    assert client.post(url, json={"document_ids": []}, headers=AUTH).status_code == 422
+    assert client.post(url, json={"document_ids": ["not-a-uuid"]}, headers=AUTH).status_code == 422
+    assert client.post(url, json={"document_ids": ids, "user_id": "bob"}, headers=AUTH).status_code == 422
+
+
+def test_removing_a_listed_document_is_204_and_unlists_it_and_an_unlisted_one_is_204_too() -> None:
+    client, _, threads, ids = ask_with(lambda ids: DELTA + sources(ids[0]) + NO_CITATIONS + DONE)
+    client.post("/threads", json=QUESTION, headers=AUTH)
+    [thread] = threads.threads.values()
+
+    removed = client.delete(f"/threads/{thread.thread_id}/documents/{ids[0]}", headers=AUTH)
+    again = client.delete(f"/threads/{thread.thread_id}/documents/{ids[0]}", headers=AUTH)
+
+    assert removed.status_code == 204 and again.status_code == 204
+    assert documents_of(client, threads) == []
+
+
+def test_an_unknown_thread_is_404_when_adding_or_removing() -> None:
+    client, _, _, ids = ask_with(lambda ids: DELTA + NO_CITATIONS + DONE)
+    unknown = uuid.uuid4()
+
+    assert client.post(f"/threads/{unknown}/documents", json={"document_ids": ids}, headers=AUTH).status_code == 404
+    assert client.delete(f"/threads/{unknown}/documents/{ids[0]}", headers=AUTH).status_code == 404
+
+
+def test_openapi_names_the_add_and_remove_operations() -> None:
+    client, _, _ = setup()
+    paths = client.get("/openapi.json").json()["paths"]
+    assert paths["/threads/{thread_id}/documents"]["post"]["operationId"] == "add_thread_documents"
+    assert paths["/threads/{thread_id}/documents/{document_id}"]["delete"]["operationId"] == "remove_thread_document"
 
 
 def started_thread() -> tuple[TestClient, InMemoryThreads, Thread]:

@@ -1,10 +1,10 @@
-"""Threads in Postgres. The table schemas live in migrations 0005, 0007 and 0009."""
+"""Threads in Postgres. The table schemas live in migrations 0005, 0007, 0009 and 0010."""
 
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, Column, DateTime, Engine, Identity, MetaData, Table, Text, Uuid, select
+from sqlalchemy import BigInteger, Column, DateTime, Engine, Identity, MetaData, Table, Text, Uuid, func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
@@ -28,6 +28,8 @@ thread_documents = Table(
     threads.metadata,
     Column("thread_id", Uuid(as_uuid=False), primary_key=True),
     Column("document_id", Uuid(as_uuid=False), primary_key=True),
+    Column("added_by", Text),
+    Column("added_at", DateTime(timezone=True)),
     Column("first_used_at", DateTime(timezone=True)),
     Column("deleted_title", Text),
     Column("seq", BigInteger, Identity(always=True)),
@@ -78,23 +80,53 @@ class SqlThreadRepository(ThreadRepository):
             return
         with self._engine.begin() as conn:
             for document_id in document_ids:
+                stmt = insert(thread_documents).values(
+                    thread_id=thread_id, document_id=document_id, added_by="answer", added_at=at, first_used_at=at
+                )
+                # A listed document keeps its place; one the learner added is now used.
+                conn.execute(
+                    stmt.on_conflict_do_update(
+                        index_elements=["thread_id", "document_id"],
+                        set_={
+                            "first_used_at": func.coalesce(
+                                thread_documents.c.first_used_at, stmt.excluded.first_used_at
+                            )
+                        },
+                    )
+                )
+
+    def add_documents(self, thread_id: ThreadId, document_ids: Sequence[DocumentId], at: datetime) -> None:
+        if not document_ids:
+            return
+        with self._engine.begin() as conn:
+            for document_id in document_ids:
                 conn.execute(
                     insert(thread_documents)
-                    .values(thread_id=thread_id, document_id=document_id, first_used_at=at)
+                    .values(thread_id=thread_id, document_id=document_id, added_by="learner", added_at=at)
                     .on_conflict_do_nothing(index_elements=["thread_id", "document_id"])
                 )
+
+    def remove_document(self, thread_id: ThreadId, document_id: DocumentId) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(
+                thread_documents.delete().where(
+                    thread_documents.c.thread_id == thread_id, thread_documents.c.document_id == document_id
+                )
+            )
 
     def documents_used(self, thread_id: ThreadId) -> list[ThreadDocument]:
         with self._engine.connect() as conn:
             rows = conn.execute(
                 select(thread_documents)
                 .where(thread_documents.c.thread_id == thread_id)
-                .order_by(thread_documents.c.first_used_at, thread_documents.c.seq)
+                .order_by(thread_documents.c.added_at, thread_documents.c.seq)
             ).all()
         return [
             ThreadDocument(
                 thread_id=ThreadId(str(r.thread_id)),
                 document_id=DocumentId(str(r.document_id)),
+                added_by=r.added_by,
+                added_at=r.added_at,
                 first_used_at=r.first_used_at,
                 deleted_title=r.deleted_title,
             )
