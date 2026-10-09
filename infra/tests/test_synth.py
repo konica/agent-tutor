@@ -571,7 +571,7 @@ def test_each_service_gets_only_its_own_s3_sqs_and_bedrock_access() -> None:
         assert not any(r == '"*"' for r in grants.values())
 
 
-def test_only_the_worker_can_list_the_bucket_and_only_its_prefixes() -> None:
+def test_only_the_worker_can_list_the_bucket() -> None:
     # Without s3:ListBucket, S3 answers 403 instead of NoSuchKey for a missing key, so an expired upload would
     # reach the DLQ instead of being handled as ObjectNotFoundError.
     t = template(make_app(), "Cluster")
@@ -580,7 +580,8 @@ def test_only_the_worker_can_list_the_bucket_and_only_its_prefixes() -> None:
     (statement,) = listing
     resource = json.dumps(statement["Resource"])  # the bucket ARN itself, not objects in it
     assert "arn:aws:s3:::" in resource and "/*" not in resource and "uploads" not in resource
-    assert statement["Condition"] == {"StringLike": {"s3:prefix": ["uploads/*", "contents/*"]}}
+    # No s3:prefix condition: S3's implicit list check on GetObject carries no prefix, so it would never match.
+    assert "Condition" not in statement
     for sa in ("api", "agent", "mcp-server"):
         assert "s3:ListBucket" not in _grants(_policy_for(t, sa))
 
