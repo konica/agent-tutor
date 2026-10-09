@@ -203,8 +203,8 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs }: Props
                 <li key={c.chunk_id}>
                   <span className={styles.source} title={formatCitation(c)}>
                     <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
-                    <span className={styles.sourceMarker}>[{c.n}]</span>
-                    <span className={styles.sourceTitle}>{c.document_title}</span>
+                    <span className={styles.sourceMarker}>[{c.n}]</span>{" "}
+                    <span className={styles.sourceTitle}>{c.document_title}</span>{" "}
                     <span>· {c.page === null ? "page unavailable" : `p. ${c.page}`}</span>
                   </span>
                 </li>

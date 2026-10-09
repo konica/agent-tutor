@@ -97,7 +97,7 @@ describe("ChatPage", () => {
     await userEvent.click(askButton());
     const sources = await screen.findByRole("list", { name: "Sources" });
     const [item] = within(sources).getAllByRole("listitem");
-    expect(item).toHaveTextContent(/^\[2\]b\.pdf· p\. 4$/);
+    expect(item).toHaveTextContent(/^\[2\] b\.pdf · p\. 4$/);
     expect(within(sources).queryByText("[1]")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Citations" })).not.toBeInTheDocument();
   });

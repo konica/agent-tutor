@@ -26,7 +26,7 @@
 /* One line of source chips under the answer (DESIGN.md → Chat). Not buttons until the viewer exists (#124). */
 .sources { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); font-size: var(--fs-12); color: var(--text-2); }
 .sourcesLabel { font-weight: 600; }
-.sourceList { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
+.sourceList { display: flex; flex: 1; min-width: 0; flex-wrap: wrap; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
 .source {
   display: inline-flex; align-items: center; gap: var(--sp-1); height: 22px; padding: 0 var(--sp-2);
   border: 1px solid var(--border-strong); border-radius: var(--r-sm); background: var(--surface);
@@ -47,23 +47,24 @@
 
 /* The composer sits at the bottom of the column. */
 .form {
-  margin-top: auto; padding: var(--sp-4) 0 var(--sp-2);
+  margin-top: auto; padding: var(--sp-4) var(--sp-1) var(--sp-2);
   position: sticky; bottom: 0; background: var(--bg);
 }
+/* 40px box; the 2px focus ring sits outside it with a 2px offset, inside the form's padding so it is never clipped. */
 .composer {
-  display: flex; align-items: flex-end; gap: var(--sp-2); padding: var(--sp-1);
+  display: flex; align-items: flex-end; gap: var(--sp-2); min-height: 40px; padding: 0 var(--sp-1) 0 0;
   border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--surface);
 }
-.composer:focus-within { border-color: var(--accent); }
+.composer:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
 .input {
-  flex: 1; resize: none; min-height: 40px; max-height: 200px; field-sizing: content;
-  padding: var(--sp-2) var(--sp-3); border: 0; background: transparent;
+  flex: 1; resize: none; min-height: 38px; max-height: 200px; field-sizing: content;
+  padding: 9px var(--sp-3); border: 0; background: transparent;
   color: var(--text); font-size: var(--fs-14); line-height: var(--lh-body);
 }
 .input:focus { outline: none; }
 .input::placeholder { color: var(--text-3); }
 .input:disabled { color: var(--text-2); }
-.composer .send, .composer .send:hover:not(:disabled) { flex: none; margin-bottom: var(--sp-1); background: var(--accent); color: var(--on-accent); }
+.composer .send, .composer .send:hover:not(:disabled) { flex: none; margin-bottom: 5px; background: var(--accent); color: var(--on-accent); }
 .composer .send:disabled { background: var(--surface-2); color: var(--text-3); }
 
 /* One quiet 12px line under the box: the processing hint (the clock marks "wait", not "problem") and the key hint. */
