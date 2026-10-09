@@ -12,6 +12,7 @@
   min-width: 200px; padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-lg);
   background: var(--surface); box-shadow: var(--shadow-lg);
 }
+.pop:focus { outline: none; }
 .field { display: grid; gap: var(--sp-1); font-size: var(--fs-12); font-weight: 600; color: var(--text-2); }
 .field input {
   height: var(--control-h-sm); padding: 0 var(--sp-2); border: 1px solid var(--border-strong); border-radius: var(--r-sm);
