@@ -16,7 +16,7 @@ const GROUPS = [0, 1, 2] as const;
 export function SideNav({ collapsed, onToggle, recent = [] }: Props) {
   const { name, signOut } = useSession();
   return (
-    <nav className={`${styles.sidenav} ${collapsed ? styles.collapsed : ""}`} aria-label="Main">
+    <nav className={collapsed ? `${styles.sidenav} ${styles.collapsed}` : styles.sidenav} aria-label="Main">
       <Link className={styles.brand} to="/library" aria-label="Smart Tutor, Library">
         <BrandMark size="sm" iconOnly={collapsed} />
       </Link>

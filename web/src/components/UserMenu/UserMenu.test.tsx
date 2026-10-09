@@ -10,6 +10,12 @@ describe("UserMenu", () => {
     expect(screen.getByRole("button", { name: /Ada Lovelace/ })).toHaveTextContent("AL");
   });
 
+  it("on the rail keeps the name as the accessible name and tooltip", () => {
+    render(<UserMenu name="Ada Lovelace" compact />);
+    const toggle = screen.getByRole("button", { name: "Ada Lovelace" });
+    expect(toggle).toHaveAttribute("data-tip", "Ada Lovelace");
+  });
+
   it("opens and closes the menu", async () => {
     render(<UserMenu name="Ada Lovelace" onSignOut={() => {}} />);
     const toggle = screen.getByRole("button", { name: /Ada Lovelace/ });

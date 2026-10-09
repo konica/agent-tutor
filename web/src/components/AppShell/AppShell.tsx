@@ -9,7 +9,7 @@ import styles from "./AppShell.module.css";
 // A route opts into the wider column with `handle: { wide: true }` (the Library table needs it).
 export function AppShell() {
   const [collapsed, toggle] = useNavCollapsed();
-  const wide =useMatches().some((m) => (m.handle as { wide?: boolean } | undefined)?.wide);
+  const wide = useMatches().some((m) => (m.handle as { wide?: boolean } | undefined)?.wide);
   const { pathname } = useLocation();
   const navigationType = useNavigationType();
   const main = useRef<HTMLElement>(null);
@@ -26,7 +26,7 @@ export function AppShell() {
   }, [pathname, navigationType]);
 
   return (
-    <div className={`${styles.app} ${collapsed ? styles.collapsed : ""}`}>
+    <div className={collapsed ? `${styles.app} ${styles.collapsed}` : styles.app}>
       {/* recent is filled when the conversations list exists (US-5) */}
       <SideNav collapsed={collapsed} onToggle={toggle} recent={[]} />
       <main ref={main} className={styles.main} id="main-content" tabIndex={-1}>
