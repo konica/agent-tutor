@@ -3,11 +3,13 @@ import { Outlet, useLocation, useMatches, useNavigationType } from "react-router
 
 import { NAV } from "../../app/nav";
 import { SideNav } from "../SideNav/SideNav";
+import { useNavCollapsed } from "../SideNav/useNavCollapsed";
 import styles from "./AppShell.module.css";
 
 // A route opts into the wider column with `handle: { wide: true }` (the Library table needs it).
 export function AppShell() {
-  const wide = useMatches().some((m) => (m.handle as { wide?: boolean } | undefined)?.wide);
+  const [collapsed, toggle] = useNavCollapsed();
+  const wide =useMatches().some((m) => (m.handle as { wide?: boolean } | undefined)?.wide);
   const { pathname } = useLocation();
   const navigationType = useNavigationType();
   const main = useRef<HTMLElement>(null);
@@ -24,8 +26,9 @@ export function AppShell() {
   }, [pathname, navigationType]);
 
   return (
-    <div className={styles.app}>
-      <SideNav />
+    <div className={`${styles.app} ${collapsed ? styles.collapsed : ""}`}>
+      {/* recent is filled when the conversations list exists (US-5) */}
+      <SideNav collapsed={collapsed} onToggle={toggle} recent={[]} />
       <main ref={main} className={styles.main} id="main-content" tabIndex={-1}>
         <div className={`${styles.page} ${wide ? styles.wide : ""}`}>
           <Outlet />
