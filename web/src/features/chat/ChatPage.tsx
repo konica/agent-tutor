@@ -2,11 +2,13 @@ import { ArrowUp, CircleAlert, Clock, FileText, PanelLeft, Upload } from "lucide
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import {
+  addThreadDocuments,
   askInNewThread,
   AskRefusedError,
   formatCitation,
   loadDocumentsUsed,
   NoDocumentsError,
+  removeThreadDocument,
   type ChatCitation,
   type ChatEvent,
 } from "../../api/chat";
@@ -19,12 +21,16 @@ import { EmptyState } from "../../components/EmptyState/EmptyState";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
 import styles from "./ChatPage.module.css";
 import { ConversationPanel } from "./ConversationPanel";
+import { DocumentPicker } from "./DocumentPicker";
 import { usePanelOpen } from "./usePanelOpen";
 
 type Props = {
   ask?: (question: string) => AsyncIterable<ChatEvent>;
   loadDocs?: () => Promise<DocumentResponse[]>;
   loadUsed?: (threadId: string) => Promise<ThreadDocumentResponse[]>;
+  loadReady?: () => Promise<DocumentResponse[]>;
+  addDocs?: (threadId: string, documentIds: string[]) => Promise<ThreadDocumentResponse[]>;
+  removeDoc?: (threadId: string, documentId: string) => Promise<void>;
 };
 
 type Exchange = {
@@ -45,6 +51,9 @@ const GENERIC_FAILURE = "The tutor couldn't answer right now. Try again in a mom
 const defaultAsk = (question: string) => askInNewThread(question);
 const defaultLoadDocs = () => loadDocuments();
 const defaultLoadUsed = (threadId: string) => loadDocumentsUsed(threadId);
+const defaultLoadReady = () => loadDocuments({ state: "ready" });
+const defaultAddDocs = (threadId: string, documentIds: string[]) => addThreadDocuments(threadId, documentIds);
+const defaultRemoveDoc = (threadId: string, documentId: string) => removeThreadDocument(threadId, documentId);
 
 function processingHint(count: number) {
   return count === 1
@@ -53,7 +62,14 @@ function processingHint(count: number) {
 }
 
 // Single turn (#82): each question starts a new thread and replaces the previous exchange.
-export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUsed = defaultLoadUsed }: Props) {
+export function ChatPage({
+  ask = defaultAsk,
+  loadDocs = defaultLoadDocs,
+  loadUsed = defaultLoadUsed,
+  loadReady = defaultLoadReady,
+  addDocs = defaultAddDocs,
+  removeDoc = defaultRemoveDoc,
+}: Props) {
   const [question, setQuestion] = useState("");
   const [answering, setAnswering] = useState(false);
   const [exchange, setExchange] = useState<Exchange | null>(null);
@@ -67,6 +83,9 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
   const [answered, setAnswered] = useState(false);
   const [showCitations, setShowCitations] = useState(true);
   const [panelOpen, togglePanel] = usePanelOpen();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  // Said by the status region once a document is added or removed (DESIGN.md → Accessibility).
+  const [announcement, setAnnouncement] = useState("");
   const alive = useRef(true);
   const busy = useRef(false);
   const sourcesId = useId();
@@ -114,6 +133,7 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
     setUsedFailed(false);
     setThreadId(null);
     setAnswered(false);
+    setPickerOpen(false);
     // The protocol always ends with done or error; a stream that just stops (dropped connection) failed.
     let ended = false;
     let done = false;
@@ -162,6 +182,32 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
     } catch {
       // The answer is complete either way; only the panel's list is missing.
       if (alive.current && turn.current === forTurn) setUsedFailed(true);
+    }
+  }
+
+  // Rejecting keeps the picker open with its error; a SessionExpiredError was already reported by the API client.
+  async function addDocuments(threadId: string, documentIds: string[]) {
+    const forTurn = turn.current;
+    const documents = await addDocs(threadId, documentIds);
+    if (!alive.current || turn.current !== forTurn) return;
+    setUsed(documents);
+    setUsedFailed(false);
+    setPickerOpen(false);
+    const n = documentIds.length;
+    setAnnouncement(`${n === 1 ? "1 document" : `${n} documents`} added to this conversation.`);
+  }
+
+  // Optimistic: the row goes at once (the panel moves focus to the next row); a failure reloads the list so the panel
+  // shows the truth. A SessionExpiredError was already reported; the session screen replaces this page.
+  async function removeDocument(threadId: string, documentId: string) {
+    const forTurn = turn.current;
+    const removed = used.find((d) => d.document_id === documentId);
+    setUsed((list) => list.filter((d) => d.document_id !== documentId));
+    if (removed) setAnnouncement(`${removed.title} removed from this conversation.`);
+    try {
+      await removeDoc(threadId, documentId);
+    } catch (error) {
+      if (alive.current && turn.current === forTurn && !(error instanceof SessionExpiredError)) void showDocumentsUsed(threadId, forTurn);
     }
   }
 
@@ -240,6 +286,10 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
         </h1>
       </header>
 
+      <p role="status" className="visually-hidden">
+        {announcement}
+      </p>
+
       <div className={`${styles.body} ${panelOpen ? styles.withPanel : ""}`}>
         {panelOpen && (
           <ConversationPanel
@@ -250,6 +300,16 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
             answered={answered}
             showCitations={showCitations}
             onShowCitationsChange={setShowCitations}
+            onAddDocuments={() => setPickerOpen(true)}
+            onRemoveDocument={threadId === null ? undefined : (documentId) => void removeDocument(threadId, documentId)}
+          />
+        )}
+        {pickerOpen && threadId !== null && (
+          <DocumentPicker
+            listedIds={new Set(used.map((d) => d.document_id))}
+            loadReady={loadReady}
+            onAdd={(documentIds) => addDocuments(threadId, documentIds)}
+            onClose={() => setPickerOpen(false)}
           />
         )}
 
