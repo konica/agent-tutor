@@ -17,7 +17,12 @@ export function AppShell() {
   // forcing without touching their saved choice.
   const [forced, setForced] = useState(false);
   const railed = collapsed || forced;
-  const onToggle = forced ? () => setForced(false) : toggle;
+  // Forced over an expanded choice: one click just ends the forcing. Forced over a saved rail: the learner asked for the
+  // nav, so the click also saves "expanded"; otherwise it would take two clicks to open.
+  const onToggle = () => {
+    if (forced) setForced(false);
+    if (!forced || collapsed) toggle();
+  };
   const matches = useMatches();
   const wide = matches.some((m) => (m.handle as Handle)?.wide);
   const bleed = matches.some((m) => (m.handle as Handle)?.bleed);

@@ -637,6 +637,7 @@ describe("ChatPage", () => {
       expect(panel()).toBeInTheDocument();
       expect(pane("ReAct")).toBeInTheDocument();
       expect(setItem).not.toHaveBeenCalledWith("smart-tutor.chat-panel-open", expect.anything());
+      setItem.mockRestore();
     });
 
     it("closes the document when a new question is asked", async () => {
@@ -646,8 +647,9 @@ describe("ChatPage", () => {
       await waitFor(() => expect(askButton()).toBeEnabled());
       await userEvent.click(askButton());
       await waitFor(() => expect(pane("ReAct")).not.toBeInTheDocument());
-      // The learner is asking: focus is not pulled back to the panel.
-      expect(within(panel()!).queryByRole("button", { name: "ReAct" })).not.toHaveFocus();
+      // The learner is asking: focus is not pulled back into the panel.
+      expect(panel()).toBeInTheDocument();
+      expect(panel()).not.toContainElement(document.activeElement as HTMLElement);
     });
   });
 

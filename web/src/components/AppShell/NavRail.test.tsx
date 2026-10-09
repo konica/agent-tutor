@@ -58,4 +58,12 @@ describe("useForceNavRail", () => {
     expect(navToggle(/navigation/)).toHaveAttribute("aria-expanded", "true");
     expect(localStorage.getItem("smart-tutor.nav-collapsed")).toBeNull();
   });
+
+  it("opens the nav in one click when the learner's saved choice is also the rail", async () => {
+    localStorage.setItem("smart-tutor.nav-collapsed", "1");
+    renderShell();
+    await screen.findByText("Split view");
+    await userEvent.click(navToggle(/Expand navigation/));
+    expect(navToggle(/navigation/)).toHaveAttribute("aria-expanded", "true");
+  });
 });

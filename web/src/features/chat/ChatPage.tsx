@@ -150,6 +150,7 @@ export function ChatPage({
     const id = from?.dataset.documentId;
     const rows = Array.from(document.querySelectorAll<HTMLElement>(`#${PANEL_ID} [data-document-id]`));
     const live = from?.isConnected ? from : rows.find((row) => row.dataset.documentId === id);
+    // The toggle fallback is for openers outside the panel (Sources chips, a later ticket) or a row no longer shown.
     (live ?? toggleRef.current)?.focus();
   }, [viewer]);
 
