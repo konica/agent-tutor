@@ -16,6 +16,7 @@
     ['P3', 'Outside chat the viewer stays the overlay', ['viewer-archived'], []]
   ];
   ST.CHANGES.push(['P4', 'Open in dialog from the pane, with a details strip', ['viewer-dialog'], []], ['P5', 'Choose the conversation\'s documents; Only search these documents', ['chat-documents-add', 'chat-scope-limited', 'chat-decline-limited', 'chat-documents-used'], []]);
+  ST.CHANGES.unshift(['P8', 'v0.11: the nav collapse chevron moves to a 40px brand row at the top, aligned with the chat header; below the logo on the rail', ['shell-nav-collapsed', 'library-default', 'chat-answer-citations'], []]);
   ST.NEW_IDS = ['chat-panel-collapsed', 'viewer-dialog', 'chat-documents-add', 'chat-scope-limited', 'chat-decline-limited', 'chat-new-from-document', 'chat-title-editing'];
   const changed = () => { const set = new Set(); ST.CHANGES.forEach((c) => c[2].forEach((id) => set.add(id))); return set; };
   ST.indexView = () => {
@@ -25,21 +26,21 @@
     return `<main class="index-page" id="main-content" tabindex="-1">
       <section class="index-hero">
         <div><span class="brand" style="padding:0 0 24px">${ST.logo('logo', 'Smart Tutor logo')}<span class="word">Smart Tutor</span></span>
-          <h1>Round 10: documents beside the conversation</h1>
-          <p>Brief v0.10 changes the chat only. A 260px conversation panel holds Documents used, the Lesson Note and the conversation's actions, and one click on a Sources chip or a document opens it beside the conversation: the conversation keeps at least 480px, the panel collapses and the nav drops to its rail. Everything else is the round 9 design.</p>
+          <h1>Round 11: the nav toggle at the top</h1>
+          <p>Brief v0.11 moves the nav collapse chevron to a 40px brand row at the top, aligned with the chat header (P8). From v0.10: A 260px conversation panel holds Documents used, the Lesson Note and the conversation's actions, and one click on a Sources chip or a document opens it beside the conversation: the conversation keeps at least 480px, the panel collapses and the nav drops to its rail. Everything else is the round 9 design.</p>
           <div class="od-cluster" style="margin-top:24px;--od-gap:12px">
             <button class="btn btn-primary btn-lg" type="button" data-action="start-flow" data-flow="J1">Start with J1 · First run${ic('arrowRight', 'sm')}</button>
             <a class="btn btn-secondary btn-lg" href="#/library-default">Open the Library</a>
             <a class="btn btn-ghost btn-lg" href="#/brief-questions">Questions for the brief</a>
           </div></div>
         <dl class="meta">
-          <div><dt>Brief</dt><dd>v0.10 · PRD Q60</dd></div><div><dt>Owner</dt><dd>Thao Dinh</dd></div><div><dt>Date</dt><dd>8 Oct 2026</dd></div>
+          <div><dt>Brief</dt><dd>v0.11 · #163</dd></div><div><dt>Owner</dt><dd>Thao Dinh</dd></div><div><dt>Date</dt><dd>9 Oct 2026</dd></div>
           <div><dt>Screens</dt><dd>Laptop, 1280–1920 px</dd></div><div><dt>Themes</dt><dd>Light and dark</dd></div><div><dt>States</dt><dd>${ST.STATES.length - 1}</dd></div>
           <div><dt>Round 1</dt><dd><a href="v0.2/index.html">v0.2 prototype</a></dd></div>
         </dl>
       </section>
 
-      <h2 class="section-title">What changed in v0.10</h2>
+      <h2 class="section-title">What changed in v0.11 and v0.10</h2>
       <div class="changes" role="table" aria-label="Decisions and the states they changed">
         ${ST.CHANGES.map(([id, title, states, removed]) => `<div class="change-row" role="row"><span class="qid" role="cell">${esc(id)}</span><span class="change-title" role="cell">${esc(title)}</span>
           <span class="change-states" role="cell">${states.length ? '' : '<span class="small muted">No state changes</span>'}${states.map((sid) => `<a href="#/${sid}"><code>${sid}</code>${ST.NEW_IDS.includes(sid) ? '<span class="badge badge-note">New</span>' : ''}</a>`).join('')}${(removed || []).map((sid) => `<span class="removed-id"><del><code>${sid}</code></del><span class="badge badge-archived">Removed</span></span>`).join('')}</span></div>`).join('')}
@@ -288,7 +289,8 @@
     ['P5', 'The conversation\'s documents', 'The panel\'s first section is Documents: documents used plus added ones, each with a remove button on hover and focus; “Add documents” opens a searchable picker; “Only search these documents” (off by default, disabled while empty) shows “Searching N documents · Change” above the composer and declines with “Add documents” / “Search all my documents”.', ['chat-documents-add', 'chat-scope-limited', 'chat-decline-limited']],
     ['P6', 'Chat header', 'Only the panel toggle (sidebar icon, “Hide panel” / “Show panel”) and the title, which is edited inline: Enter or clicking away saves, Esc cancels, 1–120 characters. No “⋯” overflow menu.', ['chat-title-editing', 'chat-panel-collapsed']],
     ['P7', '“Chat” on ready rows', 'Every ready Library row shows “Chat”, which starts a conversation with that document listed; the row title opens the viewer; “More” keeps Details, Change subjects, Edit title, Archive, Delete.', ['library-default', 'library-more-menu']],
-    ['R1–R3', 'Answered', 'R1 no new state; R2 Show citations and Archive live in the panel\'s Actions (the header overflow was removed by P6); R3 the panel can be re-opened in split view and the pane then fits the page to its width.', ['viewer-citation-highlight']]
+    ['R1–R3', 'Answered', 'R1 no new state; R2 Show citations and Archive live in the panel\'s Actions (the header overflow was removed by P6); R3 the panel can be re-opened in split view and the pane then fits the page to its width.', ['viewer-citation-highlight']],
+    ['P8', 'Nav toggle at the top (v0.11)', 'The collapse chevron sits at the right of a 40px brand row, aligned with the chat header; on the 56px rail the expand chevron sits below the logo. Chevrons stay, so it differs from the sidebar-icon panel toggle. The nav foot keeps only the user menu. Tab order: brand, toggle, nav items, user menu.', ['shell-nav-collapsed', 'library-default']]
   );
   const QUESTIONS = [
     ['S1', 'Answered', 'Removing a document the answers already cited', 'Removing a used document takes it out of the list and the search scope, but its citations in earlier answers still open it.', 'Answered: citations keep working; removal only affects future answers.'],
@@ -300,8 +302,8 @@
     ['Q4, Q5, Q8', 'Defaults kept', 'Still open in §12', 'Q4 the citations switch also covers notes · Q5 several files at once · Q8 first suggestion pre-selected.', 'All shown as designed.']
   ];
   ST.questionsView = () => `<main class="index-page" id="main-content" tabindex="-1">
-    <div class="page-head" style="margin-bottom:32px"><div><h1 style="font-size:48px">Decisions &amp; questions</h1><p>For brief v0.10, round 10 (chat only). First what P1–P7 changed and where, then open questions.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
-    <h2 class="section-title" style="margin-top:0">Applied in v0.10</h2>
+    <div class="page-head" style="margin-bottom:32px"><div><h1 style="font-size:48px">Decisions &amp; questions</h1><p>For brief v0.11, round 11 (nav toggle) on top of round 10 (chat). First what P1–P8 changed and where, then open questions.</p></div><a class="btn btn-secondary" href="#/index">${ic('arrowLeft', 'sm')}Overview</a></div>
+    <h2 class="section-title" style="margin-top:0">Applied in v0.10 and v0.11</h2>
     <ol class="qa-list">${DECISIONS.map(([id, title, what, states]) => `<li class="qa-item"><span class="qid">${esc(id)}</span>
       <div><h3>${esc(title)}</h3><p>${esc(what)}</p><p class="proposal"><strong>Applied in:</strong> ${states.length ? '' : 'no change needed'}${states.map((sid) => `<a href="#/${sid}"><code class="mono">${sid}</code></a>`).join(', ')}</p></div>
       <span class="badge qtype badge-ready-q">${ic('check')}Applied</span></li>`).join('')}</ol>

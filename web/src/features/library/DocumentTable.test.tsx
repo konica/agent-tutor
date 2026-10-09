@@ -1,10 +1,11 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { DocumentResponse } from "../../api/documents";
 import { DocumentTable } from "./DocumentTable";
 
-const doc: DocumentResponse = { document_id: "d1", title: "Toolformer", state: "ready", failure_reason: null, created_at: "2026-10-04T09:00:00Z", subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: ["Timo Schick", "Jane Dwivedi-Yu", "Roberto Dessì"], year: 2023 };
+const doc: DocumentResponse = { document_id: "d1", title: "Toolformer", state: "ready", failure_reason: null, created_at: "2026-10-04T09:00:00Z", subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: ["Timo Schick", "Jane Dwivedi-Yu", "Roberto Dessì"], year: 2023, archived: false };
 
 describe("DocumentTable", () => {
   afterEach(() => vi.useRealTimers());
@@ -72,5 +73,55 @@ describe("DocumentTable upload day", () => {
     vi.useFakeTimers({ now: new Date("2026-10-02T01:00:00Z") });
     render(<DocumentTable documents={[{ ...doc, created_at: "2026-10-01T17:30:00Z" }]} onRetry={() => {}} retrying={new Set()} />);
     expect(screen.getByText("Today")).toBeVisible();
+  });
+});
+
+describe("DocumentTable archive and restore", () => {
+  const props = { onRetry: () => {}, retrying: new Set<string>() };
+
+  it("gives an active row a More menu with Archive", async () => {
+    const onArchive = vi.fn();
+    render(<DocumentTable documents={[doc]} {...props} onArchive={onArchive} onRestore={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "More actions for Toolformer" }));
+    const menu = screen.getByRole("menu", { name: "More actions for Toolformer" });
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Archive"]);
+    await userEvent.click(within(menu).getByRole("menuitem", { name: "Archive" }));
+    expect(onArchive).toHaveBeenCalledExactlyOnceWith(doc);
+  });
+
+  it("gives a row still uploading no More menu", () => {
+    render(<DocumentTable documents={[doc]} {...props} onArchive={vi.fn()} uploading={new Set(["d1"])} />);
+    expect(screen.queryByRole("button", { name: "More actions for Toolformer" })).toBeNull();
+  });
+
+  it("gives an archived row the Archived badge and Restore, and no More or Choose subjects", async () => {
+    const onRestore = vi.fn();
+    const archived = { ...doc, state: "awaiting_subjects" as const, archived: true };
+    render(<DocumentTable documents={[archived]} {...props} onArchive={vi.fn()} onRestore={onRestore} onChooseSubjects={vi.fn()} />);
+    const row = screen.getByText("Toolformer").closest("tr")!;
+    expect(within(row).getByText("Archived")).toBeVisible();
+    expect(within(row).queryByRole("button", { name: /More actions/ })).toBeNull();
+    expect(within(row).queryByRole("button", { name: /Choose subjects/ })).toBeNull();
+    await userEvent.click(within(row).getByRole("button", { name: "Restore Toolformer" }));
+    expect(onRestore).toHaveBeenCalledExactlyOnceWith(archived);
+  });
+
+  it("gives an archived failed row no Retry", () => {
+    render(<DocumentTable documents={[{ ...doc, state: "failed", failure_reason: "x", can_retry: true, archived: true }]} {...props} onRestore={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: /Retry/ })).toBeNull();
+  });
+
+  it("disables a busy row's buttons", () => {
+    render(
+      <DocumentTable
+        documents={[doc, { ...doc, document_id: "d2", title: "Old", archived: true }]}
+        {...props}
+        onArchive={vi.fn()}
+        onRestore={vi.fn()}
+        busy={new Set(["d1", "d2"])}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "More actions for Toolformer" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Restore Old" })).toBeDisabled();
   });
 });

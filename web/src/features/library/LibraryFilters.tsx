@@ -26,10 +26,11 @@ type Props = {
   count: number | null;
   needsSubjects: number; // documents in the loaded list that wait for subjects
   onClear: () => void;
+  showState?: boolean; // the Archived tab has no State filter or needs-subjects chip
 };
 
 // Single-select Subject and State, an upload-date popover, a needs-subjects chip, and the result count. Every change reloads the list through the API.
-export const LibraryFilters = forwardRef<HTMLSelectElement, Props>(function LibraryFilters({ filters, onChange, subjects, count, needsSubjects, onClear }, subjectRef) {
+export const LibraryFilters = forwardRef<HTMLSelectElement, Props>(function LibraryFilters({ filters, onChange, subjects, count, needsSubjects, onClear, showState = true }, subjectRef) {
   const set = (patch: Partial<DocumentFilters>) => {
     const next = { ...filters, ...patch };
     // Absent means unfiltered, so an emptied control drops its key.
@@ -52,17 +53,19 @@ export const LibraryFilters = forwardRef<HTMLSelectElement, Props>(function Libr
         </select>
       </FilterField>
       <UploadedFilter from={filters.uploaded_from} to={filters.uploaded_to} onChange={set} />
-      <FilterField id="filter-state" label="State">
-        <select id="filter-state" value={filters.state ?? ""} onChange={(e) => set({ state: (e.target.value || undefined) as DocumentFilters["state"] })}>
-          <option value="">All states</option>
-          {STATES.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-      </FilterField>
-      {(needsSubjects > 0 || filters.state === "awaiting_subjects") && (
+      {showState && (
+        <FilterField id="filter-state" label="State">
+          <select id="filter-state" value={filters.state ?? ""} onChange={(e) => set({ state: (e.target.value || undefined) as DocumentFilters["state"] })}>
+            <option value="">All states</option>
+            {STATES.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </FilterField>
+      )}
+      {showState && (needsSubjects > 0 || filters.state === "awaiting_subjects") && (
         <button type="button" className={styles.chip} aria-pressed={filters.state === "awaiting_subjects"} onClick={() => set({ state: filters.state === "awaiting_subjects" ? undefined : "awaiting_subjects" })}>
           <Tag className={styles.chipIcon} strokeWidth={1.5} aria-hidden="true" />
           {needsSubjects === 0 ? "Needs subjects" : needsSubjects === 1 ? "1 needs subjects" : `${needsSubjects} need subjects`}

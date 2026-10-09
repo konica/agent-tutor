@@ -27,3 +27,8 @@
 .already svg { flex: none; width: 16px; height: 16px; color: var(--text-2); }
 .alreadyNote { display: block; color: var(--text-2); }
 .alreadyLink { display: inline-block; margin-top: var(--sp-1); color: var(--accent-text); font-weight: 600; }
+.notice {
+  display: flex; align-items: center; gap: var(--sp-2); min-height: 32px; margin: 0 0 var(--sp-2); padding: 0 var(--sp-3);
+  border-radius: var(--r-md); background: var(--surface-2); color: var(--text-2); font-size: var(--fs-13);
+}
+.notice svg { flex: none; width: 16px; height: 16px; color: var(--info); }

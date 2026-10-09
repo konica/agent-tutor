@@ -57,6 +57,7 @@ documents = Table(
     Column("state", Text),
     Column("failure_reason", Text),
     Column("archived", Boolean),
+    Column("archived_at", DateTime(timezone=True)),
     Column("title_override", Text),
     Column("created_at", DateTime(timezone=True)),
 )

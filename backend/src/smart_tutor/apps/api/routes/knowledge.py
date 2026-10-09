@@ -1,5 +1,6 @@
 """Library routes (knowledge module): start an upload, report what became of it (US-11), list the caller's
-documents, check a file hash against them, retry a failed one, suggest and save its subjects."""
+documents, check a file hash against them, retry a failed one, suggest and save its subjects, archive and restore a
+document."""
 
 from datetime import date, datetime
 from typing import Annotated, Literal
@@ -8,7 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-from smart_tutor.apps.api.deps import CurrentPrincipal, Documents, Retries, SubjectChoice, Subjects, Uploads
+from smart_tutor.apps.api.deps import Archive, CurrentPrincipal, Documents, Retries, SubjectChoice, Subjects, Uploads
 from smart_tutor.knowledge.application import (
     DocumentNotFoundError,
     DocumentStateError,
@@ -77,6 +78,7 @@ class DocumentResponse(BaseModel):
     subjects: list[SubjectResponse]
     authors: list[str]  # from the learner's own content; empty when the PDF names none
     year: int | None
+    archived: bool
 
 
 class SuggestionResponse(BaseModel):
@@ -156,6 +158,7 @@ def _document_response(view: DocumentView, names: dict[SubjectId, str]) -> Docum
         subjects=[SubjectResponse(subject_id=s, name=names[s]) for s in view.subject_ids if s in names],
         authors=list(view.authors),
         year=view.year,
+        archived=view.archived,
     )
 
 
@@ -168,11 +171,13 @@ def list_documents(
     state: Annotated[list[DocumentState], Query()] = [],  # noqa: B006
     uploaded_from: date | None = None,
     uploaded_to: date | None = None,
+    archived: bool = False,
 ) -> list[DocumentResponse]:
     """The caller's documents, newest first, narrowed by any subset of the filters (PRD §8 US-10).
 
     `subject_id` and `state` repeat; a document matches when it has any of the subjects and is in any of the states.
     `uploaded_from` and `uploaded_to` are inclusive calendar days in the app time zone (D27). The filters combine.
+    Active documents by default; `archived=true` lists the archived ones.
     """
     views = documents.list_documents(
         principal.user_id,
@@ -180,6 +185,7 @@ def list_documents(
         states=state,
         uploaded_from=uploaded_from,
         uploaded_to=uploaded_to,
+        archived=archived,
     )
     names = subjects.names_for(principal.user_id, {s for d in views for s in d.subject_ids})
     return [_document_response(d, names) for d in views]
@@ -228,6 +234,33 @@ def choose_subjects(
         raise HTTPException(409, str(e)) from None
     except InvalidSubjectsError as e:
         raise HTTPException(422, str(e)) from None
+    return _document_response(view, subjects.names_for(principal.user_id, set(view.subject_ids)))
+
+
+@router.post("/documents/{document_id}/archive", operation_id="archive_document")
+def archive_document(
+    document_id: UUID, principal: CurrentPrincipal, archive: Archive, subjects: Subjects
+) -> DocumentResponse:
+    """Archive the caller's document: it leaves search and My subjects; content and chunks stay (PRD §8 US-10).
+
+    Archiving an archived document changes nothing.
+    """
+    try:
+        view = archive.archive(principal.user_id, DocumentId(str(document_id)))
+    except DocumentNotFoundError:
+        raise HTTPException(404, "Document not found") from None
+    return _document_response(view, subjects.names_for(principal.user_id, set(view.subject_ids)))
+
+
+@router.post("/documents/{document_id}/restore", operation_id="restore_document")
+def restore_document(
+    document_id: UUID, principal: CurrentPrincipal, archive: Archive, subjects: Subjects
+) -> DocumentResponse:
+    """Bring an archived document back into search and My subjects; restoring an active one changes nothing."""
+    try:
+        view = archive.restore(principal.user_id, DocumentId(str(document_id)))
+    except DocumentNotFoundError:
+        raise HTTPException(404, "Document not found") from None
     return _document_response(view, subjects.names_for(principal.user_id, set(view.subject_ids)))
 
 

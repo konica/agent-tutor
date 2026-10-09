@@ -72,6 +72,7 @@ def _document(row: Any, subject_ids: list[SubjectId]) -> Document:
         content_year=getattr(row, "content_year", None),
         subject_ids=subject_ids,
         archived=row.archived,
+        archived_at=row.archived_at,
     )
 
 
@@ -168,7 +169,13 @@ class _Documents(DocumentRepository):
         self._conn.execute(
             update(documents)
             .where(documents.c.document_id == document.document_id)
-            .values(content_id=document.content_id, state=document.state.value, failure_reason=document.failure_reason)
+            .values(
+                content_id=document.content_id,
+                state=document.state.value,
+                failure_reason=document.failure_reason,
+                archived=document.archived,
+                archived_at=document.archived_at,
+            )
         )
         self._conn.execute(delete(document_subjects).where(document_subjects.c.document_id == document.document_id))
         if document.subject_ids:
@@ -223,7 +230,7 @@ class _Documents(DocumentRepository):
         f = document_filter
         stmt = (
             self._with_content()
-            .where(readable_by(user_id), documents.c.archived.is_(False))
+            .where(readable_by(user_id))
             .order_by(documents.c.created_at.desc(), documents.c.document_id)
         )
         # The twin of Document.matches: each part applies only when set.
@@ -236,27 +243,28 @@ class _Documents(DocumentRepository):
             )
         if f.states:
             stmt = stmt.where(documents.c.state.in_([s.value for s in f.states]))
+        if f.archived is not None:
+            stmt = stmt.where(documents.c.archived.is_(f.archived))
         if f.uploaded_from is not None:
             stmt = stmt.where(documents.c.created_at >= f.uploaded_from)
         if f.uploaded_before is not None:
             stmt = stmt.where(documents.c.created_at < f.uploaded_before)
         return self._load(list(self._conn.execute(stmt)))
 
-    def find_readable_by_sha256(self, user_id: UserId, sha256: str) -> DocumentId | None:
-        found = self._conn.execute(
-            select(documents.c.document_id)
+    def get_readable_by_sha256(self, user_id: UserId, sha256: str) -> Document | None:
+        row = self._conn.execute(
+            select(documents)
             .select_from(documents.join(contents, documents.c.content_id == contents.c.content_id))
-            .where(readable_by(user_id), documents.c.archived.is_(False), contents.c.sha256 == sha256)
-            .order_by(documents.c.created_at, documents.c.document_id)
-            .limit(1)
-        ).scalar()
-        return DocumentId(str(found)) if found else None
+            .where(readable_by(user_id), contents.c.sha256 == sha256)
+            .limit(1)  # contents are unique per (owner_id, sha256) and documents per (owner_id, content_id)
+        ).first()
+        return self._load([row])[0] if row else None
 
     def get_readable(self, user_id: UserId, document_id: DocumentId, *, for_update: bool = False) -> Document | None:
         stmt = (
             select(documents, contents.c.title.label("content_title"), contents.c.attempts.label("content_attempts"))
             .select_from(documents.outerjoin(contents, documents.c.content_id == contents.c.content_id))
-            .where(documents.c.document_id == document_id, readable_by(user_id), documents.c.archived.is_(False))
+            .where(documents.c.document_id == document_id, readable_by(user_id))
         )
         if for_update:
             stmt = stmt.with_for_update(of=documents)  # the outer join to contents stays unlocked

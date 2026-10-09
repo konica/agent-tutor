@@ -10,6 +10,7 @@ describe("StateBadge", () => {
     ["awaiting_subjects", "Choose subjects"],
     ["ready", "Ready"],
     ["failed", "Failed"],
+    ["archived", "Archived"],
   ])("shows a text label for every state (%s)", (state, label) => {
     render(<StateBadge state={state} />);
     expect(screen.getByText(label)).toBeVisible();
