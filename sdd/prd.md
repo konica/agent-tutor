@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Draft v2.24 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; conversations over all of a learner's documents; per-learner contents; research map in Release 2) |
+| **Status** | Draft v2.25 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; conversations over all of a learner's documents; per-learner contents; on-premise deployment by default; research map in Release 2) |
+| **Changes from v2.24** | Two deployment modes (#145, #146; ADR 0012). **On-premise mode** is the default and deploys on every merge to `main`: Docker Compose on one EC2 VM runs web, API, agent, MCP server, worker, Keycloak, PostgreSQL + pgvector, and Caddy. S3, SQS, SSM, Secrets Manager, and ECR stay managed. Caddy serves it at a DuckDNS address, with no CloudFront, ALB, or NAT. **Native-cloud mode** is today's EKS deployment, deployed only when chosen. §5 goal 10, §7, §9.1, §9.11–§9.13, Q64, and Appendix A describe both modes. The risk table adds two known gaps: the worker has no egress allowlist on-premise until it lands before "pilot starts", and one VM is a single point of failure. No product behavior changes. |
 | **Changes from v2.23** | Per-learner contents (#120, US-11): `GET /uploads/{upload_id}` returns the caller's own `{upload_id, outcome, document_id, archived}` so the browser can show what became of an upload; a duplicate upload ends with `document_id` pointing to the learner's existing document (shown as "Already in your library"); storage keys are `contents/<owner_id>/<content_id>.pdf` and `.pages.json`; the Glacier tagger job is removed. |
 | **Changes from v2.22** | Upload and ask on the AWS pilot (#139): the worker's IAM role also deletes `uploads/*` after it stores a content; the agent role's SSM parameters are the detection settings it reads at startup (`detect-threshold`, `detect-margin`, `multi-margin`), not `answer-floor`; the ingest queue has a 15-minute visibility timeout and moves a message to its dead-letter queue after 5 receives (Appendix A). |
 | **Changes from v2.21** | End-user feedback (`sdd/reviews/2026-10-08-end-user-feedback.md`, Q54–Q58). **No cross-user deduplication:** each learner's upload is stored, processed, and embedded for that learner; duplicates are caught only within the learner's own library (D18, D19, US-11; ADR 0011). **Conversations have no subjects and no subject detection:** the tutor searches all of the learner's ready, non-archived documents (D3, US-3, US-4; US-3b removed). Each conversation **lists the documents used** to answer it, and the learner opens one in a **PDF viewer**; a citation opens at its page with the chunk highlighted (US-4b; chunks gain a page offset; PDFs stay in S3 Standard, so the Glacier tier is removed). The owner can **delete a document** that isn't shared: its file, page text, and chunks are removed; conversations and notes keep their text, citations read "Deleted document", and the conversation's list marks it deleted (D10, US-10c). Product owner and UI/UX review defaults (Q59): conversations and notes are filtered by the subjects of their documents used, read at query time; retrieved chunk text isn't kept in a thread's saved state; content files are keyed by `content_id`. |
@@ -27,7 +28,7 @@
 | **Changes from v2.2** | Release 1 extracts PDF text page by page with `pypdf` into LangChain `Document`s instead of Docling (D26, ADR 0005): no PyTorch in the worker, no OCR (PDFs without a text layer fail with a reason), saved page text replaces saved Docling output. Reference lists and section headings move to a structured-extraction step added in Release 2, backfilled from stored PDFs. M0 drops the Docling benchmark. |
 | **Changes from v2.1** | Architecture only: the subject catalog moves from `knowledge` into a new `subjects` module (§9.15; ADR 0004). No product behavior changes. |
 | **Owner** | Thao Dinh |
-| **Last updated** | 2026-10-08 |
+| **Last updated** | 2026-10-09 |
 | **Lifecycle** | Build → Test → Deploy → Monitor ([The Agent Development Lifecycle](https://www.langchain.com/blog/the-agent-development-lifecycle)) |
 | **Changes from v2.0** | Product owner, business analyst, and technical review applied. Documents take 1–3 subjects; threads start with the detected subjects and grow to at most 3 (warning at the maximum). No admin functions (no subject rename/merge/hide, no account-deletion process — recorded as a known gap). No limit on the number of documents. Re-summarizing an edited note asks first. Traces deleted after 180 days; threads kept. Explicit document and content state machines, shared retry, work identity (same paper, different files), saved Docling output. Release order: R2 research map, R3 learning loop, R4 sharing and imports, R5 deep knowledge graph. |
 
@@ -94,7 +95,7 @@ Learners and researchers work through many documents on a topic but lack the bac
 7. **Token usage is tracked and shown**, including document processing.
 8. Every agent run is **traced and evaluated** in LangSmith, with human feedback used to calibrate LLM judges.
 9. All components require **authentication and authorization** via Keycloak; learners can only read their own documents and data.
-10. All services are **deployed to Amazon EKS**; model access is **abstracted** and business logic **encapsulated in classes** (§9.15).
+10. All services are **deployed on AWS in one of two deployment modes**: **on-premise** (the default: Docker Compose on one EC2 VM) or **native-cloud** (opt-in: Amazon EKS), with the same behavior in both (§9.11); model access is **abstracted** and business logic **encapsulated in classes** (§9.15).
 11. The data model is **ready for later releases**: visibility and grants (sharing), work identity, saved page text, and stored PDFs (research map, topic catalog, knowledge graph backfill from them; D26).
 
 ### Goals: later releases
@@ -160,7 +161,7 @@ Learners and researchers work through many documents on a topic but lack the bac
 - Conversation and note management (filter by date and subject, archive/restore).
 - Token usage view (chat and document processing); rate limits and daily caps.
 - LangSmith tracing, evaluation suites, human-feedback annotation (§10).
-- All services on **Amazon EKS** (Helm); AWS resources with **AWS CDK**; local development with **Docker Compose**.
+- All services deployed **on-premise** (Docker Compose on one EC2 VM, the default) or **native-cloud** (Amazon EKS with Helm, opt-in); AWS resources with **AWS CDK**; local development with **Docker Compose**.
 
 ### Release 2: research map
 - Structured extraction of reference lists and section headings, backfilled from stored PDFs (D22, D26).
@@ -313,10 +314,10 @@ Story IDs are stable. Release 1: US-1 to US-13b (US-3b removed in v2.22). Releas
 ### 9.1 Components
 
 ```
- Web App (React, EKS) ──► API Server (FastAPI, EKS) ──► Smart Tutor Agent (LangGraph, EKS, internal)
+ Web App (React) ───────► API Server (FastAPI) ───────► Smart Tutor Agent (LangGraph, internal)
    │   ▲  presigned POST    │  (user JWT)                        │  (same user JWT)
    │   └─────────────────── │                                    ▼
-   │                        ▼                           RAG MCP Server (EKS, internal) ──► PostgreSQL + pgvector
+   │                        ▼                           RAG MCP Server (internal) ───────► PostgreSQL + pgvector
    ▼                  Keycloak (OIDC)                                                              ▲
  S3 uploads/<user>/ ──► S3 event → SQS → Ingestion worker (hash → own-library duplicate check → first pages: ┘
                                           metadata, suggestions → page text (pypdf, saved JSON) → work key → chunk → embed)
@@ -326,10 +327,10 @@ Story IDs are stable. Release 1: US-1 to US-13b (US-3b removed in v2.22). Releas
 | Component | Responsibilities |
 |---|---|
 | **API Server** | Auth, documents (duplicate check, presigned upload, list/filter, subjects, display title, archive, delete, retry, viewer link and chunk locator), subjects (catalog search, personal names), conversations (with documents used), notes, usage, rate limits and daily caps, SSE streaming; forwards the user's token to the agent. |
-| **Ingestion worker** | Consumes S3 `ObjectCreated` events for `uploads/`; validates; computes SHA-256; points a file already in the learner's own library to their existing document, otherwise stores a new content; runs the **fast first-pages step** (text of pages 1–2 → metadata and subject candidates) before full text extraction; saves the page text; sets the work key; chunks and embeds. Processes uploads **fairly per user** (first-pages steps before full extractions; round-robin across users). Parses untrusted files: non-root, read-only filesystem, egress limited by NetworkPolicy, per-file timeout. |
+| **Ingestion worker** | Consumes S3 `ObjectCreated` events for `uploads/`; validates; computes SHA-256; points a file already in the learner's own library to their existing document, otherwise stores a new content; runs the **fast first-pages step** (text of pages 1–2 → metadata and subject candidates) before full text extraction; saves the page text; sets the work key; chunks and embeds. Processes uploads **fairly per user** (first-pages steps before full extractions; round-robin across users). Parses untrusted files: non-root, read-only filesystem, per-file timeout; egress limited by NetworkPolicy in native-cloud (on-premise allowlist pending, §9.10). |
 | **RAG MCP Server** | `search(query, k)` over streamable HTTP: validates the forwarded JWT, resolves the learner's **readable, ready, non-archived documents** (`can_read`), searches their contents' chunks only, returns chunks with scores and citation metadata (document, page, offset). `get_chunk(chunk_id)` resolves old citations (only through a document the caller can read). |
 | **Smart Tutor agent** | Ask, summarize, idle-record paths (§9.2); checkpointer and long-term memory in PostgreSQL; token usage per call. |
-| **Scheduled jobs** (Kubernetes CronJobs) | Learning-record sweeper (every minute); trace and decline-log retention (daily); *R3:* learner reports (hourly). |
+| **Scheduled jobs** (systemd timers on-premise; Kubernetes CronJobs native-cloud) | Learning-record sweeper (every minute); trace and decline-log retention (daily); *R3:* learner reports (hourly). |
 | **Web App** | Public landing page, Keycloak login, library and upload, subject choice and rename, chat with documents used, document viewer, conversations, notes, usage; *R2:* research map; *R3:* quizzes, reports; *R4:* sharing, imports. |
 
 ### 9.2 Agent flow
@@ -484,22 +485,46 @@ Every decline (relevance gate or `decline` tool) writes the question text with p
 | **Same work in different files.** Preprint and published PDFs hash differently. | Each is embedded (accepted cost); `work_key` collapses them into one research-map node. |
 | **Queue starvation and upload cost.** One learner uploads hundreds of files. | Per-user fair scheduling, first-pages step first, upload rate limits and daily caps, budget alerts. |
 | **The same file processed for many learners.** Popular papers are embedded once per learner (D18). | Accepted: embedding is a small part of processing cost; per-file limits, rate limits, daily caps, and budget alerts bound it; storage per learner is reported next to the budget alerts (no Glacier tier). |
-| **Malicious PDFs against the parser.** | Worker isolation: non-root, read-only root filesystem, NetworkPolicy egress only to AWS endpoints and PostgreSQL, resource limits, per-file timeout. |
+| **Malicious PDFs against the parser.** | Worker isolation: non-root, read-only root filesystem, resource limits, per-file timeout. Native-cloud: NetworkPolicy egress only to AWS endpoints and PostgreSQL. On-premise: `cap_drop`, and an egress allowlist still to come (next row). |
+| **No worker egress allowlist on-premise (known gap).** The worker container on the VM can reach the internet, so a compromised parser could send data out (ADR 0012). | An egress allowlist (AWS endpoints and PostgreSQL only) has its own ticket and must land before "pilot starts" (M4). Until then, the other isolation measures apply. |
+| **One VM is a single point of failure (on-premise).** A host failure or a deploy takes the product down. | Accepted for the pilot: Docker health checks and restart policies, an EC2 status-check recovery alarm, an uptime check on `/api/health`. Daily EBS snapshots (kept 7 days) and a nightly `pg_dump` to S3 bound data loss to one day; a restore runbook and one drill. |
 | **Poor metadata (scanned or unusual PDFs).** Missing year or title weakens the research map. | Fields optional; display title editable; works without a year listed separately; extraction accuracy measured. |
-| **Tool calling in streamed answers; cross-region routing; token cost; long streams on Kubernetes; EKS operations; judge bias.** | Streamed text + tool calls verified in M0 through `ChatBedrockConverse` (ADR 0006; `make bedrock-check`); the `us.` inference profile keeps requests in US regions; capped history and chunks, prompt caching, budget alerts; `preStop` hooks, grace periods, and PodDisruptionBudgets for streaming pods; managed node group with a small add-on set; judges use a different model family (Qwen) calibrated against human feedback. |
+| **Tool calling in streamed answers; cross-region routing; token cost; long streams on Kubernetes; EKS operations (native-cloud); judge bias.** | Streamed text + tool calls verified in M0 through `ChatBedrockConverse` (ADR 0006; `make bedrock-check`); the `us.` inference profile keeps requests in US regions; capped history and chunks, prompt caching, budget alerts; `preStop` hooks, grace periods, and PodDisruptionBudgets for streaming pods; managed node group with a small add-on set; judges use a different model family (Qwen) calibrated against human feedback. |
 | **Copyright of published or imported documents** *(R4)*. | In R1, the upload area reminds learners to upload only documents they have the right to use (Q47); terms of use with an upload warranty when sharing opens (R4, Q45); publishing terms, takedown per document visibility, imports limited to open-access sources. |
 
 ### 9.11 Hosting
 
-Agent, MCP server, API, web, Keycloak, ingestion worker, and CronJobs run on **EKS** (Helm umbrella chart; Pod Identity; External Secrets); RDS PostgreSQL + pgvector. Bedrock AgentCore Runtime for the agent and MCP server was considered and rejected: a second platform next to EKS, an extra hop per turn, and its microVM isolation and scale-to-zero matter little for an agent that runs no code (cost at pilot scale is similar). The worker gets stricter isolation because it parses untrusted files.
+Smart Tutor has two **deployment modes**, and the product behaves the same in both (ADR 0012):
+
+| | **On-premise** (default) | **Native-cloud** (opt-in) |
+|---|---|---|
+| Services (web, API, agent, MCP server, worker, Keycloak, scheduled jobs) | Docker Compose on one EC2 VM (t3.large, Amazon Linux 2023, 50 GB encrypted gp3 data volume); jobs are systemd timers that call `docker compose run` | EKS (Helm umbrella chart; Pod Identity; External Secrets); jobs are CronJobs |
+| PostgreSQL + pgvector | A container on the VM | RDS |
+| Public entry and TLS | Caddy (path routing, automatic Let's Encrypt) at an Elastic IP with a DuckDNS subdomain (fallback `<eip>.sslip.io`) | The CloudFront domain, through a VPC origin to an internal ALB (ADR 0009) |
+| Network | Its own VPC: one public subnet, no NAT, S3 gateway endpoint; inbound 80/443 only; no SSH | VPC in 2 AZs with a NAT gateway |
+| Managed AWS services | S3, SQS + DLQ, SSM, Secrets Manager, ECR (shared by both modes), Bedrock | The same, plus EKS, RDS, CloudFront, and the ALB |
+| Deployed | On every merge to `main` | By `workflow_dispatch`, or on every merge when `NATIVE_CLOUD_AUTO_DEPLOY=true` |
+
+Bedrock AgentCore Runtime for the agent and MCP server was considered and rejected. It would be a second platform next to the other services and add a hop per turn, and its microVM isolation and scale-to-zero matter little for an agent that runs no code (cost at pilot scale is similar). The worker gets stricter isolation because it parses untrusted files.
 
 ### 9.12 Environments, infrastructure as code, and delivery
 
 **Local (Docker Compose):** PostgreSQL + pgvector; Keycloak with realm import; LocalStack with the documents bucket (versioning; `ObjectCreated` notifications for `uploads/` to SQS + DLQ; CORS for the web origin), SSM parameters; Mailpit (catches Keycloak's verification emails). Bedrock and LangSmith are real (developer AWS profile, separate LangSmith project).
 
-**Production (us-east-1):** AWS CDK (Python) for VPC, EKS, RDS, S3 (versioning; `uploads/` event notifications; lifecycle: `uploads/` expires after 1 day), SQS + DLQ, ECR, IAM/Pod Identity, Secrets Manager, SSM, a CloudFront distribution and an internal ALB, budgets. Helm for all workloads, NetworkPolicies, External Secrets. CloudFront is the single public entry point and routes by path (`/` to web, `/api/*` to the API, `/auth/*` to Keycloak) through a VPC origin to the internal ALB (ADR 0009).
+**AWS (us-east-1):** one AWS CDK (Python) app takes `-c smart-tutor:mode=on-premise|native-cloud`, with `on-premise` as the default. Each mode has its own bucket, queue, and SSM parameters; ECR is shared.
 
-**Delivery:** on merge to `main`: tests and the smoke evaluation split → images to ECR → `cdk deploy` → `helm upgrade`. Releases gated on the full evaluation split.
+- **On-premise mode (default):** CDK creates the VPC, the **Host** stack (the EC2 instance with its Elastic IP, data volume, IAM role, status-check recovery alarm, and snapshot policy), S3 (versioning; `uploads/` event notifications; lifecycle: `uploads/` expires after 1 day), SQS + DLQ, ECR, IAM, Secrets Manager, SSM, and budgets. Docker Compose on the VM runs all services, PostgreSQL + pgvector, and Caddy. Caddy routes by path (`/` to web, `/api/*` to the API, `/auth/*` to Keycloak) and gets a Let's Encrypt certificate for the DuckDNS address.
+  - Backups: daily EBS snapshots kept 7 days and a nightly `pg_dump` to S3, with a restore runbook and one restore drill.
+  - Monitoring: Docker health checks and restart policies, log rotation, the recovery alarm, an uptime check on `/api/health`, budgets, and weekly SSM patching.
+  - On-premise starts with an empty database.
+- **Native-cloud mode (opt-in):** CDK creates the VPC, EKS, RDS, S3 (as above), SQS + DLQ, ECR, IAM/Pod Identity, Secrets Manager, SSM, a CloudFront distribution and an internal ALB, and budgets. Helm deploys all workloads, NetworkPolicies, and External Secrets. CloudFront is the single public entry point and routes by path through a VPC origin to the internal ALB (ADR 0009, 0010).
+
+**Delivery:**
+
+- **On-premise**, on every merge to `main`: tests and the smoke evaluation split → images to ECR → `cdk deploy` → SSM Run Command on the VM (pull images, migrate, `docker compose up -d`) → smoke test. Brief downtime during a deploy is acceptable.
+- **Native-cloud** (`cdk deploy` → `helm upgrade`) runs by `workflow_dispatch`, or on every merge when `NATIVE_CLOUD_AUTO_DEPLOY=true`. CI still runs `cdk synth` and `helm lint` for native-cloud on every change, so it doesn't rot.
+- The running EKS pilot stays, deployed only by hand, until on-premise passes its smoke test; then the product owner decides what happens to it.
+- Releases are gated on the full evaluation split.
 
 ### 9.13 Stack
 
@@ -511,10 +536,11 @@ Agent, MCP server, API, web, Keycloak, ingestion worker, and CronJobs run on **E
 | LLM (agent, document description) | `amazon.nova-2-lite-v1:0` via `us.amazon.nova-2-lite-v1:0` |
 | Embeddings | `amazon.nova-2-multimodal-embeddings-v1:0`, 1024 dimensions |
 | LLM (judges, synthetic data) | `qwen.qwen3-32b-v1:0` |
-| Database / vectors / memory / research map | PostgreSQL + pgvector (RDS) |
+| Database / vectors / memory / research map | PostgreSQL + pgvector (a container on the VM on-premise; RDS native-cloud) |
 | Identity | Keycloak (OIDC; roles `learner`, `admin`) |
 | Storage / events | S3 (presigned POST uploads, per-learner content storage, presigned GET for the document viewer), S3 → SQS |
-| Hosting / IaC / local | EKS + Helm / AWS CDK (Python) / Docker Compose |
+| Hosting | On-premise (default): Docker Compose on one EC2 VM, Caddy, DuckDNS. Native-cloud (opt-in): EKS + Helm, CloudFront, internal ALB (ADR 0012) |
+| IaC / local | AWS CDK (Python), one app with a `mode` context / Docker Compose |
 | API / Web | FastAPI / React |
 
 ### 9.14 Region: us-east-1
@@ -677,6 +703,7 @@ Measured over the pilot unless stated; minimum sample 100 events per metric.
 | Q62 | Conversation header (owner, 2026-10-08) | The header holds only the panel toggle ("Hide panel" / "Show panel") and the conversation title, which the learner can rename inline (US-13); no overflow menu: Show citations and Archive live in the conversation panel. |
 | Q61 | Choosing a conversation's documents (owner, 2026-10-08) | The learner adds and removes documents in a conversation's list, can start a conversation from any ready document (listed from the start), and can switch "Only search these documents" (opt-in, off by default); a limited decline offers "Add documents" and "Search all my documents", which re-asks the question. Brings "Restricting a thread to selected documents" from the backlog into Release 1 (US-4c). |
 | Q60 | Where a cited document opens (owner, 2026-10-08) | In a conversation, beside the conversation in one click (split view), not in an overlay; the conversation's documents used, note, and actions move to a side panel the learner can hide (US-4b). Elsewhere (Library, document details) the viewer stays an overlay. The side pane also offers "Open in dialog" for a larger view with the document's details. |
+| Q64 | Deployment mode (product owner, 2026-10-09) | On-premise is the default and deploys on every merge to `main`: Docker Compose on one EC2 VM, with S3, SQS, SSM, Secrets Manager, and ECR kept, behind Caddy and DuckDNS, with no CloudFront, ALB, or NAT. Native-cloud (EKS) is opt-in. The product behaves the same in both (§9.11, §9.12; ADR 0012). Narrows "all on EKS" (Q1–Q19) and Q44 to native-cloud. |
 | Q59 | Product owner and UI/UX review of Q54–Q58 (2026-10-08) | Defaults adopted: conversations and notes take subjects from their documents used at read time (deleted excluded; no stored note subjects); retrieved chunk text isn't kept in a thread's saved state, and citations are stored as ids; a turn counts once its answer is saved; the viewer opens ready, *choose subjects*, and archived documents and renews its link; content files keyed by `content_id`; shared contents split per owner on migration; storage growth accepted and reported per learner (`sdd/reviews/2026-10-08-end-user-feedback.md`). |
 
 ## 14. Roadmap: releases and milestones
@@ -736,13 +763,22 @@ M4 Production launch (R1)
 
 ## Appendix A — AWS setup checklist
 
+Both deployment modes use the same account, region, models, and CI role (ADR 0012). Items marked *(on-premise)* or *(native-cloud)* apply to that mode only.
+
 **Manual, one-time:**
 1. Region us-east-1.
 2. Model access for `amazon.nova-2-lite-v1:0` (and the `us.` inference profile), `amazon.nova-2-multimodal-embeddings-v1:0`, `qwen.qwen3-32b-v1:0`.
-3. Service quotas for the three models, sized for ingestion of uploads plus 50 concurrent learners; EKS/EC2 quotas.
-4. ~~Domain and DNS for web, API, and Keycloak (ACM certificate).~~ Not needed for the pilot: everything is served from the CloudFront address with path routing (ADR 0009). A custom domain later needs an ACM certificate in us-east-1 and an alternate domain name on the distribution.
+3. Service quotas for the three models, sized for ingestion of uploads plus 50 concurrent learners; EC2 quotas (a t3.large for on-premise; EKS and its nodes for native-cloud).
+4. ~~Domain and DNS for web, API, and Keycloak (ACM certificate).~~ Not needed for the pilot. *(On-premise)* a DuckDNS subdomain pointed at the Elastic IP, with its token in Secrets Manager (fallback `<eip>.sslip.io`); Caddy gets the certificate. *(Native-cloud)* the CloudFront address with path routing (ADR 0009); a custom domain later needs an ACM certificate in us-east-1 and an alternate domain name on the distribution.
 5. `cdk bootstrap`; CI deploy role trusted by GitHub Actions (OIDC).
 6. Developer access: AWS profile allowed to invoke the models; LangSmith API key.
 7. Decisions: PrivateLink for `bedrock-runtime`; monthly budget and alert recipients; optional Bedrock Guardrail; seed corpus license check for evaluation documents; data-erasure obligations for the pilot's users.
 
-**Created by CDK:** VPC, EKS and node group, RDS, S3 (versioning; `ObjectCreated` notifications for `uploads/` to SQS; lifecycle: `uploads/` expire after 1 day; CORS for presigned POST from the web origin), SQS + DLQ (the ingest queue has a 15-minute visibility timeout, and a message moves to the DLQ after 5 receives), ECR, Secrets Manager, SSM parameters, internal ALB and CloudFront distribution (VPC origin), budgets, IAM roles with Pod Identity (API: presign `uploads/*`, presigned GET and delete (every version) on `contents/*` (document viewer, US-10c), `ssm:GetParameter` on `/smart-tutor/*`, `sqs:SendMessage` on the ingest queue (Retry), Bedrock invoke on the embedding model (embeds new subject names); worker: `ssm:GetParameter` on `/smart-tutor/*`, read `uploads/*` and `contents/*`, write `contents/*`, delete `uploads/*`, `s3:ListBucket` on the bucket (so a missing key reads as not found, not access denied), receive, delete, and extend (change visibility of) messages on the ingest queue and read its attributes, Bedrock invoke on the embedding and agent models (chunks, summaries, subject names, first-pages description); agent: `ssm:GetParameter` on `/smart-tutor/*` (`detect-threshold`, `detect-margin`, `multi-margin`, read at startup), Bedrock invoke on the inference profile and underlying model ARNs in every destination region).
+**Created by CDK, on-premise (default):**
+
+- VPC with one public subnet, no NAT, and an S3 gateway endpoint.
+- Host stack: EC2 t3.large with an Elastic IP, a 50 GB encrypted gp3 data volume, a security group allowing 80/443 only, a status-check recovery alarm, and daily EBS snapshots kept 7 days.
+- The instance role: SSM Run Command and Session Manager, ECR pull, the S3, SQS, SSM, and Bedrock permissions that the native-cloud API, worker, and agent roles have (below), and writes of the nightly `pg_dump` to S3.
+- S3, SQS + DLQ, Secrets Manager, and SSM parameters of its own; budgets; the uptime check on `/api/health`.
+
+**Created by CDK, native-cloud (opt-in):** VPC, EKS and node group, RDS, S3 (versioning; `ObjectCreated` notifications for `uploads/` to SQS; lifecycle: `uploads/` expire after 1 day; CORS for presigned POST from the web origin), SQS + DLQ (the ingest queue has a 15-minute visibility timeout, and a message moves to the DLQ after 5 receives), ECR, Secrets Manager, SSM parameters, internal ALB and CloudFront distribution (VPC origin), budgets, IAM roles with Pod Identity (API: presign `uploads/*`, presigned GET and delete (every version) on `contents/*` (document viewer, US-10c), `ssm:GetParameter` on `/smart-tutor/*`, `sqs:SendMessage` on the ingest queue (Retry), Bedrock invoke on the embedding model (embeds new subject names); worker: `ssm:GetParameter` on `/smart-tutor/*`, read `uploads/*` and `contents/*`, write `contents/*`, delete `uploads/*`, `s3:ListBucket` on the bucket (so a missing key reads as not found, not access denied), receive, delete, and extend (change visibility of) messages on the ingest queue and read its attributes, Bedrock invoke on the embedding and agent models (chunks, summaries, subject names, first-pages description); agent: `ssm:GetParameter` on `/smart-tutor/*` (`detect-threshold`, `detect-margin`, `multi-margin`, read at startup), Bedrock invoke on the inference profile and underlying model ARNs in every destination region).
