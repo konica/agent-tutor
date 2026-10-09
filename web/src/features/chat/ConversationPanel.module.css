@@ -63,6 +63,10 @@
 }
 .switch[aria-checked="true"] .track { background: var(--accent); border-color: var(--accent); }
 .switch[aria-checked="true"] .thumb { transform: translateX(16px); background: var(--on-accent); }
+/* Nothing to limit the search to yet: the label dims and the track goes flat. */
+.switch:disabled { cursor: not-allowed; color: var(--text-2); }
+.switch:disabled .track { border-color: var(--border); background: var(--surface-2); }
+.switch:disabled .thumb { background: var(--border-strong); box-shadow: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .track, .thumb { transition: none; }
