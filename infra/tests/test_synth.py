@@ -11,11 +11,12 @@ CDK_CONTEXT = json.loads((Path(__file__).parents[1] / "cdk.json").read_text())["
 
 
 def make_app(**extra_context: Any) -> cdk.App:
-    return cdk.App(context={**CDK_CONTEXT, **extra_context})
+    """An app in native-cloud mode unless `smart-tutor:mode` says otherwise; the tests below cover native-cloud."""
+    return cdk.App(context={**CDK_CONTEXT, "smart-tutor:mode": "native-cloud", **extra_context})
 
 
 def template(app: cdk.App, suffix: str) -> Template:
-    stack = next(s for s in build_app(app) if s.stack_name == f"SmartTutor-prod-{suffix}")
+    stack = next(s for s in build_app(app) if s.stack_name.endswith(f"-prod-{suffix}"))
     return Template.from_stack(stack)
 
 
