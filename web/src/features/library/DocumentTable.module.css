@@ -1,6 +1,6 @@
 .table {
   width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
 }
 .colSubjects { width: 220px; }
 .colState { width: 260px; }
@@ -31,3 +31,9 @@
 .reasonIcon { width: 14px; height: 14px; flex: none; margin-top: 2px; }
 .date { font-size: var(--fs-12); color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .actions { text-align: right; white-space: nowrap; }
+/* No overflow clipping on the table, so the sticky header works and focus rings show; corners are rounded per cell. */
+.table thead th:first-child { border-top-left-radius: calc(var(--r-md) - 1px); }
+.table thead th:last-child { border-top-right-radius: calc(var(--r-md) - 1px); }
+.table tbody tr:last-child td:first-child { border-bottom-left-radius: calc(var(--r-md) - 1px); }
+.table tbody tr:last-child td:last-child { border-bottom-right-radius: calc(var(--r-md) - 1px); }
+.table tbody tr.needs:hover td { background: color-mix(in oklab, var(--attn-soft) 60%, var(--surface-2)); }

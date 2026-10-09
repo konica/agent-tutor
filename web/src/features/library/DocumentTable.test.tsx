@@ -31,6 +31,20 @@ describe("DocumentTable compact rows", () => {
     expect(title.closest("td")).toHaveTextContent(/Schick/);
   });
 
+  it("gives the byline and the subjects their full text as a tooltip", () => {
+    const subjects = [{ subject_id: "s1", name: "AI Agents" }, { subject_id: "s2", name: "LLMs" }];
+    render(<DocumentTable documents={[{ ...doc, subjects }]} {...props} />);
+    expect(screen.getByText("Schick et al. · 2023")).toHaveAttribute("title", "Schick et al. · 2023");
+    expect(screen.getByText("AI Agents").closest("div")).toHaveAttribute("title", "AI Agents, LLMs");
+  });
+
+  it("shows the year for an upload from a past year", () => {
+    vi.useFakeTimers({ now: new Date("2026-10-20T00:00:00Z") });
+    render(<DocumentTable documents={[{ ...doc, created_at: "2025-03-05T09:00:00Z" }]} {...props} />);
+    expect(screen.getByRole("cell", { name: /2025/ })).toBeVisible();
+    vi.useRealTimers();
+  });
+
   it("puts the processing hint on the badge line with the full hint as its tooltip", () => {
     render(<DocumentTable documents={[{ ...doc, state: "processing" }]} {...props} />);
     const hint = "You can choose subjects when processing finishes.";

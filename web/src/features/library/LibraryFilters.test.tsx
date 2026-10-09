@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { LibraryFilters } from "./LibraryFilters";
+import uploadedStyles from "./UploadedFilter.module.css";
 
 const subjects = [
   { subject_id: "s1", name: "AI Agents" },
@@ -99,6 +100,11 @@ describe("LibraryFilters", () => {
     expect(onChange).toHaveBeenLastCalledWith({});
   });
 
+  it("reads Needs subjects, with no number, while pressed and none is left", () => {
+    setup({ state: "awaiting_subjects" }, 0, 0);
+    expect(screen.getByRole("button", { name: "Needs subjects" })).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("hides the chip when nothing needs subjects", () => {
     setup({ state: "ready" }, 3, 0);
     expect(screen.queryByRole("button", { name: /needs? subjects/ })).toBeNull();
@@ -140,6 +146,11 @@ describe("UploadedFilter", () => {
   it("names the range on the button and marks it active", () => {
     setup({ uploaded_from: "2026-09-01" });
     const button = screen.getByRole("button", { name: "Uploaded: from 2026-09-01" });
-    expect(button.className).toMatch(/on/);
+    expect(button).toHaveClass(uploadedStyles.on);
+  });
+
+  it("is not marked active without a range", () => {
+    setup();
+    expect(screen.getByRole("button", { name: "Uploaded" })).not.toHaveClass(uploadedStyles.on);
   });
 });

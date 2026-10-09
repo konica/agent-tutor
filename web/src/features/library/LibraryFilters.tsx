@@ -65,7 +65,7 @@ export const LibraryFilters = forwardRef<HTMLSelectElement, Props>(function Libr
       {(needsSubjects > 0 || filters.state === "awaiting_subjects") && (
         <button type="button" className={styles.chip} aria-pressed={filters.state === "awaiting_subjects"} onClick={() => set({ state: filters.state === "awaiting_subjects" ? undefined : "awaiting_subjects" })}>
           <Tag className={styles.chipIcon} strokeWidth={1.5} aria-hidden="true" />
-          {needsSubjects === 1 ? "1 needs subjects" : `${needsSubjects} need subjects`}
+          {needsSubjects === 0 ? "Needs subjects" : needsSubjects === 1 ? "1 needs subjects" : `${needsSubjects} need subjects`}
         </button>
       )}
     </FilterBar>
