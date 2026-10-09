@@ -3,7 +3,6 @@
 import copy
 import math
 import uuid
-from collections.abc import Collection
 from types import TracebackType
 from typing import Self
 
@@ -173,14 +172,11 @@ class _Chunks(ChunkRepository):
     def replace(self, content_id: ContentId, chunks: list[Chunk]) -> None:
         self._s.chunks[content_id] = copy.deepcopy(chunks)
 
-    def search(
-        self, user_id: UserId, embedding: list[float], subject_ids: Collection[SubjectId], k: int
-    ) -> list[ChunkHit]:
+    def search(self, user_id: UserId, embedding: list[float], k: int) -> list[ChunkHit]:
         def title(d: Document) -> str:
             content = self._s.contents.get(d.content_id) if d.content_id is not None else None
             return d.title_override or (content.title if content else None) or d.file_name
 
-        requested = set(subject_ids)
         hits = [
             ChunkHit(
                 str(uuid.uuid5(uuid.NAMESPACE_URL, f"{c.content_id}:{c.seq}")),
@@ -189,10 +185,9 @@ class _Chunks(ChunkRepository):
                 c.page,
                 c.text,
                 _cosine(embedding, c.embedding),
-                tuple(sorted(s for s in d.subject_ids if s in requested)),
             )
             for d in self._s.documents.values()
-            if d.content_id is not None and d.searchable_by(user_id, subject_ids)
+            if d.content_id is not None and d.searchable_by(user_id)
             for c in self._s.chunks.get(d.content_id, [])
         ]
         return sorted(hits, key=lambda h: (-h.score, h.chunk_id))[:k]

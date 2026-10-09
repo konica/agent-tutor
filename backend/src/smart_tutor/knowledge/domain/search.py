@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from smart_tutor.shared.domain.ids import DocumentId, SubjectId
+from smart_tutor.shared.domain.ids import DocumentId
 
 
 @dataclass(frozen=True)
@@ -13,4 +13,3 @@ class ChunkHit:
     page: int | None
     text: str
     score: float  # cosine similarity: 1 is identical
-    subject_ids: tuple[SubjectId, ...]  # the requested subjects this hit's document has, sorted

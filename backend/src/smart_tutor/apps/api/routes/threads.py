@@ -135,17 +135,11 @@ async def ask_in_new_thread(
     agent: Agent,
 ) -> StreamingResponse:
     try:
-        learner_subjects = await run_in_threadpool(conversations.subjects_for_new_thread, principal.user_id)
+        await run_in_threadpool(conversations.subjects_for_new_thread, principal.user_id)
     except NoDocumentsError as e:
         raise HTTPException(409, str(e)) from None
-    names = await run_in_threadpool(subjects.names_for, principal.user_id, learner_subjects)
-    named: dict[str, str] = {}
-    for s in learner_subjects:
-        if not names.get(s):
-            logger.warning("subject %s has no name; using a placeholder", s)
-        named[s] = names.get(s) or UNNAMED_SUBJECT
     try:
-        answer = await agent.open_answer(token, body.question, list(named.items()))
+        answer = await agent.open_answer(token, body.question)
     except UnauthenticatedError:
         raise HTTPException(401, "Not authenticated", headers={"WWW-Authenticate": "Bearer"}) from None
     except AgentUnavailableError:
@@ -164,11 +158,12 @@ async def ask_in_new_thread(
             # The 200 headers are already sent: end the stream with an error event rather than cut it off.
             logger.exception("starting a thread with subjects %s failed", subject_ids)
             return None
+        names = await run_in_threadpool(subjects.names_for, principal.user_id, thread.subject_ids)
         return _sse(
             "thread",
             {
                 "thread_id": thread.thread_id,
-                "subjects": [{"subject_id": s, "name": named.get(s, UNNAMED_SUBJECT)} for s in thread.subject_ids],
+                "subjects": [{"subject_id": s, "name": names.get(s) or UNNAMED_SUBJECT} for s in thread.subject_ids],
             },
         )
 

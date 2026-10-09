@@ -1,9 +1,8 @@
 """In-memory threads and a fake retriever."""
 
 import copy
-from collections.abc import Sequence
 
-from smart_tutor.shared.domain.ids import SubjectId, ThreadId, UserId
+from smart_tutor.shared.domain.ids import ThreadId, UserId
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 from smart_tutor.tutoring.domain.thread import Thread
 from smart_tutor.tutoring.ports.retriever import Retriever
@@ -26,10 +25,10 @@ class FakeRetriever(Retriever):
     def __init__(self, chunks: list[RetrievedChunk] | None = None, error: Exception | None = None) -> None:
         self._chunks = chunks or []
         self._error = error
-        self.calls: list[tuple[str, list[SubjectId], int]] = []
+        self.calls: list[tuple[str, int]] = []
 
-    async def search(self, query: str, subject_ids: Sequence[SubjectId], k: int = 5) -> list[RetrievedChunk]:
-        self.calls.append((query, list(subject_ids), k))
+    async def search(self, query: str, k: int = 5) -> list[RetrievedChunk]:
+        self.calls.append((query, k))
         if self._error is not None:
             raise self._error
         return list(self._chunks)

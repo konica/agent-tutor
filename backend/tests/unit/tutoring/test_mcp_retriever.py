@@ -11,9 +11,8 @@ from smart_tutor.apps.mcp_server.server import build_server
 from smart_tutor.knowledge.application import SearchService
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.errors import UnauthenticatedError
-from smart_tutor.shared.domain.ids import SubjectId, UserId
+from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.domain.principal import Principal
-from smart_tutor.subjects.application import GENERAL_SUBJECT_ID
 from smart_tutor.tutoring.adapters.mcp_retriever import McpRetriever
 from smart_tutor.tutoring.domain.errors import RetrievalError
 
@@ -33,34 +32,24 @@ async def test_returns_retrieved_chunks_for_the_tokens_learner() -> None:
     ingest_ready(library, "ada", "Attention is all you need.")
     async with in_process_mcp(build(library, verifier_for_ada())) as transport:
         retriever = McpRetriever(MCP_TEST_URL, "t-ada", transport)
-        [found] = await retriever.search("Attention is all you need.", [GENERAL_SUBJECT_ID])
+        [found] = await retriever.search("Attention is all you need.")
     assert found.text == "Attention is all you need."
     assert found.page == 1
     assert found.document_title.endswith(".pdf")
-
-
-async def test_a_chunk_names_which_searched_subjects_it_belongs_to() -> None:
-    library = InMemoryLibrary()
-    other = SubjectId("00000000-0000-4000-8000-0000000000a2")
-    ingest_ready(library, "ada", "Attention is all you need.", subject_ids=[GENERAL_SUBJECT_ID, other])
-    async with in_process_mcp(build(library, verifier_for_ada())) as transport:
-        retriever = McpRetriever(MCP_TEST_URL, "t-ada", transport)
-        [found] = await retriever.search("Attention is all you need.", [other, GENERAL_SUBJECT_ID])
-    assert found.subject_ids == (GENERAL_SUBJECT_ID, other)
 
 
 async def test_a_refused_token_raises_unauthenticated() -> None:
     async with in_process_mcp(build(InMemoryLibrary(), FakeTokenVerifier())) as transport:
         retriever = McpRetriever(MCP_TEST_URL, "t-unknown", transport)
         with pytest.raises(UnauthenticatedError):
-            await retriever.search("q", [GENERAL_SUBJECT_ID])
+            await retriever.search("q")
 
 
 async def test_a_tool_error_raises_retrieval_error() -> None:
     async with in_process_mcp(build(InMemoryLibrary(), verifier_for_ada())) as transport:
         retriever = McpRetriever(MCP_TEST_URL, "t-ada", transport)
         with pytest.raises(RetrievalError):
-            await retriever.search("  ", [GENERAL_SUBJECT_ID])
+            await retriever.search("  ")
 
 
 def test_repr_never_shows_the_token() -> None:
@@ -89,7 +78,7 @@ class RefuseAndStallTransport(httpx2.AsyncBaseTransport):
 
 async def test_cancellation_after_a_401_propagates_instead_of_becoming_unauthenticated() -> None:
     transport = RefuseAndStallTransport()
-    search = asyncio.create_task(McpRetriever(MCP_TEST_URL, "t-ada", transport).search("q", [GENERAL_SUBJECT_ID]))
+    search = asyncio.create_task(McpRetriever(MCP_TEST_URL, "t-ada", transport).search("q"))
     await asyncio.wait_for(transport.reading.wait(), timeout=5)
     search.cancel()
     with pytest.raises(asyncio.CancelledError):

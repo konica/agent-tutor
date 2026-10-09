@@ -1,4 +1,4 @@
-"""US-12: two learners in the same subject; MCP search never returns the other learner's chunks."""
+"""US-12: two learners with the same subjects; MCP search never returns the other learner's chunks."""
 
 import json
 from typing import Any
@@ -22,8 +22,8 @@ B_TEXT = "Photosynthesis makes glucose."
 
 def world() -> tuple[InMemoryLibrary, FakeTokenVerifier, str]:
     library = InMemoryLibrary()
-    a_doc = ingest_ready(library, "learner-a", A_TEXT)
-    ingest_ready(library, "learner-b", B_TEXT)
+    a_doc = ingest_ready(library, "learner-a", A_TEXT, subject_ids=[GENERAL_SUBJECT_ID])
+    ingest_ready(library, "learner-b", B_TEXT, subject_ids=[GENERAL_SUBJECT_ID])
     verifier = FakeTokenVerifier()
     for user in ("a", "b"):
         verifier.add(f"token-{user}", Principal(UserId(f"learner-{user}"), user, frozenset({"learner"})))
@@ -40,9 +40,9 @@ async def search_as(library: InMemoryLibrary, verifier: FakeTokenVerifier, token
         return await client.call_tool("search", arguments)
 
 
-async def test_b_never_gets_as_chunks_in_the_same_subject() -> None:
+async def test_b_never_gets_as_chunks_even_with_the_same_subjects() -> None:
     library, verifier, a_doc = world()
-    result = await search_as(library, verifier, "token-b", query=A_TEXT, subject_ids=[str(GENERAL_SUBJECT_ID)])
+    result = await search_as(library, verifier, "token-b", query=A_TEXT)
     assert not result.is_error
     chunks = result.structured_content["chunks"]
     assert chunks and all(c["text"] == B_TEXT for c in chunks)
@@ -52,21 +52,19 @@ async def test_b_never_gets_as_chunks_in_the_same_subject() -> None:
 
 async def test_a_user_id_argument_changes_nothing() -> None:
     library, verifier, a_doc = world()
-    result = await search_as(
-        library, verifier, "token-b", query=A_TEXT, subject_ids=[str(GENERAL_SUBJECT_ID)], user_id="learner-a"
-    )
+    result = await search_as(library, verifier, "token-b", query=A_TEXT, user_id="learner-a")
     assert not result.is_error
     chunks = result.structured_content["chunks"]
     assert chunks and all(c["text"] == B_TEXT for c in chunks)
     assert A_TEXT not in json.dumps(chunks) and a_doc not in json.dumps(chunks)
 
 
-async def test_a_hit_names_only_the_subjects_asked_for() -> None:
+async def test_search_covers_documents_in_any_subject() -> None:
     library, verifier, _ = world()
     other = SubjectId("00000000-0000-4000-8000-0000000000b2")
-    ingest_ready(library, "learner-a", "Attention scales with heads.", subject_ids=[GENERAL_SUBJECT_ID, other])
-    result = await search_as(
-        library, verifier, "token-a", query="Attention scales with heads.", subject_ids=[str(GENERAL_SUBJECT_ID)]
-    )
+    ingest_ready(library, "learner-a", "Attention scales with heads.", subject_ids=[other])
+    result = await search_as(library, verifier, "token-a", query="Attention scales with heads.", k=2)
     assert not result.is_error
-    assert all(c["subject_ids"] == [str(GENERAL_SUBJECT_ID)] for c in result.structured_content["chunks"])
+    chunks = result.structured_content["chunks"]
+    assert {c["text"] for c in chunks} == {"Attention scales with heads.", A_TEXT}
+    assert all("subject_ids" not in c for c in chunks)

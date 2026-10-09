@@ -1,1 +1,1 @@
-"""Graph nodes: resolve_subject, search, gate, answer, summarize. Each calls an application service."""
+"""Graph nodes: search, answer. Each calls an application service."""

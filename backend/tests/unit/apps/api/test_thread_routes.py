@@ -87,14 +87,11 @@ def test_starts_a_thread_and_relays_the_agents_answer_after_a_thread_event() -> 
     [request] = seen
     assert request.url == "http://agent.test/ask"
     assert request.headers["authorization"] == "Bearer t-ada"  # the same token, forwarded (ADR 0007)
-    assert json.loads(request.content) == {
-        "question": "What is attention?",
-        "learner_subjects": [{"subject_id": "00000000-0000-4000-8000-000000000001", "name": "General"}],
-    }
+    assert json.loads(request.content) == {"question": "What is attention?"}
     assert "t-ada" not in request.content.decode()  # never in the body
 
 
-def test_a_subject_without_a_name_is_sent_with_a_placeholder_and_logged(caplog: pytest.LogCaptureFixture) -> None:
+def test_a_subject_without_a_name_gets_a_placeholder_in_the_thread_event() -> None:
     seen: list[httpx.Request] = []
     verifier = FakeTokenVerifier()
     verifier.add("t-ada", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
@@ -102,16 +99,15 @@ def test_a_subject_without_a_name_is_sent_with_a_placeholder_and_logged(caplog: 
     ingest_ready(library, "ada", "Attention weighs tokens.")
     services = api_services(library, subjects=SubjectNames(InMemorySubjects({})), agent=fake_agent(recording(seen)))
     client = TestClient(create_app(Settings(), verifier=verifier, services=services))
-    caplog.set_level(logging.DEBUG)
 
     response = client.post("/threads", json=QUESTION, headers=AUTH)
 
     assert response.status_code == 200
-    unnamed = [{"subject_id": "00000000-0000-4000-8000-000000000001", "name": "Unnamed subject"}]
-    assert json.loads(seen[0].content)["learner_subjects"] == unnamed
-    [record] = [r for r in caplog.records if "placeholder" in r.getMessage()]
-    assert record.levelno == logging.WARNING and "00000000-0000-4000-8000-000000000001" in record.getMessage()
-    assert "t-ada" not in caplog.text
+    first = response.text.split("\n\n", 1)[0]
+    assert json.loads(first.split("data: ", 1)[1])["subjects"] == [
+        {"subject_id": "00000000-0000-4000-8000-000000000001", "name": "Unnamed subject"}
+    ]
+    assert json.loads(seen[0].content) == QUESTION
 
 
 def event_stream(content: bytes) -> Handler:
@@ -119,7 +115,7 @@ def event_stream(content: bytes) -> Handler:
 
 
 def test_the_thread_starts_with_the_subjects_the_agent_detected() -> None:
-    # ada has General and S2; the agent gets both and detects both
+    # ada has General and S2; the agent's subjects event names both
     seen: list[httpx.Request] = []
     verifier = FakeTokenVerifier()
     verifier.add("t-ada", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
@@ -142,10 +138,7 @@ def test_the_thread_starts_with_the_subjects_the_agent_detected() -> None:
         {"subject_id": GENERAL, "name": "General"},
     ]
     assert rest == AGENT_ANSWER.decode()
-    assert json.loads(seen[0].content)["learner_subjects"] == [
-        {"subject_id": GENERAL, "name": "General"},
-        {"subject_id": S2, "name": "LLMs"},
-    ]
+    assert json.loads(seen[0].content) == QUESTION
 
 
 def test_an_agent_error_before_subjects_is_relayed_and_starts_no_thread() -> None:
