@@ -69,6 +69,10 @@ class SqlThreadRepository(ThreadRepository):
             ).first()
         return _thread(row) if row else None
 
+    def set_title(self, thread_id: ThreadId, title: str) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(threads.update().where(threads.c.thread_id == thread_id).values(title=title))
+
     def add_documents_used(self, thread_id: ThreadId, document_ids: Sequence[DocumentId], at: datetime) -> None:
         if not document_ids:
             return

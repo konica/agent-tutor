@@ -11,11 +11,6 @@
 }
 .toggle:hover { background: var(--surface-2); color: var(--text); }
 .toggleIcon { width: 16px; height: 16px; }
-/* The body font, semibold, on one line, not the serif display font base.css gives every h1. */
-.title {
-  flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-family: var(--font-body); font-size: var(--fs-14); font-weight: 600; line-height: var(--lh-head); color: var(--text);
-}
 
 /* One explicit row, so the panel and the conversation each get the body's height and scroll on their own. */
 .body { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); min-height: 0; }

@@ -77,7 +77,7 @@ describe("ChatPage", () => {
     expect(ask).toHaveBeenCalledWith("What is attention?");
     expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
     // The question is the header title and also the learner's bubble in the conversation.
-    expect(screen.getByRole("heading", { level: 1, name: "What is attention?" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toContainElement(screen.getByRole("button", { name: "What is attention?. Edit title" }));
     expect(screen.getByText("You asked:").parentElement).toHaveTextContent("You asked: What is attention?");
     expect(screen.getByText("Sources")).toBeVisible();
     expect(screen.getByTitle("a.pdf, p. 3")).toBeInTheDocument();
@@ -118,7 +118,7 @@ describe("ChatPage", () => {
     await userEvent.click(askButton());
     expect(await screen.findByText("Sources")).toBeVisible();
     expect(screen.getByTitle(`${title}, p. 3`)).toHaveTextContent(title);
-    expect(screen.getByRole("heading", { level: 1, name: "How does ReAct work?" })).toHaveAttribute("title", "How does ReAct work?");
+    expect(screen.getByRole("button", { name: "How does ReAct work?. Edit title" })).toHaveAttribute("title", "How does ReAct work?");
   });
 
   it("shows the keyboard hint under the composer", async () => {
@@ -273,7 +273,7 @@ describe("ChatPage", () => {
     renderChat({ ask, loadDocs: async () => [doc("ready"), doc("processing")] });
     await userEvent.type(await question(), "What is attention?");
     await userEvent.click(askButton());
-    expect(await screen.findByRole("heading", { level: 1, name: "What is attention?" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "What is attention?. Edit title" })).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Subjects" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Ask about your documents" })).not.toBeInTheDocument();
     expect(screen.getByText("1 document is still processing and can't be used yet.")).toBeInTheDocument();
@@ -459,6 +459,130 @@ describe("ChatPage", () => {
       await userEvent.click(screen.getByRole("switch", { name: "Show citations" }));
       expect(screen.queryByRole("list", { name: "Sources" })).not.toBeInTheDocument();
       expect(screen.getByText("It weighs tokens [1].")).toBeInTheDocument();
+    });
+  });
+
+  describe("title", () => {
+    const started = () => events({ type: "thread", thread_id: "t1" }, { type: "done" });
+    const titleButton = () => screen.findByRole("button", { name: "What is attention?. Edit title" });
+    const field = () => screen.getByRole("textbox", { name: "Conversation title" });
+
+    async function startConversation(rename: (threadId: string, title: string) => Promise<string>) {
+      renderChat({ ask: vi.fn(started), rename });
+      await userEvent.type(await question(), "What is attention?");
+      await userEvent.click(askButton());
+      return titleButton();
+    }
+
+    it("can't be edited before the conversation exists", async () => {
+      renderChat();
+      await question();
+      expect(screen.getByRole("heading", { level: 1, name: "New conversation" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Edit title/ })).not.toBeInTheDocument();
+    });
+
+    it("opens with the title selected, and Enter saves the trimmed title and returns focus", async () => {
+      const rename = vi.fn(async (_id: string, title: string) => title);
+      await userEvent.click(await startConversation(rename));
+      const input = field() as HTMLInputElement;
+      expect(input).toHaveFocus();
+      expect(input).toHaveValue("What is attention?");
+      expect([input.selectionStart, input.selectionEnd]).toEqual([0, "What is attention?".length]);
+      expect(input).toHaveAttribute("maxlength", "120");
+
+      await userEvent.paste("  Attention basics ");
+      await userEvent.keyboard("{Enter}");
+
+      const renamed = await screen.findByRole("button", { name: "Attention basics. Edit title" });
+      expect(renamed).toHaveFocus();
+      expect(rename).toHaveBeenCalledTimes(1);
+      expect(rename).toHaveBeenCalledWith("t1", "Attention basics");
+      expect(screen.queryByRole("textbox", { name: "Conversation title" })).not.toBeInTheDocument();
+    });
+
+    it("Esc cancels and restores the old title", async () => {
+      const rename = vi.fn(async (_id: string, title: string) => title);
+      await userEvent.click(await startConversation(rename));
+      await userEvent.paste("Something else");
+      await userEvent.keyboard("{Escape}");
+      expect(rename).not.toHaveBeenCalled();
+      expect(await titleButton()).toHaveFocus();
+    });
+
+    it("clicking away saves", async () => {
+      const rename = vi.fn(async (_id: string, title: string) => title);
+      await userEvent.click(await startConversation(rename));
+      await userEvent.clear(field());
+      await userEvent.paste("Attention basics");
+      await userEvent.click(await question());
+      expect(rename).toHaveBeenCalledWith("t1", "Attention basics");
+      expect(await screen.findByRole("button", { name: "Attention basics. Edit title" })).not.toHaveFocus();
+    });
+
+    it("shows Enter a title under an empty field, saves nothing, and clicking away cancels", async () => {
+      const rename = vi.fn(async (_id: string, title: string) => title);
+      await userEvent.click(await startConversation(rename));
+      await userEvent.clear(field());
+      expect(screen.getByRole("alert")).toHaveTextContent("Enter a title");
+      expect(field()).toHaveAttribute("aria-invalid", "true");
+      expect(field()).toHaveAccessibleDescription("Enter a title");
+      await userEvent.type(field(), "   {Enter}");
+      expect(field()).toBeInTheDocument();
+      await userEvent.click(await question());
+      expect(rename).not.toHaveBeenCalled();
+      expect(await titleButton()).toBeInTheDocument();
+    });
+
+    it("keeps the field open with the server's message when the title is refused", async () => {
+      const rename = vi.fn(async () => {
+        throw new Error("An archived conversation can't be renamed. Restore it first.");
+      });
+      await userEvent.click(await startConversation(rename));
+      await userEvent.type(field(), " again{Enter}");
+      expect(await screen.findByRole("alert")).toHaveTextContent("An archived conversation can't be renamed.");
+      expect(field()).toHaveValue("What is attention? again");
+      await userEvent.keyboard("{Escape}");
+      expect(await titleButton()).toBeInTheDocument();
+    });
+
+    it("saves nothing when the title is unchanged", async () => {
+      const rename = vi.fn(async (_id: string, title: string) => title);
+      await userEvent.click(await startConversation(rename));
+      await userEvent.keyboard("{Enter}");
+      expect(rename).not.toHaveBeenCalled();
+      expect(await titleButton()).toHaveFocus();
+    });
+
+    it("works by keyboard alone, next to the panel toggle", async () => {
+      const rename = vi.fn(async (_id: string, title: string) => title);
+      const button = await startConversation(rename);
+      const toggle = screen.getByRole("button", { name: "Hide panel" });
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
+      toggle.focus();
+      await userEvent.keyboard("{Enter}");
+      expect(screen.getByRole("button", { name: "Show panel" })).toHaveAttribute("aria-expanded", "false");
+      await userEvent.tab();
+      expect(button).toHaveFocus();
+      await userEvent.keyboard("{Enter}");
+      // The title opens selected, so typing replaces it.
+      await userEvent.keyboard("Renamed{Enter}");
+      expect(rename).toHaveBeenCalledWith("t1", "Renamed");
+      expect(await screen.findByRole("button", { name: "Renamed. Edit title" })).toHaveFocus();
+    });
+
+    it("goes back to the question when a new question starts a new conversation", async () => {
+      const ask = vi.fn(started);
+      renderChat({ ask, rename: async (_id, title) => title });
+      await userEvent.type(await question(), "What is attention?");
+      await userEvent.click(askButton());
+      await userEvent.click(await titleButton());
+      await userEvent.paste("Attention basics");
+      await userEvent.keyboard("{Enter}");
+      await screen.findByRole("button", { name: "Attention basics. Edit title" });
+      await userEvent.click(await question());
+      await userEvent.paste("What is a transformer?");
+      await userEvent.click(askButton());
+      expect(await screen.findByRole("button", { name: "What is a transformer?. Edit title" })).toBeInTheDocument();
     });
   });
 });
