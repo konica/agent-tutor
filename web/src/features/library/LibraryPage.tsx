@@ -1,4 +1,4 @@
-import { AlertCircle, Archive, Filter, Info, Upload } from "lucide-react";
+import { AlertCircle, Archive, Filter, Info, MessageSquare, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router";
 
@@ -7,6 +7,7 @@ import { SessionExpiredError } from "../../auth/authClient";
 import { archiveDocument, deleteDocument, DocumentGoneError, DocumentProcessingError, findInLibrary, loadDocumentDetails, loadDocuments, loadSubjectSuggestions, loadUploadLimits, loadUploadStatus, megabytes, rejectionReason, restoreDocument, RetriesUsedUpError, retryProcessing, saveDocumentTitle, saveSubjects as saveChosenSubjects, uploadPdf, type DocumentDetails, type DocumentFilters, type DocumentResponse, type SubjectSuggestions, type UploadEvents, type UploadLimits, type UploadStatus } from "../../api/documents";
 import type { SubjectResponse } from "../../api/generated/types.gen";
 import { loadMySubjects } from "../../api/subjects";
+import { Banner } from "../../components/Banner/Banner";
 import { Button } from "../../components/Button/Button";
 import { EmptyState } from "../../components/EmptyState/EmptyState";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
@@ -112,6 +113,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
   const [alreadyIn, setAlreadyIn] = useState<{ name: string; documentId: string }[]>([]);
   const seen = useRef<Map<string, DocumentResponse["state"]> | null>(null);
   const justSaved = useRef(new Set<string>()); // saved here, so the poll must not announce "is ready." over "Subjects saved."
+  const [finished, setFinished] = useState(false); // a subjects save happened in this visit, so "all ready" is news
   const [picking, setPicking] = useState<Picking | null>(null);
   const statusRegion = useRef<HTMLParagraphElement>(null);
   const wasPicking = useRef(false);
@@ -155,6 +157,18 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
     (title ?? statusRegion.current)?.focus();
   }, [details]);
 
+  const allReadyNow = finished && counts.allReady && !archivedView;
+  // Once none waits, the Library shows every document, not an emptied "needs subjects" filter.
+  useEffect(() => {
+    if (finished && counts.allReady) {
+      setFilters((f) => {
+        if (f.state !== "awaiting_subjects") return f;
+        const { state: _state, ...rest } = f;
+        return rest;
+      });
+    }
+  }, [finished, counts.allReady]);
+
   function clearFilters() {
     setFilters({});
     subjectSelect.current?.focus(); // the Clear button disappears
@@ -184,6 +198,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
   async function onSaved(doc: DocumentResponse, announce: boolean) {
     justSaved.current.add(doc.document_id);
     seen.current?.set(doc.document_id, "ready");
+    setFinished(true);
     if (announce) setStatus(`Subjects saved. ${doc.title} is ready to use.`);
     await Promise.all([refresh(), counts.refresh(), refreshSubjects()]); // the document no longer waits, so the counts change
   }
@@ -576,6 +591,13 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
         <p className={styles.error}>
           Can't load your library. Retrying…
         </p>
+      )}
+      {allReadyNow && (
+        <div role="status" className={styles.ready}>
+          <Banner variant="success" inline title="Your documents are ready." action={<Button variant="primary" size="sm" icon={MessageSquare} onClick={() => navigate("/chat")}>Ask a question</Button>}>
+            Ask anything about them; answers cite the document and page.
+          </Banner>
+        </div>
       )}
       {showToolbar && (
         <div className={styles.toolbar}>

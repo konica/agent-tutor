@@ -7,11 +7,11 @@ type Variant = "success" | "info" | "attn" | "danger";
 
 const ICONS = { success: CircleCheck, info: Info, attn: CircleAlert, danger: CircleAlert } as const;
 
-type Props = { variant: Variant; title?: string; children?: ReactNode; inline?: boolean };
+type Props = { variant: Variant; title?: string; children?: ReactNode; inline?: boolean; action?: ReactNode };
 
 // The caller sets role (status/alert) when the banner appears after load.
 // inline is one 32px row with the title and text on the same line.
-export function Banner({ variant, title, children, inline }: Props) {
+export function Banner({ variant, title, children, inline, action }: Props) {
   const Icon = ICONS[variant];
   return (
     <div className={[styles.banner, styles[variant], inline && styles.inline].filter(Boolean).join(" ")}>
@@ -21,6 +21,7 @@ export function Banner({ variant, title, children, inline }: Props) {
         {title && inline && " "}
         {children}
       </div>
+      {action && <div className={styles.action}>{action}</div>}
     </div>
   );
 }

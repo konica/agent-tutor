@@ -1328,6 +1328,54 @@ describe("needs subjects", () => {
     });
   });
 
+  describe("all ready", () => {
+    const suggestion = { document_id: "x", title: "x", summary: null, suggestions: [{ subject_id: "s1", name: "AI Agents", origin: "yours" as const }] };
+
+    function fixture(waitingIds: string[]) {
+      const docs = [...waitingIds.map(waiting), { ...ready }];
+      const load = vi.fn(async (f: DocumentFilters) => (f.archived ? [] : docs.filter((d) => !f.state || d.state === f.state).map((d) => ({ ...d }))));
+      const saveSubjects = vi.fn(async (id: string) => {
+        const doc = docs.find((d) => d.document_id === id)!;
+        doc.state = "ready";
+        doc.subjects = [{ subject_id: "s1", name: "AI Agents" }];
+        return { ...doc };
+      });
+      return { loadSubjects: subjects, check: notInLibrary, loadLimits: limits, load, upload: vi.fn(), loadSuggestions: async () => suggestion, saveSubjects, pollMs: 60_000 };
+    }
+
+    it("shows every document ready with Ask a question after the last save", async () => {
+      render(<LibraryPage {...fixture(["a", "b"])} />);
+      await userEvent.click(await screen.findByRole("button", { name: "2 need subjects" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Choose subjects for a.pdf" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Save and next" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Save" }));
+      const banner = await screen.findByText("Your documents are ready.");
+      expect(banner.closest("[role=status]")).toBeTruthy();
+      await waitFor(() => expect(screen.getByLabelText("State")).toHaveValue(""));
+      expect(await screen.findByText("r1.pdf")).toBeVisible();
+      expect(within(screen.getByRole("table")).getAllByText("Ready")).toHaveLength(3);
+      expect(screen.queryByRole("button", { name: /need(s)? subjects/ })).toBeNull();
+      await userEvent.click(screen.getByRole("button", { name: "Ask a question" }));
+      expect(await screen.findByText("/chat")).toBeVisible();
+    });
+
+    it("no ready banner while a document still waits or processes", async () => {
+      render(<LibraryPage {...fixture(["a", "b"])} />);
+      await userEvent.click(await screen.findByRole("button", { name: "Choose subjects for a.pdf" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Save and next" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Skip" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(await screen.findByRole("button", { name: "1 needs subjects" })).toBeVisible();
+      expect(screen.queryByText("Your documents are ready.")).toBeNull();
+    });
+
+    it("no ready banner on load", async () => {
+      render(<LibraryPage {...fixture([])} />);
+      await screen.findByText("r1.pdf");
+      expect(screen.queryByText("Your documents are ready.")).toBeNull();
+    });
+  });
+
   it("reports the count to the shell", async () => {
     const report = vi.fn();
     render(
