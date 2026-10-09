@@ -259,6 +259,14 @@ export function ChatPage({
     const removed = used.find((d) => d.document_id === documentId);
     setUsed((list) => list.filter((d) => d.document_id !== documentId));
     if (removed) setAnnouncement(`${removed.title} removed from this conversation.`);
+    // Removing the open document closes the pane. Its row is gone, so focus doesn't go back to it: while the panel stays
+    // shown, the panel moves focus to the next row; if it hides with the pane (its saved state is hidden), the toggle.
+    if (viewer?.documentId === documentId) {
+      opener.current = null;
+      restoreFocus.current = !panelOpen;
+      setViewer(null);
+      setPanelDuringViewer(false);
+    }
     try {
       await removeDoc(threadId, documentId);
     } catch (error) {

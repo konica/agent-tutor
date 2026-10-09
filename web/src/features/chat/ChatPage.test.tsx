@@ -578,9 +578,9 @@ describe("ChatPage", () => {
     const row = (name: string) => within(panel()!).findByRole("button", { name });
 
     // Asks one question and waits for the documents used to fill the panel.
-    async function answer() {
+    async function answer(props: ComponentProps<typeof ChatPage> = {}) {
       const ask = vi.fn().mockImplementation(answered);
-      renderChat({ ask, viewerDeps: fakeViewerDeps(), loadUsed: async () => [used("d1", "ReAct"), used("d2", "PPO")] });
+      renderChat({ ask, viewerDeps: fakeViewerDeps(), loadUsed: async () => [used("d1", "ReAct"), used("d2", "PPO")], ...props });
       await userEvent.type(await question(), "How does ReAct work?");
       await userEvent.click(askButton());
       await row("ReAct");
@@ -650,6 +650,30 @@ describe("ChatPage", () => {
       // The learner is asking: focus is not pulled back into the panel.
       expect(panel()).toBeInTheDocument();
       expect(panel()).not.toContainElement(document.activeElement as HTMLElement);
+    });
+
+    it("closes the pane when the open document is removed, focus moving to the next row's remove button", async () => {
+      const removeDoc = vi.fn(async () => {});
+      await answer({ removeDoc });
+      await openReAct();
+      await userEvent.click(screen.getByRole("button", { name: "Show panel" }));
+      await userEvent.click(within(panel()!).getByRole("button", { name: "Remove ReAct from this conversation" }));
+      expect(removeDoc).toHaveBeenCalledWith("t1", "d1");
+      await waitFor(() => expect(pane("ReAct")).not.toBeInTheDocument());
+      expect(panel()).toBeInTheDocument();
+      expect(within(panel()!).queryByRole("button", { name: "ReAct" })).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(within(panel()!).getByRole("button", { name: "Remove PPO from this conversation" })).toHaveFocus(),
+      );
+    });
+
+    it("keeps the pane open when another document is removed", async () => {
+      await answer({ removeDoc: vi.fn(async () => {}) });
+      await openReAct();
+      await userEvent.click(screen.getByRole("button", { name: "Show panel" }));
+      await userEvent.click(within(panel()!).getByRole("button", { name: "Remove PPO from this conversation" }));
+      expect(pane("ReAct")).toBeInTheDocument();
+      expect(within(panel()!).getByRole("button", { name: "ReAct" })).toHaveAttribute("aria-current", "true");
     });
   });
 
