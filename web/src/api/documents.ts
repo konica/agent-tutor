@@ -1,13 +1,14 @@
 import { SessionExpiredError } from "../auth/authClient";
 import type { Client } from "./generated/client";
 import { client } from "./generated/client.gen";
-import { checkDuplicate, chooseSubjects, getSubjectSuggestions, getUploadLimits, listDocuments, retryDocument, startUpload } from "./generated/sdk.gen";
-import type { DocumentResponse, SubjectSuggestionsResponse, SuggestionResponse, UploadLimitsResponse } from "./generated/types.gen";
+import { checkDuplicate, chooseSubjects, getSubjectSuggestions, getUpload, getUploadLimits, listDocuments, retryDocument, startUpload } from "./generated/sdk.gen";
+import type { DocumentResponse, SubjectSuggestionsResponse, SuggestionResponse, UploadLimitsResponse, UploadStatusResponse } from "./generated/types.gen";
 
 export type { DocumentResponse };
 export type UploadLimits = UploadLimitsResponse;
 export type SubjectSuggestions = SubjectSuggestionsResponse;
 export type Suggestion = SuggestionResponse;
+export type UploadStatus = UploadStatusResponse;
 
 export function sessionOver(error: unknown, response: Response | undefined): boolean {
   return error instanceof SessionExpiredError || response?.status === 401;
@@ -102,7 +103,7 @@ export async function findInLibrary(file: File, apiClient: Client = client): Pro
   return data.document_id ?? null;
 }
 
-export type UploadEvents = { onStarted?: (documentId: string) => void; onProgress?: (fraction: number) => void };
+export type UploadEvents = { onStarted?: (documentId: string, uploadId: string) => void; onProgress?: (fraction: number) => void };
 export type PostForm = (url: string, form: FormData, onProgress: (fraction: number) => void) => Promise<number>;
 
 // fetch can't report upload progress; XMLHttpRequest can (the upload tray's bars). Resolves with the HTTP status.
@@ -126,13 +127,21 @@ export async function uploadPdf(file: File, events: UploadEvents = {}, apiClient
   const { data, error, response } = await startUpload({ client: apiClient, body: { file_name: file.name }, throwOnError: false });
   if (sessionOver(error, response)) throw new SessionExpiredError();
   if (!data) throw new Error(`POST /uploads failed (${response?.status ?? "no response"})`);
-  events.onStarted?.(data.document_id);
+  events.onStarted?.(data.document_id, data.upload_id);
   const form = new FormData();
   for (const [name, value] of Object.entries(data.fields)) form.append(name, value);
   form.append("file", file); // S3 ignores fields after the file
   const status = await post(data.url, form, (fraction) => events.onProgress?.(fraction));
   if (status < 200 || status >= 300) throw new Error(`Upload to storage failed (${status})`);
   events.onProgress?.(1);
+}
+
+// What became of an upload (PRD US-11): null outcome until the worker has hashed it; a duplicate points to the learner's document.
+export async function loadUploadStatus(uploadId: string, apiClient: Client = client): Promise<UploadStatus> {
+  const { data, error, response } = await getUpload({ client: apiClient, path: { upload_id: uploadId }, throwOnError: false });
+  if (sessionOver(error, response)) throw new SessionExpiredError();
+  if (!data) throw new Error(`GET /uploads/${uploadId} failed (${response?.status ?? "no response"})`);
+  return data;
 }
 
 // Three ranked suggestions for a document waiting for subjects (PRD §8 US-2b).

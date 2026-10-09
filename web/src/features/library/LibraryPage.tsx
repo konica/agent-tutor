@@ -2,7 +2,7 @@ import { AlertCircle, Filter, Info, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import { SessionExpiredError } from "../../auth/authClient";
-import { findInLibrary, loadDocuments, loadSubjectSuggestions, loadUploadLimits, megabytes, rejectionReason, RetriesUsedUpError, retryProcessing, saveSubjects as saveChosenSubjects, uploadPdf, type DocumentFilters, type DocumentResponse, type SubjectSuggestions, type UploadEvents, type UploadLimits } from "../../api/documents";
+import { findInLibrary, loadDocuments, loadSubjectSuggestions, loadUploadLimits, loadUploadStatus, megabytes, rejectionReason, RetriesUsedUpError, retryProcessing, saveSubjects as saveChosenSubjects, uploadPdf, type DocumentFilters, type DocumentResponse, type SubjectSuggestions, type UploadEvents, type UploadLimits, type UploadStatus } from "../../api/documents";
 import type { SubjectResponse } from "../../api/generated/types.gen";
 import { loadMySubjects } from "../../api/subjects";
 import { Button } from "../../components/Button/Button";
@@ -26,6 +26,7 @@ type Props = {
   check?: (file: File) => Promise<string | null>;
   loadSuggestions?: (documentId: string) => Promise<SubjectSuggestions>;
   saveSubjects?: (documentId: string, choice: { subject_ids: string[]; new_names: string[] }) => Promise<DocumentResponse>;
+  loadUpload?: (uploadId: string) => Promise<UploadStatus>;
   pollMs?: number;
 };
 
@@ -36,19 +37,21 @@ function announceChange(doc: DocumentResponse): string | null {
   return null;
 }
 
+const MAX_STATUS_POLLS = 150; // with the default 2 s poll, five minutes for the worker to hash the file
 const MAX_PARALLEL_UPLOADS = 3; // each check hashes a whole file in memory, and presigned POSTs expire while queued behind the browser's connections
 
 const defaultUpload = (file: File, events: UploadEvents) => uploadPdf(file, events);
 const defaultRetry = (id: string) => retryProcessing(id);
 const defaultLoadLimits = () => loadUploadLimits();
 const defaultCheck = (file: File) => findInLibrary(file);
+const defaultLoadUpload = (uploadId: string) => loadUploadStatus(uploadId);
 
 const defaultLoadSubjects = () => loadMySubjects();
 const defaultLoadSuggestions = (id: string) => loadSubjectSuggestions(id);
 const defaultSaveSubjects = (id: string, choice: { subject_ids: string[]; new_names: string[] }) => saveChosenSubjects(id, choice);
 
 // Library: upload by picking or dropping PDFs (US-2), the upload tray, and the document list narrowed by subject, upload dates and state (US-10). Tabs come later.
-export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSubjects, upload = defaultUpload, retry = defaultRetry, loadLimits = defaultLoadLimits, check = defaultCheck, loadSuggestions = defaultLoadSuggestions, saveSubjects = defaultSaveSubjects, pollMs = 2000 }: Props) {
+export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSubjects, upload = defaultUpload, retry = defaultRetry, loadLimits = defaultLoadLimits, check = defaultCheck, loadSuggestions = defaultLoadSuggestions, saveSubjects = defaultSaveSubjects, loadUpload = defaultLoadUpload, pollMs = 2000 }: Props) {
   const [filters, setFilters] = useState<DocumentFilters>({});
   const { documents, applied, unavailable, refresh } = useDocuments(load, pollMs, filters);
   // The empty states follow the filters the list was loaded with, so clearing never flashes the upload card before the full list arrives.
@@ -130,6 +133,10 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
   useEffect(() => {
     loadLimitsRef.current = loadLimits; // an inline `loadLimits` must not restart the load
   }, [loadLimits]);
+  const loadUploadRef = useRef(loadUpload);
+  useEffect(() => {
+    loadUploadRef.current = loadUpload;
+  }, [loadUpload]);
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -231,12 +238,13 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
     }
     parts.current[i] = `Uploading ${file.name}…`;
     say();
-    const started: { documentId?: string } = {};
+    const started: { documentId?: string; uploadId?: string } = {};
     try {
       if (!current) throw new Error("Upload limits unavailable");
       await upload(file, {
-        onStarted: (documentId) => {
+        onStarted: (documentId, uploadId) => {
           started.documentId = documentId;
+          started.uploadId = uploadId;
           setSending(documentId, true);
           void refresh();
         },
@@ -244,6 +252,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
       });
       updateTray(id, { status: "uploaded", progress: 1 });
       parts.current[i] = `Uploaded ${file.name}. Processing.`;
+      if (started.uploadId) void watchUpload(id, started.uploadId, file.name, i, say);
     } catch {
       // A 401 is handled by the API client: the session screen replaces this page.
       updateTray(id, { status: "failed" });
@@ -253,6 +262,29 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
     if (started.documentId) setSending(started.documentId, false);
     say();
     await refresh();
+  }
+
+  // The worker decides duplicates by the server hash (PRD D19); a duplicate's placeholder document disappears, so ask the upload.
+  async function watchUpload(trayId: string, uploadId: string, name: string, i: number, say: () => void) {
+    for (let tries = 0; tries < MAX_STATUS_POLLS && alive.current; tries++) {
+      await new Promise((resolve) => setTimeout(resolve, pollMs));
+      if (!alive.current) return;
+      let found: UploadStatus;
+      try {
+        found = await loadUploadRef.current(uploadId);
+      } catch (error) {
+        if (error instanceof SessionExpiredError) return;
+        continue; // try again on the next tick
+      }
+      if (found.outcome === null) continue;
+      if (found.outcome === "duplicate" && found.document_id) {
+        updateTray(trayId, { status: "already", documentId: found.document_id, archived: found.archived });
+        parts.current[i] = `${name}: Already in your library.`;
+        say();
+        await refresh();
+      }
+      return;
+    }
   }
 
   function onPick(event: ChangeEvent<HTMLInputElement>) {

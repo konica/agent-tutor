@@ -1,9 +1,33 @@
-import { ChevronDown, ChevronUp, CircleAlert, CircleCheck, FileText, X } from "lucide-react";
+import { ChevronDown, ChevronUp, CircleAlert, CircleCheck, FileText, Info, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import styles from "./UploadTray.module.css";
 
-export type TrayItem = { id: string; name: string; size: string; status: "uploading" | "uploaded" | "failed"; progress: number };
+// "already": the server found the learner already has this file (PRD D19); documentId is their existing document.
+export type TrayItem = {
+  id: string;
+  name: string;
+  size: string;
+  status: "uploading" | "uploaded" | "failed" | "already";
+  progress: number;
+  documentId?: string;
+  archived?: boolean;
+};
+
+const ICONS = { uploading: FileText, uploaded: CircleCheck, failed: CircleAlert, already: Info } as const;
+
+function statusText(item: TrayItem): string {
+  switch (item.status) {
+    case "uploading":
+      return `Uploading · ${item.size}`;
+    case "uploaded":
+      return "Uploaded · processing";
+    case "failed":
+      return "Upload failed";
+    case "already":
+      return item.archived ? "Already in your library, archived" : "Already in your library";
+  }
+}
 
 const files = (n: number) => `${n} ${n === 1 ? "file" : "files"}`;
 
@@ -53,15 +77,20 @@ export function UploadTray({ items, onClose }: { items: TrayItem[]; onClose: () 
 }
 
 function TrayRow({ item }: { item: TrayItem }) {
-  const Icon = item.status === "uploaded" ? CircleCheck : item.status === "failed" ? CircleAlert : FileText;
-  const status = item.status === "uploading" ? `Uploading · ${item.size}` : item.status === "uploaded" ? "Uploaded · processing" : "Upload failed";
+  const Icon = ICONS[item.status];
   const percent = Math.round(item.progress * 100);
   return (
     <li className={`${styles.item} ${styles[item.status] ?? ""}`}>
       <Icon className={styles.icon} strokeWidth={1.5} aria-hidden="true" />
       <div className={styles.text}>
         <span className={styles.name}>{item.name}</span>
-        <span className={styles.status}>{status}</span>
+        <span className={styles.status}>{statusText(item)}</span>
+        {/* An archived document gets no link; Restore arrives with #108. */}
+        {item.status === "already" && !item.archived && item.documentId && (
+          <a className={styles.link} href={`#document-${item.documentId}`}>
+            Open document
+          </a>
+        )}
         {item.status === "uploading" && (
           <div className={styles.bar} role="progressbar" aria-label={`Upload progress for ${item.name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
             <span style={{ transform: `scaleX(${item.progress})` }} />
