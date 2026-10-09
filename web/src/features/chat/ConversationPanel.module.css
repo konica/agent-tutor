@@ -34,10 +34,10 @@
 /* The learner added it and no answer has used it yet: the note badge's accent look. */
 .added { border: 0; background: var(--accent-soft); color: var(--accent-text); }
 /* A 24px remove button (the row stays 32px), shown on hover and focus, always on touch screens. */
-.remove { width: 24px; height: 24px; opacity: 0; }
+.row .remove { width: 24px; height: 24px; opacity: 0; }
 .row:hover .remove, .row:focus-within .remove { opacity: 1; }
 @media (hover: none) {
-  .remove { opacity: 1; }
+  .row .remove { opacity: 1; }
 }
 
 .action { justify-self: start; }

@@ -15,6 +15,9 @@ type Props = {
   onClose: () => void;
 };
 
+/** The most documents one add request carries; matches the API's limit. */
+const MAX_ADD = 50;
+
 function byline(d: DocumentResponse): string {
   return [d.authors.join(", "), d.year === null ? "" : String(d.year)].filter(Boolean).join(" · ");
 }
@@ -67,6 +70,7 @@ export function DocumentPicker({ listedIds, loadReady, onAdd, onClose }: Props) 
   }
 
   const n = selected.length;
+  const atLimit = n >= MAX_ADD;
   return (
     <Dialog
       title="Add documents"
@@ -108,7 +112,7 @@ export function DocumentPicker({ listedIds, loadReady, onAdd, onClose }: Props) 
                   <input
                     type="checkbox"
                     checked={listed || selected.includes(d.document_id)}
-                    disabled={listed}
+                    disabled={listed || (atLimit && !selected.includes(d.document_id))}
                     onChange={(e) => toggle(d.document_id, e.target.checked)}
                   />
                   <span className={styles.title} title={d.title}>
@@ -121,6 +125,7 @@ export function DocumentPicker({ listedIds, loadReady, onAdd, onClose }: Props) 
           })}
         </ul>
       )}
+      {atLimit && <p className={styles.empty}>You can add up to {MAX_ADD} documents at a time.</p>}
       {failed && (
         <p role="alert" className={styles.error}>
           <CircleAlert className={styles.errorIcon} strokeWidth={1.5} aria-hidden="true" />

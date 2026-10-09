@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -129,4 +129,17 @@ describe("DocumentPicker", () => {
     await userEvent.keyboard("{Escape}");
     await waitFor(() => expect(props.onClose).toHaveBeenCalled());
   });
+
+  it("stops at 50 selections: the other rows are disabled and a line says why", async () => {
+    const many = Array.from({ length: 51 }, (_, i) => ready(`m${i}`, `Paper ${String(i).padStart(2, "0")}`));
+    setup({ listedIds: new Set(), loadReady: vi.fn(async () => many) });
+    await screen.findByText("Paper 00");
+    // Role queries are slow on 51 rows: take the checkboxes once.
+    const boxes = screen.getAllByRole("checkbox", { hidden: true });
+    boxes.slice(0, 50).forEach((b) => fireEvent.click(b));
+    expect(screen.getByText("You can add up to 50 documents at a time.")).toBeInTheDocument();
+    expect(boxes[50]).toBeDisabled();
+    expect(boxes[49]).toBeEnabled();
+    expect(screen.getByText("Add 50 documents")).toBeInTheDocument();
+  }, 20_000);
 });
