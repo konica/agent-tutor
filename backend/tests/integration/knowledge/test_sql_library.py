@@ -280,7 +280,7 @@ def test_ready_document_round_trips_its_subjects(engine: Engine) -> None:
     assert locked is not None and locked.subject_ids == [GENERAL]
 
 
-def test_get_readable_is_owner_only_and_skips_archived(engine: Engine) -> None:
+def test_get_readable_is_owner_only_and_includes_archived(engine: Engine) -> None:
     owner, other = f"ada-{uid()}", f"bob-{uid()}"
     doc = start(engine, owner)
     with SqlLibraryUnitOfWork(engine) as tx:
@@ -292,7 +292,8 @@ def test_get_readable_is_owner_only_and_skips_archived(engine: Engine) -> None:
     with engine.begin() as conn:
         conn.execute(text("UPDATE documents SET archived = true WHERE document_id = :d"), {"d": doc.document_id})
     with SqlLibraryUnitOfWork(engine) as tx:
-        assert tx.documents.get_readable(UserId(owner), doc.document_id) is None
+        found_archived = tx.documents.get_readable(UserId(owner), doc.document_id)
+    assert found_archived is not None and found_archived.archived
 
 
 def test_subject_ids_readable_by_counts_only_ready_documents(engine: Engine) -> None:
@@ -534,7 +535,7 @@ def test_retry_attempts_and_failed_document_locks_round_trip(engine: Engine) -> 
     assert relisted[failed.document_id].content_attempts == 2
 
 
-def test_find_by_sha256_is_owner_only_and_skips_unlinked_and_archived(engine: Engine) -> None:
+def test_find_by_sha256_is_owner_only_and_skips_unlinked_but_includes_archived(engine: Engine) -> None:
     ada, bob, carol = f"ada-{uid()}", f"bob-{uid()}", f"carol-{uid()}"
     content = stored_content(engine, ada)
     sha = content.sha256
@@ -549,7 +550,8 @@ def test_find_by_sha256_is_owner_only_and_skips_unlinked_and_archived(engine: En
 
     def find(user: str, digest: str = sha) -> DocumentId | None:
         with SqlLibraryUnitOfWork(engine) as tx:
-            return tx.documents.find_readable_by_sha256(UserId(user), digest)
+            found = tx.documents.get_readable_by_sha256(UserId(user), digest)
+        return found.document_id if found else None
 
     assert find(ada) == mine.document_id
     assert find(bob) == bobs.document_id
@@ -558,7 +560,9 @@ def test_find_by_sha256_is_owner_only_and_skips_unlinked_and_archived(engine: En
 
     with engine.begin() as conn:
         conn.execute(text("UPDATE documents SET archived = true WHERE document_id = :d"), {"d": mine.document_id})
-    assert find(ada) is None
+    with SqlLibraryUnitOfWork(engine) as tx:  # an archived document is still found, flagged
+        archived = tx.documents.get_readable_by_sha256(UserId(ada), sha)
+    assert archived is not None and archived.document_id == mine.document_id and archived.archived
 
 
 def test_listing_returns_the_authors_and_year_of_the_content(engine: Engine) -> None:
@@ -618,6 +622,17 @@ def test_listing_filters_by_any_subject(engine: Engine) -> None:
     assert listed(engine, owner, DocumentFilter(subject_ids=frozenset({s1}))) == {"late.pdf"}
     assert listed(engine, owner, DocumentFilter(subject_ids=frozenset({s1, s2}))) == {"late.pdf", "early.pdf"}
     assert listed(engine, owner, DocumentFilter(subject_ids=frozenset({SubjectId(uid())}))) == set()
+
+
+def test_listing_filters_by_archived(engine: Engine) -> None:
+    owner = f"ada-{uid()}"
+    active, archived = start(engine, owner, "active.pdf"), start(engine, owner, "archived.pdf")
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE documents SET archived = true WHERE document_id = :d"), {"d": archived.document_id})
+    assert listed(engine, owner, DocumentFilter(archived=False)) == {"active.pdf"}
+    assert listed(engine, owner, DocumentFilter(archived=True)) == {"archived.pdf"}
+    assert listed(engine, owner, DocumentFilter()) == {"active.pdf", "archived.pdf"}
+    assert active.document_id != archived.document_id
 
 
 def test_listing_filters_by_state(engine: Engine) -> None:

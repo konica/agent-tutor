@@ -158,3 +158,26 @@ def test_has_ready_documents_ignores_archived_and_unfinished_documents() -> None
     ingest_ready(library, "ada", "Ready and not archived.")
     assert docs.has_ready_documents(ada) is True
     assert docs.has_ready_documents(UserId("carol")) is False
+
+
+def test_the_list_holds_active_documents_by_default_and_archived_ones_on_request() -> None:
+    library = InMemoryLibrary()
+    active = ingest_ready(library, "ada", "active")
+    archived = ingest_ready(library, "ada", "archived")
+    library.state.documents[archived].archived = True
+    docs = DocumentService(library.unit_of_work, max_attempts=3)
+
+    assert [d.document_id for d in docs.list_documents(UserId("ada"))] == [active]
+    assert [d.document_id for d in docs.list_documents(UserId("ada"), archived=True)] == [archived]
+
+
+def test_archived_documents_leave_my_subjects_ready_check_and_duplicate_check() -> None:
+    library = InMemoryLibrary()
+    doc = ingest_ready(library, "ada", "only", [ART])
+    library.state.documents[doc].archived = True
+    docs = DocumentService(library.unit_of_work, max_attempts=3)
+    sha = hashlib.sha256(b"only").hexdigest()
+
+    assert docs.learner_subjects(UserId("ada")) == frozenset()
+    assert docs.has_ready_documents(UserId("ada")) is False
+    assert docs.find_in_library(UserId("ada"), sha) is None

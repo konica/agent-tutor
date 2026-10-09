@@ -37,6 +37,7 @@ class DocumentFilter:
     states: frozenset[DocumentState] = frozenset()
     uploaded_from: datetime | None = None  # inclusive
     uploaded_before: datetime | None = None  # exclusive
+    archived: bool | None = None  # True: only archived; False: only active; None: both
 
 
 NO_FILTER = DocumentFilter()
@@ -92,6 +93,7 @@ class Document:
             and (not f.states or self.state in f.states)
             and (f.uploaded_from is None or self.created_at >= f.uploaded_from)
             and (f.uploaded_before is None or self.created_at < f.uploaded_before)
+            and (f.archived is None or self.archived is f.archived)
         )
 
     def link_content(self, content_id: ContentId) -> None:

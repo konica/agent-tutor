@@ -95,6 +95,14 @@ def test_searchable_only_by_its_owner_when_ready_and_unarchived() -> None:
     assert not doc.searchable_by(UserId("ada"))
 
 
+def test_the_filter_selects_active_archived_or_both() -> None:
+    doc = new_document()
+    doc.archived = True
+    assert doc.matches(DocumentFilter(archived=True))
+    assert not doc.matches(DocumentFilter(archived=False))
+    assert doc.matches(DocumentFilter())  # None: both
+
+
 def test_a_processing_document_is_not_searchable() -> None:
     assert not new_document().searchable_by(UserId("ada"))
 

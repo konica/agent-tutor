@@ -113,7 +113,7 @@ class _Documents(DocumentRepository):
         mine = [
             copy.deepcopy(d)
             for d in self._s.documents.values()
-            if d.can_be_read_by(user_id) and not d.archived and d.matches(document_filter)
+            if d.can_be_read_by(user_id) and d.matches(document_filter)
         ]
         for d in mine:
             content = self._s.contents.get(d.content_id) if d.content_id is not None else None
@@ -123,7 +123,7 @@ class _Documents(DocumentRepository):
             d.content_year = content.year if content else None
         return sorted(mine, key=lambda d: d.created_at, reverse=True)
 
-    def find_readable_by_sha256(self, user_id: UserId, sha256: str) -> DocumentId | None:
+    def get_readable_by_sha256(self, user_id: UserId, sha256: str) -> Document | None:
         mine = sorted(
             (
                 d
@@ -134,7 +134,7 @@ class _Documents(DocumentRepository):
             ),
             key=lambda d: d.created_at,
         )
-        return mine[0].document_id if mine else None
+        return copy.deepcopy(mine[0]) if mine else None
 
     def get_readable(self, user_id: UserId, document_id: DocumentId, *, for_update: bool = False) -> Document | None:
         found = self._s.documents.get(document_id)
@@ -150,7 +150,7 @@ class _Documents(DocumentRepository):
         return {
             sid
             for d in self._s.documents.values()
-            if d.can_be_read_by(user_id) and d.state is DocumentState.READY
+            if d.can_be_read_by(user_id) and not d.archived and d.state is DocumentState.READY
             for sid in d.subject_ids
         }
 

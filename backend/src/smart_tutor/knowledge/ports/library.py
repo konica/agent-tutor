@@ -67,18 +67,26 @@ class DocumentRepository(ABC):
 
     @abstractmethod
     def list_readable_by(self, user_id: UserId, document_filter: DocumentFilter = NO_FILTER) -> list[Document]:
-        """`can_read` in storage: the caller's non-archived documents matching the filter, newest first.
+        """`can_read` in storage: the caller's documents matching the filter, newest first.
+
+        Archived ones are included unless the filter says otherwise.
 
         Each carries its content's title, attempts, authors, and year.
         """
 
     @abstractmethod
-    def find_readable_by_sha256(self, user_id: UserId, sha256: str) -> DocumentId | None:
-        """`can_read` in storage: the caller's oldest non-archived document whose content has this hash (PRD D19)."""
+    def get_readable_by_sha256(self, user_id: UserId, sha256: str) -> Document | None:
+        """`can_read` in storage: the caller's document whose content has this hash, archived or not.
+
+        At most one: contents are per learner.
+        """
 
     @abstractmethod
     def get_readable(self, user_id: UserId, document_id: DocumentId, *, for_update: bool = False) -> Document | None:
-        """`can_read` in storage: the caller's non-archived document with its content title; locked if `for_update`."""
+        """`can_read` in storage: the caller's document, archived or not, with its content title.
+
+        Locked if `for_update`.
+        """
 
     @abstractmethod
     def subject_ids_readable_by(self, user_id: UserId) -> set[SubjectId]:
