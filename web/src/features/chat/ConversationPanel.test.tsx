@@ -12,6 +12,8 @@ const used = (title: string, extra: Partial<ThreadDocumentResponse> = {}): Threa
   authors: [],
   year: null,
   archived: false,
+  added_by: "answer",
+  used: true,
   deleted: false,
   ...extra,
 });

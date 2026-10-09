@@ -311,6 +311,8 @@ describe("ChatPage", () => {
       authors: [],
       year: null,
       archived: false,
+      added_by: "answer",
+      used: true,
       deleted: false,
     });
     const answered = () =>

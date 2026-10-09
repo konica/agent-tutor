@@ -123,7 +123,7 @@ describe("formatCitation", () => {
 
 describe("loadDocumentsUsed", () => {
   const used = [
-    { document_id: "d1", title: "ReAct", authors: ["Yao"], year: 2023, archived: false, deleted: false },
+    { document_id: "d1", title: "ReAct", authors: ["Yao"], year: 2023, archived: false, deleted: false, added_by: "answer", used: true },
     { document_id: "d2", title: "RAG", authors: [], year: null, archived: true, deleted: false },
   ];
 
