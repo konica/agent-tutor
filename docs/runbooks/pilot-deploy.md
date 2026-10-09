@@ -1,6 +1,6 @@
-# Pilot deploy (#56, #57, #58, #59)
+# Pilot deploy (#56, #57, #58, #59, #139)
 
-Deploys the pilot's infrastructure and the `web`, `keycloak`, and `api` charts, so the CloudFront address serves the app shell, Keycloak at `/auth` on RDS, and the API at `/api` (PRD §9.12, ADRs 0009 and 0010). It needs an account admin. Do [`pilot-aws-prerequisites.md`](pilot-aws-prerequisites.md) (#55) first. The big picture is in [`pilot-environment-overview.md`](pilot-environment-overview.md). After the first deploy, every merge to `main` deploys automatically (section 12); this runbook stays the manual path and the reference for what the workflow does.
+Deploys the pilot's infrastructure and the `web`, `keycloak`, `api`, `agent`, `mcp-server`, and `worker` charts, so the CloudFront address serves the app shell, Keycloak at `/auth` on RDS, and the API at `/api`. The pilot now runs upload, processing, and chat: a learner uploads a PDF and asks a question about it (PRD §9.12, ADRs 0009 and 0010). It needs an account admin. Do [`pilot-aws-prerequisites.md`](pilot-aws-prerequisites.md) (#55) first. The big picture is in [`pilot-environment-overview.md`](pilot-environment-overview.md). After the first deploy, every merge to `main` deploys automatically (section 12); this runbook stays the manual path and the reference for what the workflow does.
 
 Commands are for **PowerShell 7** (`pwsh`). Run them from the repository root with your admin profile.
 
@@ -41,7 +41,9 @@ function Get-Output($Stack, $Key) {
 $VpcId = Get-Output Network VpcId
 $Registry = Get-Output Registry RegistryUri
 $Url = Get-Output Edge CloudFrontUrl
-$VpcId; $Registry; $Url
+$Bucket = Get-Output Storage DocumentsBucketName
+$Queue = Get-Output Storage IngestQueueUrl
+$VpcId; $Registry; $Url; $Bucket; $Queue
 ```
 
 ## 3. Connect kubectl
@@ -80,6 +82,10 @@ docker build -t "$Registry/smart-tutor/keycloak:$Tag" deploy/keycloak
 docker push "$Registry/smart-tutor/keycloak:$Tag"
 docker build --target api -t "$Registry/smart-tutor/api:$Tag" backend
 docker push "$Registry/smart-tutor/api:$Tag"
+foreach ($t in "agent", "mcp", "worker") {
+    docker build --target $t -t "$Registry/smart-tutor/${t}:$Tag" backend
+    docker push "$Registry/smart-tutor/${t}:$Tag"
+}
 ```
 
 `/api` and `/auth` are relative, so the web image does not depend on the CloudFront address. The Keycloak image is optimized once at build time (ADR 0010).
@@ -87,10 +93,10 @@ docker push "$Registry/smart-tutor/api:$Tag"
 ## 6. Install the app
 
 ```powershell
-helm upgrade --install smart-tutor deploy/helm/smart-tutor -n smart-tutor --create-namespace -f deploy/helm/smart-tutor/values-prod.yaml --set global.imageRegistry=$Registry --set global.imageTag=$Tag --set global.publicUrl=$Url --wait=legacy --timeout 15m
+helm upgrade --install smart-tutor deploy/helm/smart-tutor -n smart-tutor --create-namespace -f deploy/helm/smart-tutor/values-prod.yaml --set global.imageRegistry=$Registry --set global.imageTag=$Tag --set global.publicUrl=$Url --set global.documentsBucket=$Bucket --set global.ingestQueueUrl=$Queue --wait=legacy --timeout 15m
 ```
 
-`global.publicUrl` is the CloudFront address from step 2. Without it Keycloak refuses to start. The first install runs the `db-bootstrap` hook, which creates the database roles and databases. Keycloak's first start takes about 2 min (schema and realm import), so the wait is slow the first time; `--timeout 15m` (Helm's default is 5 min) covers the hook plus that first start. Use `--wait=legacy`: with Helm 4's default (`--wait`, the watcher strategy) Helm sits out the whole timeout on every hook that isn't a Job (the SecretStore, the ExternalSecrets, the ConfigMap), about an hour for a first install. Before the API rolls out, the `migrate` hook brings the app database to the latest Alembic revision; if it fails, the release fails and the running API stays. A failed hook Job stays for debugging: `kubectl -n smart-tutor logs job/migrate`.
+`global.publicUrl` is the CloudFront address from step 2. Without it Keycloak refuses to start. `global.documentsBucket` and `global.ingestQueueUrl` are the Storage outputs from step 2; the chart refuses to render without them. The first install runs the `db-bootstrap` hook, which creates the database roles and databases. Keycloak's first start takes about 2 min (schema and realm import), so the wait is slow the first time; `--timeout 15m` (Helm's default is 5 min) covers the hook plus that first start. Use `--wait=legacy`: with Helm 4's default (`--wait`, the watcher strategy) Helm sits out the whole timeout on every hook that isn't a Job (the SecretStore, the ExternalSecrets, the ConfigMap), about an hour for a first install. Before the API rolls out, the `migrate` hook brings the app database to the latest Alembic revision; if it fails, the release fails and the running API stays. A failed hook Job stays for debugging: `kubectl -n smart-tutor logs job/migrate`.
 
 ## 7. Check
 
@@ -112,6 +118,21 @@ aws rds describe-db-instances --db-instance-identifier smart-tutor-prod --query 
 - The HTTPS request returns 200; the HTTP request returns 301 to HTTPS.
 - The OpenID configuration shows `issuer` `<Url>/auth/realms/smart-tutor`, with your CloudFront address as `<Url>`, and `token_endpoint` and `jwks_uri` also start with `$Url/auth/`. An internal ALB name there means CloudFront is not forwarding the viewer Host (ADR 0010).
 - The database is private: the RDS query prints `False`.
+- The `agent`, `mcp-server`, and `worker` pods are `Running` (`agent` has 2 replicas, the others 1).
+- The agent and the MCP server answer inside the cluster. The deploy workflow runs the same check from `deploy/api`: `http://agent/healthz` must return 200, and `http://mcp-server/mcp` must return 401 (no token):
+
+```powershell
+kubectl -n smart-tutor exec deploy/api -- python -c "import urllib.request as u; print(u.urlopen('http://agent/healthz', timeout=10).status)"
+@'
+import urllib.error as e, urllib.request as u
+try:
+    u.urlopen('http://mcp-server/mcp', timeout=10)
+except e.HTTPError as x:
+    print(x.code)
+'@ | kubectl -n smart-tutor exec -i deploy/api -- python -
+kubectl -n smart-tutor logs deploy/worker --tail 20      # polling the queue, no errors
+```
+
 - Open `$Url` in a browser: the app shell loads.
 - The API answers through CloudFront:
 
@@ -183,13 +204,36 @@ curl.exe -s -o NUL -w "%{http_code}" -H "Authorization: Bearer $Tok2" "$Url/api/
 
 6. DevTools shows no `OPTIONS` preflight to `/api`, because the app and the API share one origin.
 
+### Demo: upload and ask (#139)
+
+Use two learner accounts from step 8 (learner A and learner B), and a PDF from the seed corpus. Use private windows so the sessions stay apart.
+
+1. As learner A, upload the PDF in the Library. It shows *processing*, then reaches *ready* with a title and subjects (choose subjects if asked). The upload goes from the browser straight to the bucket, so a failure here that mentions CORS is a bucket setting (see Troubleshooting).
+2. Ask a question about the document. The answer streams in and cites the document; the conversation lists it under the documents used. Open a citation: the PDF opens at the page with the passage highlighted.
+3. As learner B, the document is not in the Library. Ask a question about the same topic: the answer does not cite it.
+4. Retry (#95): make a document fail (for example, upload a PDF with more than 500 pages, or one that is not a real PDF renamed to `.pdf`), then choose **Retry** on the failed document. It returns to *processing*.
+
+Record the statuses and screenshots on the PR. Do not include tokens.
+
+### Troubleshooting uploads (#139)
+
+- **An upload stays in *processing*.** Read the worker logs: `kubectl -n smart-tutor logs deploy/worker --tail 100`. A message is retried until it has been received 5 times, then it goes to the dead-letter queue. Check its depth (the DLQ is the ingest queue's name plus `-dlq`):
+
+```powershell
+$Dlq = $Queue -replace 'smart-tutor-ingest$', 'smart-tutor-ingest-dlq'
+aws sqs get-queue-attributes --queue-url $Dlq --attribute-names ApproximateNumberOfMessages
+```
+
+- **A CORS error on upload.** The browser posts straight to the bucket, so the bucket's CORS must name the CloudFront address: `aws s3api get-bucket-cors --bucket $Bucket`. The allowed origin must equal `$Url`.
+- **Bedrock `AccessDeniedException`** in the worker or agent logs. Turn on model access for the two models (the embedding model and the chat model) in the Bedrock console, in us-east-1.
+
 ## 9. Update after a change
 
 Merging to `main` does all of this (section 12). By hand: deploy infrastructure changes with CDK first (`npx aws-cdk@latest deploy --all` from `infra/`), then rebuild and push the images with a new tag and run the `helm upgrade` from step 6 again (with `--timeout 15m`). The order matters: the API pods read their SSM parameters at startup through a Pod Identity association that the CDK stacks create. The upgrade runs the `db-bootstrap` and `migrate` hooks first. Only `db-bootstrap` resets database passwords, so a password rotated in Secrets Manager reaches the database there; `migrate` only applies the schema. Running Keycloak and API pods keep the old password (the environment is read at start, and External Secrets refreshes `keycloak-db` and `api-db` only hourly), so after rotating: run the `helm upgrade`, force the syncs with `kubectl -n smart-tutor annotate externalsecret keycloak-db force-sync=$(Get-Date -UFormat %s) --overwrite` and `kubectl -n smart-tutor annotate externalsecret api-db force-sync=$(Get-Date -UFormat %s) --overwrite`, then `kubectl -n smart-tutor rollout restart deploy/keycloak` and `kubectl -n smart-tutor rollout restart deploy/api`. Merging redeploys (it runs the hooks and the CDK deploy), but after a rotation the force-sync and `rollout restart` commands are still manual.
 
 ## 10. Tear down
 
-This keeps the #55 prerequisites, which cost nothing. `SmartTutor-prod-Data` keeps a final RDS snapshot, because documents and threads are never deleted. First note the VPC ID, which you need if the `Network` destroy fails (see below):
+This keeps the #55 prerequisites, which cost nothing. `SmartTutor-prod-Data` keeps a final RDS snapshot, because documents and threads are never deleted. `SmartTutor-prod-Storage` keeps the documents bucket (see below). First note the VPC ID, which you need if the `Network` destroy fails (see below):
 
 ```powershell
 $VpcId = Get-Output Network VpcId
@@ -203,11 +247,11 @@ helm uninstall aws-load-balancer-controller -n kube-system
 helm uninstall external-secrets -n external-secrets
 helm uninstall metrics-server -n kube-system
 Push-Location infra
-npx aws-cdk@latest destroy SmartTutor-prod-Edge SmartTutor-prod-Cluster SmartTutor-prod-Registry SmartTutor-prod-Budgets SmartTutor-prod-Data SmartTutor-prod-Storage SmartTutor-prod-Config SmartTutor-prod-Network
+npx aws-cdk@latest destroy SmartTutor-prod-Storage SmartTutor-prod-Edge SmartTutor-prod-Cluster SmartTutor-prod-Registry SmartTutor-prod-Budgets SmartTutor-prod-Data SmartTutor-prod-Config SmartTutor-prod-Network
 Pop-Location
 ```
 
-Never use `--all` here: it would delete the GitHub deploy role. CloudFront takes about 15 min to disable and delete. If `Network` fails because the VPC origin's network interfaces are still being released, wait 10 minutes and run the destroy for `SmartTutor-prod-Network` again.
+Destroy `SmartTutor-prod-Storage` **before** `SmartTutor-prod-Edge`, because Storage imports Edge's domain for its CORS rule. The command below lists it first. Never use `--all` here: it would delete the GitHub deploy role. CloudFront takes about 15 min to disable and delete. If `Network` fails because the VPC origin's network interfaces are still being released, wait 10 minutes and run the destroy for `SmartTutor-prod-Network` again.
 
 If it still fails, CloudFront may have left its `CloudFront-VPCOrigins-Service-SG` security group in the VPC. Find and delete it, then run the `Network` destroy again:
 
@@ -222,6 +266,8 @@ ECR images are deleted with their repositories. List the final snapshot:
 aws rds describe-db-snapshots --db-instance-identifier smart-tutor-prod
 ```
 
+The **documents bucket is retained**, so learners' PDFs survive a teardown (`smart-tutor-documents-<account id>`; the stack deletes the queues but not the bucket). Delete it by hand only if the data must go. `aws s3 rm s3://$Bucket --recursive` does not remove object versions, so use the console: **S3 → the bucket → Empty**, then **Delete**. A redeploy reuses the same bucket name, so CloudFormation fails if the bucket still exists outside the stack: import it into the stack or delete it first.
+
 Delete old snapshots you don't need, because they cost storage. A fresh deploy starts with an empty database. Restoring a snapshot is a manual step outside this runbook. Secrets in the CDK stacks are deleted at once (CloudFormation force-deletes them with no recovery window), so a redeploy with the same names works.
 
 ## 11. Costs
@@ -230,7 +276,7 @@ About **$250–300 a month** while idle, including RDS (`db.t3.micro` with 20 Gi
 
 ## 12. Deploy on merge and roll back (#59)
 
-**What runs.** `.github/workflows/deploy.yml` runs on every push to `main`: the CI checks (`ci.yml`), then `deploy-pilot.yml` in the `pilot` environment. That job runs `cdk deploy --all`, builds and pushes the three images tagged with the full commit SHA, installs the add-ons, runs `helm upgrade --install smart-tutor`, and runs `deploy/pilot/smoke_test.py` against the CloudFront address. One deployment runs at a time; a second merge waits.
+**What runs.** `.github/workflows/deploy.yml` runs on every push to `main`: the CI checks (`ci.yml`), then `deploy-pilot.yml` in the `pilot` environment. That job runs `cdk deploy --all`, builds and pushes the six images (`web`, `keycloak`, `api`, `agent`, `mcp`, `worker`) tagged with the full commit SHA, installs the add-ons, runs `helm upgrade --install smart-tutor` with the Storage outputs, checks the in-cluster services (the agent answers `/healthz`, the MCP server refuses a call without a token), and runs `deploy/pilot/smoke_test.py` against the CloudFront address. One deployment runs at a time; a second merge waits.
 
 **Concurrency.** GitHub keeps only one *pending* run per group. If several merges land while a deploy runs, only the newest waits and the ones in between are cancelled (latest wins). A queued rollback can likewise be replaced by a newer merge's deploy.
 

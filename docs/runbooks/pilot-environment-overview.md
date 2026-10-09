@@ -180,7 +180,7 @@ To roll back, run `rollback.yml` with an earlier commit SHA as the image tag (`p
 | RDS (DB app, DB keycloak), Secrets Manager entries, `keycloak` at `/auth`, production realm | #57 | Agent; human creates the client's account | CDK `DataStack`, `ConfigStack`; chart `keycloak`; `deploy/keycloak/Dockerfile`; the `db-bootstrap` hook; ADR 0010 |
 | `api` at `/api`, `migrate` hook Job, same-origin web build, probes | #58 | Agent; human runs the demo and hands over access | chart `api`, `values-prod.yaml` |
 | Deploy-on-merge workflow, smoke test, rollback runbook | #59 | Agent; human merges and approves | `.github/workflows/deploy.yml`, `deploy-pilot.yml`, `rollback.yml`; `deploy/pilot/smoke_test.py` |
-| S3 documents bucket, SQS, agent, MCP server, worker, Bedrock access | Later slices | — | `StorageStack`; charts stay disabled for now |
+| S3 documents bucket, SQS, agent, MCP server, worker, Bedrock access | #139 | Agent; human runs the demo | CDK `StorageStack`; Pod Identity roles in `ClusterStack`; charts `agent`, `mcp-server`, `worker` |
 
 ## Cost
 
