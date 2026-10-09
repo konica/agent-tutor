@@ -141,16 +141,6 @@ export type MeResponse = {
 };
 
 /**
- * RenameThreadRequest
- */
-export type RenameThreadRequest = {
-    /**
-     * Title
-     */
-    title: string;
-};
-
-/**
  * StartUploadRequest
  */
 export type StartUploadRequest = {
@@ -299,6 +289,10 @@ export type ThreadDocumentResponse = {
  */
 export type ThreadResponse = {
     /**
+     * Search Scope
+     */
+    search_scope: 'library' | 'listed';
+    /**
      * Thread Id
      */
     thread_id: string;
@@ -306,6 +300,20 @@ export type ThreadResponse = {
      * Title
      */
     title: string | null;
+};
+
+/**
+ * UpdateThreadRequest
+ */
+export type UpdateThreadRequest = {
+    /**
+     * Search Scope
+     */
+    search_scope?: 'library' | 'listed' | null;
+    /**
+     * Title
+     */
+    title?: string | null;
 };
 
 /**
@@ -720,8 +728,8 @@ export type AskInNewThreadResponses = {
 
 export type AskInNewThreadResponse = AskInNewThreadResponses[keyof AskInNewThreadResponses];
 
-export type RenameThreadData = {
-    body: RenameThreadRequest;
+export type GetThreadData = {
+    body?: never;
     path: {
         /**
          * Thread Id
@@ -732,29 +740,63 @@ export type RenameThreadData = {
     url: '/threads/{thread_id}';
 };
 
-export type RenameThreadErrors = {
+export type GetThreadErrors = {
     /**
      * Not the caller's conversation.
      */
     404: unknown;
     /**
-     * The conversation is archived.
+     * Validation Error
      */
-    409: unknown;
-    /**
-     * The title is empty or longer than 120 characters.
-     */
-    422: unknown;
+    422: HttpValidationError;
 };
 
-export type RenameThreadResponses = {
+export type GetThreadError = GetThreadErrors[keyof GetThreadErrors];
+
+export type GetThreadResponses = {
     /**
      * Successful Response
      */
     200: ThreadResponse;
 };
 
-export type RenameThreadResponse = RenameThreadResponses[keyof RenameThreadResponses];
+export type GetThreadResponse = GetThreadResponses[keyof GetThreadResponses];
+
+export type UpdateThreadData = {
+    body: UpdateThreadRequest;
+    path: {
+        /**
+         * Thread Id
+         */
+        thread_id: string;
+    };
+    query?: never;
+    url: '/threads/{thread_id}';
+};
+
+export type UpdateThreadErrors = {
+    /**
+     * Not the caller's conversation.
+     */
+    404: unknown;
+    /**
+     * The conversation is archived, or has no documents to limit the search to.
+     */
+    409: unknown;
+    /**
+     * Nothing to change, or the title is empty or longer than 120 characters.
+     */
+    422: unknown;
+};
+
+export type UpdateThreadResponses = {
+    /**
+     * Successful Response
+     */
+    200: ThreadResponse;
+};
+
+export type UpdateThreadResponse = UpdateThreadResponses[keyof UpdateThreadResponses];
 
 export type ListThreadDocumentsData = {
     body?: never;
@@ -865,6 +907,44 @@ export type RemoveThreadDocumentResponses = {
 };
 
 export type RemoveThreadDocumentResponse = RemoveThreadDocumentResponses[keyof RemoveThreadDocumentResponses];
+
+export type AskInThreadData = {
+    body: AskRequest;
+    path: {
+        /**
+         * Thread Id
+         */
+        thread_id: string;
+    };
+    query?: never;
+    url: '/threads/{thread_id}/questions';
+};
+
+export type AskInThreadErrors = {
+    /**
+     * Not the caller's conversation.
+     */
+    404: unknown;
+    /**
+     * The conversation is archived, or the learner has no ready documents.
+     */
+    409: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AskInThreadError = AskInThreadErrors[keyof AskInThreadErrors];
+
+export type AskInThreadResponses = {
+    /**
+     * Server-sent events: thread, then delta*, citations, done (or error).
+     */
+    200: string;
+};
+
+export type AskInThreadResponse = AskInThreadResponses[keyof AskInThreadResponses];
 
 export type StartUploadData = {
     body: StartUploadRequest;

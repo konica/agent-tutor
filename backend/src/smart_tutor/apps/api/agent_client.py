@@ -1,6 +1,6 @@
 """The API's client for the agent's POST /ask: forwards the learner's token, streams the SSE body back."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 
 import httpx
 
@@ -29,10 +29,16 @@ class AgentClient:
         self._url = base_url.rstrip("/") + "/ask"
         self._http = http
 
-    async def open_answer(self, access_token: str, question: str) -> AgentAnswer:
-        """Ask the agent; it searches all of the learner's ready documents with their token."""
+    async def open_answer(
+        self, access_token: str, question: str, document_ids: Sequence[str] | None = None
+    ) -> AgentAnswer:
+        """Ask the agent; it searches the learner's ready documents with their token, only `document_ids` of them
+        when given (a conversation limited to its documents, US-4c)."""
+        body: dict[str, object] = {"question": question}
+        if document_ids is not None:
+            body["document_ids"] = list(document_ids)
         request = self._http.build_request(
-            "POST", self._url, json={"question": question}, headers={"Authorization": f"Bearer {access_token}"}
+            "POST", self._url, json=body, headers={"Authorization": f"Bearer {access_token}"}
         )
         try:
             response = await self._http.send(request, stream=True)

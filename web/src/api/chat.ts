@@ -5,7 +5,7 @@ import {
   addThreadDocuments as addThreadDocumentsSdk,
   listThreadDocuments,
   removeThreadDocument as removeThreadDocumentSdk,
-  renameThread,
+  updateThread,
 } from "./generated/sdk.gen";
 import type {
   AskInNewThreadData,
@@ -132,7 +132,7 @@ export async function removeThreadDocument(threadId: string, documentId: string,
 // Renames the learner's conversation and returns the saved (trimmed) title. A refusal (empty, over 120 characters,
 // archived, not theirs) rejects with the server's message, or an empty one when it gave none.
 export async function renameConversation(threadId: string, title: string, apiClient: Client = client): Promise<string> {
-  const { data, error, response } = await renameThread({
+  const { data, error, response } = await updateThread({
     client: apiClient,
     path: { thread_id: threadId },
     body: { title },
