@@ -158,3 +158,22 @@ def test_a_failure_before_commit_leaves_the_upload_for_a_retry() -> None:
     assert w.library.state.contents == {}
     assert w.doc(a).awaiting_upload
     assert a.fields["key"] in w.objects.objects
+
+
+def test_a_redelivery_after_a_failed_commit_reuses_the_content_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    w = World()
+    a = w.upload("ada")
+    unit_of_work = type(w.library.unit_of_work())
+    real_commit = unit_of_work.commit
+
+    def failing_commit(self: object) -> None:
+        raise RuntimeError("database down")
+
+    monkeypatch.setattr(unit_of_work, "commit", failing_commit)
+    with pytest.raises(RuntimeError):
+        w.ingestion.ingest_upload(a.fields["key"])  # the PDF was copied, then the commit failed
+    monkeypatch.setattr(unit_of_work, "commit", real_commit)
+    assert w.ingestion.ingest_upload(a.fields["key"]) is UploadOutcome.STORED
+    [content] = w.library.state.contents.values()
+    pdfs = [k for k in w.objects.objects if k.startswith("contents/ada/") and k.endswith(".pdf")]
+    assert pdfs == [key("ada", content.content_id)]
