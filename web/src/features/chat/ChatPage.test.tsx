@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
@@ -373,6 +373,45 @@ describe("ChatPage", () => {
       await waitFor(() => expect(askButton()).toBeEnabled());
       await userEvent.click(askButton());
       expect(within(panel()!).queryByText("ReAct")).not.toBeInTheDocument();
+      control.push(null);
+    });
+
+    it("never shows the documents used of an earlier conversation that arrive after a new question", async () => {
+      let release!: (documents: ThreadDocumentResponse[]) => void;
+      const loadUsed = vi.fn(
+        () =>
+          new Promise<ThreadDocumentResponse[]>((resolve) => {
+            release = resolve;
+          }),
+      );
+      const control = controlledStream();
+      const ask = vi.fn().mockImplementationOnce(answered).mockImplementationOnce(() => control.stream());
+      renderChat({ ask, loadUsed });
+      await userEvent.type(await question(), "First?");
+      await userEvent.click(askButton());
+      await waitFor(() => expect(loadUsed).toHaveBeenCalledWith("t1"));
+      await userEvent.type(await question(), "Second?");
+      await waitFor(() => expect(askButton()).toBeEnabled());
+      await userEvent.click(askButton());
+      await waitFor(() => expect(ask).toHaveBeenCalledTimes(2));
+
+      await act(async () => release([used("d1", "ReAct")]));
+      expect(within(panel()!).queryByText("ReAct")).not.toBeInTheDocument();
+      expect(within(panel()!).getByText("Documents used to answer will appear here.")).toBeInTheDocument();
+      control.push(null);
+    });
+
+    it("offers a disabled Archive conversation once the conversation exists", async () => {
+      const control = controlledStream();
+      renderChat({ ask: vi.fn(() => control.stream()) });
+      await question();
+      expect(within(panel()!).queryByRole("button", { name: "Archive conversation" })).not.toBeInTheDocument();
+      await userEvent.type(await question(), "What is attention?");
+      await userEvent.click(askButton());
+      control.push({ type: "thread", thread_id: "t1" });
+      // The thread exists before its answer is done.
+      expect(await within(panel()!).findByRole("button", { name: "Archive conversation" })).toBeDisabled();
+      control.push({ type: "done" });
       control.push(null);
     });
 

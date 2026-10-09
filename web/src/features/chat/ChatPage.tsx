@@ -62,6 +62,7 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
   const [processing, setProcessing] = useState(0);
   const [noDocuments, setNoDocuments] = useState(false);
   const [used, setUsed] = useState<ThreadDocumentResponse[]>([]);
+  const [threadId, setThreadId] = useState<string | null>(null);
   const [answered, setAnswered] = useState(false);
   const [showCitations, setShowCitations] = useState(true);
   const [panelOpen, togglePanel] = usePanelOpen();
@@ -109,17 +110,21 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
     // A new question is a new thread: the panel starts over.
     const thisTurn = ++turn.current;
     setUsed([]);
+    setThreadId(null);
     setAnswered(false);
     // The protocol always ends with done or error; a stream that just stops (dropped connection) failed.
     let ended = false;
     let done = false;
-    let threadId: string | null = null;
+    let thread: string | null = null;
     try {
       for await (const event of ask(trimmed)) {
         if (!alive.current) break; // leaving the page stops reading, which closes the stream
         if (event.type === "done" || event.type === "error") ended = true;
         if (event.type === "done") done = true;
-        if (event.type === "thread") threadId = event.thread_id;
+        if (event.type === "thread") {
+          thread = event.thread_id;
+          setThreadId(thread);
+        }
         else if (event.type === "delta") setExchange((e) => e && { ...e, answer: e.answer + event.text });
         else if (event.type === "citations") setExchange((e) => e && { ...e, citations: event.citations });
         else if (event.type === "error") {
@@ -130,9 +135,9 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
       }
       // Any partial answer stays visible above the message.
       if (alive.current && !ended) setProblem({ message: GENERIC_FAILURE });
-      if (alive.current && done && threadId) {
+      if (alive.current && done && thread) {
         setAnswered(true);
-        void showDocumentsUsed(threadId, thisTurn);
+        void showDocumentsUsed(thread, thisTurn);
       }
     } catch (error) {
       if (!alive.current) return;
@@ -238,6 +243,7 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
           <ConversationPanel
             id={PANEL_ID}
             documents={used}
+            threadId={threadId}
             answered={answered}
             showCitations={showCitations}
             onShowCitationsChange={setShowCitations}

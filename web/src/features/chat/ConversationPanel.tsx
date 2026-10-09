@@ -7,6 +7,8 @@ import styles from "./ConversationPanel.module.css";
 type Props = {
   id: string;
   documents: ThreadDocumentResponse[];
+  /** The conversation's thread, once the server has started one; null before the first question. */
+  threadId: string | null;
   /** The first answer is done: the conversation exists and has something to summarize. */
   answered: boolean;
   showCitations: boolean;
@@ -23,7 +25,7 @@ function tooltip(d: ThreadDocumentResponse): string {
  * The chat's left pane (DESIGN.md → Chat, PRD Q60): the documents this conversation's answers used, its Lesson Note, and actions.
  * Rows open nothing yet (#123); Summarize lesson (US-7) and Archive conversation (US-13) stay disabled until their stories.
  */
-export function ConversationPanel({ id, documents, answered, showCitations, onShowCitationsChange }: Props) {
+export function ConversationPanel({ id, documents, threadId, answered, showCitations, onShowCitationsChange }: Props) {
   return (
     <aside id={id} className={styles.panel} aria-label="Conversation">
       <section className={styles.section} aria-labelledby={`${id}-documents`}>
@@ -81,7 +83,7 @@ export function ConversationPanel({ id, documents, answered, showCitations, onSh
           </span>
           Show citations
         </button>
-        {answered && (
+        {threadId !== null && (
           <Button variant="quiet" size="sm" icon={Archive} className={styles.action} disabled>
             Archive conversation
           </Button>

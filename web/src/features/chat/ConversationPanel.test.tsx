@@ -22,6 +22,7 @@ function renderPanel(props: Partial<ComponentProps<typeof ConversationPanel>> = 
     <ConversationPanel
       id="conversation-panel"
       documents={[]}
+      threadId={null}
       answered={false}
       showCitations
       onShowCitationsChange={onShowCitationsChange}
@@ -69,9 +70,14 @@ describe("ConversationPanel", () => {
     expect(screen.getByRole("button", { name: "Summarize lesson" })).toBeDisabled();
   });
 
-  it("offers a disabled Archive conversation", () => {
-    renderPanel({ answered: true });
+  it("offers a disabled Archive conversation once the conversation exists, even before its answer", () => {
+    renderPanel({ threadId: "t1", answered: false });
     expect(screen.getByRole("button", { name: "Archive conversation" })).toBeDisabled();
+  });
+
+  it("offers no Archive conversation before there is a conversation", () => {
+    renderPanel({ threadId: null });
+    expect(screen.queryByRole("button", { name: "Archive conversation" })).not.toBeInTheDocument();
   });
 
   it("turns citations off with the switch", async () => {
