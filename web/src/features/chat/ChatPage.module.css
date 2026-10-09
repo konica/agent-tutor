@@ -1,7 +1,7 @@
 .column { max-width: var(--chat-w); margin: 0 auto; }
 
 .welcome { display: grid; gap: var(--sp-4); margin: var(--sp-8) 0 var(--sp-6); }
-.welcomeTitle { font-size: var(--fs-40); }
+.welcomeTitle { font-family: var(--font-display); font-size: var(--fs-24); }
 .welcomeText { color: var(--text-2); max-width: 64ch; }
 
 /* The header shows at most two lines of a long question; the full text is in the bubble. The v0.7 mockup sets the
