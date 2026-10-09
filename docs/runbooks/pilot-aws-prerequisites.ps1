@@ -114,12 +114,12 @@ try {
         try {
             Write-Host "Changes cdk deploy would make to ${Stack}:"
             # Template-only diff: the default method uploads the template and creates a temporary stack for a change set.
-            npx -y aws-cdk@latest diff $Stack --method=template
+            npx -y aws-cdk@latest diff $Stack --method=template -c smart-tutor:mode=native-cloud
         } finally { Pop-Location }
     }
     Invoke-Step "cdk deploy $Stack (OIDC provider, role smart-tutor-github-deploy)" {
         Push-Location $InfraDir
-        try { npx -y aws-cdk@latest deploy $Stack --require-approval never } finally { Pop-Location }
+        try { npx -y aws-cdk@latest deploy $Stack --require-approval never -c smart-tutor:mode=native-cloud } finally { Pop-Location }
     }
     $RoleArn = if ($DryRun -and -not $StackExists) { "arn:aws:iam::${AccountId}:role/smart-tutor-github-deploy" } else {
         aws cloudformation describe-stacks --stack-name $Stack `

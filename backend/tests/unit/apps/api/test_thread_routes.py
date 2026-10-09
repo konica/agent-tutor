@@ -1,7 +1,10 @@
-"""POST /threads: start a thread, forward the same token to the agent, relay its SSE stream."""
+"""POST /threads: start a thread, forward the same token to the agent, relay its SSE stream, record the documents
+used on `done`; GET /threads/{id}/documents lists them."""
 
 import json
-from collections.abc import AsyncIterator, Callable
+import uuid
+from collections.abc import AsyncIterator, Callable, Sequence
+from typing import Any
 
 import httpx
 import pytest
@@ -9,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from fakes import (
     FakeTokenVerifier,
+    FixedClock,
     InMemoryLibrary,
     InMemoryThreads,
     api_services,
@@ -16,10 +20,11 @@ from fakes import (
     ingest_ready,
 )
 from smart_tutor.apps.api.main import create_app
+from smart_tutor.knowledge.application import DocumentService
 from smart_tutor.shared.config import Settings
-from smart_tutor.shared.domain.ids import UserId
+from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.shared.domain.principal import Principal
-from smart_tutor.tutoring.application import Thread
+from smart_tutor.tutoring.application import ConversationService, Thread
 
 AUTH = {"Authorization": "Bearer t-ada"}
 QUESTION = {"question": "What is attention?"}
@@ -348,3 +353,134 @@ def test_openapi_names_the_operation_and_declares_the_event_stream() -> None:
     operation = client.get("/openapi.json").json()["paths"]["/threads"]["post"]
     assert operation["operationId"] == "ask_in_new_thread"
     assert "text/event-stream" in operation["responses"]["200"]["content"]
+
+
+# Documents used (PRD §9.2 step 4): recorded on `done` from the agent's `sources` event, which stays internal.
+
+DELTA = b'event: delta\ndata: {"text": "It weighs tokens [1]."}\n\n'
+NO_CITATIONS = b'event: citations\ndata: {"citations": []}\n\n'
+DONE = b"event: done\ndata: {}\n\n"
+AGENT_ERROR = b'event: error\ndata: {"code": "unavailable", "message": "x"}\n\n'
+UNKNOWN_DOCUMENT = "00000000-0000-4000-8000-000000000999"
+
+
+def sources(*document_ids: str) -> bytes:
+    return f"event: sources\ndata: {json.dumps({'document_ids': list(document_ids)})}\n\n".encode()
+
+
+def ask_with(
+    agent_body: Callable[[list[DocumentId]], bytes], conversations: type[ConversationService] = ConversationService
+) -> tuple[TestClient, InMemoryLibrary, InMemoryThreads, list[DocumentId]]:
+    """Ada has two ready documents; the agent answers with `agent_body(their ids)`."""
+    verifier = FakeTokenVerifier()
+    verifier.add("t-ada", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
+    library, threads = InMemoryLibrary(), InMemoryThreads()
+    ids = [ingest_ready(library, "ada", "Attention weighs tokens."), ingest_ready(library, "ada", "Gradients descend.")]
+    service = conversations(threads, DocumentService(library.unit_of_work, max_attempts=3), FixedClock())
+    agent = fake_agent(event_stream(agent_body(ids)))
+    services = api_services(library, threads=threads, agent=agent, conversations=service)
+    return TestClient(create_app(Settings(), verifier=verifier, services=services)), library, threads, ids
+
+
+def documents_of(client: TestClient, threads: InMemoryThreads) -> list[dict[str, Any]]:
+    [thread] = threads.threads.values()
+    response = client.get(f"/threads/{thread.thread_id}/documents", headers=AUTH)
+    assert response.status_code == 200
+    body: list[dict[str, Any]] = response.json()
+    return body
+
+
+def test_an_answered_turn_records_its_documents_and_hides_sources() -> None:
+    client, _, threads, ids = ask_with(lambda ids: DELTA + sources(ids[1], ids[0]) + NO_CITATIONS + DONE)
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    assert response.status_code == 200
+    assert "event: sources" not in response.text
+    assert response.text.split("\n\n", 1)[1] == (DELTA + NO_CITATIONS + DONE).decode()
+    assert [d["document_id"] for d in documents_of(client, threads)] == [ids[1], ids[0]]
+
+
+def test_error_after_sources_records_nothing() -> None:
+    client, _, threads, _ = ask_with(lambda ids: DELTA + sources(*ids) + AGENT_ERROR)
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    assert response.text.endswith(AGENT_ERROR.decode())
+    assert documents_of(client, threads) == []
+
+
+@pytest.mark.parametrize("tail", [b"", b'event: citations\ndata: {"cit'], ids=["clean-end", "inside-an-event"])
+def test_a_stream_closed_before_done_records_nothing(tail: bytes) -> None:
+    client, _, threads, _ = ask_with(lambda ids: DELTA + sources(*ids) + tail)
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    assert response.text.endswith(UNAVAILABLE_EVENT)
+    assert "event: done" not in response.text
+    assert documents_of(client, threads) == []
+
+
+def test_a_decline_records_nothing() -> None:
+    client, _, threads, _ = ask_with(lambda ids: DELTA + NO_CITATIONS + DONE)
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    assert response.text.endswith(DONE.decode())
+    assert documents_of(client, threads) == []
+
+
+class _FailingRecord(ConversationService):
+    def record_answer(self, thread_id: ThreadId, user_id: UserId, document_ids: Sequence[DocumentId]) -> None:
+        raise RuntimeError("database down")
+
+
+def test_a_failed_record_still_ends_with_done(caplog: pytest.LogCaptureFixture) -> None:
+    client, _, threads, _ = ask_with(lambda ids: DELTA + sources(*ids) + NO_CITATIONS + DONE, _FailingRecord)
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    assert response.status_code == 200 and response.text.endswith(DONE.decode())
+    assert "recording the documents used failed" in caplog.text
+    assert documents_of(client, threads) == []
+
+
+def test_documents_list_marks_archived_and_deleted() -> None:
+    client, library, threads, ids = ask_with(lambda ids: DELTA + sources(ids[0], UNKNOWN_DOCUMENT) + DONE)
+    client.post("/threads", json=QUESTION, headers=AUTH)
+    library.state.documents[ids[0]].archived = True
+
+    archived, deleted = documents_of(client, threads)
+
+    assert archived["document_id"] == ids[0] and archived["archived"] is True and archived["deleted"] is False
+    assert set(archived) == {"document_id", "title", "authors", "year", "archived", "deleted"}
+    assert deleted == {
+        "document_id": UNKNOWN_DOCUMENT,
+        "title": "Deleted document",
+        "authors": [],
+        "year": None,
+        "archived": False,
+        "deleted": True,
+    }
+
+
+def test_unknown_thread_is_404() -> None:
+    client, _, _ = setup()
+    response = client.get(f"/threads/{uuid.uuid4()}/documents", headers=AUTH)
+    assert response.status_code == 404
+
+
+def test_a_malformed_thread_id_is_422() -> None:
+    client, _, _ = setup()
+    assert client.get("/threads/not-a-uuid/documents", headers=AUTH).status_code == 422
+
+
+def test_the_documents_list_needs_a_token() -> None:
+    client, _, _ = setup()
+    assert client.get(f"/threads/{uuid.uuid4()}/documents").status_code == 401
+
+
+def test_openapi_names_the_documents_list() -> None:
+    client, _, _ = setup()
+    operation = client.get("/openapi.json").json()["paths"]["/threads/{thread_id}/documents"]["get"]
+    assert operation["operationId"] == "list_thread_documents"

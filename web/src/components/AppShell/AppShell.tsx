@@ -6,10 +6,15 @@ import { SideNav } from "../SideNav/SideNav";
 import { useNavCollapsed } from "../SideNav/useNavCollapsed";
 import styles from "./AppShell.module.css";
 
-// A route opts into the wider column with `handle: { wide: true }` (the Library table needs it).
+type Handle = { wide?: boolean; bleed?: boolean } | undefined;
+
+// A route opts into the wider column with `handle: { wide: true }` (the Library table needs it), or into
+// `handle: { bleed: true }` to fill the whole main area and lay out its own panes (the chat).
 export function AppShell() {
   const [collapsed, toggle] = useNavCollapsed();
-  const wide = useMatches().some((m) => (m.handle as { wide?: boolean } | undefined)?.wide);
+  const matches = useMatches();
+  const wide = matches.some((m) => (m.handle as Handle)?.wide);
+  const bleed = matches.some((m) => (m.handle as Handle)?.bleed);
   const { pathname } = useLocation();
   const navigationType = useNavigationType();
   const main = useRef<HTMLElement>(null);
@@ -30,7 +35,7 @@ export function AppShell() {
       {/* recent is filled when the conversations list exists (US-5) */}
       <SideNav collapsed={collapsed} onToggle={toggle} recent={[]} />
       <main ref={main} className={styles.main} id="main-content" tabIndex={-1}>
-        <div className={wide ? `${styles.page} ${styles.wide}` : styles.page}>
+        <div className={bleed ? styles.bleed : wide ? `${styles.page} ${styles.wide}` : styles.page}>
           <Outlet />
         </div>
       </main>

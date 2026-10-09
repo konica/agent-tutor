@@ -1,10 +1,11 @@
 """PostgreSQL library: one connection and transaction per unit of work."""
 
 import uuid
+from collections.abc import Collection
 from types import TracebackType
 from typing import Any, Self
 
-from sqlalchemy import ColumnElement, Connection, Engine, delete, exists, func, select, text, update
+from sqlalchemy import ColumnElement, Connection, Engine, Select, delete, exists, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 
 from smart_tutor.knowledge.adapters.sql_tables import chunks, contents, document_subjects, documents, uploads
@@ -205,17 +206,30 @@ class _Documents(DocumentRepository):
         ).all()
         return self._load(list(rows))
 
+    @staticmethod
+    def _with_content() -> Select[Any]:
+        return select(
+            documents,
+            contents.c.title.label("content_title"),
+            contents.c.attempts.label("content_attempts"),
+            contents.c.authors.label("content_authors"),
+            contents.c.year.label("content_year"),
+        ).select_from(documents.outerjoin(contents, documents.c.content_id == contents.c.content_id))
+
+    def list_readable_by_ids(self, user_id: UserId, document_ids: Collection[DocumentId]) -> list[Document]:
+        if not document_ids:
+            return []
+        stmt = (
+            self._with_content()
+            .where(readable_by(user_id), documents.c.document_id.in_(list(document_ids)))
+            .order_by(documents.c.created_at.desc(), documents.c.document_id)
+        )
+        return self._load(list(self._conn.execute(stmt)))
+
     def list_readable_by(self, user_id: UserId, document_filter: DocumentFilter = NO_FILTER) -> list[Document]:
         f = document_filter
         stmt = (
-            select(
-                documents,
-                contents.c.title.label("content_title"),
-                contents.c.attempts.label("content_attempts"),
-                contents.c.authors.label("content_authors"),
-                contents.c.year.label("content_year"),
-            )
-            .select_from(documents.outerjoin(contents, documents.c.content_id == contents.c.content_id))
+            self._with_content()
             .where(readable_by(user_id))
             .order_by(documents.c.created_at.desc(), documents.c.document_id)
         )

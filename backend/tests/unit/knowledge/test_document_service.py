@@ -181,3 +181,19 @@ def test_archived_documents_leave_my_subjects_ready_check_and_duplicate_check() 
     assert docs.learner_subjects(UserId("ada")) == frozenset()
     assert docs.has_ready_documents(UserId("ada")) is False
     assert docs.find_in_library(UserId("ada"), sha) is None
+
+
+def test_documents_by_id_returns_the_learners_documents_archived_included() -> None:
+    library = InMemoryLibrary()
+    a = ingest_ready(library, "learner-a", "Attention weighs tokens.")
+    b = ingest_ready(library, "learner-a", "Gradient descent follows the slope.")
+    other = ingest_ready(library, "learner-b", "Someone else's.")
+    library.state.documents[b].archived = True
+    service = DocumentService(library.unit_of_work, max_attempts=3)
+
+    found = service.documents_by_id(UserId("learner-a"), [a, b, other, DocumentId("missing")])
+
+    assert set(found) == {a, b}
+    assert found[a].archived is False
+    assert found[b].archived is True
+    assert service.documents_by_id(UserId("learner-a"), []) == {}

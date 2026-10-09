@@ -1,11 +1,15 @@
-"""Threads in Postgres. The table schema lives in migrations 0005 and 0007."""
+"""Threads in Postgres. The table schemas live in migrations 0005, 0007 and 0009."""
 
+from collections.abc import Sequence
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Column, DateTime, Engine, MetaData, Table, Text, Uuid, select
+from sqlalchemy import BigInteger, Column, DateTime, Engine, Identity, MetaData, Table, Text, Uuid, select
+from sqlalchemy.dialects.postgresql import insert
 
-from smart_tutor.shared.domain.ids import ThreadId, UserId
+from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.tutoring.domain.thread import Thread, ThreadStatus
+from smart_tutor.tutoring.domain.thread_document import ThreadDocument
 from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
 
 threads = Table(
@@ -17,6 +21,16 @@ threads = Table(
     Column("status", Text),
     Column("created_at", DateTime(timezone=True)),
     Column("last_learner_message_at", DateTime(timezone=True)),
+)
+
+thread_documents = Table(
+    "thread_documents",
+    threads.metadata,
+    Column("thread_id", Uuid(as_uuid=False), primary_key=True),
+    Column("document_id", Uuid(as_uuid=False), primary_key=True),
+    Column("first_used_at", DateTime(timezone=True)),
+    Column("deleted_title", Text),
+    Column("seq", BigInteger, Identity(always=True)),
 )
 
 
@@ -54,3 +68,31 @@ class SqlThreadRepository(ThreadRepository):
                 select(threads).where(threads.c.thread_id == thread_id, threads.c.user_id == user_id)
             ).first()
         return _thread(row) if row else None
+
+    def add_documents_used(self, thread_id: ThreadId, document_ids: Sequence[DocumentId], at: datetime) -> None:
+        if not document_ids:
+            return
+        with self._engine.begin() as conn:
+            for document_id in document_ids:
+                conn.execute(
+                    insert(thread_documents)
+                    .values(thread_id=thread_id, document_id=document_id, first_used_at=at)
+                    .on_conflict_do_nothing(index_elements=["thread_id", "document_id"])
+                )
+
+    def documents_used(self, thread_id: ThreadId) -> list[ThreadDocument]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                select(thread_documents)
+                .where(thread_documents.c.thread_id == thread_id)
+                .order_by(thread_documents.c.first_used_at, thread_documents.c.seq)
+            ).all()
+        return [
+            ThreadDocument(
+                thread_id=ThreadId(str(r.thread_id)),
+                document_id=DocumentId(str(r.document_id)),
+                first_used_at=r.first_used_at,
+                deleted_title=r.deleted_title,
+            )
+            for r in rows
+        ]

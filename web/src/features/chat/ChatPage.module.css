@@ -1,7 +1,33 @@
-.column { display: flex; flex-direction: column; max-width: var(--chat-w); min-height: calc(100dvh - 44px); margin: 0 auto; }
+/* The chat fills main (a bleed route): the header row on top, then the panel and the conversation, each scrolling on its own. */
+.page { display: grid; grid-template-rows: 40px minmax(0, 1fr); height: 100%; }
 
-/* The header row has a hairline under it; the PageHeader inside is one 40px line. */
-.head { border-bottom: 1px solid var(--border); margin-bottom: var(--sp-4); }
+.header {
+  display: flex; align-items: center; gap: var(--sp-2); min-width: 0; padding: 0 var(--sp-4);
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.toggle {
+  display: inline-flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; padding: 0;
+  border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-2); cursor: pointer;
+}
+.toggle:hover { background: var(--surface-2); color: var(--text); }
+.toggleIcon { width: 16px; height: 16px; }
+/* The body font, semibold, on one line, not the serif display font base.css gives every h1. */
+.title {
+  flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--font-body); font-size: var(--fs-14); font-weight: 600; line-height: var(--lh-head); color: var(--text);
+}
+
+/* One explicit row, so the panel and the conversation each get the body's height and scroll on their own. */
+.body { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); min-height: 0; }
+.withPanel { grid-template-columns: var(--chat-panel-w) minmax(0, 1fr); }
+
+/* The conversation pane: the messages scroll, the composer row stays at the bottom. */
+.conversation { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+/* Compact page padding, the same as AppShell's .page (DESIGN.md → Density). */
+.messages { flex: 1; min-height: 0; overflow-y: auto; padding: var(--sp-3) var(--sp-4) var(--sp-6); }
+.column { max-width: var(--chat-w); margin: 0 auto; }
+/* Loading, failed, and no-documents states: one padded pane, no panel or composer. */
+.fallback { height: 100%; overflow-y: auto; padding: var(--sp-3) var(--sp-4) var(--sp-6); }
 
 .welcome { display: grid; gap: var(--sp-3); margin: var(--sp-6) 0; }
 .welcomeTitle { font-family: var(--font-display); font-size: var(--fs-24); }
@@ -45,10 +71,10 @@
 
 .thinking { margin: var(--sp-3) 0 0; color: var(--text-2); font-size: var(--fs-13); }
 
-/* The composer sits at the bottom of the column. */
+/* The composer row is pinned under the messages, as wide as their column (the column plus the pane's side padding). */
 .form {
-  margin-top: auto; padding: var(--sp-4) var(--sp-1) var(--sp-2);
-  position: sticky; bottom: 0; background: var(--bg);
+  flex: none; width: 100%; max-width: calc(var(--chat-w) + 2 * var(--sp-4)); margin: 0 auto;
+  padding: var(--sp-2) var(--sp-4) var(--sp-3); background: var(--bg);
 }
 /* 40px box; the 2px focus ring sits outside it with a 2px offset, inside the form's padding so it is never clipped. */
 .composer {

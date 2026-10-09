@@ -8,10 +8,17 @@ from smart_tutor.shared.domain.citation import Citation
 @dataclass(frozen=True)
 class RetrievedChunk:
     chunk_id: str
+    document_id: str
     document_title: str
     page: int | None
     text: str
     score: float
 
     def citation(self, n: int | None = None) -> Citation:
-        return Citation(chunk_id=self.chunk_id, document_title=self.document_title, page=self.page, n=n)
+        return Citation(
+            chunk_id=self.chunk_id,
+            document_title=self.document_title,
+            page=self.page,
+            n=n,
+            document_id=self.document_id,
+        )

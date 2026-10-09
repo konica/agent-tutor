@@ -3,6 +3,7 @@
 import copy
 import math
 import uuid
+from collections.abc import Collection
 from types import TracebackType
 from typing import Self
 
@@ -115,13 +116,25 @@ class _Documents(DocumentRepository):
             for d in self._s.documents.values()
             if d.can_be_read_by(user_id) and d.matches(document_filter)
         ]
-        for d in mine:
+        return sorted(self._enriched(mine), key=lambda d: d.created_at, reverse=True)
+
+    def list_readable_by_ids(self, user_id: UserId, document_ids: Collection[DocumentId]) -> list[Document]:
+        wanted = set(document_ids)
+        mine = [
+            copy.deepcopy(d)
+            for d in self._s.documents.values()
+            if d.document_id in wanted and d.can_be_read_by(user_id)
+        ]
+        return sorted(self._enriched(mine), key=lambda d: d.created_at, reverse=True)
+
+    def _enriched(self, documents: list[Document]) -> list[Document]:
+        for d in documents:
             content = self._s.contents.get(d.content_id) if d.content_id is not None else None
             d.content_title = content.title if content else None
             d.content_attempts = content.attempts if content else None
             d.content_authors = list(content.authors) if content else []
             d.content_year = content.year if content else None
-        return sorted(mine, key=lambda d: d.created_at, reverse=True)
+        return documents
 
     def get_readable_by_sha256(self, user_id: UserId, sha256: str) -> Document | None:
         mine = sorted(

@@ -237,6 +237,36 @@ export type SuggestionResponse = {
 };
 
 /**
+ * ThreadDocumentResponse
+ */
+export type ThreadDocumentResponse = {
+    /**
+     * Archived
+     */
+    archived: boolean;
+    /**
+     * Authors
+     */
+    authors: Array<string>;
+    /**
+     * Deleted
+     */
+    deleted: boolean;
+    /**
+     * Document Id
+     */
+    document_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Year
+     */
+    year: number | null;
+};
+
+/**
  * UploadLimitsResponse
  */
 export type UploadLimitsResponse = {
@@ -617,6 +647,42 @@ export type AskInNewThreadResponses = {
 };
 
 export type AskInNewThreadResponse = AskInNewThreadResponses[keyof AskInNewThreadResponses];
+
+export type ListThreadDocumentsData = {
+    body?: never;
+    path: {
+        /**
+         * Thread Id
+         */
+        thread_id: string;
+    };
+    query?: never;
+    url: '/threads/{thread_id}/documents';
+};
+
+export type ListThreadDocumentsErrors = {
+    /**
+     * Not the caller's conversation.
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListThreadDocumentsError = ListThreadDocumentsErrors[keyof ListThreadDocumentsErrors];
+
+export type ListThreadDocumentsResponses = {
+    /**
+     * Response List Thread Documents
+     *
+     * Successful Response
+     */
+    200: Array<ThreadDocumentResponse>;
+};
+
+export type ListThreadDocumentsResponse = ListThreadDocumentsResponses[keyof ListThreadDocumentsResponses];
 
 export type StartUploadData = {
     body: StartUploadRequest;

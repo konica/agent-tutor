@@ -1,9 +1,11 @@
 """Agent HTTP server (internal ClusterIP): POST /ask streams one answer as SSE (PRD §9.2, ADR 0007).
 
-Events, each ``event: <name>\\ndata: <json>\\n\\n``: ``delta`` {"text"} in order, then ``citations`` once
-({"citations": [{"n", "chunk_id", "document_title", "page"}]}, ``n`` being the answer's ``[n]`` marker), then
-``done``; or ``error`` {"code": "unauthenticated" | "unavailable", "message"}, which ends the stream and may
-come first.
+Events, each ``event: <name>\\ndata: <json>\\n\\n``: ``delta`` {"text"} in order, then ``sources``
+{"document_ids"} once (the distinct documents of the chunks given to the model, in rank order; left out when none
+were, as in the fixed no-chunks reply; meant for the API, which records them and never forwards the event), then
+``citations`` once ({"citations": [{"n", "chunk_id", "document_id", "document_title", "page"}]}, ``n`` being the
+answer's ``[n]`` marker), then ``done``; or ``error`` {"code": "unauthenticated" | "unavailable", "message"}, which
+ends the stream and may come first.
 """
 
 import json
@@ -26,6 +28,7 @@ from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.ports.token_verifier import TokenVerifier
 from smart_tutor.tutoring.adapters.mcp_retriever import McpRetriever
+from smart_tutor.tutoring.application import RetrievedChunk
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +51,7 @@ def sse(event: str, data: dict[str, Any]) -> str:
 async def answer_events(graph: AskGraph, body: AskRequest, token: str) -> AsyncIterator[str]:
     state: AskState = {"question": body.question}
     streamed = False
+    chunks: list[RetrievedChunk] = []  # what search found; the answer node gives the model exactly these
     try:
         async for part in graph.astream(
             state, context=AgentContext(access_token=token), stream_mode=STREAM_MODES, version="v2"
@@ -57,12 +61,22 @@ async def answer_events(graph: AskGraph, body: AskRequest, token: str) -> AsyncI
                 if meta.get("langgraph_node") == "answer" and chunk.text:
                     streamed = True
                     yield sse("delta", {"text": chunk.text})
+            elif part["type"] == "updates" and "search" in part["data"]:
+                chunks = part["data"]["search"].get("chunks", [])
             elif part["type"] == "updates" and "answer" in part["data"]:
                 update = part["data"]["answer"]
                 if not streamed:  # the fixed no-chunks answer never went through the model
                     yield sse("delta", {"text": update["answer"]})
+                if chunks:  # non-empty exactly when the answer node gave them to the model
+                    yield sse("sources", {"document_ids": list(dict.fromkeys(c.document_id for c in chunks))})
                 citations = [
-                    {"n": c.n, "chunk_id": c.chunk_id, "document_title": c.document_title, "page": c.page}
+                    {
+                        "n": c.n,
+                        "chunk_id": c.chunk_id,
+                        "document_id": c.document_id,
+                        "document_title": c.document_title,
+                        "page": c.page,
+                    }
                     for c in update["citations"]
                 ]
                 yield sse("citations", {"citations": citations})

@@ -106,7 +106,7 @@ def test_deploy_needs_the_checks() -> None:
 def test_merge_builds_pushes_and_deploys_in_order() -> None:
     text = steps_text(deploy_job())
     order = [
-        "aws-cdk@2.1145.0 deploy --all --require-approval never",
+        "aws-cdk@2.1145.0 deploy --all --require-approval never -c smart-tutor:mode=native-cloud",
         "docker push",
         "aws eks update-kubeconfig --name smart-tutor-prod",
         "helm upgrade --install aws-load-balancer-controller",
