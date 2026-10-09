@@ -1,7 +1,5 @@
 """US-12: each learner's POST /threads starts a thread owned by that learner; no one else can get it."""
 
-from collections.abc import Callable
-
 import httpx
 from fastapi.testclient import TestClient
 
@@ -13,14 +11,12 @@ from smart_tutor.shared.domain.principal import Principal
 
 A = {"Authorization": "Bearer token-a"}
 B = {"Authorization": "Bearer token-b"}
-GENERAL = "00000000-0000-4000-8000-000000000001"
-A_ONLY = "00000000-0000-4000-8000-0000000000aa"
+SHARED = SubjectId("00000000-0000-4000-8000-0000000000aa")
+ANSWER = b'event: delta\ndata: {"text": "Hi"}\n\nevent: done\ndata: {}\n\n'
 
 
-def detects(subject_id: str) -> Callable[[httpx.Request], httpx.Response]:
-    """An agent that detects `subject_id`, then answers."""
-    sse = f'event: subjects\ndata: {{"subject_ids": ["{subject_id}"]}}\n\nevent: done\ndata: {{}}\n\n'.encode()
-    return lambda request: httpx.Response(200, content=sse, headers={"content-type": "text/event-stream"})
+def answers(request: httpx.Request) -> httpx.Response:
+    return httpx.Response(200, content=ANSWER, headers={"content-type": "text/event-stream"})
 
 
 def learners() -> FakeTokenVerifier:
@@ -34,7 +30,7 @@ def test_each_learner_starts_their_own_thread() -> None:
     library, threads = InMemoryLibrary(), InMemoryThreads()
     ingest_ready(library, "learner-a", "Attention weighs tokens.")
     ingest_ready(library, "learner-b", "Gradient descent follows the slope.")
-    services = api_services(library, threads=threads, agent=fake_agent(detects(GENERAL)))
+    services = api_services(library, threads=threads, agent=fake_agent(answers))
     client = TestClient(create_app(Settings(), verifier=learners(), services=services))
 
     assert client.post("/threads", json={"question": "What is attention?"}, headers=A).status_code == 200
@@ -49,15 +45,13 @@ def test_each_learner_starts_their_own_thread() -> None:
     assert threads.get_owned(ThreadId(b_thread.thread_id), UserId("learner-a")) is None
 
 
-def test_a_subject_only_another_learner_has_starts_no_thread() -> None:
+def test_a_learner_without_documents_starts_no_thread_even_when_another_has_documents_in_their_subject() -> None:
     library, threads = InMemoryLibrary(), InMemoryThreads()
-    ingest_ready(library, "learner-a", "Attention weighs tokens.", subject_ids=(SubjectId(A_ONLY),))
-    ingest_ready(library, "learner-b", "Gradient descent follows the slope.")
-    services = api_services(library, threads=threads, agent=fake_agent(detects(A_ONLY)))
+    ingest_ready(library, "learner-a", "Attention weighs tokens.", subject_ids=(SHARED,))
+    services = api_services(library, threads=threads, agent=fake_agent(answers))
     client = TestClient(create_app(Settings(), verifier=learners(), services=services))
 
     response = client.post("/threads", json={"question": "What is attention?"}, headers=B)
 
-    assert response.status_code == 200 and "event: thread" not in response.text
-    assert response.text.startswith("event: error\n")
+    assert response.status_code == 409
     assert threads.threads == {}

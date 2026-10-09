@@ -22,7 +22,7 @@ from smart_tutor.shared.adapters.model_factory import ModelFactory
 from smart_tutor.shared.adapters.postgres.engine import create_db_engine
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.errors import IntrospectionUnavailableError, UnauthenticatedError
-from smart_tutor.shared.domain.ids import SubjectId, UserId
+from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.ports.token_verifier import TokenVerifier
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,6 @@ class ChunkResult(BaseModel):
     page: int | None
     text: str
     score: float
-    subject_ids: list[str]
 
 
 class SearchResponse(BaseModel):
@@ -73,18 +72,13 @@ def build_server(settings: Settings, verifier: TokenVerifier, search: SearchServ
     )
 
     @mcp.tool(name="search")
-    async def search_tool(query: str, subject_ids: list[str], k: int = 5) -> SearchResponse:
-        """Chunks of the caller's ready documents in any of these subjects (1 to 100), nearest first.
-
-        Each chunk names which of the subjects it belongs to.
-        """
+    async def search_tool(query: str, k: int = 5) -> SearchResponse:
+        """Chunks of the caller's ready, non-archived documents, nearest first."""
         token = get_access_token()
         if token is None or not token.subject:
             raise ToolError("not authenticated")
         try:
-            hits = await asyncio.to_thread(
-                search.search, UserId(token.subject), query, [SubjectId(s) for s in subject_ids], k
-            )
+            hits = await asyncio.to_thread(search.search, UserId(token.subject), query, k)
         except InvalidSearchError as e:
             raise ToolError(str(e)) from None
         return SearchResponse(
@@ -96,7 +90,6 @@ def build_server(settings: Settings, verifier: TokenVerifier, search: SearchServ
                     page=h.page,
                     text=h.text,
                     score=h.score,
-                    subject_ids=[str(s) for s in h.subject_ids],
                 )
                 for h in hits
             ]

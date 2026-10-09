@@ -307,9 +307,9 @@ def searchable_document(engine: Engine, owner: str, hot: list[int], *, ready: bo
     return doc
 
 
-def search(engine: Engine, user: str, i: int, subjects: list[SubjectId] | None = None, k: int = 5) -> list[ChunkHit]:
+def search(engine: Engine, user: str, i: int, k: int = 5) -> list[ChunkHit]:
     with SqlLibraryUnitOfWork(engine) as tx:
-        return tx.chunks.search(UserId(user), one_hot(i), subjects or [GENERAL], k)
+        return tx.chunks.search(UserId(user), one_hot(i), k)
 
 
 def test_search_returns_the_owners_chunk_with_title_page_and_score(engine: Engine) -> None:
@@ -320,38 +320,29 @@ def test_search_returns_the_owners_chunk_with_title_page_and_score(engine: Engin
     assert hit.score == pytest.approx(1.0)
 
 
-def test_a_hit_names_the_requested_subjects_its_document_has(engine: Engine) -> None:
+def test_search_covers_documents_in_any_subject(engine: Engine) -> None:
     owner = f"ada-{uid()}"
-    s1, s2 = sorted([SubjectId(uid()), SubjectId(uid())])
+    other = SubjectId(uid())
     doc = searchable_document(engine, owner, [12])
     with engine.begin() as conn:
-        for s in (s1, s2):
-            conn.execute(
-                text("INSERT INTO subjects (subject_id, canonical_name, normalized_name) VALUES (:id, :n, :n)"),
-                {"id": s, "n": f"subject {s}"},
-            )
+        conn.execute(
+            text("INSERT INTO subjects (subject_id, canonical_name, normalized_name) VALUES (:id, :n, :n)"),
+            {"id": other, "n": f"subject {other}"},
+        )
     with SqlLibraryUnitOfWork(engine) as tx:
         loaded = tx.documents.get_by_upload_for_update(doc.upload_id)
         assert loaded is not None
-        loaded.choose_subjects([s1, s2])
+        loaded.choose_subjects([other])
         tx.documents.save(loaded)
         tx.commit()
-    [only_s2] = search(engine, owner, 12, [s2])
-    [both] = search(engine, owner, 12, [s2, s1])
-    assert only_s2.subject_ids == (s2,)
-    assert both.subject_ids == (s1, s2)
+    [hit] = search(engine, owner, 12)
+    assert hit.document_id == doc.document_id
 
 
 def test_search_never_returns_another_learners_chunks(engine: Engine) -> None:
     owner = f"ada-{uid()}"
     searchable_document(engine, owner, [8])
     assert search(engine, f"bob-{uid()}", 8) == []
-
-
-def test_search_ignores_documents_without_a_requested_subject(engine: Engine) -> None:
-    owner = f"ada-{uid()}"
-    searchable_document(engine, owner, [9])
-    assert search(engine, owner, 9, [SubjectId(uid())]) == []
 
 
 def test_search_skips_archived_documents(engine: Engine) -> None:

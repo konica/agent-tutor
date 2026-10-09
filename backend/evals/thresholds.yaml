@@ -2,13 +2,6 @@
 # Comparators: min = score must be >= value; max = score must be <= value.
 release_1:
   search_step_ran:        {type: code,  min: 1.00}
-  subject_detection:                    # first-turn subject set (1-3 subjects)
-    exact_set:            {type: code,  min: 0.90}
-    contains_wrong:       {type: code,  max: 0.03}
-    asked_when_clear:     {type: code,  max: 0.10}
-  thread_growth:
-    correct:              {type: code,  min: 0.95}
-    limits_respected:     {type: code,  min: 1.00}  # never > 3 subjects, never removed, warned at 3
   subject_suggestion_top3: {type: code, min: 0.90}
   subject_name_check:
     bad_name_recall:      {type: code,  min: 0.95}

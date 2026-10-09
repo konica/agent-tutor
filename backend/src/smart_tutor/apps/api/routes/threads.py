@@ -1,5 +1,5 @@
-"""Thread routes (tutoring module): ask the first question of a new thread; the agent detects its subjects, then the
-API starts it. Answered as SSE (PRD §9.2)."""
+"""Thread routes (tutoring module): ask the first question of a new thread; it answers from all of the learner's
+ready documents. Answered as SSE (PRD §9.2)."""
 
 import json
 import logging
@@ -13,11 +13,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from smart_tutor.apps.api.agent_client import AgentAnswer, AgentUnavailableError
-from smart_tutor.apps.api.deps import Agent, BearerToken, Conversations, CurrentPrincipal, Subjects
-from smart_tutor.apps.api.routes.subjects import UNNAMED_SUBJECT
+from smart_tutor.apps.api.deps import Agent, BearerToken, Conversations, CurrentPrincipal
 from smart_tutor.shared.domain.errors import UnauthenticatedError
-from smart_tutor.shared.domain.ids import SubjectId
-from smart_tutor.tutoring.application import NoDocumentsError, ThreadSubjectsError
+from smart_tutor.tutoring.application import NoDocumentsError
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["tutoring"])
@@ -48,8 +46,8 @@ def _sse(event: str, data: object) -> bytes:
 _EVENT_END = b"\n\n"
 _UNAVAILABLE_EVENT = _sse("error", {"code": "unavailable", "message": UNAVAILABLE})
 
-# Starts the thread with the detected subject ids; its `thread` event, or None when they are refused.
-StartThread = Callable[[list[str]], Awaitable[bytes | None]]
+# Starts the thread; its `thread` event, or None when it couldn't start.
+StartThread = Callable[[], Awaitable[bytes | None]]
 
 
 class _EndedInsideEventError(Exception):
@@ -65,16 +63,6 @@ def _event(raw: bytes) -> tuple[str, object] | None:
         return None
 
 
-def _subject_ids(event: tuple[str, object] | None) -> list[str] | None:
-    """The ids of a well-formed `subjects` event; None for any other event."""
-    if event is None or event[0] != "subjects" or not isinstance(event[1], dict):
-        return None
-    ids = event[1].get("subject_ids")
-    if not isinstance(ids, list) or not all(isinstance(s, str) for s in ids):
-        return None
-    return ids
-
-
 async def _events(answer: AgentAnswer) -> AsyncGenerator[bytes, None]:
     """The agent's events one by one, each with its blank line, byte-identical; network reads can end anywhere."""
     pending = b""
@@ -88,34 +76,34 @@ async def _events(answer: AgentAnswer) -> AsyncGenerator[bytes, None]:
 
 
 async def _opening(first: bytes | None, start: StartThread) -> bytes | None:
-    """What replaces the agent's first event: an `error` as-is, `subjects` by the thread event; else None."""
+    """What goes before the agent's first event: nothing for an `error` (relayed as-is, no thread), else the
+    `thread` event; None when the stream ended before any event or the thread couldn't start."""
     if first is None:
-        logger.warning("the agent's stream ended before its subjects")
+        logger.warning("the agent's stream ended before its first event")
         return None
     event = _event(first)
     if event is not None and event[0] == "error":
-        return first
-    subject_ids = _subject_ids(event)
-    if subject_ids is None:
-        logger.warning("the agent's stream did not start with its subjects (got %s)", event[0] if event else None)
-        return None
-    return await start(subject_ids)
+        return b""
+    return await start()
 
 
 async def _relay(answer: AgentAnswer, start: StartThread) -> AsyncIterator[bytes]:
-    """The agent's events, its first `subjects` event replaced by the `thread` event, forwarded only once complete.
+    """The agent's events after a `thread` event, each forwarded only once complete.
 
-    The thread is started only when the agent has detected its subjects; an `error` first is relayed as-is and starts
-    none. If the stream drops inside an event, the partial event is dropped so the error event that follows stays a
+    The thread starts on the agent's first event unless it is an `error`, which is relayed as-is and starts none. If
+    the stream drops inside an event, the partial event is dropped so the error event that follows stays a
     well-formed event of its own.
     """
     events = _events(answer)
     try:
-        opening = await _opening(await anext(events, None), start)
-        if opening is None:
+        first = await anext(events, None)
+        opening = await _opening(first, start)
+        if opening is None or first is None:
             yield _UNAVAILABLE_EVENT
             return
-        yield opening
+        if opening:
+            yield opening
+        yield first
         async for event in events:
             yield event
     except (httpx.HTTPError, _EndedInsideEventError):
@@ -131,45 +119,29 @@ async def ask_in_new_thread(
     principal: CurrentPrincipal,
     token: BearerToken,
     conversations: Conversations,
-    subjects: Subjects,
     agent: Agent,
 ) -> StreamingResponse:
     try:
-        learner_subjects = await run_in_threadpool(conversations.subjects_for_new_thread, principal.user_id)
+        await run_in_threadpool(conversations.require_documents, principal.user_id)
     except NoDocumentsError as e:
         raise HTTPException(409, str(e)) from None
-    names = await run_in_threadpool(subjects.names_for, principal.user_id, learner_subjects)
-    named: dict[str, str] = {}
-    for s in learner_subjects:
-        if not names.get(s):
-            logger.warning("subject %s has no name; using a placeholder", s)
-        named[s] = names.get(s) or UNNAMED_SUBJECT
     try:
-        answer = await agent.open_answer(token, body.question, list(named.items()))
+        answer = await agent.open_answer(token, body.question)
     except UnauthenticatedError:
         raise HTTPException(401, "Not authenticated", headers={"WWW-Authenticate": "Bearer"}) from None
     except AgentUnavailableError:
         raise HTTPException(503, UNAVAILABLE) from None
 
-    async def start(subject_ids: list[str]) -> bytes | None:
+    async def start() -> bytes | None:
         try:
-            thread = await run_in_threadpool(
-                conversations.start_thread, principal.user_id, [SubjectId(s) for s in subject_ids]
-            )
-        except (ThreadSubjectsError, NoDocumentsError) as e:
-            # Ids and the reason only: never the question or the token.
-            logger.warning("the agent's subjects %s were refused: %s", subject_ids, e)
+            thread = await run_in_threadpool(conversations.start_thread, principal.user_id)
+        except NoDocumentsError as e:
+            logger.warning("the thread was refused: %s", e)
             return None
         except Exception:
             # The 200 headers are already sent: end the stream with an error event rather than cut it off.
-            logger.exception("starting a thread with subjects %s failed", subject_ids)
+            logger.exception("starting a thread failed")
             return None
-        return _sse(
-            "thread",
-            {
-                "thread_id": thread.thread_id,
-                "subjects": [{"subject_id": s, "name": named.get(s, UNNAMED_SUBJECT)} for s in thread.subject_ids],
-            },
-        )
+        return _sse("thread", {"thread_id": thread.thread_id})
 
     return StreamingResponse(_relay(answer, start), media_type="text/event-stream", headers=SSE_HEADERS)

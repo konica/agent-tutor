@@ -25,7 +25,7 @@ Each module has `domain/` (entities and rules, no I/O), `application/` (one serv
 
 ## Where a change goes
 
-- A business rule → a method on the owning domain class (e.g. `Thread.add_subject()`, `Document.set_subjects()`, `Content.retry()`).
+- A business rule → a method on the owning domain class (e.g. `Document.set_subjects()`, `Content.retry()`).
 - A use case → a service in the owning module's `application/`, receiving ports through its constructor.
 - Talking to Bedrock, PostgreSQL, S3, SQS, MCP, the PDF loader, or the LangGraph store → a port in `ports/` and its implementation in `adapters/`.
 - An HTTP route, graph node, MCP tool, SQS handler, or CronJob → `apps/<app>/`: parse input, call one service, format output.

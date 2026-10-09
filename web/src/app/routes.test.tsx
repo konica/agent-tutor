@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
+import { loadDocuments } from "../api/documents";
+import type { DocumentResponse } from "../api/generated/types.gen";
 import { SessionContext, SessionProvider } from "../auth/SessionProvider";
 import type { AuthClient } from "../auth/authClient";
 import { NAV } from "./nav";
@@ -12,13 +14,10 @@ import { createRoutes } from "./routes";
 // The Library loads documents from the API; these tests are about routing, so it sees an empty library.
 vi.mock("../api/documents", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api/documents")>()),
-  loadDocuments: async () => [],
+  loadDocuments: vi.fn(async (): Promise<DocumentResponse[]> => []),
   loadUploadLimits: async () => ({ max_bytes: 52_428_800, max_pages: 500 }),
   uploadPdf: vi.fn(),
 }));
-
-// The Chat page lists the learner's subjects first.
-vi.mock("../api/subjects", () => ({ loadMySubjects: async () => [{ subject_id: "s1", name: "LLMs" }] }));
 
 const signOut = vi.fn();
 
@@ -127,6 +126,8 @@ describe("app shell routes", () => {
   });
 
   it("renders the Chat page with a question box", async () => {
+    // The Chat page offers the question box only when the learner has a ready document.
+    vi.mocked(loadDocuments).mockResolvedValueOnce([{ state: "ready" } as DocumentResponse]);
     renderAt("/chat");
     expect(await screen.findByRole("textbox", { name: "Your question" })).toBeEnabled();
     expect(screen.getByRole("heading", { level: 1, name: "New conversation" })).toBeInTheDocument();

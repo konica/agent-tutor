@@ -29,18 +29,10 @@ class AgentClient:
         self._url = base_url.rstrip("/") + "/ask"
         self._http = http
 
-    async def open_answer(
-        self, access_token: str, question: str, learner_subjects: list[tuple[str, str]]
-    ) -> AgentAnswer:
-        """Ask the agent; `learner_subjects` are (subject_id, name) of all the learner's subjects, to detect among."""
+    async def open_answer(self, access_token: str, question: str) -> AgentAnswer:
+        """Ask the agent; it searches all of the learner's ready documents with their token."""
         request = self._http.build_request(
-            "POST",
-            self._url,
-            json={
-                "question": question,
-                "learner_subjects": [{"subject_id": s, "name": n} for s, n in learner_subjects],
-            },
-            headers={"Authorization": f"Bearer {access_token}"},
+            "POST", self._url, json={"question": question}, headers={"Authorization": f"Bearer {access_token}"}
         )
         try:
             response = await self._http.send(request, stream=True)

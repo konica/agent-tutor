@@ -4,4 +4,4 @@ from typing import Any
 
 
 def tutor_target(inputs: dict[str, Any]) -> dict[str, Any]:
-    raise NotImplementedError("M2: invoke the agent graph and return answer, citations, trajectory, state.subject")
+    raise NotImplementedError("M2: invoke the agent graph and return answer, citations, trajectory")

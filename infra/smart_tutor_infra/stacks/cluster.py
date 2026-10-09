@@ -165,7 +165,7 @@ class ClusterStack(cdk.Stack):
                 ]
             ),
         )
-        self._pod_identity("Agent", "smart-tutor", "agent", iam.PolicyDocument(statements=[ssm, chat]))
+        self._pod_identity("Agent", "smart-tutor", "agent", iam.PolicyDocument(statements=[chat]))
         self._pod_identity("Mcp", "smart-tutor", "mcp-server", iam.PolicyDocument(statements=[embed]))
         cdk.CfnOutput(self, "ClusterName", value=self.cluster.cluster_name)
 

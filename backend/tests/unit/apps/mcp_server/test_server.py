@@ -50,15 +50,12 @@ async def test_search_returns_the_callers_chunks_as_structured_content() -> None
     library = InMemoryLibrary()
     ingest_ready(library, "ada", "Attention is all you need.")
     result = await call_search(
-        build(library, verifier_with("t-ada", "ada")),
-        "t-ada",
-        query="Attention is all you need.",
-        subject_ids=[GENERAL],
+        build(library, verifier_with("t-ada", "ada")), "t-ada", query="Attention is all you need."
     )
     assert not result.is_error
     [chunk] = result.structured_content["chunks"]
     assert chunk["text"] == "Attention is all you need." and chunk["page"] == 1
-    assert chunk["subject_ids"] == ["00000000-0000-4000-8000-000000000001"]
+    assert "subject_ids" not in chunk
 
 
 @pytest.mark.parametrize("headers", [{}, {"Authorization": "Bearer unknown"}, {"Authorization": "Basic x"}])
@@ -72,21 +69,16 @@ async def test_a_revoked_token_is_401() -> None:
     assert await raw_post(build(InMemoryLibrary(), verifier), {"Authorization": "Bearer t-ada"}) == 401
 
 
-@pytest.mark.parametrize(("query", "subject_ids", "reason"), [(" ", [GENERAL], "query"), ("q", ["not-a-uuid"], "UUID")])
-async def test_invalid_arguments_are_a_tool_error_with_the_reason(
-    query: str, subject_ids: list[str], reason: str
-) -> None:
-    result = await call_search(
-        build(InMemoryLibrary(), verifier_with("t", "ada")), "t", query=query, subject_ids=subject_ids
-    )
+async def test_an_invalid_argument_is_a_tool_error_with_the_reason() -> None:
+    result = await call_search(build(InMemoryLibrary(), verifier_with("t", "ada")), "t", query=" ")
     assert result.is_error
-    assert reason in result.content[0].text
+    assert "query" in result.content[0].text
 
 
 async def test_the_tool_takes_no_user_id() -> None:
     mcp = build(InMemoryLibrary(), verifier_with("t", "ada"))
     [tool] = [t for t in await mcp.list_tools() if t.name == "search"]
-    assert set(tool.input_schema["properties"]) == {"query", "subject_ids", "k"}
+    assert set(tool.input_schema["properties"]) == {"query", "k"}
 
 
 class FailingVerifier(TokenVerifier):

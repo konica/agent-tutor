@@ -17,7 +17,7 @@ def answer_node(model: BaseChatModel) -> AnswerNode:
         chunks = state.get("chunks", [])
         if not chunks:
             return {"answer": NO_CHUNKS_ANSWER, "citations": []}
-        reply = await model.ainvoke(answer_messages(state["question"], state["subject_names"], chunks))
+        reply = await model.ainvoke(answer_messages(state["question"], chunks))
         text = reply.text
         return {"answer": text, "citations": [c.citation(n) for n, c in cited_chunks(text, chunks)]}
 

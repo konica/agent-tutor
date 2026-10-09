@@ -1,7 +1,6 @@
 """PostgreSQL library: one connection and transaction per unit of work."""
 
 import uuid
-from collections.abc import Collection
 from types import TracebackType
 from typing import Any, Self
 
@@ -302,29 +301,10 @@ class _Chunks(ChunkRepository):
                 ],
             )
 
-    def search(
-        self, user_id: UserId, embedding: list[float], subject_ids: Collection[SubjectId], k: int
-    ) -> list[ChunkHit]:
+    def search(self, user_id: UserId, embedding: list[float], k: int) -> list[ChunkHit]:
         # Exact search (#31): with index scans off, Postgres can't use HNSW and drop filtered-out rows after the scan.
         self._conn.execute(text("SET LOCAL enable_indexscan = off"))
         distance = chunks.c.embedding.cosine_distance(embedding)
-        requested = list(subject_ids)
-        hit_subjects = (
-            select(func.array_agg(document_subjects.c.subject_id))
-            .where(
-                document_subjects.c.document_id == documents.c.document_id,
-                document_subjects.c.subject_id.in_(requested),
-            )
-            .scalar_subquery()
-        )
-        in_subjects = (
-            select(document_subjects.c.document_id)
-            .where(
-                document_subjects.c.document_id == documents.c.document_id,
-                document_subjects.c.subject_id.in_(requested),
-            )
-            .exists()
-        )
         rows = self._conn.execute(
             select(
                 chunks.c.chunk_id,
@@ -334,7 +314,6 @@ class _Chunks(ChunkRepository):
                 # The display title, as Document.title computes it (PRD §9.4).
                 func.coalesce(documents.c.title_override, contents.c.title, documents.c.file_name).label("title"),
                 (1 - distance).label("score"),
-                hit_subjects.label("subject_ids"),
             )
             .join(documents, documents.c.content_id == chunks.c.content_id)
             .join(contents, contents.c.content_id == chunks.c.content_id)
@@ -342,7 +321,6 @@ class _Chunks(ChunkRepository):
                 readable_by(user_id),
                 documents.c.state == DocumentState.READY.value,
                 documents.c.archived.is_(False),
-                in_subjects,
             )
             .order_by(distance, chunks.c.chunk_id)
             .limit(k)
@@ -355,7 +333,6 @@ class _Chunks(ChunkRepository):
                 r.page,
                 r.text,
                 float(r.score),
-                tuple(sorted(SubjectId(str(s)) for s in r.subject_ids)),
             )
             for r in rows
         ]

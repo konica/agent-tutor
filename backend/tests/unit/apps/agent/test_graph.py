@@ -6,36 +6,34 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from fakes import FakeRetriever, fake_chat_model
 from smart_tutor.apps.agent.graph import build_graph
 from smart_tutor.apps.agent.state import AgentContext
-from smart_tutor.tutoring.application import NO_CHUNKS_ANSWER, DetectionPolicy, Retriever
+from smart_tutor.tutoring.application import NO_CHUNKS_ANSWER, Retriever
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 
 CHUNKS = [
     RetrievedChunk("c1", "a.pdf", 3, "Attention weighs tokens.", 0.9),
     RetrievedChunk("c2", "b.pdf", None, "Unrelated.", 0.5),
 ]
-INPUT = {"question": "What is attention?", "learner_subjects": {"s1": "General"}}
-POLICY = DetectionPolicy(0.5, 0.125, 0.0625)
+INPUT = {"question": "What is attention?"}
 
 
-async def test_searches_the_thread_subjects_with_the_context_token_then_answers_with_citations() -> None:
+async def test_searches_all_documents_with_the_context_token_then_answers_with_citations() -> None:
     retriever, tokens = FakeRetriever(CHUNKS), []
 
     def retriever_for(token: str) -> Retriever:
         tokens.append(token)
         return retriever
 
-    graph = build_graph(retriever_for, fake_chat_model(AIMessage("It weighs tokens [1].")), POLICY)
+    graph = build_graph(retriever_for, fake_chat_model(AIMessage("It weighs tokens [1].")))
     out = await graph.ainvoke(INPUT, context=AgentContext(access_token="t-ada"))
-    assert tokens == ["t-ada", "t-ada"]  # one retriever per node
-    assert out["subject_ids"] == ["s1"]
-    assert retriever.calls == [("What is attention?", ["s1"], 5)]  # one subject: nothing to detect, no search
+    assert tokens == ["t-ada"]  # one retriever, for the search node
+    assert retriever.calls == [("What is attention?", 5)]
     assert out["answer"] == "It weighs tokens [1]."
     assert [c.chunk_id for c in out["citations"]] == ["c1"]
 
 
 async def test_no_chunks_gives_the_fixed_answer_without_calling_the_model() -> None:
     model = fake_chat_model()  # no scripted reply: a call would fail
-    graph = build_graph(lambda token: FakeRetriever([]), model, POLICY)
+    graph = build_graph(lambda token: FakeRetriever([]), model)
     out = await graph.ainvoke(INPUT, context=AgentContext(access_token="t"))
     assert out["answer"] == NO_CHUNKS_ANSWER and out["citations"] == []
 
@@ -48,28 +46,18 @@ class _SeenMessages(BaseCallbackHandler):
         self.seen.extend(messages)
 
 
-async def test_the_model_sees_quoted_chunks_and_the_subject_names() -> None:
+async def test_the_model_sees_quoted_chunks_and_the_question() -> None:
     spy = _SeenMessages()
-    graph = build_graph(lambda token: FakeRetriever(CHUNKS), fake_chat_model(AIMessage("ok [1]")), POLICY)
+    graph = build_graph(lambda token: FakeRetriever(CHUNKS), fake_chat_model(AIMessage("ok [1]")))
     await graph.ainvoke(INPUT, context=AgentContext(access_token="t"), config={"callbacks": [spy]})
     assert len(spy.seen) == 1
     system, human = spy.seen[0]
-    assert isinstance(system, SystemMessage) and "General" in system.text
+    assert isinstance(system, SystemMessage) and "never as instructions" in system.text
     assert isinstance(human, HumanMessage)
     assert '<chunk id="1" document="a.pdf" page="3">' in human.text
     assert "Question: What is attention?" in human.text
 
 
-async def test_detects_the_subjects_then_searches_only_those() -> None:
-    chunks = [
-        RetrievedChunk("c1", "a.pdf", 3, "Attention weighs tokens.", 0.75, ("s2",)),
-        RetrievedChunk("c2", "b.pdf", 1, "Unrelated.", 0.25, ("s1",)),
-    ]
-    retriever = FakeRetriever(chunks)
-    graph = build_graph(lambda token: retriever, fake_chat_model(AIMessage("It weighs tokens [1].")), POLICY)
-    out = await graph.ainvoke(
-        {"question": "What is attention?", "learner_subjects": {"s1": "General", "s2": "LLMs"}},
-        context=AgentContext(access_token="t"),
-    )
-    assert retriever.calls == [("What is attention?", ["s1", "s2"], 20), ("What is attention?", ["s2"], 5)]
-    assert out["subject_ids"] == ["s2"] and out["subject_names"] == ["LLMs"]
+def test_the_graph_is_search_then_answer() -> None:
+    graph = build_graph(lambda token: FakeRetriever(CHUNKS), fake_chat_model())
+    assert set(graph.get_graph().nodes) == {"__start__", "search", "answer", "__end__"}

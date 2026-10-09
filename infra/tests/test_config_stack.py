@@ -19,11 +19,11 @@ def test_max_processing_attempts_is_an_ssm_parameter() -> None:
     )
 
 
-def test_detection_thresholds_are_ssm_parameters() -> None:
+def test_no_subject_detection_parameters() -> None:
     template = Template.from_stack(ConfigStack(cdk.App(), "Config"))
 
-    for name, value in (("detect-threshold", "0.35"), ("detect-margin", "0.05"), ("multi-margin", "0.03")):
-        template.has_resource_properties("AWS::SSM::Parameter", {"Name": f"/smart-tutor/{name}", "Value": value})
+    names = {p["Properties"]["Name"] for p in template.find_resources("AWS::SSM::Parameter").values()}
+    assert not names & {"/smart-tutor/detect-threshold", "/smart-tutor/detect-margin", "/smart-tutor/multi-margin"}
 
 
 def test_app_time_zone_is_an_ssm_parameter() -> None:

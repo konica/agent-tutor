@@ -3,10 +3,6 @@
 from smart_tutor.shared.domain.errors import DomainError
 
 
-class ThreadSubjectsError(DomainError):
-    """A thread holds 1 to 3 distinct subjects, and subjects are only ever added."""
-
-
 class NoDocumentsError(DomainError):
     """The learner has no ready documents to answer from (PRD §8 US-3)."""
 

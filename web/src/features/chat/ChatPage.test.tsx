@@ -38,17 +38,13 @@ function controlledStream() {
   };
 }
 
-const SUBJECTS = [
-  { subject_id: "s1", name: "LLMs" },
-  { subject_id: "s2", name: "AI Agents" },
-];
 const doc = (state: string) => ({ state }) as DocumentResponse;
 
-// The page loads its subjects and documents first; tests that don't care get ready subjects and no processing documents.
+// The page loads the learner's documents first; tests that don't care get one ready document.
 function renderChat(props: ComponentProps<typeof ChatPage> = {}) {
   return render(
     <MemoryRouter>
-      <ChatPage loadSubjects={async () => SUBJECTS} loadDocs={async () => []} {...props} />
+      <ChatPage loadDocs={async () => [doc("ready")]} {...props} />
     </MemoryRouter>,
   );
 }
@@ -61,7 +57,7 @@ describe("ChatPage", () => {
   it("sends the question and renders the streamed answer with citations", async () => {
     const ask = vi.fn(() =>
       events(
-        { type: "thread", thread_id: "t1", subjects: [{ subject_id: "s1", name: "General" }] },
+        { type: "thread", thread_id: "t1" },
         { type: "delta", text: "It weighs " },
         { type: "delta", text: "tokens [1]." },
         {
@@ -82,7 +78,6 @@ describe("ChatPage", () => {
     // The question is the header title and also the learner's bubble in the conversation.
     expect(screen.getByRole("heading", { level: 1, name: "What is attention?" })).toBeInTheDocument();
     expect(screen.getByText("You asked:").parentElement).toHaveTextContent("You asked: What is attention?");
-    expect(screen.getByText("General")).toBeInTheDocument();
     expect(screen.getByText("a.pdf, p. 3")).toBeInTheDocument();
     expect(screen.getByText("b.pdf, page unavailable")).toBeInTheDocument();
   });
@@ -90,7 +85,7 @@ describe("ChatPage", () => {
   it("numbers each citation with the marker the answer uses for it", async () => {
     const ask = vi.fn(() =>
       events(
-        { type: "thread", thread_id: "t1", subjects: [] },
+        { type: "thread", thread_id: "t1" },
         { type: "delta", text: "Only the second chunk [2]." },
         { type: "citations", citations: [{ n: 2, chunk_id: "c2", document_title: "b.pdf", page: 4 }] },
         { type: "done" },
@@ -107,12 +102,12 @@ describe("ChatPage", () => {
 
   it("shows another refusal's message without pointing to the Library", async () => {
     const ask = vi.fn(() => {
-      throw new AskRefusedError("Subject detection isn't available yet");
+      throw new AskRefusedError("The tutor can't answer that right now");
     });
     renderChat({ ask });
     await userEvent.type(await question(), "What is attention?");
     await userEvent.click(askButton());
-    expect(await screen.findByText("Subject detection isn't available yet")).toBeInTheDocument();
+    expect(await screen.findByText("The tutor can't answer that right now")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /library/i })).not.toBeInTheDocument();
   });
 
@@ -134,7 +129,7 @@ describe("ChatPage", () => {
     await userEvent.type(await question(), "What is attention?");
     await userEvent.click(askButton());
 
-    control.push({ type: "thread", thread_id: "t1", subjects: [] });
+    control.push({ type: "thread", thread_id: "t1" });
     control.push({ type: "delta", text: "It weighs" });
     const answer = await screen.findByText("It weighs");
     const region = answer.closest("[aria-live]")!;
@@ -154,7 +149,7 @@ describe("ChatPage", () => {
   it("shows the message of an unavailable error", async () => {
     const ask = vi.fn(() =>
       events(
-        { type: "thread", thread_id: "t1", subjects: [] },
+        { type: "thread", thread_id: "t1" },
         { type: "error", code: "unavailable", message: "The tutor is unavailable. Try again in a moment." },
       ),
     );
@@ -168,7 +163,7 @@ describe("ChatPage", () => {
     const notify = vi.spyOn(sessionExpiry, "notify").mockImplementation(() => {});
     const ask = vi.fn(() =>
       events(
-        { type: "thread", thread_id: "t1", subjects: [] },
+        { type: "thread", thread_id: "t1" },
         { type: "error", code: "unauthenticated", message: "Please sign in again." },
       ),
     );
@@ -180,7 +175,7 @@ describe("ChatPage", () => {
 
   it("shows a generic message when the stream ends without done or error, keeping the partial answer", async () => {
     const ask = vi.fn(() =>
-      events({ type: "thread", thread_id: "t1", subjects: [] }, { type: "delta", text: "It weighs" }),
+      events({ type: "thread", thread_id: "t1" }, { type: "delta", text: "It weighs" }),
     );
     renderChat({ ask });
     await userEvent.type(await question(), "What is attention?");
@@ -199,32 +194,7 @@ describe("ChatPage", () => {
     expect(await screen.findByText("The tutor couldn't answer right now. Try again in a moment.")).toBeInTheDocument();
   });
 
-  it("shows the thread's subjects as chips under the question in the header", async () => {
-    const ask = vi.fn(() =>
-      events(
-        {
-          type: "thread",
-          thread_id: "t1",
-          subjects: [
-            { subject_id: "s1", name: "LLMs" },
-            { subject_id: "s2", name: "AI Agents" },
-          ],
-        },
-        { type: "delta", text: "Answer." },
-        { type: "citations", citations: [] },
-        { type: "done" },
-      ),
-    );
-    renderChat({ ask });
-    await userEvent.type(await question(), "How does chain-of-thought help?");
-    await userEvent.click(askButton());
-    const heading = await screen.findByRole("heading", { level: 1, name: "How does chain-of-thought help?" });
-    const list = within(heading.closest("header")!).getByRole("list", { name: "Subjects" });
-    expect(within(list).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["LLMs", "AI Agents"]);
-    expect(await screen.findByText("Answer.")).toBeInTheDocument();
-  });
-
-  it("shows the problem with no subjects when an error arrives before any thread event", async () => {
+  it("shows the problem when an error arrives before any thread event", async () => {
     const ask = vi.fn(() =>
       events({ type: "error", code: "unavailable", message: "The tutor is unavailable. Try again in a moment." }),
     );
@@ -233,21 +203,21 @@ describe("ChatPage", () => {
     await userEvent.click(askButton());
     expect(await screen.findByText("The tutor is unavailable. Try again in a moment.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1, name: "What is attention?" })).toBeInTheDocument();
-    expect(screen.queryByRole("list", { name: "Subjects" })).toBeNull();
   });
 
-  it("starts with the new-conversation header, the welcome and the learner's subjects, without example questions", async () => {
+  it("starts with the new-conversation header and the welcome, without subjects or example questions", async () => {
     renderChat();
-    const list = await screen.findByRole("list", { name: "Your subjects" });
+    expect(await screen.findByRole("heading", { name: "Ask about your documents" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1, name: "New conversation" })).toBeInTheDocument();
-    expect(screen.getByText("Subjects appear after your first question.")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Ask about your documents" })).toBeInTheDocument();
-    expect(within(list).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["LLMs", "AI Agents"]);
+    expect(screen.getByText(/There's nothing to choose first: just ask\./)).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Your subjects" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Subjects" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Subjects appear after your first question.")).not.toBeInTheDocument();
     expect(screen.queryByText(/try asking/i)).not.toBeInTheDocument();
   });
 
-  it("asks for an upload first when the learner has no subjects", async () => {
-    renderChat({ loadSubjects: async () => [] });
+  it("asks for an upload first when the learner has no ready documents", async () => {
+    renderChat({ loadDocs: async () => [doc("processing"), doc("awaiting_subjects"), doc("failed")] });
     expect(await screen.findByRole("heading", { name: "Upload a document first" })).toBeInTheDocument();
     expect(screen.getByText(/The tutor answers only from your documents\. Add a PDF to your Library/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Upload" })).toHaveAttribute("href", "/library");
@@ -261,7 +231,7 @@ describe("ChatPage", () => {
   });
 
   it("uses the singular for one processing document", async () => {
-    renderChat({ loadDocs: async () => [doc("processing"), doc("ready")] });
+    renderChat({ loadDocs: async () => [doc("ready"), doc("processing"), doc("awaiting_subjects"), doc("failed")] });
     expect(await screen.findByText("1 document is still processing and can't be used yet.")).toBeInTheDocument();
   });
 
@@ -271,18 +241,14 @@ describe("ChatPage", () => {
     expect(screen.queryByText(/still processing/)).not.toBeInTheDocument();
   });
 
-  it("titles the conversation with the question and shows the thread's subjects, keeping the hint", async () => {
-    const ask = vi.fn(() =>
-      events({ type: "thread", thread_id: "t1", subjects: [{ subject_id: "s2", name: "AI Agents" }] }, { type: "done" }),
-    );
-    renderChat({ ask, loadDocs: async () => [doc("processing")] });
+  it("titles the conversation with the question, with no subject chips, keeping the hint", async () => {
+    const ask = vi.fn(() => events({ type: "thread", thread_id: "t1" }, { type: "done" }));
+    renderChat({ ask, loadDocs: async () => [doc("ready"), doc("processing")] });
     await userEvent.type(await question(), "What is attention?");
     await userEvent.click(askButton());
     expect(await screen.findByRole("heading", { level: 1, name: "What is attention?" })).toBeInTheDocument();
-    const list = screen.getByRole("list", { name: "Subjects" });
-    expect(within(list).getByText("AI Agents")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Subjects" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Ask about your documents" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Subjects appear after your first question.")).not.toBeInTheDocument();
     expect(screen.getByText("1 document is still processing and can't be used yet.")).toBeInTheDocument();
   });
 
@@ -298,21 +264,15 @@ describe("ChatPage", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });
 
-  it("explains when the subjects can't be loaded, instead of a blank page or a false upload prompt", async () => {
-    renderChat({ loadSubjects: () => Promise.reject(new Error("GET /me/subjects failed (500)")) });
-    expect(await screen.findByText("Your subjects couldn't be loaded. Reload the page to try again.")).toBeInTheDocument();
+  it("explains when the documents can't be loaded, instead of a blank page or a false upload prompt", async () => {
+    renderChat({ loadDocs: () => Promise.reject(new Error("GET /documents failed (500)")) });
+    expect(await screen.findByText("Your documents couldn't be loaded. Reload the page to try again.")).toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Upload a document first" })).not.toBeInTheDocument();
   });
 
-  it("still lets the learner ask when only the document count can't be loaded", async () => {
-    renderChat({ loadDocs: () => Promise.reject(new Error("boom")) });
-    expect(await question()).toBeEnabled();
-    expect(screen.queryByText(/still processing/)).not.toBeInTheDocument();
-  });
-
   it("shows nothing of its own when the session has ended", async () => {
-    renderChat({ loadSubjects: () => Promise.reject(new SessionExpiredError()) });
+    renderChat({ loadDocs: () => Promise.reject(new SessionExpiredError()) });
     await waitFor(() => expect(screen.queryByText(/couldn't be loaded/)).not.toBeInTheDocument());
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });

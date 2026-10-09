@@ -1,7 +1,6 @@
 """Persistence of contents, documents, and uploads, committed together (one unit of work per use case)."""
 
 from abc import ABC, abstractmethod
-from collections.abc import Collection
 from types import TracebackType
 from typing import Self
 
@@ -91,10 +90,8 @@ class ChunkRepository(ABC):
         """Make these the content's only chunks (idempotent: processing twice never duplicates)."""
 
     @abstractmethod
-    def search(
-        self, user_id: UserId, embedding: list[float], subject_ids: Collection[SubjectId], k: int
-    ) -> list[ChunkHit]:
-        """`can_read` in SQL: chunks of the caller's ready, non-archived documents in any of these subjects."""
+    def search(self, user_id: UserId, embedding: list[float], k: int) -> list[ChunkHit]:
+        """`can_read` in SQL: chunks of the caller's ready, non-archived documents."""
 
 
 class LibraryUnitOfWork(ABC):
