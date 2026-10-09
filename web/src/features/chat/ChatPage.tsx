@@ -11,32 +11,26 @@ import {
 } from "../../api/chat";
 import { loadDocuments } from "../../api/documents";
 import type { DocumentResponse } from "../../api/generated/types.gen";
-import { loadMySubjects } from "../../api/subjects";
 import { SessionExpiredError, sessionExpiry } from "../../auth/authClient";
 import { Button } from "../../components/Button/Button";
 import { LinkButton } from "../../components/Button/LinkButton";
 import { EmptyState } from "../../components/EmptyState/EmptyState";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
-import { SubjectChip } from "../../components/SubjectChip/SubjectChip";
 import styles from "./ChatPage.module.css";
-
-type Subject = { subject_id: string; name: string };
 
 type Props = {
   ask?: (question: string) => AsyncIterable<ChatEvent>;
-  loadSubjects?: () => Promise<Subject[]>;
   loadDocs?: () => Promise<DocumentResponse[]>;
 };
 
 type Exchange = {
   question: string;
-  subjects: Subject[];
   answer: string;
   citations: ChatCitation[];
 };
 
 // "ended" is a session that expired while loading: the session screen takes over, this page shows nothing.
-type Subjects = { status: "loading" | "failed" | "ended" } | { status: "ready"; list: Subject[] };
+type Library = { status: "loading" | "failed" | "ended" } | { status: "ready" };
 
 type Problem = { message: string };
 
@@ -44,7 +38,6 @@ const MAX_QUESTION = 4000;
 const GENERIC_FAILURE = "The tutor couldn't answer right now. Try again in a moment.";
 
 const defaultAsk = (question: string) => askInNewThread(question);
-const defaultLoadSubjects = () => loadMySubjects();
 const defaultLoadDocs = () => loadDocuments();
 
 function processingHint(count: number) {
@@ -54,12 +47,12 @@ function processingHint(count: number) {
 }
 
 // Single turn (#82): each question starts a new thread and replaces the previous exchange.
-export function ChatPage({ ask = defaultAsk, loadSubjects = defaultLoadSubjects, loadDocs = defaultLoadDocs }: Props) {
+export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs }: Props) {
   const [question, setQuestion] = useState("");
   const [answering, setAnswering] = useState(false);
   const [exchange, setExchange] = useState<Exchange | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
-  const [subjects, setSubjects] = useState<Subjects>({ status: "loading" });
+  const [library, setLibrary] = useState<Library>({ status: "loading" });
   const [processing, setProcessing] = useState(0);
   const [noDocuments, setNoDocuments] = useState(false);
   const alive = useRef(true);
@@ -72,21 +65,22 @@ export function ChatPage({ ask = defaultAsk, loadSubjects = defaultLoadSubjects,
     };
   }, []);
 
-  // The subjects decide what the page is; the document count only feeds a hint, so its failure is not shown.
+  // The documents decide what the page is: none ready → upload first; still processing → a hint.
   useEffect(() => {
     let current = true;
-    loadSubjects().then(
-      (list) => current && (list.length === 0 ? setNoDocuments(true) : setSubjects({ status: "ready", list })),
-      (error: unknown) => current && setSubjects({ status: error instanceof SessionExpiredError ? "ended" : "failed" }),
-    );
     loadDocs().then(
-      (docs) => current && setProcessing(docs.filter((d) => d.state === "processing").length),
-      () => {},
+      (docs) => {
+        if (!current) return;
+        setProcessing(docs.filter((d) => d.state === "processing").length);
+        if (docs.some((d) => d.state === "ready")) setLibrary({ status: "ready" });
+        else setNoDocuments(true);
+      },
+      (error: unknown) => current && setLibrary({ status: error instanceof SessionExpiredError ? "ended" : "failed" }),
     );
     return () => {
       current = false;
     };
-  }, [loadSubjects, loadDocs]);
+  }, [loadDocs]);
 
   const trimmed = question.trim();
   const canAsk = !answering && trimmed.length > 0;
@@ -97,7 +91,7 @@ export function ChatPage({ ask = defaultAsk, loadSubjects = defaultLoadSubjects,
     busy.current = true;
     setAnswering(true);
     setProblem(null);
-    setExchange({ question: trimmed, subjects: [], answer: "", citations: [] });
+    setExchange({ question: trimmed, answer: "", citations: [] });
     setQuestion("");
     // The protocol always ends with done or error; a stream that just stops (dropped connection) failed.
     let ended = false;
@@ -105,8 +99,7 @@ export function ChatPage({ ask = defaultAsk, loadSubjects = defaultLoadSubjects,
       for await (const event of ask(trimmed)) {
         if (!alive.current) break; // leaving the page stops reading, which closes the stream
         if (event.type === "done" || event.type === "error") ended = true;
-        if (event.type === "thread") setExchange((e) => e && { ...e, subjects: event.subjects });
-        else if (event.type === "delta") setExchange((e) => e && { ...e, answer: e.answer + event.text });
+        if (event.type === "delta") setExchange((e) => e && { ...e, answer: e.answer + event.text });
         else if (event.type === "citations") setExchange((e) => e && { ...e, citations: event.citations });
         else if (event.type === "error") {
           // The token stopped working mid-answer: the session screen asks the learner to sign in again.
@@ -160,14 +153,14 @@ export function ChatPage({ ask = defaultAsk, loadSubjects = defaultLoadSubjects,
     );
   }
 
-  if (subjects.status === "ended") return null;
+  if (library.status === "ended") return null;
 
-  if (subjects.status !== "ready") {
+  if (library.status !== "ready") {
     return (
       <div className={styles.column}>
-        <PageHeader title="New conversation" description="Subjects appear after your first question." />
-        {subjects.status === "failed" && (
-          <p className={styles.problem}>Your subjects couldn't be loaded. Reload the page to try again.</p>
+        <PageHeader title="New conversation" />
+        {library.status === "failed" && (
+          <p className={styles.problem}>Your documents couldn't be loaded. Reload the page to try again.</p>
         )}
       </div>
     );
@@ -176,40 +169,16 @@ export function ChatPage({ ask = defaultAsk, loadSubjects = defaultLoadSubjects,
   return (
     <div className={styles.column}>
       {exchange ? (
-        <PageHeader
-          title={exchange.question}
-          titleClassName={styles.clampedTitle}
-          below={
-            exchange.subjects.length > 0 && (
-              <ul className={`${styles.chips} ${styles.headerChips}`} aria-label="Subjects">
-                {exchange.subjects.map((s) => (
-                  <li key={s.subject_id}>
-                    <SubjectChip name={s.name} hueKey={s.subject_id} size="sm" />
-                  </li>
-                ))}
-              </ul>
-            )
-          }
-        />
+        <PageHeader title={exchange.question} titleClassName={styles.clampedTitle} />
       ) : (
         <>
-          <PageHeader title="New conversation" description="Subjects appear after your first question." />
+          <PageHeader title="New conversation" />
           <section className={styles.welcome}>
             <h2 className={styles.welcomeTitle}>Ask about your documents</h2>
             <p className={styles.welcomeText}>
-              I work out which of your subjects a question is about, answer only from your documents, and show the page each
-              answer came from.
+              I answer only from the documents in your Library and show the page each answer came from. There's nothing to
+              choose first: just ask.
             </p>
-            <div className={styles.yourSubjects}>
-              <span>Your subjects:</span>
-              <ul className={styles.chips} aria-label="Your subjects">
-                {subjects.list.map((s) => (
-                  <li key={s.subject_id}>
-                    <SubjectChip name={s.name} hueKey={s.subject_id} size="sm" />
-                  </li>
-                ))}
-              </ul>
-            </div>
           </section>
         </>
       )}

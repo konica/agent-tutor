@@ -3,9 +3,6 @@
 .welcome { display: grid; gap: var(--sp-4); margin: var(--sp-8) 0 var(--sp-6); }
 .welcomeTitle { font-size: var(--fs-40); }
 .welcomeText { color: var(--text-2); max-width: 64ch; }
-.yourSubjects { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); color: var(--text-2); font-size: var(--fs-14); }
-.chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
-.headerChips { margin-top: var(--sp-3); }
 
 /* The header shows at most two lines of a long question; the full text is in the bubble. The v0.7 mockup sets the
    thread title in the body font, semibold, not the serif display font base.css gives every h1. */

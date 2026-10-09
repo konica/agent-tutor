@@ -33,7 +33,7 @@ async function collect(events: AsyncIterable<ChatEvent>): Promise<ChatEvent[]> {
 }
 
 const answer = [
-  'event: thread\ndata: {"thread_id": "t1", "subjects": [{"subject_id": "s1", "name": "General"}]}\n\n',
+  'event: thread\ndata: {"thread_id": "t1"}\n\n',
   'event: delta\ndata: {"text": "It weighs "}\n\n',
   'event: delta\ndata: {"text": "tokens [1]."}\n\n',
   'event: citations\ndata: {"citations": [{"n": 1, "chunk_id": "c1", "document_title": "a.pdf", "page": 3}]}\n\n',
@@ -47,7 +47,7 @@ describe("askInNewThread", () => {
     const events = await collect(askInNewThread("What is attention?", apiClient));
 
     expect(events).toEqual([
-      { type: "thread", thread_id: "t1", subjects: [{ subject_id: "s1", name: "General" }] },
+      { type: "thread", thread_id: "t1" },
       { type: "delta", text: "It weighs " },
       { type: "delta", text: "tokens [1]." },
       { type: "citations", citations: [{ n: 1, chunk_id: "c1", document_title: "a.pdf", page: 3 }] },

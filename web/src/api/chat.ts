@@ -8,7 +8,7 @@ import { parseSse } from "./sse";
 export type ChatCitation = { n: number; chunk_id: string; document_title: string; page: number | null };
 
 export type ChatEvent =
-  | { type: "thread"; thread_id: string; subjects: { subject_id: string; name: string }[] }
+  | { type: "thread"; thread_id: string }
   | { type: "delta"; text: string }
   | { type: "citations"; citations: ChatCitation[] }
   | { type: "error"; code: "unauthenticated" | "unavailable"; message: string }
@@ -24,7 +24,7 @@ export class NoDocumentsError extends Error {
   }
 }
 
-/** Another 409 from POST /threads (e.g. subject detection isn't available yet): its message is for the learner. */
+/** Another 409 from POST /threads: its message is for the learner. */
 export class AskRefusedError extends Error {
   constructor(message: string) {
     super(message);
@@ -42,7 +42,7 @@ function toEvent(event: string, data: string): ChatEvent | null {
   const payload = () => JSON.parse(data) as Record<string, unknown>;
   switch (event) {
     case "thread":
-      return { type: "thread", ...(payload() as { thread_id: string; subjects: { subject_id: string; name: string }[] }) };
+      return { type: "thread", thread_id: payload().thread_id as string };
     case "delta":
       return { type: "delta", text: payload().text as string };
     case "citations":
