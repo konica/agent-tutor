@@ -7,6 +7,10 @@ class InvalidFileNameError(DomainError):
     """The upload has no usable file name."""
 
 
+class InvalidTitleError(DomainError):
+    """A display title must keep 1-300 characters once cleaned (PRD §9.4)."""
+
+
 class DocumentStateError(DomainError):
     """The document isn't in a state that allows this change (PRD §9.5)."""
 
