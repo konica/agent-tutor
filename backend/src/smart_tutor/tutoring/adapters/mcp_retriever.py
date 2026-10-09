@@ -1,5 +1,8 @@
 """Retriever over the RAG MCP server's `search` tool (ADR 0007: the token rides in the Authorization header)."""
 
+from collections.abc import Sequence
+from typing import Any
+
 import httpx2
 from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
@@ -22,7 +25,10 @@ class McpRetriever(Retriever):
     def __repr__(self) -> str:
         return f"McpRetriever(url={self._url!r})"
 
-    async def search(self, query: str, k: int = 5) -> list[RetrievedChunk]:
+    async def search(self, query: str, k: int = 5, document_ids: Sequence[str] | None = None) -> list[RetrievedChunk]:
+        arguments: dict[str, Any] = {"query": query, "k": k}
+        if document_ids is not None:
+            arguments["document_ids"] = list(document_ids)
         refused = False
 
         async def note_401(response: httpx2.Response) -> None:
@@ -39,7 +45,7 @@ class McpRetriever(Retriever):
                 ) as http,
                 Client(streamable_http_client(self._url, http_client=http)) as client,
             ):
-                result = await client.call_tool("search", {"query": query, "k": k})
+                result = await client.call_tool("search", arguments)
         except BaseException as e:  # the SDK wraps transport errors in ExceptionGroups
             if not isinstance(e, Exception):
                 raise  # cancellation, interrupts and BaseExceptionGroups holding them propagate as-is

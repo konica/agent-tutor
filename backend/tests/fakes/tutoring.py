@@ -63,10 +63,10 @@ class FakeRetriever(Retriever):
     def __init__(self, chunks: list[RetrievedChunk] | None = None, error: Exception | None = None) -> None:
         self._chunks = chunks or []
         self._error = error
-        self.calls: list[tuple[str, int]] = []
+        self.calls: list[tuple[str, int, list[str] | None]] = []
 
-    async def search(self, query: str, k: int = 5) -> list[RetrievedChunk]:
-        self.calls.append((query, k))
+    async def search(self, query: str, k: int = 5, document_ids: Sequence[str] | None = None) -> list[RetrievedChunk]:
+        self.calls.append((query, k, None if document_ids is None else list(document_ids)))
         if self._error is not None:
             raise self._error
         return list(self._chunks)

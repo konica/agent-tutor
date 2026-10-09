@@ -1,6 +1,6 @@
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from smart_tutor.tutoring.application import NO_CHUNKS_ANSWER, answer_messages, cited_chunks
+from smart_tutor.tutoring.application import NO_CHUNKS_ANSWER, answer_messages, cited_chunks, covers
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 
 
@@ -62,3 +62,13 @@ def test_no_chunks_answer_is_plain() -> None:
 def test_retrieved_chunk_citation() -> None:
     c = chunk(1, page=None).citation(2)
     assert (c.n, c.chunk_id, c.document_title, c.page) == (2, "c1", "doc1.pdf", None)
+
+
+def test_covers_needs_a_chunk_scoring_at_least_the_floor() -> None:
+    def scored(score: float) -> RetrievedChunk:
+        return RetrievedChunk("c", "d", "a.pdf", 1, "t", score)
+
+    assert covers([], 0.3) is False
+    assert covers([scored(0.3)], 0.3) is True
+    assert covers([scored(0.29)], 0.3) is False
+    assert covers([scored(0.1), scored(0.5)], 0.3) is True
