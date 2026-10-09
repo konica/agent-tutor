@@ -29,7 +29,7 @@ Every color, font size, space, radius, shadow, and duration in feature code is a
 | Type | `--font-display` (serif: brand word, landing page, empty-state headline only), `--font-body` (system UI; all app headings), `--font-mono` (numbers, ids, token counts; tabular figures); sizes `--fs-12`, `--fs-13`, `--fs-14` (body), `--fs-16`, `--fs-18`, `--fs-20`, `--fs-24`, `--fs-32` (landing), `--fs-64` (landing headline only); `--lh-body` 1.45 (UI), `--lh-read` 1.6 (chat answers, note editor), `--lh-head` 1.25 |
 | Space and shape | `--sp-0` (2px), `--sp-1` (4px) … `--sp-6` (24px) in the app; `--sp-8` … `--sp-16` on the landing page only; `--r-sm` 4px, `--r-md` 6px, `--r-lg` 8px (dialogs, drawers), `--r-pill` |
 | Motion | `--dur-fast`, `--dur-base`, `--dur-exit`, `--dur-spin`, `--ease-out`, `--ease-in`; everything stops under `prefers-reduced-motion: reduce` |
-| Layout | `--nav-w` 208px (`--nav-w-collapsed` 56px), `--page-w` 1200px, `--page-w-wide` fluid up to 1360px (Library and tables), `--chat-w` 720px, `--panel-w` 340px, `--chat-panel-w` 260px (conversation side panel), `--chat-min-w` 480px (conversation beside a document), `--viewer-w` `min(960px, 100% - 64px)` (overlay outside chat), `--tray-w` 320px |
+| Layout | `--nav-w` 208px (`--nav-w-collapsed` 56px), `--page-w` 1200px, `--page-w-wide` fluid up to 1360px (Library and tables), `--chat-w` 720px, `--panel-w` 340px, `--chat-panel-w` 260px (conversation side panel), `--chat-min-w` 480px (conversation beside a document), `--viewer-w` `min(960px, 100% - 64px)` (overlay outside chat), `--tray-w` 320px, `--landing-w` 1120px (landing page column) |
 
 The prototype's `--chrome-*` tokens, `.rb-*` classes, and `od-*` layout primitives belong to the review tool, not the product: leave them out.
 
