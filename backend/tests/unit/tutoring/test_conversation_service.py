@@ -10,6 +10,7 @@ from smart_tutor.shared.domain.ids import DocumentId, UserId
 from smart_tutor.tutoring.application import (
     DELETED_DOCUMENT,
     ConversationService,
+    DocumentNotAvailableError,
     DocumentUsed,
     NoDocumentsError,
     ThreadNotFoundError,
@@ -122,7 +123,9 @@ def test_a_document_that_no_longer_exists_reads_as_deleted() -> None:
 
     _, deleted = svc.documents_used(thread.thread_id, LEARNER)
 
-    assert deleted == DocumentUsed(gone, DELETED_DOCUMENT, (), None, archived=False, deleted=True)
+    assert deleted == DocumentUsed(
+        gone, DELETED_DOCUMENT, (), None, archived=False, deleted=True, added_by="answer", used=True
+    )
 
 
 def test_a_deleted_document_keeps_the_title_copied_when_it_was_deleted() -> None:
@@ -149,3 +152,76 @@ def test_another_learner_can_neither_record_nor_read() -> None:
     with pytest.raises(ThreadNotFoundError):
         svc.record_answer(thread.thread_id, OTHER, [a])
     assert threads.documents_used_rows == {}
+
+
+def test_the_learner_adds_ready_documents_listed_as_added_and_unused() -> None:
+    library = InMemoryLibrary()
+    svc, _, used, added, _ = started(library)
+    thread = svc.start_thread(LEARNER)
+    svc.record_answer(thread.thread_id, LEARNER, [used])
+
+    listed = svc.add_documents(thread.thread_id, LEARNER, [added, used])
+
+    assert [(d.document_id, d.added_by, d.used) for d in listed] == [(used, "answer", True), (added, "learner", False)]
+    svc.record_answer(thread.thread_id, LEARNER, [added])
+    assert [(d.document_id, d.added_by, d.used) for d in svc.documents_used(thread.thread_id, LEARNER)] == [
+        (used, "answer", True),
+        (added, "learner", True),
+    ]
+
+
+@pytest.mark.parametrize("kind", ["foreign", "archived", "processing", "unknown"])
+def test_only_the_learners_ready_active_documents_can_be_added(kind: str) -> None:
+    library = InMemoryLibrary()
+    svc, _, good, _, _ = started(library)
+    thread = svc.start_thread(LEARNER)
+    bad: DocumentId
+    if kind == "foreign":
+        bad = ingest_ready(library, "bob", "Someone else's paper.")
+    elif kind == "archived":
+        bad = ingest_ready(library, "ada", "An archived paper.")
+        library.state.documents[bad].archived = True
+    elif kind == "processing":
+        bad = (
+            UploadService(library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS)
+            .start_upload(LEARNER, "processing.pdf")
+            .document_id
+        )
+    else:
+        bad = DocumentId("00000000-0000-0000-0000-000000000000")
+
+    with pytest.raises(DocumentNotAvailableError, match="Document not found"):
+        svc.add_documents(thread.thread_id, LEARNER, [good, bad])
+
+    assert svc.documents_used(thread.thread_id, LEARNER) == []
+
+
+def test_removing_a_document_takes_it_off_the_list_until_an_answer_uses_it_again() -> None:
+    library = InMemoryLibrary()
+    svc, _, a, b, _ = started(library)
+    thread = svc.start_thread(LEARNER)
+    svc.record_answer(thread.thread_id, LEARNER, [a, b])
+
+    svc.remove_document(thread.thread_id, LEARNER, a)
+
+    assert [d.document_id for d in svc.documents_used(thread.thread_id, LEARNER)] == [b]
+    assert a in library.state.documents and not library.state.documents[a].archived
+    svc.record_answer(thread.thread_id, LEARNER, [a])
+    listed = svc.documents_used(thread.thread_id, LEARNER)
+    assert [d.document_id for d in listed] == [b, a]
+    assert listed[1].added_by == "answer"
+
+
+def test_another_learner_can_neither_add_nor_remove() -> None:
+    library = InMemoryLibrary()
+    svc, _, a, b, _ = started(library)
+    ingest_ready(library, "bob", "Bob's paper.")
+    thread = svc.start_thread(LEARNER)
+    svc.record_answer(thread.thread_id, LEARNER, [a])
+
+    with pytest.raises(ThreadNotFoundError, match="Conversation not found"):
+        svc.add_documents(thread.thread_id, OTHER, [b])
+    with pytest.raises(ThreadNotFoundError, match="Conversation not found"):
+        svc.remove_document(thread.thread_id, OTHER, a)
+
+    assert [d.document_id for d in svc.documents_used(thread.thread_id, LEARNER)] == [a]

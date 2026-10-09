@@ -3,7 +3,12 @@
 from smart_tutor.tutoring.application.answer import NO_CHUNKS_ANSWER, answer_messages, cited_chunks
 from smart_tutor.tutoring.application.conversation_service import ConversationService
 from smart_tutor.tutoring.domain.document_used import DELETED_DOCUMENT, DocumentUsed
-from smart_tutor.tutoring.domain.errors import NoDocumentsError, RetrievalError, ThreadNotFoundError
+from smart_tutor.tutoring.domain.errors import (
+    DocumentNotAvailableError,
+    NoDocumentsError,
+    RetrievalError,
+    ThreadNotFoundError,
+)
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 from smart_tutor.tutoring.domain.thread import Thread
 from smart_tutor.tutoring.ports.retriever import Retriever
@@ -13,6 +18,7 @@ __all__ = [
     "DELETED_DOCUMENT",
     "NO_CHUNKS_ANSWER",
     "ConversationService",
+    "DocumentNotAvailableError",
     "DocumentUsed",
     "NoDocumentsError",
     "RetrievalError",
