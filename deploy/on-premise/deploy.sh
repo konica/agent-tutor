@@ -6,7 +6,8 @@
 # 1. Renders settings (SSM) and secrets (Secrets Manager) into a root-only env file.
 # 2. Pulls the images, starts Postgres, and creates or updates the app and Keycloak roles and databases.
 # 3. Migrates, then starts every service and waits until all are healthy. Compose recreates only the services whose
-#    image or settings changed, so the same tag again changes nothing.
+#    image or settings changed, so the same tag again changes nothing. Installs and enables the scheduled jobs'
+#    systemd units (the nightly backup, #151).
 # 4. Creates the test learner if it is missing.
 #
 # It prints no secret: never add `set -x`, `docker compose config`, or an echo of the env file.
@@ -89,6 +90,15 @@ echo "Migrating"
 
 echo "Starting the services"
 "${compose[@]}" up -d --wait --wait-timeout 900 --remove-orphans
+
+# Scheduled jobs are systemd timers that call `docker compose run` (docs/runbooks/on-premise-backups.md). The units
+# read the env file rendered above, so they start only after the first deploy.
+echo "Installing the scheduled jobs"
+install -m 644 "$here"/systemd/* /etc/systemd/system/
+systemctl daemon-reload
+for timer in "$here"/systemd/*.timer; do
+  systemctl enable --now --quiet "$(basename "$timer")"
+done
 
 # The test learner is created once (the realm uses the email as the username) and gets the secret's password while it
 # has none; later changes go through the admin console. The script reaches the container on stdin, so the password is

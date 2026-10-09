@@ -151,7 +151,11 @@ def test_only_the_tagged_host_may_attach_the_tagged_volume(t: Template) -> None:
 
 
 def test_instance_role_pulls_images_reads_its_own_settings_and_secrets_and_is_managed_by_ssm(t: Template) -> None:
-    (role,) = t.find_resources("AWS::IAM::Role").values()
+    (role,) = (
+        r
+        for r in t.find_resources("AWS::IAM::Role").values()
+        if "ec2.amazonaws.com" in json.dumps(r["Properties"]["AssumeRolePolicyDocument"])
+    )
     assert "AmazonSSMManagedInstanceCore" in json.dumps(role["Properties"]["ManagedPolicyArns"])
     statements = _statements(t)
 
@@ -164,8 +168,121 @@ def test_instance_role_pulls_images_reads_its_own_settings_and_secrets_and_is_ma
     # Nothing of native-cloud's.
     assert "parameter/smart-tutor/" not in json.dumps(statements)
     assert "secret:smart-tutor/" not in json.dumps(statements)
-    # Only the ECR login, which has no resource, may use "*".
-    assert [sid for sid, s in statements.items() if s["Resource"] == "*"] == ["EcrLogin"]
+    # Only the ECR login and metrics, which have no resource, may use "*".
+    assert [sid for sid, s in statements.items() if s["Resource"] == "*"] == ["EcrLogin", "PublishJobMetrics"]
+
+
+def test_instance_role_writes_only_the_backups_prefix_of_the_on_premise_bucket(t: Template) -> None:
+    statements = _statements(t)
+    writes = {
+        sid: s
+        for sid, s in statements.items()
+        if any(a.startswith("s3:") and not a.startswith(("s3:Get", "s3:List")) for a in _actions(s))
+    }
+    assert set(writes) == {"WriteDatabaseBackups"}
+    assert sorted(_actions(writes["WriteDatabaseBackups"])) == ["s3:AbortMultipartUpload", "s3:PutObject"]
+    resource = json.dumps(writes["WriteDatabaseBackups"]["Resource"])
+    assert "smart-tutor-on-premise-documents-" in resource and resource.endswith('/backups/*"]]}')
+    # Restore reads the dumps back; listing is limited to the prefix too.
+    assert json.dumps(statements["ReadDatabaseBackups"]["Resource"]).endswith('/backups/*"]]}')
+    assert statements["ListDatabaseBackups"]["Condition"] == {"StringLike": {"s3:prefix": ["backups/*"]}}
+
+
+def test_instance_role_publishes_metrics_only_to_its_own_namespace(t: Template) -> None:
+    statement = _statements(t)["PublishJobMetrics"]
+    assert statement["Action"] == "cloudwatch:PutMetricData"
+    assert statement["Condition"] == {"StringEquals": {"cloudwatch:namespace": "SmartTutor/OnPremise"}}
+
+
+def _actions(statement: dict[str, Any]) -> list[str]:
+    actions = statement["Action"]
+    return [actions] if isinstance(actions, str) else actions
+
+
+# --- backups -------------------------------------------------------------------------------------------------------
+
+
+def test_data_volume_is_snapshotted_daily_and_snapshots_are_kept_7_days(t: Template) -> None:
+    (policy,) = t.find_resources("AWS::DLM::LifecyclePolicy").values()
+    props = policy["Properties"]
+    assert props["State"] == "ENABLED"
+    details = props["PolicyDetails"]
+    assert details["ResourceTypes"] == ["VOLUME"]
+    assert details["TargetTags"] == [{"Key": "smart-tutor:snapshots", "Value": "smart-tutor-on-premise-prod"}]
+    (schedule,) = details["Schedules"]
+    assert schedule["CreateRule"] == {"Interval": 24, "IntervalUnit": "HOURS", "Times": ["19:00"]}  # 02:00 ICT
+    assert schedule["RetainRule"] == {"Interval": 7, "IntervalUnit": "DAYS"}
+    assert schedule["CopyTags"] is True
+    (role_id,) = (
+        rid
+        for rid, r in t.find_resources("AWS::IAM::Role").items()
+        if "dlm.amazonaws.com" in json.dumps(r["Properties"]["AssumeRolePolicyDocument"])
+    )
+    assert props["ExecutionRoleArn"] == {"Fn::GetAtt": [role_id, "Arn"]}
+
+
+def test_only_the_data_volume_carries_the_snapshot_tag(t: Template) -> None:
+    tagged = [
+        kind
+        for kind in ("AWS::EC2::Volume", "AWS::EC2::Instance")
+        for r in t.find_resources(kind).values()
+        if any(tag["Key"] == "smart-tutor:snapshots" for tag in r["Properties"].get("Tags", []))
+    ]
+    assert tagged == ["AWS::EC2::Volume"]
+    (instance,) = t.find_resources("AWS::EC2::Instance").values()
+    assert not instance["Properties"].get("PropagateTagsToVolumeOnCreation")
+
+
+def test_data_volume_can_be_restored_from_a_snapshot() -> None:
+    restored = host(**{"smart-tutor:on-premise-data-snapshot-id": "snap-0123456789abcdef0"})
+    (volume,) = restored.find_resources("AWS::EC2::Volume").values()
+    assert volume["Properties"]["SnapshotId"] == "snap-0123456789abcdef0"
+    (default_volume,) = host().find_resources("AWS::EC2::Volume").values()
+    assert "SnapshotId" not in default_volume["Properties"]
+
+
+def test_a_new_data_volume_replaces_the_instance_so_it_attaches_at_first_boot() -> None:
+    # The user data names the volume and runs only at first boot, so a changed user data must replace the instance.
+    (before,) = host().find_resources("AWS::EC2::Instance")
+    (after,) = host(**{"smart-tutor:on-premise-data-snapshot-id": "snap-0123456789abcdef0"}).find_resources(
+        "AWS::EC2::Instance"
+    )
+    assert before != after
+
+
+def _alarm(t: Template, metric: str) -> dict[str, Any]:
+    (alarm,) = (
+        a["Properties"]
+        for a in t.find_resources("AWS::CloudWatch::Alarm").values()
+        if a["Properties"].get("MetricName") == metric
+    )
+    alarm_properties: dict[str, Any] = alarm
+    return alarm_properties
+
+
+def test_a_failed_database_backup_raises_an_alarm_that_emails_the_alert_addresses(t: Template) -> None:
+    (topic_id,) = t.find_resources("AWS::SNS::Topic")
+    t.has_resource_properties(
+        "AWS::SNS::Subscription",
+        {"Protocol": "email", "Endpoint": "dtrungthao@gmail.com", "TopicArn": {"Ref": topic_id}},
+    )
+    alarm = _alarm(t, "JobFailed")
+    assert alarm["Namespace"] == "SmartTutor/OnPremise"
+    assert alarm["Dimensions"] == [{"Name": "Job", "Value": "smart-tutor-backup"}]
+    assert alarm["Statistic"] == "Sum" and alarm["Threshold"] == 1
+    assert alarm["ComparisonOperator"] == "GreaterThanOrEqualToThreshold"
+    assert alarm["TreatMissingData"] == "notBreaching"
+    assert alarm["AlarmActions"] == [{"Ref": topic_id}]
+
+
+def test_a_failed_snapshot_raises_an_alarm(t: Template) -> None:
+    (topic_id,) = t.find_resources("AWS::SNS::Topic")
+    (policy_id,) = t.find_resources("AWS::DLM::LifecyclePolicy")
+    alarm = _alarm(t, "SnapshotsCreateFailed")
+    assert alarm["Namespace"] == "AWS/EBS"
+    assert alarm["Dimensions"] == [{"Name": "DLMPolicyId", "Value": {"Ref": policy_id}}]
+    assert alarm["ComparisonOperator"] == "GreaterThanOrEqualToThreshold" and alarm["Threshold"] == 1
+    assert alarm["AlarmActions"] == [{"Ref": topic_id}]
 
 
 # --- settings, secrets, deploy document ----------------------------------------------------------------------------
@@ -249,8 +366,9 @@ LONG_RUNNING = {"postgres", "keycloak", "api", "web", "caddy"}
 
 
 def test_compose_runs_the_production_services_and_no_local_emulators(compose: dict[str, Any]) -> None:
-    assert set(compose["services"]) == LONG_RUNNING | {"migrate"}
+    assert set(compose["services"]) == LONG_RUNNING | {"migrate", "pg-dump"}
     assert compose["services"]["migrate"]["profiles"] == ["tools"]  # run by deploy.sh, never by `up`
+    assert compose["services"]["pg-dump"]["profiles"] == ["jobs"]  # run by a systemd timer, never by `up`
 
 
 def test_every_service_has_a_health_check_restart_policy_and_log_rotation(compose: dict[str, Any]) -> None:
@@ -322,7 +440,7 @@ def test_deploy_script_keeps_secrets_out_of_output_and_files_root_only() -> None
 
 def test_no_credential_shaped_url_is_in_the_repository() -> None:
     # GitGuardian's generic-password detector flags user:password@host even when the password is a ${PLACEHOLDER}.
-    for path in ON_PREMISE_DIR.iterdir():
+    for path in (p for p in ON_PREMISE_DIR.rglob("*") if p.is_file()):
         assert not re.search(r"://[^\s/:@]+:[^\s/@]+@", path.read_text(encoding="utf-8")), path
 
 
@@ -331,18 +449,28 @@ def test_deploy_script_migrates_before_it_starts_the_new_tag() -> None:
     assert script.index("run --rm migrate") < script.index("up -d --wait --wait-timeout")
 
 
+ENSURE_HEALTHY = ON_PREMISE_DIR / "ensure-healthy.sh"
+SCRIPTS = [
+    DEPLOY_SCRIPT,
+    ENSURE_HEALTHY,
+    *(ON_PREMISE_DIR / name for name in ("backup.sh", "restore.sh", "report-failure.sh")),
+]
+SYSTEMD_DIR = ON_PREMISE_DIR / "systemd"
+
+
 @pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")
-def test_deploy_script_parses() -> None:
+@pytest.mark.parametrize("script", SCRIPTS, ids=lambda p: p.name)
+def test_scripts_parse(script: Path) -> None:
     # On stdin: on Windows, `bash` may be WSL's, which can't open a Windows path.
-    subprocess.run(["bash", "-n"], input=DEPLOY_SCRIPT.read_bytes(), check=True)
+    subprocess.run(["bash", "-n"], input=script.read_bytes(), check=True)
 
 
 def test_files_the_vm_runs_keep_lf_line_endings() -> None:
-    for path in (DEPLOY_SCRIPT, ENSURE_HEALTHY, ON_PREMISE_DIR / "compose.yaml", ON_PREMISE_DIR / "Caddyfile"):
+    for path in (*SCRIPTS, ON_PREMISE_DIR / "compose.yaml", ON_PREMISE_DIR / "Caddyfile", *SYSTEMD_DIR.iterdir()):
         assert b"\r\n" not in path.read_bytes(), path
 
 
-# --- monitoring and patching (#152) --------------------------------------------------------------------------------
+# --- monitoring and patching (#152)--------------------------------------------------------------------------------
 
 
 def _alarm(t: Template, metric_name: str) -> dict[str, Any]:
@@ -356,7 +484,7 @@ def _alarm(t: Template, metric_name: str) -> dict[str, Any]:
 
 def test_alarms_email_the_budget_recipients(t: Template) -> None:
     (topic_id,) = t.find_resources("AWS::SNS::Topic")
-    t.has_resource_properties("AWS::SNS::Topic", {"TopicName": "smart-tutor-on-premise-prod-alarms"})
+    t.has_resource_properties("AWS::SNS::Topic", {"TopicName": "smart-tutor-on-premise-prod-alerts"})
     subscriptions = [s["Properties"] for s in t.find_resources("AWS::SNS::Subscription").values()]
     assert [(s["Protocol"], s["Endpoint"]) for s in subscriptions] == [("email", "dtrungthao@gmail.com")]
     assert all(s["TopicArn"] == {"Ref": topic_id} for s in subscriptions)
@@ -425,7 +553,7 @@ def test_weekly_maintenance_window_patches_the_host_then_checks_the_services(t: 
     (window_id,) = t.find_resources("AWS::SSM::MaintenanceWindow")
     t.has_resource_properties(
         "AWS::SSM::MaintenanceWindow",
-        {"Schedule": "cron(0 3 ? * SUN *)", "ScheduleTimezone": "Asia/Ho_Chi_Minh", "AllowUnassociatedTargets": False},
+        {"Schedule": "cron(0 4 ? * SUN *)", "ScheduleTimezone": "Asia/Ho_Chi_Minh", "AllowUnassociatedTargets": False},
     )
     (instance_id,) = t.find_resources("AWS::EC2::Instance")
     (target_id,) = t.find_resources("AWS::SSM::MaintenanceWindowTarget")
@@ -464,9 +592,6 @@ def test_a_failed_maintenance_window_emails(t: Template) -> None:
     assert [target["Arn"] for target in rule["Properties"]["Targets"]] == [{"Ref": topic_id}]
 
 
-ENSURE_HEALTHY = ON_PREMISE_DIR / "ensure-healthy.sh"
-
-
 def test_ensure_healthy_starts_what_is_down_and_waits_for_health() -> None:
     script = ENSURE_HEALTHY.read_text(encoding="utf-8")
     assert script.startswith("#!/usr/bin/env bash\n")
@@ -477,6 +602,74 @@ def test_ensure_healthy_starts_what_is_down_and_waits_for_health() -> None:
     assert " pull" not in commands and "migrate" not in commands
 
 
-@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")
-def test_ensure_healthy_parses() -> None:
-    subprocess.run(["bash", "-n"], input=ENSURE_HEALTHY.read_bytes(), check=True)
+# --- backups (#151) ------------------------------------------------------------------------------------------------
+
+
+def _unit(name: str) -> dict[str, dict[str, str]]:
+    sections: dict[str, dict[str, str]] = {}
+    section: dict[str, str] = {}
+    for line in (SYSTEMD_DIR / name).read_text(encoding="utf-8").splitlines():
+        if line.startswith("["):
+            section = sections.setdefault(line.strip("[]"), {})
+        elif "=" in line and not line.startswith("#"):
+            key, value = line.split("=", 1)
+            section[key] = value
+    return sections
+
+
+def test_pg_dump_runs_the_servers_own_pg_dump_against_postgres(compose: dict[str, Any]) -> None:
+    pg_dump = compose["services"]["pg-dump"]
+    assert pg_dump["image"] == compose["services"]["postgres"]["image"]
+    assert pg_dump["entrypoint"][:3] == ["pg_dump", "--host=postgres", "--username=postgres"]
+    assert "--format=custom" in pg_dump["entrypoint"]
+    assert pg_dump["environment"] == {"PGPASSWORD": "${POSTGRES_PASSWORD:?}"}
+    assert pg_dump["volumes"] == ["/data/backups:/backups"]
+
+
+def test_backup_dumps_both_databases_with_compose_run_and_uploads_them_under_the_backups_prefix() -> None:
+    script = (ON_PREMISE_DIR / "backup.sh").read_text(encoding="utf-8")
+    assert "set -euo pipefail" in script
+    assert "for db in smart_tutor keycloak" in script
+    assert "run --rm -T pg-dump" in script
+    assert 's3://$bucket/backups/postgres/$stamp/$db.dump' in script
+    # Every dump is written before any is uploaded, so a failed night leaves no half backup.
+    assert script.index("run --rm -T pg-dump") < script.index("aws s3 cp")
+    assert "trap" in script and "rm -rf" in script  # local copies don't pile up on /data
+
+
+def test_restore_stops_the_services_and_restores_both_databases_from_one_backup() -> None:
+    script = (ON_PREMISE_DIR / "restore.sh").read_text(encoding="utf-8")
+    assert script.index('"${compose[@]}" stop\n') < script.index("pg_restore -U")
+    assert "pg_restore -U postgres -d postgres --clean --if-exists --create --exit-on-error" in script
+    assert "for db in smart_tutor keycloak" in script
+
+
+def test_backup_timer_runs_nightly_and_catches_up_after_downtime() -> None:
+    timer = _unit("smart-tutor-backup.timer")["Timer"]
+    assert timer["OnCalendar"] == "*-*-* 20:00:00 UTC"  # 03:00 ICT, an hour after the snapshot
+    assert timer["Persistent"] == "true"
+    assert _unit("smart-tutor-backup.timer")["Install"]["WantedBy"] == "timers.target"
+
+
+def test_backup_service_runs_the_script_and_reports_a_failure() -> None:
+    service = _unit("smart-tutor-backup.service")
+    assert service["Service"]["Type"] == "oneshot"
+    assert service["Service"]["ExecStart"] == "/usr/bin/bash /opt/smart-tutor/on-premise/backup.sh"
+    assert service["Unit"]["OnFailure"] == "smart-tutor-job-failed@%N.service"
+    assert "docker.service" in service["Unit"]["Requires"]
+
+
+def test_a_failed_job_publishes_the_metric_the_alarm_watches() -> None:
+    unit = _unit("smart-tutor-job-failed@.service")
+    assert unit["Service"]["ExecStart"] == "/usr/bin/bash /opt/smart-tutor/on-premise/report-failure.sh %i"
+    script = (ON_PREMISE_DIR / "report-failure.sh").read_text(encoding="utf-8")
+    assert "--namespace SmartTutor/OnPremise --metric-name JobFailed" in script
+    assert '--dimensions "Job=$job"' in script
+
+
+def test_deploy_installs_and_enables_every_timer() -> None:
+    script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
+    assert 'install -m 644 "$here"/systemd/* /etc/systemd/system/' in script
+    assert "systemctl daemon-reload" in script
+    assert 'for timer in "$here"/systemd/*.timer' in script
+    assert script.index("up -d --wait --wait-timeout") < script.index("systemctl daemon-reload")

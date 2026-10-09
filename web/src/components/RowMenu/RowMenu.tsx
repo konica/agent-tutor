@@ -1,5 +1,5 @@
 import { MoreHorizontal, type LucideIcon } from "lucide-react";
-import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
+import { Fragment, useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
 
 import { IconButton } from "../Button/IconButton";
 import styles from "./RowMenu.module.css";
@@ -53,23 +53,25 @@ export function RowMenu({ label, items, disabled = false }: Props) {
       {open && (
         <div className={styles.menu} id={menuId} role="menu" aria-label={label}>
           {items.map((item, i) => (
-            <button
-              key={item.label}
-              type="button"
-              role="menuitem"
-              ref={(el) => {
-                entries.current[i] = el;
-              }}
-              className={item.danger ? `${styles.item} ${styles.danger}` : styles.item}
-              onClick={() => {
-                setOpen(false);
-                toggle.current?.focus();
-                item.onSelect();
-              }}
-            >
-              <item.icon className={styles.icon} strokeWidth={1.5} aria-hidden="true" />
-              {item.label}
-            </button>
+            <Fragment key={item.label}>
+              {item.danger && i > 0 && !items[i - 1]!.danger && <div role="separator" className={styles.separator} />}
+              <button
+                type="button"
+                role="menuitem"
+                ref={(el) => {
+                  entries.current[i] = el;
+                }}
+                className={item.danger ? `${styles.item} ${styles.danger}` : styles.item}
+                onClick={() => {
+                  setOpen(false);
+                  toggle.current?.focus();
+                  item.onSelect();
+                }}
+              >
+                <item.icon className={styles.icon} strokeWidth={1.5} aria-hidden="true" />
+                {item.label}
+              </button>
+            </Fragment>
           ))}
         </div>
       )}

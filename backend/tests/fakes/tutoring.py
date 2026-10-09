@@ -3,6 +3,7 @@
 import copy
 import dataclasses
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import datetime
 
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
@@ -46,6 +47,13 @@ class InMemoryThreads(ThreadRepository):
     def remove_document(self, thread_id: ThreadId, document_id: DocumentId) -> None:
         rows = self.documents_used_rows.get(thread_id, [])
         self.documents_used_rows[thread_id] = [row for row in rows if row.document_id != document_id]
+
+    def keep_deleted_title(self, user_id: UserId, document_id: DocumentId, title: str) -> None:
+        for thread in self.threads.values():
+            if thread.user_id != user_id:
+                continue
+            rows = self.documents_used_rows.get(thread.thread_id, [])
+            rows[:] = [replace(r, deleted_title=title) if r.document_id == document_id else r for r in rows]
 
     def documents_used(self, thread_id: ThreadId) -> list[ThreadDocument]:
         return list(self.documents_used_rows.get(thread_id, []))

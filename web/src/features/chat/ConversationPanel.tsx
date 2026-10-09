@@ -1,4 +1,4 @@
-import { Archive, FileText, NotebookPen, Plus, X } from "lucide-react";
+import { Archive, FileText, Info, NotebookPen, Plus, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import type { ThreadDocumentResponse } from "../../api/generated/types.gen";
@@ -86,7 +86,10 @@ export function ConversationPanel({
                 <FileText className={styles.rowIcon} strokeWidth={1.5} aria-hidden="true" />
                 <span className={`${styles.title} ${d.deleted ? styles.gone : ""}`}>{d.title}</span>
                 {d.deleted ? (
-                  <span className={styles.badge}>Deleted</span>
+                  <span className={styles.badge}>
+                    <X className={styles.badgeIcon} strokeWidth={1.5} aria-hidden="true" />
+                    Deleted
+                  </span>
                 ) : d.archived ? (
                   <span className={styles.badge}>Archived</span>
                 ) : (
@@ -105,6 +108,12 @@ export function ConversationPanel({
               </li>
             ))}
           </ul>
+        )}
+        {!documentsFailed && documents.some((d) => d.deleted) && (
+          <p className={styles.note}>
+            <Info className={styles.noteIcon} strokeWidth={1.5} aria-hidden="true" />
+            Deleted documents can't be opened.
+          </p>
         )}
         {onAddDocuments && threadId !== null && (
           <Button

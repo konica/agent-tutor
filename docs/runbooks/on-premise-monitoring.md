@@ -17,12 +17,12 @@ $Url = Get-Output PublicUrl
 
 ## Who gets the emails
 
-Every alarm emails the SNS topic **`smart-tutor-on-premise-prod-alarms`**. Its recipients are the budget's, the context `smart-tutor:budget-alert-emails` in `infra/cdk.json`, so native-cloud's budget, on-premise's budget, and these alarms all reach the same people.
+Every alarm emails the SNS topic **`smart-tutor-on-premise-prod-alerts`**. Its recipients are the budget's, the context `smart-tutor:budget-alert-emails` in `infra/cdk.json`, so native-cloud's budget, on-premise's budget, and these alarms all reach the same people. The same topic carries the backup alarms (a failed snapshot or nightly dump), which `on-premise-backups.md` covers. One confirmation covers both.
 
 **After the first deploy of the Host stack, and after adding a recipient, each recipient confirms the subscription.** AWS sends an email titled "AWS Notification - Subscription Confirmation", and nothing reaches an address until its owner chooses **Confirm subscription**. To check:
 
 ```powershell
-$Topic = aws sns list-topics --query "Topics[?ends_with(TopicArn, ':smart-tutor-on-premise-prod-alarms')].TopicArn" --output text
+$Topic = aws sns list-topics --query "Topics[?ends_with(TopicArn, ':smart-tutor-on-premise-prod-alerts')].TopicArn" --output text
 aws sns list-subscriptions-by-topic --topic-arn $Topic --query "Subscriptions[].[Endpoint, SubscriptionArn]" --output table
 ```
 
@@ -114,7 +114,7 @@ An **instance** status check failure (the VM's own OS, such as memory exhaustion
 
 | What | Value |
 |---|---|
-| When | Every **Sunday at 03:00 Asia/Ho_Chi_Minh** (the app time zone), for at most 3 hours; no task starts in the last hour |
+| When | Every **Sunday at 04:00 Asia/Ho_Chi_Minh** (the app time zone, an hour after the nightly dump starts), for at most 3 hours; no task starts in the last hour |
 | Window | `smart-tutor-on-premise-prod-patching`, targeting the Host instance by id |
 | Patches | The baseline `smart-tutor-on-premise-prod-security`: Amazon Linux 2023 updates classified **Security**, every severity, approved as soon as they are released. The instance's `PatchGroup` tag selects it. Patch Manager reads the latest AL2023 repository, not the one the image pinned. |
 | Task 1, `PatchTask` | `AWS-RunPatchBaseline` with `Install` and `RebootIfNeeded`. It reboots only when an installed patch needs it (a kernel, for example). |
