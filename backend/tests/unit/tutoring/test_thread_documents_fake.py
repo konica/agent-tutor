@@ -26,3 +26,30 @@ def test_documents_used_keep_first_use_order_without_duplicates() -> None:
 
 def test_a_thread_with_no_documents_used_lists_none() -> None:
     assert InMemoryThreads().documents_used(ThreadId(str(uuid.uuid4()))) == []
+
+
+T0 = datetime(2026, 10, 9, 9, 0, tzinfo=UTC)
+T1 = datetime(2026, 10, 9, 9, 5, tzinfo=UTC)
+
+
+def test_learner_added_documents_are_listed_unused_until_an_answer_uses_them() -> None:
+    threads = InMemoryThreads()
+    t, a, b = ThreadId("t"), DocumentId("a"), DocumentId("b")
+    threads.add_documents_used(t, [a], T0)
+    threads.add_documents(t, [b, a], T1)  # a is listed already
+
+    threads.add_documents_used(t, [b], T1)
+
+    rows = threads.documents_used(t)
+    assert [(r.document_id, r.added_by, r.first_used_at) for r in rows] == [(a, "answer", T0), (b, "learner", T1)]
+
+
+def test_a_removed_document_comes_back_when_added_again() -> None:
+    threads = InMemoryThreads()
+    t, a = ThreadId("t"), DocumentId("a")
+    threads.add_documents_used(t, [a], T0)
+    threads.remove_document(t, a)
+    assert threads.documents_used(t) == []
+    threads.add_documents(t, [a], T1)
+    [row] = threads.documents_used(t)
+    assert (row.added_by, row.added_at, row.first_used_at) == ("learner", T1, None)
