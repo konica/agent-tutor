@@ -63,19 +63,20 @@ def test_uncommitted_work_rolls_back(engine: Engine) -> None:
     assert count == 0
 
 
-def test_concurrent_insert_or_get_makes_one_content_row(engine: Engine) -> None:
+def test_concurrent_insert_or_get_by_one_owner_makes_one_content_row(engine: Engine) -> None:
+    owner = UserId(f"ada-{uid()}")
     sha = hashlib.sha256(uid().encode()).hexdigest()
     barrier = threading.Barrier(2, timeout=10)
     results: list[bool] = []
 
-    def worker(user: str) -> None:
+    def worker() -> None:
         with SqlLibraryUnitOfWork(engine) as tx:
             barrier.wait()
-            _, created = tx.contents.insert_or_get(Content.first_upload(ContentId(uid()), sha, 10, UserId(user)))
+            _, created = tx.contents.insert_or_get(Content.first_upload(ContentId(uid()), sha, 10, owner))
             results.append(created)
             tx.commit()
 
-    threads = [threading.Thread(target=worker, args=(u,), daemon=True) for u in ("ada", "bob")]
+    threads = [threading.Thread(target=worker, daemon=True) for _ in range(2)]
     for t in threads:
         t.start()
     for t in threads:
@@ -87,7 +88,25 @@ def test_concurrent_insert_or_get_makes_one_content_row(engine: Engine) -> None:
     assert rows == 1
 
 
-def test_duplicate_document_keeps_content_id_null(engine: Engine) -> None:
+def test_two_owners_with_the_same_hash_get_two_contents(engine: Engine) -> None:
+    sha = hashlib.sha256(uid().encode()).hexdigest()
+    made = []
+    for owner in (f"ada-{uid()}", f"bob-{uid()}"):
+        with SqlLibraryUnitOfWork(engine) as tx:
+            content, created = tx.contents.insert_or_get(Content.first_upload(ContentId(uid()), sha, 10, UserId(owner)))
+            tx.commit()
+        assert created is True
+        assert content.owner_id == owner
+        made.append(content.content_id)
+    with engine.connect() as conn:
+        rows = conn.execute(text("select content_id, owner_id from contents where sha256 = :s"), {"s": sha}).all()
+    assert sorted(str(r.content_id) for r in rows) == sorted(made)
+    with SqlLibraryUnitOfWork(engine) as tx:
+        loaded = tx.contents.get(made[1])
+    assert loaded is not None and loaded.owner_id.startswith("bob-")
+
+
+def test_a_duplicate_upload_removes_its_document_and_points_to_the_existing_one(engine: Engine) -> None:
     owner = f"ada-{uid()}"
     sha = hashlib.sha256(uid().encode()).hexdigest()
     first, second = start(engine, owner), start(engine, owner)
@@ -100,17 +119,50 @@ def test_duplicate_document_keeps_content_id_null(engine: Engine) -> None:
         tx.uploads.record_outcome(first.upload_id, 10, UploadOutcome.STORED, first.document_id)
         tx.commit()
     with SqlLibraryUnitOfWork(engine) as tx:
-        _, created = tx.contents.insert_or_get(Content.first_upload(ContentId(uid()), sha, 10, UserId(owner)))
-        assert not created
-        dup = tx.documents.get_by_upload_for_update(second.upload_id)
-        assert dup is not None
-        dup.fail("This file isn't a readable PDF")
-        tx.documents.save(dup)
+        again, created = tx.contents.insert_or_get(Content.first_upload(ContentId(uid()), sha, 10, UserId(owner)))
+        assert not created and again.content_id == content.content_id
+        existing = tx.documents.get_by_content(again.content_id)
+        assert existing is not None and existing.document_id == first.document_id
+        tx.documents.remove(second.document_id)
+        tx.uploads.record_outcome(second.upload_id, 10, UploadOutcome.DUPLICATE, existing.document_id)
         tx.commit()
     with SqlLibraryUnitOfWork(engine) as tx:
-        by_id = {d.document_id: d for d in tx.documents.list_readable_by(UserId(owner))}
-    assert by_id[first.document_id].content_id == content.content_id
-    assert (by_id[second.document_id].state, by_id[second.document_id].content_id) == ("failed", None)
+        assert tx.documents.get(second.document_id) is None
+        assert [d.document_id for d in tx.documents.list_readable_by(UserId(owner))] == [first.document_id]
+        stored, duplicate = tx.uploads.get(first.upload_id), tx.uploads.get(second.upload_id)
+        assert tx.uploads.get(UploadId(uid())) is None
+        assert tx.documents.get_by_content(ContentId(uid())) is None
+    assert stored is not None and (stored.outcome, stored.document_id, stored.size) == (
+        UploadOutcome.STORED,
+        first.document_id,
+        10,
+    )
+    assert duplicate is not None and (duplicate.outcome, duplicate.document_id) == (
+        UploadOutcome.DUPLICATE,
+        first.document_id,
+    )
+    assert duplicate.user_id == owner
+
+
+def test_removing_a_document_drops_its_subjects(engine: Engine) -> None:
+    owner = f"ada-{uid()}"
+    doc = start(engine, owner)
+    link(engine, doc, stored_content(engine, owner))
+    with SqlLibraryUnitOfWork(engine) as tx:
+        loaded = tx.documents.get_by_upload_for_update(doc.upload_id)
+        assert loaded is not None
+        loaded.await_subjects()
+        loaded.choose_subjects([GENERAL])
+        tx.documents.save(loaded)
+        tx.commit()
+    with SqlLibraryUnitOfWork(engine) as tx:
+        tx.documents.remove(doc.document_id)
+        tx.commit()
+    with engine.connect() as conn:
+        count = conn.execute(
+            text("select count(*) from document_subjects where document_id = :d"), {"d": doc.document_id}
+        )
+        assert count.scalar_one() == 0
 
 
 GENERAL = SubjectId("00000000-0000-4000-8000-000000000001")
@@ -486,10 +538,14 @@ def test_find_by_sha256_is_owner_only_and_skips_unlinked_and_archived(engine: En
     ada, bob, carol = f"ada-{uid()}", f"bob-{uid()}", f"carol-{uid()}"
     content = stored_content(engine, ada)
     sha = content.sha256
+    with SqlLibraryUnitOfWork(engine) as tx:  # bob uploads the same bytes: his own content
+        bobs_content, created = tx.contents.insert_or_get(Content.first_upload(ContentId(uid()), sha, 10, UserId(bob)))
+        assert created
+        tx.commit()
     mine, bobs = start(engine, ada), start(engine, bob)
     start(engine, ada)  # still processing: never matches
     link(engine, mine, content)
-    link(engine, bobs, content)
+    link(engine, bobs, bobs_content)
 
     def find(user: str, digest: str = sha) -> DocumentId | None:
         with SqlLibraryUnitOfWork(engine) as tx:
