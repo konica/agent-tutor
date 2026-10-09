@@ -139,6 +139,8 @@ class EdgeStack(cdk.Stack):
             # The ALB sets X-Forwarded-Proto: http, so Keycloak would mark its session cookies non-Secure. CloudFront
             # overwrites any viewer-sent Forwarded header, so Keycloak can trust this one (KC_PROXY_HEADERS=forwarded).
             custom_headers={"Forwarded": "proto=https"},
+            # answers stream as SSE without heartbeats; 30 s (the default) cut a slow one with a 504
+            read_timeout=cdk.Duration.seconds(60),
         )
         distribution = cloudfront.Distribution(
             self,
@@ -171,7 +173,8 @@ class EdgeStack(cdk.Stack):
             },
         )
 
-        cdk.CfnOutput(self, "CloudFrontUrl", value=f"https://{distribution.distribution_domain_name}")
+        self.public_url = f"https://{distribution.distribution_domain_name}"
+        cdk.CfnOutput(self, "CloudFrontUrl", value=self.public_url)
         cdk.CfnOutput(self, "DistributionId", value=distribution.distribution_id)
         cdk.CfnOutput(self, "WebTargetGroupName", value=web_target_group_name)
         cdk.CfnOutput(self, "KeycloakTargetGroupName", value=keycloak_target_group_name)

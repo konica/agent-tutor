@@ -533,3 +533,15 @@ def test_api_reads_only_the_smart_tutor_parameters_through_pod_identity() -> Non
         ["ssm:GetParameter", "ssm:GetParameters"]
     ]
     assert "parameter/smart-tutor/*" in json.dumps(statements[0]["Resource"])
+
+def test_origin_waits_60_seconds_between_bytes() -> None:
+    # Answers stream as SSE without heartbeats; CloudFront's default 30 s would cut a slow one with a 504.
+    t = template(make_app(), "Edge")
+    t.has_resource_properties(
+        "AWS::CloudFront::Distribution",
+        {
+            "DistributionConfig": Match.object_like(
+                {"Origins": [Match.object_like({"VpcOriginConfig": Match.object_like({"OriginReadTimeout": 60})})]}
+            )
+        },
+    )
