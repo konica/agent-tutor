@@ -12,6 +12,7 @@ An AI tutor for your own documents: learners upload PDFs, the system suggests su
 | `infra/` | AWS CDK app (Python), us-east-1 |
 | `deploy/helm/` | Umbrella Helm chart for EKS and cluster add-on values |
 | `local/` | Files used only by Docker Compose (Keycloak realm, LocalStack and Postgres init) |
+| `docs/` | The AWS pilot's [solution architecture](docs/architecture/solution-architecture.md) for stakeholders, and [runbooks](docs/runbooks/) for engineers (deploy, environment overview, AWS prerequisites) |
 
 ## Local development
 

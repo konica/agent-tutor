@@ -230,7 +230,18 @@ aws sqs get-queue-attributes --queue-url $Dlq --attribute-names ApproximateNumbe
 
 ## 9. Update after a change
 
-Merging to `main` does all of this (section 12). By hand: deploy infrastructure changes with CDK first (`npx aws-cdk@latest deploy --all` from `infra/`), then rebuild and push the images with a new tag and run the `helm upgrade` from step 6 again (with `--timeout 15m`). The order matters: the API pods read their SSM parameters at startup through a Pod Identity association that the CDK stacks create. The upgrade runs the `db-bootstrap` and `migrate` hooks first. Only `db-bootstrap` resets database passwords, so a password rotated in Secrets Manager reaches the database there; `migrate` only applies the schema. Running Keycloak and API pods keep the old password (the environment is read at start, and External Secrets refreshes `keycloak-db` and `api-db` only hourly), so after rotating: run the `helm upgrade`, force the syncs with `kubectl -n smart-tutor annotate externalsecret keycloak-db force-sync=$(Get-Date -UFormat %s) --overwrite` and `kubectl -n smart-tutor annotate externalsecret api-db force-sync=$(Get-Date -UFormat %s) --overwrite`, then `kubectl -n smart-tutor rollout restart deploy/keycloak` and `kubectl -n smart-tutor rollout restart deploy/api`. Merging redeploys (it runs the hooks and the CDK deploy), but after a rotation the force-sync and `rollout restart` commands are still manual.
+Merging to `main` does all of this (section 12). By hand: deploy infrastructure changes with CDK first (`npx aws-cdk@latest deploy --all` from `infra/`), then rebuild and push the images with a new tag and run the `helm upgrade` from step 6 again (with `--timeout 15m`). The order matters: the API pods read their SSM parameters at startup through a Pod Identity association that the CDK stacks create. The upgrade runs the `db-bootstrap` and `migrate` hooks first. Only `db-bootstrap` resets database passwords, so a password rotated in Secrets Manager reaches the database there; `migrate` only applies the schema. Since #139, five deployments read a database secret: `keycloak` (`keycloak-db`, database `keycloak`) and `api`, `agent`, `mcp-server`, `worker` (`api-db`, `agent-db`, `mcp-db`, `worker-db`, all copies of `smart-tutor/db/app`). Running pods keep the old password (the environment is read at start, and External Secrets refreshes these secrets only hourly), so after rotating, run the `helm upgrade`, then force the syncs and restart all five:
+
+```powershell
+foreach ($Secret in "keycloak-db", "api-db", "agent-db", "mcp-db", "worker-db") {
+    kubectl -n smart-tutor annotate externalsecret $Secret force-sync=$(Get-Date -UFormat %s) --overwrite
+}
+foreach ($Deploy in "keycloak", "api", "agent", "mcp-server", "worker") {
+    kubectl -n smart-tutor rollout restart deploy/$Deploy
+}
+```
+
+The agent receives the app database secret but doesn't use it yet, so restarting it is harmless and keeps its copy current. Merging redeploys (it runs the hooks and the CDK deploy), but after a rotation the force-sync and `rollout restart` commands are still manual.
 
 ## 10. Tear down
 
