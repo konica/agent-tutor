@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { DocumentResponse, SubjectSuggestions } from "../../api/documents";
 import { SubjectPicker } from "./SubjectPicker";
 
-const doc: DocumentResponse = { document_id: "d1", title: "Toolformer", state: "awaiting_subjects", failure_reason: null, created_at: new Date().toISOString(), subjects: [], attempt: 1, max_attempts: 3, can_retry: false, authors: [], year: null };
+const doc: DocumentResponse = { document_id: "d1", title: "Toolformer", state: "awaiting_subjects", failure_reason: null, created_at: new Date().toISOString(), subjects: [], attempt: 1, max_attempts: 3, can_retry: false, authors: [], year: null, archived: false };
 const suggestions: SubjectSuggestions = {
   document_id: "d1",
   title: "Toolformer",

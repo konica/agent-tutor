@@ -55,6 +55,28 @@ describe("UploadTray", () => {
     expect(screen.queryByRole("link")).toBeNull();
   });
 
+  it("offers Restore for an archived duplicate", async () => {
+    const onRestore = vi.fn();
+    const item: TrayItem = { ...uploaded, status: "already", documentId: "d1", archived: true };
+    render(<UploadTray items={[item]} onClose={vi.fn()} onRestore={onRestore} />);
+    await userEvent.click(screen.getByRole("button", { name: "Restore react-yao-2022.pdf" }));
+    expect(onRestore).toHaveBeenCalledExactlyOnceWith(item);
+  });
+
+  it("offers no Restore for an active duplicate or without a document id", () => {
+    render(
+      <UploadTray
+        items={[
+          { ...uploaded, status: "already", documentId: "d1", archived: false },
+          { ...uploaded, id: "5", name: "x.pdf", status: "already", archived: true },
+        ]}
+        onClose={vi.fn()}
+        onRestore={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: /^Restore/ })).toBeNull();
+  });
+
   it("collapses and expands the list by keyboard", async () => {
     render(<UploadTray items={[uploaded]} onClose={vi.fn()} />);
     const toggle = screen.getByRole("button", { name: "Collapse uploads" });

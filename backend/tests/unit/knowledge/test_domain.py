@@ -95,6 +95,14 @@ def test_searchable_only_by_its_owner_when_ready_and_unarchived() -> None:
     assert not doc.searchable_by(UserId("ada"))
 
 
+def test_the_filter_selects_active_archived_or_both() -> None:
+    doc = new_document()
+    doc.archived = True
+    assert doc.matches(DocumentFilter(archived=True))
+    assert not doc.matches(DocumentFilter(archived=False))
+    assert doc.matches(DocumentFilter())  # None: both
+
+
 def test_a_processing_document_is_not_searchable() -> None:
     assert not new_document().searchable_by(UserId("ada"))
 
@@ -358,3 +366,23 @@ def test_a_filter_needs_every_part_to_match() -> None:
     assert doc.matches(both)
     assert not doc.matches(replace(both, states=frozenset({DocumentState.FAILED})))
     assert not doc.matches(replace(both, uploaded_before=NOW))
+
+
+def test_archive_sets_the_flag_once_and_restore_clears_it() -> None:
+    doc = new_document()
+    first, later = datetime(2026, 10, 9, tzinfo=UTC), datetime(2026, 10, 10, tzinfo=UTC)
+    doc.archive(first)
+    doc.archive(later)  # harmless: keeps the first time
+    assert (doc.archived, doc.archived_at) == (True, first)
+    doc.restore()
+    doc.restore()
+    assert (doc.archived, doc.archived_at) == (False, None)
+
+
+def test_subjects_of_an_archived_document_cant_change() -> None:
+    doc = linked_document()
+    doc.await_subjects()
+    doc.archive(datetime(2026, 10, 9, tzinfo=UTC))
+    with pytest.raises(DocumentStateError):
+        doc.choose_subjects([SubjectId("s1")])
+    assert doc.subject_ids == [] and doc.state is DocumentState.AWAITING_SUBJECTS

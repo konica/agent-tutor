@@ -410,3 +410,73 @@ def test_upload_date_filter_uses_the_gmt_plus_7_day_at_the_boundary() -> None:
 def test_a_range_with_from_after_to_is_empty_not_an_error(client: TestClient) -> None:
     library_of_three(client)
     assert listed_ids(client, {"uploaded_from": "2026-10-05", "uploaded_to": "2026-10-01"}) == set()
+
+
+def ready_document(client: TestClient) -> str:
+    doc = awaiting_document(client)
+    assert client.put(f"/documents/{doc}/subjects", json={"subject_ids": [GENERAL]}, headers=AUTH).status_code == 200
+    return doc
+
+
+def test_archive_moves_a_document_to_the_archived_list(client: TestClient) -> None:
+    doc = ready_document(client)
+
+    r = client.post(f"/documents/{doc}/archive", headers=AUTH)
+
+    assert r.status_code == 200
+    assert (r.json()["document_id"], r.json()["archived"]) == (doc, True)
+    assert listed_ids(client, {}) == set()
+    assert listed_ids(client, {"archived": "true"}) == {doc}
+    assert listed_ids(client, {"archived": "false"}) == set()
+
+
+def test_archive_twice_is_harmless(client: TestClient) -> None:
+    doc = ready_document(client)
+    assert client.post(f"/documents/{doc}/archive", headers=AUTH).status_code == 200
+    again = client.post(f"/documents/{doc}/archive", headers=AUTH)
+    assert (again.status_code, again.json()["archived"]) == (200, True)
+
+
+def test_restore_brings_the_document_back(client: TestClient) -> None:
+    doc = ready_document(client)
+    client.post(f"/documents/{doc}/archive", headers=AUTH)
+
+    r = client.post(f"/documents/{doc}/restore", headers=AUTH)
+
+    assert (r.status_code, r.json()["archived"]) == (200, False)
+    assert listed_ids(client, {}) == {doc}
+    assert listed_ids(client, {"archived": "true"}) == set()
+    assert client.post(f"/documents/{doc}/restore", headers=AUTH).status_code == 200
+
+
+def test_archive_and_restore_of_an_unknown_document_are_404(client: TestClient) -> None:
+    unknown = "00000000-0000-4000-8000-0000000000aa"
+    for action in ("archive", "restore"):
+        r = client.post(f"/documents/{unknown}/{action}", headers=AUTH)
+        assert (r.status_code, r.json()["detail"]) == (404, "Document not found")
+
+
+def test_my_subjects_loses_the_subject_while_archived(client: TestClient) -> None:
+    doc = ready_document(client)
+    assert [s["subject_id"] for s in client.get("/me/subjects", headers=AUTH).json()] == [GENERAL]
+
+    client.post(f"/documents/{doc}/archive", headers=AUTH)
+    assert client.get("/me/subjects", headers=AUTH).json() == []
+
+    client.post(f"/documents/{doc}/restore", headers=AUTH)
+    assert [s["subject_id"] for s in client.get("/me/subjects", headers=AUTH).json()] == [GENERAL]
+
+
+def test_choosing_subjects_of_an_archived_document_is_409(client: TestClient) -> None:
+    doc = awaiting_document(client)
+    client.post(f"/documents/{doc}/archive", headers=AUTH)
+
+    r = client.put(f"/documents/{doc}/subjects", json={"subject_ids": [GENERAL]}, headers=AUTH)
+    assert r.status_code == 409
+    assert client.get(f"/documents/{doc}/subject-suggestions", headers=AUTH).status_code == 409
+
+
+def test_archive_routes_need_a_token(client: TestClient) -> None:
+    unknown = "00000000-0000-4000-8000-0000000000aa"
+    assert client.post(f"/documents/{unknown}/archive").status_code == 401
+    assert client.post(f"/documents/{unknown}/restore").status_code == 401

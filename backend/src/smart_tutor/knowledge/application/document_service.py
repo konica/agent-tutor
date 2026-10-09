@@ -66,6 +66,7 @@ class DocumentService:
         states: Collection[DocumentStateName] = (),
         uploaded_from: date | None = None,
         uploaded_to: date | None = None,
+        archived: bool = False,
     ) -> list[DocumentView]:
         """The learner's documents, newest first, narrowed by any of the subjects and states and by upload dates.
 
@@ -76,6 +77,7 @@ class DocumentService:
             frozenset(DocumentState(s) for s in states),
             None if uploaded_from is None else datetime.combine(uploaded_from, time(), tzinfo=self._tz),
             None if uploaded_to is None else datetime.combine(uploaded_to + timedelta(days=1), time(), tzinfo=self._tz),
+            archived,
         )
         with self._uow() as tx:
             documents = tx.documents.list_readable_by(user_id, document_filter)
@@ -92,13 +94,13 @@ class DocumentService:
     def learner_subjects(self, user_id: UserId) -> frozenset[SubjectId]:
         """My subjects: those of the learner's ready, non-archived documents (PRD §9.4)."""
         with self._uow() as tx:
-            documents = tx.documents.list_readable_by(user_id)
+            documents = tx.documents.list_readable_by(user_id, DocumentFilter(archived=False))
         return frozenset(s for d in documents if d.state is DocumentState.READY for s in d.subject_ids)
 
     def has_ready_documents(self, user_id: UserId) -> bool:
         """Whether the learner has a ready, non-archived document to answer from (PRD §8 US-3)."""
         with self._uow() as tx:
-            documents = tx.documents.list_readable_by(user_id)
+            documents = tx.documents.list_readable_by(user_id, DocumentFilter(archived=False))
         return any(d.state is DocumentState.READY for d in documents)
 
     def find_in_library(self, user_id: UserId, sha256: str) -> DocumentId | None:
@@ -107,4 +109,5 @@ class DocumentService:
         Answers only from the caller's own documents; it never links content.
         """
         with self._uow() as tx:
-            return tx.documents.find_readable_by_sha256(user_id, sha256)
+            found = tx.documents.get_readable_by_sha256(user_id, sha256)
+        return None if found is None or found.archived else found.document_id

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { SessionExpiredError } from "../auth/authClient";
 import { configureApiClient } from "./client";
 import {
+  archiveDocument,
   findInLibrary,
   loadDocuments,
   loadSubjectSuggestions,
@@ -10,6 +11,7 @@ import {
   loadUploadStatus,
   postForm,
   rejectionReason,
+  restoreDocument,
   RetriesUsedUpError,
   retryProcessing,
   saveSubjects,
@@ -50,6 +52,41 @@ describe("loadDocuments", () => {
   it("rejects with SessionExpiredError on 401", async () => {
     const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
     await expect(loadDocuments({}, apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+
+  it("asks for the archived list only when archived is true", async () => {
+    const { apiClient, fetch } = api(() => json([]));
+    await loadDocuments({ archived: true }, apiClient);
+    expect(new URL((fetch.mock.calls[0][0] as Request).url).searchParams.get("archived")).toBe("true");
+    await loadDocuments({ archived: false }, apiClient);
+    expect(new URL((fetch.mock.calls[1][0] as Request).url).search).toBe("");
+  });
+});
+
+describe.each([
+  ["archiveDocument", archiveDocument, "archive"],
+  ["restoreDocument", restoreDocument, "restore"],
+] as const)("%s", (_name, call, action) => {
+  const doc = { document_id: "d3", title: "a.pdf", state: "ready", failure_reason: null, created_at: "2026-10-04T09:00:00Z", subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: [], year: null, archived: action === "archive" };
+
+  it(`POSTs to the document's ${action} path and returns the document`, async () => {
+    const { apiClient, fetch } = api(() => json(doc));
+    await expect(call("d3", apiClient)).resolves.toEqual(doc);
+    const request = fetch.mock.calls[0]![0] as Request;
+    expect(request.method).toBe("POST");
+    expect(request.url).toBe(`http://api.test/documents/d3/${action}`);
+  });
+
+  it("rejects with SessionExpiredError on 401", async () => {
+    const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
+    await expect(call("d3", apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+
+  it("rejects with an Error on 404", async () => {
+    const { apiClient } = api(() => json({ detail: "Document not found" }, 404));
+    const rejection = call("d3", apiClient);
+    await expect(rejection).rejects.toThrow("Document not found");
+    await expect(rejection).rejects.not.toBeInstanceOf(SessionExpiredError);
   });
 });
 

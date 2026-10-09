@@ -1,7 +1,8 @@
-import { CircleAlert, FileText, RefreshCw } from "lucide-react";
+import { Archive, CircleAlert, FileText, RefreshCw, RotateCcw } from "lucide-react";
 
 import type { DocumentResponse } from "../../api/documents";
 import { Button } from "../../components/Button/Button";
+import { RowMenu } from "../../components/RowMenu/RowMenu";
 import { StateBadge } from "../../components/StateBadge/StateBadge";
 import { SubjectChip } from "../../components/SubjectChip/SubjectChip";
 import { APP_TIME_ZONE } from "../../time";
@@ -24,6 +25,7 @@ const NONE: ReadonlySet<string> = new Set();
 function StateCell({ doc, uploading }: { doc: DocumentResponse; uploading: boolean }) {
   // The API creates the row when it presigns the upload; until the browser has sent the file it reads "Uploading".
   if (uploading) return <StateBadge state="uploading" />;
+  if (doc.archived) return <StateBadge state="archived" />; // archived is a flag on any state (PRD §9.5); the row shows only that
   const retried = doc.state === "processing" && doc.attempt && doc.attempt > 1 ? `Attempt ${doc.attempt} of ${doc.max_attempts}` : null;
   const hint = doc.state === "processing" ? [retried, "You can choose subjects when processing finishes."].filter(Boolean).join(" · ") : null;
   return (
@@ -50,9 +52,37 @@ type Props = {
   retrying: ReadonlySet<string>;
   onChooseSubjects?: (doc: DocumentResponse) => void;
   uploading?: ReadonlySet<string>; // document ids whose file is still being sent
+  onArchive?: (doc: DocumentResponse) => void;
+  onRestore?: (doc: DocumentResponse) => void;
+  busy?: ReadonlySet<string>; // document ids whose archive or restore is running
 };
 
-export function DocumentTable({ documents, onRetry, retrying, onChooseSubjects, uploading = NONE }: Props) {
+// An archived row offers only Restore: its subjects can't change until then (PRD US-10), and it isn't processed again.
+function Actions({ doc, onRetry, retrying, onChooseSubjects, uploading, onArchive, onRestore, busy }: Omit<Props, "documents" | "uploading" | "busy"> & { doc: DocumentResponse; uploading: boolean; busy: boolean }) {
+  if (doc.archived)
+    return onRestore ? (
+      <Button size="sm" icon={RotateCcw} aria-label={`Restore ${doc.title}`} disabled={busy} onClick={() => onRestore(doc)}>
+        Restore
+      </Button>
+    ) : null;
+  return (
+    <>
+      {doc.state === "awaiting_subjects" && onChooseSubjects && (
+        <Button size="sm" variant="primary" aria-label={`Choose subjects for ${doc.title}`} disabled={busy} onClick={() => onChooseSubjects(doc)}>
+          Choose subjects
+        </Button>
+      )}
+      {doc.state === "failed" && doc.can_retry && (
+        <Button size="sm" icon={RefreshCw} aria-label={`Retry ${doc.title}`} disabled={busy || retrying.has(doc.document_id)} onClick={() => onRetry(doc)}>
+          Retry
+        </Button>
+      )}
+      {onArchive && !uploading && <RowMenu label={`More actions for ${doc.title}`} disabled={busy} items={[{ label: "Archive", icon: Archive, onSelect: () => onArchive(doc) }]} />}
+    </>
+  );
+}
+
+export function DocumentTable({ documents, onRetry, retrying, onChooseSubjects, uploading = NONE, onArchive, onRestore, busy = NONE }: Props) {
   return (
     <table className={styles.table}>
       <thead>
@@ -69,9 +99,9 @@ export function DocumentTable({ documents, onRetry, retrying, onChooseSubjects, 
       <tbody>
         {documents.map((doc) => {
           const by = byline(doc.authors, doc.year);
-          const failed = doc.state === "failed" && Boolean(doc.failure_reason);
+          const failed = !doc.archived && doc.state === "failed" && Boolean(doc.failure_reason);
           return (
-            <tr key={doc.document_id} id={`document-${doc.document_id}`} className={doc.state === "awaiting_subjects" ? styles.needs : undefined}>
+            <tr key={doc.document_id} id={`document-${doc.document_id}`} className={doc.archived ? styles.archived : doc.state === "awaiting_subjects" ? styles.needs : undefined}>
               <td>
                 <span className={styles.doc}>
                   <FileText className={styles.fileIcon} strokeWidth={1.5} aria-hidden="true" />
@@ -91,16 +121,9 @@ export function DocumentTable({ documents, onRetry, retrying, onChooseSubjects, 
               </td>
               <td className={styles.date}>{uploadedOn(doc.created_at)}</td>
               <td className={styles.actions}>
-                {doc.state === "awaiting_subjects" && onChooseSubjects && (
-                  <Button size="sm" variant="primary" aria-label={`Choose subjects for ${doc.title}`} onClick={() => onChooseSubjects(doc)}>
-                    Choose subjects
-                  </Button>
-                )}
-                {doc.state === "failed" && doc.can_retry && (
-                  <Button size="sm" icon={RefreshCw} aria-label={`Retry ${doc.title}`} disabled={retrying.has(doc.document_id)} onClick={() => onRetry(doc)}>
-                    Retry
-                  </Button>
-                )}
+                <div className={styles.actionsRow}>
+                  <Actions doc={doc} onRetry={onRetry} retrying={retrying} onChooseSubjects={onChooseSubjects} uploading={uploading.has(doc.document_id)} onArchive={onArchive} onRestore={onRestore} busy={busy.has(doc.document_id)} />
+                </div>
               </td>
             </tr>
           );

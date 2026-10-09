@@ -2,13 +2,13 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { RetriesUsedUpError, type DocumentResponse, type UploadEvents, type UploadStatus } from "../../api/documents";
+import { RetriesUsedUpError, type DocumentFilters, type DocumentResponse, type UploadEvents, type UploadStatus } from "../../api/documents";
 import { SessionExpiredError } from "../../auth/authClient";
 import { LibraryPage } from "./LibraryPage";
 
 const today = new Date().toISOString();
-const processing: DocumentResponse = { document_id: "d1", title: "lewis-rag-2020.pdf", state: "processing", failure_reason: null, created_at: today, subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: [], year: null };
-const duplicate: DocumentResponse = { document_id: "d2", title: "copy.pdf", state: "failed", failure_reason: "This file isn't a readable PDF", created_at: today, subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: [], year: null };
+const processing: DocumentResponse = { document_id: "d1", title: "lewis-rag-2020.pdf", state: "processing", failure_reason: null, created_at: today, subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: [], year: null, archived: false };
+const duplicate: DocumentResponse = { document_id: "d2", title: "copy.pdf", state: "failed", failure_reason: "This file isn't a readable PDF", created_at: today, subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: [], year: null, archived: false };
 
 const notInLibrary = async () => null;
 const noSubjects = async () => [];
@@ -28,7 +28,7 @@ describe("LibraryPage", () => {
   it("shows the upload-rights sentence beside Upload and the count in the header", async () => {
     const three = ["a", "b", "c"].map((n) => ({ ...processing, document_id: n, title: `${n}.pdf` }));
     render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => three} upload={vi.fn()} />);
-    expect(await screen.findByText("3 documents", { selector: "span:not([aria-live])" })).toBeVisible();
+    expect(await screen.findByText("3 active documents", { selector: "span:not([aria-live])" })).toBeVisible();
     expect(screen.getByText("Only upload documents you have the right to use.")).toBeVisible();
     expect(screen.getByRole("button", { name: "About Library" })).toHaveAttribute("data-tip", expect.stringContaining("private to you"));
   });
@@ -59,7 +59,8 @@ describe("LibraryPage", () => {
   });
 
   it("uploads the picked PDF and refreshes the list", async () => {
-    const load = vi.fn().mockResolvedValueOnce([]).mockResolvedValue([processing]);
+    let activeLoads = 0;
+    const load = vi.fn(async (f: DocumentFilters) => (f.archived ? [] : (activeLoads++ === 0 ? [] : [processing])));
     const upload = vi.fn(async () => {});
     render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={upload} />);
     await screen.findByText("Upload your first document");
@@ -395,7 +396,8 @@ describe("LibraryPage drop zone and upload tray", () => {
   it("shows the new row as Uploading until its file reaches storage, then Processing", async () => {
     const { upload, pending } = controlledUpload();
     const row: DocumentResponse = { ...processing, document_id: "d9", title: "a.pdf" };
-    const load = vi.fn().mockResolvedValueOnce([]).mockResolvedValue([row]);
+    let activeLoads = 0;
+    const load = vi.fn(async (f: DocumentFilters) => (f.archived ? [] : (activeLoads++ === 0 ? [] : [row])));
     render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={upload} />);
     await screen.findByText("Upload your first document");
     drop([pdf("a.pdf")]);
@@ -508,6 +510,27 @@ describe("LibraryPage drop zone and upload tray", () => {
     expect(screen.getByRole("status")).toHaveTextContent("old.pdf: Already in your library, archived.");
   });
 
+  it("restores an archived duplicate from the tray, then links to it", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const loadUpload = vi.fn(async () => ({ upload_id: "u9", outcome: "duplicate" as const, document_id: "d1", archived: true }));
+    const restore = vi.fn(async () => processing);
+    const load = vi.fn(async () => [processing]);
+    const loadSubjects = vi.fn(noSubjects);
+    render(<LibraryPage loadSubjects={loadSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={startsUpload("u9")} loadUpload={loadUpload} restore={restore} pollMs={POLL} />);
+    await dropSent("old.pdf");
+    await advance(POLL);
+    const tray = screen.getByRole("region", { name: "Uploads · 1 file" });
+    const loadsBefore = load.mock.calls.length;
+    await userEvent.click(await within(tray).findByRole("button", { name: "Restore old.pdf" }));
+    expect(restore).toHaveBeenCalledExactlyOnceWith("d1");
+    expect(await within(tray).findByText("Already in your library")).toBeVisible();
+    expect(within(tray).getByRole("link", { name: "Open document" })).toHaveAttribute("href", "#document-d1");
+    expect(within(tray).queryByRole("button", { name: "Restore old.pdf" })).toBeNull();
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("old.pdf restored."));
+    expect(load.mock.calls.length).toBeGreaterThan(loadsBefore);
+    expect(loadSubjects.mock.calls.length).toBeGreaterThan(1);
+  });
+
   it("marks a duplicate without a document as already in the library, with no link", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const loadUpload = vi.fn(async () => ({ upload_id: "u9", outcome: "duplicate" as const, document_id: null, archived: false }));
@@ -606,7 +629,7 @@ describe("LibraryPage choose subjects", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Save" }));
     expect(saveSubjects).toHaveBeenCalledWith("d1", { subject_ids: ["s1"], new_names: [] });
     await waitFor(() => expect(pageStatus()).toHaveTextContent("Subjects saved. Toolformer is ready to use."));
-    expect(load).toHaveBeenCalledTimes(2);
+    expect(load).toHaveBeenCalledTimes(4); // on mount the list and both tab counts, then the list again
     await userEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(pageStatus()).toHaveFocus();
@@ -645,7 +668,7 @@ describe("LibraryPage choose subjects", () => {
   });
 });
 
-const scan: DocumentResponse = { document_id: "d3", title: "scan.pdf", state: "failed", failure_reason: "No text layer (scanned PDFs are not supported yet)", created_at: today, subjects: [], attempt: 1, max_attempts: 3, can_retry: true, authors: [], year: null };
+const scan: DocumentResponse = { document_id: "d3", title: "scan.pdf", state: "failed", failure_reason: "No text layer (scanned PDFs are not supported yet)", created_at: today, subjects: [], attempt: 1, max_attempts: 3, can_retry: true, authors: [], year: null, archived: false };
 
 describe("LibraryPage retry", () => {
   it("retries a failed document and refreshes the list", async () => {
@@ -714,7 +737,7 @@ describe("LibraryPage retry", () => {
       const load = vi.fn(async () => [ready]);
       render(<LibraryPage check={notInLibrary} loadLimits={limits} loadSubjects={subjects} load={load} upload={vi.fn()} />);
       await screen.findByText("lewis-rag-2020.pdf");
-      expect(load).toHaveBeenLastCalledWith({});
+      expect(load).toHaveBeenCalledWith({});
       await screen.findByRole("option", { name: "AI Agents" });
       await userEvent.selectOptions(screen.getByLabelText("Subject"), "s1");
       await waitFor(() => expect(load).toHaveBeenLastCalledWith({ subject_ids: ["s1"] }));
@@ -770,5 +793,193 @@ describe("LibraryPage retry", () => {
       expect(await screen.findByText("lewis-rag-2020.pdf")).toBeVisible();
       expect([...(screen.getByLabelText("Subject") as HTMLSelectElement).options].map((o) => o.text)).toEqual(["All subjects"]);
     });
+  });
+});
+
+describe("LibraryPage archive and restore", () => {
+  const ready: DocumentResponse = { ...processing, document_id: "d1", title: "Toolformer", state: "ready" };
+  const other: DocumentResponse = { ...processing, document_id: "d2", title: "Attention", state: "ready" };
+  const old: DocumentResponse = { ...processing, document_id: "d7", title: "GPT-3", state: "awaiting_subjects", archived: true };
+
+  // A server in memory: archive and restore move a document between the two lists.
+  function library(active: DocumentResponse[], archived: DocumentResponse[]) {
+    const lists = { active: [...active], archived: [...archived] };
+    const load = vi.fn(async (filters: DocumentFilters) => (filters.archived ? lists.archived : lists.active));
+    const move = (id: string, from: DocumentResponse[], toArchived: boolean) => {
+      const doc = { ...from.find((d) => d.document_id === id)!, archived: toArchived };
+      lists.active = toArchived ? lists.active.filter((d) => d.document_id !== id) : [doc, ...lists.active];
+      lists.archived = toArchived ? [doc, ...lists.archived] : lists.archived.filter((d) => d.document_id !== id);
+      return doc;
+    };
+    const archive = vi.fn(async (id: string) => move(id, lists.active, true));
+    const restore = vi.fn(async (id: string) => move(id, lists.archived, false));
+    return { load, archive, restore };
+  }
+
+  const tab = (name: "Active" | "Archived") => screen.getByRole("tab", { name: new RegExp(`^${name}`) });
+  const NOTICE = "Archived documents aren't used for answers, but citations to them in past conversations still work. Restore a document to change its subjects.";
+
+  it("shows Active and Archived tabs with unfiltered totals and the active total in the header", async () => {
+    const { load } = library([ready, other], [old]);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} />);
+    expect(await screen.findByText("2 active documents", { selector: "span:not([aria-live])" })).toBeVisible();
+    expect(screen.getByRole("tablist", { name: "Library view" })).toBeVisible();
+    expect(tab("Active")).toHaveAttribute("aria-selected", "true");
+    expect(tab("Active")).toHaveTextContent("2");
+    expect(tab("Archived")).toHaveTextContent("1");
+    expect(load).toHaveBeenCalledWith({});
+    expect(load).toHaveBeenCalledWith({ archived: true });
+  });
+
+  it("archives from the More menu, announces it, and moves the row to Archived", async () => {
+    const { load, archive, restore } = library([ready, other], []);
+    const loadSubjects = vi.fn(noSubjects);
+    render(<LibraryPage loadSubjects={loadSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} archive={archive} restore={restore} />);
+    await userEvent.click(await screen.findByRole("button", { name: "More actions for Toolformer" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Archive" }));
+    expect(archive).toHaveBeenCalledExactlyOnceWith("d1");
+    const status = screen.getByRole("status");
+    await waitFor(() => expect(status).toHaveTextContent("Toolformer archived. Find it under Archived."));
+    await waitFor(() => expect(screen.queryByText("Toolformer")).toBeNull());
+    await waitFor(() => expect(tab("Archived")).toHaveTextContent("1"));
+    expect(tab("Active")).toHaveTextContent("1");
+    expect(status).toHaveFocus();
+    expect(loadSubjects.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it("does not announce a document that left the list because it was archived", async () => {
+    const { load, archive } = library([ready, other], []);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} archive={archive} pollMs={20} />);
+    await userEvent.click(await screen.findByRole("button", { name: "More actions for Toolformer" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Archive" }));
+    const callsAfter = load.mock.calls.length;
+    await waitFor(() => expect(load.mock.calls.length).toBeGreaterThan(callsAfter + 2));
+    expect(screen.getByRole("status")).toHaveTextContent(/^Toolformer archived\. Find it under Archived\.$/);
+  });
+
+  it("announces a failed archive and keeps the row", async () => {
+    const { load } = library([ready], []);
+    const archive = vi.fn(async () => {
+      throw new Error("POST /documents/d1/archive failed (500)");
+    });
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} archive={archive} />);
+    await userEvent.click(await screen.findByRole("button", { name: "More actions for Toolformer" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Archive" }));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Couldn't archive Toolformer. Try again."));
+    expect(screen.getByText("Toolformer")).toBeVisible();
+    expect(screen.getByRole("button", { name: "More actions for Toolformer" })).toBeEnabled();
+  });
+
+  it("says nothing when the session expired during an archive", async () => {
+    const { load } = library([ready], []);
+    const archive = vi.fn(async () => {
+      throw new SessionExpiredError();
+    });
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} archive={archive} />);
+    await userEvent.click(await screen.findByRole("button", { name: "More actions for Toolformer" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Archive" }));
+    await waitFor(() => expect(archive).toHaveBeenCalled());
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  });
+
+  it("shows the Archived tab: the notice, the Archived badge, Restore, and no Choose subjects or State filter", async () => {
+    const { load } = library([ready], [old]);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} />);
+    await screen.findByText("Toolformer");
+    expect(screen.getByLabelText("State")).toBeVisible();
+    await userEvent.click(tab("Archived"));
+    const row = (await screen.findByText("GPT-3")).closest("tr")!;
+    expect(load).toHaveBeenLastCalledWith({ archived: true });
+    expect(tab("Archived")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText(NOTICE)).toBeVisible();
+    expect(within(row).getByText("Archived")).toBeVisible();
+    expect(within(row).getByRole("button", { name: "Restore GPT-3" })).toBeEnabled();
+    expect(within(row).queryByRole("button", { name: /Choose subjects/ })).toBeNull();
+    expect(within(row).queryByRole("button", { name: /More actions/ })).toBeNull();
+    expect(screen.queryByLabelText("State")).toBeNull();
+    expect(screen.queryByRole("button", { name: /needs? subjects/ })).toBeNull();
+  });
+
+  it("keeps the subject and date filters across tabs and drops the state", async () => {
+    const { load } = library([ready], [old]);
+    const subjects = async () => [{ subject_id: "s1", name: "AI Agents" }];
+    render(<LibraryPage loadSubjects={subjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} />);
+    await screen.findByRole("option", { name: "AI Agents" });
+    await userEvent.selectOptions(screen.getByLabelText("Subject"), "s1");
+    await userEvent.selectOptions(screen.getByLabelText("State"), "ready");
+    await waitFor(() => expect(load).toHaveBeenLastCalledWith({ subject_ids: ["s1"], state: "ready" }));
+    await userEvent.click(tab("Archived"));
+    await waitFor(() => expect(load).toHaveBeenCalledWith({ subject_ids: ["s1"], archived: true }));
+  });
+
+  it("restores from the Archived tab, announces it, and the Active count goes up", async () => {
+    const { load, archive, restore } = library([ready], [old]);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} archive={archive} restore={restore} />);
+    await screen.findByText("Toolformer");
+    await userEvent.click(tab("Archived"));
+    await userEvent.click(await screen.findByRole("button", { name: "Restore GPT-3" }));
+    expect(restore).toHaveBeenCalledExactlyOnceWith("d7");
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("GPT-3 restored."));
+    await waitFor(() => expect(tab("Active")).toHaveTextContent("2"));
+    expect(tab("Archived")).toHaveTextContent("0");
+    expect(screen.queryByText("GPT-3")).toBeNull();
+  });
+
+  it("announces a failed restore", async () => {
+    const { load } = library([], [old]);
+    const restore = vi.fn(async () => {
+      throw new Error("500");
+    });
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} restore={restore} />);
+    await userEvent.click(await screen.findByRole("tab", { name: /^Archived/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Restore GPT-3" }));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Couldn't restore GPT-3. Try again."));
+  });
+
+  it("shows the empty Archived tab", async () => {
+    const { load } = library([ready], []);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} />);
+    await screen.findByText("Toolformer");
+    await userEvent.click(tab("Archived"));
+    expect(await screen.findByText("No archived documents")).toBeVisible();
+    expect(screen.getByText("Archived documents leave search until you restore them.")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Choose PDFs" })).toBeNull();
+    expect(screen.queryByText("Upload your first document")).toBeNull();
+  });
+
+  it("keeps the tabs reachable when every document is archived", async () => {
+    const { load } = library([], [old]);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} />);
+    expect(await screen.findByText("No active documents")).toBeVisible();
+    expect(screen.getByText("Your documents are all archived. Restore one from Archived, or upload a new one.")).toBeVisible();
+    expect(screen.queryByText("Upload your first document")).toBeNull();
+    expect(screen.getAllByRole("button", { name: "Upload" })).toHaveLength(2);
+    expect(screen.getByText("Only upload documents you have the right to use.")).toBeVisible();
+    await waitFor(() => expect(tab("Archived")).toHaveTextContent("1"));
+  });
+
+  it("offers no State in the empty filtered sentence on the Archived tab", async () => {
+    const { load } = library([ready], [old]);
+    const subjects = async () => [{ subject_id: "s1", name: "AI Agents" }];
+    const filteredLoad = vi.fn(async (f: DocumentFilters) => (f.subject_ids?.length ? [] : load(f)));
+    render(<LibraryPage loadSubjects={subjects} check={notInLibrary} loadLimits={limits} load={filteredLoad} upload={vi.fn()} />);
+    await screen.findByRole("option", { name: "AI Agents" });
+    await userEvent.selectOptions(screen.getByLabelText("Subject"), "s1");
+    expect(await screen.findByText("Try another subject, state or a wider date range.")).toBeVisible();
+    await userEvent.click(tab("Archived"));
+    expect(await screen.findByText("Try another subject or a wider date range.")).toBeVisible();
+  });
+
+  it("does not announce processing changes of an archived document", async () => {
+    let state: DocumentResponse["state"] = "processing";
+    const load = vi.fn(async (f: DocumentFilters) => (f.archived ? [{ ...old, state }] : [ready]));
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} pollMs={20} />);
+    await screen.findByText("Toolformer");
+    await userEvent.click(tab("Archived"));
+    await screen.findByText("GPT-3");
+    state = "awaiting_subjects";
+    const calls = load.mock.calls.length;
+    await waitFor(() => expect(load.mock.calls.length).toBeGreaterThan(calls + 3));
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
   });
 });

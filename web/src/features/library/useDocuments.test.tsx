@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DocumentFilters, DocumentResponse } from "../../api/documents";
 import { useDocuments } from "./useDocuments";
 
-const doc = (id: string): DocumentResponse => ({ document_id: id, title: `${id}.pdf`, state: "processing", failure_reason: null, created_at: "2026-10-04T09:00:00Z", subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: [], year: null });
+const doc = (id: string): DocumentResponse => ({ document_id: id, title: `${id}.pdf`, state: "processing", failure_reason: null, created_at: "2026-10-04T09:00:00Z", subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: [], year: null, archived: false });
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
