@@ -9,6 +9,8 @@
 .sm { --pad: var(--sp-2); min-height: 20px; font-size: var(--fs-12); }
 .lg { --pad: 10px; min-height: 32px; }
 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--h); flex: none; }
+.truncate { min-width: 0; max-width: 100%; }
+.name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .check { width: 14px; height: 14px; flex: none; }
 .origin { color: var(--text-2); font-size: var(--fs-12); font-weight: 500; }
 button.chip { --pad: 10px; min-height: 28px; font-size: var(--fs-13); cursor: pointer; }

@@ -1,6 +1,6 @@
 .empty {
   display: grid; justify-items: center; gap: var(--sp-3); text-align: center;
-  padding: var(--sp-12) var(--sp-6); background: var(--surface); border-radius: var(--r-md);
+  padding: calc(var(--sp-6) * 2) var(--sp-6); background: var(--surface); border-radius: var(--r-md);
 }
 .default { border: 1px dashed var(--border-strong); }
 .dropzone { border: 2px dashed var(--border-strong); }

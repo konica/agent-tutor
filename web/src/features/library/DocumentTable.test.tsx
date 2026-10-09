@@ -7,6 +7,8 @@ import { DocumentTable } from "./DocumentTable";
 const doc: DocumentResponse = { document_id: "d1", title: "Toolformer", state: "ready", failure_reason: null, created_at: "2026-10-04T09:00:00Z", subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: ["Timo Schick", "Jane Dwivedi-Yu", "Roberto Dessì"], year: 2023 };
 
 describe("DocumentTable", () => {
+  afterEach(() => vi.useRealTimers());
+
   it("shows authors and year under the title", () => {
     render(<DocumentTable documents={[doc]} onRetry={() => {}} retrying={new Set()} />);
     const row = screen.getByText("Toolformer").closest("tr")!;
@@ -42,7 +44,6 @@ describe("DocumentTable compact rows", () => {
     vi.useFakeTimers({ now: new Date("2026-10-20T00:00:00Z") });
     render(<DocumentTable documents={[{ ...doc, created_at: "2025-03-05T09:00:00Z" }]} {...props} />);
     expect(screen.getByRole("cell", { name: /2025/ })).toBeVisible();
-    vi.useRealTimers();
   });
 
   it("puts the processing hint on the badge line with the full hint as its tooltip", () => {

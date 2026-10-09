@@ -161,7 +161,10 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs }: Props
       <div className={styles.column}>
         <PageHeader title="New conversation" />
         {library.status === "failed" && (
-          <p className={styles.problem}>Your documents couldn't be loaded. Reload the page to try again.</p>
+          <p className={styles.problem}>
+            <CircleAlert className={styles.problemIcon} strokeWidth={1.5} aria-hidden="true" />
+            Your documents couldn't be loaded. Reload the page to try again.
+          </p>
         )}
       </div>
     );

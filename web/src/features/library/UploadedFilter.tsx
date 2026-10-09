@@ -39,7 +39,7 @@ export function UploadedFilter({ from, to, onChange }: Props) {
         <ChevronDown className={styles.icon} strokeWidth={1.5} aria-hidden="true" />
       </button>
       {open && (
-        <div className={styles.pop} id={popId} role="group" aria-label="Upload dates">
+        <div className={styles.pop} id={popId} tabIndex={-1} role="group" aria-label="Upload dates">
           <label className={styles.field}>
             From
             <input ref={first} type="date" value={from ?? ""} max={to || undefined} onChange={(e) => onChange({ uploaded_from: e.target.value })} />

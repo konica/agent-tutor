@@ -21,6 +21,7 @@ describe("LibraryPage", () => {
     expect(await screen.findByText("Upload your first document")).toBeVisible();
     expect(screen.getByRole("button", { name: "Choose PDFs" })).toBeEnabled();
     expect(screen.getByText("Only upload documents you have the right to use.")).toBeVisible();
+    expect(screen.queryByText(/^0 documents$/, { selector: "span:not([aria-live])" })).toBeNull();
   });
 
   it("shows the upload-rights sentence beside Upload and the count in the header", async () => {

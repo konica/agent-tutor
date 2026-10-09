@@ -89,7 +89,7 @@ export function DocumentTable({ documents, onRetry, retrying, onChooseSubjects, 
                 </span>
               </td>
               <td className={doc.subjects.length ? undefined : styles.muted}>
-                <div className={styles.subjects} title={doc.subjects.map((s) => s.name).join(", ") || undefined}>{doc.subjects.length ? doc.subjects.map((s) => <SubjectChip key={s.subject_id} name={s.name} hueKey={s.subject_id} />) : "Not chosen yet"}</div>
+                <div className={styles.subjects} title={doc.subjects.map((s) => s.name).join(", ") || undefined}>{doc.subjects.length ? doc.subjects.map((s) => <SubjectChip key={s.subject_id} name={s.name} hueKey={s.subject_id} truncate />) : "Not chosen yet"}</div>
               </td>
               <td>
                 <div className={failed ? `${styles.state} ${styles.stateFailed}` : styles.state}>

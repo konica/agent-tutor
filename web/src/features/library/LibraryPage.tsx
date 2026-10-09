@@ -294,7 +294,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
     <>
       <PageHeader
         title="Library"
-        count={documents && !filtered ? `${documents.length} ${documents.length === 1 ? "document" : "documents"}` : undefined}
+        count={documents && documents.length > 0 && !filtered ? `${documents.length} ${documents.length === 1 ? "document" : "documents"}` : undefined}
         description="Your documents. They're private to you, and the tutor answers only from them."
         actions={
           documents && (documents.length > 0 || filtered) ? (

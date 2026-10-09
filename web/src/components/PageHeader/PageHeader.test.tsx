@@ -10,6 +10,7 @@ describe("PageHeader", () => {
     expect(screen.getByText("8 documents")).toBeVisible();
     const info = screen.getByRole("button", { name: "About Library" });
     expect(info).toHaveAttribute("data-tip", "Your documents.");
+    expect(info).toHaveAccessibleDescription("Your documents.");
     expect(screen.getByRole("button", { name: "Upload" })).toBeVisible();
   });
 
