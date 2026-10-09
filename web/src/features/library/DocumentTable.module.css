@@ -2,11 +2,11 @@
   width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
 }
-/* The Document column takes the rest: about 280px at the 1024px minimum width, wider above. */
-.colSubjects { width: 150px; }
-.colState { width: 140px; }
-.colUploaded { width: 76px; }
-.colActions { width: 144px; }
+/* Widths sit on the th cells: Chrome ignores calc() and clamp() with % in table cells, so plain %. The Document column takes the rest: about 280px at the 1024px minimum width, wider above. */
+.table th.colSubjects { width: 18%; }
+.table th.colState { width: 20%; }
+.table th.colUploaded { width: 76px; }
+.table th.colActions { width: 144px; }
 .table th {
   position: sticky; top: 0; z-index: 1; height: 28px; text-align: left; padding: 0 var(--sp-3);
   background: var(--surface-2); color: var(--text-2);

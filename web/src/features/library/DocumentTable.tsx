@@ -55,20 +55,13 @@ type Props = {
 export function DocumentTable({ documents, onRetry, retrying, onChooseSubjects, uploading = NONE }: Props) {
   return (
     <table className={styles.table}>
-      <colgroup>
-        <col />
-        <col className={styles.colSubjects} />
-        <col className={styles.colState} />
-        <col className={styles.colUploaded} />
-        <col className={styles.colActions} />
-      </colgroup>
       <thead>
         <tr>
           <th scope="col">Document</th>
-          <th scope="col">Subjects</th>
-          <th scope="col">State</th>
-          <th scope="col">Uploaded</th>
-          <th scope="col">
+          <th scope="col" className={styles.colSubjects}>Subjects</th>
+          <th scope="col" className={styles.colState}>State</th>
+          <th scope="col" className={styles.colUploaded}>Uploaded</th>
+          <th scope="col" className={styles.colActions}>
             <span className="visually-hidden">Actions</span>
           </th>
         </tr>
