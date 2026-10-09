@@ -24,7 +24,7 @@
 
 .close { padding: var(--sp-16) 0; }
 .closeTitle { margin: 0; font-size: var(--fs-32); }
-.landing :is(h1, h2, h3) { font-family: var(--font-display); font-weight: 600; letter-spacing: -.01em; }
+.title, .closeTitle { font-family: var(--font-display); font-weight: 600; }
 .close .ctas { margin-top: var(--sp-6); }
 
 .foot { display: flex; align-items: center; padding: var(--sp-4) 0 var(--sp-6); border-top: 1px solid var(--border); font-size: var(--fs-14); color: var(--text-2); }
