@@ -3,9 +3,15 @@ import hashlib
 import pytest
 
 from fakes import TEST_LIMITS, FakeObjectStore, FixedClock, InMemoryLibrary, fake_tools
-from smart_tutor.knowledge.application import IngestionService, StartedUpload, UploadOutcome, UploadService
+from smart_tutor.knowledge.application import (
+    IngestionService,
+    StartedUpload,
+    UploadOutcome,
+    UploadService,
+    UploadStatus,
+)
 from smart_tutor.knowledge.domain.document import Document
-from smart_tutor.shared.domain.ids import UserId
+from smart_tutor.shared.domain.ids import UploadId, UserId
 
 PDF = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
 SHA = hashlib.sha256(PDF).hexdigest()
@@ -26,43 +32,73 @@ class World:
         return self.library.state.documents[started.document_id]
 
 
-def test_a_new_file_is_stored_once_under_its_hash_and_the_upload_copy_removed() -> None:
+def key(user: str, content_id: str, suffix: str = "pdf") -> str:
+    return f"contents/{user}/{content_id}.{suffix}"
+
+
+def test_a_new_file_is_stored_under_its_owner_and_the_upload_copy_removed() -> None:
     w = World()
     a = w.upload("ada")
     assert w.ingestion.ingest_upload(a.fields["key"]) is UploadOutcome.STORED
-    assert set(w.objects.objects) == {f"contents/{SHA}.pdf", f"contents/{SHA}.pages.json"}
-    assert w.objects.objects[f"contents/{SHA}.pdf"] == PDF
     [content] = w.library.state.contents.values()
-    assert (content.sha256, content.size, content.state, content.processed_by_user_id) == (
-        SHA,
-        len(PDF),
-        "ready",
-        "ada",
-    )
+    assert set(w.objects.objects) == {key("ada", content.content_id), key("ada", content.content_id, "pages.json")}
+    assert w.objects.objects[key("ada", content.content_id)] == PDF
+    assert (content.sha256, content.size, content.state, content.owner_id) == (SHA, len(PDF), "ready", "ada")
     doc = w.doc(a)
     assert (doc.content_id, doc.state) == (content.content_id, "awaiting_subjects")
     upload = w.library.state.uploads[a.upload_id]
-    assert (upload.size, upload.outcome) == (len(PDF), UploadOutcome.STORED)
+    assert (upload.size, upload.outcome, upload.document_id) == (len(PDF), UploadOutcome.STORED, a.document_id)
 
 
-def test_another_learners_identical_file_fails_as_a_duplicate() -> None:
+def test_another_learners_identical_file_is_their_own_content() -> None:
     w = World()
     a, b = w.upload("ada"), w.upload("bob")
     w.ingestion.ingest_upload(a.fields["key"])
-    assert w.ingestion.ingest_upload(b.fields["key"]) is UploadOutcome.DUPLICATE
-    assert len(w.library.state.contents) == 1
-    doc = w.doc(b)
-    assert (doc.state, doc.failure_reason, doc.content_id) == ("failed", "Duplicate uploads aren't supported yet", None)
-    assert b.fields["key"] not in w.objects.objects
-    assert w.library.state.uploads[b.upload_id].outcome is UploadOutcome.DUPLICATE
+    assert w.ingestion.ingest_upload(b.fields["key"]) is UploadOutcome.STORED
+    contents = sorted(w.library.state.contents.values(), key=lambda c: c.owner_id)
+    assert [(c.owner_id, c.sha256, c.state) for c in contents] == [("ada", SHA, "ready"), ("bob", SHA, "ready")]
+    assert contents[0].content_id != contents[1].content_id
+    assert all(w.library.state.chunks[c.content_id] for c in contents)  # each embedded in full
+    assert (w.doc(a).state, w.doc(b).state) == ("awaiting_subjects", "awaiting_subjects")
+    assert w.doc(b).content_id == contents[1].content_id
 
 
-def test_same_learner_same_file_is_a_duplicate() -> None:
+def test_the_same_learners_duplicate_points_to_their_document() -> None:
     w = World()
     first, second = w.upload("ada"), w.upload("ada", name="copy.pdf")
     w.ingestion.ingest_upload(first.fields["key"])
+    chunks_before = dict(w.library.state.chunks)
     assert w.ingestion.ingest_upload(second.fields["key"]) is UploadOutcome.DUPLICATE
-    assert w.doc(second).state == "failed"
+    assert second.document_id not in w.library.state.documents  # no second document
+    assert len(w.library.state.contents) == 1 and w.library.state.chunks == chunks_before
+    assert second.fields["key"] not in w.objects.objects
+    upload = w.library.state.uploads[second.upload_id]
+    assert (upload.outcome, upload.document_id) == (UploadOutcome.DUPLICATE, first.document_id)
+
+
+def test_redelivery_after_a_duplicate_deletes_the_leftover_upload() -> None:
+    w = World()
+    first, second = w.upload("ada"), w.upload("ada")
+    w.ingestion.ingest_upload(first.fields["key"])
+    w.ingestion.ingest_upload(second.fields["key"])
+    w.objects.objects[second.fields["key"]] = PDF  # say the delete hadn't happened
+    assert w.ingestion.ingest_upload(second.fields["key"]) is None
+    assert second.fields["key"] not in w.objects.objects
+    assert len(w.library.state.contents) == 1
+
+
+def test_upload_status_reports_the_outcome_only_to_its_learner() -> None:
+    w = World()
+    first, second = w.upload("ada"), w.upload("ada")
+    pending = w.uploads.upload_status(UserId("ada"), second.upload_id)
+    assert pending == UploadStatus(None, None, False)
+    w.ingestion.ingest_upload(first.fields["key"])
+    w.ingestion.ingest_upload(second.fields["key"])
+    assert w.uploads.upload_status(UserId("ada"), second.upload_id) == UploadStatus(
+        UploadOutcome.DUPLICATE, first.document_id, False
+    )
+    assert w.uploads.upload_status(UserId("bob"), second.upload_id) is None
+    assert w.uploads.upload_status(UserId("ada"), UploadId("00000000-0000-4000-8000-000000000000")) is None
 
 
 def test_different_bytes_make_different_contents() -> None:
@@ -78,15 +114,12 @@ def test_different_bytes_make_different_contents() -> None:
 
 def test_redelivery_after_success_changes_nothing() -> None:
     w = World()
-    a, b = w.upload("ada"), w.upload("bob")
+    a = w.upload("ada")
     w.ingestion.ingest_upload(a.fields["key"])
     w.objects.objects[a.fields["key"]] = PDF  # S3 event redelivered; say the delete hadn't happened
     assert w.ingestion.ingest_upload(a.fields["key"]) is None
     assert w.doc(a).state == "awaiting_subjects" and w.doc(a).content_id is not None
     assert a.fields["key"] not in w.objects.objects
-    w.ingestion.ingest_upload(b.fields["key"])
-    assert w.ingestion.ingest_upload(b.fields["key"]) is None
-    assert w.doc(b).failure_reason == "Duplicate uploads aren't supported yet"
 
 
 def test_key_owner_mismatch_is_skipped() -> None:
@@ -102,7 +135,7 @@ def test_key_owner_mismatch_is_skipped() -> None:
 def test_unknown_upload_and_non_upload_keys_are_skipped() -> None:
     w = World()
     assert w.ingestion.ingest_upload("uploads/ada/nope.pdf") is None
-    assert w.ingestion.ingest_upload(f"contents/{SHA}.pdf") is None
+    assert w.ingestion.ingest_upload("contents/ada/c1.pdf") is None
 
 
 def test_a_missing_upload_object_is_skipped_and_the_document_still_waits() -> None:
@@ -125,3 +158,22 @@ def test_a_failure_before_commit_leaves_the_upload_for_a_retry() -> None:
     assert w.library.state.contents == {}
     assert w.doc(a).awaiting_upload
     assert a.fields["key"] in w.objects.objects
+
+
+def test_a_redelivery_after_a_failed_commit_reuses_the_content_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    w = World()
+    a = w.upload("ada")
+    unit_of_work = type(w.library.unit_of_work())
+    real_commit = unit_of_work.commit
+
+    def failing_commit(self: object) -> None:
+        raise RuntimeError("database down")
+
+    monkeypatch.setattr(unit_of_work, "commit", failing_commit)
+    with pytest.raises(RuntimeError):
+        w.ingestion.ingest_upload(a.fields["key"])  # the PDF was copied, then the commit failed
+    monkeypatch.setattr(unit_of_work, "commit", real_commit)
+    assert w.ingestion.ingest_upload(a.fields["key"]) is UploadOutcome.STORED
+    [content] = w.library.state.contents.values()
+    pdfs = [k for k in w.objects.objects if k.startswith("contents/ada/") and k.endswith(".pdf")]
+    assert pdfs == [key("ada", content.content_id)]

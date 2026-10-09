@@ -132,7 +132,7 @@ class ClusterStack(cdk.Stack):
                 ]
             ),
         )
-        # The worker moves an upload into contents/<sha256>.pdf, writes its page text, and deletes the upload; it
+        # The worker moves an upload into contents/<owner_id>/<content_id>.pdf, writes its page text, and deletes the upload; it
         # describes first pages with the agent model and embeds chunks.
         self._pod_identity(
             "Worker",

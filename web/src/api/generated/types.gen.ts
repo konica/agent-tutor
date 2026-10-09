@@ -247,6 +247,28 @@ export type UploadLimitsResponse = {
 };
 
 /**
+ * UploadStatusResponse
+ */
+export type UploadStatusResponse = {
+    /**
+     * Archived
+     */
+    archived: boolean;
+    /**
+     * Document Id
+     */
+    document_id: string | null;
+    /**
+     * Outcome
+     */
+    outcome: 'stored' | 'duplicate' | null;
+    /**
+     * Upload Id
+     */
+    upload_id: string;
+};
+
+/**
  * ValidationError
  */
 export type ValidationError = {
@@ -568,3 +590,33 @@ export type GetUploadLimitsResponses = {
 };
 
 export type GetUploadLimitsResponse = GetUploadLimitsResponses[keyof GetUploadLimitsResponses];
+
+export type GetUploadData = {
+    body?: never;
+    path: {
+        /**
+         * Upload Id
+         */
+        upload_id: string;
+    };
+    query?: never;
+    url: '/uploads/{upload_id}';
+};
+
+export type GetUploadErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetUploadError = GetUploadErrors[keyof GetUploadErrors];
+
+export type GetUploadResponses = {
+    /**
+     * Successful Response
+     */
+    200: UploadStatusResponse;
+};
+
+export type GetUploadResponse = GetUploadResponses[keyof GetUploadResponses];

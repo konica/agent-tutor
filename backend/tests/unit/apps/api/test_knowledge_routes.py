@@ -96,6 +96,38 @@ def test_upload_limits_need_a_token(client: TestClient) -> None:
     assert client.get("/uploads/limits").status_code == 401
 
 
+def test_an_own_duplicate_upload_reports_the_existing_document(client: TestClient) -> None:
+    pdf = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
+    first = client.post("/uploads", json={"file_name": "a.pdf"}, headers=AUTH).json()
+    again = client.post("/uploads", json={"file_name": "copy.pdf"}, headers=AUTH).json()
+    pending = client.get(f"/uploads/{again['upload_id']}", headers=AUTH).json()
+    assert pending["outcome"] is None
+    for started in (first, again):
+        client.app.state.objects.objects[started["fields"]["key"]] = pdf  # type: ignore[attr-defined]
+        client.app.state.ingestion.ingest_upload(started["fields"]["key"])  # type: ignore[attr-defined]
+
+    response = client.get(f"/uploads/{again['upload_id']}", headers=AUTH)
+    assert response.status_code == 200
+    assert response.json() == {
+        "upload_id": again["upload_id"],
+        "outcome": "duplicate",
+        "document_id": first["document_id"],
+        "archived": False,
+    }
+
+
+def test_an_unknown_upload_is_404(client: TestClient) -> None:
+    assert client.get("/uploads/00000000-0000-4000-8000-0000000000aa", headers=AUTH).status_code == 404
+
+
+def test_a_malformed_upload_id_is_422(client: TestClient) -> None:
+    assert client.get("/uploads/not-a-uuid", headers=AUTH).status_code == 422
+
+
+def test_upload_status_needs_a_token(client: TestClient) -> None:
+    assert client.get("/uploads/00000000-0000-4000-8000-0000000000aa").status_code == 401
+
+
 SCAN = b"%PDF-1.7 tiny"  # fake extractor: no text layer → failed
 
 
@@ -173,7 +205,9 @@ def test_duplicate_check_needs_a_token(client: TestClient) -> None:
 def awaiting_document(client: TestClient) -> str:
     started = client.post("/uploads", json={"file_name": "paper.pdf"}, headers=AUTH).json()
     key = started["fields"]["key"]
-    client.app.state.objects.objects[key] = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()  # type: ignore[attr-defined]
+    # Distinct bytes per call: the learner's own identical file would be a duplicate (US-11).
+    pdf = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode() + started["upload_id"].encode()
+    client.app.state.objects.objects[key] = pdf  # type: ignore[attr-defined]
     client.app.state.ingestion.ingest_upload(key)  # type: ignore[attr-defined]
     return str(started["document_id"])
 

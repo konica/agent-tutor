@@ -78,20 +78,23 @@ def test_a_second_retry_while_processing_changes_nothing() -> None:
 
 
 def test_a_failed_document_without_content_is_left_alone() -> None:
-    library, objects = InMemoryLibrary(), FakeObjectStore()
-    uploads = UploadService(library.unit_of_work, objects, FixedClock(), TEST_LIMITS)
-    ingestion = IngestionService(library.unit_of_work, objects, fake_tools(), TEST_LIMITS)
-    for name in ("a.pdf", "copy.pdf"):  # the second is a duplicate: failed with no content
-        started = uploads.start_upload(ADA, name)
-        objects.objects[started.fields["key"]] = SCAN
-        ingestion.ingest_upload(started.fields["key"])
-    duplicate = started.document_id
+    library = InMemoryLibrary()
+    started = UploadService(library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS).start_upload(
+        ADA, "a.pdf"
+    )
+    with library.unit_of_work() as tx:  # failed before its bytes were stored
+        document = tx.documents.get_by_upload_for_update(started.upload_id)
+        assert document is not None
+        document.fail("This file isn't a readable PDF")
+        tx.documents.save(document)
+        tx.commit()
+    bare = started.document_id
     queue = FakeQueue()
-    RetryService(library.unit_of_work, queue, max_attempts=3).retry(ADA, duplicate)
-    assert library.state.documents[duplicate].failure_reason == "Duplicate uploads aren't supported yet"
+    RetryService(library.unit_of_work, queue, max_attempts=3).retry(ADA, bare)
+    assert library.state.documents[bare].state.value == "failed"
     assert queue.sent == []
     views = DocumentService(library.unit_of_work, max_attempts=3).list_documents(ADA)
-    assert next(v for v in views if v.document_id == duplicate).can_retry is False
+    assert next(v for v in views if v.document_id == bare).can_retry is False
 
 
 def test_another_learner_cannot_retry_and_learns_nothing() -> None:

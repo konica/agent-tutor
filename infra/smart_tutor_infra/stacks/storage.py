@@ -1,8 +1,8 @@
 """Documents bucket and ingest queue (#139, PRD §9.5).
 
 `uploads/<user>/<id>.pdf` (browser presigned POST, expires after 1 day; each upload notifies the ingest queue) and
-`contents/<sha256>.pdf` (the worker's deduplicated copies). Versioned and retained on teardown: documents are archived,
-never deleted. CORS lets only the web app's address POST (the upload); on-premise has none until its Host stack
+`contents/<owner_id>/<content_id>.pdf` and `.pages.json` (the worker's per-learner copies and page text). Versioned and
+retained on teardown. CORS lets only the web app's address POST (the upload); on-premise has none until its Host stack
 has an address (#149).
 """
 

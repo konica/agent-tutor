@@ -45,14 +45,14 @@ The unit tests fake Keycloak; this is the end-to-end check for US-1 (#45).
 2. Library → **Choose PDFs** (**Upload** once the library has documents) → pick a PDF under 50 MB. A row with the file name shows **Processing** within a few seconds.
 3. `docker compose logs worker` shows `upload <id>: stored`; the object is in `contents/`, not in `uploads/`:
    `docker compose exec localstack awslocal s3 ls s3://smart-tutor-documents/ --recursive`
-4. Upload the same file again (or as `learner2@example.com`): the new row shows **Failed — Duplicate uploads aren't supported yet**, and the content count is unchanged: `docker compose exec postgres psql -U smart_tutor -c "select count(*) from contents"`.
+4. After the first upload is processed, choose the same file again: the browser check says **Already in your library** and uploads nothing. A duplicate the server detects (the browser check can be bypassed) shows **Already in your library** on the tray row and adds no row. Sign in as `learner2@example.com` and upload the same file: it gets its own document, processed in full. The contents count goes up by one per learner: `docker compose exec postgres psql -U smart_tutor -c "select owner_id, count(*) from contents group by owner_id"`.
 
 ## Compose check: processing to ready (#61)
 
 1. Put `AWS_PROFILE=<profile>` in `.env` (Bedrock embeddings; the worker mounts `~/.aws` read-only), then `docker compose --profile app up -d --build`.
 2. Sign in at http://localhost:10453 as `learner@example.com` / `learner` and upload an arXiv PDF in the Library. After processing, the row turns **Ready** with subject **General**.
 3. Verify:
-   - `docker compose exec localstack awslocal s3 ls s3://smart-tutor-documents/contents/` shows `<sha256>.pdf` and `<sha256>.pages.json`.
+   - `docker compose exec localstack awslocal s3 ls s3://smart-tutor-documents/contents/` shows `<owner_id>/<content_id>.pdf` and `<owner_id>/<content_id>.pages.json`.
    - `docker compose exec postgres psql -U smart_tutor -c "select seq, page, left(text, 40) from chunks order by content_id, seq limit 5"`
    - `docker compose exec postgres psql -U smart_tutor -c "select chunker, embedding_model, embedding_dim, pages from contents"`
 4. Upload a non-PDF renamed `.pdf`: the row shows **Failed — This file isn't a readable PDF**. Upload a scanned (image-only) PDF: **Failed — No text layer (scanned PDFs are not supported yet)**. Neither creates chunks.

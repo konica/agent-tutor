@@ -1,6 +1,8 @@
 """US-12: a learner never sees another learner's documents, and can't get a presigned POST for their key.
 
-The browser hash check (D19) answers only from the caller's own library and links nothing.
+US-11: each learner's upload is their own content; a learner's own duplicate points to their existing document, and
+another learner's upload status is a 404. The browser hash check (D19) answers only from the caller's own library
+and links nothing.
 """
 
 import hashlib
@@ -18,7 +20,7 @@ from fakes import (
     fake_tools,
 )
 from smart_tutor.apps.api.main import create_app
-from smart_tutor.knowledge.application import IngestionService
+from smart_tutor.knowledge.application import IngestionService, UploadOutcome
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.domain.principal import Principal
@@ -138,3 +140,38 @@ def test_b_filters_find_nothing_of_a_and_a_filtered_list_holds_only_as() -> None
     assert by_state == []
     assert [d["title"] for d in by_dates] == ["b1.pdf"]  # the range covers A's upload too, but B sees only B's
     assert [d["document_id"] for d in mine] == [stored["document_id"]]
+
+
+def test_two_learners_with_the_same_file_each_get_their_own_document_and_never_see_the_other() -> None:
+    client, objects, ingestion = setup()
+    pdf = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
+    a = client.post("/uploads", json={"file_name": "a.pdf"}, headers=A).json()
+    b = client.post("/uploads", json={"file_name": "b.pdf"}, headers=B).json()
+    for started in (a, b):
+        objects.objects[started["fields"]["key"]] = pdf
+        assert ingestion.ingest_upload(started["fields"]["key"]) is UploadOutcome.STORED
+
+    [doc_a] = client.get("/documents", headers=A).json()
+    [doc_b] = client.get("/documents", headers=B).json()
+    assert (doc_a["document_id"], doc_b["document_id"]) == (a["document_id"], b["document_id"])
+    assert doc_a["state"] == doc_b["state"] == "awaiting_subjects"
+    assert client.get(f"/uploads/{a['upload_id']}", headers=A).json()["document_id"] == a["document_id"]
+    assert client.get(f"/uploads/{a['upload_id']}", headers=B).status_code == 404
+    assert client.get(f"/uploads/{b['upload_id']}", headers=A).status_code == 404
+
+
+def test_a_learners_own_duplicate_points_to_their_document() -> None:
+    client, objects, ingestion = setup()
+    pdf = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
+    first = client.post("/uploads", json={"file_name": "a.pdf"}, headers=A).json()
+    again = client.post("/uploads", json={"file_name": "copy.pdf"}, headers=A).json()
+    for started in (first, again):
+        objects.objects[started["fields"]["key"]] = pdf
+        ingestion.ingest_upload(started["fields"]["key"])
+    assert [d["document_id"] for d in client.get("/documents", headers=A).json()] == [first["document_id"]]
+    assert client.get(f"/uploads/{again['upload_id']}", headers=A).json() == {
+        "upload_id": again["upload_id"],
+        "outcome": "duplicate",
+        "document_id": first["document_id"],
+        "archived": False,
+    }

@@ -1,6 +1,6 @@
 # One entry point for local work. On Windows, run from Git Bash/WSL with `make` installed,
 # or run the commands below directly.
-.PHONY: help up down up-app api agent mcp worker api-debug agent-debug mcp-debug worker-debug sync migrate lint test test-integration bedrock-check sweep glacier-tag retention evals-smoke web api-client infra-synth helm-lint
+.PHONY: help up down up-app api agent mcp worker api-debug agent-debug mcp-debug worker-debug sync migrate lint test test-integration bedrock-check sweep retention evals-smoke web api-client infra-synth helm-lint
 .PHONY: design-states design-accept design-shots design-diff
 
 BACKEND := cd backend &&
@@ -62,8 +62,6 @@ bedrock-check: ## real Bedrock calls (us-east-1, your AWS credentials): models r
 
 sweep:         ## run the learning-record sweeper once (PRD §9.2)
 	$(BACKEND) uv run python -m smart_tutor.apps.jobs.record_sweeper
-glacier-tag:   ## run the Glacier tagger once (PRD §9.5)
-	$(BACKEND) uv run python -m smart_tutor.apps.jobs.glacier_tagger
 retention:     ## run the retention job once: traces 180 days, decline log 90 days (PRD D25, §9.6)
 	$(BACKEND) uv run python -m smart_tutor.apps.jobs.retention
 

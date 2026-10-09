@@ -14,7 +14,7 @@ from smart_tutor.knowledge.domain.content import (
     pages_key,
     too_many_pages,
 )
-from smart_tutor.knowledge.domain.document import DUPLICATE_UPLOAD, Document, DocumentFilter, DocumentState
+from smart_tutor.knowledge.domain.document import Document, DocumentFilter, DocumentState
 from smart_tutor.knowledge.domain.errors import (
     ContentStateError,
     DocumentStateError,
@@ -79,16 +79,6 @@ def test_a_document_links_content_only_once() -> None:
         doc.link_content(ContentId("c2"))
 
 
-def test_failing_records_the_reason() -> None:
-    doc = new_document()
-    doc.fail(DUPLICATE_UPLOAD)
-    assert doc.state is DocumentState.FAILED
-    assert doc.failure_reason == "Duplicate uploads aren't supported yet"
-    assert not doc.awaiting_upload
-    with pytest.raises(DocumentStateError):
-        doc.fail("again")
-
-
 def test_only_the_owner_can_read_a_document() -> None:
     doc = new_document()
     assert doc.can_be_read_by(UserId("ada"))
@@ -115,12 +105,12 @@ def test_title_override_wins() -> None:
     assert doc.title == "RAG for knowledge-intensive NLP"
 
 
-def test_first_upload_creates_processing_content_at_its_hash_key() -> None:
+def test_first_upload_creates_processing_content_under_its_owner() -> None:
     content = Content.first_upload(ContentId("c1"), SHA, 1234, UserId("ada"))
     assert content.state is ContentState.PROCESSING
-    assert content.s3_key == content_key(SHA) == f"contents/{SHA}.pdf"
+    assert content.s3_key == content_key(UserId("ada"), ContentId("c1")) == "contents/ada/c1.pdf"
     assert content.attempts == 1
-    assert content.processed_by_user_id == "ada"
+    assert content.owner_id == "ada"
 
 
 @pytest.mark.parametrize("bad", ["A" * 64, "a" * 63, "g" * 64, ""])
@@ -154,7 +144,7 @@ def test_other_keys_are_not_upload_keys(key: str) -> None:
 
 
 def test_pages_key_and_failure_reasons() -> None:
-    assert pages_key(SHA) == f"contents/{SHA}.pages.json"
+    assert pages_key(UserId("ada"), ContentId("c1")) == "contents/ada/c1.pages.json"
     assert UNREADABLE_PDF == "This file isn't a readable PDF"
     assert NO_TEXT_LAYER == "No text layer (scanned PDFs are not supported yet)"
     assert GENERAL_SUBJECT_ID == "00000000-0000-4000-8000-000000000001"
@@ -182,9 +172,15 @@ def processing_content() -> Content:
 
 def test_content_ready_records_how_it_was_processed() -> None:
     content = processing_content()
-    content.ready(pages=3, text_key=pages_key(SHA), chunker="c:v1", embedding_model="m", embedding_dim=1024)
+    content.ready(
+        pages=3,
+        text_key=pages_key(UserId("ada"), ContentId("c1")),
+        chunker="c:v1",
+        embedding_model="m",
+        embedding_dim=1024,
+    )
     assert content.state is ContentState.READY
-    assert (content.pages, content.text_key, content.chunker) == (3, pages_key(SHA), "c:v1")
+    assert (content.pages, content.text_key, content.chunker) == (3, pages_key(UserId("ada"), ContentId("c1")), "c:v1")
     assert (content.embedding_model, content.embedding_dim) == ("m", 1024)
 
 
@@ -313,7 +309,7 @@ def test_only_a_failed_document_with_content_can_retry() -> None:
     doc = Document.start_upload(DocumentId("d1"), UserId("ada"), UploadId("u1"), "a.pdf", NOW)
     with pytest.raises(DocumentStateError):
         doc.retry()  # processing
-    doc.fail("Duplicate uploads aren't supported yet")  # failed, but no content
+    doc.fail("This file isn't a readable PDF")  # failed, but no content
     with pytest.raises(DocumentStateError):
         doc.retry()
 

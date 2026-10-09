@@ -1,4 +1,4 @@
-/* Smart Tutor design tokens, ported from sdd/design/prototype at tag design-v0.3 (smart-tutor-ds v0.3). Single source of truth: DESIGN.md → Tokens. */
+/* Smart Tutor design tokens, ported from sdd/design/prototype at tag design-v0.3 (smart-tutor-ds v0.3); compact density from design-v0.10 (DESIGN.md → Density). Single source of truth: DESIGN.md → Tokens. */
 
 :root, [data-theme="light"] {
   color-scheme: light;
@@ -33,25 +33,28 @@
   --font-body: system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
 
-  --fs-12: 12px; --fs-14: 14px; --fs-16: 16px; --fs-18: 18px;
-  --fs-20: 20px; --fs-24: 24px; --fs-32: 32px; --fs-40: 40px; --fs-64: 64px;
-  --lh-body: 1.55; --lh-head: 1.2;
+  --fs-12: 12px; --fs-13: 13px; --fs-14: 14px; --fs-16: 16px; --fs-18: 18px;
+  --fs-20: 20px; --fs-24: 24px; --fs-32: 32px; --fs-64: 64px;
+  --lh-body: 1.45; --lh-read: 1.6; --lh-head: 1.25;
 
-  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px;
+  --sp-0: 2px; --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px;
   --sp-6: 24px; --sp-8: 32px; --sp-12: 48px; --sp-16: 64px;
 
-  --r-sm: 6px; --r-md: 10px; --r-pill: 999px;
+  --r-sm: 4px; --r-md: 6px; --r-lg: 8px; --r-pill: 999px;
 
   --dur-fast: 150ms; --dur-base: 220ms; --dur-exit: 150ms; --dur-spin: 800ms;
   --ease-out: cubic-bezier(.2, .7, .2, 1);
   --ease-in: cubic-bezier(.5, 0, .75, .2);
 
-  --control-h: 40px;
-  --filter-field-w: 160px;
-  --nav-w: 240px;
-  --chat-w: 760px;
-  --page-w: 1120px;
-  --page-w-wide: 1200px;
+  --control-h: 32px;
+  --control-h-sm: 28px;
+  --nav-w: 208px;
+  --nav-w-collapsed: 56px;
+  --chat-w: 720px;
+  --page-w: 1200px;
+  --landing-w: 1120px;
+  --page-w-wide: 1360px;
+  --viewer-w: min(960px, 100% - 64px);
 
   --subj-llm: #2563A8;
   --subj-agents: #7A4BAE;
@@ -61,8 +64,8 @@
   --subj-other: #5B6875;
   --attn: #8A4B00;
   --attn-soft: #FDEFD9;
-  --panel-w: 480px;
-  --tray-w: 384px;
+  --panel-w: 340px;
+  --tray-w: 320px;
 }
 
 [data-theme="dark"] {

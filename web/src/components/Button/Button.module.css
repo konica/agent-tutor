@@ -1,12 +1,12 @@
 .button {
-  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   border: 1px solid transparent; border-radius: var(--r-sm);
   font-size: var(--fs-14); font-weight: 600; line-height: 1.2; text-decoration: none; white-space: nowrap;
   transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
-.sm { min-height: 32px; padding: 0 var(--sp-3); }
-.md { min-height: 40px; padding: 0 var(--sp-4); }
-.lg { min-height: 48px; padding: 0 var(--sp-6); font-size: var(--fs-16); }
+.sm { min-height: var(--control-h-sm); padding: 0 10px; font-size: var(--fs-13); }
+.md { min-height: var(--control-h); padding: 0 var(--sp-3); }
+.lg { min-height: 36px; padding: 0 var(--sp-4); font-size: var(--fs-14); }
 .icon { width: 16px; height: 16px; flex: none; }
 .primary { background: var(--accent); color: var(--on-accent); }
 /* :not(:disabled) also matches links; each hover rule restates the colour so a:hover in base.css can't override it. */
@@ -18,3 +18,8 @@
 .quiet { background: transparent; color: var(--text); }
 .quiet:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
 .button:disabled { background: var(--surface-2); color: var(--text-3); border-color: var(--border); }
+.iconButton {
+  display: inline-grid; place-items: center; width: 28px; height: 28px; flex: none; padding: 0;
+  border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; color: var(--text-2);
+}
+.iconButton:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }

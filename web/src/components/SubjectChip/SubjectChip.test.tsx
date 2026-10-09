@@ -10,6 +10,14 @@ describe("SubjectChip", () => {
     expect(screen.queryByRole("button")).toBeNull();
   });
 
+  it("wraps the name in a shrinkable span only when truncate is set", () => {
+    const { rerender } = render(<SubjectChip name="LLMs" hueKey="s1" truncate />);
+    expect(screen.getByText("LLMs").tagName).toBe("SPAN");
+    expect(screen.getByText("LLMs").parentElement).toHaveClass(/truncate/);
+    rerender(<SubjectChip name="LLMs" hueKey="s1" />);
+    expect(screen.getByText("LLMs")).not.toHaveClass(/name/);
+  });
+
   it("shows the origin after the name", () => {
     render(<SubjectChip name="LLMs" hueKey="s1" origin="Your subject" onToggle={() => {}} />);
     expect(screen.getByRole("button")).toHaveTextContent("LLMs· Your subject");

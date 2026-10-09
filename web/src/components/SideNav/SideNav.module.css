@@ -1,14 +1,37 @@
 .sidenav {
-  display: flex; flex-direction: column; gap: var(--sp-1); padding: var(--sp-4) var(--sp-3);
+  display: flex; flex-direction: column; gap: var(--sp-0); padding: var(--sp-3) var(--sp-2) var(--sp-2);
   background: var(--surface); border-right: 1px solid var(--border); overflow-y: auto;
 }
-.brand { display: block; padding: var(--sp-1) var(--sp-2) var(--sp-4); text-decoration: none; border-radius: var(--r-sm); }
-.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.brand { display: block; padding: var(--sp-1) var(--sp-2) var(--sp-3); text-decoration: none; border-radius: var(--r-sm); }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-0); }
 .link {
-  display: flex; align-items: center; gap: var(--sp-3); min-height: 40px; padding: 0 var(--sp-3); border-radius: var(--r-sm);
-  color: var(--text-2); text-decoration: none; font-size: var(--fs-14); font-weight: 500;
+  display: flex; align-items: center; gap: 10px; min-height: 32px; padding: 0 var(--sp-2); border-radius: var(--r-sm);
+  color: var(--text-2); text-decoration: none; font-size: var(--fs-14); font-weight: 500; position: relative;
   transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
 .link:hover { background: var(--surface-2); color: var(--text); }
 .link[aria-current="page"] { background: var(--accent-soft); color: var(--accent-text); font-weight: 650; }
-.icon { width: 20px; height: 20px; flex: none; }
+.icon { width: 16px; height: 16px; flex: none; }
+.text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hr { border: 0; height: 1px; margin: var(--sp-2); background: var(--border); }
+.sub { list-style: none; margin: 0 0 var(--sp-1); padding: 0 0 0 34px; display: grid; }
+.sub a {
+  display: block; min-height: 28px; line-height: 28px; padding: 0 var(--sp-2); border-radius: var(--r-sm);
+  font-size: var(--fs-13); color: var(--text-2); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sub a:hover { background: var(--surface-2); color: var(--text); }
+.sub a[aria-current="page"] { color: var(--accent-text); font-weight: 650; }
+.foot { margin-top: auto; display: grid; gap: var(--sp-1); padding-top: var(--sp-2); border-top: 1px solid var(--border); }
+.collapse { justify-self: end; }
+/* Expanded: the button sits at the nav's right edge, so its tooltip opens leftward to stay inside the nav. */
+.sidenav:not(.collapsed) .collapse[data-tip]:hover::after, .sidenav:not(.collapsed) .collapse[data-tip]:focus-visible::after { left: auto; right: 0; transform: none; }
+
+/* The icon rail: tooltips replace the labels and open to the right, so the rail must not clip them. */
+.collapsed { overflow: visible; }
+.collapsed .brand { padding-inline: var(--sp-1); display: grid; justify-items: center; }
+.collapsed .link { justify-content: center; padding: 0; }
+.collapsed .collapse { justify-self: center; }
+.collapsed .hr { margin: var(--sp-2) var(--sp-1); }
+.collapsed [data-tip]:hover::after, .collapsed [data-tip]:focus-visible::after {
+  left: calc(100% + 10px); right: auto; top: 50%; transform: translateY(-50%);
+}

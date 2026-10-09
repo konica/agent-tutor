@@ -3,12 +3,12 @@ import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent
 
 import styles from "./UserMenu.module.css";
 
-type Props = { name: string; detail?: string; onSignOut?: () => void };
+type Props = { name: string; detail?: string; onSignOut?: () => void; compact?: boolean };
 
 const initials = (name: string) =>
   name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]!.toUpperCase()).join("");
 
-export function UserMenu({ name, detail, onSignOut }: Props) {
+export function UserMenu({ name, detail, onSignOut, compact = false }: Props) {
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const root = useRef<HTMLDivElement>(null);
@@ -32,7 +32,7 @@ export function UserMenu({ name, detail, onSignOut }: Props) {
   return (
     <div className={styles.foot} ref={root} onKeyDown={onKeyDown} onBlur={onBlur}>
       {open && (
-        <div className={styles.menu} id={menuId}>
+        <div className={compact ? `${styles.menu} ${styles.compactMenu}` : styles.menu} id={menuId}>
           <div className={styles.head}>
             <strong>{name}</strong>
           </div>
@@ -47,17 +47,23 @@ export function UserMenu({ name, detail, onSignOut }: Props) {
       <button
         type="button"
         ref={toggle}
-        className={styles.user}
+        className={compact ? `${styles.user} ${styles.compact}` : styles.user}
+        aria-label={compact ? name : undefined}
+        data-tip={compact ? name : undefined}
         aria-expanded={open}
         aria-controls={menuId}
         onClick={() => setOpen((v) => !v)}
       >
         <span className={styles.avatar} aria-hidden="true">{initials(name)}</span>
-        <span className={styles.who}>
-          <span className={styles.name}>{name}</span>
-          {detail && <span className={styles.detail}>{detail}</span>}
-        </span>
-        <ChevronUp className={`${styles.icon} ${open ? styles.flip : ""}`} strokeWidth={1.5} aria-hidden="true" />
+        {!compact && (
+          <>
+            <span className={styles.who}>
+              <span className={styles.name}>{name}</span>
+              {detail && <span className={styles.detail}>{detail}</span>}
+            </span>
+            <ChevronUp className={`${styles.icon} ${open ? styles.flip : ""}`} strokeWidth={1.5} aria-hidden="true" />
+          </>
+        )}
       </button>
     </div>
   );

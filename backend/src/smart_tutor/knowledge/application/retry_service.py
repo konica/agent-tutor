@@ -1,11 +1,11 @@
-"""Retry a failed document: its shared content gets another processing attempt from the stored file (PRD §9.5).
+"""Retry a failed document: its content (the owner's own copy) gets another attempt from the stored file (PRD §9.5).
 
 The worker is woken by a message on the ingest queue. It is sent before the commit, while this transaction holds
 the content's row lock; the worker's first read locks the content too, so it waits for the commit. If the commit
 fails, the worker finds the content still failed and drops the message; nothing was used up.
 
-Locks are taken in the worker's order (the content, then its documents in id order), so two learners retrying the
-same shared content cannot deadlock. The caller's document is first read without a lock.
+Locks are taken in the worker's order (the content, then its documents in id order), so two retries of the same
+content (documents linked to it are the owner's) cannot deadlock. The caller's document is first read without a lock.
 """
 
 import json

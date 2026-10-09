@@ -2,12 +2,13 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { RetriesUsedUpError, type DocumentResponse, type UploadEvents } from "../../api/documents";
+import { RetriesUsedUpError, type DocumentResponse, type UploadEvents, type UploadStatus } from "../../api/documents";
+import { SessionExpiredError } from "../../auth/authClient";
 import { LibraryPage } from "./LibraryPage";
 
 const today = new Date().toISOString();
 const processing: DocumentResponse = { document_id: "d1", title: "lewis-rag-2020.pdf", state: "processing", failure_reason: null, created_at: today, subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: [], year: null };
-const duplicate: DocumentResponse = { document_id: "d2", title: "copy.pdf", state: "failed", failure_reason: "Duplicate uploads aren't supported yet", created_at: today, subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: [], year: null };
+const duplicate: DocumentResponse = { document_id: "d2", title: "copy.pdf", state: "failed", failure_reason: "This file isn't a readable PDF", created_at: today, subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: [], year: null };
 
 const notInLibrary = async () => null;
 const noSubjects = async () => [];
@@ -20,6 +21,16 @@ describe("LibraryPage", () => {
     render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => []} upload={vi.fn()} />);
     expect(await screen.findByText("Upload your first document")).toBeVisible();
     expect(screen.getByRole("button", { name: "Choose PDFs" })).toBeEnabled();
+    expect(screen.getByText("Only upload documents you have the right to use.")).toBeVisible();
+    expect(screen.queryByText(/^0 documents$/, { selector: "span:not([aria-live])" })).toBeNull();
+  });
+
+  it("shows the upload-rights sentence beside Upload and the count in the header", async () => {
+    const three = ["a", "b", "c"].map((n) => ({ ...processing, document_id: n, title: `${n}.pdf` }));
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => three} upload={vi.fn()} />);
+    expect(await screen.findByText("3 documents", { selector: "span:not([aria-live])" })).toBeVisible();
+    expect(screen.getByText("Only upload documents you have the right to use.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "About Library" })).toHaveAttribute("data-tip", expect.stringContaining("private to you"));
   });
 
   it("lists a processing document by its file name with the subjects hint", async () => {
@@ -44,7 +55,7 @@ describe("LibraryPage", () => {
     render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => [duplicate]} upload={vi.fn()} />);
     const row = (await screen.findByText("copy.pdf")).closest("tr")!;
     expect(within(row).getByText("Failed")).toBeVisible();
-    expect(within(row).getByText("Duplicate uploads aren't supported yet")).toBeVisible();
+    expect(within(row).getByText("This file isn't a readable PDF")).toBeVisible();
   });
 
   it("uploads the picked PDF and refreshes the list", async () => {
@@ -151,7 +162,7 @@ describe("LibraryPage", () => {
   });
 
   it("announces a processing state change in the status region, but not the first load", async () => {
-    const failedNow: DocumentResponse = { ...processing, state: "failed", failure_reason: "Duplicate uploads aren't supported yet" };
+    const failedNow: DocumentResponse = { ...processing, state: "failed", failure_reason: "This file isn't a readable PDF" };
     let release!: () => void;
     const gate = new Promise<void>((resolve) => (release = resolve)); // the change arrives only after the first-load check
     const load = vi
@@ -166,7 +177,7 @@ describe("LibraryPage", () => {
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
     release();
     await waitFor(() =>
-      expect(screen.getByRole("status")).toHaveTextContent("lewis-rag-2020.pdf failed: Duplicate uploads aren't supported yet."),
+      expect(screen.getByRole("status")).toHaveTextContent("lewis-rag-2020.pdf failed: This file isn't a readable PDF."),
     );
   });
 
@@ -389,12 +400,162 @@ describe("LibraryPage drop zone and upload tray", () => {
     await screen.findByText("Upload your first document");
     drop([pdf("a.pdf")]);
     await waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
-    act(() => pending.get("a.pdf")!.events.onStarted!("d9"));
+    act(() => pending.get("a.pdf")!.events.onStarted!("d9", "u9"));
     const tr = (await screen.findByRole("cell", { name: /a\.pdf/ })).closest("tr")!;
     expect(within(tr).getByText("Uploading")).toBeVisible();
     expect(within(tr).queryByText("You can choose subjects when processing finishes.")).toBeNull();
     await act(async () => pending.get("a.pdf")!.resolve());
     expect(await within(tr).findByText("Processing")).toBeVisible();
+  });
+
+  it("turns the tray row into Already in your library when the server finds a duplicate", async () => {
+    const upload = vi.fn(async (_file: File, events: UploadEvents) => events.onStarted?.("d9", "u9"));
+    const loadUpload = vi
+      .fn()
+      .mockResolvedValueOnce({ upload_id: "u9", outcome: null, document_id: null, archived: false })
+      .mockResolvedValue({ upload_id: "u9", outcome: "duplicate", document_id: "d1", archived: false });
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => [processing]} upload={upload} loadUpload={loadUpload} pollMs={20} />);
+    await screen.findByText("lewis-rag-2020.pdf");
+    drop([pdf("copy.pdf")]);
+    const tray = await screen.findByRole("region", { name: "Uploads · 1 file" });
+    expect(await within(tray).findByText("Already in your library")).toBeVisible();
+    expect(within(tray).getByRole("link", { name: "Open document" })).toHaveAttribute("href", "#document-d1");
+    expect(loadUpload).toHaveBeenCalledWith("u9");
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("copy.pdf: Already in your library."));
+  });
+
+  const startsUpload = (uploadId: string) => vi.fn(async (_file: File, events: UploadEvents) => events.onStarted?.("d9", uploadId));
+  const advance = (ms: number) =>
+    act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+  // Polls run only when a test advances the clock, so the tests stay fast and in order.
+  const POLL = 1000;
+  // Drops the file and waits until it is sent, when the page starts asking about the upload.
+  async function dropSent(name: string) {
+    await screen.findByText("lewis-rag-2020.pdf");
+    drop([pdf(name)]);
+    await within(await screen.findByRole("region", { name: "Uploads · 1 file" })).findByText("Uploaded · processing");
+  }
+
+  const page = (loadUpload: (uploadId: string) => Promise<UploadStatus>) => (
+    <LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => [processing]} upload={startsUpload("u9")} loadUpload={loadUpload} pollMs={POLL} />
+  );
+
+  it("keeps a stored upload as Uploaded and stops asking", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const loadUpload = vi.fn(async () => ({ upload_id: "u9", outcome: "stored" as const, document_id: "d9", archived: false }));
+    render(page(loadUpload));
+    await dropSent("fresh.pdf");
+    await advance(POLL);
+    expect(loadUpload).toHaveBeenCalledTimes(1);
+    await advance(5 * POLL);
+    expect(loadUpload).toHaveBeenCalledTimes(1);
+    expect(within(screen.getByRole("region", { name: "Uploads · 1 file" })).getByText("Uploaded · processing")).toBeVisible();
+  });
+
+  it("stops asking about the upload when the session expires", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const loadUpload = vi.fn(async (): Promise<UploadStatus> => {
+      throw new SessionExpiredError();
+    });
+    render(page(loadUpload));
+    await dropSent("fresh.pdf");
+    await advance(POLL);
+    expect(loadUpload).toHaveBeenCalledTimes(1);
+    await advance(5 * POLL);
+    expect(loadUpload).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks again after a failed status check and still finds the duplicate", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const loadUpload = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("500"))
+      .mockResolvedValue({ upload_id: "u9", outcome: "duplicate", document_id: "d1", archived: false });
+    render(page(loadUpload));
+    await dropSent("copy.pdf");
+    await advance(POLL);
+    expect(loadUpload).toHaveBeenCalledTimes(1);
+    await advance(POLL);
+    const tray = screen.getByRole("region", { name: "Uploads · 1 file" });
+    expect(await within(tray).findByText("Already in your library")).toBeVisible();
+    expect(loadUpload).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("status")).toHaveTextContent("copy.pdf: Already in your library.");
+  });
+
+  it("stops asking about the upload when the page closes", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const loadUpload = vi.fn(async () => ({ upload_id: "u9", outcome: null, document_id: null, archived: false }));
+    const { unmount } = render(page(loadUpload));
+    await dropSent("fresh.pdf");
+    await advance(POLL);
+    expect(loadUpload).toHaveBeenCalledTimes(1);
+    unmount();
+    await advance(5 * POLL);
+    expect(loadUpload).toHaveBeenCalledTimes(1);
+  });
+
+  it("says an archived duplicate is already in the library, archived, with no link", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const loadUpload = vi.fn(async () => ({ upload_id: "u9", outcome: "duplicate" as const, document_id: "d1", archived: true }));
+    render(page(loadUpload));
+    await dropSent("old.pdf");
+    await advance(POLL);
+    const tray = screen.getByRole("region", { name: "Uploads · 1 file" });
+    expect(await within(tray).findByText("Already in your library, archived")).toBeVisible();
+    expect(within(tray).queryByRole("link", { name: "Open document" })).toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent("old.pdf: Already in your library, archived.");
+  });
+
+  it("marks a duplicate without a document as already in the library, with no link", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const loadUpload = vi.fn(async () => ({ upload_id: "u9", outcome: "duplicate" as const, document_id: null, archived: false }));
+    render(page(loadUpload));
+    await dropSent("copy.pdf");
+    await advance(POLL);
+    const tray = screen.getByRole("region", { name: "Uploads · 1 file" });
+    expect(await within(tray).findByText("Already in your library")).toBeVisible();
+    expect(within(tray).queryByRole("link", { name: "Open document" })).toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent("copy.pdf: Already in your library.");
+    await advance(5 * POLL);
+    expect(loadUpload).toHaveBeenCalledTimes(1);
+  });
+
+  it("announces a late duplicate without overwriting a newer batch's message", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const { upload, pending } = controlledUpload();
+    let aIsDuplicate = false;
+    const loadUpload = vi.fn(async (uploadId: string) =>
+      uploadId === "ua" && aIsDuplicate
+        ? { upload_id: uploadId, outcome: "duplicate" as const, document_id: "d1", archived: false }
+        : { upload_id: uploadId, outcome: null, document_id: null, archived: false },
+    );
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => [processing]} upload={upload} loadUpload={loadUpload} pollMs={POLL} />);
+    await screen.findByText("lewis-rag-2020.pdf");
+    const status = screen.getByRole("status");
+
+    drop([pdf("a.pdf")]);
+    await waitFor(() => expect(pending.has("a.pdf")).toBe(true));
+    act(() => pending.get("a.pdf")!.events.onStarted!("da", "ua"));
+    await act(async () => pending.get("a.pdf")!.resolve());
+    await waitFor(() => expect(status).toHaveTextContent("Uploaded a.pdf. Processing."));
+
+    // A new batch resets the live region; b1.pdf takes the slot a.pdf had.
+    drop([pdf("b1.pdf"), pdf("b2.pdf")]);
+    await waitFor(() => expect(pending.has("b2.pdf")).toBe(true));
+    act(() => pending.get("b1.pdf")!.events.onStarted!("db1", "ub1"));
+    await act(async () => pending.get("b1.pdf")!.resolve());
+    await waitFor(() => expect(status).toHaveTextContent("Uploaded b1.pdf. Processing. Uploading b2.pdf…"));
+    expect(status).not.toHaveTextContent("a.pdf");
+
+    aIsDuplicate = true;
+    await advance(POLL);
+    await waitFor(() => expect(status).toHaveTextContent("a.pdf: Already in your library."));
+
+    act(() => pending.get("b2.pdf")!.events.onStarted!("db2", "ub2"));
+    await act(async () => pending.get("b2.pdf")!.resolve());
+    await waitFor(() => expect(status).toHaveTextContent("Uploaded b1.pdf. Processing. Uploaded b2.pdf. Processing."));
   });
 
   it("uploads by keyboard from the Upload button", async () => {
@@ -494,7 +655,7 @@ describe("LibraryPage retry", () => {
     const row = (await screen.findByText("scan.pdf")).closest("tr")!;
     await userEvent.click(within(row).getByRole("button", { name: "Retry scan.pdf" }));
     expect(retry).toHaveBeenCalledWith("d3");
-    expect(await within(row).findByText("Attempt 2 of 3.")).toBeVisible();
+    expect(await within(row).findByText(/^Attempt 2 of 3 · /)).toBeVisible();
     expect(within(row).getByText("Processing")).toBeVisible();
     expect(within(row).queryByRole("button", { name: /Retry/ })).toBeNull();
   });
@@ -545,7 +706,7 @@ describe("LibraryPage retry", () => {
       render(<LibraryPage check={notInLibrary} loadLimits={limits} loadSubjects={subjects} load={async () => [ready]} upload={vi.fn()} />);
       expect(await screen.findByText("Schick et al. · 2023")).toBeVisible();
       expect(screen.getByRole("search", { name: "Filter documents" })).toBeVisible();
-      expect(screen.getByText("1 document")).toBeVisible();
+      expect(within(screen.getByRole("search", { name: "Filter documents" })).getByText("1 document")).toBeVisible();
       expect(screen.queryByRole("button", { name: "Clear filters" })).toBeNull();
     });
 
@@ -559,6 +720,7 @@ describe("LibraryPage retry", () => {
       await waitFor(() => expect(load).toHaveBeenLastCalledWith({ subject_ids: ["s1"] }));
       await userEvent.selectOptions(screen.getByLabelText("State"), "awaiting_subjects");
       await waitFor(() => expect(load).toHaveBeenLastCalledWith({ subject_ids: ["s1"], state: "awaiting_subjects" }));
+      await userEvent.click(screen.getByRole("button", { name: "Uploaded" }));
       fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-10-01" } });
       fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-10-07" } });
       await waitFor(() => expect(load).toHaveBeenLastCalledWith({ subject_ids: ["s1"], state: "awaiting_subjects", uploaded_from: "2026-10-01", uploaded_to: "2026-10-07" }));

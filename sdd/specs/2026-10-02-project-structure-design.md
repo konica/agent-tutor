@@ -37,7 +37,7 @@ Architecture decisions after this spec are recorded as ADRs in `sdd/adr/` (0001 
 ```
 agent-tutor/
 ├── README.md
-├── Makefile                 # one entry point: make up, make test, make lint, make sweep, make glacier-tag, make retention
+├── Makefile                 # one entry point: make up, make test, make lint, make sweep, make retention
 ├── compose.yaml             # local dependencies (default) + `app` profile (same images as prod)
 ├── .env.example
 ├── .gitignore  .editorconfig  .pre-commit-config.yaml
@@ -100,7 +100,7 @@ backend/src/smart_tutor/
     ├── agent/         # server.py, graph.py, state.py, nodes/ (search, gate, answer, summarize)
     ├── mcp_server/    # server.py, tools.py (search, get_chunk) → knowledge.application
     ├── worker/        # SQS consumer → knowledge.application.IngestionService
-    └── jobs/          # migrate.py, record_sweeper.py, glacier_tagger.py, retention.py, (R3) learner_reports.py
+    └── jobs/          # migrate.py, record_sweeper.py, retention.py, (R3) learner_reports.py
 ```
 
 Every module has the same shape:
@@ -118,7 +118,7 @@ Every module has the same shape:
 
 | Module | Owns (PRD) | Key classes | Depends on (application of) |
 |---|---|---|---|
-| `knowledge` | Library (PRD §9.2 document processing, §9.3–§9.5, US-2, US-2b, US-10, US-11): contents deduplicated by SHA-256 (states, shared retry), documents (library entries, 1–3 subjects, states, archive flag, visibility, grants), the single `can_read` rule, upload flow, ingestion (first pages, saved page text, work key), chunks, search | `Content`, `Document` (`set_subjects()`, `can_be_read_by()`), `Chunk`; `UploadService`, `DeduplicationService`, `IngestionService`, `DocumentService`, `SearchService`; ports `PdfExtractor` (`extract_pages(..., first=2)` reads the first pages), `ObjectStore`, `ContentRepository`, `DocumentRepository`, `ChunkRepository` | `subjects` (suggestions, get-or-create), `accounts` (rate limits, processing usage) |
+| `knowledge` | Library (PRD §9.2 document processing, §9.3–§9.5, US-2, US-2b, US-10, US-11): per-learner contents with a SHA-256 duplicate check within the learner's library (states, retry by the owner), documents (library entries, 1–3 subjects, states, archive flag, visibility, grants), the single `can_read` rule, upload flow, ingestion (first pages, saved page text, work key), chunks, search | `Content`, `Document` (`set_subjects()`, `can_be_read_by()`), `Chunk`; `UploadService`, `DeduplicationService`, `IngestionService`, `DocumentService`, `SearchService`; ports `PdfExtractor` (`extract_pages(..., first=2)` reads the first pages), `ObjectStore`, `ContentRepository`, `DocumentRepository`, `ChunkRepository` | `subjects` (suggestions, get-or-create), `accounts` (rate limits, processing usage) |
 | `subjects` | Shared subject catalog (PRD D1, D20, D21, US-2b, US-10b; ADR 0003, 0004): stable `subject_id`s, canonical names, personal names (rename, reset), suggestion ranking, name checks | `Subject`, `SubjectName`, `PersonalSubjectName`; `SubjectCatalogService`, `SubjectSuggester`, `SubjectNameChecker`; ports `SubjectRepository`, `PersonalNameRepository` | — |
 | `tutoring` | Threads (no subjects), relevance gate, ask path (§9.2, US-3–US-6, US-3b, US-13) | `Thread`, `RelevanceGate`; `AskService`, `ConversationService`; ports `Retriever`, `ThreadRepository` | `knowledge` (whether the learner has a ready document), `accounts`, `insights` (log declines) |
 | `learning` | Lesson Notes, learning records, idle sweep (§9.4, US-7, US-8, US-13b) | `LessonNote`, `LearningRecord`; `NoteService`, `LearningRecordService`; ports `NoteRepository`, `LearningMemory` | `tutoring` (thread content) |
@@ -182,7 +182,7 @@ deploy/
 └── helm/
     ├── smart-tutor/                # umbrella chart: Chart.yaml, values.yaml, values-prod.yaml
     │   ├── templates/              # SecretStore and the db-bootstrap hook (files/db-bootstrap.sql)
-    │   └── charts/                 # api, agent, mcp-server, worker, web, jobs (sweeper, Glacier tagger, retention), keycloak
+    │   └── charts/                 # api, agent, mcp-server, worker, web, jobs (sweeper, retention), keycloak
     │                               # each sub-chart owns its NetworkPolicy and ExternalSecret
     └── addons/                     # values for AWS Load Balancer Controller, External Secrets Operator, metrics-server
 ```

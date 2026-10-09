@@ -8,7 +8,6 @@ from enum import StrEnum
 from smart_tutor.knowledge.domain.errors import DocumentStateError, InvalidFileNameError, InvalidSubjectsError
 from smart_tutor.shared.domain.ids import ContentId, DocumentId, SubjectId, UploadId, UserId
 
-DUPLICATE_UPLOAD = "Duplicate uploads aren't supported yet"  # until US-11 links duplicates
 MAX_FILE_NAME = 255
 MAX_SUBJECTS = 3
 # C0/C1 controls and bidi controls (which can disguise a file name)
