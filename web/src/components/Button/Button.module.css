@@ -11,6 +11,8 @@
 .primary { background: var(--accent); color: var(--on-accent); }
 /* :not(:disabled) also matches links; each hover rule restates the colour so a:hover in base.css can't override it. */
 .primary:hover:not(:disabled) { background: var(--accent-hover); color: var(--on-accent); }
+.danger { background: var(--danger); color: var(--surface); border-color: var(--danger); }
+.danger:hover:not(:disabled) { filter: brightness(0.92); color: var(--surface); }
 .secondary { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
 .secondary:hover:not(:disabled) { background: var(--surface-2); border-color: var(--text-3); color: var(--text); }
 .ghost { background: transparent; color: var(--accent-text); }

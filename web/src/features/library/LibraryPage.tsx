@@ -2,7 +2,7 @@ import { AlertCircle, Archive, Filter, Info, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import { SessionExpiredError } from "../../auth/authClient";
-import { archiveDocument, findInLibrary, loadDocuments, loadSubjectSuggestions, loadUploadLimits, loadUploadStatus, megabytes, rejectionReason, restoreDocument, RetriesUsedUpError, retryProcessing, saveSubjects as saveChosenSubjects, uploadPdf, type DocumentFilters, type DocumentResponse, type SubjectSuggestions, type UploadEvents, type UploadLimits, type UploadStatus } from "../../api/documents";
+import { archiveDocument, deleteDocument, findInLibrary, loadDocuments, loadSubjectSuggestions, loadUploadLimits, loadUploadStatus, megabytes, rejectionReason, restoreDocument, RetriesUsedUpError, retryProcessing, saveSubjects as saveChosenSubjects, uploadPdf, type DocumentFilters, type DocumentResponse, type SubjectSuggestions, type UploadEvents, type UploadLimits, type UploadStatus } from "../../api/documents";
 import type { SubjectResponse } from "../../api/generated/types.gen";
 import { loadMySubjects } from "../../api/subjects";
 import { Button } from "../../components/Button/Button";
@@ -10,6 +10,7 @@ import { EmptyState } from "../../components/EmptyState/EmptyState";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
 import { Tabs } from "../../components/Tabs/Tabs";
 import { UploadTray, type TrayItem } from "../../components/UploadTray/UploadTray";
+import { DeleteDialog } from "./DeleteDialog";
 import { DropOverlay } from "./DropOverlay";
 import { DocumentTable } from "./DocumentTable";
 import { hasFilters, LibraryFilters } from "./LibraryFilters";
@@ -31,6 +32,7 @@ type Props = {
   loadUpload?: (uploadId: string) => Promise<UploadStatus>;
   archive?: (documentId: string) => Promise<DocumentResponse>;
   restore?: (documentId: string) => Promise<DocumentResponse>;
+  remove?: (documentId: string) => Promise<void>;
   pollMs?: number;
 };
 
@@ -55,13 +57,14 @@ const defaultCheck = (file: File) => findInLibrary(file);
 const defaultLoadUpload = (uploadId: string) => loadUploadStatus(uploadId);
 const defaultArchive = (id: string) => archiveDocument(id);
 const defaultRestore = (id: string) => restoreDocument(id);
+const defaultRemove = (id: string) => deleteDocument(id);
 
 const defaultLoadSubjects = () => loadMySubjects();
 const defaultLoadSuggestions = (id: string) => loadSubjectSuggestions(id);
 const defaultSaveSubjects = (id: string, choice: { subject_ids: string[]; new_names: string[] }) => saveChosenSubjects(id, choice);
 
 // Library: upload by picking or dropping PDFs (US-2), the upload tray, and the Active and Archived lists narrowed by subject, upload dates and state (US-10).
-export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSubjects, upload = defaultUpload, retry = defaultRetry, loadLimits = defaultLoadLimits, check = defaultCheck, loadSuggestions = defaultLoadSuggestions, saveSubjects = defaultSaveSubjects, loadUpload = defaultLoadUpload, archive = defaultArchive, restore = defaultRestore, pollMs = 2000 }: Props) {
+export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSubjects, upload = defaultUpload, retry = defaultRetry, loadLimits = defaultLoadLimits, check = defaultCheck, loadSuggestions = defaultLoadSuggestions, saveSubjects = defaultSaveSubjects, loadUpload = defaultLoadUpload, archive = defaultArchive, restore = defaultRestore, remove = defaultRemove, pollMs = 2000 }: Props) {
   const [filters, setFilters] = useState<DocumentFilters>({});
   const [view, setView] = useState<View>("active");
   const archivedView = view === "archived";
@@ -97,6 +100,18 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
   const [picking, setPicking] = useState<DocumentResponse | null>(null);
   const statusRegion = useRef<HTMLParagraphElement>(null);
   const wasPicking = useRef(false);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const [deleting, setDeleting] = useState<DocumentResponse | null>(null); // the document whose delete dialog is open
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleted, setDeleted] = useState(false); // a delete just succeeded: its row, and the button that had focus, are going away
+
+  // The dialog gives focus back to the More button as it unmounts, and the row then leaves; this effect runs after that, so the heading keeps focus.
+  useEffect(() => {
+    if (deleted && !deleting) {
+      setDeleted(false);
+      headingRef.current?.focus();
+    }
+  }, [deleted, deleting]);
 
   // The dialog gives focus back to the row button; after a save that button is gone, so the status region takes it.
   useEffect(() => {
@@ -374,6 +389,28 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
     if (document.activeElement === document.body) statusRegion.current?.focus(); // the disabled button lost focus
   }
 
+  async function confirmDelete(doc: DocumentResponse) {
+    setDeleteBusy(true);
+    try {
+      await remove(doc.document_id);
+      setDeleting(null);
+      setDeleted(true);
+      setStatus(`${doc.title} deleted.`);
+    } catch (error) {
+      // A 401 is left to the session screen. Otherwise the dialog stays open so the learner can try again.
+      if (!(error instanceof SessionExpiredError)) setStatus(`Couldn't delete ${doc.title}. Try again.`);
+      setDeleteBusy(false);
+      return;
+    }
+    setDeleteBusy(false);
+    await Promise.all([refresh(), counts.refresh(), refreshSubjects()]);
+  }
+
+  function archiveInstead(doc: DocumentResponse) {
+    setDeleting(null);
+    void changeArchived(doc, true);
+  }
+
   // An archived duplicate found by the server: restoring it turns the tray row into "Already in your library" with its link.
   async function restoreFromTray(item: TrayItem) {
     if (!item.documentId) return;
@@ -394,6 +431,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
     <>
       <PageHeader
         title="Library"
+        headingRef={headingRef}
         count={counts.active ? `${counts.active} active ${counts.active === 1 ? "document" : "documents"}` : undefined}
         description="Your documents. They're private to you, and the tutor answers only from them."
         actions={
@@ -528,10 +566,12 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
           uploading={uploading}
           onArchive={(d) => void changeArchived(d, true)}
           onRestore={(d) => void changeArchived(d, false)}
+          onDelete={setDeleting}
           busy={busy}
         />
       )}
       {picking && <SubjectPicker document={picking} load={loadSuggestions} save={saveSubjects} onClose={() => setPicking(null)} onSaved={(doc) => void onSaved(doc)} />}
+      {deleting && <DeleteDialog doc={deleting} busy={deleteBusy} onCancel={() => setDeleting(null)} onDelete={() => void confirmDelete(deleting)} onArchive={() => archiveInstead(deleting)} />}
       {dragging && !picking && <DropOverlay />}
       <UploadTray items={tray} onClose={closeTray} onRestore={(item) => void restoreFromTray(item)} />
     </>

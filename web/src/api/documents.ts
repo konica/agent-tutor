@@ -1,7 +1,7 @@
 import { SessionExpiredError } from "../auth/authClient";
 import type { Client } from "./generated/client";
 import { client } from "./generated/client.gen";
-import { archiveDocument as postArchive, checkDuplicate, chooseSubjects, getSubjectSuggestions, getUpload, getUploadLimits, listDocuments, restoreDocument as postRestore, retryDocument, startUpload } from "./generated/sdk.gen";
+import { archiveDocument as postArchive, checkDuplicate, chooseSubjects, deleteDocument as sendDelete, getSubjectSuggestions, getUpload, getUploadLimits, listDocuments, restoreDocument as postRestore, retryDocument, startUpload } from "./generated/sdk.gen";
 import type { DocumentResponse, SubjectSuggestionsResponse, SuggestionResponse, UploadLimitsResponse, UploadStatusResponse } from "./generated/types.gen";
 
 export type { DocumentResponse };
@@ -77,6 +77,13 @@ export async function restoreDocument(documentId: string, apiClient: Client = cl
   if (sessionOver(error, response)) throw new SessionExpiredError();
   if (!data) throw failure(error);
   return data;
+}
+
+// Deleting removes the PDF, its text and chunks for good (PRD US-10c). 409: the document is still processing.
+export async function deleteDocument(documentId: string, apiClient: Client = client): Promise<void> {
+  const { error, response } = await sendDelete({ client: apiClient, path: { document_id: documentId }, throwOnError: false });
+  if (sessionOver(error, response)) throw new SessionExpiredError();
+  if (!response?.ok) throw failure(error);
 }
 
 export async function loadUploadLimits(apiClient: Client = client): Promise<UploadLimits> {

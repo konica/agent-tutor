@@ -4,7 +4,7 @@ import type { ButtonHTMLAttributes } from "react";
 import styles from "./Button.module.css";
 
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "ghost" | "quiet";
+  variant?: "primary" | "secondary" | "ghost" | "quiet" | "danger";
   size?: "sm" | "md" | "lg";
   icon?: LucideIcon;
 };

@@ -4,6 +4,7 @@ import { SessionExpiredError } from "../auth/authClient";
 import { configureApiClient } from "./client";
 import {
   archiveDocument,
+  deleteDocument,
   findInLibrary,
   loadDocuments,
   loadSubjectSuggestions,
@@ -366,5 +367,30 @@ describe("saveSubjects", () => {
   it("rejects with the server's detail on 409", async () => {
     const { apiClient } = api(() => json({ detail: "Document is not ready for subjects" }, 409));
     await expect(saveSubjects("d1", choice, apiClient)).rejects.toThrow("Document is not ready for subjects");
+  });
+});
+
+describe("deleteDocument", () => {
+  it("sends DELETE to the document's path and resolves on 204", async () => {
+    const { apiClient, fetch } = api(() => new Response(null, { status: 204 }));
+    await expect(deleteDocument("d3", apiClient)).resolves.toBeUndefined();
+    const request = fetch.mock.calls[0]![0] as Request;
+    expect(request.method).toBe("DELETE");
+    expect(request.url).toBe("http://api.test/documents/d3");
+  });
+
+  it("rejects with SessionExpiredError on 401", async () => {
+    const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
+    await expect(deleteDocument("d3", apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+
+  it.each([
+    [404, "Document not found"],
+    [409, "This document is still processing"],
+  ])("rejects with the server's message on %i", async (status, detail) => {
+    const { apiClient } = api(() => json({ detail }, status));
+    const rejection = deleteDocument("d3", apiClient);
+    await expect(rejection).rejects.toThrow(detail);
+    await expect(rejection).rejects.not.toBeInstanceOf(SessionExpiredError);
   });
 });
