@@ -166,16 +166,30 @@ describe("DocumentViewer", () => {
   });
 
   it("does not reload the PDF when the link is renewed", async () => {
-    const loadFile = vi
-      .fn()
-      .mockResolvedValueOnce(file({}, "u1", Date.now() + 30_000))
-      .mockResolvedValue(file({}, "u2"));
-    const { loadPdfDoc } = renderViewer({ loadFile });
-    await ready();
-    await waitFor(() => expect(loadFile).toHaveBeenCalledTimes(2));
-    await act(async () => {});
-    expect(loadPdfDoc).toHaveBeenCalledTimes(1);
-    expect(loadPdfDoc).toHaveBeenCalledWith("u1");
+    // Fake time makes the order fixed: the PDF loads from u1 first, and only then does the renewal timer fire.
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    try {
+      const loadFile = vi
+        .fn()
+        .mockResolvedValueOnce(file({}, "u1", 300_000))
+        .mockResolvedValue(file({}, "u2", 600_000));
+      const { loadPdfDoc } = renderViewer({ loadFile });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByText("p. 1 / 3")).toBeInTheDocument();
+      expect(loadPdfDoc).toHaveBeenCalledTimes(1);
+      expect(loadPdfDoc).toHaveBeenCalledWith("u1");
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(271_000); // past expiresAt - 30s
+      });
+      expect(loadFile).toHaveBeenCalledTimes(2);
+      expect(loadPdfDoc).toHaveBeenCalledTimes(1);
+      expect(loadPdfDoc).not.toHaveBeenCalledWith("u2");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("destroys the PDF when it closes", async () => {
