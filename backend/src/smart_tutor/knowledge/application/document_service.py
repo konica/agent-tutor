@@ -85,6 +85,12 @@ class DocumentService:
             documents = tx.documents.list_readable_by(user_id)
         return frozenset(s for d in documents if d.state is DocumentState.READY for s in d.subject_ids)
 
+    def has_ready_documents(self, user_id: UserId) -> bool:
+        """Whether the learner has a ready, non-archived document to answer from (PRD §8 US-3)."""
+        with self._uow() as tx:
+            documents = tx.documents.list_readable_by(user_id)
+        return any(d.state is DocumentState.READY for d in documents)
+
     def find_in_library(self, user_id: UserId, sha256: str) -> DocumentId | None:
         """The caller's document holding this file, so the browser can skip uploading it (US-2, D19).
 

@@ -2,11 +2,7 @@
 
 from smart_tutor.tutoring.application.answer import NO_CHUNKS_ANSWER, answer_messages, cited_chunks
 from smart_tutor.tutoring.application.conversation_service import ConversationService
-from smart_tutor.tutoring.domain.errors import (
-    NoDocumentsError,
-    RetrievalError,
-    ThreadSubjectsError,
-)
+from smart_tutor.tutoring.domain.errors import NoDocumentsError, RetrievalError
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 from smart_tutor.tutoring.domain.thread import Thread
 from smart_tutor.tutoring.ports.retriever import Retriever
@@ -21,7 +17,6 @@ __all__ = [
     "Retriever",
     "Thread",
     "ThreadRepository",
-    "ThreadSubjectsError",
     "answer_messages",
     "cited_chunks",
 ]

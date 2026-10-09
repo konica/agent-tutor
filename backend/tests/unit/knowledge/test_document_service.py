@@ -4,6 +4,7 @@ from typing import Any
 
 from fakes import TEST_LIMITS, FakeObjectStore, FixedClock, InMemoryLibrary, fake_tools, ingest_ready
 from smart_tutor.knowledge.application import DocumentService, IngestionService, UploadService
+from smart_tutor.knowledge.domain.document import DocumentState
 from smart_tutor.shared.domain.ids import DocumentId, SubjectId, UserId
 from smart_tutor.subjects.application import GENERAL_SUBJECT_ID
 
@@ -139,3 +140,21 @@ def test_an_unlinked_or_duplicate_failed_document_never_matches() -> None:
     service = DocumentService(library.unit_of_work, max_attempts=3)
     assert service.find_in_library(UserId("ada"), SHA) == first
     assert service.find_in_library(UserId("carol"), SHA) is None
+
+
+def test_has_ready_documents_ignores_archived_and_unfinished_documents() -> None:
+    library = InMemoryLibrary()
+    docs = DocumentService(library.unit_of_work, max_attempts=3)
+    ada = UserId("ada")
+    UploadService(library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS).start_upload(ada, "p.pdf")
+    choosing = ingest_ready(library, "ada", "Awaiting subjects.")
+    library.state.documents[choosing].state = DocumentState.AWAITING_SUBJECTS
+    archived = ingest_ready(library, "ada", "Archived.")
+    library.state.documents[archived].archived = True
+    ingest_ready(library, "bob", "Bob's ready document.")  # another learner's never counts
+
+    assert docs.has_ready_documents(ada) is False
+
+    ingest_ready(library, "ada", "Ready and not archived.")
+    assert docs.has_ready_documents(ada) is True
+    assert docs.has_ready_documents(UserId("carol")) is False
