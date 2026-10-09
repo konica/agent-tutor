@@ -172,17 +172,25 @@ def test_instance_role_pulls_images_reads_its_own_settings_and_secrets_and_is_ma
     assert [sid for sid, s in statements.items() if s["Resource"] == "*"] == ["EcrLogin", "PublishJobMetrics"]
 
 
-def test_instance_role_writes_only_the_backups_prefix_of_the_on_premise_bucket(t: Template) -> None:
+def test_instance_role_writes_the_on_premise_bucket_only_where_a_service_or_the_backup_does(t: Template) -> None:
     statements = _statements(t)
-    writes = {
-        sid: s
-        for sid, s in statements.items()
-        if any(a.startswith("s3:") and not a.startswith(("s3:Get", "s3:List")) for a in _actions(s))
-    }
-    assert set(writes) == {"WriteDatabaseBackups"}
-    assert sorted(_actions(writes["WriteDatabaseBackups"])) == ["s3:AbortMultipartUpload", "s3:PutObject"]
-    resource = json.dumps(writes["WriteDatabaseBackups"]["Resource"])
-    assert "smart-tutor-on-premise-documents-" in resource and resource.endswith('/backups/*"]]}')
+    writes = sorted(
+        (action, resource)
+        for action, resource in _grants(t)
+        if action.startswith("s3:") and not action.startswith(("s3:Get", "s3:List"))
+    )
+    assert all(ON_PREMISE_BUCKET in resource for _, resource in writes)
+    assert [(action, resource.rsplit("/", 1)[0].rsplit('"', 1)[1]) for action, resource in writes] == [
+        ("s3:AbortMultipartUpload", "/backups"),
+        ("s3:DeleteObject", "/uploads"),
+        ("s3:DeleteObjectVersion", "/contents"),
+        ("s3:PutObject", "/backups"),
+        ("s3:PutObject", "/contents"),
+        ("s3:PutObject", "/uploads"),
+    ]
+    assert sorted(_actions(statements["WriteDatabaseBackups"])) == ["s3:AbortMultipartUpload", "s3:PutObject"]
+    resource = json.dumps(statements["WriteDatabaseBackups"]["Resource"])
+    assert ON_PREMISE_BUCKET in resource and resource.endswith('/backups/*"]]}')
     # Restore reads the dumps back; listing is limited to the prefix too.
     assert json.dumps(statements["ReadDatabaseBackups"]["Resource"]).endswith('/backups/*"]]}')
     assert statements["ListDatabaseBackups"]["Condition"] == {"StringLike": {"s3:prefix": ["backups/*"]}}
@@ -197,6 +205,72 @@ def test_instance_role_publishes_metrics_only_to_its_own_namespace(t: Template) 
 def _actions(statement: dict[str, Any]) -> list[str]:
     actions = statement["Action"]
     return [actions] if isinstance(actions, str) else actions
+
+
+def _all_statements(t: Template) -> list[dict[str, Any]]:
+    return [
+        s for p in t.find_resources("AWS::IAM::Policy").values() for s in p["Properties"]["PolicyDocument"]["Statement"]
+    ]
+
+
+def _grants(t: Template) -> list[tuple[str, str]]:
+    """Every (action, resource) pair the instance role allows; a resource is its JSON text."""
+    pairs: list[tuple[str, str]] = []
+    for statement in _all_statements(t):
+        resources = statement["Resource"]
+        for resource in resources if isinstance(resources, list) else [resources]:
+            pairs.extend((action, json.dumps(resource)) for action in _actions(statement))
+    return pairs
+
+
+def _granted(t: Template, action: str, *fragments: str) -> bool:
+    return any(a == action and all(f in r for f in fragments) for a, r in _grants(t))
+
+
+ON_PREMISE_BUCKET = "smart-tutor-on-premise-documents-"
+
+
+def test_instance_role_has_the_api_and_worker_bucket_permissions(t: Template) -> None:
+    # One role runs every service (#149), so it holds what native-cloud gives the API and the worker separately.
+    for action, prefix in (
+        ("s3:PutObject", "/uploads/*"),  # the browser's presigned POST
+        ("s3:PutObject", "/contents/*"),
+        ("s3:GetObject", "/uploads/*"),
+        ("s3:GetObject", "/contents/*"),  # also the document viewer's presigned GET (#123)
+        ("s3:DeleteObject", "/uploads/*"),
+        ("s3:DeleteObjectVersion", "/contents/*"),
+    ):
+        assert _granted(t, action, ON_PREMISE_BUCKET, f'{prefix}"'), (action, prefix)
+    (list_versions,) = (s for s in _all_statements(t) if "s3:ListBucketVersions" in _actions(s))
+    assert ON_PREMISE_BUCKET in json.dumps(list_versions["Resource"])
+    assert list_versions["Condition"] == {"StringLike": {"s3:prefix": ["contents/*"]}}
+
+
+def test_instance_role_sends_and_consumes_the_on_premise_ingest_queue(t: Template) -> None:
+    for action in (
+        "sqs:SendMessage",
+        "sqs:ReceiveMessage",
+        "sqs:DeleteMessage",
+        "sqs:ChangeMessageVisibility",
+        "sqs:GetQueueAttributes",
+    ):
+        assert _granted(t, action, "arn:aws:sqs:us-east-1:", ':smart-tutor-on-premise-ingest"'), action
+
+
+def test_instance_role_invokes_the_agent_and_embedding_models(t: Template) -> None:
+    for action in ("bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"):
+        assert _granted(t, action, ":inference-profile/us.amazon.nova-2-lite-v1:0")
+        for region in ("us-east-1", "us-east-2", "us-west-2"):
+            assert _granted(t, action, f"arn:aws:bedrock:{region}::foundation-model/amazon.nova-2-lite-v1:0")
+        assert _granted(
+            t, action, "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-2-multimodal-embeddings-v1:0"
+        )
+
+
+def test_instance_role_names_no_native_cloud_resource(t: Template) -> None:
+    rendered = json.dumps(_all_statements(t))
+    assert "smart-tutor-documents-" not in rendered
+    assert ":smart-tutor-ingest" not in rendered
 
 
 # --- backups -------------------------------------------------------------------------------------------------------
@@ -350,7 +424,14 @@ def test_no_secret_reaches_the_outputs_or_the_template(t: Template) -> None:
     assert "resolve:secretsmanager" not in rendered
     assert '"SecretString"' not in rendered  # every secret value is generated by Secrets Manager
     outputs = t.to_json()["Outputs"]
-    assert set(outputs) == {"InstanceId", "PublicIp", "PublicUrl", "DataVolumeId", "DeployDocumentName"}
+    # Besides CDK's export of the Elastic IP, which StorageStack's CORS imports.
+    assert {o for o in outputs if not o.startswith("ExportsOutput")} == {
+        "InstanceId",
+        "PublicIp",
+        "PublicUrl",
+        "DataVolumeId",
+        "DeployDocumentName",
+    }
     assert "Secret" not in json.dumps(outputs)
 
 

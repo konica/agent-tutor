@@ -2,6 +2,7 @@
 later). The mode comes from the context `smart-tutor:mode` (`on-premise` by default, or `native-cloud`; #147)."""
 
 import aws_cdk as cdk
+from aws_cdk import aws_s3 as s3
 
 from smart_tutor_infra.names import DEFAULT_MODE, NATIVE_CLOUD, ModeNames, mode_names
 from smart_tutor_infra.stacks.budgets import BudgetsStack
@@ -52,27 +53,36 @@ def _on_premise(app: cdk.App, env: cdk.Environment, names: ModeNames) -> list[cd
         existing_provider_arn=app.node.try_get_context("smart-tutor:github-oidc-provider-arn")
         or f"arn:aws:iam::{cdk.Aws.ACCOUNT_ID}:oidc-provider/{GITHUB_OIDC_HOST}",
     )
+    host = HostStack(
+        app,
+        f"{prefix}-Host",
+        env=env,
+        names=names,
+        instance_type=app.node.get_context("smart-tutor:on-premise-instance-type"),
+        # Empty: <Elastic IP>.sslip.io until the DuckDNS name is claimed (#154).
+        domain=app.node.try_get_context("smart-tutor:on-premise-domain") or None,
+        # Empty: a blank data volume. Set only to restore one (docs/runbooks/on-premise-backups.md); clearing it
+        # again replaces the restored volume with a blank one.
+        data_snapshot_id=app.node.try_get_context("smart-tutor:on-premise-data-snapshot-id") or None,
+        # The backup, recovery, uptime, and patching alarms email the budget's recipients (#151, #152).
+        alert_emails=app.node.get_context("smart-tutor:budget-alert-emails"),
+    )
     return [
+        host,
+        # The bucket's CORS allows only the Host's address (POST uploads, GET for the viewer), so Storage deploys
+        # after Host; the Host's IAM names the bucket and queue by ModeNames, never by reference.
         StorageStack(
-            app, f"{prefix}-Storage", env=env, names=names, web_origin=None, backups_retention=cdk.Duration.days(30)
+            app,
+            f"{prefix}-Storage",
+            env=env,
+            names=names,
+            web_origin=host.public_url,
+            cors_methods=(s3.HttpMethods.GET, s3.HttpMethods.POST),
+            backups_retention=cdk.Duration.days(30),
         ),
         ConfigStack(app, f"{prefix}-Config", env=env, names=names),
         _budgets(app, env, names),
         deploy,
-        HostStack(
-            app,
-            f"{prefix}-Host",
-            env=env,
-            names=names,
-            instance_type=app.node.get_context("smart-tutor:on-premise-instance-type"),
-            # Empty: <Elastic IP>.sslip.io until the DuckDNS name is claimed (#154).
-            domain=app.node.try_get_context("smart-tutor:on-premise-domain") or None,
-            # Empty: a blank data volume. Set only to restore one (docs/runbooks/on-premise-backups.md); clearing it
-            # again replaces the restored volume with a blank one.
-            data_snapshot_id=app.node.try_get_context("smart-tutor:on-premise-data-snapshot-id") or None,
-            # The backup, recovery, uptime, and patching alarms email the budget's recipients (#151, #152).
-            alert_emails=app.node.get_context("smart-tutor:budget-alert-emails"),
-        ),
     ]
 
 
