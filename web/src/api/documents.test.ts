@@ -6,8 +6,11 @@ import {
   archiveDocument,
   DocumentGoneError,
   deleteDocument,
+  DocumentNotFoundError,
+  DocumentNotOpenableError,
   DocumentProcessingError,
   findInLibrary,
+  loadDocumentFile,
   loadDocuments,
   loadSubjectSuggestions,
   loadUploadLimits,
@@ -404,5 +407,42 @@ describe("deleteDocument", () => {
     await expect(rejection).rejects.toThrow("boom");
     await expect(rejection).rejects.not.toBeInstanceOf(DocumentGoneError);
     await expect(rejection).rejects.not.toBeInstanceOf(DocumentProcessingError);
+  });
+});
+
+describe("loadDocumentFile", () => {
+  const document = { document_id: "d1", title: "a.pdf", state: "ready", failure_reason: null, created_at: "2026-10-04T09:00:00Z", subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: [], year: null, archived: false };
+
+  it("returns the link with its expiry computed from now and the document", async () => {
+    const { apiClient, fetch } = api(() => json({ url: "http://s3.test/a.pdf?sig=1", expires_in: 300, document }));
+    await expect(loadDocumentFile("d1", apiClient, () => 1_000)).resolves.toEqual({ url: "http://s3.test/a.pdf?sig=1", expiresAt: 301_000, document });
+    const request = fetch.mock.calls[0]![0] as Request;
+    expect(request.method).toBe("GET");
+    expect(request.url).toBe("http://api.test/documents/d1/file");
+  });
+
+  it("rejects with DocumentNotFoundError on 404", async () => {
+    const { apiClient } = api(() => json({ detail: "Document not found" }, 404));
+    await expect(loadDocumentFile("d1", apiClient)).rejects.toBeInstanceOf(DocumentNotFoundError);
+  });
+
+  it("rejects with DocumentNotOpenableError carrying the detail on 409", async () => {
+    const { apiClient } = api(() => json({ detail: "Document is still processing" }, 409));
+    const rejection = loadDocumentFile("d1", apiClient);
+    await expect(rejection).rejects.toBeInstanceOf(DocumentNotOpenableError);
+    await expect(rejection).rejects.toThrow("Document is still processing");
+  });
+
+  it("rejects with SessionExpiredError on 401", async () => {
+    const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
+    await expect(loadDocumentFile("d1", apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+
+  it("rejects with a plain Error on 500", async () => {
+    const { apiClient } = api(() => json({ detail: "no" }, 500));
+    const rejection = loadDocumentFile("d1", apiClient);
+    await expect(rejection).rejects.toThrow("500");
+    await expect(rejection).rejects.not.toBeInstanceOf(DocumentNotFoundError);
+    await expect(rejection).rejects.not.toBeInstanceOf(DocumentNotOpenableError);
   });
 });
