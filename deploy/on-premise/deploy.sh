@@ -36,6 +36,9 @@ documents_bucket=$(param host/documents-bucket)
 ingest_queue_url=$(param host/ingest-queue-url)
 postgres_password=$(secret db/postgres)
 app_db_password=$(secret db/app)
+# Built here, not written out in compose.yaml: a URL of the form user:password@host in the repository looks like a
+# leaked credential to secret scanners (GitGuardian), even when the password is a ${PLACEHOLDER}.
+app_database_url=$(printf 'postgresql+psycopg://%s@postgres:5432/smart_tutor' "smart_tutor:$app_db_password")
 keycloak_db_password=$(secret db/keycloak)
 keycloak_admin=$(secret keycloak/admin)
 keycloak_admin_username=$(field username <<<"$keycloak_admin")
@@ -59,6 +62,7 @@ INGEST_QUEUE_URL=$ingest_queue_url
 CADDYFILE_SHA256=$caddyfile_sha256
 POSTGRES_PASSWORD=$postgres_password
 APP_DB_PASSWORD=$app_db_password
+APP_DATABASE_URL=$app_database_url
 KEYCLOAK_DB_PASSWORD=$keycloak_db_password
 KEYCLOAK_ADMIN_USERNAME=$keycloak_admin_username
 KEYCLOAK_ADMIN_PASSWORD=$keycloak_admin_password

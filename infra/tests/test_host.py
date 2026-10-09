@@ -320,6 +320,12 @@ def test_deploy_script_keeps_secrets_out_of_output_and_files_root_only() -> None
     assert "\\\\getenv app_password APP_DB_PASSWORD" in script
 
 
+def test_no_credential_shaped_url_is_in_the_repository() -> None:
+    # GitGuardian's generic-password detector flags user:password@host even when the password is a ${PLACEHOLDER}.
+    for path in ON_PREMISE_DIR.iterdir():
+        assert not re.search(r"://[^\s/:@]+:[^\s/@]+@", path.read_text(encoding="utf-8")), path
+
+
 def test_deploy_script_migrates_before_it_starts_the_new_tag() -> None:
     script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
     assert script.index("run --rm migrate") < script.index("up -d --wait --wait-timeout")

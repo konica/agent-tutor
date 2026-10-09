@@ -29,3 +29,4 @@ Product decisions are recorded in `sdd/prd.md` (§6, §13); ADRs cover architect
 | [0010](0010-keycloak-behind-cloudfront.md) | Keycloak behind CloudFront: pinned hostname, a trusted Forwarded header, databases made by a Helm hook |
 | [0011](0011-per-learner-contents.md) | Per-learner contents: no cross-user deduplication; owners can delete (supersedes the cross-user parts of 0002) |
 | [0012](0012-on-premise-default-deployment-mode.md) | On-premise (Docker Compose on one EC2 VM, Caddy, DuckDNS) is the default deployment mode; native-cloud (EKS) is opt-in (narrows 0009 and 0010 to native-cloud) |
+| [0013](0013-secrets-stay-in-aws-secrets-manager.md) | Secrets stay in AWS Secrets Manager (no SOPS for now); no credential-shaped strings in the repository; GitGuardian findings are triaged, not silenced (proposed) |
