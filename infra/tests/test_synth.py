@@ -542,8 +542,10 @@ def test_each_service_gets_only_its_own_s3_sqs_and_bedrock_access() -> None:
     t = template(make_app(), "Cluster")
     api, worker, agent, mcp = (_grants(_policy_for(t, sa)) for sa in ("api", "worker", "agent", "mcp-server"))
 
-    # The API signs uploads into uploads/, presigns the viewer's GET on contents/, and sends Retry messages.
-    assert "contents/*" in api["s3:GetObject"] and "uploads/" not in api["s3:GetObject"]
+    # The API signs uploads into uploads/, presigns the viewer's GET on contents' PDFs only (never the page text in
+    # .pages.json), and sends Retry messages.
+    assert "contents/*.pdf" in api["s3:GetObject"] and "uploads/" not in api["s3:GetObject"]
+    assert 'contents/*"' not in api["s3:GetObject"] and ".pages.json" not in api["s3:GetObject"]
     assert "s3:DeleteObject" not in api
     assert "uploads/*" in api["s3:PutObject"] and "contents/" not in api["s3:PutObject"]
     # It deletes a document's files, every version, under contents/ only.

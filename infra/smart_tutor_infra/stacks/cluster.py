@@ -118,8 +118,8 @@ class ClusterStack(cdk.Stack):
         )
 
         # The API signs uploads into uploads/ (the browser's POST is authorised as this role), presigns the document
-        # viewer's GET on contents/ (US-4b), sends Retry messages (#95), reads its startup parameters, embeds subject
-        # names, and deletes a document's files, every version.
+        # viewer's GET on contents/*.pdf, never the page text (US-4b), sends Retry messages (#95), reads its startup
+        # parameters, embeds subject names, and deletes a document's files, every version.
         self._pod_identity(
             "Api",
             "smart-tutor",
@@ -134,7 +134,7 @@ class ClusterStack(cdk.Stack):
                         conditions={"StringLike": {"s3:prefix": ["contents/*"]}},
                     ),
                     iam.PolicyStatement(actions=["s3:DeleteObjectVersion"], resources=[f"{bucket_arn}/contents/*"]),
-                    iam.PolicyStatement(actions=["s3:GetObject"], resources=[f"{bucket_arn}/contents/*"]),
+                    iam.PolicyStatement(actions=["s3:GetObject"], resources=[f"{bucket_arn}/contents/*.pdf"]),
                     iam.PolicyStatement(actions=["sqs:SendMessage"], resources=[queue_arn]),
                     embed,
                 ]

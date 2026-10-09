@@ -12,10 +12,17 @@ const CSS_PER_PT = 96 / 72;
 
 export const loadPdf: PdfLoader = async (url) => {
   const task = getDocument({ url });
-  const pdf = await task.promise;
+  let pdf: Awaited<typeof task.promise>;
+  try {
+    pdf = await task.promise;
+  } catch (error) {
+    // A failed load still holds its worker; free it before the viewer shows the error.
+    task.destroy().catch(() => {});
+    throw error;
+  }
   return {
     numPages: pdf.numPages,
-    destroy: () => void task.destroy(), // frees the worker and aborts any network requests
+    destroy: () => void task.destroy().catch(() => {}), // frees the worker and aborts any network requests
     page: async (n) => {
       const p = await pdf.getPage(n);
       const base = p.getViewport({ scale: CSS_PER_PT });

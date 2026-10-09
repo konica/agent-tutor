@@ -214,6 +214,9 @@ function Viewer({
             <p className={styles.failureTitle}>We couldn't open this document.</p>
             {failed === "not-openable" ? (
               <p>This document can't be opened until it has been processed.</p>
+            ) : failed === "not-found" ? (
+              // Deleted (or never the learner's): a new link would 404 again, so there is no Retry.
+              <p>This document is no longer in your library.</p>
             ) : (
               <>
                 <p>Check your connection and try again.</p>
@@ -225,7 +228,7 @@ function Viewer({
           </div>
         ) : doc ? (
           <div className={styles.page}>
-            <canvas ref={canvasRef} />
+            <canvas ref={canvasRef} role="img" aria-label={`Page ${page} of ${doc.numPages}`} />
           </div>
         ) : (
           <div className={styles.skeleton} aria-busy="true">

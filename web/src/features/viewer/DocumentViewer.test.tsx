@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { DocumentNotOpenableError, type DocumentResponse } from "../../api/documents";
+import { DocumentNotFoundError, DocumentNotOpenableError, type DocumentResponse } from "../../api/documents";
 import { DocumentViewer } from "./DocumentViewer";
 import type { PdfDoc } from "./pdf";
 import { fakeDocument, fakeFile, fakePdf } from "./testFakes";
@@ -41,6 +41,7 @@ describe("DocumentViewer", () => {
     expect(screen.getByRole("heading", { level: 2, name: "ReAct" })).toBeInTheDocument();
     expect(screen.queryByText("Loading document")).not.toBeInTheDocument();
     expect(await screen.findByText("Page 1 of 3")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Page 1 of 3" }).tagName).toBe("CANVAS");
   });
 
   it("pages with the buttons and PageDown/PageUp, and announces the page", async () => {
@@ -113,6 +114,13 @@ describe("DocumentViewer", () => {
   it("says a document still processing can't be opened, without Retry", async () => {
     renderViewer({ loadFile: vi.fn().mockRejectedValue(new DocumentNotOpenableError("processing")) });
     expect(await screen.findByText("This document can't be opened until it has been processed.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+  });
+
+  it("says a document no longer in the library is gone, without Retry", async () => {
+    renderViewer({ loadFile: vi.fn().mockRejectedValue(new DocumentNotFoundError("Document not found")) });
+    expect(await screen.findByText("This document is no longer in your library.")).toBeInTheDocument();
+    expect(screen.queryByText("Check your connection and try again.")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
   });
 

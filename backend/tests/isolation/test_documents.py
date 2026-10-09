@@ -85,9 +85,11 @@ def test_b_cannot_get_a_documents_file_link() -> None:
     doc = stored["document_id"]
 
     assert client.get(f"/documents/{doc}/file", headers=B).status_code == 404
-    assert all(not key.startswith("contents/learner-a/") for key, _ in objects.presigned_gets)
+    assert objects.presigned_gets == []  # B's request signed nothing
     mine = client.get(f"/documents/{doc}/file", headers=A)
     assert mine.status_code == 200 and mine.json()["expires_in"] == 300
+    [(key, _)] = objects.presigned_gets
+    assert key.startswith("contents/learner-a/")
     assert mine.json()["document"]["document_id"] == doc
 
 
