@@ -1,10 +1,11 @@
 import { SessionExpiredError } from "../auth/authClient";
 import type { Client } from "./generated/client";
 import { client } from "./generated/client.gen";
-import { archiveDocument as postArchive, checkDuplicate, chooseSubjects, getSubjectSuggestions, getUpload, getUploadLimits, listDocuments, restoreDocument as postRestore, retryDocument, startUpload } from "./generated/sdk.gen";
-import type { DocumentResponse, SubjectSuggestionsResponse, SuggestionResponse, UploadLimitsResponse, UploadStatusResponse } from "./generated/types.gen";
+import { archiveDocument as postArchive, checkDuplicate, chooseSubjects, getDocument, getSubjectSuggestions, getUpload, getUploadLimits, listDocuments, restoreDocument as postRestore, retryDocument, setDocumentTitle, startUpload } from "./generated/sdk.gen";
+import type { DocumentDetailsResponse, DocumentResponse, SubjectSuggestionsResponse, SuggestionResponse, UploadLimitsResponse, UploadStatusResponse } from "./generated/types.gen";
 
 export type { DocumentResponse };
+export type DocumentDetails = DocumentDetailsResponse;
 export type UploadLimits = UploadLimitsResponse;
 export type SubjectSuggestions = SubjectSuggestionsResponse;
 export type Suggestion = SuggestionResponse;
@@ -74,6 +75,22 @@ export async function archiveDocument(documentId: string, apiClient: Client = cl
 
 export async function restoreDocument(documentId: string, apiClient: Client = client): Promise<DocumentResponse> {
   const { data, error, response } = await postRestore({ client: apiClient, path: { document_id: documentId }, throwOnError: false });
+  if (sessionOver(error, response)) throw new SessionExpiredError();
+  if (!data) throw failure(error);
+  return data;
+}
+
+// One document with its facts and summary (PRD US-10); a missing or foreign document reads "Document not found".
+export async function loadDocumentDetails(documentId: string, apiClient: Client = client): Promise<DocumentDetails> {
+  const { data, error, response } = await getDocument({ client: apiClient, path: { document_id: documentId }, throwOnError: false });
+  if (sessionOver(error, response)) throw new SessionExpiredError();
+  if (!data) throw failure(error);
+  return data;
+}
+
+// Sets the learner's own display title; null goes back to the extracted title (PRD §9.4). 422 carries the reason to show.
+export async function saveDocumentTitle(documentId: string, title: string | null, apiClient: Client = client): Promise<DocumentDetails> {
+  const { data, error, response } = await setDocumentTitle({ client: apiClient, path: { document_id: documentId }, body: { title }, throwOnError: false });
   if (sessionOver(error, response)) throw new SessionExpiredError();
   if (!data) throw failure(error);
   return data;
