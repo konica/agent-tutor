@@ -10,6 +10,7 @@ from smart_tutor.knowledge.adapters.s3_object_store import S3ObjectStore
 from smart_tutor.knowledge.adapters.sql_library import SqlLibraryUnitOfWork
 from smart_tutor.knowledge.application import (
     ArchiveService,
+    DeleteService,
     DocumentService,
     RetryService,
     SubjectChoiceService,
@@ -37,6 +38,7 @@ class ApiServices:
     subjects: SubjectNames
     retries: RetryService
     archive: ArchiveService
+    deletion: DeleteService
     subject_choice: SubjectChoiceService
     conversations: ConversationService
     agent: AgentClient
@@ -56,12 +58,14 @@ def build_services(settings: Settings) -> ApiServices:
     subject_repo = SqlSubjectRepository(engine)
     names = SubjectNames(subject_repo)
     documents = DocumentService(library, max_attempts, time_zone=ZoneInfo(params.get(settings.app_time_zone_param)))
+    conversations = ConversationService(SqlThreadRepository(engine), documents, SystemClock())
     return ApiServices(
         uploads=UploadService(library, objects, SystemClock(), limits),
         documents=documents,
         subjects=names,
         retries=RetryService(library, queue, max_attempts),
         archive=ArchiveService(library, SystemClock(), max_attempts),
+        deletion=DeleteService(library, objects, conversations.keep_deleted_title),
         subject_choice=SubjectChoiceService(
             library,
             SubjectSuggester(subject_repo, names),
@@ -69,7 +73,7 @@ def build_services(settings: Settings) -> ApiServices:
             SubjectSearch(subject_repo, names),
             max_attempts,
         ),
-        conversations=ConversationService(SqlThreadRepository(engine), documents, SystemClock()),
+        conversations=conversations,
         # Answers stream for a while: a long read timeout between SSE events, a short one to connect.
         agent=AgentClient(settings.agent_url, httpx.AsyncClient(timeout=httpx.Timeout(10, read=120))),
     )

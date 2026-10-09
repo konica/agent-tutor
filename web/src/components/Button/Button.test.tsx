@@ -20,6 +20,11 @@ describe("Button", () => {
     expect(screen.getByRole("button", { name: "Go" })).toHaveClass(styles.primary, styles.lg);
   });
 
+  it("has a danger variant", () => {
+    render(<Button variant="danger">Delete</Button>);
+    expect(screen.getByRole("button", { name: "Delete" })).toHaveClass(styles.danger);
+  });
+
   it("keeps the icon out of the accessible name", () => {
     render(<Button icon={Upload}>Upload</Button>);
     const button = screen.getByRole("button", { name: "Upload" });

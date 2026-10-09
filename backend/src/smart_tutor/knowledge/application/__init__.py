@@ -1,6 +1,7 @@
 """knowledge.application: Use-case services. This package is the module's public API for other modules."""
 
 from smart_tutor.knowledge.application.archive_service import ArchiveService
+from smart_tutor.knowledge.application.delete_service import DeleteService
 from smart_tutor.knowledge.application.describer import FIRST_PAGES, Described, DocumentDescriber
 from smart_tutor.knowledge.application.document_service import DocumentService, DocumentView
 from smart_tutor.knowledge.application.ingestion_service import IngestionService, ProcessingTools
@@ -36,6 +37,7 @@ __all__ = [
     "ArchiveService",
     "ChunkHit",
     "ContentState",
+    "DeleteService",
     "Described",
     "DocumentDescriber",
     "DocumentNotFoundError",

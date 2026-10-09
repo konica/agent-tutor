@@ -1,5 +1,5 @@
 import { Info } from "lucide-react";
-import { useId, type ReactNode } from "react";
+import { useId, type ReactNode, type Ref } from "react";
 
 import styles from "./PageHeader.module.css";
 
@@ -10,14 +10,16 @@ type Props = {
   // Shown on hover/focus of an info button after the title.
   description?: string;
   actions?: ReactNode;
+  // Lets a page move focus to the title when the control that had it is gone; the title then takes focus by script only.
+  headingRef?: Ref<HTMLHeadingElement>;
 };
 
 // One 40px row: title, count, info button, then the actions on the right.
-export function PageHeader({ title, count, description, actions }: Props) {
+export function PageHeader({ title, count, description, actions, headingRef }: Props) {
   const descId = useId();
   return (
     <header className={styles.header}>
-      <h1 className={styles.title} title={title}>
+      <h1 ref={headingRef} tabIndex={headingRef ? -1 : undefined} className={styles.title} title={title}>
         {title}
       </h1>
       {count && <span className={styles.count}>{count}</span>}

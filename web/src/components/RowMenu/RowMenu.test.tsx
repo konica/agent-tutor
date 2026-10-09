@@ -48,6 +48,22 @@ describe("RowMenu", () => {
     expect(screen.getByRole("menuitem", { name: "Archive" })).toHaveFocus();
   });
 
+  it("puts a separator before the danger item, outside the arrow-key order", async () => {
+    const { button } = setup();
+    await userEvent.click(button);
+    const items = screen.getAllByRole("menuitem");
+    const separator = screen.getByRole("separator");
+    expect(items[0]!.compareDocumentPosition(separator) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(separator.compareDocumentPosition(items[1]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(separator).not.toHaveAttribute("tabindex");
+  });
+
+  it("has no separator before the first item or without a danger item", async () => {
+    render(<RowMenu label="More" items={[{ label: "Archive", icon: Archive, onSelect: vi.fn() }]} />);
+    await userEvent.click(screen.getByRole("button", { name: "More" }));
+    expect(screen.queryByRole("separator")).toBeNull();
+  });
+
   it("moves between items with the arrow keys", async () => {
     const { button } = setup();
     await userEvent.click(button);

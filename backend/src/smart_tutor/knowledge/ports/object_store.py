@@ -36,3 +36,10 @@ class ObjectStore(ABC):
     @abstractmethod
     def delete(self, key: str) -> None:
         """Delete; a missing object is not an error."""
+
+    @abstractmethod
+    def delete_all_versions(self, key: str) -> None:
+        """Delete every stored version and delete marker of exactly `key` (the bucket is versioned, PRD §9.5).
+
+        A missing key is not an error.
+        """
