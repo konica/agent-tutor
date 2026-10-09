@@ -28,7 +28,7 @@ class DocumentView:
     attempt: int | None  # of the learner's own content; None until the upload is hashed
     max_attempts: int
     can_retry: bool
-    archived: bool
+    archived: bool = False
 
 
 def document_view(d: Document, max_attempts: int) -> DocumentView:

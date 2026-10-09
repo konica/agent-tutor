@@ -1,6 +1,6 @@
 """Thread routes (tutoring module): ask the first question of a new thread; it answers from all of the learner's
 ready documents. Answered as SSE (PRD §9.2); the documents an answer drew on are recorded when it is done and
-listed per thread."""
+listed per thread. The learner can rename a thread."""
 
 import json
 import logging
@@ -18,7 +18,12 @@ from smart_tutor.apps.api.agent_client import AgentAnswer, AgentUnavailableError
 from smart_tutor.apps.api.deps import Agent, BearerToken, Conversations, CurrentPrincipal
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId
-from smart_tutor.tutoring.application import NoDocumentsError, ThreadNotFoundError
+from smart_tutor.tutoring.application import (
+    InvalidTitleError,
+    NoDocumentsError,
+    ThreadArchivedError,
+    ThreadNotFoundError,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["tutoring"])
@@ -169,7 +174,7 @@ async def ask_in_new_thread(
     async def start() -> bytes | None:
         nonlocal thread_id
         try:
-            thread = await run_in_threadpool(conversations.start_thread, principal.user_id)
+            thread = await run_in_threadpool(conversations.start_thread, principal.user_id, body.question)
         except NoDocumentsError as e:
             logger.warning("the thread was refused: %s", e)
             return None
@@ -192,6 +197,41 @@ async def ask_in_new_thread(
             logger.exception("recording the documents used failed")
 
     return StreamingResponse(_relay(answer, start, record), media_type="text/event-stream", headers=SSE_HEADERS)
+
+
+class RenameThreadRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # Checked by the thread (trimmed, 1-120 characters), so a refusal carries the learner's message.
+    title: str
+
+
+class ThreadResponse(BaseModel):
+    thread_id: str
+    title: str | None
+
+
+@router.patch(
+    "/threads/{thread_id}",
+    operation_id="rename_thread",
+    responses={
+        404: {"description": "Not the caller's conversation."},
+        409: {"description": "The conversation is archived."},
+        422: {"description": "The title is empty or longer than 120 characters."},
+    },
+)
+def rename_thread(
+    thread_id: uuid.UUID, body: RenameThreadRequest, principal: CurrentPrincipal, conversations: Conversations
+) -> ThreadResponse:
+    """Rename the learner's conversation from its header (PRD US-13)."""
+    try:
+        thread = conversations.rename_thread(ThreadId(str(thread_id)), principal.user_id, body.title)
+    except ThreadNotFoundError as e:
+        raise HTTPException(404, str(e)) from None
+    except ThreadArchivedError as e:
+        raise HTTPException(409, str(e)) from None
+    except InvalidTitleError as e:
+        raise HTTPException(422, str(e)) from None
+    return ThreadResponse(thread_id=thread.thread_id, title=thread.title)
 
 
 class ThreadDocumentResponse(BaseModel):

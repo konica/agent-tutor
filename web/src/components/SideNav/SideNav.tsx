@@ -17,9 +17,18 @@ export function SideNav({ collapsed, onToggle, recent = [] }: Props) {
   const { name, signOut } = useSession();
   return (
     <nav className={collapsed ? `${styles.sidenav} ${styles.collapsed}` : styles.sidenav} aria-label="Main">
-      <Link className={styles.brand} to="/library" aria-label="Smart Tutor, Library">
-        <BrandMark size="sm" iconOnly={collapsed} />
-      </Link>
+      <div className={styles.head}>
+        <Link className={styles.brand} to="/library" aria-label="Smart Tutor, Library">
+          <BrandMark size="sm" iconOnly={collapsed} />
+        </Link>
+        <IconButton
+          label={collapsed ? "Expand navigation" : "Collapse navigation"}
+          icon={collapsed ? ChevronRight : ChevronLeft}
+          aria-expanded={!collapsed}
+          onClick={onToggle}
+          className={styles.collapse}
+        />
+      </div>
       {GROUPS.map((group) => (
         <Fragment key={group}>
           {group > 0 && <hr className={styles.hr} />}
@@ -52,13 +61,6 @@ export function SideNav({ collapsed, onToggle, recent = [] }: Props) {
         </Fragment>
       ))}
       <div className={styles.foot}>
-        <IconButton
-          label={collapsed ? "Expand navigation" : "Collapse navigation"}
-          icon={collapsed ? ChevronRight : ChevronLeft}
-          aria-expanded={!collapsed}
-          onClick={onToggle}
-          className={styles.collapse}
-        />
         <UserMenu name={name} onSignOut={signOut} compact={collapsed} />
       </div>
     </nav>

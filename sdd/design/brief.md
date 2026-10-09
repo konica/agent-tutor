@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Brief version** | v0.10 |
-| **Based on** | `sdd/prd.md` Draft v2.22 |
-| **Status** | Draft, round 10 (chat in two panes with a document beside the conversation; keeps the round 9 density) |
+| **Brief version** | v0.11 |
+| **Based on** | `sdd/prd.md` Draft v2.26 |
+| **Status** | Draft, round 11 (the nav toggle moves to the top of the nav; everything else is round 10) |
 | **Owner** | Thao Dinh |
-| **Last updated** | 2026-10-08 |
+| **Last updated** | 2026-10-09 |
 | **Designer** | Open Design |
 
 > **For the designer:** this brief is the source of truth for the mockups. If the brief and the PRD disagree, follow the brief and flag the conflict. Name every deliverable with the brief version it answers (e.g. `chat-growth-notice@v0.3`). Read **§0 What changed** first on every new version. A ready-to-paste prompt for starting a round is in **Appendix A**.
@@ -15,7 +15,15 @@
 
 ## 0. What changed in this version
 
-**Chat in two panes, documents beside the conversation.** Keep the round 9 prototype (v0.9, compact density; M1–M10 are in the changelog, §13) and change the chat only. The owner (2026-10-08, PRD Q60): the learner must see a document's content **without an extra click**, next to the conversation.
+**v0.11: the nav toggle moves to the top (owner, #163).** Keep the round 10 prototype and change only the left nav. The chevron that collapses the nav sits at the bottom above the user menu, while the conversation panel's toggle sits at the top of the chat header: the two panel toggles are at opposite ends of the screen.
+
+| Change | What to do |
+|---|---|
+| **P8 — nav toggle at the top (owner, UI/UX designer).** | The brand row becomes one 40px row, aligned with the chat header: the logo and "Smart Tutor" on the left, the collapse chevron (28px ghost icon button, "Collapse navigation") right-aligned. On the 56px rail the expand chevron ("Expand navigation") sits directly below the logo, above Library; don't swap the logo for it on hover. Keep the chevrons (the chat panel toggle is a sidebar icon, so the two stay distinct). The nav foot keeps only the user menu row. Tab order: brand, toggle, nav items, user menu; focus stays on the toggle after pressing it. Tooltips, `aria-expanded`, and the remembered choice are unchanged. |
+
+States: redo `shell-nav-collapsed`; every screen inside the app shell shows the new brand row.
+
+**From v0.10 — chat in two panes, documents beside the conversation.** Keep the round 9 prototype (v0.9, compact density; M1–M10 are in the changelog, §13) and change the chat only. The owner (2026-10-08, PRD Q60): the learner must see a document's content **without an extra click**, next to the conversation.
 
 | Change | What to do |
 |---|---|
@@ -108,6 +116,7 @@ The public page at `/` for anyone not signed in (and the same page for signed-in
 ### 6.1 App shell
 - Left navigation, in this order: **Library** (home), **Chat** (starts a new conversation), **Conversations**, **Notes**, **Subjects**, **Usage**.
 - Reserve space for later items without showing them: **Research map** (R2, after Library), **Quizzes** and **Reports** (R3, after Notes).
+- A chevron in the top brand row collapses the navigation to a 56px icon rail (right of the logo; below it on the rail), P8.
 - **Library** shows a count badge when documents need the learner's action (choose subjects, or failed).
 - User menu: name, sign out. Signing out returns to the landing page (§6.0).
 - A global, non-blocking **upload tray** (bottom right) shows uploads in progress on every screen, so the learner can keep working while files process.
@@ -362,6 +371,7 @@ Use this realistic sample data, not lorem ipsum.
 
 | Version | Date | PRD | Changes | Screens to redo |
 |---|---|---|---|---|
+| v0.11 | 2026-10-09 | v2.26 | The nav collapse toggle moves from the nav foot to the top brand row, aligned with the chat header (P8, #163). | `shell-nav-collapsed`; the brand row on every app screen |
 | v0.10 | 2026-10-08 | v2.22 | Chat in two panes: a collapsible conversation panel (Documents, Lesson Note, Actions) and the conversation; a document opens beside the conversation in one click (P1–P3, Q60); "Open in dialog" (P4); choose a conversation's documents, opt-in search limit, start from a document (P5, US-4c, Q61). | Chat states listed in §0; new `chat-panel-collapsed` |
 | v0.9 | 2026-10-08 | v2.22 | Compact density (M1–M8): 14px base, 20px sans page titles, 32px controls, 32–40px rows, one-row header and toolbar, collapsible 208px nav, compact chat chrome with a Sources chip line, wider compact viewer, dense lists and Usage; `DESIGN.md` → Density. Landing: three trust points with leads (M9). No needs-subjects banner (M10). | Every screen; new `shell-nav-collapsed` |
 | v0.8 | 2026-10-08 | v2.22 | End-user feedback: conversations have no subjects (K1); documents used (K2); document viewer with the cited passage highlighted (K3); delete a document (K4); no cross-learner duplicate linking (K5). J2, J3, J4 and the §9 conversation rewritten. | Remove the 7 subject states and `chat-citation-opens-details`; new `chat-documents-used`, `chat-documents-used-deleted`, `chat-citation-deleted`, `viewer-*` (4), `library-delete-confirm`, `library-deleted`; redo the chat and details states listed in §0 |
@@ -398,6 +408,7 @@ Use this realistic sample data, not lorem ipsum.
 | 14 (owner, designer) | v0.10 | Owner: the panel must toggle visibly; remove the "⋯" menu on the conversation title; let the learner edit the title (P6, PRD Q62, US-13). Delivered: sidebar-icon toggle ("Hide panel" / "Show panel"), no overflow menu (reverses R2), inline title editing; new state `chat-title-editing`. Review fixes: the edit field renders in its state, the title is centered with the toggle and uses the whole header. | P6 applied. | v0.10 |
 | 15 (owner, designer) | v0.10 | Owner: ready Library rows should offer "Chat" directly instead of "Open", so starting a conversation needs no "More" menu (P7). Delivered: "Chat" on every ready row; the title opens the document viewer; "More" keeps Details, Change subjects, Edit title, Archive, Delete. | P7 applied; answers L2 (the title opens the viewer). | v0.10 |
 | 16 (owner) | v0.10 | Answers to L1 and N3. | L1: a deleted document's subjects no longer count for the conversations that used it; the conversation list's chips and subject filter ignore deleted documents (PRD D11, Q63). N3: Conversations and Notes search titles only (Q63). | v0.10 |
+| 17 (owner, UI/UX designer) | v0.10 | Owner: the nav toggle at the bottom of the nav is far from the conversation panel's toggle at the top of the chat header; move it to the top (#163). | UI/UX designer: right end of a 40px brand row, below the logo on the rail; keep chevrons so it differs from the sidebar-icon panel toggle; the foot keeps only the user menu. Applied in the prototype as P8. | v0.11 |
 
 ---
 
@@ -405,4 +416,4 @@ Use this realistic sample data, not lorem ipsum.
 
 Paste this, together with this file, to start or continue a round:
 
-> You are designing **Smart Tutor**, a laptop web app (1440 px, light mode) where learners upload their own PDFs and ask a tutor that answers only from them, with citations. Follow the attached design brief **v0.10** exactly; it is the source of truth. Start with **§0 What changed**: this round updates the existing prototype in this project, so change only what is listed there and keep everything else as it is. Keep (1) the four clickable flows in §5 working, (2) every Release 1 screen and state in §6, (3) the wireframes for §7 and §8, and (4) the components page (§10). Use the sample data in §9 and the quoted wording verbatim. Name each frame `<screen>-<state>@v0.10`. Do not design anything listed as out of scope in §4. Follow the prototype contract in §11 item 6: every state in `window.ST.STATES` with its specific user stories in `ref`, each state at `index.html#/<state-id>`, and review chrome hidden when the URL has `?shot=1`. End with a list of questions or proposed changes to the brief.
+> You are designing **Smart Tutor**, a laptop web app (1440 px, light mode) where learners upload their own PDFs and ask a tutor that answers only from them, with citations. Follow the attached design brief **v0.11** exactly; it is the source of truth. Start with **§0 What changed**: this round updates the existing prototype in this project, so change only what is listed there and keep everything else as it is. Keep (1) the four clickable flows in §5 working, (2) every Release 1 screen and state in §6, (3) the wireframes for §7 and §8, and (4) the components page (§10). Use the sample data in §9 and the quoted wording verbatim. Name each frame `<screen>-<state>@v0.11`. Do not design anything listed as out of scope in §4. Follow the prototype contract in §11 item 6: every state in `window.ST.STATES` with its specific user stories in `ref`, each state at `index.html#/<state-id>`, and review chrome hidden when the URL has `?shot=1`. End with a list of questions or proposed changes to the brief.

@@ -1,7 +1,48 @@
 from datetime import UTC, datetime
 
+import pytest
+
 from smart_tutor.shared.domain.ids import ThreadId, UserId
+from smart_tutor.tutoring.domain.errors import InvalidTitleError, ThreadArchivedError
 from smart_tutor.tutoring.domain.thread import Thread, ThreadStatus
+
+NOW = datetime(2026, 10, 9, tzinfo=UTC)
+
+
+def new_thread() -> Thread:
+    return Thread.start(ThreadId("t1"), UserId("ada"), NOW, title="What is attention?")
+
+
+def test_a_new_thread_is_titled_with_its_first_question() -> None:
+    assert new_thread().title == "What is attention?"
+
+
+def test_rename_trims_the_title() -> None:
+    thread = new_thread()
+    assert thread.rename("  Attention basics\n") == "Attention basics"
+    assert thread.title == "Attention basics"
+
+
+def test_rename_accepts_one_to_120_characters() -> None:
+    thread = new_thread()
+    assert thread.rename("A") == "A"
+    assert thread.rename("x" * 120) == "x" * 120
+
+
+@pytest.mark.parametrize(("title", "message"), [("", "Enter a title"), ("  \t ", "Enter a title"), ("x" * 121, "120")])
+def test_rename_refuses_an_empty_or_too_long_title(title: str, message: str) -> None:
+    thread = new_thread()
+    with pytest.raises(InvalidTitleError, match=message):
+        thread.rename(title)
+    assert thread.title == "What is attention?"
+
+
+def test_an_archived_thread_cannot_be_renamed() -> None:
+    thread = new_thread()
+    thread.status = ThreadStatus.ARCHIVED
+    with pytest.raises(ThreadArchivedError):
+        thread.rename("New")
+    assert thread.title == "What is attention?"
 
 
 def test_a_new_thread_belongs_to_its_learner_and_records_the_first_question() -> None:

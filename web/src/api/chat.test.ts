@@ -1,7 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { SessionExpiredError } from "../auth/authClient";
-import { askInNewThread, AskRefusedError, formatCitation, loadDocumentsUsed, NoDocumentsError, type ChatEvent } from "./chat";
+import {
+  askInNewThread,
+  AskRefusedError,
+  formatCitation,
+  loadDocumentsUsed,
+  NoDocumentsError,
+  renameConversation,
+  type ChatEvent,
+} from "./chat";
 import { configureApiClient } from "./client";
 import { createClient, createConfig } from "./generated/client";
 
@@ -146,5 +154,27 @@ describe("loadDocumentsUsed", () => {
     const failure = loadDocumentsUsed("t1", apiClient);
     await expect(failure).rejects.toThrow("404");
     await expect(failure).rejects.not.toBeInstanceOf(SessionExpiredError);
+  });
+});
+
+describe("renameConversation", () => {
+  it("patches the thread's title with the token and returns the saved title", async () => {
+    const { apiClient, fetch } = api(() => json({ thread_id: "t1", title: "Attention basics" }));
+    expect(await renameConversation("t1", " Attention basics ", apiClient)).toBe("Attention basics");
+    const request = fetch.mock.calls[0]![0] as Request;
+    expect(request.method).toBe("PATCH");
+    expect(request.url).toBe("http://api.test/threads/t1");
+    expect(request.headers.get("Authorization")).toBe("Bearer t");
+    expect(await request.json()).toEqual({ title: " Attention basics " });
+  });
+
+  it("rejects with the server's message when the title is refused", async () => {
+    const { apiClient } = api(() => json({ detail: "Use at most 120 characters" }, 422));
+    await expect(renameConversation("t1", "x".repeat(121), apiClient)).rejects.toThrow("Use at most 120 characters");
+  });
+
+  it("rejects with SessionExpiredError on 401", async () => {
+    const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
+    await expect(renameConversation("t1", "New", apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
   });
 });

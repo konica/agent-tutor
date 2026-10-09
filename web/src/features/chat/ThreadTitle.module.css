@@ -1,0 +1,34 @@
+/* The body font, semibold, on one line, not the serif display font base.css gives every h1. */
+.heading {
+  display: flex; align-items: center; flex: 1; min-width: 0; margin: 0;
+  font-family: var(--font-body); font-size: var(--fs-14); font-weight: 600; line-height: var(--lh-head); color: var(--text);
+}
+.text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The title is a 28px button; the pencil shows on hover and focus (DESIGN.md → Chat). */
+.button {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; height: 28px; padding: 0 6px;
+  border: 1px solid transparent; border-radius: var(--r-sm); background: transparent;
+  font: inherit; color: inherit; cursor: text;
+}
+.button:hover, .button:focus-visible { background: var(--surface-2); }
+.pen { flex: none; width: 14px; height: 14px; color: var(--text-2); opacity: 0; }
+.button:hover .pen, .button:focus-visible .pen { opacity: 1; }
+
+/* The field takes the title's place; its error hangs under it, over the content, so the 40px row keeps its height. */
+.edit { position: relative; display: flex; align-items: center; flex: 1 1 auto; min-width: 160px; max-width: 640px; }
+.input {
+  width: 100%; height: 32px; padding: 0 var(--sp-2);
+  border: 1px solid var(--focus); border-radius: var(--r-sm); background: var(--surface);
+  font-family: var(--font-body); font-size: var(--fs-14); font-weight: 600; color: var(--text);
+}
+.input:focus { outline: 2px solid var(--focus); outline-offset: 1px; }
+.input[aria-invalid="true"] { border-color: var(--danger); }
+.error {
+  position: absolute; left: 0; top: calc(100% + var(--sp-1)); z-index: 5;
+  display: inline-flex; align-items: center; gap: var(--sp-1); margin: 0; padding: 2px var(--sp-2);
+  border: 1px solid var(--danger); border-radius: var(--r-sm); background: var(--surface); box-shadow: var(--shadow-sm);
+  font-size: var(--fs-13); color: var(--danger); white-space: nowrap;
+}
+.errorIcon { width: 14px; height: 14px; flex: none; }
+.hint { flex: none; font-size: var(--fs-12); color: var(--text-2); white-space: nowrap; }

@@ -25,6 +25,7 @@ from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.shared.domain.principal import Principal
 from smart_tutor.tutoring.application import ConversationService, Thread
+from smart_tutor.tutoring.domain.thread import ThreadStatus
 
 AUTH = {"Authorization": "Bearer t-ada"}
 QUESTION = {"question": "What is attention?"}
@@ -484,3 +485,69 @@ def test_openapi_names_the_documents_list() -> None:
     client, _, _ = setup()
     operation = client.get("/openapi.json").json()["paths"]["/threads/{thread_id}/documents"]["get"]
     assert operation["operationId"] == "list_thread_documents"
+
+
+def started_thread() -> tuple[TestClient, InMemoryThreads, Thread]:
+    client, threads, _ = setup()
+    assert client.post("/threads", json=QUESTION, headers=AUTH).status_code == 200
+    [thread] = threads.threads.values()
+    return client, threads, thread
+
+
+def test_a_new_thread_is_titled_with_its_first_question() -> None:
+    _, _, thread = started_thread()
+    assert thread.title == "What is attention?"
+
+
+def test_rename_trims_and_saves_the_title() -> None:
+    client, threads, thread = started_thread()
+
+    response = client.patch(f"/threads/{thread.thread_id}", json={"title": "  Attention basics "}, headers=AUTH)
+
+    assert response.status_code == 200
+    assert response.json() == {"thread_id": thread.thread_id, "title": "Attention basics"}
+    assert threads.threads[thread.thread_id].title == "Attention basics"
+
+
+@pytest.mark.parametrize(("title", "message"), [("   ", "Enter a title"), ("x" * 121, "Use at most 120 characters")])
+def test_an_empty_or_too_long_title_is_422_and_saves_nothing(title: str, message: str) -> None:
+    client, threads, thread = started_thread()
+
+    response = client.patch(f"/threads/{thread.thread_id}", json={"title": title}, headers=AUTH)
+
+    assert response.status_code == 422 and response.json() == {"detail": message}
+    assert threads.threads[thread.thread_id].title == "What is attention?"
+
+
+def test_a_120_character_title_is_accepted() -> None:
+    client, _, thread = started_thread()
+    response = client.patch(f"/threads/{thread.thread_id}", json={"title": "x" * 120}, headers=AUTH)
+    assert response.status_code == 200
+
+
+def test_an_archived_thread_is_409_and_keeps_its_title() -> None:
+    client, threads, thread = started_thread()
+    threads.threads[thread.thread_id].status = ThreadStatus.ARCHIVED
+
+    response = client.patch(f"/threads/{thread.thread_id}", json={"title": "New"}, headers=AUTH)
+
+    assert response.status_code == 409
+    assert threads.threads[thread.thread_id].title == "What is attention?"
+
+
+def test_renaming_an_unknown_thread_is_404() -> None:
+    client, _, _ = setup()
+    assert client.patch(f"/threads/{uuid.uuid4()}", json={"title": "New"}, headers=AUTH).status_code == 404
+
+
+def test_rename_refuses_unknown_fields_and_needs_a_token() -> None:
+    client, _, thread = started_thread()
+    url = f"/threads/{thread.thread_id}"
+    assert client.patch(url, json={"title": "New", "user_id": "bob"}, headers=AUTH).status_code == 422
+    assert client.patch(url, json={"title": "New"}).status_code == 401
+
+
+def test_openapi_names_the_rename() -> None:
+    client, _, _ = setup()
+    operation = client.get("/openapi.json").json()["paths"]["/threads/{thread_id}"]["patch"]
+    assert operation["operationId"] == "rename_thread"

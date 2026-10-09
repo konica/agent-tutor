@@ -2,7 +2,7 @@
 window.ST = window.ST || {};
 
 ST.TODAY = '2026-10-03';
-ST.BRIEF = 'v0.10';
+ST.BRIEF = 'v0.11';
 /* G2: shown in the Library's upload area; a plain line, nothing to accept. */
 ST.RIGHTS = 'Only upload documents you have the right to use.';
 /* D8: one time zone for everyone in Release 1. */

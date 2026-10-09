@@ -7,6 +7,7 @@ import {
   formatCitation,
   loadDocumentsUsed,
   NoDocumentsError,
+  renameConversation,
   type ChatCitation,
   type ChatEvent,
 } from "../../api/chat";
@@ -19,12 +20,15 @@ import { EmptyState } from "../../components/EmptyState/EmptyState";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
 import styles from "./ChatPage.module.css";
 import { ConversationPanel } from "./ConversationPanel";
+import { ThreadTitle } from "./ThreadTitle";
 import { usePanelOpen } from "./usePanelOpen";
 
 type Props = {
   ask?: (question: string) => AsyncIterable<ChatEvent>;
   loadDocs?: () => Promise<DocumentResponse[]>;
   loadUsed?: (threadId: string) => Promise<ThreadDocumentResponse[]>;
+  /** Resolves with the saved title. */
+  rename?: (threadId: string, title: string) => Promise<string>;
 };
 
 type Exchange = {
@@ -45,6 +49,7 @@ const GENERIC_FAILURE = "The tutor couldn't answer right now. Try again in a mom
 const defaultAsk = (question: string) => askInNewThread(question);
 const defaultLoadDocs = () => loadDocuments();
 const defaultLoadUsed = (threadId: string) => loadDocumentsUsed(threadId);
+const defaultRename = (threadId: string, title: string) => renameConversation(threadId, title);
 
 function processingHint(count: number) {
   return count === 1
@@ -53,7 +58,12 @@ function processingHint(count: number) {
 }
 
 // Single turn (#82): each question starts a new thread and replaces the previous exchange.
-export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUsed = defaultLoadUsed }: Props) {
+export function ChatPage({
+  ask = defaultAsk,
+  loadDocs = defaultLoadDocs,
+  loadUsed = defaultLoadUsed,
+  rename = defaultRename,
+}: Props) {
   const [question, setQuestion] = useState("");
   const [answering, setAnswering] = useState(false);
   const [exchange, setExchange] = useState<Exchange | null>(null);
@@ -64,6 +74,7 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
   const [used, setUsed] = useState<ThreadDocumentResponse[]>([]);
   const [usedFailed, setUsedFailed] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
+  const [renamed, setRenamed] = useState<string | null>(null);
   const [answered, setAnswered] = useState(false);
   const [showCitations, setShowCitations] = useState(true);
   const [panelOpen, togglePanel] = usePanelOpen();
@@ -113,6 +124,7 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
     setUsed([]);
     setUsedFailed(false);
     setThreadId(null);
+    setRenamed(null);
     setAnswered(false);
     // The protocol always ends with done or error; a stream that just stops (dropped connection) failed.
     let ended = false;
@@ -163,6 +175,14 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
       // The answer is complete either way; only the panel's list is missing.
       if (alive.current && turn.current === forTurn) setUsedFailed(true);
     }
+  }
+
+  // A refusal rejects with the server's message, which the title field shows.
+  async function renameTitle(newTitle: string) {
+    if (threadId === null) return;
+    const forTurn = turn.current;
+    const saved = await rename(threadId, newTitle);
+    if (alive.current && turn.current === forTurn) setRenamed(saved);
   }
 
   function onSubmit(event: FormEvent) {
@@ -218,7 +238,8 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
 
   // A citation to a deleted document keeps its [n] but loses the title and page: references read "Deleted document".
   const deletedIds = new Set(used.filter((d) => d.deleted).map((d) => d.document_id));
-  const title = exchange ? exchange.question : "New conversation";
+  // The title starts as the first question until the learner renames it (PRD §9.4).
+  const title = renamed ?? (exchange ? exchange.question : "New conversation");
   const toggleLabel = panelOpen ? "Hide panel" : "Show panel";
 
   return (
@@ -236,10 +257,8 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
         >
           <PanelLeft className={styles.toggleIcon} strokeWidth={1.5} aria-hidden="true" />
         </button>
-        {/* One line; a long question is cut with an ellipsis, and the full text is in the tooltip and the bubble. */}
-        <h1 className={styles.title} title={title}>
-          {title}
-        </h1>
+        {/* Editable once the server has started the conversation (US-13). */}
+        <ThreadTitle title={title} editable={threadId !== null} onRename={renameTitle} />
       </header>
 
       <div className={`${styles.body} ${panelOpen ? styles.withPanel : ""}`}>

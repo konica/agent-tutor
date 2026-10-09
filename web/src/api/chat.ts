@@ -1,14 +1,14 @@
 import { SessionExpiredError } from "../auth/authClient";
 import type { Client } from "./generated/client";
 import { client } from "./generated/client.gen";
-import { listThreadDocuments } from "./generated/sdk.gen";
+import { listThreadDocuments, renameThread } from "./generated/sdk.gen";
 import type {
   AskInNewThreadData,
   AskInNewThreadErrors,
   AskInNewThreadResponses,
   ThreadDocumentResponse,
 } from "./generated/types.gen";
-import { sessionOver } from "./documents";
+import { failure, sessionOver } from "./documents";
 import { parseSse } from "./sse";
 
 export type { ThreadDocumentResponse };
@@ -97,6 +97,20 @@ export async function loadDocumentsUsed(threadId: string, apiClient: Client = cl
   if (sessionOver(error, response)) throw new SessionExpiredError();
   if (!data) throw new Error(`GET /threads/${threadId}/documents failed (${response?.status ?? "no response"})`);
   return data;
+}
+
+// Renames the learner's conversation and returns the saved (trimmed) title. A refusal (empty, over 120 characters,
+// archived, not theirs) rejects with the server's message, or an empty one when it gave none.
+export async function renameConversation(threadId: string, title: string, apiClient: Client = client): Promise<string> {
+  const { data, error, response } = await renameThread({
+    client: apiClient,
+    path: { thread_id: threadId },
+    body: { title },
+    throwOnError: false,
+  });
+  if (sessionOver(error, response)) throw new SessionExpiredError();
+  if (!data) throw failure(error);
+  return data.title ?? title.trim();
 }
 
 export function formatCitation(c: ChatCitation): string {
