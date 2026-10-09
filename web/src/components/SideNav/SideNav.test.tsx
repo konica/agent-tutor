@@ -51,6 +51,47 @@ describe("SideNav", () => {
     expect(onToggle).toHaveBeenCalled();
   });
 
+  it("puts the collapse toggle at the top, after the brand and before the items", () => {
+    renderNav();
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    const brand = within(nav).getByRole("link", { name: "Smart Tutor, Library" });
+    const toggle = within(nav).getByRole("button", { name: "Collapse navigation" });
+    const library = within(nav).getByRole("link", { name: "Library" });
+    const user = within(nav).getByRole("button", { name: /Ada Lovelace/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(brand.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(toggle.compareDocumentPosition(library) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(library.compareDocumentPosition(user) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("tabs from the brand to the toggle, then to the first item", async () => {
+    renderNav();
+    await userEvent.tab();
+    expect(screen.getByRole("link", { name: "Smart Tutor, Library" })).toHaveFocus();
+    await userEvent.tab();
+    expect(screen.getByRole("button", { name: "Collapse navigation" })).toHaveFocus();
+    await userEvent.tab();
+    expect(screen.getByRole("link", { name: "Library" })).toHaveFocus();
+  });
+
+  it("keeps focus on the toggle after it changes state", async () => {
+    function Harness() {
+      const [collapsed, toggle] = useNavCollapsed();
+      return <SideNav collapsed={collapsed} onToggle={toggle} />;
+    }
+    render(
+      <SessionContext.Provider value={{ name: "Ada Lovelace", signOut: vi.fn() }}>
+        <MemoryRouter initialEntries={["/library"]}>
+          <Harness />
+        </MemoryRouter>
+      </SessionContext.Provider>,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Collapse navigation" }));
+    const expand = screen.getByRole("button", { name: "Expand navigation" });
+    expect(expand).toHaveFocus();
+    expect(expand).toHaveAttribute("aria-expanded", "false");
+  });
+
   it("hides the recent conversations on the rail", () => {
     renderNav({ collapsed: true, recent: [{ id: "t1", title: "Q", path: "/conversations/t1" }] });
     expect(screen.queryByRole("list", { name: "Recent conversations" })).toBeNull();
