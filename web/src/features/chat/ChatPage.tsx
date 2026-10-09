@@ -105,13 +105,17 @@ export function ChatPage({
   const [renamed, setRenamed] = useState<string | null>(null);
   const [answered, setAnswered] = useState(false);
   const [showCitations, setShowCitations] = useState(true);
-  const [panelOpen, togglePanel] = usePanelOpen();
+  const [storedOpen, togglePanel] = usePanelOpen();
+  // A starting document opens the panel once without saving it, so the learner's remembered choice stays as it was.
+  const [forceOpen, setForceOpen] = useState(false);
+  const panelOpen = storedOpen || forceOpen;
   const [pickerOpen, setPickerOpen] = useState(false);
   // Said by the status region once a document is added or removed (DESIGN.md → Accessibility).
   const [announcement, setAnnouncement] = useState("");
   // The document from `/chat?document=<id>` (US-4b), until the first question takes it or the learner removes it.
-  const [searchParams] = useSearchParams();
-  const startId = searchParams.get("document");
+  // Read once: the param is cleared from the URL once used or dropped, which must not reload the page's documents.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [startId] = useState(() => searchParams.get("document"));
   const [starting, setStarting] = useState<DocumentResponse | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const alive = useRef(true);
@@ -150,10 +154,31 @@ export function ChatPage({
   const hasStarting = starting !== null && library.status === "ready";
   useEffect(() => {
     if (!hasStarting) return;
-    if (!panelOpen) togglePanel();
+    setForceOpen(true);
     input.current?.focus();
     // Only when a starting document appears: closing the panel afterwards is the learner's choice.
   }, [hasStarting]);
+
+  // The learner's toggle is remembered as before. Closing a panel the page opened for them keeps the saved "closed".
+  function toggle() {
+    if (forceOpen) setForceOpen(false);
+    else togglePanel();
+  }
+
+  // Once the starting document is used or dropped, a reload or Back doesn't bring it back.
+  function forgetStartParam() {
+    if (!searchParams.has("document")) return;
+    setSearchParams(
+      (params) => {
+        params.delete("document");
+        return params;
+      },
+      { replace: true },
+    );
+  }
+
+  // Only before the first question: a starting document never replaces a live conversation's list.
+  const pendingStart = threadId === null && !exchange ? starting : null;
 
   const trimmed = question.trim();
   const canAsk = !answering && trimmed.length > 0;
@@ -175,8 +200,9 @@ export function ChatPage({
     setAnswered(false);
     setPickerOpen(false);
     // The starting document goes with the first question only; later questions start library-wide threads.
-    const documentId = starting?.document_id;
+    const documentId = pendingStart?.document_id;
     setStarting(null);
+    forgetStartParam();
     // The protocol always ends with done or error; a stream that just stops (dropped connection) failed.
     let ended = false;
     let done = false;
@@ -258,6 +284,7 @@ export function ChatPage({
   // library-wide. The removed row had focus and there's no Add documents yet, so focus goes to the composer.
   function dropStarting(document: DocumentResponse) {
     setStarting(null);
+    forgetStartParam();
     setAnnouncement(`${document.title} removed from this conversation.`);
     input.current?.focus();
   }
@@ -336,7 +363,7 @@ export function ChatPage({
           title={toggleLabel}
           aria-expanded={panelOpen}
           aria-controls={PANEL_ID}
-          onClick={togglePanel}
+          onClick={toggle}
         >
           <PanelLeft className={styles.toggleIcon} strokeWidth={1.5} aria-hidden="true" />
         </button>
@@ -352,7 +379,7 @@ export function ChatPage({
         {panelOpen && (
           <ConversationPanel
             id={PANEL_ID}
-            documents={starting ? [asListed(starting)] : used}
+            documents={pendingStart ? [asListed(pendingStart)] : used}
             documentsFailed={usedFailed}
             threadId={threadId}
             answered={answered}
@@ -360,8 +387,8 @@ export function ChatPage({
             onShowCitationsChange={setShowCitations}
             onAddDocuments={() => setPickerOpen(true)}
             onRemoveDocument={
-              starting
-                ? () => dropStarting(starting)
+              pendingStart
+                ? () => dropStarting(pendingStart)
                 : threadId === null
                   ? undefined
                   : (documentId) => void removeDocument(threadId, documentId)
@@ -381,11 +408,11 @@ export function ChatPage({
         <div className={styles.conversation}>
           <div className={styles.messages}>
             <div className={styles.column}>
-              {starting && !exchange && (
+              {pendingStart && (
                 <p className={styles.notice}>
                   <FileText className={styles.noticeIcon} strokeWidth={1.5} aria-hidden="true" />
                   <span>
-                    Started from <em>{starting.title}</em>. It's listed in Documents; answers still use all your documents.
+                    Started from <em>{pendingStart.title}</em>. It's listed in Documents; answers still use all your documents.
                   </span>
                 </p>
               )}

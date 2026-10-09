@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AskRefusedError, NoDocumentsError, type ChatEvent } from "../../api/chat";
@@ -738,6 +738,47 @@ describe("ChatPage", () => {
       startChat();
       expect(await within((await screen.findByRole("complementary", { name: "Conversation" }))).findByText(TITLE)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Hide panel" })).toHaveAttribute("aria-expanded", "true");
+      // The page's open is not the learner's choice: the saved "closed" stays, and closing the panel keeps it.
+      expect(localStorage.getItem("smart-tutor.chat-panel-open")).toBe("false");
+      await userEvent.click(screen.getByRole("button", { name: "Hide panel" }));
+      expect(panel()).not.toBeInTheDocument();
+      expect(localStorage.getItem("smart-tutor.chat-panel-open")).toBe("false");
+    });
+
+    function Location() {
+      const location = useLocation();
+      return <output data-testid="location">{location.pathname + location.search}</output>;
+    }
+    const startChatAt = (props: ComponentProps<typeof ChatPage>) =>
+      render(
+        <MemoryRouter initialEntries={["/chat?document=d1"]}>
+          <ChatPage loadDocs={async () => [library()]} loadUsed={async () => []} {...props} />
+          <Location />
+        </MemoryRouter>,
+      );
+
+    it("takes the document param out of the URL once the first question uses it, without resetting the page", async () => {
+      const control = controlledStream();
+      const loadDocs = vi.fn(async () => [library()]);
+      startChatAt({ ask: vi.fn(() => control.stream()), loadDocs });
+      expect(screen.getByTestId("location")).toHaveTextContent("/chat?document=d1");
+      await userEvent.type(await question(), "q");
+      await userEvent.click(askButton());
+      expect(screen.getByTestId("location").textContent).toBe("/chat");
+      control.push({ type: "thread", thread_id: "t1" });
+      control.push({ type: "delta", text: "Partly." });
+      expect(await screen.findByText("Partly.")).toBeInTheDocument();
+      expect(loadDocs).toHaveBeenCalledTimes(1);
+      control.push({ type: "done" });
+      control.push(null);
+    });
+
+    it("takes the document param out of the URL when its row is removed", async () => {
+      startChatAt({ ask: vi.fn(answered) });
+      await question();
+      await userEvent.click(await within(panel()!).findByRole("button", { name: `Remove ${TITLE} from this conversation` }));
+      expect(screen.getByTestId("location").textContent).toBe("/chat");
+      expect(notice()).not.toBeInTheDocument();
     });
   });
 });
