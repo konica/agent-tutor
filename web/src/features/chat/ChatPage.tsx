@@ -1,5 +1,5 @@
-import { Clock, Send, Upload } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { ArrowUp, CircleAlert, Clock, FileText, Upload } from "lucide-react";
+import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import {
   askInNewThread,
@@ -12,7 +12,7 @@ import {
 import { loadDocuments } from "../../api/documents";
 import type { DocumentResponse } from "../../api/generated/types.gen";
 import { SessionExpiredError, sessionExpiry } from "../../auth/authClient";
-import { Button } from "../../components/Button/Button";
+import { IconButton } from "../../components/Button/IconButton";
 import { LinkButton } from "../../components/Button/LinkButton";
 import { EmptyState } from "../../components/EmptyState/EmptyState";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
@@ -57,6 +57,7 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs }: Props
   const [noDocuments, setNoDocuments] = useState(false);
   const alive = useRef(true);
   const busy = useRef(false);
+  const sourcesId = useId();
 
   useEffect(() => {
     alive.current = true;
@@ -160,7 +161,10 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs }: Props
       <div className={styles.column}>
         <PageHeader title="New conversation" />
         {library.status === "failed" && (
-          <p className={styles.problem}>Your documents couldn't be loaded. Reload the page to try again.</p>
+          <p className={styles.problem}>
+            <CircleAlert className={styles.problemIcon} strokeWidth={1.5} aria-hidden="true" />
+            Your documents couldn't be loaded. Reload the page to try again.
+          </p>
         )}
       </div>
     );
@@ -168,19 +172,17 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs }: Props
 
   return (
     <div className={styles.column}>
-      {exchange ? (
-        <PageHeader title={exchange.question} titleClassName={styles.clampedTitle} />
-      ) : (
-        <>
-          <PageHeader title="New conversation" />
-          <section className={styles.welcome}>
-            <h2 className={styles.welcomeTitle}>Ask about your documents</h2>
-            <p className={styles.welcomeText}>
-              I answer only from the documents in your Library and show the page each answer came from. There's nothing to
-              choose first: just ask.
-            </p>
-          </section>
-        </>
+      <div className={styles.head}>
+        <PageHeader title={exchange ? exchange.question : "New conversation"} />
+      </div>
+      {!exchange && (
+        <section className={styles.welcome}>
+          <h2 className={styles.welcomeTitle}>Ask about your documents</h2>
+          <p className={styles.welcomeText}>
+            I answer only from the documents in your Library and show the page each answer came from. There's nothing to
+            choose first: just ask.
+          </p>
+        </section>
       )}
 
       {exchange && (
@@ -194,48 +196,64 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs }: Props
       <div className={styles.answerRegion} aria-live="polite" aria-busy={answering}>
         {exchange && exchange.answer && <p className={styles.answer}>{exchange.answer}</p>}
         {exchange && exchange.citations.length > 0 && (
-          <section className={styles.citations} aria-label="Citations">
-            <h2 className={styles.citationsTitle}>Citations</h2>
-            {/* Each citation shows the [n] the answer's text uses for it; an answer may cite [2] without [1]. */}
-            <ul>
+          <div className={styles.sources}>
+            <span className={styles.sourcesLabel} id={sourcesId}>
+              Sources
+            </span>
+            {/* Each source shows the [n] the answer's text uses for it; an answer may cite [2] without [1]. */}
+            <ul className={styles.sourceList} aria-labelledby={sourcesId}>
               {exchange.citations.map((c) => (
                 <li key={c.chunk_id}>
-                  <span className={styles.marker}>[{c.n}]</span> <span>{formatCitation(c)}</span>
+                  <span className={styles.source} title={formatCitation(c)}>
+                    <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
+                    <span className={styles.sourceMarker}>[{c.n}]</span>{" "}
+                    <span className={styles.sourceTitle}>{c.document_title}</span>{" "}
+                    <span>· {c.page === null ? "page unavailable" : `p. ${c.page}`}</span>
+                  </span>
                 </li>
               ))}
             </ul>
-          </section>
+          </div>
         )}
-        {problem && <p className={styles.problem}>{problem.message}</p>}
+        {problem && (
+          <p className={styles.problem}>
+            <CircleAlert className={styles.problemIcon} strokeWidth={1.5} aria-hidden="true" />
+            {problem.message}
+          </p>
+        )}
       </div>
 
       {answering && <p className={styles.thinking}>The tutor is answering…</p>}
-
-      {processing > 0 && (
-        <p className={styles.hint}>
-          <Clock className={styles.hintIcon} strokeWidth={1.5} aria-hidden="true" />
-          {processingHint(processing)}
-        </p>
-      )}
 
       <form className={styles.form} onSubmit={onSubmit}>
         <label htmlFor="chat-question" className="visually-hidden">
           Your question
         </label>
-        <textarea
-          id="chat-question"
-          className={styles.input}
-          rows={3}
-          maxLength={MAX_QUESTION}
-          placeholder="Ask about your documents"
-          value={question}
-          disabled={answering}
-          onChange={(e) => setQuestion(e.target.value)}
-          onKeyDown={onKeyDown}
-        />
-        <Button type="submit" variant="primary" icon={Send} disabled={!canAsk}>
-          Ask
-        </Button>
+        <div className={styles.composer}>
+          <textarea
+            id="chat-question"
+            className={styles.input}
+            rows={1}
+            maxLength={MAX_QUESTION}
+            placeholder="Ask about your documents"
+            value={question}
+            disabled={answering}
+            onChange={(e) => setQuestion(e.target.value)}
+            onKeyDown={onKeyDown}
+          />
+          <IconButton type="submit" label="Ask" icon={ArrowUp} tip={false} disabled={!canAsk} className={styles.send} />
+        </div>
+        <div className={styles.statusLine}>
+          <span className={styles.hint}>
+            {processing > 0 && (
+              <>
+                <Clock className={styles.hintIcon} strokeWidth={1.5} aria-hidden="true" />
+                {processingHint(processing)}
+              </>
+            )}
+          </span>
+          <span>Enter to send · Shift + Enter for a new line</span>
+        </div>
       </form>
     </div>
   );

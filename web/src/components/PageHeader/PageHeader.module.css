@@ -1,4 +1,10 @@
-.header { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--sp-6); margin-bottom: var(--sp-6); }
-.title { font-size: var(--fs-32); overflow-wrap: anywhere; }
-.description { color: var(--text-2); margin-top: var(--sp-2); max-width: 64ch; }
-.actions { display: flex; gap: var(--sp-3); flex: none; }
+.header { display: flex; align-items: center; gap: var(--sp-2); min-height: 40px; margin: 0 0 var(--sp-2); }
+.title { min-width: 0; font-size: var(--fs-20); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.count { font-size: var(--fs-13); color: var(--text-2); white-space: nowrap; }
+.info {
+  width: 24px; height: 24px; display: inline-grid; place-items: center; flex: none; padding: 0;
+  background: transparent; border: 0; border-radius: 50%; color: var(--text-2);
+}
+.info:hover { background: var(--surface-2); color: var(--text); }
+.info[data-tip]::after { left: 0; transform: none; }
+.actions { display: flex; align-items: center; gap: var(--sp-2); flex: none; margin-left: auto; }

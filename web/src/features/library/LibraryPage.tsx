@@ -294,8 +294,16 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
     <>
       <PageHeader
         title="Library"
+        count={documents && documents.length > 0 && !filtered ? `${documents.length} ${documents.length === 1 ? "document" : "documents"}` : undefined}
         description="Your documents. They're private to you, and the tutor answers only from them."
-        actions={documents && (documents.length > 0 || filtered) ? <Button variant="primary" icon={Upload} onClick={pick}>Upload</Button> : undefined}
+        actions={
+          documents && (documents.length > 0 || filtered) ? (
+            <>
+              <p className={styles.rights}>Only upload documents you have the right to use.</p>
+              <Button variant="primary" icon={Upload} onClick={pick}>Upload</Button>
+            </>
+          ) : undefined
+        }
       />
       <input
         ref={input}
@@ -346,7 +354,11 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
           Can't load your library. Retrying…
         </p>
       )}
-      {documents && (documents.length > 0 || filtered) && <LibraryFilters ref={subjectSelect} filters={filters} onChange={setFilters} subjects={subjects} count={documents.length} onClear={clearFilters} />}
+      {documents && (documents.length > 0 || filtered) && (
+        <div className={styles.toolbar}>
+          <LibraryFilters ref={subjectSelect} filters={filters} onChange={setFilters} subjects={subjects} count={documents.length} needsSubjects={documents.filter((d) => d.state === "awaiting_subjects").length} onClear={clearFilters} />
+        </div>
+      )}
       {documents?.length === 0 && filtered && (
         <EmptyState icon={Filter} title="No documents match these filters" actions={<Button onClick={clearFilters}>Clear filters</Button>}>
           <p>Try another subject, state or a wider date range.</p>
@@ -371,6 +383,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
           ) : (
             <p>Your documents stay private to you.</p>
           )}
+          <p>Only upload documents you have the right to use.</p>
         </EmptyState>
       )}
       {documents && documents.length > 0 && <DocumentTable documents={documents} onRetry={(d) => void onRetry(d)} retrying={retrying} onChooseSubjects={setPicking} uploading={uploading} />}

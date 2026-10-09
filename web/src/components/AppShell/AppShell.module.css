@@ -1,5 +1,6 @@
 .app { display: grid; grid-template-columns: var(--nav-w) minmax(0, 1fr); height: 100dvh; }
+.app.collapsed { grid-template-columns: var(--nav-w-collapsed) minmax(0, 1fr); }
 .main { min-width: 0; overflow-y: auto; position: relative; }
 .main:focus { outline: none; }
-.page { max-width: var(--page-w); margin: 0 auto; padding: var(--sp-8) var(--sp-8) var(--sp-16); }
-.wide { max-width: var(--page-w-wide); }
+.page { max-width: var(--page-w); margin: 0 auto; padding: var(--sp-3) var(--sp-4) var(--sp-6); }
+.wide { max-width: min(var(--page-w-wide), 100%); }
