@@ -1,5 +1,7 @@
 # Pilot environment on AWS: the big picture
 
+> This is the engineer view. For the stakeholder view (what runs, how a request travels, security, cost), read [`docs/architecture/solution-architecture.md`](../architecture/solution-architecture.md).
+
 How the pilot environment (#54) fits together across GitHub and AWS: who deploys what, how the pieces trust each other, and how a learner's request travels. It shows the **target** after #55–#59, per the decisions on #54 and PRD §9.11–§9.12. Today the CDK bootstrap and the deploy role exist (#55), and #56 adds the network, cluster, registry, edge (internal ALB and CloudFront), and budget stacks. The deploy steps are in [`pilot-deploy.md`](pilot-deploy.md). The human setup is in [`pilot-aws-prerequisites.md`](pilot-aws-prerequisites.md).
 
 ## 1. Platforms and trust
