@@ -10,7 +10,7 @@ type Props = {
   count: number | null; // null while the first result is loading
   active: boolean; // any filter set; shows Clear filters
   onClear: () => void;
-  children: ReactNode; // FilterField / FilterRange items
+  children: ReactNode; // FilterField items
 };
 
 // Labelled filter fields, the live result count, and a Clear filters button that appears only while a filter is set.
@@ -37,18 +37,5 @@ export function FilterField({ id, label, children }: { id: string; label: string
       <label htmlFor={id} className="visually-hidden">{label}</label>
       {children}
     </div>
-  );
-}
-
-// Fields joined by a dash, for From–To ranges.
-export function FilterRange({ children }: { children: ReactNode }) {
-  return <div className={styles.range}>{children}</div>;
-}
-
-export function FilterRangeDash() {
-  return (
-    <span className={styles.dash} aria-hidden="true">
-      –
-    </span>
   );
 }

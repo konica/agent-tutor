@@ -1,23 +1,28 @@
-.status { margin: 0 0 var(--sp-3); min-height: 1lh; color: var(--text-2); font-size: var(--fs-14); }
+.rights { margin: 0; font-size: var(--fs-12); color: var(--text-2); }
+.toolbar {
+  display: flex; align-items: center; gap: var(--sp-2); min-height: 36px; margin: 0 0 var(--sp-2);
+  border-bottom: 1px solid var(--border);
+}
+.status { margin: 0 0 var(--sp-2); min-height: 1lh; color: var(--text-2); font-size: var(--fs-13); }
 .error {
-  margin: 0 0 var(--sp-4); padding: var(--sp-3) var(--sp-4); border-radius: var(--r-md);
-  background: var(--danger-soft); color: var(--danger);
+  margin: 0 0 var(--sp-2); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md);
+  background: var(--danger-soft); color: var(--danger); font-size: var(--fs-13);
 }
 .rejected {
-  margin: 0 0 var(--sp-4); padding: 0; list-style: none;
+  margin: 0 0 var(--sp-2); padding: 0; list-style: none; font-size: var(--fs-13);
   border-radius: var(--r-md); background: var(--danger-soft);
 }
-.rejected li { display: flex; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); }
+.rejected li { display: flex; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); }
 .rejected li + li { border-top: 1px solid var(--border); }
-.rejected svg { flex: none; width: 1.25rem; height: 1.25rem; color: var(--danger); }
+.rejected svg { flex: none; width: 16px; height: 16px; color: var(--danger); }
 .rejectedName { display: block; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
 .rejectedReason { display: block; color: var(--danger); }
 .already {
-  margin: 0 0 var(--sp-4); padding: 0; list-style: none;
+  margin: 0 0 var(--sp-2); padding: 0; list-style: none; font-size: var(--fs-13);
   border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface);
 }
-.already li { display: flex; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); }
+.already li { display: flex; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); }
 .already li + li { border-top: 1px solid var(--border); }
-.already svg { flex: none; width: 1.25rem; height: 1.25rem; color: var(--text-2); }
+.already svg { flex: none; width: 16px; height: 16px; color: var(--text-2); }
 .alreadyNote { display: block; color: var(--text-2); }
 .alreadyLink { display: inline-block; margin-top: var(--sp-1); color: var(--accent-text); font-weight: 600; }

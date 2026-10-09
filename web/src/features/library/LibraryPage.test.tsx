@@ -20,6 +20,15 @@ describe("LibraryPage", () => {
     render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => []} upload={vi.fn()} />);
     expect(await screen.findByText("Upload your first document")).toBeVisible();
     expect(screen.getByRole("button", { name: "Choose PDFs" })).toBeEnabled();
+    expect(screen.getByText("Only upload documents you have the right to use.")).toBeVisible();
+  });
+
+  it("shows the upload-rights sentence beside Upload and the count in the header", async () => {
+    const three = ["a", "b", "c"].map((n) => ({ ...processing, document_id: n, title: `${n}.pdf` }));
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => three} upload={vi.fn()} />);
+    expect(await screen.findByText("3 documents", { selector: "span:not([aria-live])" })).toBeVisible();
+    expect(screen.getByText("Only upload documents you have the right to use.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "About Library" })).toHaveAttribute("data-tip", expect.stringContaining("private to you"));
   });
 
   it("lists a processing document by its file name with the subjects hint", async () => {
@@ -494,7 +503,7 @@ describe("LibraryPage retry", () => {
     const row = (await screen.findByText("scan.pdf")).closest("tr")!;
     await userEvent.click(within(row).getByRole("button", { name: "Retry scan.pdf" }));
     expect(retry).toHaveBeenCalledWith("d3");
-    expect(await within(row).findByText("Attempt 2 of 3.")).toBeVisible();
+    expect(await within(row).findByText(/^Attempt 2 of 3 · /)).toBeVisible();
     expect(within(row).getByText("Processing")).toBeVisible();
     expect(within(row).queryByRole("button", { name: /Retry/ })).toBeNull();
   });
@@ -545,7 +554,7 @@ describe("LibraryPage retry", () => {
       render(<LibraryPage check={notInLibrary} loadLimits={limits} loadSubjects={subjects} load={async () => [ready]} upload={vi.fn()} />);
       expect(await screen.findByText("Schick et al. · 2023")).toBeVisible();
       expect(screen.getByRole("search", { name: "Filter documents" })).toBeVisible();
-      expect(screen.getByText("1 document")).toBeVisible();
+      expect(within(screen.getByRole("search", { name: "Filter documents" })).getByText("1 document")).toBeVisible();
       expect(screen.queryByRole("button", { name: "Clear filters" })).toBeNull();
     });
 
@@ -559,6 +568,7 @@ describe("LibraryPage retry", () => {
       await waitFor(() => expect(load).toHaveBeenLastCalledWith({ subject_ids: ["s1"] }));
       await userEvent.selectOptions(screen.getByLabelText("State"), "awaiting_subjects");
       await waitFor(() => expect(load).toHaveBeenLastCalledWith({ subject_ids: ["s1"], state: "awaiting_subjects" }));
+      await userEvent.click(screen.getByRole("button", { name: "Uploaded" }));
       fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-10-01" } });
       fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-10-07" } });
       await waitFor(() => expect(load).toHaveBeenLastCalledWith({ subject_ids: ["s1"], state: "awaiting_subjects", uploaded_from: "2026-10-01", uploaded_to: "2026-10-07" }));

@@ -20,13 +20,37 @@ describe("DocumentTable", () => {
   });
 });
 
+describe("DocumentTable compact rows", () => {
+  const props = { onRetry: () => {}, retrying: new Set<string>() };
+
+  it("keeps a row on one line: authors and year inline, the full title in the tooltip", () => {
+    const long = "Toolformer: Language Models Can Teach Themselves to Use Tools";
+    render(<DocumentTable documents={[{ ...doc, title: long, authors: ["Schick", "Dwivedi-Yu"], year: 2023 }]} {...props} />);
+    const title = screen.getByText(long);
+    expect(title).toHaveAttribute("title", long);
+    expect(title.closest("td")).toHaveTextContent(/Schick/);
+  });
+
+  it("puts the processing hint on the badge line with the full hint as its tooltip", () => {
+    render(<DocumentTable documents={[{ ...doc, state: "processing" }]} {...props} />);
+    const hint = "You can choose subjects when processing finishes.";
+    expect(screen.getByText(hint)).toHaveAttribute("title", hint);
+  });
+
+  it("shows a failure reason in full", () => {
+    const reason = "No text layer (scanned PDFs are not supported yet)";
+    render(<DocumentTable documents={[{ ...doc, state: "failed", failure_reason: reason, can_retry: true }]} {...props} />);
+    expect(screen.getByText(reason)).not.toHaveAttribute("title");
+  });
+});
+
 describe("DocumentTable upload day", () => {
   afterEach(() => vi.useRealTimers());
 
   it("shows the day in GMT+7, not the browser's", () => {
     vi.useFakeTimers({ now: new Date("2026-10-20T00:00:00Z") });
     render(<DocumentTable documents={[{ ...doc, created_at: "2026-10-01T17:30:00Z" }]} onRetry={() => {}} retrying={new Set()} />);
-    expect(screen.getByRole("cell", { name: /2 Oct 2026|Oct 2, 2026/ })).toBeVisible();
+    expect(screen.getByRole("cell", { name: /2 Oct|Oct 2/ })).toBeVisible();
   });
 
   it("says Today when the upload is on the current GMT+7 day", () => {

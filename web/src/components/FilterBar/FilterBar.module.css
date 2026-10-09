@@ -6,7 +6,4 @@
   background: var(--surface); color: var(--text); font-size: var(--fs-13);
 }
 .field select { max-width: 180px; }
-.range { display: flex; align-items: center; gap: var(--sp-2); }
-.range .field { min-width: 0; }
-.dash { display: flex; align-items: center; min-height: var(--control-h-sm); color: var(--text-2); }
 .summary { margin-left: auto; display: flex; align-items: center; gap: var(--sp-2); min-height: var(--control-h-sm); font-size: var(--fs-13); color: var(--text-2); }

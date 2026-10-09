@@ -1,0 +1,19 @@
+.root { position: relative; }
+.button {
+  display: inline-flex; align-items: center; gap: var(--sp-2); height: var(--control-h-sm); padding: 0 var(--sp-2);
+  border: 1px solid var(--border-strong); border-radius: var(--r-sm); background: var(--surface); color: var(--text);
+  font-size: var(--fs-13); cursor: pointer;
+}
+.button:hover { background: var(--surface-2); }
+.on { border-color: var(--accent); background: var(--accent-soft); }
+.icon { width: 14px; height: 14px; flex: none; color: var(--text-2); }
+.pop {
+  position: absolute; z-index: 30; top: calc(100% + var(--sp-1)); left: 0; display: grid; gap: var(--sp-3);
+  min-width: 200px; padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-lg);
+  background: var(--surface); box-shadow: var(--shadow-lg);
+}
+.field { display: grid; gap: var(--sp-1); font-size: var(--fs-12); font-weight: 600; color: var(--text-2); }
+.field input {
+  height: var(--control-h-sm); padding: 0 var(--sp-2); border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--text); font-size: var(--fs-13);
+}
