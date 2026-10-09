@@ -133,6 +133,16 @@ describe("app shell routes", () => {
     expect(screen.getByRole("heading", { level: 1, name: "New conversation" })).toBeInTheDocument();
   });
 
+  it("shows the needs-subjects badge on Library from any page", async () => {
+    vi.mocked(loadDocuments).mockImplementation(async (filters) => (filters?.state === "awaiting_subjects" ? [{ state: "awaiting_subjects" } as DocumentResponse] : []));
+    try {
+      renderAt("/chat");
+      expect(await nav().findByRole("link", { name: "Library, 1 needs subjects" })).toBeVisible();
+    } finally {
+      vi.mocked(loadDocuments).mockImplementation(async () => []);
+    }
+  });
+
   it("moves to a page and marks it current when a nav item is clicked", async () => {
     renderAt("/library");
     await userEvent.click(nav().getByRole("link", { name: "Usage" }));

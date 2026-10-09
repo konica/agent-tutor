@@ -9,11 +9,16 @@ import { IconButton } from "../Button/IconButton";
 import { UserMenu } from "../UserMenu/UserMenu";
 import styles from "./SideNav.module.css";
 
-type Props = { collapsed: boolean; onToggle: () => void; recent?: RecentConversation[] };
+type Props = {
+  collapsed: boolean;
+  onToggle: () => void;
+  recent?: RecentConversation[];
+  badges?: Partial<Record<string, { count: number; label: string }>>; // keyed by nav path
+};
 
 const GROUPS = [0, 1, 2] as const;
 
-export function SideNav({ collapsed, onToggle, recent = [] }: Props) {
+export function SideNav({ collapsed, onToggle, recent = [], badges }: Props) {
   const { name, signOut } = useSession();
   return (
     <nav className={collapsed ? `${styles.sidenav} ${styles.collapsed}` : styles.sidenav} aria-label="Main">
@@ -33,16 +38,24 @@ export function SideNav({ collapsed, onToggle, recent = [] }: Props) {
         <Fragment key={group}>
           {group > 0 && <hr className={styles.hr} />}
           <ul className={styles.list}>
-            {NAV.filter((item) => item.group === group).map(({ path, label, icon: Icon }) => (
+            {NAV.filter((item) => item.group === group).map(({ path, label, icon: Icon }) => {
+              const badge = badges?.[path];
+              const named = badge ? `${label}, ${badge.label}` : label;
+              return (
               <li key={path}>
                 <NavLink
                   className={styles.link}
                   to={path}
-                  aria-label={collapsed ? label : undefined}
-                  data-tip={collapsed ? label : undefined}
+                  aria-label={badge || collapsed ? named : undefined}
+                  data-tip={collapsed ? named : undefined}
                 >
                   <Icon className={styles.icon} strokeWidth={1.5} aria-hidden="true" />
                   {!collapsed && <span className={styles.text}>{label}</span>}
+                  {badge && (
+                    <span className={styles.badge} aria-hidden="true">
+                      {badge.count}
+                    </span>
+                  )}
                 </NavLink>
                 {path === "/conversations" && !collapsed && recent.length > 0 && (
                   <ul className={styles.sub} aria-label="Recent conversations">
@@ -56,7 +69,8 @@ export function SideNav({ collapsed, onToggle, recent = [] }: Props) {
                   </ul>
                 )}
               </li>
-            ))}
+              );
+            })}
           </ul>
         </Fragment>
       ))}

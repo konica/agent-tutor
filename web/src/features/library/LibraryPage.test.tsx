@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 
 import { DocumentGoneError, DocumentProcessingError, RetriesUsedUpError, type DocumentFilters, type DocumentResponse, type UploadEvents, type UploadStatus } from "../../api/documents";
 import { SessionExpiredError } from "../../auth/authClient";
+import { NeedsSubjectsContext } from "../../app/needsSubjects";
 import { LibraryPage } from "./LibraryPage";
 
 // The page navigates (Chat on a row), so every render sits in a router.
@@ -642,13 +643,13 @@ describe("LibraryPage choose subjects", () => {
     const load = vi.fn().mockResolvedValueOnce([waiting]).mockResolvedValue([ready]);
     const loadSuggestions = vi.fn(async () => suggestions);
     const saveSubjects = vi.fn(async () => ready);
-    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} loadSuggestions={loadSuggestions} saveSubjects={saveSubjects} />);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} loadSuggestions={loadSuggestions} saveSubjects={saveSubjects} pollMs={60_000} />);
     await userEvent.click(await screen.findByRole("button", { name: "Choose subjects for Toolformer" }));
     expect(screen.getByRole("dialog", { name: "Choose subjects" })).toBeVisible();
     await userEvent.click(await screen.findByRole("button", { name: "Save" }));
     expect(saveSubjects).toHaveBeenCalledWith("d1", { subject_ids: ["s1"], new_names: [] });
     await waitFor(() => expect(pageStatus()).toHaveTextContent("Subjects saved. Toolformer is ready to use."));
-    expect(load).toHaveBeenCalledTimes(4); // on mount the list and both tab counts, then the list again
+    await waitFor(() => expect(load).toHaveBeenCalledTimes(6)); // on mount the list and both tab counts, then the list and both tab counts again
     await userEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(pageStatus()).toHaveFocus();
@@ -1223,5 +1224,46 @@ describe("LibraryPage document details", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Archive" }));
     expect(archive).toHaveBeenCalledWith("d1");
     await waitFor(() => expect(load.mock.calls.length).toBeGreaterThan(before));
+  });
+});
+
+describe("needs subjects", () => {
+  const waiting = (id: string): DocumentResponse => ({ ...processing, document_id: id, title: `${id}.pdf`, state: "awaiting_subjects" });
+  const ready: DocumentResponse = { ...processing, document_id: "r1", title: "r1.pdf", state: "ready", subjects: [{ subject_id: "s1", name: "AI Agents" }] };
+  const subjects = async () => [{ subject_id: "s1", name: "AI Agents" }];
+
+  it("counts waiting documents across the whole active library, not the filtered list", async () => {
+    const load = vi.fn(async (f: DocumentFilters) => (f.subject_ids ? [ready] : [waiting("w1"), waiting("w2"), ready]));
+    render(<LibraryPage check={notInLibrary} loadLimits={limits} loadSubjects={subjects} load={load} upload={vi.fn()} />);
+    await screen.findByRole("option", { name: "AI Agents" });
+    await userEvent.selectOptions(screen.getByLabelText("Subject"), "s1");
+    await waitFor(() => expect(load).toHaveBeenLastCalledWith({ subject_ids: ["s1"] }));
+    expect(await screen.findByRole("button", { name: "2 need subjects" })).toBeVisible();
+  });
+
+  it("hides the chip when nothing waits", async () => {
+    render(<LibraryPage check={notInLibrary} loadLimits={limits} loadSubjects={subjects} load={async () => [ready]} upload={vi.fn()} />);
+    await screen.findByText("r1.pdf");
+    expect(screen.queryByRole("button", { name: /need(s)? subjects/ })).toBeNull();
+  });
+
+  it("recounts when polling sees a state change", async () => {
+    let state: DocumentResponse["state"] = "processing";
+    const load = vi.fn(async () => [{ ...processing, state }]);
+    render(<LibraryPage check={notInLibrary} loadLimits={limits} loadSubjects={subjects} load={load} upload={vi.fn()} pollMs={20} />);
+    await screen.findByText("lewis-rag-2020.pdf");
+    expect(screen.queryByRole("button", { name: /need(s)? subjects/ })).toBeNull();
+    state = "awaiting_subjects";
+    expect(await screen.findByRole("button", { name: "1 needs subjects" }, { timeout: 3000 })).toBeVisible();
+  });
+
+  it("reports the count to the shell", async () => {
+    const report = vi.fn();
+    render(
+      <NeedsSubjectsContext.Provider value={{ count: null, report }}>
+        <LibraryPage check={notInLibrary} loadLimits={limits} loadSubjects={subjects} load={async () => [waiting("w1"), waiting("w2")]} upload={vi.fn()} />
+      </NeedsSubjectsContext.Provider>,
+    );
+    await waitFor(() => expect(report).toHaveBeenCalledWith(2));
   });
 });

@@ -107,9 +107,10 @@ describe("LibraryFilters", () => {
     expect(onChange).toHaveBeenLastCalledWith({});
   });
 
-  it("reads Needs subjects, with no number, while pressed and none is left", () => {
+  it("hides the chip at 0 even while pressed; the State select still removes the filter", () => {
     setup({ state: "awaiting_subjects" }, 0, 0);
-    expect(screen.getByRole("button", { name: "Needs subjects" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("button", { name: /needs? subjects/ })).toBeNull();
+    expect(screen.getByLabelText("State")).toHaveValue("awaiting_subjects");
   });
 
   it("hides the chip when nothing needs subjects", () => {

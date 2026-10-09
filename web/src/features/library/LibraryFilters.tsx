@@ -2,6 +2,7 @@ import { Tag } from "lucide-react";
 import { forwardRef } from "react";
 
 import type { DocumentFilters } from "../../api/documents";
+import { needsSubjectsLabel } from "../../app/needsSubjects";
 import type { SubjectResponse } from "../../api/generated/types.gen";
 import { FilterBar, FilterField } from "../../components/FilterBar/FilterBar";
 import styles from "./LibraryFilters.module.css";
@@ -24,7 +25,7 @@ type Props = {
   onChange: (filters: DocumentFilters) => void;
   subjects: SubjectResponse[];
   count: number | null;
-  needsSubjects: number; // documents in the loaded list that wait for subjects
+  needsSubjects: number; // active documents that wait for subjects, across the whole library
   onClear: () => void;
   showState?: boolean; // the Archived tab has no State filter or needs-subjects chip
 };
@@ -65,10 +66,10 @@ export const LibraryFilters = forwardRef<HTMLSelectElement, Props>(function Libr
           </select>
         </FilterField>
       )}
-      {showState && (needsSubjects > 0 || filters.state === "awaiting_subjects") && (
+      {showState && needsSubjects > 0 && (
         <button type="button" className={styles.chip} aria-pressed={filters.state === "awaiting_subjects"} onClick={() => set({ state: filters.state === "awaiting_subjects" ? undefined : "awaiting_subjects" })}>
           <Tag className={styles.chipIcon} strokeWidth={1.5} aria-hidden="true" />
-          {needsSubjects === 0 ? "Needs subjects" : needsSubjects === 1 ? "1 needs subjects" : `${needsSubjects} need subjects`}
+          {needsSubjectsLabel(needsSubjects)}
         </button>
       )}
     </FilterBar>

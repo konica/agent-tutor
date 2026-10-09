@@ -2,6 +2,7 @@ import { AlertCircle, Archive, Filter, Info, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router";
 
+import { useNeedsSubjects } from "../../app/needsSubjects";
 import { SessionExpiredError } from "../../auth/authClient";
 import { archiveDocument, deleteDocument, DocumentGoneError, DocumentProcessingError, findInLibrary, loadDocumentDetails, loadDocuments, loadSubjectSuggestions, loadUploadLimits, loadUploadStatus, megabytes, rejectionReason, restoreDocument, RetriesUsedUpError, retryProcessing, saveDocumentTitle, saveSubjects as saveChosenSubjects, uploadPdf, type DocumentDetails, type DocumentFilters, type DocumentResponse, type SubjectSuggestions, type UploadEvents, type UploadLimits, type UploadStatus } from "../../api/documents";
 import type { SubjectResponse } from "../../api/generated/types.gen";
@@ -77,6 +78,12 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
   const archivedView = view === "archived";
   const { documents, applied, unavailable, refresh } = useDocuments(load, pollMs, archivedView ? { ...filters, archived: true } : filters);
   const counts = useLibraryCounts(load);
+  const { report } = useNeedsSubjects();
+  const waitingCount = counts.waiting?.length ?? 0;
+  // The chip and the nav badge count the whole active library, whatever the filters show.
+  useEffect(() => {
+    if (counts.waiting) report(counts.waiting.length);
+  }, [counts.waiting, report]);
   // Until the selected tab's list arrives, the other tab's rows are not shown under it.
   const list = documents !== null && Boolean(applied.archived) === archivedView ? documents : null;
   // The empty states follow the filters the list was loaded with, so clearing never flashes the upload card before the full list arrives.
@@ -156,7 +163,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
     justSaved.current.add(doc.document_id);
     seen.current?.set(doc.document_id, "ready");
     setStatus(`Subjects saved. ${doc.title} is ready to use.`);
-    await Promise.all([refresh(), refreshSubjects()]);
+    await Promise.all([refresh(), counts.refresh(), refreshSubjects()]); // the document no longer waits, so the counts change
   }
 
   // One polite live region carries upload results and processing-state changes (DESIGN.md → Accessibility).
@@ -165,6 +172,8 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
     const before = seen.current;
     seen.current = new Map(documents.map((d) => [d.document_id, d.state]));
     if (!before) return; // the first load is not a change
+    // A poll that sees a state change moves the counts (a document may now wait for subjects).
+    if (documents.some((d) => before.has(d.document_id) && before.get(d.document_id) !== d.state)) void counts.refresh();
     const changes = documents
       .filter((d) => !d.archived && before.has(d.document_id) && before.get(d.document_id) !== d.state && !justSaved.current.has(d.document_id))
       .map(announceChange)
@@ -557,7 +566,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
             value={view}
             onChange={changeView}
           />
-          <LibraryFilters ref={subjectSelect} filters={filters} onChange={setFilters} subjects={subjects} count={list ? list.length : null} needsSubjects={list ? list.filter((d) => d.state === "awaiting_subjects").length : 0} onClear={clearFilters} showState={!archivedView} />
+          <LibraryFilters ref={subjectSelect} filters={filters} onChange={setFilters} subjects={subjects} count={list ? list.length : null} needsSubjects={waitingCount} onClear={clearFilters} showState={!archivedView} />
         </div>
       )}
       {showToolbar && archivedView && (
