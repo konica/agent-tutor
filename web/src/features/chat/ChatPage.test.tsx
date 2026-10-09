@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AskRefusedError, NoDocumentsError, type ChatEvent } from "../../api/chat";
 import type { DocumentResponse, ThreadDocumentResponse } from "../../api/generated/types.gen";
 import { SessionExpiredError, sessionExpiry } from "../../auth/authClient";
+import { fakeViewerDeps } from "../viewer/testFakes";
 import { ChatPage } from "./ChatPage";
 
 async function* events(...list: ChatEvent[]) {
@@ -556,6 +557,97 @@ describe("ChatPage", () => {
       await userEvent.click(screen.getByRole("switch", { name: "Show citations" }));
       expect(screen.queryByRole("list", { name: "Sources" })).not.toBeInTheDocument();
       expect(screen.getByText("It weighs tokens [1].")).toBeInTheDocument();
+    });
+  });
+
+  describe("document viewer", () => {
+    const used = (document_id: string, title: string): ThreadDocumentResponse => ({
+      document_id,
+      title,
+      authors: [],
+      year: null,
+      archived: false,
+      deleted: false,
+      added_by: "answer",
+      used: true,
+    });
+    const answered = () =>
+      events({ type: "thread", thread_id: "t1" }, { type: "delta", text: "It weighs tokens [1]." }, { type: "done" });
+    const panel = () => screen.queryByRole("complementary", { name: "Conversation" });
+    const pane = (name: string) => screen.queryByRole("region", { name });
+    const row = (name: string) => within(panel()!).findByRole("button", { name });
+
+    // Asks one question and waits for the documents used to fill the panel.
+    async function answer() {
+      const ask = vi.fn().mockImplementation(answered);
+      renderChat({ ask, viewerDeps: fakeViewerDeps(), loadUsed: async () => [used("d1", "ReAct"), used("d2", "PPO")] });
+      await userEvent.type(await question(), "How does ReAct work?");
+      await userEvent.click(askButton());
+      await row("ReAct");
+    }
+
+    async function openReAct() {
+      await userEvent.click(await row("ReAct"));
+      // The viewer loads its file link and PDF first; give it room when the suite runs under load.
+      expect(await screen.findByText("p. 1 / 3", {}, { timeout: 3000 })).toBeInTheDocument();
+    }
+
+    it("opens a used document beside the conversation with its title focused, hiding the panel", async () => {
+      await answer();
+      await openReAct();
+      expect(pane("ReAct")).toBeInTheDocument();
+      expect(within(pane("ReAct")!).getByRole("heading", { level: 2, name: "ReAct" })).toHaveFocus();
+      expect(panel()).not.toBeInTheDocument();
+      expect(screen.getByText("It weighs tokens [1].")).toBeInTheDocument();
+    });
+
+    it("swaps the document in place when another row is opened", async () => {
+      await answer();
+      await openReAct();
+      await userEvent.click(screen.getByRole("button", { name: "Show panel" }));
+      await userEvent.click(await row("PPO"));
+      expect(await screen.findByRole("region", { name: "PPO" })).toBeInTheDocument();
+      expect(pane("ReAct")).not.toBeInTheDocument();
+      expect(within(panel()!).getByRole("button", { name: "PPO" })).toHaveAttribute("aria-current", "true");
+    });
+
+    it("Close removes the pane, brings the panel back, and returns focus to the row", async () => {
+      await answer();
+      await openReAct();
+      await userEvent.click(within(pane("ReAct")!).getByRole("button", { name: "Close" }));
+      expect(pane("ReAct")).not.toBeInTheDocument();
+      expect(panel()).toBeInTheDocument();
+      await waitFor(() => expect(within(panel()!).getByRole("button", { name: "ReAct" })).toHaveFocus());
+    });
+
+    it("Escape in the pane does the same", async () => {
+      await answer();
+      await openReAct();
+      fireEvent.keyDown(within(pane("ReAct")!).getByRole("heading", { level: 2, name: "ReAct" }), { key: "Escape" });
+      expect(pane("ReAct")).not.toBeInTheDocument();
+      expect(panel()).toBeInTheDocument();
+      await waitFor(() => expect(within(panel()!).getByRole("button", { name: "ReAct" })).toHaveFocus());
+    });
+
+    it("shows the panel during the split without changing the saved choice", async () => {
+      await answer();
+      await openReAct();
+      const setItem = vi.spyOn(Storage.prototype, "setItem");
+      await userEvent.click(screen.getByRole("button", { name: "Show panel" }));
+      expect(panel()).toBeInTheDocument();
+      expect(pane("ReAct")).toBeInTheDocument();
+      expect(setItem).not.toHaveBeenCalledWith("smart-tutor.chat-panel-open", expect.anything());
+    });
+
+    it("closes the document when a new question is asked", async () => {
+      await answer();
+      await openReAct();
+      await userEvent.type(await question(), "Second?");
+      await waitFor(() => expect(askButton()).toBeEnabled());
+      await userEvent.click(askButton());
+      await waitFor(() => expect(pane("ReAct")).not.toBeInTheDocument());
+      // The learner is asking: focus is not pulled back to the panel.
+      expect(within(panel()!).queryByRole("button", { name: "ReAct" })).not.toHaveFocus();
     });
   });
 

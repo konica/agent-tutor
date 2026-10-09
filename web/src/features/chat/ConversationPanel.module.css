@@ -22,6 +22,18 @@
 .list { margin: 0; padding: 0; list-style: none; }
 /* Single-line 32px rows; the full title and the byline are in the tooltip. */
 .row { display: flex; align-items: center; gap: var(--sp-2); min-height: 32px; min-width: 0; }
+/* A row's open button: it fills the row beside the remove button, its content level with plain rows (the padding
+   cancels the margin), so the hover fill and the 2px focus ring (base.css) sit in the panel's padding and are never
+   clipped. */
+.rowButton {
+  flex: 1; display: flex; align-items: center; gap: var(--sp-2); min-height: 32px; min-width: 0;
+  margin: 0 0 0 calc(-1 * var(--sp-2)); padding: 0 var(--sp-2);
+  border: 0; border-radius: var(--r-sm); background: transparent;
+  color: var(--text); font: inherit; text-align: left; cursor: pointer;
+}
+.rowButton:hover { background: var(--surface-2); }
+/* The document open beside the conversation (DESIGN.md: --accent-soft marks the selected row). */
+.rowButton[aria-current="true"] { background: var(--accent-soft); }
 .rowIcon { width: 16px; height: 16px; flex: none; color: var(--text-2); }
 .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gone { color: var(--text-2); }

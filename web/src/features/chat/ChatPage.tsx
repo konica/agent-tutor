@@ -19,7 +19,10 @@ import { SessionExpiredError, sessionExpiry } from "../../auth/authClient";
 import { IconButton } from "../../components/Button/IconButton";
 import { LinkButton } from "../../components/Button/LinkButton";
 import { EmptyState } from "../../components/EmptyState/EmptyState";
+import { useForceNavRail } from "../../components/AppShell/NavRail";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
+import { DocumentPane } from "../viewer/DocumentPane";
+import type { ViewerDeps } from "../viewer/ViewerDialog";
 import styles from "./ChatPage.module.css";
 import { ConversationPanel } from "./ConversationPanel";
 import { DocumentPicker } from "./DocumentPicker";
@@ -35,6 +38,8 @@ type Props = {
   removeDoc?: (threadId: string, documentId: string) => Promise<void>;
   /** Resolves with the saved title. */
   rename?: (threadId: string, title: string) => Promise<string>;
+  /** Test seam: the document viewer's file link, PDF loader, and restore. */
+  viewerDeps?: ViewerDeps;
 };
 
 type Exchange = {
@@ -47,6 +52,8 @@ type Exchange = {
 type Library = { status: "loading" | "failed" | "ended" } | { status: "ready" };
 
 type Problem = { message: string };
+
+type Viewer = { documentId: string };
 
 const MAX_QUESTION = 4000;
 const PANEL_ID = "conversation-panel";
@@ -75,6 +82,7 @@ export function ChatPage({
   addDocs = defaultAddDocs,
   removeDoc = defaultRemoveDoc,
   rename = defaultRename,
+  viewerDeps,
 }: Props) {
   const [question, setQuestion] = useState("");
   const [answering, setAnswering] = useState(false);
@@ -93,6 +101,14 @@ export function ChatPage({
   const [pickerOpen, setPickerOpen] = useState(false);
   // Said by the status region once a document is added or removed (DESIGN.md → Accessibility).
   const [announcement, setAnnouncement] = useState("");
+  // The document open beside the conversation (DESIGN.md → Chat, Split view). While it is open the panel collapses
+  // and the nav drops to its rail; the header toggle then shows the panel for this split only, never saving the choice.
+  const [viewer, setViewer] = useState<Viewer | null>(null);
+  const [panelDuringViewer, setPanelDuringViewer] = useState(false);
+  const opener = useRef<HTMLElement | null>(null);
+  const restoreFocus = useRef(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  useForceNavRail(viewer !== null);
   const alive = useRef(true);
   const busy = useRef(false);
   const sourcesId = useId();
@@ -123,6 +139,32 @@ export function ChatPage({
     };
   }, [loadDocs]);
 
+  // Once the pane has closed, focus goes back to the row that opened it. The panel re-mounts on close, so the row is
+  // a new element: find it again by its document id. If it is not on screen (the panel stays hidden), the panel
+  // toggle takes focus instead.
+  useEffect(() => {
+    if (viewer !== null || !restoreFocus.current) return;
+    restoreFocus.current = false;
+    const from = opener.current;
+    opener.current = null;
+    const id = from?.dataset.documentId;
+    const rows = Array.from(document.querySelectorAll<HTMLElement>(`#${PANEL_ID} [data-document-id]`));
+    const live = from?.isConnected ? from : rows.find((row) => row.dataset.documentId === id);
+    (live ?? toggleRef.current)?.focus();
+  }, [viewer]);
+
+  // Another row swaps the document in place; the pane moves focus to the new title.
+  function openDocument(documentId: string, from: HTMLElement) {
+    opener.current = from;
+    setViewer({ documentId });
+  }
+
+  function closeDocument() {
+    restoreFocus.current = true;
+    setViewer(null);
+    setPanelDuringViewer(false);
+  }
+
   const trimmed = question.trim();
   const canAsk = !answering && trimmed.length > 0;
 
@@ -134,6 +176,10 @@ export function ChatPage({
     setProblem(null);
     setExchange({ question: trimmed, answer: "", citations: [] });
     setQuestion("");
+    // A new question closes the document; focus stays with the learner's question.
+    opener.current = null;
+    setViewer(null);
+    setPanelDuringViewer(false);
     // A new question is a new thread: the panel starts over.
     const thisTurn = ++turn.current;
     setUsed([]);
@@ -282,20 +328,24 @@ export function ChatPage({
   const deletedIds = new Set(used.filter((d) => d.deleted).map((d) => d.document_id));
   // The title starts as the first question until the learner renames it (PRD §9.4).
   const title = renamed ?? (exchange ? exchange.question : "New conversation");
-  const toggleLabel = panelOpen ? "Hide panel" : "Show panel";
+  const showPanel = viewer ? panelDuringViewer : panelOpen;
+  const toggleLabel = showPanel ? "Hide panel" : "Show panel";
+  const onTogglePanel = viewer ? () => setPanelDuringViewer((shown) => !shown) : togglePanel;
+  const bodyClass = [styles.body, showPanel && styles.withPanel, viewer && styles.withViewer].filter(Boolean).join(" ");
 
   return (
     <div className={styles.page}>
       {/* One 40px row: the panel toggle and the conversation's title (DESIGN.md → Chat). */}
       <header className={styles.header}>
         <button
+          ref={toggleRef}
           type="button"
           className={styles.toggle}
           aria-label={toggleLabel}
           title={toggleLabel}
-          aria-expanded={panelOpen}
+          aria-expanded={showPanel}
           aria-controls={PANEL_ID}
-          onClick={togglePanel}
+          onClick={onTogglePanel}
         >
           <PanelLeft className={styles.toggleIcon} strokeWidth={1.5} aria-hidden="true" />
         </button>
@@ -307,8 +357,8 @@ export function ChatPage({
         {announcement}
       </p>
 
-      <div className={`${styles.body} ${panelOpen ? styles.withPanel : ""}`}>
-        {panelOpen && (
+      <div className={bodyClass}>
+        {showPanel && (
           <ConversationPanel
             id={PANEL_ID}
             documents={used}
@@ -319,6 +369,8 @@ export function ChatPage({
             onShowCitationsChange={setShowCitations}
             onAddDocuments={() => setPickerOpen(true)}
             onRemoveDocument={threadId === null ? undefined : (documentId) => void removeDocument(threadId, documentId)}
+            onOpen={openDocument}
+            openId={viewer?.documentId ?? null}
           />
         )}
         {pickerOpen && threadId !== null && (
@@ -433,6 +485,12 @@ export function ChatPage({
             </div>
           </form>
         </div>
+
+        {viewer && (
+          <div className={styles.viewer}>
+            <DocumentPane documentId={viewer.documentId} onClose={closeDocument} viewerDeps={viewerDeps} />
+          </div>
+        )}
       </div>
     </div>
   );

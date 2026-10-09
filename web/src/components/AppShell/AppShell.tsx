@@ -1,10 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useMatches, useNavigationType } from "react-router";
 
 import { NAV } from "../../app/nav";
 import { SideNav } from "../SideNav/SideNav";
 import { useNavCollapsed } from "../SideNav/useNavCollapsed";
 import styles from "./AppShell.module.css";
+import { NavRailContext } from "./NavRail";
 
 type Handle = { wide?: boolean; bleed?: boolean } | undefined;
 
@@ -12,6 +13,11 @@ type Handle = { wide?: boolean; bleed?: boolean } | undefined;
 // `handle: { bleed: true }` to fill the whole main area and lay out its own panes (the chat).
 export function AppShell() {
   const [collapsed, toggle] = useNavCollapsed();
+  // A page can force the rail for a while (the chat's split view). The learner can still open the nav: that ends the
+  // forcing without touching their saved choice.
+  const [forced, setForced] = useState(false);
+  const railed = collapsed || forced;
+  const onToggle = forced ? () => setForced(false) : toggle;
   const matches = useMatches();
   const wide = matches.some((m) => (m.handle as Handle)?.wide);
   const bleed = matches.some((m) => (m.handle as Handle)?.bleed);
@@ -31,14 +37,16 @@ export function AppShell() {
   }, [pathname, navigationType]);
 
   return (
-    <div className={collapsed ? `${styles.app} ${styles.collapsed}` : styles.app}>
-      {/* recent is filled when the conversations list exists (US-5) */}
-      <SideNav collapsed={collapsed} onToggle={toggle} recent={[]} />
-      <main ref={main} className={styles.main} id="main-content" tabIndex={-1}>
-        <div className={bleed ? styles.bleed : wide ? `${styles.page} ${styles.wide}` : styles.page}>
-          <Outlet />
-        </div>
-      </main>
-    </div>
+    <NavRailContext.Provider value={setForced}>
+      <div className={railed ? `${styles.app} ${styles.collapsed}` : styles.app}>
+        {/* recent is filled when the conversations list exists (US-5) */}
+        <SideNav collapsed={railed} onToggle={onToggle} recent={[]} />
+        <main ref={main} className={styles.main} id="main-content" tabIndex={-1}>
+          <div className={bleed ? styles.bleed : wide ? `${styles.page} ${styles.wide}` : styles.page}>
+            <Outlet />
+          </div>
+        </main>
+      </div>
+    </NavRailContext.Provider>
   );
 }
