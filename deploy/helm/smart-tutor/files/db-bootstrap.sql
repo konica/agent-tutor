@@ -1,4 +1,5 @@
 -- Creates the app and Keycloak roles and databases on RDS (#57), connected as the master user to `postgres`.
+-- On-premise, deploy/on-premise/deploy.sh runs it too, as the container's superuser (#148).
 -- Idempotent: every Helm install and upgrade runs it, and it resets the passwords to the Secrets Manager values,
 -- so a rotated secret or an instance restored from a snapshot gets back in sync. Running Keycloak pods keep the
 -- old password until restarted (rotation steps: docs/runbooks/pilot-deploy.md).
