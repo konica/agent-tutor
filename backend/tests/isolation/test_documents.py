@@ -202,8 +202,9 @@ def test_b_cannot_see_or_rename_as_document_and_keeps_own_title_for_same_file() 
         ingestion.ingest_upload(stored["fields"]["key"])
         docs[who] = stored["document_id"]
 
+    b_title = client.get(f"/documents/{docs['b']}", headers=B).json()["title"]
     assert client.get(f"/documents/{docs['a']}", headers=B).status_code == 404
     assert client.put(f"/documents/{docs['a']}/title", json={"title": "B's"}, headers=B).status_code == 404
     assert client.put(f"/documents/{docs['a']}/title", json={"title": "A's"}, headers=A).json()["title"] == "A's"
-    assert client.get(f"/documents/{docs['b']}", headers=B).json()["title"] != "A's"
+    assert client.get(f"/documents/{docs['b']}", headers=B).json()["title"] == b_title
     assert client.get(f"/documents/{docs['a']}", headers=A).json()["title"] == "A's"

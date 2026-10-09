@@ -130,10 +130,63 @@ describe("DocumentDetailsPanel", () => {
     expect(screen.queryByRole("button", { name: "Reset to extracted title" })).toBeNull();
   });
 
-  it("offers no reset without an extracted title", async () => {
-    setup(details({ title_overridden: true, extracted_title: null }));
-    await screen.findByRole("heading", { name: "ReAct" });
+  it("offers reset to the file name when no title was extracted", async () => {
+    const user = userEvent.setup();
+    const props = setup(details({ title: "Mine", title_overridden: true, extracted_title: null }));
+    await screen.findByRole("heading", { name: "Mine" });
+    expect(screen.queryByText(/Extracted title/)).toBeNull();
     expect(screen.queryByRole("button", { name: "Reset to extracted title" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Reset to file name" }));
+    expect(props.saveTitle).toHaveBeenCalledWith("d1", null);
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Title reset to the file name."));
+  });
+
+  it("offers reset to the file name in the edit form when no title was extracted", async () => {
+    const user = userEvent.setup();
+    setup(details({ title: "Mine", title_overridden: true, extracted_title: null }));
+    await user.click(await screen.findByRole("button", { name: "Edit title" }));
+    expect(screen.getByRole("button", { name: "Reset to file name" })).toBeVisible();
+  });
+
+  it("cancels the edit with Escape from a form button, then closes on the next Escape", async () => {
+    const user = userEvent.setup();
+    const props = setup();
+    await user.click(await screen.findByRole("button", { name: "Edit title" }));
+    screen.getByRole("button", { name: "Cancel" }).focus();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(props.onClose).not.toHaveBeenCalled();
+    await user.keyboard("{Escape}");
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("counts characters, not UTF-16 units, for the title limit", async () => {
+    const user = userEvent.setup();
+    const props = setup();
+    await user.click(await screen.findByRole("button", { name: "Edit title" }));
+    await user.click(field());
+    await user.clear(field());
+    await user.paste("😀".repeat(300));
+    await user.keyboard("{Enter}");
+    expect(props.saveTitle).toHaveBeenCalledWith("d1", "😀".repeat(300));
+  });
+
+  it("refuses 301 emoji", async () => {
+    const user = userEvent.setup();
+    const props = setup();
+    await user.click(await screen.findByRole("button", { name: "Edit title" }));
+    await user.click(field());
+    await user.clear(field());
+    await user.paste("😀".repeat(301));
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("alert")).toHaveTextContent("Keep the title to 300 characters or fewer");
+    expect(props.saveTitle).not.toHaveBeenCalled();
+  });
+
+  it("does not show the edit form for an archived document even with startEditing", async () => {
+    setup(details({ archived: true }), { startEditing: true });
+    await screen.findByRole("heading", { name: "ReAct" });
+    expect(screen.queryByRole("textbox", { name: "Display title" })).toBeNull();
   });
 
   it("cancels editing on the first Escape and closes on the second", async () => {

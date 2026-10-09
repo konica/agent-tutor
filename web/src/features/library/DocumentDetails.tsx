@@ -71,7 +71,8 @@ export function DocumentDetailsPanel({ documentId, startEditing = false, load, s
     };
   }, [documentId]); // load is read through a ref: a new function from the parent must not refetch or reset the draft
 
-  const isEditing = editing && details !== null;
+  const canRename = details !== null && !details.archived && details.state !== "failed";
+  const isEditing = editing && canRename;
   useEffect(() => {
     if (isEditing) inputRef.current?.focus();
   }, [isEditing]);
@@ -130,11 +131,11 @@ export function DocumentDetailsPanel({ documentId, startEditing = false, load, s
     event.preventDefault();
     const title = draft.replace(/\s+/g, " ").trim();
     if (!title) return setError("Enter a title");
-    if (title.length > MAX_TITLE) return setError("Keep the title to 300 characters or fewer");
+    if ([...title].length > MAX_TITLE) return setError("Keep the title to 300 characters or fewer");
     store(title, "Title updated.", "Couldn't save the title. Try again.");
   }
 
-  const resetTitle = () => store(null, "Title reset to the extracted title.", "Couldn't reset the title. Try again.");
+  const resetTitle = () => store(null, details?.extracted_title ? "Title reset to the extracted title." : "Title reset to the file name.", "Couldn't reset the title. Try again.");
 
   // onChanged fires as soon as the mutation succeeds; a failed reload afterwards doesn't undo it.
   async function changeArchive(archiving: boolean) {
@@ -176,8 +177,8 @@ export function DocumentDetailsPanel({ documentId, startEditing = false, load, s
     );
   }
 
-  const canRename = !details.archived && details.state !== "failed";
-  const canReset = details.title_overridden && details.extracted_title !== null;
+  const canReset = details.title_overridden;
+  const resetLabel = details.extracted_title !== null ? "Reset to extracted title" : "Reset to file name";
   const uploaded = new Date(details.created_at).toLocaleDateString(undefined, { timeZone: APP_TIME_ZONE, day: "numeric", month: "short", year: "numeric" });
   const facts: [string, string][] = [
     ["Authors", dash(details.authors.join(", "))],
@@ -228,7 +229,7 @@ export function DocumentDetailsPanel({ documentId, startEditing = false, load, s
         )}
 
         {isEditing ? (
-          <form className={styles.form} onSubmit={submit}>
+          <form className={styles.form} onSubmit={submit} onKeyDown={onTitleKeyDown}>
             <label id={labelId} htmlFor={inputId} className={styles.label}>
               Display title
             </label>
@@ -241,7 +242,6 @@ export function DocumentDetailsPanel({ documentId, startEditing = false, load, s
               aria-describedby={error ? `${helperId} ${errorId}` : helperId}
               aria-invalid={!!error}
               onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={onTitleKeyDown}
             />
             <p id={helperId} className={styles.helper}>
               Only changes how the title appears to you. Citations use this title.
@@ -256,7 +256,7 @@ export function DocumentDetailsPanel({ documentId, startEditing = false, load, s
               </Button>
               {canReset && (
                 <Button variant="ghost" size="sm" icon={RotateCcw} disabled={busy} onClick={resetTitle}>
-                  Reset to extracted title
+                  {resetLabel}
                 </Button>
               )}
             </div>
@@ -275,9 +275,9 @@ export function DocumentDetailsPanel({ documentId, startEditing = false, load, s
             </div>
             {canReset && (
               <p className={styles.extracted}>
-                Extracted title: {details.extracted_title} ·{" "}
+                {details.extracted_title !== null && <>Extracted title: {details.extracted_title} · </>}
                 <Button variant="ghost" size="sm" icon={RotateCcw} disabled={busy} onClick={resetTitle}>
-                  Reset to extracted title
+                  {resetLabel}
                 </Button>
               </p>
             )}
