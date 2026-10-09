@@ -252,7 +252,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
       });
       updateTray(id, { status: "uploaded", progress: 1 });
       parts.current[i] = `Uploaded ${file.name}. Processing.`;
-      if (started.uploadId) void watchUpload(id, started.uploadId, file.name, i, say);
+      if (started.uploadId) void watchUpload(id, started.uploadId, file.name);
     } catch {
       // A 401 is handled by the API client: the session screen replaces this page.
       updateTray(id, { status: "failed" });
@@ -265,7 +265,8 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
   }
 
   // The worker decides duplicates by the server hash (PRD D19); a duplicate's placeholder document disappears, so ask the upload.
-  async function watchUpload(trayId: string, uploadId: string, name: string, i: number, say: () => void) {
+  // The answer can come after a newer batch reused this file's live-region slot, so it is announced on its own.
+  async function watchUpload(trayId: string, uploadId: string, name: string) {
     for (let tries = 0; tries < MAX_STATUS_POLLS && alive.current; tries++) {
       await new Promise((resolve) => setTimeout(resolve, pollMs));
       if (!alive.current) return;
@@ -277,10 +278,10 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
         continue; // try again on the next tick
       }
       if (found.outcome === null) continue;
-      if (found.outcome === "duplicate" && found.document_id) {
-        updateTray(trayId, { status: "already", documentId: found.document_id, archived: found.archived });
-        parts.current[i] = `${name}: Already in your library.`;
-        say();
+      if (found.outcome === "duplicate") {
+        // Without a document id the row still says "Already in your library", just with no link.
+        updateTray(trayId, { status: "already", documentId: found.document_id ?? undefined, archived: found.archived });
+        setStatus(`${name}: Already in your library${found.archived ? ", archived" : ""}.`);
         await refresh();
       }
       return;
