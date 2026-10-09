@@ -1,5 +1,6 @@
 """US-12: each learner's POST /threads starts a thread owned by that learner; no one else can get it, its
-documents used (GET /threads/{id}/documents), or rename it (PATCH /threads/{id})."""
+documents used (GET /threads/{id}/documents), or rename it (PATCH /threads/{id}). A thread starts from a document
+only if it is the learner's own ready, active one."""
 
 import httpx
 from fastapi.testclient import TestClient
@@ -165,3 +166,35 @@ def test_only_the_owner_adds_or_removes_a_threads_documents() -> None:
 
     assert added.status_code == 404 and removed.status_code == 404
     assert [d["document_id"] for d in client.get(url, headers=A).json()] == [a_document]
+
+
+def test_a_learner_starts_a_thread_only_from_their_own_ready_document() -> None:
+    library, threads = InMemoryLibrary(), InMemoryThreads()
+    a_ready = ingest_ready(library, "learner-a", "Attention weighs tokens.")
+    b_document = ingest_ready(library, "learner-b", "Gradient descent follows the slope.")
+    b_title = library.state.documents[b_document].file_name
+    a_archived = ingest_ready(library, "learner-a", "Dropout regularises networks.")
+    library.state.documents[a_archived].archived = True
+    upload = UploadService(library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS)
+    a_processing = upload.start_upload(UserId("learner-a"), "processing.pdf").document_id  # never made ready
+    seen: list[httpx.Request] = []
+
+    def recording(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return answers(request)
+
+    services = api_services(library, threads=threads, agent=fake_agent(recording))
+    client = TestClient(create_app(Settings(), verifier=learners(), services=services))
+    question = {"question": "What is attention?"}
+
+    foreign = client.post("/threads", json={**question, "document_id": b_document}, headers=A)
+    assert foreign.status_code == 404
+    assert b_title not in foreign.text and b_document not in foreign.text
+    assert client.post("/threads", json={**question, "document_id": a_archived}, headers=A).status_code == 404
+    assert client.post("/threads", json={**question, "document_id": a_processing}, headers=A).status_code == 404
+    assert seen == [] and threads.threads == {}  # the agent was never called and no thread started
+
+    assert client.post("/threads", json={**question, "document_id": a_ready}, headers=A).status_code == 200
+    [thread] = threads.threads.values()
+    listed = client.get(f"/threads/{thread.thread_id}/documents", headers=A).json()
+    assert [d["document_id"] for d in listed] == [a_ready]

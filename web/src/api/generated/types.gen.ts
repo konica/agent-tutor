@@ -19,6 +19,10 @@ export type AddThreadDocumentsRequest = {
  */
 export type AskRequest = {
     /**
+     * Document Id
+     */
+    document_id?: string | null;
+    /**
      * Question
      */
     question: string;
@@ -900,6 +904,10 @@ export type AskInNewThreadData = {
 };
 
 export type AskInNewThreadErrors = {
+    /**
+     * A document that isn't the caller's ready one.
+     */
+    404: unknown;
     /**
      * The learner has no ready documents.
      */

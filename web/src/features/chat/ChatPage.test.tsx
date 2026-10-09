@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AskRefusedError, NoDocumentsError, type ChatEvent } from "../../api/chat";
@@ -42,9 +42,9 @@ function controlledStream() {
 const doc = (state: string) => ({ state }) as DocumentResponse;
 
 // The page loads the learner's documents first; tests that don't care get one ready document.
-function renderChat(props: ComponentProps<typeof ChatPage> = {}) {
+function renderChat(props: ComponentProps<typeof ChatPage> = {}, entry = "/chat") {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[entry]}>
       <ChatPage loadDocs={async () => [doc("ready")]} loadUsed={async () => []} {...props} />
     </MemoryRouter>,
   );
@@ -75,7 +75,7 @@ describe("ChatPage", () => {
     renderChat({ ask });
     await userEvent.type(await question(), "What is attention?");
     await userEvent.click(askButton());
-    expect(ask).toHaveBeenCalledWith("What is attention?");
+    expect(ask).toHaveBeenCalledWith("What is attention?", undefined);
     expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
     // The question is the header title and also the learner's bubble in the conversation.
     expect(screen.getByRole("heading", { level: 1 })).toContainElement(screen.getByRole("button", { name: "What is attention?. Edit title" }));
@@ -798,6 +798,142 @@ describe("ChatPage", () => {
       await userEvent.paste("What is a transformer?");
       await userEvent.click(askButton());
       expect(await screen.findByRole("button", { name: "What is a transformer?. Edit title" })).toBeInTheDocument();
+    });
+  });
+
+  describe("starting from a document", () => {
+    const TITLE = "ReAct: Synergizing Reasoning and Acting";
+    const NOTICE = `Started from ${TITLE}. It's listed in Documents; answers still use all your documents.`;
+    const library = (overrides: Partial<DocumentResponse> = {}) =>
+      ({ document_id: "d1", title: TITLE, state: "ready", archived: false, authors: ["Yao"], year: 2023, ...overrides }) as DocumentResponse;
+    const panel = () => screen.queryByRole("complementary", { name: "Conversation" });
+    const notice = () => screen.queryByText((_, el) => el?.tagName === "P" && el.textContent === NOTICE);
+    const startChat = (props: ComponentProps<typeof ChatPage> = {}, docs = [library()]) =>
+      renderChat({ loadDocs: async () => docs, ...props }, "/chat?document=d1");
+    const answered = () => events({ type: "thread", thread_id: "t1" }, { type: "delta", text: "Yes." }, { type: "done" });
+
+    it("lists the document as Added, says where the conversation started, and focuses the composer", async () => {
+      startChat();
+      await question();
+      const rows = await within(panel()!).findAllByRole("listitem");
+      expect(rows.map((r) => r.textContent)).toEqual([`${TITLE}Added`]);
+      expect(notice()).toBeInTheDocument();
+      expect(notice()!.querySelector("em")).toHaveTextContent(TITLE);
+      await waitFor(() => expect(screen.getByRole("textbox", { name: /question/i })).toHaveFocus());
+    });
+
+    it("sends the document with the first question only, and drops the notice once asked", async () => {
+      const control = controlledStream();
+      const ask = vi.fn().mockImplementationOnce(answered).mockImplementationOnce(() => control.stream());
+      startChat({ ask });
+      await userEvent.type(await question(), "q");
+      await userEvent.click(askButton());
+      expect(ask).toHaveBeenNthCalledWith(1, "q", "d1");
+      expect(await screen.findByText("Yes.")).toBeInTheDocument();
+      expect(notice()).not.toBeInTheDocument();
+      await userEvent.type(await question(), "q2");
+      await waitFor(() => expect(askButton()).toBeEnabled());
+      await userEvent.click(askButton());
+      expect(ask).toHaveBeenNthCalledWith(2, "q2", undefined);
+      expect(within(panel()!).queryByText(TITLE)).not.toBeInTheDocument();
+      control.push(null);
+    });
+
+    it("drops the document and the notice when its row is removed before asking", async () => {
+      const ask = vi.fn(answered);
+      const removeDoc = vi.fn(async () => {});
+      startChat({ ask, removeDoc });
+      await question();
+      await userEvent.click(await within(panel()!).findByRole("button", { name: `Remove ${TITLE} from this conversation` }));
+      expect(removeDoc).not.toHaveBeenCalled();
+      expect(within(panel()!).getByText("Documents used to answer will appear here.")).toBeInTheDocument();
+      expect(notice()).not.toBeInTheDocument();
+      expect(screen.getByRole("status")).toHaveTextContent(`${TITLE} removed from this conversation.`);
+      await userEvent.type(await question(), "q");
+      await userEvent.click(askButton());
+      expect(ask).toHaveBeenCalledWith("q", undefined);
+    });
+
+    it.each([
+      ["an archived document", [library({ archived: true })]],
+      ["a processing document", [library({ state: "processing" }), library({ document_id: "d2" })]],
+      ["an unknown document", [library({ document_id: "d2" })]],
+    ])("ignores %s", async (_, docs) => {
+      const ask = vi.fn(answered);
+      startChat({ ask }, docs);
+      await question();
+      expect(notice()).not.toBeInTheDocument();
+      expect(within(panel()!).getByText("Documents used to answer will appear here.")).toBeInTheDocument();
+      await userEvent.type(await question(), "q");
+      await userEvent.click(askButton());
+      expect(ask).toHaveBeenCalledWith("q", undefined);
+    });
+
+    it("shows a refusal of the document as a problem line", async () => {
+      const ask = vi.fn(() => {
+        throw new AskRefusedError("Document not found");
+      });
+      startChat({ ask });
+      await userEvent.type(await question(), "q");
+      await userEvent.click(askButton());
+      expect(await screen.findByText("Document not found")).toBeInTheDocument();
+    });
+
+    it("opens the panel when it was left closed", async () => {
+      localStorage.setItem("smart-tutor.chat-panel-open", "false");
+      startChat();
+      expect(await within((await screen.findByRole("complementary", { name: "Conversation" }))).findByText(TITLE)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Hide panel" })).toHaveAttribute("aria-expanded", "true");
+      // The page's open is not the learner's choice: the saved "closed" stays, and closing the panel keeps it.
+      expect(localStorage.getItem("smart-tutor.chat-panel-open")).toBe("false");
+      await userEvent.click(screen.getByRole("button", { name: "Hide panel" }));
+      expect(panel()).not.toBeInTheDocument();
+      expect(localStorage.getItem("smart-tutor.chat-panel-open")).toBe("false");
+    });
+
+    it("closes the panel in one click when it was already open, saving the choice", async () => {
+      startChat();
+      await question();
+      expect(await within(panel()!).findByText(TITLE)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Hide panel" }));
+      expect(panel()).not.toBeInTheDocument();
+      expect(localStorage.getItem("smart-tutor.chat-panel-open")).toBe("false");
+    });
+
+    function Location() {
+      const location = useLocation();
+      return <output data-testid="location">{location.pathname + location.search}</output>;
+    }
+    const startChatAt = (props: ComponentProps<typeof ChatPage>) =>
+      render(
+        <MemoryRouter initialEntries={["/chat?document=d1"]}>
+          <ChatPage loadDocs={async () => [library()]} loadUsed={async () => []} {...props} />
+          <Location />
+        </MemoryRouter>,
+      );
+
+    it("takes the document param out of the URL once the first question uses it, without resetting the page", async () => {
+      const control = controlledStream();
+      const loadDocs = vi.fn(async () => [library()]);
+      startChatAt({ ask: vi.fn(() => control.stream()), loadDocs });
+      expect(screen.getByTestId("location")).toHaveTextContent("/chat?document=d1");
+      await userEvent.type(await question(), "q");
+      await userEvent.click(askButton());
+      expect(screen.getByTestId("location").textContent).toBe("/chat");
+      control.push({ type: "thread", thread_id: "t1" });
+      control.push({ type: "delta", text: "Partly." });
+      expect(await screen.findByText("Partly.")).toBeInTheDocument();
+      expect(loadDocs).toHaveBeenCalledTimes(1);
+      control.push({ type: "done" });
+      control.push(null);
+    });
+
+    it("takes the document param out of the URL when its row is removed", async () => {
+      startChatAt({ ask: vi.fn(answered) });
+      await question();
+      await userEvent.click(await within(panel()!).findByRole("button", { name: `Remove ${TITLE} from this conversation` }));
+      expect(screen.getByTestId("location").textContent).toBe("/chat");
+      expect(notice()).not.toBeInTheDocument();
     });
   });
 });

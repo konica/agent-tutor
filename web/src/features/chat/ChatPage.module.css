@@ -29,6 +29,15 @@
 /* Loading, failed, and no-documents states: one padded pane, no panel or composer. */
 .fallback { height: 100%; overflow-y: auto; padding: var(--sp-3) var(--sp-4) var(--sp-6); }
 
+/* A system notice above the welcome (DESIGN.md → Notices): one quiet info row, set apart from the tutor's prose. */
+.notice {
+  display: flex; align-items: center; gap: var(--sp-2); min-height: 32px; margin: var(--sp-6) 0 0;
+  padding: var(--sp-1) var(--sp-3); border-radius: var(--r-md);
+  background: var(--info-soft); color: var(--text); font-size: var(--fs-13);
+}
+.notice em { font-style: normal; font-weight: 600; }
+.noticeIcon { width: 16px; height: 16px; flex: none; color: var(--info); }
+
 .welcome { display: grid; gap: var(--sp-3); margin: var(--sp-6) 0; }
 .welcomeTitle { font-family: var(--font-display); font-size: var(--fs-24); }
 .welcomeText { color: var(--text-2); font-size: var(--fs-14); max-width: 64ch; }

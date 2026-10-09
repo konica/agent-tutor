@@ -1,4 +1,4 @@
-import { Archive, CircleAlert, FileText, Info, Pencil, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { Archive, CircleAlert, FileText, Info, MessageSquare, Pencil, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 
 import type { DocumentResponse } from "../../api/documents";
 import { Button } from "../../components/Button/Button";
@@ -54,13 +54,14 @@ type Props = {
   uploading?: ReadonlySet<string>; // document ids whose file is still being sent
   onArchive?: (doc: DocumentResponse) => void;
   onRestore?: (doc: DocumentResponse) => void;
+  onChat?: (doc: DocumentResponse) => void; // start a conversation from a ready document
   onOpen?: (doc: DocumentResponse, options?: { editTitle?: boolean }) => void;
   onDelete?: (doc: DocumentResponse) => void;
   busy?: ReadonlySet<string>; // document ids whose archive or restore is running
 };
 
 // An archived row offers Restore and Delete…: its subjects can't change until restored (PRD US-10), and it isn't processed again.
-function Actions({ doc, onRetry, retrying, onChooseSubjects, uploading, onArchive, onRestore, onOpen, onDelete, busy }: Omit<Props, "documents" | "uploading" | "busy"> & { doc: DocumentResponse; uploading: boolean; busy: boolean }) {
+function Actions({ doc, onRetry, retrying, onChooseSubjects, uploading, onArchive, onRestore, onChat, onOpen, onDelete, busy }: Omit<Props, "documents" | "uploading" | "busy"> & { doc: DocumentResponse; uploading: boolean; busy: boolean }) {
   const canDelete = onDelete && doc.state !== "processing"; // the worker is still writing a processing document's content, archived or not
   const label = `More actions for ${doc.title}`;
   const deleteItem = { label: "Delete…", icon: Trash2, danger: true, onSelect: () => onDelete?.(doc) };
@@ -94,12 +95,17 @@ function Actions({ doc, onRetry, retrying, onChooseSubjects, uploading, onArchiv
           Retry
         </Button>
       )}
+      {doc.state === "ready" && !uploading && onChat && (
+        <Button size="sm" icon={MessageSquare} aria-label={`Chat about ${doc.title}`} disabled={busy} onClick={() => onChat(doc)}>
+          Chat
+        </Button>
+      )}
       {onArchive && !uploading && <RowMenu label={label} disabled={busy} items={items} />}
     </>
   );
 }
 
-export function DocumentTable({ documents, onRetry, retrying, onChooseSubjects, uploading = NONE, onArchive, onRestore, onOpen, onDelete, busy = NONE }: Props) {
+export function DocumentTable({ documents, onRetry, retrying, onChooseSubjects, uploading = NONE, onArchive, onRestore, onChat, onOpen, onDelete, busy = NONE }: Props) {
   return (
     <table className={styles.table}>
       <thead>
@@ -145,7 +151,7 @@ export function DocumentTable({ documents, onRetry, retrying, onChooseSubjects, 
               <td className={styles.date}>{uploadedOn(doc.created_at)}</td>
               <td className={styles.actions}>
                 <div className={styles.actionsRow}>
-                  <Actions doc={doc} onRetry={onRetry} retrying={retrying} onChooseSubjects={onChooseSubjects} uploading={uploading.has(doc.document_id)} onArchive={onArchive} onRestore={onRestore} onOpen={onOpen} onDelete={onDelete} busy={busy.has(doc.document_id)} />
+                  <Actions doc={doc} onRetry={onRetry} retrying={retrying} onChooseSubjects={onChooseSubjects} uploading={uploading.has(doc.document_id)} onArchive={onArchive} onRestore={onRestore} onChat={onChat} onOpen={onOpen} onDelete={onDelete} busy={busy.has(doc.document_id)} />
                 </div>
               </td>
             </tr>
