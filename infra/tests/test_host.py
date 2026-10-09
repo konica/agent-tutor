@@ -449,7 +449,12 @@ def test_deploy_script_migrates_before_it_starts_the_new_tag() -> None:
     assert script.index("run --rm migrate") < script.index("up -d --wait --wait-timeout")
 
 
-SCRIPTS = [DEPLOY_SCRIPT, *(ON_PREMISE_DIR / name for name in ("backup.sh", "restore.sh", "report-failure.sh"))]
+ENSURE_HEALTHY = ON_PREMISE_DIR / "ensure-healthy.sh"
+SCRIPTS = [
+    DEPLOY_SCRIPT,
+    ENSURE_HEALTHY,
+    *(ON_PREMISE_DIR / name for name in ("backup.sh", "restore.sh", "report-failure.sh")),
+]
 SYSTEMD_DIR = ON_PREMISE_DIR / "systemd"
 
 
@@ -463,6 +468,141 @@ def test_scripts_parse(script: Path) -> None:
 def test_files_the_vm_runs_keep_lf_line_endings() -> None:
     for path in (*SCRIPTS, ON_PREMISE_DIR / "compose.yaml", ON_PREMISE_DIR / "Caddyfile", *SYSTEMD_DIR.iterdir()):
         assert b"\r\n" not in path.read_bytes(), path
+
+
+# --- monitoring and patching (#152)--------------------------------------------------------------------------------
+
+
+def _alarm(t: Template, metric_name: str) -> dict[str, Any]:
+    (alarm,) = (
+        a["Properties"]
+        for a in t.find_resources("AWS::CloudWatch::Alarm").values()
+        if a["Properties"]["MetricName"] == metric_name
+    )
+    return alarm
+
+
+def test_alarms_email_the_budget_recipients(t: Template) -> None:
+    (topic_id,) = t.find_resources("AWS::SNS::Topic")
+    t.has_resource_properties("AWS::SNS::Topic", {"TopicName": "smart-tutor-on-premise-prod-alerts"})
+    subscriptions = [s["Properties"] for s in t.find_resources("AWS::SNS::Subscription").values()]
+    assert [(s["Protocol"], s["Endpoint"]) for s in subscriptions] == [("email", "dtrungthao@gmail.com")]
+    assert all(s["TopicArn"] == {"Ref": topic_id} for s in subscriptions)
+
+
+def test_system_status_check_alarm_recovers_the_instance_and_emails(t: Template) -> None:
+    (instance_id,) = t.find_resources("AWS::EC2::Instance")
+    (topic_id,) = t.find_resources("AWS::SNS::Topic")
+    alarm = _alarm(t, "StatusCheckFailed_System")
+
+    assert alarm["Namespace"] == "AWS/EC2"
+    assert alarm["Dimensions"] == [{"Name": "InstanceId", "Value": {"Ref": instance_id}}]
+    assert alarm["ComparisonOperator"] == "GreaterThanOrEqualToThreshold" and alarm["Threshold"] == 1
+    actions = json.dumps(alarm["AlarmActions"])
+    assert ":automate:" in actions and ":ec2:recover" in actions
+    assert {"Ref": topic_id} in alarm["AlarmActions"]
+
+
+def test_uptime_check_probes_the_api_health_route_over_https_on_the_domain(t: Template) -> None:
+    (check,) = t.find_resources("AWS::Route53::HealthCheck").values()
+    config = check["Properties"]["HealthCheckConfig"]
+    (eip_id,) = t.find_resources("AWS::EC2::EIP")
+
+    assert config["Type"] == "HTTPS"
+    assert config["Port"] == 443
+    assert config["ResourcePath"] == "/api/healthz"
+    # Through DNS, as a learner reaches it: a lapsed DuckDNS name fails the check too.
+    assert config["FullyQualifiedDomainName"] == {
+        "Fn::Join": ["", [{"Fn::GetAtt": [eip_id, "PublicIp"]}, ".sslip.io"]]
+    }
+    assert "IPAddress" not in config
+
+
+def test_uptime_check_follows_the_domain_setting() -> None:
+    t = host(**{"smart-tutor:on-premise-domain": "smart-tutor.duckdns.org"})
+    (check,) = t.find_resources("AWS::Route53::HealthCheck").values()
+    assert check["Properties"]["HealthCheckConfig"]["FullyQualifiedDomainName"] == "smart-tutor.duckdns.org"
+
+
+def test_uptime_alarm_emails_when_the_check_fails_and_when_it_recovers(t: Template) -> None:
+    (check_id,) = t.find_resources("AWS::Route53::HealthCheck")
+    (topic_id,) = t.find_resources("AWS::SNS::Topic")
+    alarm = _alarm(t, "HealthCheckStatus")
+
+    assert alarm["Namespace"] == "AWS/Route53"
+    assert alarm["Dimensions"] == [{"Name": "HealthCheckId", "Value": {"Ref": check_id}}]
+    assert alarm["Statistic"] == "Minimum"
+    assert alarm["ComparisonOperator"] == "LessThanThreshold" and alarm["Threshold"] == 1
+    assert alarm["AlarmActions"] == [{"Ref": topic_id}]
+    assert alarm["OKActions"] == [{"Ref": topic_id}]
+
+
+def test_patch_baseline_approves_security_patches_for_the_tagged_host(t: Template) -> None:
+    (baseline,) = t.find_resources("AWS::SSM::PatchBaseline").values()
+    props = baseline["Properties"]
+    assert props["OperatingSystem"] == "AMAZON_LINUX_2023"
+    assert props["PatchGroups"] == ["smart-tutor-on-premise-prod"]
+    (rule,) = props["ApprovalRules"]["PatchRules"]
+    filters = {f["Key"]: f["Values"] for f in rule["PatchFilterGroup"]["PatchFilters"]}
+    assert filters["CLASSIFICATION"] == ["Security"]
+    (instance,) = t.find_resources("AWS::EC2::Instance").values()
+    assert {"Key": "PatchGroup", "Value": "smart-tutor-on-premise-prod"} in instance["Properties"]["Tags"]
+
+
+def test_weekly_maintenance_window_patches_the_host_then_checks_the_services(t: Template) -> None:
+    (window_id,) = t.find_resources("AWS::SSM::MaintenanceWindow")
+    t.has_resource_properties(
+        "AWS::SSM::MaintenanceWindow",
+        {"Schedule": "cron(0 4 ? * SUN *)", "ScheduleTimezone": "Asia/Ho_Chi_Minh", "AllowUnassociatedTargets": False},
+    )
+    (instance_id,) = t.find_resources("AWS::EC2::Instance")
+    (target_id,) = t.find_resources("AWS::SSM::MaintenanceWindowTarget")
+    t.has_resource_properties(
+        "AWS::SSM::MaintenanceWindowTarget",
+        {
+            "WindowId": {"Ref": window_id},
+            "ResourceType": "INSTANCE",
+            "Targets": [{"Key": "InstanceIds", "Values": [{"Ref": instance_id}]}],
+        },
+    )
+    tasks = sorted(
+        (task["Properties"] for task in t.find_resources("AWS::SSM::MaintenanceWindowTask").values()),
+        key=lambda task: task["Priority"],
+    )
+    assert [task["TaskArn"] for task in tasks] == ["AWS-RunPatchBaseline", "AWS-RunShellScript"]
+    assert all(task["Targets"] == [{"Key": "WindowTargetIds", "Values": [{"Ref": target_id}]}] for task in tasks)
+    patch, check = (task["TaskInvocationParameters"]["MaintenanceWindowRunCommandParameters"] for task in tasks)
+    assert patch["Parameters"] == {"Operation": ["Install"], "RebootOption": ["RebootIfNeeded"]}
+    (command,) = check["Parameters"]["commands"]
+    assert command.endswith("; bash /opt/smart-tutor/on-premise/ensure-healthy.sh")
+    assert "redeploy the current tag" in command  # a VM deployed before #152 doesn't have the script yet
+    # The check runs after the patching even when the window's time is up.
+    assert all(task["CutoffBehavior"] == "CONTINUE_TASK" for task in tasks)
+
+
+def test_a_failed_maintenance_window_emails(t: Template) -> None:
+    (window_id,) = t.find_resources("AWS::SSM::MaintenanceWindow")
+    (topic_id,) = t.find_resources("AWS::SNS::Topic")
+    (rule,) = t.find_resources("AWS::Events::Rule").values()
+    pattern = rule["Properties"]["EventPattern"]
+
+    assert pattern["source"] == ["aws.ssm"]
+    assert pattern["detail-type"] == ["Maintenance Window Execution State-change Notification"]
+    assert pattern["detail"] == {"window-id": [{"Ref": window_id}], "status": ["FAILED", "TIMED_OUT"]}
+    assert [target["Arn"] for target in rule["Properties"]["Targets"]] == [{"Ref": topic_id}]
+
+
+def test_ensure_healthy_starts_what_is_down_and_waits_for_health() -> None:
+    script = ENSURE_HEALTHY.read_text(encoding="utf-8")
+    assert script.startswith("#!/usr/bin/env bash\n")
+    assert "set -euo pipefail" in script
+    assert "up -d --wait --wait-timeout" in script
+    # It brings back what the last deploy ran: no pull, no migration.
+    commands = "\n".join(line for line in script.splitlines() if not line.lstrip().startswith("#"))
+    assert " pull" not in commands and "migrate" not in commands
+
+
+# --- backups (#151) ------------------------------------------------------------------------------------------------
 
 
 def _unit(name: str) -> dict[str, dict[str, str]]:
