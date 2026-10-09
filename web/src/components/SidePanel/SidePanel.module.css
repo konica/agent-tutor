@@ -1,0 +1,20 @@
+.scrim {
+  position: fixed; inset: 0; z-index: 50; background: var(--scrim); animation: fade-in var(--dur-base) var(--ease-out);
+}
+.panel {
+  position: absolute; inset-block: 0; inset-inline-end: 0; width: min(var(--panel-w), 100%);
+  display: flex; flex-direction: column; background: var(--surface); border-inline-start: 1px solid var(--border);
+  box-shadow: var(--shadow-lg); animation: slide-in var(--dur-base) var(--ease-out);
+}
+.header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-4); border-bottom: 1px solid var(--border); }
+.heading { display: grid; justify-items: start; gap: var(--sp-2); }
+.kicker { margin: 0; font-size: var(--fs-12); font-weight: 650; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
+.body { flex: 1; overflow-y: auto; padding: var(--sp-4); display: grid; align-content: start; gap: var(--sp-4); font-size: var(--fs-14); }
+.footer { display: flex; justify-content: flex-end; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--border); }
+
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+@keyframes slide-in {
+  from { transform: translateX(24px); opacity: 0; }
+}

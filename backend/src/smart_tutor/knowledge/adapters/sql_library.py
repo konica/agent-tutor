@@ -178,6 +178,7 @@ class _Documents(DocumentRepository):
                 failure_reason=document.failure_reason,
                 archived=document.archived,
                 archived_at=document.archived_at,
+                title_override=document.title_override,
             )
         )
         self._conn.execute(delete(document_subjects).where(document_subjects.c.document_id == document.document_id))

@@ -1,5 +1,6 @@
 import { ArrowUp, CircleAlert, Clock, FileText, Filter, PanelLeft, Plus, Search, Upload } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useSearchParams } from "react-router";
 
 import {
   addThreadDocuments,
@@ -31,8 +32,9 @@ import { ThreadTitle } from "./ThreadTitle";
 import { usePanelOpen } from "./usePanelOpen";
 
 type Props = {
-  /** Asks in a new thread. */
-  ask?: (question: string) => AsyncIterable<ChatEvent>;
+  /** Asks in a new thread; `documentId` is the document the conversation starts from (`/chat?document=<id>`), sent
+   * with the first question only. */
+  ask?: (question: string, documentId?: string) => AsyncIterable<ChatEvent>;
   /** Asks in an existing thread, within its search scope. */
   askIn?: (threadId: string, question: string) => AsyncIterable<ChatEvent>;
   loadDocs?: () => Promise<DocumentResponse[]>;
@@ -63,7 +65,7 @@ const MAX_QUESTION = 4000;
 const PANEL_ID = "conversation-panel";
 const GENERIC_FAILURE = "The tutor couldn't answer right now. Try again in a moment.";
 
-const defaultAsk = (question: string) => askInNewThread(question);
+const defaultAsk = (question: string, documentId?: string) => askInNewThread(question, documentId);
 const defaultAskIn = (threadId: string, question: string) => askInThread(threadId, question);
 const defaultLoadDocs = () => loadDocuments();
 const defaultLoadUsed = (threadId: string) => loadDocumentsUsed(threadId);
@@ -77,6 +79,20 @@ const documentCount = (n: number) => (n === 1 ? "1 document" : `${n} documents`)
 
 function errorMessage(error: unknown) {
   return error instanceof Error && error.message ? error.message : GENERIC_FAILURE;
+}
+
+// The starting document as the panel lists it before the thread exists: added by the learner, not used yet.
+function asListed(d: DocumentResponse): ThreadDocumentResponse {
+  return {
+    document_id: d.document_id,
+    title: d.title,
+    authors: d.authors,
+    year: d.year,
+    archived: false,
+    deleted: false,
+    added_by: "learner",
+    used: false,
+  };
 }
 
 function processingHint(count: number) {
@@ -114,13 +130,22 @@ export function ChatPage({
   const [scope, setScope] = useState<SearchScope>("library");
   const [answered, setAnswered] = useState(false);
   const [showCitations, setShowCitations] = useState(true);
-  const [panelOpen, togglePanel] = usePanelOpen();
+  const [storedOpen, togglePanel] = usePanelOpen();
+  // A starting document opens the panel once without saving it, so the learner's remembered choice stays as it was.
+  const [forceOpen, setForceOpen] = useState(false);
+  const panelOpen = storedOpen || forceOpen;
   const [pickerOpen, setPickerOpen] = useState(false);
   // Said by the status region once a document is added or removed (DESIGN.md → Accessibility).
   const [announcement, setAnnouncement] = useState("");
   // Bumped by Change under the composer: focus the panel's switch once the panel has rendered.
   const [focusSwitch, setFocusSwitch] = useState(0);
   const pageRef = useRef<HTMLDivElement>(null);
+  // The document from `/chat?document=<id>` (US-4b), until the first question takes it or the learner removes it.
+  // Read once: the param is cleared from the URL once used or dropped, which must not reload the page's documents.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [startId] = useState(() => searchParams.get("document"));
+  const [starting, setStarting] = useState<DocumentResponse | null>(null);
+  const input = useRef<HTMLTextAreaElement>(null);
   const alive = useRef(true);
   const busy = useRef(false);
   const sourcesId = useId();
@@ -145,6 +170,8 @@ export function ChatPage({
       (docs) => {
         if (!current) return;
         setProcessing(docs.filter((d) => d.state === "processing").length);
+        // Only the learner's ready, non-archived document can start a conversation; any other id is ignored.
+        setStarting(docs.find((d) => d.document_id === startId && d.state === "ready" && !d.archived) ?? null);
         if (docs.some((d) => d.state === "ready")) setLibrary({ status: "ready" });
         else setNoDocuments(true);
       },
@@ -153,7 +180,38 @@ export function ChatPage({
     return () => {
       current = false;
     };
-  }, [loadDocs]);
+  }, [loadDocs, startId]);
+
+  // A starting document is shown in the panel, so the panel opens; the learner can type their question at once.
+  const hasStarting = starting !== null && library.status === "ready";
+  useEffect(() => {
+    if (!hasStarting) return;
+    if (!storedOpen) setForceOpen(true);
+    input.current?.focus();
+    // Only when a starting document appears: closing the panel afterwards is the learner's choice.
+  }, [hasStarting]);
+
+  // The learner's toggle is remembered as before. Closing a panel the page opened for them keeps the saved "closed".
+  function toggle() {
+    const overridden = forceOpen && !storedOpen;
+    setForceOpen(false);
+    if (!overridden) togglePanel();
+  }
+
+  // Once the starting document is used or dropped, a reload or Back doesn't bring it back.
+  function forgetStartParam() {
+    if (!searchParams.has("document")) return;
+    setSearchParams(
+      (params) => {
+        params.delete("document");
+        return params;
+      },
+      { replace: true },
+    );
+  }
+
+  // Only before the first question: a starting document never replaces a live conversation's list.
+  const pendingStart = threadId === null && !exchange ? starting : null;
 
   const trimmed = question.trim();
   const canAsk = !answering && trimmed.length > 0;
@@ -173,6 +231,8 @@ export function ChatPage({
     setProblem(null);
     setExchange({ question: text, answer: "", citations: [], declined: null });
     let thisTurn = turn.current;
+    // The starting document goes with the first question only; later questions start library-wide threads.
+    let documentId: string | undefined;
     if (inThread === null) {
       thisTurn = ++turn.current;
       setUsed([]);
@@ -183,8 +243,11 @@ export function ChatPage({
       setAnswered(false);
       setPickerOpen(false);
       setScope("library");
+      documentId = pendingStart?.document_id;
+      setStarting(null);
+      forgetStartParam();
     }
-    await run(() => (inThread === null ? ask(text) : askIn(inThread, text)), thisTurn);
+    await run(() => (inThread === null ? ask(text, documentId) : askIn(inThread, text)), thisTurn);
   }
 
   // Reads one answer's events into the exchange. The protocol always ends with done or error; a stream that just stops
@@ -314,6 +377,15 @@ export function ChatPage({
     }
   }
 
+  // Before the thread exists, removing the starting document only forgets it: no request, and the first question goes
+  // library-wide. The removed row had focus and there's no Add documents yet, so focus goes to the composer.
+  function dropStarting(document: DocumentResponse) {
+    setStarting(null);
+    forgetStartParam();
+    setAnnouncement(`${document.title} removed from this conversation.`);
+    input.current?.focus();
+  }
+
   // A refusal rejects with the server's message, which the title field shows.
   async function renameTitle(newTitle: string) {
     if (threadId === null) return;
@@ -390,7 +462,7 @@ export function ChatPage({
           title={toggleLabel}
           aria-expanded={panelOpen}
           aria-controls={PANEL_ID}
-          onClick={togglePanel}
+          onClick={toggle}
         >
           <PanelLeft className={styles.toggleIcon} strokeWidth={1.5} aria-hidden="true" />
         </button>
@@ -406,14 +478,20 @@ export function ChatPage({
         {panelOpen && (
           <ConversationPanel
             id={PANEL_ID}
-            documents={used}
+            documents={pendingStart ? [asListed(pendingStart)] : used}
             documentsFailed={usedFailed}
             threadId={threadId}
             answered={answered}
             showCitations={showCitations}
             onShowCitationsChange={setShowCitations}
             onAddDocuments={() => setPickerOpen(true)}
-            onRemoveDocument={threadId === null ? undefined : (documentId) => void removeDocument(threadId, documentId)}
+            onRemoveDocument={
+              pendingStart
+                ? () => dropStarting(pendingStart)
+                : threadId === null
+                  ? undefined
+                  : (documentId) => void removeDocument(threadId, documentId)
+            }
             searchListed={scope === "listed"}
             onSearchListedChange={threadId === null ? undefined : (on) => void changeSearchScope(threadId, on)}
           />
@@ -431,6 +509,14 @@ export function ChatPage({
         <div className={styles.conversation}>
           <div className={styles.messages}>
             <div className={styles.column}>
+              {pendingStart && (
+                <p className={styles.notice}>
+                  <FileText className={styles.noticeIcon} strokeWidth={1.5} aria-hidden="true" />
+                  <span>
+                    Started from <em>{pendingStart.title}</em>. It's listed in Documents; answers still use all your documents.
+                  </span>
+                </p>
+              )}
               {!exchange && (
                 <section className={styles.welcome}>
                   <h2 className={styles.welcomeTitle}>Ask about your documents</h2>
@@ -526,6 +612,7 @@ export function ChatPage({
             )}
             <div className={styles.composer}>
               <textarea
+                ref={input}
                 id="chat-question"
                 className={styles.input}
                 rows={1}

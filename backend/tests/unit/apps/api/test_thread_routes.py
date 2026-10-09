@@ -727,6 +727,19 @@ def test_a_question_in_an_unknown_thread_is_404() -> None:
     assert client.post(f"/threads/{uuid.uuid4()}/questions", json=QUESTION, headers=AUTH).status_code == 404
 
 
+def test_a_question_in_a_thread_takes_no_starting_document() -> None:
+    seen: list[httpx.Request] = []
+    client, threads, _ = setup(recording(seen))
+    client.post("/threads", json=QUESTION, headers=AUTH)
+    [thread] = threads.threads.values()
+    seen.clear()
+
+    body = {**QUESTION, "document_id": str(uuid.uuid4())}
+    response = client.post(f"/threads/{thread.thread_id}/questions", json=body, headers=AUTH)
+
+    assert response.status_code == 422 and seen == []
+
+
 def test_the_scope_is_kept_with_the_thread() -> None:
     client, _, thread_id, _ = limited_thread([])
     body = client.get(f"/threads/{thread_id}", headers=AUTH).json()
@@ -750,3 +763,41 @@ def test_an_update_needs_a_field_and_refuses_an_unknown_scope() -> None:
     url = f"/threads/{thread.thread_id}"
     assert client.patch(url, json={}, headers=AUTH).status_code == 422
     assert client.patch(url, json={"search_scope": "all"}, headers=AUTH).status_code == 422
+
+
+# Started from a document (US-4c): listed as added by the learner; the answer marks it used.
+
+
+def test_a_thread_started_from_a_document_lists_it_once_as_used_when_the_answer_cites_it() -> None:
+    client, _, threads, ids = ask_with(lambda ids: DELTA + sources(ids[0]) + NO_CITATIONS + DONE)
+
+    response = client.post("/threads", json={**QUESTION, "document_id": ids[0]}, headers=AUTH)
+
+    assert response.status_code == 200
+    [row] = documents_of(client, threads)
+    assert (row["document_id"], row["added_by"], row["used"]) == (ids[0], "learner", True)
+
+
+def test_a_thread_started_from_a_document_lists_it_unused_when_the_answer_names_no_sources() -> None:
+    client, _, threads, ids = ask_with(lambda ids: DELTA + NO_CITATIONS + DONE)
+
+    assert client.post("/threads", json={**QUESTION, "document_id": ids[0]}, headers=AUTH).status_code == 200
+
+    [row] = documents_of(client, threads)
+    assert (row["document_id"], row["added_by"], row["used"]) == (ids[0], "learner", False)
+
+
+def test_a_starting_document_id_must_be_a_uuid() -> None:
+    client, _, _ = setup()
+
+    response = client.post("/threads", json={**QUESTION, "document_id": "not-a-uuid"}, headers=AUTH)
+
+    assert response.status_code == 422
+
+
+def test_openapi_declares_the_starting_document_and_its_404() -> None:
+    client, _, _ = setup()
+    spec = client.get("/openapi.json").json()
+    operation = spec["paths"]["/threads"]["post"]
+    assert "404" in operation["responses"]
+    assert "document_id" in spec["components"]["schemas"]["AskRequest"]["properties"]

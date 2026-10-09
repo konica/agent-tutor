@@ -24,6 +24,18 @@
       "AskRequest": {
         "additionalProperties": false,
         "properties": {
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
           "question": {
             "maxLength": 4000,
             "minLength": 1,
@@ -61,6 +73,166 @@
           }
         },
         "title": "ChooseSubjectsRequest",
+        "type": "object"
+      },
+      "DocumentDetailsResponse": {
+        "properties": {
+          "archived": {
+            "title": "Archived",
+            "type": "boolean"
+          },
+          "attempt": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt"
+          },
+          "authors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Authors",
+            "type": "array"
+          },
+          "can_retry": {
+            "title": "Can Retry",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "doi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doi"
+          },
+          "extracted_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extracted Title"
+          },
+          "failure_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Reason"
+          },
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "max_attempts": {
+            "title": "Max Attempts",
+            "type": "integer"
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pages"
+          },
+          "state": {
+            "enum": [
+              "processing",
+              "awaiting_subjects",
+              "ready",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "subjects": {
+            "items": {
+              "$ref": "#/components/schemas/SubjectResponse"
+            },
+            "title": "Subjects",
+            "type": "array"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "title_overridden": {
+            "title": "Title Overridden",
+            "type": "boolean"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          }
+        },
+        "required": [
+          "document_id",
+          "title",
+          "state",
+          "failure_reason",
+          "attempt",
+          "max_attempts",
+          "can_retry",
+          "created_at",
+          "subjects",
+          "authors",
+          "year",
+          "archived",
+          "file_name",
+          "extracted_title",
+          "title_overridden",
+          "doi",
+          "pages",
+          "summary"
+        ],
+        "title": "DocumentDetailsResponse",
         "type": "object"
       },
       "DocumentResponse": {
@@ -237,6 +409,44 @@
           "roles"
         ],
         "title": "MeResponse",
+        "type": "object"
+      },
+      "QuestionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "question": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "title": "QuestionRequest",
+        "type": "object"
+      },
+      "SetTitleRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "SetTitleRequest",
         "type": "object"
       },
       "StartUploadRequest": {
@@ -859,6 +1069,53 @@
         "tags": [
           "knowledge"
         ]
+      },
+      "get": {
+        "description": "The caller's document with its facts, summary, and subjects, archived or not (PRD \u00a78 US-10).",
+        "operationId": "get_document",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentDetailsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Document",
+        "tags": [
+          "knowledge"
+        ]
       }
     },
     "/documents/{document_id}/archive": {
@@ -1109,6 +1366,65 @@
         ]
       }
     },
+    "/documents/{document_id}/title": {
+      "put": {
+        "description": "Set the caller's display title for this document, or clear it with null; their library only (PRD \u00a79.4).",
+        "operationId": "set_document_title",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetTitleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentDetailsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Document Title",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
     "/me": {
       "get": {
         "operationId": "get_me",
@@ -1242,6 +1558,9 @@
               }
             },
             "description": "Server-sent events: thread, then delta*, citations, done (or error)."
+          },
+          "404": {
+            "description": "A document that isn't the caller's ready one."
           },
           "409": {
             "description": "The learner has no ready documents."
@@ -1571,7 +1890,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AskRequest"
+                "$ref": "#/components/schemas/QuestionRequest"
               }
             }
           },

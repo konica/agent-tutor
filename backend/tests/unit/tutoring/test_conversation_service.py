@@ -363,3 +363,43 @@ def test_an_archived_thread_can_neither_be_limited_nor_searched() -> None:
         svc.update_thread(thread_id, LEARNER, search_scope=SearchScope.LISTED)
     with pytest.raises(ThreadArchivedError):
         svc.search_documents(thread_id, LEARNER)
+
+
+def test_a_thread_started_from_a_document_lists_it_as_added_then_marks_it_used() -> None:
+    library = InMemoryLibrary()
+    svc, _, doc, other, _ = started(library)
+
+    thread = svc.start_thread(LEARNER, "What is attention?", doc)
+
+    [row] = svc.documents_used(thread.thread_id, LEARNER)
+    assert (row.document_id, row.added_by, row.used) == (doc, "learner", False)
+    svc.record_answer(thread.thread_id, LEARNER, [doc, other])
+    assert [(d.document_id, d.added_by, d.used) for d in svc.documents_used(thread.thread_id, LEARNER)] == [
+        (doc, "learner", True),
+        (other, "answer", True),
+    ]
+
+
+@pytest.mark.parametrize("kind", ["foreign", "archived", "processing", "unknown"])
+def test_a_thread_starts_only_from_the_learners_ready_active_document(kind: str) -> None:
+    library = InMemoryLibrary()
+    svc, threads, _, _, _ = started(library)
+    bad: DocumentId
+    if kind == "foreign":
+        bad = ingest_ready(library, "bob", "Someone else's paper.")
+    elif kind == "archived":
+        bad = ingest_ready(library, "ada", "An archived paper.")
+        library.state.documents[bad].archived = True
+    elif kind == "processing":
+        bad = (
+            UploadService(library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS)
+            .start_upload(LEARNER, "processing.pdf")
+            .document_id
+        )
+    else:
+        bad = DocumentId("00000000-0000-0000-0000-000000000000")
+
+    with pytest.raises(DocumentNotAvailableError, match="Document not found"):
+        svc.start_thread(LEARNER, "q", bad)
+
+    assert threads.threads == {}

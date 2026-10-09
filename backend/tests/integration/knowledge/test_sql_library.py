@@ -9,12 +9,14 @@ import pytest
 from sqlalchemy import Engine, text
 
 from smart_tutor.knowledge.adapters.sql_library import SqlLibraryUnitOfWork
+from smart_tutor.knowledge.application import ArchiveService, DocumentService
 from smart_tutor.knowledge.domain.chunk import Chunk
 from smart_tutor.knowledge.domain.content import UNREADABLE_PDF, Content
 from smart_tutor.knowledge.domain.description import DocumentDescription, parse_description
 from smart_tutor.knowledge.domain.document import Document, DocumentFilter, DocumentState
 from smart_tutor.knowledge.domain.search import ChunkHit
 from smart_tutor.knowledge.domain.upload import Upload, UploadOutcome
+from smart_tutor.shared.adapters.clock import SystemClock
 from smart_tutor.shared.adapters.postgres.engine import create_db_engine
 from smart_tutor.shared.adapters.postgres.migrate import upgrade_to_head
 from smart_tutor.shared.config import Settings
@@ -342,6 +344,23 @@ def test_archive_and_restore_round_trip(engine: Engine) -> None:
     with SqlLibraryUnitOfWork(engine) as tx:
         restored = tx.documents.get_readable(owner, doc.document_id)
     assert restored is not None and (restored.archived, restored.archived_at) == (False, None)
+
+
+def test_a_renamed_document_keeps_its_title_through_archive_and_resets(engine: Engine) -> None:
+    owner = UserId(f"ada-{uid()}")
+    doc = start(engine, owner)
+    docs = DocumentService(lambda: SqlLibraryUnitOfWork(engine), max_attempts=3)
+    docs.set_title(owner, doc.document_id, "  Mine ")
+    ArchiveService(lambda: SqlLibraryUnitOfWork(engine), SystemClock(), max_attempts=3).archive(owner, doc.document_id)
+    with SqlLibraryUnitOfWork(engine) as tx:
+        kept = tx.documents.get_readable(owner, doc.document_id)
+        [listed] = tx.documents.list_readable_by(owner, DocumentFilter(archived=True))
+    assert kept is not None and kept.title_override == "Mine" and kept.archived is True
+    assert listed.title == "Mine"
+    docs.set_title(owner, doc.document_id, None)
+    with SqlLibraryUnitOfWork(engine) as tx:
+        reset = tx.documents.get_readable(owner, doc.document_id)
+    assert reset is not None and reset.title_override is None
 
 
 def test_a_processing_document_stays_archived_when_the_worker_saves_it(engine: Engine) -> None:
