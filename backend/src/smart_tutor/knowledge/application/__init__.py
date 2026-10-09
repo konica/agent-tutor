@@ -2,7 +2,7 @@
 
 from smart_tutor.knowledge.application.archive_service import ArchiveService
 from smart_tutor.knowledge.application.describer import FIRST_PAGES, Described, DocumentDescriber
-from smart_tutor.knowledge.application.document_service import DocumentService, DocumentView
+from smart_tutor.knowledge.application.document_service import DocumentDetails, DocumentService, DocumentView
 from smart_tutor.knowledge.application.ingestion_service import IngestionService, ProcessingTools
 from smart_tutor.knowledge.application.limits import load_file_limits, load_max_attempts
 from smart_tutor.knowledge.application.retry_service import RetryService, retried_content, retry_message
@@ -21,6 +21,7 @@ from smart_tutor.knowledge.domain.errors import (
     InvalidFileNameError,
     InvalidSearchError,
     InvalidSubjectsError,
+    InvalidTitleError,
     RetryLimitError,
 )
 from smart_tutor.knowledge.domain.limits import FileLimits
@@ -38,6 +39,7 @@ __all__ = [
     "ContentState",
     "Described",
     "DocumentDescriber",
+    "DocumentDetails",
     "DocumentNotFoundError",
     "DocumentService",
     "DocumentStateError",
@@ -47,6 +49,7 @@ __all__ = [
     "InvalidFileNameError",
     "InvalidSearchError",
     "InvalidSubjectsError",
+    "InvalidTitleError",
     "LibraryUnitOfWork",
     "ObjectStore",
     "PdfExtractor",

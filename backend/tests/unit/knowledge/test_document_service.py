@@ -2,8 +2,25 @@ import hashlib
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
-from fakes import TEST_LIMITS, FakeObjectStore, FixedClock, InMemoryLibrary, fake_tools, ingest_ready
-from smart_tutor.knowledge.application import DocumentService, IngestionService, UploadService
+import pytest
+
+from fakes import (
+    TEST_LIMITS,
+    FakeObjectStore,
+    FixedClock,
+    InMemoryLibrary,
+    fake_embeddings,
+    fake_tools,
+    ingest_ready,
+)
+from smart_tutor.knowledge.application import (
+    ArchiveService,
+    DocumentNotFoundError,
+    DocumentService,
+    IngestionService,
+    SearchService,
+    UploadService,
+)
 from smart_tutor.knowledge.domain.document import DocumentState
 from smart_tutor.shared.domain.ids import DocumentId, SubjectId, UserId
 from smart_tutor.subjects.application import GENERAL_SUBJECT_ID
@@ -197,3 +214,88 @@ def test_documents_by_id_returns_the_learners_documents_archived_included() -> N
     assert found[a].archived is False
     assert found[b].archived is True
     assert service.documents_by_id(UserId("learner-a"), []) == {}
+
+
+ADA = UserId("ada")
+
+
+def _describe(library: InMemoryLibrary, doc: DocumentId, **fields: Any) -> None:
+    content_id = library.state.documents[doc].content_id
+    assert content_id is not None
+    with library.unit_of_work() as tx:
+        content = tx.contents.get(content_id)
+        assert content is not None
+        for name, value in fields.items():
+            setattr(content, name, value)
+        tx.contents.save(content)
+        tx.commit()
+
+
+def test_details_carry_facts_summary_and_subjects() -> None:
+    library = InMemoryLibrary()
+    doc = ingest_ready(library, "ada", "attention", [ART])
+    _describe(library, doc, title="Extracted", summary="A summary", doi="10.1/x", authors=["Yao"], year=2022)
+    details = DocumentService(library.unit_of_work, max_attempts=3).details(ADA, doc)
+    assert details.document.title == "Extracted"
+    assert details.document.authors == ("Yao",) and details.document.year == 2022
+    assert details.document.subject_ids == (ART,)
+    assert (details.extracted_title, details.title_overridden) == ("Extracted", False)
+    assert (details.doi, details.pages, details.summary) == ("10.1/x", 1, "A summary")
+    assert details.file_name.endswith(".pdf")
+
+
+def test_details_of_an_archived_document() -> None:
+    library = InMemoryLibrary()
+    doc = ingest_ready(library, "ada", "attention", [ART])
+    ArchiveService(library.unit_of_work, FixedClock(), max_attempts=3).archive(ADA, doc)
+    assert DocumentService(library.unit_of_work, max_attempts=3).details(ADA, doc).document.archived is True
+
+
+def test_details_of_a_document_still_uploading_have_no_content_facts() -> None:
+    library = InMemoryLibrary()
+    started = UploadService(library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS).start_upload(
+        ADA, "p.pdf"
+    )
+    details = DocumentService(library.unit_of_work, max_attempts=3).details(ADA, DocumentId(started.document_id))
+    assert (details.document.title, details.extracted_title, details.pages, details.summary) == (
+        "p.pdf",
+        None,
+        None,
+        None,
+    )
+
+
+def test_details_of_another_learners_document_is_not_found() -> None:
+    library = InMemoryLibrary()
+    doc = ingest_ready(library, "ada", "attention", [ART])
+    with pytest.raises(DocumentNotFoundError):
+        DocumentService(library.unit_of_work, max_attempts=3).details(UserId("bob"), doc)
+
+
+def test_set_title_and_reset() -> None:
+    library = InMemoryLibrary()
+    doc = ingest_ready(library, "ada", "attention", [ART])
+    _describe(library, doc, title="Extracted")
+    docs = DocumentService(library.unit_of_work, max_attempts=3)
+    renamed = docs.set_title(ADA, doc, "  Mine ")
+    assert (renamed.document.title, renamed.title_overridden) == ("Mine", True)
+    assert [v.title for v in docs.list_documents(ADA)] == ["Mine"]
+    reset = docs.set_title(ADA, doc, None)
+    assert (reset.document.title, reset.title_overridden) == ("Extracted", False)
+    assert library.state.contents[library.state.documents[doc].content_id or ""].title == "Extracted"
+
+
+def test_set_title_of_another_learners_document_is_not_found() -> None:
+    library = InMemoryLibrary()
+    doc = ingest_ready(library, "ada", "attention", [ART])
+    with pytest.raises(DocumentNotFoundError):
+        DocumentService(library.unit_of_work, max_attempts=3).set_title(UserId("bob"), doc, "Mine")
+    assert library.state.documents[doc].title_override is None
+
+
+def test_a_renamed_document_is_cited_by_its_new_title() -> None:
+    library = InMemoryLibrary()
+    doc = ingest_ready(library, "ada", "attention mechanisms", [ART])
+    DocumentService(library.unit_of_work, max_attempts=3).set_title(ADA, doc, "Mine")
+    hits = SearchService(library.unit_of_work, fake_embeddings()).search(ADA, "attention mechanisms")
+    assert [h.document_title for h in hits] == ["Mine"]
