@@ -1,12 +1,13 @@
 /* The conversation panel scrolls on its own, beside the conversation (DESIGN.md → Chat). */
 .panel {
-  display: grid; align-content: start; gap: var(--sp-4);
+  /* minmax(0, 1fr): a long one-line title must not widen the column past the panel; it truncates instead. */
+  display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--sp-4);
   min-height: 0; overflow-y: auto; padding: var(--sp-4);
   background: var(--surface); border-right: 1px solid var(--border);
   font-size: var(--fs-13); color: var(--text);
 }
 
-.section { display: grid; gap: var(--sp-2); }
+.section { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-2); min-width: 0; }
 .heading {
   display: flex; align-items: center; gap: var(--sp-2); margin: 0;
   font-family: var(--font-body); font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-head); color: var(--text-2);
