@@ -226,7 +226,7 @@ def rename_thread(
 ) -> ThreadResponse:
     """Rename the learner's conversation from its header (PRD US-13)."""
     try:
-        thread = conversations.rename_thread(ThreadId(str(thread_id)), principal.user_id, body.title)
+        thread = conversations.update_thread(ThreadId(str(thread_id)), principal.user_id, title=body.title)
     except ThreadNotFoundError as e:
         raise HTTPException(404, str(e)) from None
     except ThreadArchivedError as e:

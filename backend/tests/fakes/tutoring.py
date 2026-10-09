@@ -8,7 +8,7 @@ from datetime import datetime
 
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
-from smart_tutor.tutoring.domain.thread import Thread
+from smart_tutor.tutoring.domain.thread import SearchScope, Thread
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
 from smart_tutor.tutoring.ports.retriever import Retriever
 from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
@@ -28,6 +28,9 @@ class InMemoryThreads(ThreadRepository):
 
     def set_title(self, thread_id: ThreadId, title: str) -> None:
         self.threads[thread_id].title = title
+
+    def set_search_scope(self, thread_id: ThreadId, scope: SearchScope) -> None:
+        self.threads[thread_id].search_scope = scope
 
     def add_documents_used(self, thread_id: ThreadId, document_ids: Sequence[DocumentId], at: datetime) -> None:
         rows = self.documents_used_rows.setdefault(thread_id, [])

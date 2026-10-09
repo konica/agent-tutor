@@ -13,12 +13,13 @@ from smart_tutor.tutoring.domain.errors import (
     DocumentNotAvailableError,
     InvalidTitleError,
     NoDocumentsError,
+    NoListedDocumentsError,
     RetrievalError,
     ThreadArchivedError,
     ThreadNotFoundError,
 )
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
-from smart_tutor.tutoring.domain.thread import Thread
+from smart_tutor.tutoring.domain.thread import SearchScope, Thread
 from smart_tutor.tutoring.ports.retriever import Retriever
 from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
 
@@ -31,9 +32,11 @@ __all__ = [
     "DocumentUsed",
     "InvalidTitleError",
     "NoDocumentsError",
+    "NoListedDocumentsError",
     "RetrievalError",
     "RetrievedChunk",
     "Retriever",
+    "SearchScope",
     "Thread",
     "ThreadArchivedError",
     "ThreadNotFoundError",

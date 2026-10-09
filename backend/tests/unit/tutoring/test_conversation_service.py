@@ -6,7 +6,7 @@ import pytest
 
 from fakes import TEST_LIMITS, FakeObjectStore, FixedClock, InMemoryLibrary, InMemoryThreads, ingest_ready
 from smart_tutor.knowledge.application import DocumentService, UploadService
-from smart_tutor.shared.domain.ids import DocumentId, UserId
+from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.tutoring.application import (
     DELETED_DOCUMENT,
     ConversationService,
@@ -14,6 +14,8 @@ from smart_tutor.tutoring.application import (
     DocumentUsed,
     InvalidTitleError,
     NoDocumentsError,
+    NoListedDocumentsError,
+    SearchScope,
     ThreadArchivedError,
     ThreadNotFoundError,
 )
@@ -154,12 +156,12 @@ def test_start_thread_titles_it_with_the_first_question() -> None:
     assert threads.threads[thread.thread_id].title == "What is attention?"
 
 
-def test_rename_thread_saves_the_trimmed_title() -> None:
+def test_update_thread_saves_the_trimmed_title() -> None:
     library = InMemoryLibrary()
     svc, threads, _, _, _ = started(library)
     thread = svc.start_thread(LEARNER, "What is attention?")
 
-    renamed = svc.rename_thread(thread.thread_id, LEARNER, " Attention basics ")
+    renamed = svc.update_thread(thread.thread_id, LEARNER, title=" Attention basics ")
 
     assert renamed.title == threads.threads[thread.thread_id].title == "Attention basics"
 
@@ -170,10 +172,10 @@ def test_a_refused_rename_saves_nothing() -> None:
     thread = svc.start_thread(LEARNER, "What is attention?")
 
     with pytest.raises(InvalidTitleError):
-        svc.rename_thread(thread.thread_id, LEARNER, "x" * 121)
+        svc.update_thread(thread.thread_id, LEARNER, title="x" * 121)
     threads.threads[thread.thread_id].status = ThreadStatus.ARCHIVED
     with pytest.raises(ThreadArchivedError):
-        svc.rename_thread(thread.thread_id, LEARNER, "New")
+        svc.update_thread(thread.thread_id, LEARNER, title="New")
     assert threads.threads[thread.thread_id].title == "What is attention?"
 
 
@@ -183,7 +185,7 @@ def test_another_learner_cannot_rename() -> None:
     thread = svc.start_thread(LEARNER, "What is attention?")
 
     with pytest.raises(ThreadNotFoundError, match="Conversation not found"):
-        svc.rename_thread(thread.thread_id, OTHER, "Mine now")
+        svc.update_thread(thread.thread_id, OTHER, title="Mine now")
     assert threads.threads[thread.thread_id].title == "What is attention?"
 
 
@@ -301,3 +303,63 @@ def test_another_learner_can_neither_add_nor_remove() -> None:
         svc.remove_document(thread.thread_id, OTHER, a)
 
     assert [d.document_id for d in svc.documents_used(thread.thread_id, LEARNER)] == [a]
+
+
+def started_with_document() -> tuple[ConversationService, InMemoryThreads, ThreadId, DocumentId]:
+    library = InMemoryLibrary()
+    svc, threads, a, _, _ = started(library)
+    thread = svc.start_thread(LEARNER)
+    svc.add_documents(thread.thread_id, LEARNER, [a])
+    return svc, threads, thread.thread_id, a
+
+
+def test_limiting_needs_a_listed_document() -> None:
+    svc, _, _, _, _ = started(InMemoryLibrary())
+    thread = svc.start_thread(LEARNER)
+    with pytest.raises(NoListedDocumentsError):
+        svc.update_thread(thread.thread_id, LEARNER, search_scope=SearchScope.LISTED)
+
+
+def test_a_limited_thread_searches_its_listed_documents() -> None:
+    svc, _, thread_id, doc = started_with_document()
+    svc.update_thread(thread_id, LEARNER, search_scope=SearchScope.LISTED)
+    assert svc.get_thread(thread_id, LEARNER).search_scope is SearchScope.LISTED
+    assert svc.search_documents(thread_id, LEARNER) == [doc]
+
+
+def test_an_unlimited_thread_searches_the_library() -> None:
+    svc, _, thread_id, _ = started_with_document()
+    assert svc.search_documents(thread_id, LEARNER) is None
+
+
+def test_removing_the_last_listed_document_turns_the_limit_off() -> None:
+    svc, _, thread_id, doc = started_with_document()
+    svc.update_thread(thread_id, LEARNER, search_scope=SearchScope.LISTED)
+    svc.remove_document(thread_id, LEARNER, doc)
+    assert svc.get_thread(thread_id, LEARNER).search_scope is SearchScope.LIBRARY
+
+
+def test_a_bad_title_saves_neither_the_title_nor_the_scope() -> None:
+    svc, _, thread_id, _ = started_with_document()
+    with pytest.raises(InvalidTitleError):
+        svc.update_thread(thread_id, LEARNER, title=" ", search_scope=SearchScope.LISTED)
+    assert svc.get_thread(thread_id, LEARNER).search_scope is SearchScope.LIBRARY
+
+
+def test_another_learners_thread_is_not_found_for_scope_and_search() -> None:
+    svc, _, thread_id, _ = started_with_document()
+    with pytest.raises(ThreadNotFoundError):
+        svc.update_thread(thread_id, OTHER, search_scope=SearchScope.LIBRARY)
+    with pytest.raises(ThreadNotFoundError):
+        svc.search_documents(thread_id, OTHER)
+    with pytest.raises(ThreadNotFoundError):
+        svc.get_thread(thread_id, OTHER)
+
+
+def test_an_archived_thread_can_neither_be_limited_nor_searched() -> None:
+    svc, threads, thread_id, _ = started_with_document()
+    threads.threads[thread_id].status = ThreadStatus.ARCHIVED
+    with pytest.raises(ThreadArchivedError):
+        svc.update_thread(thread_id, LEARNER, search_scope=SearchScope.LISTED)
+    with pytest.raises(ThreadArchivedError):
+        svc.search_documents(thread_id, LEARNER)
