@@ -1,6 +1,6 @@
-# On-premise deploy (#148)
+# On-premise deploy (#148, #149)
 
-Deploys on-premise mode (ADR 0012, PRD §9.12): one EC2 VM runs Smart Tutor with Docker Compose, and Caddy serves it over HTTPS at `https://<Elastic IP>.sslip.io` with a Let's Encrypt certificate. This runbook covers the first deploy and a manual redeploy. It currently brings up Postgres, Keycloak, the API, the web app, and Caddy, so a learner can sign in. The worker, agent, and MCP server, and with them upload and ask, come in #149. Deploy on merge is #150. Backups and restore: `on-premise-backups.md` (#151). Alarms and weekly patching: `on-premise-monitoring.md` (#152); after the first deploy, every alert recipient confirms the subscription email.
+Deploys on-premise mode (ADR 0012, PRD §9.12): one EC2 VM runs Smart Tutor with Docker Compose, and Caddy serves it over HTTPS at `https://<Elastic IP>.sslip.io` with a Let's Encrypt certificate. This runbook covers the first deploy and a manual redeploy. It brings up Postgres, Keycloak, the API, the web app, Caddy, the agent, the MCP server, and the worker, so a learner can sign in, upload a PDF, and ask about it (#149). Deploy on merge is #150. Backups and restore: `on-premise-backups.md` (#151). Alarms and weekly patching: `on-premise-monitoring.md` (#152); after the first deploy, every alert recipient confirms the subscription email.
 
 Commands are for **PowerShell 7** (`pwsh`). Run them from the repository root with your admin profile. No command here prints a secret. Don't paste the values you read in step 4 anywhere.
 
@@ -12,6 +12,7 @@ Commands are for **PowerShell 7** (`pwsh`). Run them from the repository root wi
 | Images | ECR `smart-tutor/<service>:<commit SHA>`, shared with native-cloud (its Registry stack owns the repositories) |
 | Files on the VM | `deploy/` is uploaded as a CDK asset; the deploy unpacks it to `/opt/smart-tutor` and runs `/opt/smart-tutor/on-premise/deploy.sh` |
 | Settings and secrets | SSM `/smart-tutor-on-premise/*` and Secrets Manager `smart-tutor-on-premise/*`. On the VM, `deploy.sh` renders them into `/etc/smart-tutor/smart-tutor.env` (root only, mode 600) |
+| AWS from the containers | The agent, MCP server, worker, and API use the instance profile (IMDSv2, hop limit 2): Bedrock, the on-premise bucket and ingest queue, and SSM `/smart-tutor-on-premise/*`. One role holds what native-cloud gives each service separately |
 | Data | The data volume, mounted at `/data`: Postgres in `/data/postgres` (the app and Keycloak databases), and Caddy's certificates in `/data/caddy` |
 
 The Host stack creates a VPC with one public subnet, no NAT, and an S3 gateway endpoint. It also creates a `t3.large` Amazon Linux 2023 instance with no SSH key and a security group that admits TCP 80 and 443 only, plus an Elastic IP and a 50 GB encrypted gp3 data volume. The SSM document `smart-tutor-on-premise-deploy` runs the deploy. The instance size is the context `smart-tutor:on-premise-instance-type` in `infra/cdk.json`. The domain is `smart-tutor:on-premise-domain`: empty means `<Elastic IP>.sslip.io`, and #154 switches it to DuckDNS.
@@ -19,7 +20,7 @@ The Host stack creates a VPC with one public subnet, no NAT, and an S3 gateway e
 ## 1. Before you start
 
 - CDK is bootstrapped in the account (`pilot-aws-prerequisites.md` §2), and the GitHub OIDC provider exists (native-cloud's `SmartTutor-prod-GitHubDeploy` created it; the on-premise deploy role reuses it).
-- The ECR repositories exist (`SmartTutor-prod-Registry`) and hold images for the commit you want. Every merge to `main` pushes them, tagged with the full commit SHA. On-premise needs `api`, `web`, and `keycloak`.
+- The ECR repositories exist (`SmartTutor-prod-Registry`) and hold images for the commit you want. Every merge to `main` pushes them, tagged with the full commit SHA. On-premise needs `api`, `web`, `keycloak`, `agent`, `mcp`, and `worker`.
 - Tools: Node 22+, uv, AWS CLI v2, and the [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) to open a shell on the VM.
 - Set up the shell for real AWS (the same as `pilot-deploy.md` §1):
 
@@ -63,7 +64,7 @@ Pick the commit whose images to run. It must be a full 40-character SHA with ima
 
 ```powershell
 $Tag = git rev-parse origin/main
-foreach ($Repo in "api", "web", "keycloak") {
+foreach ($Repo in "api", "web", "keycloak", "agent", "mcp", "worker") {
     aws ecr describe-images --repository-name "smart-tutor/$Repo" --image-ids imageTag=$Tag --query "imageDetails[0].imageTags[0]" --output text
 }
 ```
@@ -83,7 +84,8 @@ aws ssm get-command-invocation --command-id $CommandId --instance-id $InstanceId
 1. It waits for `/data`, then renders settings from SSM and secrets from Secrets Manager into `/etc/smart-tutor/smart-tutor.env`.
 2. It pulls the images, starts Postgres, and creates or updates the `smart_tutor` and `keycloak` roles and databases (`deploy/helm/smart-tutor/files/db-bootstrap.sql`, the same script as native-cloud).
 3. It runs the migrations, then `docker compose up -d --wait`, which waits until every service is healthy. A deploy fails if any service doesn't become healthy within 15 minutes.
-4. It creates the test learner if it is missing.
+4. It checks the worker's isolation (user 10001, read-only root filesystem, all capabilities dropped, no new privileges) and fails the deploy otherwise, and checks from the API container that the agent answers `/healthz` and the MCP server refuses a call without a token.
+5. It creates the test learner if it is missing.
 
 The output lists each service's status and ends with `Deployed <tag> to https://...`. It never contains a secret.
 
@@ -94,6 +96,18 @@ The output lists each service's status and ends with `Deployed <tag> to https://
 ```powershell
 python deploy/pilot/smoke_test.py $Url
 ```
+
+Then run it end to end as the test learner: it signs in, uploads a one-page PDF, chooses a subject, waits until the document is ready, asks about it, and requires a citation of that PDF. It deletes the document at the end, also when a step fails (a document that is still processing can't be deleted; delete it from the Library later). The conversation stays, and the subject "Smoke testing" may be added to the shared catalog once. Use only the test learner.
+
+```powershell
+$Learner = aws secretsmanager get-secret-value --secret-id smart-tutor-on-premise/keycloak/test-learner --query SecretString --output text | ConvertFrom-Json
+$env:SMOKE_TEST_USERNAME = $Learner.username
+$env:SMOKE_TEST_PASSWORD = $Learner.password
+python deploy/pilot/smoke_test.py $Url --end-to-end
+Remove-Item Env:SMOKE_TEST_USERNAME, Env:SMOKE_TEST_PASSWORD; Remove-Variable Learner
+```
+
+The first upload after a deploy takes a minute or two (the worker describes and embeds it with Bedrock). If it fails, read `dc logs --tail 100 worker` (section 6). Keep `--deadline-seconds` under 900: the access token lasts 15 minutes and isn't refreshed.
 
 2. **Only 80 and 443 are open.** `Test-NetConnection` reports `TcpTestSucceeded : False` for SSH:
 
@@ -140,6 +154,26 @@ dc restart keycloak
 
 Never run `dc config` or `cat` on the env file in a session that someone records: both print secrets.
 
+**Worker isolation.** `deploy.sh` checks it on every deploy; to check by hand:
+
+```bash
+docker inspect --format 'user={{.Config.User}} readonly={{.HostConfig.ReadonlyRootfs}} capdrop={{.HostConfig.CapDrop}} secopt={{.HostConfig.SecurityOpt}}' "$(dc ps -q worker)"
+```
+
+It prints `user=10001:10001 readonly=true capdrop=[ALL] secopt=[no-new-privileges:true]`. The worker parses each PDF in a child process, which it stops after `SMART_TUTOR_EXTRACTION_TIMEOUT_SECONDS` (300); the document then fails with "This PDF took too long to read". The worker can still reach the internet: the egress allowlist is #153.
+
+**Dead-letter drill.** A message the worker fails on 5 times moves to `smart-tutor-on-premise-ingest-dlq`. To check the redrive, stop the worker so it doesn't take the message, send one, receive it 5 times without deleting it, and look in the DLQ. From your laptop, with `dc stop worker` done on the VM first:
+
+```powershell
+$Queue = aws sqs get-queue-url --queue-name smart-tutor-on-premise-ingest --query QueueUrl --output text
+$Dlq = aws sqs get-queue-url --queue-name smart-tutor-on-premise-ingest-dlq --query QueueUrl --output text
+aws sqs send-message --queue-url $Queue --message-body '{"poisoned": true}' | Out-Null
+1..6 | ForEach-Object { aws sqs receive-message --queue-url $Queue --visibility-timeout 0 --wait-time-seconds 5 --query "Messages[0].Attributes.ApproximateReceiveCount" --attribute-names ApproximateReceiveCount --output text }
+aws sqs get-queue-attributes --queue-url $Dlq --attribute-names ApproximateNumberOfMessages --query Attributes.ApproximateNumberOfMessages --output text
+```
+
+The receive counts go 1 to 5, the sixth receive returns nothing (`None`), and the DLQ holds 1 message (the count can lag a minute). Then purge the DLQ (`aws sqs purge-queue --queue-url $Dlq`) and run `dc start worker` on the VM. In normal running, a message lands there when processing crashes 5 times (Bedrock, S3, or database errors); `dc logs worker` shows why.
+
 **Services restart by themselves.** Every service has a health check and `restart: unless-stopped`. After a reboot, Docker waits for `/data` to be mounted before it starts them.
 
 **Resize the instance.** Change `smart-tutor:on-premise-instance-type` in `infra/cdk.json` (for example to `t3.xlarge`) and run step 2. CloudFormation stops the instance, changes its type, and starts it again. The data volume stays attached, and the services come back on their own.
@@ -171,4 +205,6 @@ This deletes the VM, the Elastic IP, and the VPC. The data volume is deleted aft
 | The browser warns about the certificate | Caddy couldn't get one: `dc logs caddy`. Let's Encrypt needs port 80 open (it is in the security group) and the domain to resolve to the Elastic IP. sslip.io names resolve to the IP they contain. Too many attempts hit Let's Encrypt's rate limits; the certificate is kept on `/data/caddy`, so replacing the VM doesn't request a new one. |
 | `docker compose up` times out on `keycloak` | The first start creates the schema and imports the realm, which takes up to 3 minutes. Check `dc logs keycloak`. |
 | Sign-in says "Invalid parameter: redirect_uri" | The domain changed after the realm was imported. Keycloak imports the realm once, so update the `smart-tutor-web` client's redirect URIs, web origins, and post-logout redirect URIs in the admin console (#154). |
+| `The worker container isn't isolated` (deploy fails) | `compose.yaml` lost one of the worker's `user`, `read_only`, `cap_drop`, or `security_opt` settings. Restore them; never deploy the worker without them. |
+| A document stays processing | The worker isn't running or can't reach AWS: `dc ps worker`, `dc logs --tail 100 worker`. `AccessDenied` means the instance role lacks a permission (Host stack); a Bedrock `ThrottlingException` retries on its own. |
 | `Warning: could not check the test learner` | The bootstrap admin was deleted. The deploy still succeeded; create the test learner by hand if you need it. |
