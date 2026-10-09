@@ -28,6 +28,13 @@ describe("LibraryFilters", () => {
     expect(screen.getByLabelText("State")).toBeVisible();
   });
 
+  it("hides the State filter and the needs-subjects chip when showState is false", () => {
+    render(<LibraryFilters filters={{}} onChange={vi.fn()} subjects={subjects} count={1} needsSubjects={2} onClear={vi.fn()} showState={false} />);
+    expect(screen.getByLabelText("Subject")).toBeVisible();
+    expect(screen.queryByLabelText("State")).toBeNull();
+    expect(screen.queryByRole("button", { name: /need subjects/ })).toBeNull();
+  });
+
   it("offers all subjects first, then the learner's subjects", () => {
     setup();
     const options = [...(screen.getByLabelText("Subject") as HTMLSelectElement).options].map((o) => o.text);

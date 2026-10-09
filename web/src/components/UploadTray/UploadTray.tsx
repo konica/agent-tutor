@@ -1,6 +1,7 @@
-import { ChevronDown, ChevronUp, CircleAlert, CircleCheck, FileText, Info, X } from "lucide-react";
+import { ChevronDown, ChevronUp, CircleAlert, CircleCheck, FileText, Info, RotateCcw, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
+import { Button } from "../Button/Button";
 import styles from "./UploadTray.module.css";
 
 // "already": the server found the learner already has this file (PRD D19); documentId is their existing document.
@@ -32,7 +33,7 @@ function statusText(item: TrayItem): string {
 const files = (n: number) => `${n} ${n === 1 ? "file" : "files"}`;
 
 // Fixed bottom right and non-blocking (DESIGN.md → Layout). Results are announced by the page's live region, not here.
-export function UploadTray({ items, onClose }: { items: TrayItem[]; onClose: () => void }) {
+export function UploadTray({ items, onClose, onRestore }: { items: TrayItem[]; onClose: () => void; onRestore?: (item: TrayItem) => void }) {
   const headingId = useId();
   const [collapsed, setCollapsed] = useState(false);
   const toggle = useRef<HTMLButtonElement>(null);
@@ -68,7 +69,7 @@ export function UploadTray({ items, onClose }: { items: TrayItem[]; onClose: () 
       {!collapsed && (
         <ul className={styles.list}>
           {items.map((t) => (
-            <TrayRow key={t.id} item={t} />
+            <TrayRow key={t.id} item={t} onRestore={onRestore} />
           ))}
         </ul>
       )}
@@ -76,7 +77,7 @@ export function UploadTray({ items, onClose }: { items: TrayItem[]; onClose: () 
   );
 }
 
-function TrayRow({ item }: { item: TrayItem }) {
+function TrayRow({ item, onRestore }: { item: TrayItem; onRestore?: (item: TrayItem) => void }) {
   const Icon = ICONS[item.status];
   const percent = Math.round(item.progress * 100);
   return (
@@ -85,7 +86,12 @@ function TrayRow({ item }: { item: TrayItem }) {
       <div className={styles.text}>
         <span className={styles.name}>{item.name}</span>
         <span className={styles.status}>{statusText(item)}</span>
-        {/* An archived document gets no link; Restore arrives with #108. */}
+        {/* An archived document is not in the Active list, so it gets Restore instead of a link. */}
+        {item.status === "already" && item.archived && item.documentId && onRestore && (
+          <Button size="sm" icon={RotateCcw} className={styles.restore} aria-label={`Restore ${item.name}`} onClick={() => onRestore(item)}>
+            Restore
+          </Button>
+        )}
         {item.status === "already" && !item.archived && item.documentId && (
           <a className={styles.link} href={`#document-${item.documentId}`}>
             Open document

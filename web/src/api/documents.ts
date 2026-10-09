@@ -1,7 +1,7 @@
 import { SessionExpiredError } from "../auth/authClient";
 import type { Client } from "./generated/client";
 import { client } from "./generated/client.gen";
-import { checkDuplicate, chooseSubjects, getSubjectSuggestions, getUpload, getUploadLimits, listDocuments, retryDocument, startUpload } from "./generated/sdk.gen";
+import { archiveDocument as postArchive, checkDuplicate, chooseSubjects, getSubjectSuggestions, getUpload, getUploadLimits, listDocuments, restoreDocument as postRestore, retryDocument, startUpload } from "./generated/sdk.gen";
 import type { DocumentResponse, SubjectSuggestionsResponse, SuggestionResponse, UploadLimitsResponse, UploadStatusResponse } from "./generated/types.gen";
 
 export type { DocumentResponse };
@@ -32,6 +32,7 @@ export type DocumentFilters = {
   state?: DocumentResponse["state"];
   uploaded_from?: string;
   uploaded_to?: string;
+  archived?: boolean; // true lists the archived documents; absent or false, the active ones
 };
 
 export async function loadDocuments(filters: DocumentFilters = {}, apiClient: Client = client): Promise<DocumentResponse[]> {
@@ -40,6 +41,7 @@ export async function loadDocuments(filters: DocumentFilters = {}, apiClient: Cl
     ...(filters.state ? { state: [filters.state] } : {}),
     ...(filters.uploaded_from ? { uploaded_from: filters.uploaded_from } : {}),
     ...(filters.uploaded_to ? { uploaded_to: filters.uploaded_to } : {}),
+    ...(filters.archived ? { archived: true } : {}),
   };
   const { data, error, response } = await listDocuments({ client: apiClient, query, throwOnError: false });
   if (sessionOver(error, response)) throw new SessionExpiredError();
@@ -60,6 +62,21 @@ export async function retryProcessing(documentId: string, apiClient: Client = cl
   if (sessionOver(error, response)) throw new SessionExpiredError();
   if (response?.status === 409) throw new RetriesUsedUpError();
   if (!response?.ok) throw new Error(`POST /documents/${documentId}/retry failed (${response?.status ?? "no response"})`);
+}
+
+// Archiving takes a document out of search and My subjects; its content stays (PRD US-10). Repeating it is harmless.
+export async function archiveDocument(documentId: string, apiClient: Client = client): Promise<DocumentResponse> {
+  const { data, error, response } = await postArchive({ client: apiClient, path: { document_id: documentId }, throwOnError: false });
+  if (sessionOver(error, response)) throw new SessionExpiredError();
+  if (!data) throw failure(error);
+  return data;
+}
+
+export async function restoreDocument(documentId: string, apiClient: Client = client): Promise<DocumentResponse> {
+  const { data, error, response } = await postRestore({ client: apiClient, path: { document_id: documentId }, throwOnError: false });
+  if (sessionOver(error, response)) throw new SessionExpiredError();
+  if (!data) throw failure(error);
+  return data;
 }
 
 export async function loadUploadLimits(apiClient: Client = client): Promise<UploadLimits> {

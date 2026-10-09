@@ -25,7 +25,7 @@
   const j2 = (n, o) => { ST.conv('cv1').noteId = null; S.thread = ST.j2Thread(n, Object.assign({ noteId: null }, o || {})); return S.thread; };
 
   const defs = [
-    { id: 'index', group: 'Overview', ref: '§5 · review flows', desc: 'Round 10 overview: what changed in v0.10 (chat in two panes, documents beside the conversation), the four review flows and every state.', view: ST.indexView, setup: () => { fresh(); } },
+    { id: 'index', group: 'Overview', ref: '§5 · review flows', desc: 'Round 11 overview: what changed in v0.11 (nav toggle at the top) and v0.10 (chat in two panes, documents beside the conversation), the four review flows and every state.', view: ST.indexView, setup: () => { fresh(); } },
 
     /* §6.0 */
     { id: 'landing-default', group: 'Landing page', ref: '§6.0 · US-1', desc: 'Public page at /: what Smart Tutor does, how it works, trust points, “Create an account” and “Sign in”. Text only, outside the app shell.', view: ST.landingView, setup: () => { ST.noTray = true; } },
@@ -36,7 +36,7 @@
     { id: 'auth-sign-in', group: 'Sign in, sign up', ref: '§6.2 · US-1', desc: 'Keycloak login page: stock keycloak.v2 layout (low-detail reference).', view: ST.authSignIn },
 
     /* §6.1 */
-    { id: 'shell-nav-collapsed', group: 'App shell', ref: '§6.1 · US-13', desc: 'Navigation collapsed to the 56px icon rail; names show as tooltips on hover and focus (here: Chat). The choice is remembered.', view: ST.libraryView, setup: () => { fresh(); ST.resetList(); S.navCollapsed = true; S.tipDemo = 'chat'; } },
+    { id: 'shell-nav-collapsed', group: 'App shell', ref: '§6.1 · US-13', desc: 'Navigation collapsed to the 56px icon rail; the expand chevron sits below the logo at the top (P8); names show as tooltips on hover and focus (here: Chat). The choice is remembered.', view: ST.libraryView, setup: () => { fresh(); ST.resetList(); S.navCollapsed = true; S.tipDemo = 'chat'; } },
 
     /* §6.3 */
     lib('US-2', 'Live Library: the home screen, with the sample documents; the upload-rights line sits under “Upload” (where navigation lands).', null, { id: 'library-default', live: true, setup: () => { if (!ST.keepListFilters) ST.resetList(); ST.keepListFilters = false; } }),
@@ -215,7 +215,7 @@
 
     /* §10–11 */
     { id: 'components', group: 'Components & questions', ref: '§10 · components', desc: 'Every reusable component, in both themes.', view: ST.componentsView },
-    { id: 'brief-questions', group: 'Components & questions', ref: '§11 · questions', desc: 'Brief v0.10 decisions: what P1–P7 changed and where, then the open questions.', view: ST.questionsView }
+    { id: 'brief-questions', group: 'Components & questions', ref: '§11 · questions', desc: 'Brief v0.11 decisions: what P1–P8 changed and where, then the open questions.', view: ST.questionsView }
   ];
 
   ST.STATES = defs.map((d) => {

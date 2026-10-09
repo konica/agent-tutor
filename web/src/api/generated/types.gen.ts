@@ -43,6 +43,10 @@ export type ChooseSubjectsRequest = {
  */
 export type DocumentResponse = {
     /**
+     * Archived
+     */
+    archived: boolean;
+    /**
      * Attempt
      */
     attempt: number | null;
@@ -364,6 +368,10 @@ export type ListDocumentsData = {
          * Uploaded To
          */
         uploaded_to?: string | null;
+        /**
+         * Archived
+         */
+        archived?: boolean;
     };
     url: '/documents';
 };
@@ -412,6 +420,66 @@ export type CheckDuplicateResponses = {
 };
 
 export type CheckDuplicateResponse = CheckDuplicateResponses[keyof CheckDuplicateResponses];
+
+export type ArchiveDocumentData = {
+    body?: never;
+    path: {
+        /**
+         * Document Id
+         */
+        document_id: string;
+    };
+    query?: never;
+    url: '/documents/{document_id}/archive';
+};
+
+export type ArchiveDocumentErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ArchiveDocumentError = ArchiveDocumentErrors[keyof ArchiveDocumentErrors];
+
+export type ArchiveDocumentResponses = {
+    /**
+     * Successful Response
+     */
+    200: DocumentResponse;
+};
+
+export type ArchiveDocumentResponse = ArchiveDocumentResponses[keyof ArchiveDocumentResponses];
+
+export type RestoreDocumentData = {
+    body?: never;
+    path: {
+        /**
+         * Document Id
+         */
+        document_id: string;
+    };
+    query?: never;
+    url: '/documents/{document_id}/restore';
+};
+
+export type RestoreDocumentErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RestoreDocumentError = RestoreDocumentErrors[keyof RestoreDocumentErrors];
+
+export type RestoreDocumentResponses = {
+    /**
+     * Successful Response
+     */
+    200: DocumentResponse;
+};
+
+export type RestoreDocumentResponse = RestoreDocumentResponses[keyof RestoreDocumentResponses];
 
 export type RetryDocumentData = {
     body?: never;

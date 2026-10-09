@@ -15,6 +15,7 @@ from fakes import (
     fake_tools,
 )
 from smart_tutor.knowledge.application import (
+    ArchiveService,
     DocumentNotFoundError,
     DocumentService,
     DocumentStateError,
@@ -220,3 +221,18 @@ def test_without_a_description_the_picker_still_has_a_suggestion() -> None:
     assert [(s.name, s.origin, s.subject_id) for s in offered.suggestions] == [
         ("General", SuggestionOrigin.SHARED, GENERAL_SUBJECT_ID)
     ]
+
+
+def test_an_archived_document_cant_get_suggestions_or_subjects_until_restored() -> None:
+    w = World()
+    document_id = w.upload()
+    ArchiveService(w.library.unit_of_work, FixedClock(), max_attempts=3).archive(ADA, document_id)
+
+    with pytest.raises(DocumentStateError, match="Restore"):
+        w.choice.suggestions(ADA, document_id)
+    with pytest.raises(DocumentStateError, match="Restore"):
+        w.choice.choose(ADA, document_id, [GENERAL_SUBJECT_ID], [])
+
+    assert w.state() == []  # the active tab shows nothing; the document keeps no subjects
+    [archived] = w.documents.list_documents(ADA, archived=True)
+    assert (archived.state, archived.subject_ids) == ("awaiting_subjects", ())

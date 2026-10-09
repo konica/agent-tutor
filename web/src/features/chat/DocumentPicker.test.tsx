@@ -17,6 +17,7 @@ const ready = (document_id: string, title: string, extra: Partial<DocumentRespon
   can_retry: false,
   authors: [],
   year: null,
+  archived: false,
   ...extra,
 });
 

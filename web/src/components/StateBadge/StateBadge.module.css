@@ -8,6 +8,7 @@
 .awaiting_subjects { background: var(--attn-soft); color: var(--attn); }
 .ready { background: var(--success-soft); color: var(--success); }
 .failed { background: var(--danger-soft); color: var(--danger); }
+.archived { background: var(--surface-2); color: var(--text-2); border: 1px dashed var(--border-strong); }
 
 @keyframes spin {
   to {
