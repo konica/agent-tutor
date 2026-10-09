@@ -131,7 +131,10 @@ jobs:
           helm upgrade --install smart-tutor deploy/helm/smart-tutor -n smart-tutor --create-namespace \
             -f deploy/helm/smart-tutor/values-prod.yaml \
             --set global.imageRegistry="$REGISTRY" --set global.imageTag="$IMAGE_TAG" \
-            --set global.publicUrl="$CLOUDFRONT_URL"             --set global.documentsBucket="$DOCUMENTS_BUCKET" --set global.ingestQueueUrl="$INGEST_QUEUE_URL"             --wait=legacy --timeout 15m
+            --set global.publicUrl="$CLOUDFRONT_URL" \
+            --set global.documentsBucket="$DOCUMENTS_BUCKET" \
+            --set global.ingestQueueUrl="$INGEST_QUEUE_URL" \
+            --wait=legacy --timeout 15m
 
       # The agent and MCP server are in-cluster only, so the smoke test can't reach them: check from an API pod that
       # the names, ports, and auth line up (agent healthy; MCP refuses a call without a token).
