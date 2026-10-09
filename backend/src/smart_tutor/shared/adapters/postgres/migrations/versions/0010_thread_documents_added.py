@@ -18,11 +18,11 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     # Every existing row came from an answer, added when first used.
+    # The defaults stay: code from before 0010 (an old pod during a rolling deploy) inserts without these columns.
     op.add_column("thread_documents", sa.Column("added_by", sa.Text, nullable=False, server_default="answer"))
     op.add_column("thread_documents", sa.Column("added_at", sa.DateTime(timezone=True)))
     op.execute("UPDATE thread_documents SET added_at = first_used_at")
-    op.alter_column("thread_documents", "added_at", nullable=False)
-    op.alter_column("thread_documents", "added_by", server_default=None)
+    op.alter_column("thread_documents", "added_at", nullable=False, server_default=sa.func.now())
     op.create_check_constraint("thread_documents_added_by", "thread_documents", "added_by IN ('answer', 'learner')")
     op.alter_column("thread_documents", "first_used_at", nullable=True)
 

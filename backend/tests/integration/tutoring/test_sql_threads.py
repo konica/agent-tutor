@@ -10,7 +10,7 @@ from smart_tutor.shared.adapters.postgres.engine import create_db_engine
 from smart_tutor.shared.adapters.postgres.migrate import upgrade_to_head
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
-from smart_tutor.tutoring.adapters.sql_threads import SqlThreadRepository
+from smart_tutor.tutoring.adapters.sql_threads import SqlThreadRepository, thread_documents
 from smart_tutor.tutoring.domain.thread import Thread
 
 pytestmark = pytest.mark.integration
@@ -76,3 +76,20 @@ def test_learner_added_documents_keep_their_place_and_are_marked_used(engine: En
     repo.remove_document(t, c)
     repo.remove_document(t, c)  # not listed: nothing happens
     assert [r.document_id for r in repo.documents_used(t)] == [a, b]
+
+
+def test_a_row_inserted_as_before_0010_gets_the_column_defaults(engine: Engine) -> None:
+    repo = SqlThreadRepository(engine)
+    thread = Thread.start(ThreadId(str(uuid.uuid4())), UserId("learner-a"), datetime(2026, 10, 9, tzinfo=UTC))
+    repo.add(thread)
+    doc = DocumentId(str(uuid.uuid4()))
+    used_at = datetime(2026, 10, 9, 9, tzinfo=UTC)
+
+    # An old API pod during a rolling deploy inserts without added_by and added_at.
+    with engine.begin() as conn:
+        conn.execute(
+            thread_documents.insert().values(thread_id=thread.thread_id, document_id=doc, first_used_at=used_at)
+        )
+
+    rows = repo.documents_used(ThreadId(thread.thread_id))
+    assert [(r.document_id, r.added_by, r.first_used_at) for r in rows] == [(doc, "answer", used_at)]
