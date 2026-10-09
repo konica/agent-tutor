@@ -247,6 +247,16 @@ def test_worker_polls_the_ingest_queue_for_the_documents_bucket() -> None:
     assert find(docs, "ServiceAccount", "worker")
 
 
+def test_worker_pods_are_not_selected_by_the_api_service() -> None:
+    docs = render(*PROD, *DEPLOY)
+    deploy = find(docs, "Deployment", "worker")
+    pod_labels = deploy["spec"]["template"]["metadata"]["labels"]
+    assert deploy["spec"]["selector"]["matchLabels"]["app.kubernetes.io/name"] == "worker"
+    assert pod_labels["app.kubernetes.io/name"] == "worker"
+    selector = find(docs, "Service", "api")["spec"]["selector"]
+    assert not all(pod_labels.get(k) == v for k, v in selector.items())
+
+
 def test_api_signs_uploads_for_the_bucket_and_sends_retries_to_the_queue() -> None:
     env = env_of(find(render(*PROD, *DEPLOY), "Deployment", "api")["spec"]["template"]["spec"]["containers"][0])
     assert env["SMART_TUTOR_DOCUMENTS_BUCKET"] == "docs-bucket"

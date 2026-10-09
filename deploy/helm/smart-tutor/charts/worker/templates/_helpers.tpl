@@ -1,5 +1,5 @@
 {{- define "worker.labels" -}}
-app.kubernetes.io/name: api
+app.kubernetes.io/name: worker
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
