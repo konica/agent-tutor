@@ -12,6 +12,8 @@ const used = (title: string, extra: Partial<ThreadDocumentResponse> = {}): Threa
   authors: [],
   year: null,
   archived: false,
+  added_by: "answer",
+  used: true,
   deleted: false,
   ...extra,
 });
@@ -56,6 +58,7 @@ describe("ConversationPanel", () => {
   it("lists the documents used in the given order, marking archived and deleted ones", () => {
     renderPanel({
       answered: true,
+      onRemoveDocument: vi.fn(),
       documents: [
         used("ReAct", { authors: ["Yao", "Zhao"], year: 2023 }),
         used("RAG", { archived: true }),
@@ -67,8 +70,99 @@ describe("ConversationPanel", () => {
     expect(rows[0]).toHaveAttribute("title", "ReAct\nYao, Zhao · 2023");
     expect(within(documentsSection()).getByText("3")).toBeInTheDocument();
     expect(screen.queryByText("Documents used to answer will appear here.")).not.toBeInTheDocument();
-    // Opening a document from a row comes with #123.
-    expect(within(documentsSection()).queryByRole("button")).not.toBeInTheDocument();
+    // Opening a document from a row comes with #123: a row's only button removes it.
+    expect(within(rows[0]!).getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual([
+      "Remove ReAct from this conversation",
+    ]);
+  });
+
+  it("offers Add documents once the conversation exists", async () => {
+    const onAddDocuments = vi.fn();
+    renderPanel({ threadId: "t1", onAddDocuments });
+    const add = within(documentsSection()).getByRole("button", { name: "Add documents" });
+    expect(add).toHaveAttribute("aria-haspopup", "dialog");
+    await userEvent.click(add);
+    expect(onAddDocuments).toHaveBeenCalled();
+  });
+
+  it("offers no Add documents before there is a conversation", () => {
+    renderPanel({ threadId: null, onAddDocuments: vi.fn() });
+    expect(screen.queryByRole("button", { name: "Add documents" })).not.toBeInTheDocument();
+  });
+
+  it("marks a document the learner added that no answer has used yet", () => {
+    renderPanel({
+      threadId: "t1",
+      answered: true,
+      documents: [
+        used("ReAct"),
+        used("RAG", { added_by: "learner", used: false }),
+        used("PPO", { added_by: "learner", used: true }),
+        used("Gone", { added_by: "learner", used: false, deleted: true }),
+      ],
+    });
+    const rows = within(documentsSection()).getAllByRole("listitem");
+    expect(rows.map((r) => r.textContent)).toEqual(["ReAct", "RAGAdded", "PPO", "GoneDeleted"]);
+  });
+
+  it("removes a row, deleted ones too, with its remove button", async () => {
+    const onRemoveDocument = vi.fn();
+    renderPanel({ threadId: "t1", documents: [used("ReAct"), used("PPO", { deleted: true })], onRemoveDocument });
+    const remove = screen.getByRole("button", { name: "Remove PPO from this conversation" });
+    expect(remove).toHaveAttribute("data-tip", "Remove from this conversation");
+    await userEvent.click(remove);
+    expect(onRemoveDocument).toHaveBeenCalledWith("PPO");
+    await userEvent.click(screen.getByRole("button", { name: "Remove ReAct from this conversation" }));
+    expect(onRemoveDocument).toHaveBeenCalledWith("ReAct");
+  });
+
+  describe("focus after removing a row", () => {
+    function setup(documents: ThreadDocumentResponse[]) {
+      const onRemoveDocument = vi.fn();
+      const props = {
+        id: "conversation-panel",
+        threadId: "t1",
+        answered: true,
+        showCitations: true,
+        onShowCitationsChange: vi.fn(),
+        onAddDocuments: vi.fn(),
+        onRemoveDocument,
+      };
+      const view = render(<ConversationPanel {...props} documents={documents} />);
+      const rerender = (next: ThreadDocumentResponse[]) => view.rerender(<ConversationPanel {...props} documents={next} />);
+      return { rerender, onRemoveDocument };
+    }
+    const removeButton = (title: string) => screen.getByRole("button", { name: `Remove ${title} from this conversation` });
+
+    it("moves to the previous row when the last row goes", async () => {
+      const { rerender } = setup([used("a"), used("b")]);
+      await userEvent.click(removeButton("b"));
+      rerender([used("a")]);
+      expect(removeButton("a")).toHaveFocus();
+    });
+
+    it("moves to the next row", async () => {
+      const { rerender } = setup([used("a"), used("b")]);
+      await userEvent.click(removeButton("a"));
+      rerender([used("b")]);
+      expect(removeButton("b")).toHaveFocus();
+    });
+
+    it("moves to Add documents when no row is left, and the empty text comes back", async () => {
+      const { rerender } = setup([used("a")]);
+      await userEvent.click(removeButton("a"));
+      rerender([]);
+      expect(screen.getByRole("button", { name: "Add documents" })).toHaveFocus();
+      expect(screen.getByText("Documents used to answer will appear here.")).toBeInTheDocument();
+    });
+
+    it("stays put while the removed row is still listed", async () => {
+      const { rerender, onRemoveDocument } = setup([used("a"), used("b")]);
+      await userEvent.click(removeButton("a"));
+      expect(onRemoveDocument).toHaveBeenCalledWith("a");
+      rerender([used("a"), used("b")]);
+      expect(removeButton("a")).toHaveFocus();
+    });
   });
 
   it("marks a deleted document with an icon badge, no link, and one note below the list", () => {

@@ -1,6 +1,7 @@
 """In-memory threads and a fake retriever."""
 
 import copy
+import dataclasses
 from collections.abc import Sequence
 from dataclasses import replace
 from datetime import datetime
@@ -31,8 +32,21 @@ class InMemoryThreads(ThreadRepository):
     def add_documents_used(self, thread_id: ThreadId, document_ids: Sequence[DocumentId], at: datetime) -> None:
         rows = self.documents_used_rows.setdefault(thread_id, [])
         for document_id in document_ids:
+            i = next((i for i, row in enumerate(rows) if row.document_id == document_id), None)
+            if i is None:
+                rows.append(ThreadDocument(thread_id, document_id, "answer", at, first_used_at=at))
+            elif rows[i].first_used_at is None:
+                rows[i] = dataclasses.replace(rows[i], first_used_at=at)
+
+    def add_documents(self, thread_id: ThreadId, document_ids: Sequence[DocumentId], at: datetime) -> None:
+        rows = self.documents_used_rows.setdefault(thread_id, [])
+        for document_id in document_ids:
             if all(row.document_id != document_id for row in rows):
-                rows.append(ThreadDocument(thread_id, document_id, at))
+                rows.append(ThreadDocument(thread_id, document_id, "learner", at))
+
+    def remove_document(self, thread_id: ThreadId, document_id: DocumentId) -> None:
+        rows = self.documents_used_rows.get(thread_id, [])
+        self.documents_used_rows[thread_id] = [row for row in rows if row.document_id != document_id]
 
     def keep_deleted_title(self, user_id: UserId, document_id: DocumentId, title: str) -> None:
         for thread in self.threads.values():

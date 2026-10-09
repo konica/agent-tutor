@@ -311,6 +311,8 @@ describe("ChatPage", () => {
       authors: [],
       year: null,
       archived: false,
+      added_by: "answer",
+      used: true,
       deleted: false,
     });
     const answered = () =>
@@ -477,6 +479,73 @@ describe("ChatPage", () => {
       await question();
       expect(toggle()).toHaveAttribute("aria-expanded", "false");
       expect(panel()).not.toBeInTheDocument();
+    });
+
+    describe("adding and removing documents", () => {
+      const readyDoc = (document_id: string, title: string) =>
+        ({ document_id, title, state: "ready", authors: [], year: null }) as unknown as DocumentResponse;
+      const status = () => screen.getByRole("status");
+
+      async function answer(props: ComponentProps<typeof ChatPage>) {
+        renderChat({ ask: vi.fn(answered), loadUsed: vi.fn(async () => [used("d1", "a.pdf")]), ...props });
+        await userEvent.type(await question(), "What is attention?");
+        await userEvent.click(askButton());
+        expect(await within(panel()!).findByText("a.pdf")).toBeInTheDocument();
+      }
+
+      it("waits for the conversation before offering Add documents", async () => {
+        renderChat();
+        await question();
+        expect(within(panel()!).queryByRole("button", { name: "Add documents" })).not.toBeInTheDocument();
+      });
+
+      it("adds the checked documents, marks them Added, closes the picker, and returns focus", async () => {
+        const loadReady = vi.fn(async () => [readyDoc("d1", "a.pdf"), readyDoc("d2", "ReAct")]);
+        const addDocs = vi.fn(async () => [used("d1", "a.pdf"), { ...used("d2", "ReAct"), added_by: "learner" as const, used: false }]);
+        await answer({ loadReady, addDocs });
+        const add = within(panel()!).getByRole("button", { name: "Add documents" });
+        await userEvent.click(add);
+        const dialog = await screen.findByRole("dialog", { name: "Add documents" });
+        await userEvent.click(await within(dialog).findByRole("checkbox", { name: /^ReAct/ }));
+        await userEvent.click(within(dialog).getByRole("button", { name: "Add 1 document" }));
+        expect(addDocs).toHaveBeenCalledWith("t1", ["d2"]);
+        await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+        expect(within(panel()!).getAllByRole("listitem").map((r) => r.textContent)).toEqual(["a.pdf", "ReActAdded"]);
+        expect(within(panel()!).getByRole("button", { name: "Add documents" })).toHaveFocus();
+        expect(status()).toHaveTextContent("1 document added to this conversation.");
+      });
+
+      it("keeps the picker open with an error when adding fails", async () => {
+        const addDocs = vi.fn(() => Promise.reject(new Error("POST /threads/t1/documents failed (500)")));
+        await answer({ loadReady: vi.fn(async () => [readyDoc("d2", "ReAct")]), addDocs });
+        await userEvent.click(within(panel()!).getByRole("button", { name: "Add documents" }));
+        const dialog = await screen.findByRole("dialog", { name: "Add documents" });
+        await userEvent.click(await within(dialog).findByRole("checkbox", { name: /^ReAct/ }));
+        await userEvent.click(within(dialog).getByRole("button", { name: "Add 1 document" }));
+        expect(await within(dialog).findByRole("alert")).toHaveTextContent("Couldn't add the documents. Try again.");
+        expect(within(dialog).getByRole("checkbox", { name: /^ReAct/ })).toBeChecked();
+        expect(within(panel()!).getAllByRole("listitem").map((r) => r.textContent)).toEqual(["a.pdf"]);
+      });
+
+      it("removes a row and keeps the answer's citations", async () => {
+        const removeDoc = vi.fn(async () => {});
+        await answer({ removeDoc });
+        await userEvent.click(within(panel()!).getByRole("button", { name: "Remove a.pdf from this conversation" }));
+        expect(removeDoc).toHaveBeenCalledWith("t1", "d1");
+        expect(within(panel()!).queryByText("a.pdf")).not.toBeInTheDocument();
+        expect(within(panel()!).getByText("Documents used to answer will appear here.")).toBeInTheDocument();
+        expect(screen.getByTitle("a.pdf, p. 3")).toBeInTheDocument();
+        expect(status()).toHaveTextContent("a.pdf removed from this conversation.");
+      });
+
+      it("reloads the list when removing fails, so the row comes back", async () => {
+        const loadUsed = vi.fn(async () => [used("d1", "a.pdf")]);
+        const removeDoc = vi.fn(() => Promise.reject(new Error("DELETE failed (500)")));
+        await answer({ loadUsed, removeDoc });
+        await userEvent.click(within(panel()!).getByRole("button", { name: "Remove a.pdf from this conversation" }));
+        await waitFor(() => expect(loadUsed).toHaveBeenCalledTimes(2));
+        expect(await within(panel()!).findByText("a.pdf")).toBeInTheDocument();
+      });
     });
 
     it("hides the citations when Show citations is off", async () => {

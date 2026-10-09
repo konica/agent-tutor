@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ArchiveDocumentData, ArchiveDocumentErrors, ArchiveDocumentResponses, AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponse, AskInNewThreadResponses, CheckDuplicateData, CheckDuplicateErrors, CheckDuplicateResponses, ChooseSubjectsData, ChooseSubjectsErrors, ChooseSubjectsResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, GetMeData, GetMeResponses, GetSubjectSuggestionsData, GetSubjectSuggestionsErrors, GetSubjectSuggestionsResponses, GetUploadData, GetUploadErrors, GetUploadLimitsData, GetUploadLimitsResponses, GetUploadResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListMySubjectsData, ListMySubjectsResponses, ListThreadDocumentsData, ListThreadDocumentsErrors, ListThreadDocumentsResponses, RenameThreadData, RenameThreadErrors, RenameThreadResponses, RestoreDocumentData, RestoreDocumentErrors, RestoreDocumentResponses, RetryDocumentData, RetryDocumentErrors, RetryDocumentResponses, SearchSubjectsData, SearchSubjectsErrors, SearchSubjectsResponses, StartUploadData, StartUploadErrors, StartUploadResponses } from './types.gen';
+import type { AddThreadDocumentsData, AddThreadDocumentsErrors, AddThreadDocumentsResponses, ArchiveDocumentData, ArchiveDocumentErrors, ArchiveDocumentResponses, AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponse, AskInNewThreadResponses, CheckDuplicateData, CheckDuplicateErrors, CheckDuplicateResponses, ChooseSubjectsData, ChooseSubjectsErrors, ChooseSubjectsResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, GetMeData, GetMeResponses, GetSubjectSuggestionsData, GetSubjectSuggestionsErrors, GetSubjectSuggestionsResponses, GetUploadData, GetUploadErrors, GetUploadLimitsData, GetUploadLimitsResponses, GetUploadResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListMySubjectsData, ListMySubjectsResponses, ListThreadDocumentsData, ListThreadDocumentsErrors, ListThreadDocumentsResponses, RemoveThreadDocumentData, RemoveThreadDocumentErrors, RemoveThreadDocumentResponses, RenameThreadData, RenameThreadErrors, RenameThreadResponses, RestoreDocumentData, RestoreDocumentErrors, RestoreDocumentResponses, RetryDocumentData, RetryDocumentErrors, RetryDocumentResponses, SearchSubjectsData, SearchSubjectsErrors, SearchSubjectsResponses, StartUploadData, StartUploadErrors, StartUploadResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -184,11 +184,37 @@ export const renameThread = <ThrowOnError extends boolean = false>(options: Opti
 /**
  * List Thread Documents
  *
- * The documents the conversation's answers drew on, in order of first use (PRD US-4b).
+ * The conversation's documents: those its answers drew on and those the learner added (PRD US-4b, US-4c).
  */
 export const listThreadDocuments = <ThrowOnError extends boolean = false>(options: Options<ListThreadDocumentsData, ThrowOnError>): RequestResult<ListThreadDocumentsResponses, ListThreadDocumentsErrors, ThrowOnError> => (options.client ?? client).get<ListThreadDocumentsResponses, ListThreadDocumentsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/threads/{thread_id}/documents',
+    ...options
+});
+
+/**
+ * Add Thread Documents
+ *
+ * Add the learner's ready, non-archived documents to the conversation's list (PRD US-4c); returns the list.
+ */
+export const addThreadDocuments = <ThrowOnError extends boolean = false>(options: Options<AddThreadDocumentsData, ThrowOnError>): RequestResult<AddThreadDocumentsResponses, AddThreadDocumentsErrors, ThrowOnError> => (options.client ?? client).post<AddThreadDocumentsResponses, AddThreadDocumentsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/threads/{thread_id}/documents',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Remove Thread Document
+ *
+ * Take a document off the conversation's list (PRD US-4c); the document and old citations are unchanged.
+ */
+export const removeThreadDocument = <ThrowOnError extends boolean = false>(options: Options<RemoveThreadDocumentData, ThrowOnError>): RequestResult<RemoveThreadDocumentResponses, RemoveThreadDocumentErrors, ThrowOnError> => (options.client ?? client).delete<RemoveThreadDocumentResponses, RemoveThreadDocumentErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/threads/{thread_id}/documents/{document_id}',
     ...options
 });
 
