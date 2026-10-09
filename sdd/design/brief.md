@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Brief version** | v0.11 |
-| **Based on** | `sdd/prd.md` Draft v2.22 |
+| **Based on** | `sdd/prd.md` Draft v2.26 |
 | **Status** | Draft, round 11 (the nav toggle moves to the top of the nav; everything else is round 10) |
 | **Owner** | Thao Dinh |
 | **Last updated** | 2026-10-09 |
@@ -371,7 +371,7 @@ Use this realistic sample data, not lorem ipsum.
 
 | Version | Date | PRD | Changes | Screens to redo |
 |---|---|---|---|---|
-| v0.11 | 2026-10-09 | v2.25 | The nav collapse toggle moves from the nav foot to the top brand row, aligned with the chat header (P8, #163). | `shell-nav-collapsed`; the brand row on every app screen |
+| v0.11 | 2026-10-09 | v2.26 | The nav collapse toggle moves from the nav foot to the top brand row, aligned with the chat header (P8, #163). | `shell-nav-collapsed`; the brand row on every app screen |
 | v0.10 | 2026-10-08 | v2.22 | Chat in two panes: a collapsible conversation panel (Documents, Lesson Note, Actions) and the conversation; a document opens beside the conversation in one click (P1–P3, Q60); "Open in dialog" (P4); choose a conversation's documents, opt-in search limit, start from a document (P5, US-4c, Q61). | Chat states listed in §0; new `chat-panel-collapsed` |
 | v0.9 | 2026-10-08 | v2.22 | Compact density (M1–M8): 14px base, 20px sans page titles, 32px controls, 32–40px rows, one-row header and toolbar, collapsible 208px nav, compact chat chrome with a Sources chip line, wider compact viewer, dense lists and Usage; `DESIGN.md` → Density. Landing: three trust points with leads (M9). No needs-subjects banner (M10). | Every screen; new `shell-nav-collapsed` |
 | v0.8 | 2026-10-08 | v2.22 | End-user feedback: conversations have no subjects (K1); documents used (K2); document viewer with the cited passage highlighted (K3); delete a document (K4); no cross-learner duplicate linking (K5). J2, J3, J4 and the §9 conversation rewritten. | Remove the 7 subject states and `chat-citation-opens-details`; new `chat-documents-used`, `chat-documents-used-deleted`, `chat-citation-deleted`, `viewer-*` (4), `library-delete-confirm`, `library-deleted`; redo the chat and details states listed in §0 |
