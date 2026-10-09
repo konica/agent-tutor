@@ -1,0 +1,12 @@
+# Nightly pg_dump of the app and Keycloak databases to S3 (#151); smart-tutor-backup.timer starts it.
+# Run it now: systemctl start smart-tutor-backup; logs: journalctl -u smart-tutor-backup
+[Unit]
+Description=Smart Tutor: back up the databases to S3
+Requires=docker.service
+After=docker.service
+OnFailure=smart-tutor-job-failed@%N.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /opt/smart-tutor/on-premise/backup.sh
+TimeoutStartSec=1h
