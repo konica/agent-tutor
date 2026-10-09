@@ -11,6 +11,8 @@ from smart_tutor.shared.ports.clock import Clock
 
 
 class ArchiveService:
+    """The returned view comes from `get_readable`, so authors and year are empty; callers re-list for the full view."""
+
     def __init__(self, uow: Callable[[], LibraryUnitOfWork], clock: Clock, max_attempts: int) -> None:
         self._uow, self._clock, self._max_attempts = uow, clock, max_attempts
 

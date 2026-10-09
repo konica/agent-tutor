@@ -59,7 +59,8 @@ describe("LibraryPage", () => {
   });
 
   it("uploads the picked PDF and refreshes the list", async () => {
-    const load = vi.fn().mockResolvedValueOnce([]).mockResolvedValue([processing]);
+    let activeLoads = 0;
+    const load = vi.fn(async (f: DocumentFilters) => (f.archived ? [] : (activeLoads++ === 0 ? [] : [processing])));
     const upload = vi.fn(async () => {});
     render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={upload} />);
     await screen.findByText("Upload your first document");
@@ -395,7 +396,8 @@ describe("LibraryPage drop zone and upload tray", () => {
   it("shows the new row as Uploading until its file reaches storage, then Processing", async () => {
     const { upload, pending } = controlledUpload();
     const row: DocumentResponse = { ...processing, document_id: "d9", title: "a.pdf" };
-    const load = vi.fn().mockResolvedValueOnce([]).mockResolvedValue([row]);
+    let activeLoads = 0;
+    const load = vi.fn(async (f: DocumentFilters) => (f.archived ? [] : (activeLoads++ === 0 ? [] : [row])));
     render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={upload} />);
     await screen.findByText("Upload your first document");
     drop([pdf("a.pdf")]);
@@ -948,7 +950,36 @@ describe("LibraryPage archive and restore", () => {
   it("keeps the tabs reachable when every document is archived", async () => {
     const { load } = library([], [old]);
     render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} />);
-    expect(await screen.findByText("Upload your first document")).toBeVisible();
+    expect(await screen.findByText("No active documents")).toBeVisible();
+    expect(screen.getByText("Your documents are all archived. Restore one from Archived, or upload a new one.")).toBeVisible();
+    expect(screen.queryByText("Upload your first document")).toBeNull();
+    expect(screen.getAllByRole("button", { name: "Upload" })).toHaveLength(2);
+    expect(screen.getByText("Only upload documents you have the right to use.")).toBeVisible();
     await waitFor(() => expect(tab("Archived")).toHaveTextContent("1"));
+  });
+
+  it("offers no State in the empty filtered sentence on the Archived tab", async () => {
+    const { load } = library([ready], [old]);
+    const subjects = async () => [{ subject_id: "s1", name: "AI Agents" }];
+    const filteredLoad = vi.fn(async (f: DocumentFilters) => (f.subject_ids?.length ? [] : load(f)));
+    render(<LibraryPage loadSubjects={subjects} check={notInLibrary} loadLimits={limits} load={filteredLoad} upload={vi.fn()} />);
+    await screen.findByRole("option", { name: "AI Agents" });
+    await userEvent.selectOptions(screen.getByLabelText("Subject"), "s1");
+    expect(await screen.findByText("Try another subject, state or a wider date range.")).toBeVisible();
+    await userEvent.click(tab("Archived"));
+    expect(await screen.findByText("Try another subject or a wider date range.")).toBeVisible();
+  });
+
+  it("does not announce processing changes of an archived document", async () => {
+    let state: DocumentResponse["state"] = "processing";
+    const load = vi.fn(async (f: DocumentFilters) => (f.archived ? [{ ...old, state }] : [ready]));
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} pollMs={20} />);
+    await screen.findByText("Toolformer");
+    await userEvent.click(tab("Archived"));
+    await screen.findByText("GPT-3");
+    state = "awaiting_subjects";
+    const calls = load.mock.calls.length;
+    await waitFor(() => expect(load.mock.calls.length).toBeGreaterThan(calls + 3));
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
   });
 });

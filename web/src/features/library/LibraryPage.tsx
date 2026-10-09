@@ -71,9 +71,11 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
   const list = documents !== null && Boolean(applied.archived) === archivedView ? documents : null;
   // The empty states follow the filters the list was loaded with, so clearing never flashes the upload card before the full list arrives.
   const filtered = hasFilters(filters) || hasFilters(applied);
-  const firstRun = !archivedView && list?.length === 0 && !filtered;
+  const noActive = !archivedView && list?.length === 0 && !filtered;
+  const firstRun = noActive && !counts.archived;
+  const allArchived = noActive && Boolean(counts.archived);
   // The tabs stay while anything is archived, so an all-archived library can still reach its documents.
-  const showToolbar = documents !== null && !(firstRun && !counts.archived);
+  const showToolbar = documents !== null && !firstRun;
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set()); // document ids whose archive or restore is running
   const [subjects, setSubjects] = useState<SubjectResponse[]>([]);
   const subjectSelect = useRef<HTMLSelectElement>(null);
@@ -124,7 +126,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
     seen.current = new Map(documents.map((d) => [d.document_id, d.state]));
     if (!before) return; // the first load is not a change
     const changes = documents
-      .filter((d) => before.has(d.document_id) && before.get(d.document_id) !== d.state && !justSaved.current.has(d.document_id))
+      .filter((d) => !d.archived && before.has(d.document_id) && before.get(d.document_id) !== d.state && !justSaved.current.has(d.document_id))
       .map(announceChange)
       .filter((message): message is string => message !== null);
     for (const d of documents) if (d.state === "ready") justSaved.current.delete(d.document_id);
@@ -474,12 +476,25 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
       )}
       {list?.length === 0 && filtered && (
         <EmptyState icon={Filter} title="No documents match these filters" actions={<Button onClick={clearFilters}>Clear filters</Button>}>
-          <p>Try another subject, state or a wider date range.</p>
+          <p>Try another subject{archivedView ? "" : ", state"} or a wider date range.</p>
         </EmptyState>
       )}
       {archivedView && list?.length === 0 && !filtered && (
         <EmptyState icon={Archive} title="No archived documents">
           <p>Archived documents leave search until you restore them.</p>
+        </EmptyState>
+      )}
+      {allArchived && (
+        <EmptyState
+          icon={Archive}
+          title="No active documents"
+          actions={
+            <Button variant="primary" icon={Upload} onClick={pick}>
+              Upload
+            </Button>
+          }
+        >
+          <p>Your documents are all archived. Restore one from Archived, or upload a new one.</p>
         </EmptyState>
       )}
       {firstRun && (
