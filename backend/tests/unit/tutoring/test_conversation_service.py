@@ -199,6 +199,37 @@ def test_another_learner_can_neither_record_nor_read() -> None:
     assert threads.documents_used_rows == {}
 
 
+def test_a_deleted_document_keeps_its_title_in_the_learners_threads_only() -> None:
+    library = InMemoryLibrary()
+    svc, _, doc, _, _ = started(library)
+    other = UserId("bob")
+    ingest_ready(library, "bob", "Something else.")
+    thread_a = svc.start_thread(LEARNER)
+    thread_b = svc.start_thread(other)
+    svc.record_answer(thread_a.thread_id, LEARNER, [doc])
+    svc.record_answer(thread_b.thread_id, other, [doc])  # cannot happen in practice; the update is scoped by owner
+
+    svc.keep_deleted_title(LEARNER, doc, "Chain-of-Thought Prompting")
+    library.state.documents.pop(doc)
+
+    used_a = svc.documents_used(thread_a.thread_id, LEARNER)
+    used_b = svc.documents_used(thread_b.thread_id, other)
+    assert [(d.title, d.deleted) for d in used_a] == [("Chain-of-Thought Prompting", True)]
+    assert [(d.title, d.deleted) for d in used_b] == [(DELETED_DOCUMENT, True)]
+
+
+def test_an_answer_saved_after_the_delete_lists_the_document_as_deleted() -> None:
+    library = InMemoryLibrary()
+    svc, _, doc, _, _ = started(library)
+    thread = svc.start_thread(LEARNER)
+
+    library.state.documents.pop(doc)
+    svc.record_answer(thread.thread_id, LEARNER, [doc])
+
+    used = svc.documents_used(thread.thread_id, LEARNER)
+    assert [(d.title, d.deleted) for d in used] == [(DELETED_DOCUMENT, True)]
+
+
 def test_the_learner_adds_ready_documents_listed_as_added_and_unused() -> None:
     library = InMemoryLibrary()
     svc, _, used, added, _ = started(library)

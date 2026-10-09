@@ -43,6 +43,84 @@ export type ChooseSubjectsRequest = {
 };
 
 /**
+ * DocumentDetailsResponse
+ */
+export type DocumentDetailsResponse = {
+    /**
+     * Archived
+     */
+    archived: boolean;
+    /**
+     * Attempt
+     */
+    attempt: number | null;
+    /**
+     * Authors
+     */
+    authors: Array<string>;
+    /**
+     * Can Retry
+     */
+    can_retry: boolean;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Document Id
+     */
+    document_id: string;
+    /**
+     * Doi
+     */
+    doi: string | null;
+    /**
+     * Extracted Title
+     */
+    extracted_title: string | null;
+    /**
+     * Failure Reason
+     */
+    failure_reason: string | null;
+    /**
+     * File Name
+     */
+    file_name: string;
+    /**
+     * Max Attempts
+     */
+    max_attempts: number;
+    /**
+     * Pages
+     */
+    pages: number | null;
+    /**
+     * State
+     */
+    state: 'processing' | 'awaiting_subjects' | 'ready' | 'failed';
+    /**
+     * Subjects
+     */
+    subjects: Array<SubjectResponse>;
+    /**
+     * Summary
+     */
+    summary: string | null;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Title Overridden
+     */
+    title_overridden: boolean;
+    /**
+     * Year
+     */
+    year: number | null;
+};
+
+/**
  * DocumentResponse
  */
 export type DocumentResponse = {
@@ -152,6 +230,16 @@ export type RenameThreadRequest = {
      * Title
      */
     title: string;
+};
+
+/**
+ * SetTitleRequest
+ */
+export type SetTitleRequest = {
+    /**
+     * Title
+     */
+    title: string | null;
 };
 
 /**
@@ -449,6 +537,66 @@ export type CheckDuplicateResponses = {
 
 export type CheckDuplicateResponse = CheckDuplicateResponses[keyof CheckDuplicateResponses];
 
+export type DeleteDocumentData = {
+    body?: never;
+    path: {
+        /**
+         * Document Id
+         */
+        document_id: string;
+    };
+    query?: never;
+    url: '/documents/{document_id}';
+};
+
+export type DeleteDocumentErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteDocumentError = DeleteDocumentErrors[keyof DeleteDocumentErrors];
+
+export type DeleteDocumentResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteDocumentResponse = DeleteDocumentResponses[keyof DeleteDocumentResponses];
+
+export type GetDocumentData = {
+    body?: never;
+    path: {
+        /**
+         * Document Id
+         */
+        document_id: string;
+    };
+    query?: never;
+    url: '/documents/{document_id}';
+};
+
+export type GetDocumentErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetDocumentError = GetDocumentErrors[keyof GetDocumentErrors];
+
+export type GetDocumentResponses = {
+    /**
+     * Successful Response
+     */
+    200: DocumentDetailsResponse;
+};
+
+export type GetDocumentResponse = GetDocumentResponses[keyof GetDocumentResponses];
+
 export type ArchiveDocumentData = {
     body?: never;
     path: {
@@ -598,6 +746,36 @@ export type ChooseSubjectsResponses = {
 };
 
 export type ChooseSubjectsResponse = ChooseSubjectsResponses[keyof ChooseSubjectsResponses];
+
+export type SetDocumentTitleData = {
+    body: SetTitleRequest;
+    path: {
+        /**
+         * Document Id
+         */
+        document_id: string;
+    };
+    query?: never;
+    url: '/documents/{document_id}/title';
+};
+
+export type SetDocumentTitleErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetDocumentTitleError = SetDocumentTitleErrors[keyof SetDocumentTitleErrors];
+
+export type SetDocumentTitleResponses = {
+    /**
+     * Successful Response
+     */
+    200: DocumentDetailsResponse;
+};
+
+export type SetDocumentTitleResponse = SetDocumentTitleResponses[keyof SetDocumentTitleResponses];
 
 export type GetMeData = {
     body?: never;

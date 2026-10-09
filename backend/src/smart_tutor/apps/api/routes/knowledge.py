@@ -1,6 +1,6 @@
 """Library routes (knowledge module): start an upload, report what became of it (US-11), list the caller's
 documents, check a file hash against them, retry a failed one, suggest and save its subjects, archive and restore a
-document."""
+document, show a document's details and set its display title, delete one for good."""
 
 from datetime import date, datetime
 from typing import Annotated, Literal
@@ -9,13 +9,24 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-from smart_tutor.apps.api.deps import Archive, CurrentPrincipal, Documents, Retries, SubjectChoice, Subjects, Uploads
+from smart_tutor.apps.api.deps import (
+    Archive,
+    CurrentPrincipal,
+    Deletion,
+    Documents,
+    Retries,
+    SubjectChoice,
+    Subjects,
+    Uploads,
+)
 from smart_tutor.knowledge.application import (
+    DocumentDetails,
     DocumentNotFoundError,
     DocumentStateError,
     DocumentView,
     InvalidFileNameError,
     InvalidSubjectsError,
+    InvalidTitleError,
     RetryLimitError,
 )
 from smart_tutor.shared.domain.ids import DocumentId, SubjectId, UploadId
@@ -79,6 +90,21 @@ class DocumentResponse(BaseModel):
     authors: list[str]  # from the learner's own content; empty when the PDF names none
     year: int | None
     archived: bool
+
+
+class DocumentDetailsResponse(DocumentResponse):
+    file_name: str
+    extracted_title: str | None  # from the learner's own content; null until described
+    title_overridden: bool
+    doi: str | None
+    pages: int | None
+    summary: str | None
+
+
+class SetTitleRequest(BaseModel):
+    # null goes back to the extracted title. Cleaning and the 300-character limit are the domain's (PRD §9.4).
+    model_config = ConfigDict(extra="forbid")
+    title: str | None = Field(max_length=2000)
 
 
 class SuggestionResponse(BaseModel):
@@ -191,6 +217,44 @@ def list_documents(
     return [_document_response(d, names) for d in views]
 
 
+def _details_response(details: DocumentDetails, names: dict[SubjectId, str]) -> DocumentDetailsResponse:
+    return DocumentDetailsResponse(
+        **_document_response(details.document, names).model_dump(),
+        file_name=details.file_name,
+        extracted_title=details.extracted_title,
+        title_overridden=details.title_overridden,
+        doi=details.doi,
+        pages=details.pages,
+        summary=details.summary,
+    )
+
+
+@router.get("/documents/{document_id}", operation_id="get_document")
+def get_document(
+    document_id: UUID, principal: CurrentPrincipal, documents: Documents, subjects: Subjects
+) -> DocumentDetailsResponse:
+    """The caller's document with its facts, summary, and subjects, archived or not (PRD §8 US-10)."""
+    try:
+        details = documents.details(principal.user_id, DocumentId(str(document_id)))
+    except DocumentNotFoundError:
+        raise HTTPException(404, "Document not found") from None
+    return _details_response(details, subjects.names_for(principal.user_id, set(details.document.subject_ids)))
+
+
+@router.put("/documents/{document_id}/title", operation_id="set_document_title")
+def set_document_title(
+    document_id: UUID, body: SetTitleRequest, principal: CurrentPrincipal, documents: Documents, subjects: Subjects
+) -> DocumentDetailsResponse:
+    """Set the caller's display title for this document, or clear it with null; their library only (PRD §9.4)."""
+    try:
+        details = documents.set_title(principal.user_id, DocumentId(str(document_id)), body.title)
+    except DocumentNotFoundError:
+        raise HTTPException(404, "Document not found") from None
+    except InvalidTitleError as e:
+        raise HTTPException(422, str(e)) from None
+    return _details_response(details, subjects.names_for(principal.user_id, set(details.document.subject_ids)))
+
+
 @router.get("/documents/{document_id}/subject-suggestions", operation_id="get_subject_suggestions")
 def get_subject_suggestions(
     document_id: UUID, principal: CurrentPrincipal, choice: SubjectChoice
@@ -272,4 +336,18 @@ def retry_document(document_id: UUID, principal: CurrentPrincipal, retries: Retr
     except DocumentNotFoundError:
         raise HTTPException(404, "Document not found") from None
     except RetryLimitError as e:
+        raise HTTPException(409, str(e)) from None
+
+
+@router.delete("/documents/{document_id}", operation_id="delete_document", status_code=status.HTTP_204_NO_CONTENT)
+def delete_document(document_id: UUID, principal: CurrentPrincipal, deletion: Deletion) -> None:
+    """Delete the caller's document for good: its PDF, page text, and chunks (PRD §8 US-10c).
+
+    Refused while processing (409). Conversations keep their text and list it as deleted.
+    """
+    try:
+        deletion.delete(principal.user_id, DocumentId(str(document_id)))
+    except DocumentNotFoundError:
+        raise HTTPException(404, "Document not found") from None
+    except DocumentStateError as e:
         raise HTTPException(409, str(e)) from None

@@ -8,6 +8,7 @@ from smart_tutor.knowledge.ports.object_store import ObjectNotFoundError, Object
 
 if TYPE_CHECKING:
     from mypy_boto3_s3 import S3Client
+    from mypy_boto3_s3.type_defs import ObjectIdentifierTypeDef
 
 
 class S3ObjectStore(ObjectStore):
@@ -43,3 +44,18 @@ class S3ObjectStore(ObjectStore):
 
     def delete(self, key: str) -> None:
         self._client.delete_object(Bucket=self._bucket, Key=key)
+
+    def delete_all_versions(self, key: str) -> None:
+        # The prefix also matches longer keys, so only exact matches are deleted.
+        paginator = self._client.get_paginator("list_object_versions")
+        for page in paginator.paginate(Bucket=self._bucket, Prefix=key):
+            found: list[ObjectIdentifierTypeDef] = [
+                {"Key": v["Key"], "VersionId": v["VersionId"]}
+                for v in [*page.get("Versions", []), *page.get("DeleteMarkers", [])]
+                if v["Key"] == key
+            ]
+            if not found:
+                continue
+            result = self._client.delete_objects(Bucket=self._bucket, Delete={"Objects": found, "Quiet": True})
+            if result.get("Errors"):
+                raise RuntimeError(f"Couldn't delete every version of {key}: {result['Errors']}")

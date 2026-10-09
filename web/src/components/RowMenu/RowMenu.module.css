@@ -9,4 +9,5 @@
 }
 .item:hover { background: var(--surface-2); }
 .danger { color: var(--danger); }
+.separator { height: 1px; margin: var(--sp-1) 0; background: var(--border); }
 .icon { width: 16px; height: 16px; flex: none; }

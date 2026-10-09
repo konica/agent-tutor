@@ -480,3 +480,100 @@ def test_archive_routes_need_a_token(client: TestClient) -> None:
     unknown = "00000000-0000-4000-8000-0000000000aa"
     assert client.post(f"/documents/{unknown}/archive").status_code == 401
     assert client.post(f"/documents/{unknown}/restore").status_code == 401
+
+
+def test_get_document_returns_its_details(client: TestClient) -> None:
+    doc = ready_document(client)
+    r = client.get(f"/documents/{doc}", headers=AUTH)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["document_id"] == doc
+    assert body["file_name"] == "paper.pdf"
+    assert body["title_overridden"] is False
+    assert len(body["subjects"]) == 1 and body["subjects"][0]["name"]
+    assert "summary" in body and "pages" in body and "doi" in body and "extracted_title" in body
+    assert body["pages"] is not None
+
+
+def test_get_unknown_document_is_404(client: TestClient) -> None:
+    assert client.get("/documents/00000000-0000-4000-8000-0000000000aa", headers=AUTH).status_code == 404
+
+
+def test_set_title_trims_and_lists_the_new_title(client: TestClient) -> None:
+    doc = ready_document(client)
+    r = client.put(f"/documents/{doc}/title", json={"title": "  Mine  "}, headers=AUTH)
+    assert r.status_code == 200
+    assert (r.json()["title"], r.json()["title_overridden"]) == ("Mine", True)
+    assert [d["title"] for d in client.get("/documents", headers=AUTH).json()] == ["Mine"]
+
+
+def test_null_title_goes_back_to_the_extracted_title(client: TestClient) -> None:
+    doc = ready_document(client)
+    before = client.get(f"/documents/{doc}", headers=AUTH).json()["title"]
+    client.put(f"/documents/{doc}/title", json={"title": "Mine"}, headers=AUTH)
+    r = client.put(f"/documents/{doc}/title", json={"title": None}, headers=AUTH)
+    assert r.status_code == 200
+    assert (r.json()["title"], r.json()["title_overridden"]) == (before, False)
+
+
+def test_set_title_refuses_a_blank_or_long_title(client: TestClient) -> None:
+    doc = ready_document(client)
+    blank = client.put(f"/documents/{doc}/title", json={"title": "   "}, headers=AUTH)
+    assert (blank.status_code, blank.json()["detail"]) == (422, "Enter a title")
+    long = client.put(f"/documents/{doc}/title", json={"title": "x" * 301}, headers=AUTH)
+    assert long.status_code == 422 and "300 characters" in long.json()["detail"]
+    assert client.get(f"/documents/{doc}", headers=AUTH).json()["title_overridden"] is False
+
+
+@pytest.mark.parametrize("body", [{"title": "x", "owner_id": "b"}, {}])
+def test_set_title_refuses_a_bad_body(client: TestClient, body: dict[str, object]) -> None:
+    doc = ready_document(client)
+    assert client.put(f"/documents/{doc}/title", json=body, headers=AUTH).status_code == 422
+
+
+def test_set_title_of_an_unknown_document_is_404(client: TestClient) -> None:
+    unknown = "00000000-0000-4000-8000-0000000000aa"
+    assert client.put(f"/documents/{unknown}/title", json={"title": "x"}, headers=AUTH).status_code == 404
+
+
+def test_delete_answers_204_and_the_document_leaves_both_lists(client: TestClient) -> None:
+    active, archived = ready_document(client), ready_document(client)
+    client.post(f"/documents/{archived}/archive", headers=AUTH)
+
+    for doc in (active, archived):
+        r = client.delete(f"/documents/{doc}", headers=AUTH)
+        assert (r.status_code, r.content) == (204, b"")
+
+    assert listed_ids(client, {}) == set()
+    assert listed_ids(client, {"archived": "true"}) == set()
+
+
+def test_delete_of_a_processing_document_is_409(client: TestClient) -> None:
+    doc = client.post("/uploads", json={"file_name": "paper.pdf"}, headers=AUTH).json()["document_id"]
+
+    r = client.delete(f"/documents/{doc}", headers=AUTH)
+
+    assert (r.status_code, r.json()["detail"]) == (409, "This document is still processing")
+    assert listed_ids(client, {}) == {doc}
+
+
+def test_delete_of_an_unknown_document_is_404(client: TestClient) -> None:
+    r = client.delete("/documents/00000000-0000-4000-8000-0000000000aa", headers=AUTH)
+
+    assert (r.status_code, r.json()["detail"]) == (404, "Document not found")
+
+
+def test_delete_needs_a_token(client: TestClient) -> None:
+    assert client.delete("/documents/00000000-0000-4000-8000-0000000000aa").status_code == 401
+
+
+def test_a_deleted_documents_subject_leaves_my_subjects_unless_another_document_has_it(client: TestClient) -> None:
+    shared, other = ready_document(client), awaiting_document(client)
+    client.put(f"/documents/{other}/subjects", json={"new_names": ["Topology"]}, headers=AUTH)
+    names = {s["name"] for s in client.get("/me/subjects", headers=AUTH).json()}
+    assert names == {"General", "Topology"}
+
+    assert client.delete(f"/documents/{other}", headers=AUTH).status_code == 204
+
+    assert [s["subject_id"] for s in client.get("/me/subjects", headers=AUTH).json()] == [GENERAL]
+    assert listed_ids(client, {}) == {shared}

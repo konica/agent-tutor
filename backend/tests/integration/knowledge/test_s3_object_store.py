@@ -78,3 +78,19 @@ def test_put_stores_bytes_with_the_content_type_and_replaces(store: S3ObjectStor
     store.put(key, b'{"pages": [1]}', "application/json")
     assert store.read(key) == b'{"pages": [1]}'
     store.delete(key)
+
+
+def test_delete_all_versions_removes_every_version_and_marker_of_that_key_only(store: S3ObjectStore) -> None:
+    key = f"contents/it-{uuid.uuid4()}/{uuid.uuid4()}.pdf"
+    neighbour = key + ".bak"  # shares the prefix
+    store.put(key, b"v1", "application/pdf")
+    store.put(key, b"v2", "application/pdf")
+    store.delete(key)  # leaves a delete marker
+    store.put(neighbour, b"keep", "application/pdf")
+
+    store.delete_all_versions(key)
+    store.delete_all_versions(key)  # nothing left: not an error
+
+    versions = store._client.list_object_versions(Bucket=BUCKET, Prefix=key)
+    assert [v["Key"] for v in versions.get("Versions", []) + versions.get("DeleteMarkers", [])] == [neighbour]
+    assert store.read(neighbour) == b"keep"

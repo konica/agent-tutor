@@ -1,5 +1,7 @@
 """The documents bucket and the ingest queue (#139, PRD §9.5)."""
 
+from typing import Any
+
 from aws_cdk.assertions import Match
 
 from tests.test_synth import make_app, template
@@ -120,3 +122,21 @@ def test_storage_outputs_the_bucket_and_queue() -> None:
     t = template(make_app(), "Storage")
     t.has_output("DocumentsBucketName", {})
     t.has_output("IngestQueueUrl", {})
+
+
+def _lifecycle_rules(mode: str) -> list[dict[str, Any]]:
+    (bucket,) = template(make_app(**{"smart-tutor:mode": mode}), "Storage").find_resources("AWS::S3::Bucket").values()
+    rules: list[dict[str, Any]] = bucket["Properties"]["LifecycleConfiguration"]["Rules"]
+    return rules
+
+
+def test_on_premise_database_backups_expire_after_30_days() -> None:
+    (backups,) = (r for r in _lifecycle_rules("on-premise") if r["Prefix"] == "backups/")
+    assert backups["ExpirationInDays"] == 30
+    assert backups["NoncurrentVersionExpiration"] == {"NoncurrentDays": 1}  # the bucket is versioned
+    assert backups["AbortIncompleteMultipartUpload"] == {"DaysAfterInitiation": 1}
+
+
+def test_native_cloud_bucket_has_no_backups_rule() -> None:
+    # Native-cloud's database is RDS, with its own automated backups.
+    assert [r["Prefix"] for r in _lifecycle_rules("native-cloud")] == ["uploads/"]

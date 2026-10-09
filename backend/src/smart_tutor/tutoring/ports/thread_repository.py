@@ -31,6 +31,10 @@ class ThreadRepository(ABC):
         """
 
     @abstractmethod
+    def keep_deleted_title(self, user_id: UserId, document_id: DocumentId, title: str) -> None:
+        """Copy a document's display title onto its rows in the user's threads, before the document is deleted."""
+
+    @abstractmethod
     def add_documents(self, thread_id: ThreadId, document_ids: Sequence[DocumentId], at: datetime) -> None:
         """The learner adds these documents, in this order, not used yet; listed ones are unchanged (committed)."""
 

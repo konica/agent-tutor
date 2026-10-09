@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 from smart_tutor.knowledge.domain.content import RETRIES_USED_UP
 from smart_tutor.knowledge.domain.document import Document, DocumentFilter, DocumentState
+from smart_tutor.knowledge.domain.errors import DocumentNotFoundError
 from smart_tutor.knowledge.ports.library import LibraryUnitOfWork
 from smart_tutor.shared.domain.ids import DocumentId, SubjectId, UserId
 
@@ -50,6 +51,19 @@ def document_view(d: Document, max_attempts: int) -> DocumentView:
         failed and not used_up,
         d.archived,
     )
+
+
+@dataclass(frozen=True)
+class DocumentDetails:
+    """What the details panel shows (PRD §8 US-10): the Library view plus the learner's own content's facts."""
+
+    document: DocumentView
+    file_name: str
+    extracted_title: str | None
+    title_overridden: bool
+    doi: str | None
+    pages: int | None
+    summary: str | None
 
 
 class DocumentService:
@@ -111,3 +125,42 @@ class DocumentService:
         with self._uow() as tx:
             found = tx.documents.get_readable_by_sha256(user_id, sha256)
         return None if found is None or found.archived else found.document_id
+
+    def details(self, user_id: UserId, document_id: DocumentId) -> DocumentDetails:
+        """One of the learner's documents, archived or not; others' are not found."""
+        with self._uow() as tx:
+            return self._details(tx, self._readable(tx, user_id, document_id))
+
+    def set_title(self, user_id: UserId, document_id: DocumentId, title: str | None) -> DocumentDetails:
+        """Set the learner's display title, or go back to the extracted one with None (their library only, §9.4)."""
+        with self._uow() as tx:
+            document = self._readable(tx, user_id, document_id, for_update=True)
+            document.set_title(title)
+            tx.documents.save(document)
+            details = self._details(tx, document)
+            tx.commit()
+        return details
+
+    @staticmethod
+    def _readable(
+        tx: LibraryUnitOfWork, user_id: UserId, document_id: DocumentId, *, for_update: bool = False
+    ) -> Document:
+        document = tx.documents.get_readable(user_id, document_id, for_update=for_update)
+        if document is None:
+            raise DocumentNotFoundError("This document isn't in your library")
+        return document
+
+    def _details(self, tx: LibraryUnitOfWork, document: Document) -> DocumentDetails:
+        # Contents are per learner, so the document's content is the caller's own.
+        content = tx.contents.get(document.content_id) if document.content_id is not None else None
+        if content is not None:
+            document.content_authors, document.content_year = list(content.authors), content.year
+        return DocumentDetails(
+            document_view(document, self._max_attempts),
+            document.file_name,
+            document.content_title,
+            document.title_override is not None,
+            content.doi if content else None,
+            content.pages if content else None,
+            content.summary if content else None,
+        )

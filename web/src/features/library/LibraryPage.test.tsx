@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 
-import { RetriesUsedUpError, type DocumentFilters, type DocumentResponse, type UploadEvents, type UploadStatus } from "../../api/documents";
+import { DocumentGoneError, DocumentProcessingError, RetriesUsedUpError, type DocumentFilters, type DocumentResponse, type UploadEvents, type UploadStatus } from "../../api/documents";
 import { SessionExpiredError } from "../../auth/authClient";
 import { LibraryPage } from "./LibraryPage";
 
@@ -815,6 +815,148 @@ describe("LibraryPage retry", () => {
   });
 });
 
+describe("LibraryPage delete", () => {
+  const cot: DocumentResponse = { ...processing, document_id: "d1", title: "Chain-of-Thought Prompting", state: "ready" };
+  const other: DocumentResponse = { ...processing, document_id: "d2", title: "Attention", state: "ready" };
+  const old: DocumentResponse = { ...processing, document_id: "d7", title: "GPT-3", state: "ready", archived: true };
+
+  // A server in memory: delete removes the document from whichever list holds it.
+  function library(active: DocumentResponse[], archived: DocumentResponse[] = []) {
+    const lists = { active: [...active], archived: [...archived] };
+    // Reloads after a delete take a moment, as over the network: the dialog has unmounted while the old row is still on screen.
+    let deletedOne = false;
+    const load = vi.fn(async (filters: DocumentFilters) => {
+      if (deletedOne) await new Promise((resolve) => setTimeout(resolve, 20));
+      return filters.archived ? lists.archived : lists.active;
+    });
+    const remove = vi.fn(async (id: string) => {
+      deletedOne = true;
+      lists.active = lists.active.filter((d) => d.document_id !== id);
+      lists.archived = lists.archived.filter((d) => d.document_id !== id);
+    });
+    const archive = vi.fn(async (id: string) => ({ ...lists.active.find((d) => d.document_id === id)!, archived: true }));
+    return { load, remove, archive };
+  }
+
+  const open = async (title: string) => {
+    await userEvent.click(await screen.findByRole("button", { name: `More actions for ${title}` }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Delete…" }));
+  };
+
+  it("deletes after confirming, closes the dialog, refreshes, announces it, and focuses the Library heading", async () => {
+    const { load, remove } = library([cot, other]);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} remove={remove} />);
+    await open("Chain-of-Thought Prompting");
+    expect(screen.getByRole("dialog", { name: "Delete Chain-of-Thought Prompting?" })).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(remove).toHaveBeenCalledExactlyOnceWith("d1");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("Chain-of-Thought Prompting")).toBeNull());
+    expect(screen.getByRole("status")).toHaveTextContent("Chain-of-Thought Prompting deleted.");
+    // The Dialog hands focus back to the button that opened it as it unmounts; the heading must win.
+    expect(screen.getByRole("heading", { level: 1, name: "Library" })).toHaveFocus();
+  });
+
+  it("deletes an archived document from the Archived tab", async () => {
+    const { load, remove } = library([cot], [old]);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} remove={remove} />);
+    await userEvent.click(await screen.findByRole("tab", { name: /^Archived/ }));
+    await open("GPT-3");
+    expect(screen.queryByRole("button", { name: "Archive instead" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(remove).toHaveBeenCalledExactlyOnceWith("d7");
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("GPT-3 deleted."));
+  });
+
+  it("cancels without deleting and returns focus to the More button", async () => {
+    const { load, remove } = library([cot]);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} remove={remove} />);
+    await open("Chain-of-Thought Prompting");
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(remove).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("button", { name: "More actions for Chain-of-Thought Prompting" })).toHaveFocus();
+  });
+
+  it("archives instead and closes the dialog", async () => {
+    const { load, remove, archive } = library([cot, other]);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} remove={remove} archive={archive} />);
+    await open("Chain-of-Thought Prompting");
+    await userEvent.click(screen.getByRole("button", { name: "Archive instead" }));
+    expect(archive).toHaveBeenCalledExactlyOnceWith("d1");
+    expect(remove).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Chain-of-Thought Prompting archived. Find it under Archived."));
+  });
+
+  it("keeps the dialog open and shows the error inside it when the delete fails", async () => {
+    const { load } = library([cot]);
+    const remove = vi.fn(async () => {
+      throw new Error("boom");
+    });
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} remove={remove} />);
+    await open("Chain-of-Thought Prompting");
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    const dialog = screen.getByRole("dialog");
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Couldn't delete Chain-of-Thought Prompting. Try again.");
+    expect(screen.getByRole("button", { name: "Delete" })).toBeEnabled();
+  });
+
+  it("treats a document that is already gone as deleted", async () => {
+    const { load } = library([cot, other]);
+    const remove = vi.fn(async () => {
+      throw new DocumentGoneError();
+    });
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} remove={remove} />);
+    await open("Chain-of-Thought Prompting");
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByRole("status")).toHaveTextContent("Chain-of-Thought Prompting deleted.");
+    await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: "Library" })).toHaveFocus());
+    expect(load.mock.calls.length).toBeGreaterThan(2);
+  });
+
+  it("closes the dialog and announces the server's message when the document is processing again", async () => {
+    const { load } = library([cot]);
+    const remove = vi.fn(async () => {
+      throw new DocumentProcessingError("This document is still processing");
+    });
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} remove={remove} />);
+    await open("Chain-of-Thought Prompting");
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByRole("status")).toHaveTextContent("Couldn't delete Chain-of-Thought Prompting: This document is still processing.");
+  });
+
+  it("starts the next delete dialog fresh after cancelling one whose request was in flight", async () => {
+    const { load } = library([cot]);
+    let fail: (error: Error) => void = () => {};
+    const remove = vi.fn(() => new Promise<void>((_, reject) => (fail = reject)));
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} remove={remove} />);
+    await open("Chain-of-Thought Prompting");
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await open("Chain-of-Thought Prompting");
+    expect(screen.getByRole("button", { name: "Delete" })).toBeEnabled();
+    fail(new Error("boom")); // the first request fails late
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeEnabled();
+  });
+
+  it("says nothing when the session expired during a delete", async () => {
+    const { load } = library([cot]);
+    const remove = vi.fn(async () => {
+      throw new SessionExpiredError();
+    });
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} remove={remove} />);
+    await open("Chain-of-Thought Prompting");
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(remove).toHaveBeenCalled());
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  });
+});
+
 describe("LibraryPage archive and restore", () => {
   const ready: DocumentResponse = { ...processing, document_id: "d1", title: "Toolformer", state: "ready" };
   const other: DocumentResponse = { ...processing, document_id: "d2", title: "Attention", state: "ready" };
@@ -914,7 +1056,7 @@ describe("LibraryPage archive and restore", () => {
     expect(within(row).getByText("Archived")).toBeVisible();
     expect(within(row).getByRole("button", { name: "Restore GPT-3" })).toBeEnabled();
     expect(within(row).queryByRole("button", { name: /Choose subjects/ })).toBeNull();
-    expect(within(row).queryByRole("button", { name: /More actions/ })).toBeNull();
+    expect(within(row).getByRole("button", { name: "More actions for GPT-3" })).toBeEnabled();
     expect(screen.queryByLabelText("State")).toBeNull();
     expect(screen.queryByRole("button", { name: /needs? subjects/ })).toBeNull();
   });
@@ -1009,5 +1151,77 @@ describe("LibraryPage Chat on a row", () => {
     render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => [ready]} upload={vi.fn()} />);
     await userEvent.click(await screen.findByRole("button", { name: "Chat about Toolformer" }));
     expect(await screen.findByText("/chat?document=d1")).toBeVisible();
+  });
+});
+
+describe("LibraryPage document details", () => {
+  const row: DocumentResponse = { ...processing, document_id: "d1", title: "Toolformer", state: "ready" };
+  const full = (title: string) => ({
+    document_id: "d1", state: "ready" as const, archived: false, title, extracted_title: "Toolformer", title_overridden: title !== "Toolformer",
+    authors: [], year: null, doi: null, file_name: "toolformer.pdf", pages: 10, summary: null, failure_reason: null, created_at: today,
+    subjects: [], attempt: null, max_attempts: 3, can_retry: false,
+  });
+
+  function setup() {
+    let title = "Toolformer";
+    const load = vi.fn(async (f: DocumentFilters) => (f.archived ? [] : [{ ...row, title }]));
+    const loadDetails = vi.fn(async (_id: string) => full(title));
+    const saveTitle = vi.fn(async (_id: string, next: string | null) => {
+      title = next ?? "Toolformer";
+      return full(title);
+    });
+    const archive = vi.fn(async (_id: string) => ({ ...row, archived: true }));
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} loadDetails={loadDetails} saveTitle={saveTitle} archive={archive} />);
+    return { load, loadDetails, saveTitle, archive };
+  }
+
+  it("opens a dialog from the row title and returns focus to it on close", async () => {
+    setup();
+    const opener = await screen.findByRole("button", { name: "Toolformer" });
+    await userEvent.click(opener);
+    expect(await screen.findByRole("dialog", { name: "Toolformer" })).toBeVisible();
+    expect(screen.getByText("Document details")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Close document details" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(opener).toHaveFocus();
+  });
+
+  it("returns focus to the More button when the panel opened from the More menu closes", async () => {
+    setup();
+    await userEvent.click(await screen.findByRole("button", { name: "More actions for Toolformer" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Details" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Close document details" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("button", { name: "More actions for Toolformer" })).toHaveFocus(); // RowMenu keeps the toggle as the opener once its item is gone
+  });
+
+  it("opens Edit title from the More menu with the field focused", async () => {
+    setup();
+    await userEvent.click(await screen.findByRole("button", { name: "More actions for Toolformer" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Edit title" }));
+    expect(await screen.findByRole("textbox", { name: "Display title" })).toHaveFocus();
+  });
+
+  it("re-lists after a title change", async () => {
+    const { load } = setup();
+    await userEvent.click(await screen.findByRole("button", { name: "Toolformer" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Edit title" }));
+    const field = screen.getByRole("textbox", { name: "Display title" });
+    await userEvent.clear(field);
+    await userEvent.type(field, "Tool use");
+    const before = load.mock.calls.length;
+    await userEvent.click(screen.getByRole("button", { name: "Save title" }));
+    await waitFor(() => expect(load.mock.calls.length).toBeGreaterThan(before));
+    await userEvent.click(await screen.findByRole("button", { name: "Close document details" }));
+    expect(await screen.findByRole("button", { name: "Tool use" })).toBeVisible();
+  });
+
+  it("re-lists after archiving from the panel", async () => {
+    const { load, archive } = setup();
+    await userEvent.click(await screen.findByRole("button", { name: "Toolformer" }));
+    const before = load.mock.calls.length;
+    await userEvent.click(await screen.findByRole("button", { name: "Archive" }));
+    expect(archive).toHaveBeenCalledWith("d1");
+    await waitFor(() => expect(load.mock.calls.length).toBeGreaterThan(before));
   });
 });

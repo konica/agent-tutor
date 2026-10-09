@@ -12,7 +12,7 @@ x-logging: &logging
 
 services:
   postgres:
-    image: pgvector/pgvector:0.8.7-pg17
+    image: &postgres-image pgvector/pgvector:0.8.7-pg17
     restart: unless-stopped
     logging: *logging
     environment:
@@ -73,6 +73,21 @@ services:
     command: ["python", "-m", "smart_tutor.apps.jobs.migrate"]
     environment:
       SMART_TUTOR_DATABASE_URL: ${APP_DATABASE_URL:?}  # built by deploy.sh (see there)
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  # Scheduled jobs (profile `jobs`) are one-off containers a systemd timer starts with `docker compose run --rm`
+  # (docs/runbooks/on-premise-backups.md, "Scheduled jobs"). This one dumps one database to /data/backups for
+  # backup.sh: `run --rm -T pg-dump --file=/backups/<file> <database>`. The server's image, so pg_dump matches it.
+  pg-dump:
+    image: *postgres-image
+    profiles: [jobs]
+    logging: *logging
+    entrypoint: [pg_dump, --host=postgres, --username=postgres, --format=custom]
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?}
+    volumes:
+      - /data/backups:/backups
     depends_on:
       postgres: {condition: service_healthy}
 

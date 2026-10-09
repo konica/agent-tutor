@@ -15,6 +15,7 @@ from smart_tutor.apps.api.agent_client import AgentClient
 from smart_tutor.apps.api.services import ApiServices
 from smart_tutor.knowledge.application import (
     ArchiveService,
+    DeleteService,
     DocumentService,
     RetryService,
     SubjectChoiceService,
@@ -53,12 +54,14 @@ def api_services(
     queue = queue or FakeQueue()
     names = names or SubjectNames(catalog)
     documents = DocumentService(library.unit_of_work, max_attempts=3)
+    conversations = ConversationService(threads, documents, clock)
     fields: dict[str, Any] = {
         "uploads": UploadService(library.unit_of_work, objects, clock, TEST_LIMITS),
         "documents": documents,
         "subjects": names,
         "retries": RetryService(library.unit_of_work, queue, max_attempts=3),
         "archive": ArchiveService(library.unit_of_work, clock, max_attempts=3),
+        "deletion": DeleteService(library.unit_of_work, objects, conversations.keep_deleted_title),
         "subject_choice": SubjectChoiceService(
             library.unit_of_work,
             SubjectSuggester(catalog, names),
@@ -66,7 +69,7 @@ def api_services(
             SubjectSearch(catalog, names),
             max_attempts=3,
         ),
-        "conversations": ConversationService(threads, documents, clock),
+        "conversations": conversations,
         "agent": fake_agent(),
     }
     fields.update(overrides)
