@@ -27,12 +27,12 @@ aws sts get-caller-identity
 ```powershell
 Push-Location infra
 uv sync
-npx aws-cdk@latest diff
-npx aws-cdk@latest deploy --all --require-approval broadening
+npx aws-cdk@latest diff -c smart-tutor:mode=native-cloud
+npx aws-cdk@latest deploy --all --require-approval broadening -c smart-tutor:mode=native-cloud
 Pop-Location
 ```
 
-`--all` orders the stacks by their dependencies (the Cluster stack waits for `SmartTutor-prod-GitHubDeploy`, which already exists). Read the outputs you need:
+The pilot is native-cloud mode; without `-c smart-tutor:mode=native-cloud` the CDK app builds the on-premise stacks instead (#147), so every `cdk` command in this runbook passes it. `--all` orders the stacks by their dependencies (the Cluster stack waits for `SmartTutor-prod-GitHubDeploy`, which already exists). Read the outputs you need:
 
 ```powershell
 function Get-Output($Stack, $Key) {
@@ -259,7 +259,7 @@ helm uninstall aws-load-balancer-controller -n kube-system
 helm uninstall external-secrets -n external-secrets
 helm uninstall metrics-server -n kube-system
 Push-Location infra
-npx aws-cdk@latest destroy SmartTutor-prod-Storage SmartTutor-prod-Edge SmartTutor-prod-Cluster SmartTutor-prod-Registry SmartTutor-prod-Budgets SmartTutor-prod-Data SmartTutor-prod-Config SmartTutor-prod-Network
+npx aws-cdk@latest destroy -c smart-tutor:mode=native-cloud SmartTutor-prod-Storage SmartTutor-prod-Edge SmartTutor-prod-Cluster SmartTutor-prod-Registry SmartTutor-prod-Budgets SmartTutor-prod-Data SmartTutor-prod-Config SmartTutor-prod-Network
 Pop-Location
 ```
 
@@ -284,7 +284,7 @@ Delete old snapshots you don't need, because they cost storage. A fresh deploy s
 
 ## 11. Costs
 
-About **$250–300 a month** while idle, including RDS (`db.t3.micro` with 20 GiB, about $15 a month). During the testing phase the budget is **$20 a month** (`smart-tutor:budget-monthly-usd` in `infra/cdk.json`), with alerts. That is below the idle cost, so expect the 80% alert email within the first days the environment runs. Raise the value and run `npx aws-cdk@latest deploy SmartTutor-prod-Budgets` from `infra/` when the pilot starts.
+About **$250–300 a month** while idle, including RDS (`db.t3.micro` with 20 GiB, about $15 a month). During the testing phase the budget is **$20 a month** (`smart-tutor:budget-monthly-usd` in `infra/cdk.json`), with alerts. That is below the idle cost, so expect the 80% alert email within the first days the environment runs. Raise the value and run `npx aws-cdk@latest deploy SmartTutor-prod-Budgets -c smart-tutor:mode=native-cloud` from `infra/` when the pilot starts.
 
 ## 12. Deploy on merge and roll back (#59)
 

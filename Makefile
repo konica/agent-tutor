@@ -76,8 +76,10 @@ api-client:    ## regenerate web/src/api from the API's OpenAPI schema
 web:
 	cd web && npm run dev
 
+# Deployment mode the CDK app builds: on-premise (default) or native-cloud (`make infra-synth MODE=native-cloud`).
+MODE ?= on-premise
 infra-synth:
-	cd infra && uv run cdk synth
+	cd infra && uv run cdk synth -c smart-tutor:mode=$(MODE)
 
 helm-lint:
 	helm lint deploy/helm/smart-tutor

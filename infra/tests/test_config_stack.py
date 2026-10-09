@@ -1,18 +1,19 @@
 import aws_cdk as cdk
 from aws_cdk.assertions import Template
 
+from smart_tutor_infra.names import NATIVE_CLOUD, mode_names
 from smart_tutor_infra.stacks.config import ConfigStack
 
 
 def test_file_limits_are_ssm_parameters() -> None:
-    template = Template.from_stack(ConfigStack(cdk.App(), "Config"))
+    template = Template.from_stack(ConfigStack(cdk.App(), "Config", names=mode_names(NATIVE_CLOUD)))
 
     template.has_resource_properties("AWS::SSM::Parameter", {"Name": "/smart-tutor/max-upload-mb", "Value": "50"})
     template.has_resource_properties("AWS::SSM::Parameter", {"Name": "/smart-tutor/max-pages", "Value": "500"})
 
 
 def test_max_processing_attempts_is_an_ssm_parameter() -> None:
-    template = Template.from_stack(ConfigStack(cdk.App(), "Config"))
+    template = Template.from_stack(ConfigStack(cdk.App(), "Config", names=mode_names(NATIVE_CLOUD)))
 
     template.has_resource_properties(
         "AWS::SSM::Parameter", {"Name": "/smart-tutor/max-processing-attempts", "Value": "3"}
@@ -20,14 +21,14 @@ def test_max_processing_attempts_is_an_ssm_parameter() -> None:
 
 
 def test_no_subject_detection_parameters() -> None:
-    template = Template.from_stack(ConfigStack(cdk.App(), "Config"))
+    template = Template.from_stack(ConfigStack(cdk.App(), "Config", names=mode_names(NATIVE_CLOUD)))
 
     names = {p["Properties"]["Name"] for p in template.find_resources("AWS::SSM::Parameter").values()}
     assert not names & {"/smart-tutor/detect-threshold", "/smart-tutor/detect-margin", "/smart-tutor/multi-margin"}
 
 
 def test_app_time_zone_is_an_ssm_parameter() -> None:
-    template = Template.from_stack(ConfigStack(cdk.App(), "Config"))
+    template = Template.from_stack(ConfigStack(cdk.App(), "Config", names=mode_names(NATIVE_CLOUD)))
 
     template.has_resource_properties(
         "AWS::SSM::Parameter", {"Name": "/smart-tutor/app-time-zone", "Value": "Asia/Ho_Chi_Minh"}
@@ -35,7 +36,7 @@ def test_app_time_zone_is_an_ssm_parameter() -> None:
 
 
 def test_keycloak_admin_and_client_secrets_are_generated_not_written() -> None:
-    template = Template.from_stack(ConfigStack(cdk.App(), "Config"))
+    template = Template.from_stack(ConfigStack(cdk.App(), "Config", names=mode_names(NATIVE_CLOUD)))
 
     secrets = template.find_resources("AWS::SecretsManager::Secret")
     by_name = {s["Properties"]["Name"]: s["Properties"] for s in secrets.values()}

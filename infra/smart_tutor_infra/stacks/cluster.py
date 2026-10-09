@@ -21,7 +21,7 @@ from smart_tutor_infra.models import (
     AGENT_PROFILE,
     EMBEDDING_MODEL,
 )
-from smart_tutor_infra.names import INGEST_QUEUE, documents_bucket_name
+from smart_tutor_infra.names import ModeNames
 
 # The controller's official policy, unmodified, at the chart's app version (docs/install/iam_policy.json, v3.5.0).
 LB_CONTROLLER_POLICY = Path(__file__).parents[1] / "policies" / "aws-load-balancer-controller-v3.5.0.json"
@@ -34,9 +34,8 @@ class ClusterStack(cdk.Stack):
         construct_id: str,
         *,
         vpc: ec2.IVpc,
-        cluster_name: str,
+        names: ModeNames,
         admin_principal_arns: Sequence[str],
-        deploy_role_name: str,
         **kwargs: Any,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -44,7 +43,7 @@ class ClusterStack(cdk.Stack):
         self.cluster = eks.Cluster(
             self,
             "Cluster",
-            cluster_name=cluster_name,
+            cluster_name=names.resource_prefix,
             version=eks.KubernetesVersion.V1_36,
             vpc=vpc,
             vpc_subnets=[private],
@@ -61,7 +60,7 @@ class ClusterStack(cdk.Stack):
         self.cluster_security_group_id = self.cluster.cluster_security_group_id
         self.cluster.add_nodegroup_capacity(
             "Nodes",
-            nodegroup_name=f"{cluster_name}-default",
+            nodegroup_name=f"{names.resource_prefix}-default",
             instance_types=[ec2.InstanceType("t3.large")],
             ami_type=eks.NodegroupAmiType.AL2023_X86_64_STANDARD,
             min_size=2,
@@ -78,7 +77,7 @@ class ClusterStack(cdk.Stack):
         for i, arn in enumerate(admin_principal_arns):
             self.cluster.grant_access(f"AdminAccess{i}", arn, [cluster_admin])
         self.cluster.grant_access(
-            "DeployRoleAccess", f"arn:aws:iam::{self.account}:role/{deploy_role_name}", [cluster_admin]
+            "DeployRoleAccess", f"arn:aws:iam::{self.account}:role/{names.deploy_role}", [cluster_admin]
         )
 
         self._pod_identity(
@@ -95,16 +94,16 @@ class ClusterStack(cdk.Stack):
                 statements=[
                     iam.PolicyStatement(
                         actions=["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"],
-                        resources=[f"arn:aws:secretsmanager:{self.region}:{self.account}:secret:smart-tutor/*"],
+                        resources=[f"arn:aws:secretsmanager:{self.region}:{self.account}:secret:{names.secret_prefix}/*"],
                     )
                 ]
             ),
         )
-        bucket_arn = f"arn:aws:s3:::{documents_bucket_name(self.account)}"
-        queue_arn = f"arn:aws:sqs:{self.region}:{self.account}:{INGEST_QUEUE}"
+        bucket_arn = f"arn:aws:s3:::{names.documents_bucket(self.account)}"
+        queue_arn = f"arn:aws:sqs:{self.region}:{self.account}:{names.ingest_queue}"
         ssm = iam.PolicyStatement(
             actions=["ssm:GetParameter", "ssm:GetParameters"],
-            resources=[f"arn:aws:ssm:{self.region}:{self.account}:parameter/smart-tutor/*"],
+            resources=[f"arn:aws:ssm:{self.region}:{self.account}:parameter{names.ssm_path}/*"],
         )
         invoke = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
         chat = iam.PolicyStatement(
