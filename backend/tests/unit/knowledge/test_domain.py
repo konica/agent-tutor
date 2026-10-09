@@ -386,3 +386,14 @@ def test_subjects_of_an_archived_document_cant_change() -> None:
     with pytest.raises(DocumentStateError):
         doc.choose_subjects([SubjectId("s1")])
     assert doc.subject_ids == [] and doc.state is DocumentState.AWAITING_SUBJECTS
+
+
+def test_only_a_processing_document_cant_be_deleted() -> None:
+    doc = new_document()
+    with pytest.raises(DocumentStateError):
+        doc.check_deletable()
+    for state in (DocumentState.AWAITING_SUBJECTS, DocumentState.READY, DocumentState.FAILED):
+        doc.state = state
+        doc.check_deletable()
+    doc.archived = True
+    doc.check_deletable()

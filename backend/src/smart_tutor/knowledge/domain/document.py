@@ -105,6 +105,11 @@ class Document:
     def restore(self) -> None:
         self.archived, self.archived_at = False, None
 
+    def check_deletable(self) -> None:
+        """Delete is refused only while processing (PRD §9.5); archived and failed documents can go."""
+        if self.state is DocumentState.PROCESSING:
+            raise DocumentStateError("This document is still processing")
+
     def link_content(self, content_id: ContentId) -> None:
         if not self.awaiting_upload:
             raise DocumentStateError("This document already has its content")
