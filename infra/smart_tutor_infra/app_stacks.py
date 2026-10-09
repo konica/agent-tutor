@@ -57,7 +57,15 @@ def _on_premise(app: cdk.App, env: cdk.Environment, names: ModeNames) -> list[cd
         ConfigStack(app, f"{prefix}-Config", env=env, names=names),
         _budgets(app, env, names),
         deploy,
-        HostStack(app, f"{prefix}-Host", env=env),
+        HostStack(
+            app,
+            f"{prefix}-Host",
+            env=env,
+            names=names,
+            instance_type=app.node.get_context("smart-tutor:on-premise-instance-type"),
+            # Empty: <Elastic IP>.sslip.io until the DuckDNS name is claimed (#154).
+            domain=app.node.try_get_context("smart-tutor:on-premise-domain") or None,
+        ),
     ]
 
 

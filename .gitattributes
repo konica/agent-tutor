@@ -3,6 +3,8 @@
 *.sh text eol=lf
 Makefile text eol=lf
 Dockerfile text eol=lf
+# Files the on-premise VM runs (the CDK asset bundles the working copy).
+deploy/on-premise/** text eol=lf
 *.pdf binary
 # Open Design project: keep bytes as Open Design wrote them (its version manifests store SHA-256 digests).
 sdd/design/prototype/** -text
