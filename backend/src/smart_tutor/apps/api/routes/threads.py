@@ -1,6 +1,7 @@
-"""Thread routes (tutoring module): ask the first question of a new thread; it answers from all of the learner's
-ready documents. Answered as SSE (PRD §9.2); the documents an answer drew on are recorded when it is done and
-listed per thread; the learner adds documents to that list and removes them (US-4c). The learner can rename a thread."""
+"""Thread routes (tutoring module): ask the first question of a new thread, optionally started from one of the
+learner's documents; it answers from all of the learner's ready documents. Answered as SSE (PRD §9.2); the
+documents an answer drew on are recorded when it is done and listed per thread; the learner adds documents to
+that list and removes them (US-4c). The learner can rename a thread."""
 
 import json
 import logging
@@ -38,6 +39,7 @@ SSE_RESPONSE: dict[int | str, dict[str, object]] = {
         "description": "Server-sent events: thread, then delta*, citations, done (or error).",
         "content": {"text/event-stream": {"schema": {"type": "string"}}},
     },
+    404: {"description": "A document that isn't the caller's ready one."},
     409: {"description": "The learner has no ready documents."},
 }
 
@@ -47,6 +49,8 @@ class AskRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     # Stripped before the length check, so a blank question is a 422; the agent gets the stripped text.
     question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)]
+    # Started from a document (US-4c): listed in the new thread; answers still search all documents.
+    document_id: uuid.UUID | None = None
 
 
 def _sse(event: str, data: object) -> bytes:
@@ -164,6 +168,12 @@ async def ask_in_new_thread(
         await run_in_threadpool(conversations.require_documents, principal.user_id)
     except NoDocumentsError as e:
         raise HTTPException(409, str(e)) from None
+    document_id = DocumentId(str(body.document_id)) if body.document_id else None
+    if document_id is not None:
+        try:
+            await run_in_threadpool(conversations.require_readable, principal.user_id, document_id)
+        except DocumentNotAvailableError as e:
+            raise HTTPException(404, str(e)) from None
     try:
         answer = await agent.open_answer(token, body.question)
     except UnauthenticatedError:
@@ -176,8 +186,8 @@ async def ask_in_new_thread(
     async def start() -> bytes | None:
         nonlocal thread_id
         try:
-            thread = await run_in_threadpool(conversations.start_thread, principal.user_id, body.question)
-        except NoDocumentsError as e:
+            thread = await run_in_threadpool(conversations.start_thread, principal.user_id, body.question, document_id)
+        except (NoDocumentsError, DocumentNotAvailableError) as e:
             logger.warning("the thread was refused: %s", e)
             return None
         except Exception:
