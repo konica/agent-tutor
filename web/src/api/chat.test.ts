@@ -4,12 +4,14 @@ import { SessionExpiredError } from "../auth/authClient";
 import {
   addThreadDocuments,
   askInNewThread,
+  askInThread,
   AskRefusedError,
   formatCitation,
   loadDocumentsUsed,
   NoDocumentsError,
   removeThreadDocument,
   renameConversation,
+  setSearchScope,
   type ChatEvent,
 } from "./chat";
 import { configureApiClient } from "./client";
@@ -231,5 +233,72 @@ describe("renameConversation", () => {
   it("rejects with SessionExpiredError on 401", async () => {
     const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
     await expect(renameConversation("t1", "New", apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+});
+
+describe("askInThread", () => {
+  it("posts the question to the conversation and yields its events, a decline included", async () => {
+    const { apiClient, fetch } = api(() =>
+      eventStream(
+        [
+          'event: thread\ndata: {"thread_id": "t1"}\n\n',
+          'event: decline\ndata: {"code": "limited", "message": "These documents don\'t cover this."}\n\n',
+          "event: done\ndata: {}\n\n",
+        ].join(""),
+      ),
+    );
+
+    const events = await collect(askInThread("t1", "Why?", apiClient));
+
+    const request = fetch.mock.calls[0]![0] as Request;
+    expect(request.method).toBe("POST");
+    expect(request.url).toBe("http://api.test/threads/t1/questions");
+    expect(request.headers.get("Authorization")).toBe("Bearer t");
+    expect(await request.json()).toEqual({ question: "Why?" });
+    expect(events).toEqual([
+      { type: "thread", thread_id: "t1" },
+      { type: "decline", code: "limited", message: "These documents don't cover this." },
+      { type: "done" },
+    ]);
+  });
+
+  it("rejects with SessionExpiredError on 401", async () => {
+    const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
+    await expect(collect(askInThread("t1", "q", apiClient))).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+
+  it("rejects with NoDocumentsError or AskRefusedError on 409 by its message", async () => {
+    const none = api(() => json({ detail: "Upload a document first" }, 409));
+    await expect(collect(askInThread("t1", "q", none.apiClient))).rejects.toBeInstanceOf(NoDocumentsError);
+    const refused = api(() => json({ detail: "Add documents to limit the search." }, 409));
+    const failure = collect(askInThread("t1", "q", refused.apiClient));
+    await expect(failure).rejects.toBeInstanceOf(AskRefusedError);
+    await expect(failure).rejects.toThrow("Add documents to limit the search.");
+  });
+
+  it("rejects with a plain Error on 503", async () => {
+    const { apiClient } = api(() => json({ detail: "unavailable" }, 503));
+    await expect(collect(askInThread("t1", "q", apiClient))).rejects.toThrow("503");
+  });
+});
+
+describe("setSearchScope", () => {
+  it("patches the scope and resolves with the saved one", async () => {
+    const { apiClient, fetch } = api(() => json({ thread_id: "t1", title: "q", search_scope: "listed" }));
+    await expect(setSearchScope("t1", "listed", apiClient)).resolves.toBe("listed");
+    const request = fetch.mock.calls[0]![0] as Request;
+    expect(request.method).toBe("PATCH");
+    expect(request.url).toBe("http://api.test/threads/t1");
+    expect(await request.json()).toEqual({ search_scope: "listed" });
+  });
+
+  it("rejects with the server's message when refused", async () => {
+    const { apiClient } = api(() => json({ detail: "Add documents to limit the search." }, 409));
+    await expect(setSearchScope("t1", "listed", apiClient)).rejects.toThrow("Add documents to limit the search.");
+  });
+
+  it("rejects with SessionExpiredError on 401", async () => {
+    const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
+    await expect(setSearchScope("t1", "library", apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
   });
 });
