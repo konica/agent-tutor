@@ -62,6 +62,7 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
   const [processing, setProcessing] = useState(0);
   const [noDocuments, setNoDocuments] = useState(false);
   const [used, setUsed] = useState<ThreadDocumentResponse[]>([]);
+  const [usedFailed, setUsedFailed] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [answered, setAnswered] = useState(false);
   const [showCitations, setShowCitations] = useState(true);
@@ -110,6 +111,7 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
     // A new question is a new thread: the panel starts over.
     const thisTurn = ++turn.current;
     setUsed([]);
+    setUsedFailed(false);
     setThreadId(null);
     setAnswered(false);
     // The protocol always ends with done or error; a stream that just stops (dropped connection) failed.
@@ -151,14 +153,15 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
     }
   }
 
-  // The server recorded the documents the answer drew on before it sent done. A failure leaves the list as it
-  // was; a SessionExpiredError was already reported by the API client.
+  // The server recorded the documents the answer drew on before it sent done. A failure says so in the panel, so an
+  // empty list never reads as "nothing was used"; a SessionExpiredError was already reported by the API client.
   async function showDocumentsUsed(threadId: string, forTurn: number) {
     try {
       const documents = await loadUsed(threadId);
       if (alive.current && turn.current === forTurn) setUsed(documents);
     } catch {
-      // The answer is complete either way; the panel just keeps its empty list.
+      // The answer is complete either way; only the panel's list is missing.
+      if (alive.current && turn.current === forTurn) setUsedFailed(true);
     }
   }
 
@@ -242,6 +245,7 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
           <ConversationPanel
             id={PANEL_ID}
             documents={used}
+            documentsFailed={usedFailed}
             threadId={threadId}
             answered={answered}
             showCitations={showCitations}

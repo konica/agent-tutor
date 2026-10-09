@@ -46,6 +46,13 @@ describe("ConversationPanel", () => {
     expect(screen.queryByRole("button", { name: "Summarize lesson" })).not.toBeInTheDocument();
   });
 
+  it("says the documents used couldn't be loaded, without a count, when they failed", () => {
+    renderPanel({ answered: true, documentsFailed: true });
+    expect(within(documentsSection()).getByText("Couldn't load the documents used.")).toBeInTheDocument();
+    expect(within(documentsSection()).queryByText("0")).not.toBeInTheDocument();
+    expect(screen.queryByText("Documents used to answer will appear here.")).not.toBeInTheDocument();
+  });
+
   it("lists the documents used in the given order, marking archived and deleted ones", () => {
     renderPanel({
       answered: true,

@@ -352,14 +352,23 @@ describe("ChatPage", () => {
       expect(loadUsed).not.toHaveBeenCalled();
     });
 
-    it("keeps the list as it was when the documents used can't be loaded", async () => {
+    it("says the documents used couldn't be loaded, until the next question", async () => {
       const loadUsed = vi.fn(() => Promise.reject(new Error("GET /threads/t1/documents failed (500)")));
-      renderChat({ ask: vi.fn(answered), loadUsed });
+      const control = controlledStream();
+      const ask = vi.fn().mockImplementationOnce(answered).mockImplementationOnce(() => control.stream());
+      renderChat({ ask, loadUsed });
       await userEvent.type(await question(), "What is attention?");
       await userEvent.click(askButton());
-      await waitFor(() => expect(loadUsed).toHaveBeenCalled());
       expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
+      expect(await within(panel()!).findByText("Couldn't load the documents used.")).toBeInTheDocument();
+      expect(within(panel()!).queryByText("Documents used to answer will appear here.")).not.toBeInTheDocument();
+
+      await userEvent.type(await question(), "Second?");
+      await waitFor(() => expect(askButton()).toBeEnabled());
+      await userEvent.click(askButton());
+      expect(within(panel()!).queryByText("Couldn't load the documents used.")).not.toBeInTheDocument();
       expect(within(panel()!).getByText("Documents used to answer will appear here.")).toBeInTheDocument();
+      control.push(null);
     });
 
     it("clears the documents used when a new question starts a new conversation", async () => {

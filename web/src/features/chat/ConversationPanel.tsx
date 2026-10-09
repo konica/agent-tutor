@@ -7,6 +7,8 @@ import styles from "./ConversationPanel.module.css";
 type Props = {
   id: string;
   documents: ThreadDocumentResponse[];
+  /** The documents used couldn't be loaded after an answer: the empty list then means "unknown", not "none". */
+  documentsFailed?: boolean;
   /** The conversation's thread, once the server has started one; null before the first question. */
   threadId: string | null;
   /** The first answer is done: the conversation exists and has something to summarize. */
@@ -25,14 +27,24 @@ function tooltip(d: ThreadDocumentResponse): string {
  * The chat's left pane (DESIGN.md → Chat, PRD Q60): the documents this conversation's answers used, its Lesson Note, and actions.
  * Rows open nothing yet (#123); Summarize lesson (US-7) and Archive conversation (US-13) stay disabled until their stories.
  */
-export function ConversationPanel({ id, documents, threadId, answered, showCitations, onShowCitationsChange }: Props) {
+export function ConversationPanel({
+  id,
+  documents,
+  documentsFailed = false,
+  threadId,
+  answered,
+  showCitations,
+  onShowCitationsChange,
+}: Props) {
   return (
     <aside id={id} className={styles.panel} aria-label="Conversation">
       <section className={styles.section} aria-labelledby={`${id}-documents`}>
         <h2 id={`${id}-documents`} className={styles.heading}>
-          Documents <span className={styles.count}>{documents.length}</span>
+          Documents {!documentsFailed && <span className={styles.count}>{documents.length}</span>}
         </h2>
-        {documents.length === 0 ? (
+        {documentsFailed ? (
+          <p className={styles.text}>Couldn't load the documents used.</p>
+        ) : documents.length === 0 ? (
           <p className={styles.text}>Documents used to answer will appear here.</p>
         ) : (
           <ul className={styles.list}>
