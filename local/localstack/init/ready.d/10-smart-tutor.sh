@@ -27,9 +27,10 @@ awslocal s3api put-bucket-notification-configuration --bucket "$BUCKET" --notifi
   }]
 }"
 
-# Browser uploads from the local web app.
+# Browser uploads from the local web app, and the document viewer's GET (pdf.js reads the range headers).
 awslocal s3api put-bucket-cors --bucket "$BUCKET" --cors-configuration '{
-  "CORSRules": [{"AllowedOrigins": ["http://localhost:10453"], "AllowedMethods": ["POST", "GET"], "AllowedHeaders": ["*"]}]
+  "CORSRules": [{"AllowedOrigins": ["http://localhost:10453"], "AllowedMethods": ["POST", "GET"], "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["Accept-Ranges", "Content-Range", "Content-Length"]}]
 }'
 
 awslocal ssm put-parameter --name /smart-tutor/learning-record-idle-minutes --type String --value 10 --overwrite

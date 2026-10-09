@@ -24,7 +24,9 @@ function reasonFor(error: unknown): "not-found" | "not-openable" | "error" {
   return "error";
 }
 
-// Fetches the short-lived link to a document's PDF and renews it before it expires.
+// Fetches the short-lived link to a document's PDF and renews it before it expires. The viewer loads the PDF from the
+// first link only and pdf.js fetches the rest from it, so renewing doesn't keep pdf.js's range requests working: a fetch
+// after the first link expires fails, the viewer shows its error card, and Retry fetches a fresh link.
 export function useDocumentFile(
   documentId: string,
   load: (id: string) => Promise<DocumentFile> = loadDocumentFile,

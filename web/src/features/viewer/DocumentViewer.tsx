@@ -70,8 +70,9 @@ function Viewer({
   const current = file.status === "ready" ? file.file.document : null;
   if (current && current !== document) setKnownDocument(current);
 
-  // The PDF loads from the first link only: a renewed link (a new url) must not reload it. Retry drops the link
-  // (file goes back to loading), so the next link loads it again.
+  // The PDF loads from the first link only, and pdf.js fetches the rest of the file from that link in the background;
+  // a renewed link (a new url) does not reload it and is not handed to pdf.js. So a fetch after the first link expires
+  // fails: the error card shows, and Retry drops the link (file goes back to loading) so a fresh link loads it again.
   const url = file.status === "ready" ? file.file.url : null;
   const urlRef = useRef(url);
   urlRef.current = url;

@@ -88,6 +88,8 @@ class StorageStack(cdk.Stack):
                     allowed_methods=[s3.HttpMethods.POST, s3.HttpMethods.GET],
                     allowed_origins=[web_origin],
                     allowed_headers=["*"],
+                    # pdf.js reads these to fetch the viewer's PDF in byte ranges instead of all at once.
+                    exposed_headers=["Accept-Ranges", "Content-Range", "Content-Length"],
                 )
             ]
             if web_origin
