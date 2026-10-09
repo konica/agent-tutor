@@ -2,7 +2,7 @@ import { AlertCircle, Archive, Filter, Info, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import { SessionExpiredError } from "../../auth/authClient";
-import { archiveDocument, deleteDocument, findInLibrary, loadDocuments, loadSubjectSuggestions, loadUploadLimits, loadUploadStatus, megabytes, rejectionReason, restoreDocument, RetriesUsedUpError, retryProcessing, saveSubjects as saveChosenSubjects, uploadPdf, type DocumentFilters, type DocumentResponse, type SubjectSuggestions, type UploadEvents, type UploadLimits, type UploadStatus } from "../../api/documents";
+import { archiveDocument, deleteDocument, DocumentGoneError, DocumentProcessingError, findInLibrary, loadDocuments, loadSubjectSuggestions, loadUploadLimits, loadUploadStatus, megabytes, rejectionReason, restoreDocument, RetriesUsedUpError, retryProcessing, saveSubjects as saveChosenSubjects, uploadPdf, type DocumentFilters, type DocumentResponse, type SubjectSuggestions, type UploadEvents, type UploadLimits, type UploadStatus } from "../../api/documents";
 import type { SubjectResponse } from "../../api/generated/types.gen";
 import { loadMySubjects } from "../../api/subjects";
 import { Button } from "../../components/Button/Button";
@@ -103,6 +103,8 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [deleting, setDeleting] = useState<DocumentResponse | null>(null); // the document whose delete dialog is open
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | undefined>(undefined);
+  const deleteDialog = useRef(0); // counts opened delete dialogs, so a late answer to a cancelled one is ignored
   const [deleted, setDeleted] = useState(false); // a delete just succeeded: its row, and the button that had focus, are going away
 
   // The dialog gives focus back to the More button as it unmounts, and the row then leaves; this effect runs after that, so the heading keeps focus.
@@ -389,25 +391,54 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
     if (document.activeElement === document.body) statusRegion.current?.focus(); // the disabled button lost focus
   }
 
+  function openDelete(doc: DocumentResponse) {
+    deleteDialog.current++;
+    setDeleteBusy(false);
+    setDeleteError(undefined);
+    setDeleting(doc);
+  }
+
+  function cancelDelete() {
+    deleteDialog.current++; // a request still in flight no longer belongs to a dialog
+    setDeleting(null);
+  }
+
   async function confirmDelete(doc: DocumentResponse) {
+    const dialog = deleteDialog.current;
+    const open = () => deleteDialog.current === dialog;
     setDeleteBusy(true);
+    setDeleteError(undefined);
+    let outcome: "deleted" | "processing" | "failed" = "deleted";
+    let reason = "";
     try {
       await remove(doc.document_id);
-      setDeleting(null);
-      setDeleted(true);
-      setStatus(`${doc.title} deleted.`);
     } catch (error) {
-      // A 401 is left to the session screen. Otherwise the dialog stays open so the learner can try again.
-      if (!(error instanceof SessionExpiredError)) setStatus(`Couldn't delete ${doc.title}. Try again.`);
-      setDeleteBusy(false);
+      if (error instanceof SessionExpiredError) {
+        // The session screen replaces this page.
+        if (open()) setDeleteBusy(false);
+        return;
+      }
+      if (error instanceof DocumentProcessingError) {
+        outcome = "processing";
+        reason = error.message.replace(/\.$/, "");
+      } else if (!(error instanceof DocumentGoneError)) outcome = "failed"; // already deleted elsewhere reads as done
+    }
+    if (open()) setDeleteBusy(false);
+    if (outcome === "failed") {
+      // The dialog is modal, so the error goes inside it.
+      if (open()) setDeleteError(`Couldn't delete ${doc.title}. Try again.`);
       return;
     }
-    setDeleteBusy(false);
+    if (open()) {
+      setDeleting(null);
+      if (outcome === "deleted") setDeleted(true);
+    }
+    setStatus(outcome === "deleted" ? `${doc.title} deleted.` : `Couldn't delete ${doc.title}${reason ? `: ${reason}` : ""}.`);
     await Promise.all([refresh(), counts.refresh(), refreshSubjects()]);
   }
 
   function archiveInstead(doc: DocumentResponse) {
-    setDeleting(null);
+    cancelDelete();
     void changeArchived(doc, true);
   }
 
@@ -566,12 +597,12 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
           uploading={uploading}
           onArchive={(d) => void changeArchived(d, true)}
           onRestore={(d) => void changeArchived(d, false)}
-          onDelete={setDeleting}
+          onDelete={openDelete}
           busy={busy}
         />
       )}
       {picking && <SubjectPicker document={picking} load={loadSuggestions} save={saveSubjects} onClose={() => setPicking(null)} onSaved={(doc) => void onSaved(doc)} />}
-      {deleting && <DeleteDialog doc={deleting} busy={deleteBusy} onCancel={() => setDeleting(null)} onDelete={() => void confirmDelete(deleting)} onArchive={() => archiveInstead(deleting)} />}
+      {deleting && <DeleteDialog doc={deleting} busy={deleteBusy} error={deleteError} onCancel={cancelDelete} onDelete={() => void confirmDelete(deleting)} onArchive={() => archiveInstead(deleting)} />}
       {dragging && !picking && <DropOverlay />}
       <UploadTray items={tray} onClose={closeTray} onRestore={(item) => void restoreFromTray(item)} />
     </>

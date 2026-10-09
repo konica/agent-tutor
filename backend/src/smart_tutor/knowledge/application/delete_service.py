@@ -33,6 +33,7 @@ class DeleteService:
             if document is None:
                 raise DocumentNotFoundError("Document not found")
             document.check_deletable()
+            # Runs on its own connection while this transaction holds the row locks (deletes are rare).
             self._keep_title(user_id, document_id, document.title)
             tx.documents.remove(document_id)
             if content is not None and tx.documents.get_by_content(content.content_id) is None:

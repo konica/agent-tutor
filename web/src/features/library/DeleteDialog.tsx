@@ -5,10 +5,10 @@ import { Button } from "../../components/Button/Button";
 import { Dialog } from "../../components/Dialog/Dialog";
 import styles from "./DeleteDialog.module.css";
 
-type Props = { doc: DocumentResponse; busy?: boolean; onCancel: () => void; onDelete: () => void; onArchive: () => void };
+type Props = { doc: DocumentResponse; busy?: boolean; error?: string; onCancel: () => void; onDelete: () => void; onArchive: () => void };
 
 // US-10c: Cancel is focused first; Delete is the danger action; an active document can be archived instead.
-export function DeleteDialog({ doc, busy = false, onCancel, onDelete, onArchive }: Props) {
+export function DeleteDialog({ doc, busy = false, error, onCancel, onDelete, onArchive }: Props) {
   return (
     <Dialog
       title={
@@ -36,6 +36,11 @@ export function DeleteDialog({ doc, busy = false, onCancel, onDelete, onArchive 
             Archive instead
           </Button>
         </div>
+      )}
+      {error && (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
       )}
     </Dialog>
   );

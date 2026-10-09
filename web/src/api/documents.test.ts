@@ -4,7 +4,9 @@ import { SessionExpiredError } from "../auth/authClient";
 import { configureApiClient } from "./client";
 import {
   archiveDocument,
+  DocumentGoneError,
   deleteDocument,
+  DocumentProcessingError,
   findInLibrary,
   loadDocuments,
   loadSubjectSuggestions,
@@ -384,13 +386,23 @@ describe("deleteDocument", () => {
     await expect(deleteDocument("d3", apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
   });
 
-  it.each([
-    [404, "Document not found"],
-    [409, "This document is still processing"],
-  ])("rejects with the server's message on %i", async (status, detail) => {
-    const { apiClient } = api(() => json({ detail }, status));
+  it("rejects with DocumentGoneError on 404 (already deleted)", async () => {
+    const { apiClient } = api(() => json({ detail: "Document not found" }, 404));
+    await expect(deleteDocument("d3", apiClient)).rejects.toBeInstanceOf(DocumentGoneError);
+  });
+
+  it("rejects with DocumentProcessingError carrying the server's message on 409", async () => {
+    const { apiClient } = api(() => json({ detail: "This document is still processing" }, 409));
     const rejection = deleteDocument("d3", apiClient);
-    await expect(rejection).rejects.toThrow(detail);
-    await expect(rejection).rejects.not.toBeInstanceOf(SessionExpiredError);
+    await expect(rejection).rejects.toBeInstanceOf(DocumentProcessingError);
+    await expect(rejection).rejects.toThrow("This document is still processing");
+  });
+
+  it("rejects with a plain error on other failures", async () => {
+    const { apiClient } = api(() => json({ detail: "boom" }, 500));
+    const rejection = deleteDocument("d3", apiClient);
+    await expect(rejection).rejects.toThrow("boom");
+    await expect(rejection).rejects.not.toBeInstanceOf(DocumentGoneError);
+    await expect(rejection).rejects.not.toBeInstanceOf(DocumentProcessingError);
   });
 });

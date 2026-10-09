@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { RetriesUsedUpError, type DocumentFilters, type DocumentResponse, type UploadEvents, type UploadStatus } from "../../api/documents";
+import { DocumentGoneError, DocumentProcessingError, RetriesUsedUpError, type DocumentFilters, type DocumentResponse, type UploadEvents, type UploadStatus } from "../../api/documents";
 import { SessionExpiredError } from "../../auth/authClient";
 import { LibraryPage } from "./LibraryPage";
 
@@ -870,16 +870,58 @@ describe("LibraryPage delete", () => {
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Chain-of-Thought Prompting archived. Find it under Archived."));
   });
 
-  it("keeps the dialog open and says so when the delete fails", async () => {
+  it("keeps the dialog open and shows the error inside it when the delete fails", async () => {
     const { load } = library([cot]);
     const remove = vi.fn(async () => {
-      throw new Error("This document is still processing");
+      throw new Error("boom");
     });
     render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} remove={remove} />);
     await open("Chain-of-Thought Prompting");
     await userEvent.click(screen.getByRole("button", { name: "Delete" }));
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Couldn't delete Chain-of-Thought Prompting. Try again."));
-    expect(screen.getByRole("dialog")).toBeVisible();
+    const dialog = screen.getByRole("dialog");
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Couldn't delete Chain-of-Thought Prompting. Try again.");
+    expect(screen.getByRole("button", { name: "Delete" })).toBeEnabled();
+  });
+
+  it("treats a document that is already gone as deleted", async () => {
+    const { load } = library([cot, other]);
+    const remove = vi.fn(async () => {
+      throw new DocumentGoneError();
+    });
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} remove={remove} />);
+    await open("Chain-of-Thought Prompting");
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByRole("status")).toHaveTextContent("Chain-of-Thought Prompting deleted.");
+    await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: "Library" })).toHaveFocus());
+    expect(load.mock.calls.length).toBeGreaterThan(2);
+  });
+
+  it("closes the dialog and announces the server's message when the document is processing again", async () => {
+    const { load } = library([cot]);
+    const remove = vi.fn(async () => {
+      throw new DocumentProcessingError("This document is still processing");
+    });
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} remove={remove} />);
+    await open("Chain-of-Thought Prompting");
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByRole("status")).toHaveTextContent("Couldn't delete Chain-of-Thought Prompting: This document is still processing.");
+  });
+
+  it("starts the next delete dialog fresh after cancelling one whose request was in flight", async () => {
+    const { load } = library([cot]);
+    let fail: (error: Error) => void = () => {};
+    const remove = vi.fn(() => new Promise<void>((_, reject) => (fail = reject)));
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} remove={remove} />);
+    await open("Chain-of-Thought Prompting");
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await open("Chain-of-Thought Prompting");
+    expect(screen.getByRole("button", { name: "Delete" })).toBeEnabled();
+    fail(new Error("boom")); // the first request fails late
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByRole("button", { name: "Delete" })).toBeEnabled();
   });
 

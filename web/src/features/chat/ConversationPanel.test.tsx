@@ -63,7 +63,7 @@ describe("ConversationPanel", () => {
       ],
     });
     const rows = within(documentsSection()).getAllByRole("listitem");
-    expect(rows.map((r) => r.textContent)).toEqual(["ReAct", "RAGArchived", "Deleted: PPODeleted"]);
+    expect(rows.map((r) => r.textContent)).toEqual(["ReAct", "RAGArchived", "PPODeleted"]);
     expect(rows[0]).toHaveAttribute("title", "ReAct\nYao, Zhao · 2023");
     expect(within(documentsSection()).getByText("3")).toBeInTheDocument();
     expect(screen.queryByText("Documents used to answer will appear here.")).not.toBeInTheDocument();
@@ -85,7 +85,6 @@ describe("ConversationPanel", () => {
     const row = within(documentsSection()).getAllByRole("listitem")[1];
     const badge = within(row).getByText("Deleted");
     expect(badge.querySelector("svg")).not.toBeNull();
-    expect(within(row).getByText("Deleted:")).toBeInTheDocument();
     expect(within(row).queryByRole("link")).not.toBeInTheDocument();
     expect(within(row).queryByRole("button")).not.toBeInTheDocument();
     expect(screen.getAllByText("Deleted documents can't be opened.")).toHaveLength(1);

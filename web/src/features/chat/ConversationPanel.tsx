@@ -50,7 +50,6 @@ export function ConversationPanel({
           <ul className={styles.list}>
             {documents.map((d) => (
               <li key={d.document_id} className={styles.row} title={tooltip(d)}>
-                {d.deleted && <span className="visually-hidden">Deleted: </span>}
                 <FileText className={styles.rowIcon} strokeWidth={1.5} aria-hidden="true" />
                 <span className={`${styles.title} ${d.deleted ? styles.gone : ""}`}>{d.title}</span>
                 {d.deleted ? (
