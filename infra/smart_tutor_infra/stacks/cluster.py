@@ -147,6 +147,12 @@ class ClusterStack(cdk.Stack):
                     ),
                     iam.PolicyStatement(actions=["s3:PutObject"], resources=[f"{bucket_arn}/contents/*"]),
                     iam.PolicyStatement(actions=["s3:DeleteObject"], resources=[f"{bucket_arn}/uploads/*"]),
+                    # With ListBucket, S3 answers NoSuchKey for a missing key; without it, 403 AccessDenied.
+                    iam.PolicyStatement(
+                        actions=["s3:ListBucket"],
+                        resources=[bucket_arn],
+                        conditions={"StringLike": {"s3:prefix": ["uploads/*", "contents/*"]}},
+                    ),
                     iam.PolicyStatement(
                         actions=[
                             "sqs:ReceiveMessage",

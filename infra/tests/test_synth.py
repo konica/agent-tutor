@@ -571,6 +571,24 @@ def test_each_service_gets_only_its_own_s3_sqs_and_bedrock_access() -> None:
         assert not any(r == '"*"' for r in grants.values())
 
 
+def test_only_the_worker_can_list_the_bucket_and_only_its_prefixes() -> None:
+    # Without s3:ListBucket, S3 answers 403 instead of NoSuchKey for a missing key, so an expired upload would
+    # reach the DLQ instead of being handled as ObjectNotFoundError.
+    t = template(make_app(), "Cluster")
+    listing = [s for s in _policy_for(t, "worker") if "s3:ListBucket" in _as_list(s["Action"])]
+    assert len(listing) == 1
+    (statement,) = listing
+    resource = json.dumps(statement["Resource"])  # the bucket ARN itself, not objects in it
+    assert "arn:aws:s3:::" in resource and "/*" not in resource and "uploads" not in resource
+    assert statement["Condition"] == {"StringLike": {"s3:prefix": ["uploads/*", "contents/*"]}}
+    for sa in ("api", "agent", "mcp-server"):
+        assert "s3:ListBucket" not in _grants(_policy_for(t, sa))
+
+
+def _as_list(value: Any) -> list[str]:
+    return value if isinstance(value, list) else [value]
+
+
 def test_origin_waits_60_seconds_between_bytes() -> None:
     # Answers stream as SSE without heartbeats; CloudFront's default 30 s would cut a slow one with a 504.
     t = template(make_app(), "Edge")
