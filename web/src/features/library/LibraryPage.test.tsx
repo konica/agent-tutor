@@ -983,3 +983,75 @@ describe("LibraryPage archive and restore", () => {
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
   });
 });
+
+describe("LibraryPage document details", () => {
+  const row: DocumentResponse = { ...processing, document_id: "d1", title: "Toolformer", state: "ready" };
+  const full = (title: string) => ({
+    document_id: "d1", state: "ready" as const, archived: false, title, extracted_title: "Toolformer", title_overridden: title !== "Toolformer",
+    authors: [], year: null, doi: null, file_name: "toolformer.pdf", pages: 10, summary: null, failure_reason: null, created_at: today,
+    subjects: [], attempt: null, max_attempts: 3, can_retry: false,
+  });
+
+  function setup() {
+    let title = "Toolformer";
+    const load = vi.fn(async (f: DocumentFilters) => (f.archived ? [] : [{ ...row, title }]));
+    const loadDetails = vi.fn(async (_id: string) => full(title));
+    const saveTitle = vi.fn(async (_id: string, next: string | null) => {
+      title = next ?? "Toolformer";
+      return full(title);
+    });
+    const archive = vi.fn(async (_id: string) => ({ ...row, archived: true }));
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={load} upload={vi.fn()} loadDetails={loadDetails} saveTitle={saveTitle} archive={archive} />);
+    return { load, loadDetails, saveTitle, archive };
+  }
+
+  it("opens a dialog from the row title and returns focus to it on close", async () => {
+    setup();
+    const opener = await screen.findByRole("button", { name: "Toolformer" });
+    await userEvent.click(opener);
+    expect(await screen.findByRole("dialog", { name: "Toolformer" })).toBeVisible();
+    expect(screen.getByText("Document details")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Close document details" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(opener).toHaveFocus();
+  });
+
+  it("moves focus to the row title when the panel opened from the More menu closes", async () => {
+    setup();
+    await userEvent.click(await screen.findByRole("button", { name: "More actions for Toolformer" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Details" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Close document details" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.body).not.toHaveFocus();
+  });
+
+  it("opens Edit title from the More menu with the field focused", async () => {
+    setup();
+    await userEvent.click(await screen.findByRole("button", { name: "More actions for Toolformer" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Edit title" }));
+    expect(await screen.findByRole("textbox", { name: "Display title" })).toHaveFocus();
+  });
+
+  it("re-lists after a title change", async () => {
+    const { load } = setup();
+    await userEvent.click(await screen.findByRole("button", { name: "Toolformer" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Edit title" }));
+    const field = screen.getByRole("textbox", { name: "Display title" });
+    await userEvent.clear(field);
+    await userEvent.type(field, "Tool use");
+    const before = load.mock.calls.length;
+    await userEvent.click(screen.getByRole("button", { name: "Save title" }));
+    await waitFor(() => expect(load.mock.calls.length).toBeGreaterThan(before));
+    await userEvent.click(await screen.findByRole("button", { name: "Close document details" }));
+    expect(await screen.findByRole("button", { name: "Tool use" })).toBeVisible();
+  });
+
+  it("re-lists after archiving from the panel", async () => {
+    const { load, archive } = setup();
+    await userEvent.click(await screen.findByRole("button", { name: "Toolformer" }));
+    const before = load.mock.calls.length;
+    await userEvent.click(await screen.findByRole("button", { name: "Archive" }));
+    expect(archive).toHaveBeenCalledWith("d1");
+    await waitFor(() => expect(load.mock.calls.length).toBeGreaterThan(before));
+  });
+});
