@@ -218,6 +218,24 @@ def test_b_cannot_archive_restore_or_see_as_archived_document() -> None:
     assert [d["document_id"] for d in client.get("/documents", headers=A, params={"archived": "true"}).json()] == [doc]
 
 
+def test_b_cannot_see_or_rename_as_document_and_keeps_own_title_for_same_file() -> None:
+    client, objects, ingestion = setup()
+    pdf = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
+    docs = {}
+    for who, headers in (("a", A), ("b", B)):
+        stored = client.post("/uploads", json={"file_name": f"{who}.pdf"}, headers=headers).json()
+        objects.objects[stored["fields"]["key"]] = pdf
+        ingestion.ingest_upload(stored["fields"]["key"])
+        docs[who] = stored["document_id"]
+
+    b_title = client.get(f"/documents/{docs['b']}", headers=B).json()["title"]
+    assert client.get(f"/documents/{docs['a']}", headers=B).status_code == 404
+    assert client.put(f"/documents/{docs['a']}/title", json={"title": "B's"}, headers=B).status_code == 404
+    assert client.put(f"/documents/{docs['a']}/title", json={"title": "A's"}, headers=A).json()["title"] == "A's"
+    assert client.get(f"/documents/{docs['b']}", headers=B).json()["title"] == b_title
+    assert client.get(f"/documents/{docs['a']}", headers=A).json()["title"] == "A's"
+
+
 def test_b_cant_delete_as_document_and_as_copy_of_the_same_file_is_untouched() -> None:
     client, objects, ingestion, library = setup_with_library()
     pdf = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()

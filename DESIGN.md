@@ -82,7 +82,8 @@ Shared components live in `web/src/components/`, one folder each (`Button/Button
 | `FilterBar` | `.filter-bar` | built (Library): `role="search"` with a label, labelled fields (labels visually hidden in the compact toolbar; see Layout → Toolbar), live count, Clear filters shown only while a filter is set; `noun` reuses it for conversations and notes |
 | `Tabs` | `.tabs` | built (Library): `role="tablist"` selector with roving tabindex and arrow/Home/End keys, optional count pill; no panels, the page's list is the panel |
 | `RowMenu` | `.row-menu` | built (Library): a "More" icon button opening a `role="menu"` of icon + label items (first item focused, arrows move, Escape returns focus, blur closes) |
-| `Banner`, `Toast`, `Dialog`, `SidePanel`, `UploadTray`, `Citation`, `SystemNotice` | `.banner-*`, `.toast`, `.dialog`, `.side-panel`, `.tray`, `.cite`, `.notice` | built with the story that first shows them |
+| `SidePanel` | `.side-panel` | built (document details): a right-hand modal drawer of `--panel-w`, kicker and badge header, close button, scrolling body, footer; focus moves in, Tab stays in, Escape closes, focus goes back |
+| `Banner`, `Toast`, `Dialog`, `UploadTray`, `Citation`, `SystemNotice` | `.banner-*`, `.toast`, `.dialog`, `.tray`, `.cite`, `.notice` | built with the story that first shows them |
 
 Icons: one outline family at 1.5px stroke, `lucide-react` with `strokeWidth={1.5}`, 16px by default (see Density), `aria-hidden` unless the icon is the only label.
 

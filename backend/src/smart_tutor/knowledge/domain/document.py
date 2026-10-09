@@ -5,10 +5,16 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 
-from smart_tutor.knowledge.domain.errors import DocumentStateError, InvalidFileNameError, InvalidSubjectsError
+from smart_tutor.knowledge.domain.errors import (
+    DocumentStateError,
+    InvalidFileNameError,
+    InvalidSubjectsError,
+    InvalidTitleError,
+)
 from smart_tutor.shared.domain.ids import ContentId, DocumentId, SubjectId, UploadId, UserId
 
 MAX_FILE_NAME = 255
+MAX_TITLE = 300
 MAX_SUBJECTS = 3
 # C0/C1 controls and bidi controls (which can disguise a file name)
 _CONTROL = re.compile("[\\x00-\\x1f\\x7f-\\x9f\\u200e\\u200f\\u202a-\\u202e\\u2066-\\u2069]")
@@ -27,6 +33,16 @@ def clean_file_name(raw: str) -> str:
     if not name:
         raise InvalidFileNameError("The file needs a name")
     return name
+
+
+def clean_title(raw: str) -> str:
+    """A display title the learner typed: one line, no control or bidi characters, 1-300 characters (PRD §9.4)."""
+    title = " ".join(_CONTROL.sub("", " ".join(raw.split())).split())
+    if not title:
+        raise InvalidTitleError("Enter a title")
+    if len(title) > MAX_TITLE:
+        raise InvalidTitleError(f"Keep the title to {MAX_TITLE} characters or fewer")
+    return title
 
 
 @dataclass(frozen=True)
@@ -104,6 +120,14 @@ class Document:
 
     def restore(self) -> None:
         self.archived, self.archived_at = False, None
+
+    def set_title(self, raw: str | None) -> None:
+        """The learner's display title for their library only (`title_override`); None goes back to the extracted one.
+
+        A title equal to the extracted title needs no override.
+        """
+        title = None if raw is None else clean_title(raw)
+        self.title_override = None if title == self.content_title else title
 
     def check_deletable(self) -> None:
         """Delete is refused only while processing (PRD §9.5); archived and failed documents can go."""

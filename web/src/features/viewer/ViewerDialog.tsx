@@ -1,7 +1,7 @@
 import { useId, useRef, type RefObject } from "react";
 import { createPortal } from "react-dom";
 
-import { useFocusTrap } from "../../components/Dialog/useFocusTrap";
+import { useModal } from "../../components/Dialog/useModal";
 import { DocumentViewer, type DocumentViewerProps } from "./DocumentViewer";
 import styles from "./ViewerDialog.module.css";
 
@@ -23,7 +23,7 @@ export function ViewerDialog({ documentId, initialPage = 1, closeLabel, onClose,
   const titleId = useId();
   const page = useRef(initialPage);
   const close = () => onClose(page.current);
-  const { ref, onKeyDown } = useFocusTrap(close, returnFocusTo);
+  const { ref, onKeyDown } = useModal(close, returnFocusTo);
   // The title is a tabIndex=-1 heading, so the trap finds it by data-autofocus.
   const markTitle = (title: HTMLHeadingElement | null) => title?.setAttribute("data-autofocus", "");
 
