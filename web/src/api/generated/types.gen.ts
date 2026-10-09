@@ -127,6 +127,16 @@ export type MeResponse = {
 };
 
 /**
+ * RenameThreadRequest
+ */
+export type RenameThreadRequest = {
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
  * StartUploadRequest
  */
 export type StartUploadRequest = {
@@ -260,6 +270,20 @@ export type ThreadDocumentResponse = {
      * Year
      */
     year: number | null;
+};
+
+/**
+ * ThreadResponse
+ */
+export type ThreadResponse = {
+    /**
+     * Thread Id
+     */
+    thread_id: string;
+    /**
+     * Title
+     */
+    title: string | null;
 };
 
 /**
@@ -579,6 +603,42 @@ export type AskInNewThreadResponses = {
 };
 
 export type AskInNewThreadResponse = AskInNewThreadResponses[keyof AskInNewThreadResponses];
+
+export type RenameThreadData = {
+    body: RenameThreadRequest;
+    path: {
+        /**
+         * Thread Id
+         */
+        thread_id: string;
+    };
+    query?: never;
+    url: '/threads/{thread_id}';
+};
+
+export type RenameThreadErrors = {
+    /**
+     * Not the caller's conversation.
+     */
+    404: unknown;
+    /**
+     * The conversation is archived.
+     */
+    409: unknown;
+    /**
+     * The title is empty or longer than 120 characters.
+     */
+    422: unknown;
+};
+
+export type RenameThreadResponses = {
+    /**
+     * Successful Response
+     */
+    200: ThreadResponse;
+};
+
+export type RenameThreadResponse = RenameThreadResponses[keyof RenameThreadResponses];
 
 export type ListThreadDocumentsData = {
     body?: never;

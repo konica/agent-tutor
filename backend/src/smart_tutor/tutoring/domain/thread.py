@@ -5,6 +5,9 @@ from datetime import datetime
 from enum import StrEnum
 
 from smart_tutor.shared.domain.ids import ThreadId, UserId
+from smart_tutor.tutoring.domain.errors import InvalidTitleError, ThreadArchivedError
+
+MAX_TITLE = 120
 
 
 class ThreadStatus(StrEnum):
@@ -22,9 +25,21 @@ class Thread:
     last_learner_message_at: datetime | None = None
 
     @classmethod
-    def start(cls, thread_id: ThreadId, user_id: UserId, now: datetime) -> "Thread":
-        """A new thread with its first question asked now."""
-        return cls(thread_id, user_id, now, last_learner_message_at=now)
+    def start(cls, thread_id: ThreadId, user_id: UserId, now: datetime, title: str | None = None) -> "Thread":
+        """A new thread with its first question asked now; its title starts as that question (§9.4)."""
+        return cls(thread_id, user_id, now, title=title, last_learner_message_at=now)
 
     def is_owned_by(self, user_id: UserId) -> bool:
         return self.user_id == user_id
+
+    def rename(self, title: str) -> str:
+        """The learner's title, trimmed, 1-120 characters (US-13); returns it. An archived thread can't be renamed."""
+        if self.status is ThreadStatus.ARCHIVED:
+            raise ThreadArchivedError("An archived conversation can't be renamed. Restore it first.")
+        trimmed = title.strip()
+        if not trimmed:
+            raise InvalidTitleError("Enter a title")
+        if len(trimmed) > MAX_TITLE:
+            raise InvalidTitleError(f"Use at most {MAX_TITLE} characters")
+        self.title = trimmed
+        return trimmed

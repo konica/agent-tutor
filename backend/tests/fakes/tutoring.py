@@ -24,6 +24,9 @@ class InMemoryThreads(ThreadRepository):
         found = self.threads.get(thread_id)
         return copy.deepcopy(found) if found and found.is_owned_by(user_id) else None
 
+    def set_title(self, thread_id: ThreadId, title: str) -> None:
+        self.threads[thread_id].title = title
+
     def add_documents_used(self, thread_id: ThreadId, document_ids: Sequence[DocumentId], at: datetime) -> None:
         rows = self.documents_used_rows.setdefault(thread_id, [])
         for document_id in document_ids:

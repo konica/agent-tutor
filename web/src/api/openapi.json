@@ -214,6 +214,20 @@
         "title": "MeResponse",
         "type": "object"
       },
+      "RenameThreadRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "RenameThreadRequest",
+        "type": "object"
+      },
       "StartUploadRequest": {
         "additionalProperties": false,
         "properties": {
@@ -425,6 +439,31 @@
           "deleted"
         ],
         "title": "ThreadDocumentResponse",
+        "type": "object"
+      },
+      "ThreadResponse": {
+        "properties": {
+          "thread_id": {
+            "title": "Thread Id",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "thread_id",
+          "title"
+        ],
+        "title": "ThreadResponse",
         "type": "object"
       },
       "UploadLimitsResponse": {
@@ -1007,6 +1046,64 @@
           }
         ],
         "summary": "Ask In New Thread",
+        "tags": [
+          "tutoring"
+        ]
+      }
+    },
+    "/threads/{thread_id}": {
+      "patch": {
+        "description": "Rename the learner's conversation from its header (PRD US-13).",
+        "operationId": "rename_thread",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "thread_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Thread Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameThreadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not the caller's conversation."
+          },
+          "409": {
+            "description": "The conversation is archived."
+          },
+          "422": {
+            "description": "The title is empty or longer than 120 characters."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rename Thread",
         "tags": [
           "tutoring"
         ]

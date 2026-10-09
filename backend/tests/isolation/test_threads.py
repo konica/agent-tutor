@@ -1,5 +1,5 @@
-"""US-12: each learner's POST /threads starts a thread owned by that learner; no one else can get it, nor its
-documents used (GET /threads/{id}/documents)."""
+"""US-12: each learner's POST /threads starts a thread owned by that learner; no one else can get it, its
+documents used (GET /threads/{id}/documents), or rename it (PATCH /threads/{id})."""
 
 import httpx
 from fastapi.testclient import TestClient
@@ -68,6 +68,24 @@ def test_only_the_owner_lists_a_threads_documents_used() -> None:
     theirs = client.get(f"/threads/{thread.thread_id}/documents", headers=B)
     assert theirs.status_code == 404
     assert a_title not in theirs.text and a_document not in theirs.text
+
+
+def test_only_the_owner_renames_a_thread() -> None:
+    library, threads = InMemoryLibrary(), InMemoryThreads()
+    ingest_ready(library, "learner-a", "Attention weighs tokens.")
+    ingest_ready(library, "learner-b", "Gradient descent follows the slope.")
+    services = api_services(library, threads=threads, agent=fake_agent(answers))
+    client = TestClient(create_app(Settings(), verifier=learners(), services=services))
+    assert client.post("/threads", json={"question": "What is attention?"}, headers=A).status_code == 200
+    [thread] = threads.threads.values()
+
+    theirs = client.patch(f"/threads/{thread.thread_id}", json={"title": "Taken over"}, headers=B)
+
+    assert theirs.status_code == 404
+    assert "What is attention?" not in theirs.text
+    assert threads.threads[thread.thread_id].title == "What is attention?"
+    mine = client.patch(f"/threads/{thread.thread_id}", json={"title": "Attention basics"}, headers=A)
+    assert mine.status_code == 200 and threads.threads[thread.thread_id].title == "Attention basics"
 
 
 def test_a_learner_without_documents_starts_no_thread_even_when_another_has_documents_in_their_subject() -> None:

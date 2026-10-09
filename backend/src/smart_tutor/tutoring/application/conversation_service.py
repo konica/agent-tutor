@@ -23,11 +23,19 @@ class ConversationService:
         if not self._documents.has_ready_documents(user_id):
             raise NoDocumentsError("Upload a document first")
 
-    def start_thread(self, user_id: UserId) -> Thread:
-        """A new thread owned by the learner, persisted."""
+    def start_thread(self, user_id: UserId, question: str | None = None) -> Thread:
+        """A new thread owned by the learner, persisted; its title starts as the first question."""
         self.require_documents(user_id)
-        thread = Thread.start(ThreadId(str(uuid.uuid4())), user_id, self._clock.now())
+        thread = Thread.start(ThreadId(str(uuid.uuid4())), user_id, self._clock.now(), title=question)
         self._threads.add(thread)
+        return thread
+
+    def rename_thread(self, thread_id: ThreadId, user_id: UserId, title: str) -> Thread:
+        """The learner renames their conversation (US-13): trimmed, 1-120 characters; not while archived."""
+        thread = self._threads.get_owned(thread_id, user_id)
+        if thread is None:
+            raise ThreadNotFoundError("Conversation not found")
+        self._threads.set_title(thread_id, thread.rename(title))
         return thread
 
     def record_answer(self, thread_id: ThreadId, user_id: UserId, document_ids: Sequence[DocumentId]) -> None:
