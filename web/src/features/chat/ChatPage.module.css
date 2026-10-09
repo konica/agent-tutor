@@ -1,7 +1,27 @@
-.column { display: flex; flex-direction: column; max-width: var(--chat-w); min-height: calc(100dvh - 44px); margin: 0 auto; }
+/* The chat fills main (a bleed route): the header row on top, then the panel and the conversation, each scrolling on its own. */
+.page { display: grid; grid-template-rows: 40px minmax(0, 1fr); height: 100%; }
 
-/* The header row has a hairline under it; the PageHeader inside is one 40px line. */
-.head { border-bottom: 1px solid var(--border); margin-bottom: var(--sp-4); }
+.header {
+  display: flex; align-items: center; gap: var(--sp-2); min-width: 0; padding: 0 var(--sp-4);
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.toggle {
+  display: inline-flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; padding: 0;
+  border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-2); cursor: pointer;
+}
+.toggle:hover { background: var(--surface-2); color: var(--text); }
+.toggleIcon { width: 16px; height: 16px; }
+/* The body font, semibold, on one line, not the serif display font base.css gives every h1. */
+.title {
+  flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--font-body); font-size: var(--fs-14); font-weight: 600; line-height: var(--lh-head); color: var(--text);
+}
+
+.body { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; }
+.withPanel { grid-template-columns: var(--chat-panel-w) minmax(0, 1fr); }
+
+.conversation { min-height: 0; overflow-y: auto; padding: var(--sp-8) var(--sp-8) var(--sp-16); }
+.column { display: flex; flex-direction: column; max-width: var(--chat-w); min-height: calc(100dvh - 44px); margin: 0 auto; }
 
 .welcome { display: grid; gap: var(--sp-3); margin: var(--sp-6) 0; }
 .welcomeTitle { font-family: var(--font-display); font-size: var(--fs-24); }

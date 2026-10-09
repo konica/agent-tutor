@@ -2,10 +2,10 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AskRefusedError, NoDocumentsError, type ChatEvent } from "../../api/chat";
-import type { DocumentResponse } from "../../api/generated/types.gen";
+import type { DocumentResponse, ThreadDocumentResponse } from "../../api/generated/types.gen";
 import { SessionExpiredError, sessionExpiry } from "../../auth/authClient";
 import { ChatPage } from "./ChatPage";
 
@@ -44,13 +44,14 @@ const doc = (state: string) => ({ state }) as DocumentResponse;
 function renderChat(props: ComponentProps<typeof ChatPage> = {}) {
   return render(
     <MemoryRouter>
-      <ChatPage loadDocs={async () => [doc("ready")]} {...props} />
+      <ChatPage loadDocs={async () => [doc("ready")]} loadUsed={async () => []} {...props} />
     </MemoryRouter>,
   );
 }
 const question = () => screen.findByRole("textbox", { name: /question/i });
 const askButton = () => screen.getByRole("button", { name: /ask/i });
 
+beforeEach(() => localStorage.clear());
 afterEach(() => vi.restoreAllMocks());
 
 describe("ChatPage", () => {
@@ -63,8 +64,8 @@ describe("ChatPage", () => {
         {
           type: "citations",
           citations: [
-            { n: 1, chunk_id: "c1", document_title: "a.pdf", page: 3 },
-            { n: 2, chunk_id: "c2", document_title: "b.pdf", page: null },
+            { n: 1, chunk_id: "c1", document_id: "d1", document_title: "a.pdf", page: 3 },
+            { n: 2, chunk_id: "c2", document_id: "d2", document_title: "b.pdf", page: null },
           ],
         },
         { type: "done" },
@@ -88,7 +89,7 @@ describe("ChatPage", () => {
       events(
         { type: "thread", thread_id: "t1" },
         { type: "delta", text: "Only the second chunk [2]." },
-        { type: "citations", citations: [{ n: 2, chunk_id: "c2", document_title: "b.pdf", page: 4 }] },
+        { type: "citations", citations: [{ n: 2, chunk_id: "c2", document_id: "d2", document_title: "b.pdf", page: 4 }] },
         { type: "done" },
       ),
     );
@@ -108,7 +109,7 @@ describe("ChatPage", () => {
       events(
         { type: "thread", thread_id: "t1" },
         { type: "delta", text: "Yes [1]." },
-        { type: "citations", citations: [{ n: 1, chunk_id: "c1", document_title: title, page: 3 }] },
+        { type: "citations", citations: [{ n: 1, chunk_id: "c1", document_id: "d1", document_title: title, page: 3 }] },
         { type: "done" },
       ),
     );
@@ -301,5 +302,115 @@ describe("ChatPage", () => {
     renderChat({ loadDocs: () => Promise.reject(new SessionExpiredError()) });
     await waitFor(() => expect(screen.queryByText(/couldn't be loaded/)).not.toBeInTheDocument());
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  describe("conversation panel", () => {
+    const used = (document_id: string, title: string): ThreadDocumentResponse => ({
+      document_id,
+      title,
+      authors: [],
+      year: null,
+      archived: false,
+      deleted: false,
+    });
+    const answered = () =>
+      events(
+        { type: "thread", thread_id: "t1" },
+        { type: "delta", text: "It weighs tokens [1]." },
+        { type: "citations", citations: [{ n: 1, chunk_id: "c1", document_id: "d1", document_title: "a.pdf", page: 3 }] },
+        { type: "done" },
+      );
+    const panel = () => screen.queryByRole("complementary", { name: "Conversation" });
+    const toggle = () => screen.getByRole("button", { name: /panel/ });
+
+    it("says where the documents used will appear before the first question", async () => {
+      renderChat();
+      await question();
+      expect(within(panel()!).getByText("Documents used to answer will appear here.")).toBeInTheDocument();
+    });
+
+    it("lists the documents the answer used, in order, once the answer is done", async () => {
+      const loadUsed = vi.fn(async () => [used("d2", "Retrieval-Augmented Generation"), used("d1", "ReAct")]);
+      renderChat({ ask: vi.fn(answered), loadUsed });
+      await userEvent.type(await question(), "What is attention?");
+      await userEvent.click(askButton());
+      await waitFor(() => expect(loadUsed).toHaveBeenCalledWith("t1"));
+      const rows = await within(panel()!).findAllByRole("listitem");
+      expect(rows.map((r) => r.textContent)).toEqual(["Retrieval-Augmented Generation", "ReAct"]);
+      expect(within(panel()!).getByRole("button", { name: "Summarize lesson" })).toBeDisabled();
+    });
+
+    it("does not look up documents used when the answer failed", async () => {
+      const loadUsed = vi.fn(async () => []);
+      const ask = vi.fn(() =>
+        events({ type: "thread", thread_id: "t1" }, { type: "error", code: "unavailable", message: "The tutor is unavailable." }),
+      );
+      renderChat({ ask, loadUsed });
+      await userEvent.type(await question(), "What is attention?");
+      await userEvent.click(askButton());
+      expect(await screen.findByText("The tutor is unavailable.")).toBeInTheDocument();
+      expect(loadUsed).not.toHaveBeenCalled();
+    });
+
+    it("keeps the list as it was when the documents used can't be loaded", async () => {
+      const loadUsed = vi.fn(() => Promise.reject(new Error("GET /threads/t1/documents failed (500)")));
+      renderChat({ ask: vi.fn(answered), loadUsed });
+      await userEvent.type(await question(), "What is attention?");
+      await userEvent.click(askButton());
+      await waitFor(() => expect(loadUsed).toHaveBeenCalled());
+      expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
+      expect(within(panel()!).getByText("Documents used to answer will appear here.")).toBeInTheDocument();
+    });
+
+    it("clears the documents used when a new question starts a new conversation", async () => {
+      const control = controlledStream();
+      const ask = vi.fn().mockImplementationOnce(answered).mockImplementationOnce(() => control.stream());
+      renderChat({ ask, loadUsed: async () => [used("d1", "ReAct")] });
+      await userEvent.type(await question(), "First?");
+      await userEvent.click(askButton());
+      expect(await within(panel()!).findByText("ReAct")).toBeInTheDocument();
+      await userEvent.type(await question(), "Second?");
+      await waitFor(() => expect(askButton()).toBeEnabled());
+      await userEvent.click(askButton());
+      expect(within(panel()!).queryByText("ReAct")).not.toBeInTheDocument();
+      control.push(null);
+    });
+
+    it("hides and shows the panel with the toggle, by mouse or keyboard, and remembers the choice", async () => {
+      const { unmount } = renderChat();
+      await question();
+      expect(toggle()).toHaveAttribute("aria-expanded", "true");
+      expect(toggle()).toHaveAccessibleName("Hide panel");
+      expect(toggle()).toHaveAttribute("aria-controls", "conversation-panel");
+      expect(panel()).toHaveAttribute("id", "conversation-panel");
+
+      await userEvent.click(toggle());
+      expect(toggle()).toHaveAttribute("aria-expanded", "false");
+      expect(toggle()).toHaveAccessibleName("Show panel");
+      expect(panel()).not.toBeInTheDocument();
+
+      toggle().focus();
+      await userEvent.keyboard("{Enter}");
+      expect(toggle()).toHaveAttribute("aria-expanded", "true");
+      expect(panel()).toBeInTheDocument();
+      await userEvent.keyboard(" ");
+      expect(toggle()).toHaveAttribute("aria-expanded", "false");
+
+      unmount();
+      renderChat();
+      await question();
+      expect(toggle()).toHaveAttribute("aria-expanded", "false");
+      expect(panel()).not.toBeInTheDocument();
+    });
+
+    it("hides the citations when Show citations is off", async () => {
+      renderChat({ ask: vi.fn(answered) });
+      await userEvent.type(await question(), "What is attention?");
+      await userEvent.click(askButton());
+      expect(await screen.findByRole("list", { name: "Sources" })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("switch", { name: "Show citations" }));
+      expect(screen.queryByRole("list", { name: "Sources" })).not.toBeInTheDocument();
+      expect(screen.getByText("It weighs tokens [1].")).toBeInTheDocument();
+    });
   });
 });
