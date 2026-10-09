@@ -60,6 +60,7 @@ type Props = {
 
 // An archived row offers Restore and Delete…: its subjects can't change until restored (PRD US-10), and it isn't processed again.
 function Actions({ doc, onRetry, retrying, onChooseSubjects, uploading, onArchive, onRestore, onDelete, busy }: Omit<Props, "documents" | "uploading" | "busy"> & { doc: DocumentResponse; uploading: boolean; busy: boolean }) {
+  const canDelete = onDelete && doc.state !== "processing"; // the worker is still writing a processing document's content, archived or not
   const label = `More actions for ${doc.title}`;
   const deleteItem = { label: "Delete…", icon: Trash2, danger: true, onSelect: () => onDelete?.(doc) };
   if (doc.archived)
@@ -70,11 +71,10 @@ function Actions({ doc, onRetry, retrying, onChooseSubjects, uploading, onArchiv
             Restore
           </Button>
         )}
-        {onDelete && <RowMenu label={label} disabled={busy} items={[deleteItem]} />}
+        {canDelete && <RowMenu label={label} disabled={busy} items={[deleteItem]} />}
       </>
     );
-  // A document can't be deleted while it is processing: the worker is still writing its content.
-  const items = [{ label: "Archive", icon: Archive, onSelect: () => onArchive?.(doc) }, ...(doc.state !== "processing" && onDelete ? [deleteItem] : [])];
+  const items = [{ label: "Archive", icon: Archive, onSelect: () => onArchive?.(doc) }, ...(canDelete ? [deleteItem] : [])];
   return (
     <>
       {doc.state === "awaiting_subjects" && onChooseSubjects && (

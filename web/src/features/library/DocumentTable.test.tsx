@@ -105,6 +105,12 @@ describe("DocumentTable archive and restore", () => {
     expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Archive"]);
   });
 
+  it("offers an archived processing row Restore and no More menu", () => {
+    render(<DocumentTable documents={[{ ...doc, state: "processing", archived: true }]} {...props} onRestore={vi.fn()} onDelete={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Restore Toolformer" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "More actions for Toolformer" })).toBeNull();
+  });
+
   it("gives an archived row Restore and a More menu with only Delete…", async () => {
     const onDelete = vi.fn();
     const archived = { ...doc, archived: true };
