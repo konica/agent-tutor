@@ -108,6 +108,45 @@ describe("SubjectPicker", () => {
     expect(props.onSaved).not.toHaveBeenCalled();
   });
 
+  describe("in a step-through", () => {
+    it("shows its place in a step-through", async () => {
+      setup({ step: { index: 0, total: 3 }, onSkip: vi.fn() });
+      await chip(/AI Agents/);
+      expect(screen.getByText("Document 1 of 3")).toBeVisible();
+      expect(screen.getByText("1 of 3")).toBeVisible();
+      expect(screen.getByRole("button", { name: "Skip" })).toBeVisible();
+      expect(screen.getByRole("button", { name: "Save and next" })).toBeVisible();
+      expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
+    });
+
+    it("says Save on the last step", async () => {
+      setup({ step: { index: 2, total: 3 }, onSkip: vi.fn() });
+      await chip(/AI Agents/);
+      expect(screen.getByRole("button", { name: "Save" })).toBeVisible();
+      expect(screen.queryByRole("button", { name: "Save and next" })).toBeNull();
+    });
+
+    it("calls onSaved without a saved screen in a step-through", async () => {
+      const props = setup({ step: { index: 0, total: 3 }, onSkip: vi.fn() });
+      await userEvent.click(await screen.findByRole("button", { name: "Save and next" }));
+      await waitFor(() => expect(props.onSaved).toHaveBeenCalledWith(saved));
+      expect(screen.queryByText("Subjects saved.")).toBeNull();
+    });
+
+    it("Skip calls onSkip", async () => {
+      const props = setup({ step: { index: 0, total: 3 }, onSkip: vi.fn() });
+      await userEvent.click(await screen.findByRole("button", { name: "Skip" }));
+      expect(props.onSkip).toHaveBeenCalledTimes(1);
+    });
+
+    it("stays on the document when a save fails in a step-through", async () => {
+      const props = setup({ step: { index: 0, total: 3 }, onSkip: vi.fn(), save: vi.fn(async () => { throw new Error(""); }) });
+      await userEvent.click(await screen.findByRole("button", { name: "Save and next" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't save subjects");
+      expect(props.onSaved).not.toHaveBeenCalled();
+    });
+  });
+
   it("shows only the generic message when the error has no server detail", async () => {
     setup({ save: vi.fn(async () => { throw new Error(""); }) });
     await userEvent.click(await screen.findByRole("button", { name: "Save" }));

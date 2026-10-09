@@ -42,6 +42,7 @@ type Props = {
 };
 
 type View = "active" | "archived";
+type Picking = { queue: DocumentResponse[]; index: number; saved: number }; // the documents to step through, where the picker is, and how many were saved
 
 const ARCHIVED_NOTICE = "Archived documents aren't used for answers, but citations to them in past conversations still work. Restore a document to change its subjects.";
 
@@ -111,7 +112,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
   const [alreadyIn, setAlreadyIn] = useState<{ name: string; documentId: string }[]>([]);
   const seen = useRef<Map<string, DocumentResponse["state"]> | null>(null);
   const justSaved = useRef(new Set<string>()); // saved here, so the poll must not announce "is ready." over "Subjects saved."
-  const [picking, setPicking] = useState<DocumentResponse | null>(null);
+  const [picking, setPicking] = useState<Picking | null>(null);
   const statusRegion = useRef<HTMLParagraphElement>(null);
   const wasPicking = useRef(false);
   const [details, setDetails] = useState<{ id: string; editing: boolean } | null>(null);
@@ -159,10 +160,31 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
     subjectSelect.current?.focus(); // the Clear button disappears
   }
 
-  async function onSaved(doc: DocumentResponse) {
+  // The queue is the clicked document, then every other waiting one in list order. The counts hold the whole active library; the visible list stands in until they load.
+  function choose(doc: DocumentResponse) {
+    const others = (counts.waiting ?? list ?? []).filter((d) => d.state === "awaiting_subjects" && !d.archived && d.document_id !== doc.document_id);
+    setPicking({ queue: [doc, ...others], index: 0, saved: 0 });
+  }
+
+  // Reads `picking` from render, not an updater: setStatus must not run twice under StrictMode.
+  function advance(saved: boolean) {
+    const p = picking;
+    if (!p) return;
+    const done = p.saved + (saved ? 1 : 0);
+    if (p.index < p.queue.length - 1) {
+      if (saved) setStatus(`Saved. Document ${p.index + 2} of ${p.queue.length}.`);
+      setPicking({ ...p, index: p.index + 1, saved: done });
+      return;
+    }
+    if (done) setStatus(`Subjects saved for ${done} ${done === 1 ? "document" : "documents"}. They're ready to use.`);
+    setPicking(null);
+  }
+
+  // `announce` is false in a step-through, where advance() words the status.
+  async function onSaved(doc: DocumentResponse, announce: boolean) {
     justSaved.current.add(doc.document_id);
     seen.current?.set(doc.document_id, "ready");
-    setStatus(`Subjects saved. ${doc.title} is ready to use.`);
+    if (announce) setStatus(`Subjects saved. ${doc.title} is ready to use.`);
     await Promise.all([refresh(), counts.refresh(), refreshSubjects()]); // the document no longer waits, so the counts change
   }
 
@@ -625,7 +647,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
           documents={list}
           onRetry={(d) => void onRetry(d)}
           retrying={retrying}
-          onChooseSubjects={setPicking}
+          onChooseSubjects={choose}
           uploading={uploading}
           onArchive={(d) => void changeArchived(d, true)}
           onRestore={(d) => void changeArchived(d, false)}
@@ -635,7 +657,25 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
           busy={busy}
         />
       )}
-      {picking && <SubjectPicker document={picking} load={loadSuggestions} save={saveSubjects} onClose={() => setPicking(null)} onSaved={(doc) => void onSaved(doc)} />}
+      {picking && (() => {
+        const doc = picking.queue[picking.index]!;
+        const multi = picking.queue.length > 1;
+        return (
+          <SubjectPicker
+            key={doc.document_id} // a fresh picker for each document
+            document={doc}
+            step={multi ? { index: picking.index, total: picking.queue.length } : undefined}
+            onSkip={() => advance(false)}
+            load={loadSuggestions}
+            save={saveSubjects}
+            onClose={() => setPicking(null)}
+            onSaved={(d) => {
+              void onSaved(d, !multi);
+              if (multi) advance(true);
+            }}
+          />
+        );
+      })()}
       {details && (
         <DocumentDetailsPanel
           key={details.id}

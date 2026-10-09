@@ -1257,6 +1257,77 @@ describe("needs subjects", () => {
     expect(await screen.findByRole("button", { name: "1 needs subjects" }, { timeout: 3000 })).toBeVisible();
   });
 
+  describe("step-through", () => {
+    const suggestion = { document_id: "x", title: "x", summary: null, suggestions: [{ subject_id: "s1", name: "AI Agents", origin: "yours" as const }] };
+    const dialog = () => screen.getByRole("dialog", { name: "Choose subjects" });
+    const pageStatus = () => screen.getAllByRole("status").find((el) => el.tagName === "P")!;
+
+    function fixture(ids: string[]) {
+      const docs = ids.map(waiting);
+      const load = vi.fn(async (f: DocumentFilters) => (f.archived ? [] : docs.map((d) => ({ ...d }))));
+      const saveSubjects = vi.fn(async (id: string) => {
+        const doc = docs.find((d) => d.document_id === id)!;
+        doc.state = "ready";
+        doc.subjects = [{ subject_id: "s1", name: "AI Agents" }];
+        return { ...doc };
+      });
+      const props = { loadSubjects: subjects, check: notInLibrary, loadLimits: limits, load, upload: vi.fn(), loadSuggestions: async () => suggestion, saveSubjects, pollMs: 60_000 };
+      return { docs, load, saveSubjects, props };
+    }
+
+    it("steps through every waiting document, starting with the clicked one", async () => {
+      const { saveSubjects, props } = fixture(["a", "b", "c"]);
+      render(<LibraryPage {...props} />);
+      await userEvent.click(await screen.findByRole("button", { name: "Choose subjects for b.pdf" }));
+      expect(within(dialog()).getByText("Document 1 of 3")).toBeVisible();
+      expect(within(dialog()).getByText("b.pdf")).toBeVisible();
+      await userEvent.click(await screen.findByRole("button", { name: "Save and next" }));
+      await waitFor(() => expect(within(dialog()).getByText("Document 2 of 3")).toBeVisible());
+      expect(within(dialog()).getByText("a.pdf")).toBeVisible();
+      await userEvent.click(screen.getByRole("button", { name: "Skip" }));
+      await waitFor(() => expect(within(dialog()).getByText("Document 3 of 3")).toBeVisible());
+      expect(within(dialog()).getByText("c.pdf")).toBeVisible();
+      await userEvent.click(await screen.findByRole("button", { name: "Save" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(saveSubjects.mock.calls.map((c) => c[0])).toEqual(["b", "c"]);
+      expect(pageStatus()).toHaveTextContent("Subjects saved for 2 documents. They're ready to use.");
+    });
+
+    it("queues waiting documents hidden by a filter", async () => {
+      const { docs, props } = fixture(["a", "b", "c"]);
+      const load = vi.fn(async (f: DocumentFilters) => (f.archived ? [] : f.subject_ids ? [{ ...docs[0]!, subjects: [{ subject_id: "s1", name: "AI Agents" }] }] : docs.map((d) => ({ ...d }))));
+      render(<LibraryPage {...props} load={load} />);
+      await screen.findByRole("option", { name: "AI Agents" });
+      await userEvent.selectOptions(screen.getByLabelText("Subject"), "s1");
+      await waitFor(() => expect(load).toHaveBeenLastCalledWith({ subject_ids: ["s1"] }));
+      await userEvent.click(await screen.findByRole("button", { name: "Choose subjects for a.pdf" }));
+      expect(within(dialog()).getByText("Document 1 of 3")).toBeVisible();
+    });
+
+    it("Skip on the last step closes quietly when nothing was saved", async () => {
+      const { props } = fixture(["a", "b"]);
+      render(<LibraryPage {...props} />);
+      await userEvent.click(await screen.findByRole("button", { name: "Choose subjects for a.pdf" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Skip" }));
+      await waitFor(() => expect(within(dialog()).getByText("Document 2 of 2")).toBeVisible());
+      await userEvent.click(screen.getByRole("button", { name: "Skip" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(pageStatus()).not.toHaveTextContent(/saved/);
+    });
+
+    it("a single waiting document keeps the plain picker", async () => {
+      const { saveSubjects, props } = fixture(["a"]);
+      render(<LibraryPage {...props} />);
+      await userEvent.click(await screen.findByRole("button", { name: "Choose subjects for a.pdf" }));
+      expect(within(dialog()).getByText("Processing finished")).toBeVisible();
+      expect(screen.getByRole("button", { name: "Cancel" })).toBeVisible();
+      await userEvent.click(await screen.findByRole("button", { name: "Save" }));
+      expect(await screen.findByText("Subjects saved.")).toBeVisible();
+      expect(screen.getByRole("button", { name: "Done" })).toBeVisible();
+      expect(saveSubjects).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("reports the count to the shell", async () => {
     const report = vi.fn();
     render(

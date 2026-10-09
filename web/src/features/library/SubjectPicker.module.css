@@ -39,3 +39,11 @@
 .over { color: var(--danger); font-weight: 650; }
 .addError { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-2) 0 0; color: var(--danger); font-size: var(--fs-13); }
 .errorIcon { width: 16px; height: 16px; flex: none; }
+
+.step {
+  margin-right: auto;
+  align-self: center;
+  font-size: var(--fs-13);
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
