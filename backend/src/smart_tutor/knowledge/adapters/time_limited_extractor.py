@@ -41,7 +41,12 @@ class TimeLimitedExtractor(PdfExtractor):
         context = multiprocessing.get_context("spawn")
         receiver, sender = context.Pipe(duplex=False)
         child = context.Process(target=_extract, args=(sender, self._inner, data, max_pages, first), daemon=True)
-        child.start()
+        try:
+            child.start()  # can fail: an unpicklable inner, or EAGAIN at the container's process limit
+        except BaseException:
+            receiver.close()
+            sender.close()
+            raise
         sender.close()  # the child holds the only write end, so its death shows up as EOF
         try:
             if not receiver.poll(self._timeout):

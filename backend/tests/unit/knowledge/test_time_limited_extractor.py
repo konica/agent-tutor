@@ -1,5 +1,8 @@
+import errno
 import multiprocessing
 import time
+from multiprocessing.connection import Connection
+from multiprocessing.context import SpawnContext, SpawnProcess
 
 import pytest
 
@@ -48,3 +51,25 @@ def test_a_parser_that_dies_is_unreadable() -> None:
 def test_the_real_extractor_works_through_the_wrapper() -> None:
     extractor = TimeLimitedExtractor(PypdfExtractor(), timeout_seconds=30)
     assert extractor.extract_pages(make_pdf(["hello world"]), max_pages=10) == ["hello world"]
+
+
+def test_a_child_that_cannot_start_leaks_no_pipe(monkeypatch: pytest.MonkeyPatch) -> None:
+    # At the container's process limit, start() fails with EAGAIN; both pipe ends must still close.
+    opened: list[Connection] = []
+    real_pipe = SpawnContext.Pipe
+
+    def pipe(self: SpawnContext, duplex: bool = True) -> tuple[Connection, Connection]:
+        ends = real_pipe(self, duplex)
+        opened.extend(ends)
+        return ends
+
+    def refuse(self: SpawnProcess) -> None:
+        raise BlockingIOError(errno.EAGAIN, "Resource temporarily unavailable")
+
+    monkeypatch.setattr(SpawnContext, "Pipe", pipe)
+    monkeypatch.setattr(SpawnProcess, "start", refuse)
+
+    with pytest.raises(BlockingIOError):
+        TimeLimitedExtractor(PagesExtractor(), timeout_seconds=30).extract_pages(b"x", max_pages=10)
+    assert len(opened) == 2
+    assert all(end.closed for end in opened)
