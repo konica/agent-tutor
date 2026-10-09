@@ -157,12 +157,21 @@ function Viewer({
 
   const [restoring, setRestoring] = useState(false);
   const [restoreFailed, setRestoreFailed] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const focusTitle = useRef(false);
+  // A restored document loses its Restore button; focus moves to the title rather than dropping to <body>.
+  useEffect(() => {
+    if (!focusTitle.current) return;
+    focusTitle.current = false;
+    root.current?.querySelector<HTMLElement>("h2")?.focus();
+  }, [document]);
   const onRestore = () => {
     setRestoring(true);
     setRestoreFailed(false);
     restore(documentId).then(
       (updated) => {
         setRestoring(false);
+        focusTitle.current = true;
         setKnownDocument(updated);
         setDocument(updated);
       },
@@ -176,7 +185,7 @@ function Viewer({
   const failed = file.status === "failed" ? file.reason : pdf.status === "failed" ? "error" : null;
 
   return (
-    <div className={styles.viewer} onKeyDown={onKeyDown}>
+    <div ref={root} className={styles.viewer} onKeyDown={onKeyDown}>
       <ViewerToolbar
         mode={mode}
         title={document?.title ?? "Document"}

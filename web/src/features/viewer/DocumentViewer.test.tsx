@@ -48,7 +48,8 @@ describe("DocumentViewer", () => {
     renderViewer({ onPageChange });
     await ready();
     const previous = screen.getByRole("button", { name: "Previous page" });
-    expect(previous).toBeDisabled();
+    expect(previous).toHaveAttribute("aria-disabled", "true");
+    expect(previous).not.toBeDisabled(); // focusable: a disabled button would drop focus to <body>
     await userEvent.click(screen.getByRole("button", { name: "Next page" }));
     expect(screen.getByText("p. 2 / 3")).toBeInTheDocument();
     expect(await screen.findByText("Page 2 of 3")).toBeInTheDocument();
@@ -59,7 +60,8 @@ describe("DocumentViewer", () => {
     fireEvent.keyDown(title, { key: "PageDown" });
     fireEvent.keyDown(title, { key: "PageDown" });
     expect(screen.getByText("p. 3 / 3")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Next page" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next page" })).toHaveAttribute("aria-disabled", "true");
+    await userEvent.click(screen.getByRole("button", { name: "Next page" }));
     fireEvent.keyDown(title, { key: "PageDown" });
     expect(screen.getByText("p. 3 / 3")).toBeInTheDocument();
     fireEvent.keyDown(title, { key: "PageUp" });
@@ -78,10 +80,13 @@ describe("DocumentViewer", () => {
     await userEvent.click(zoomIn);
     await userEvent.click(zoomIn);
     expect(screen.getByText("200%")).toBeInTheDocument();
-    expect(zoomIn).toBeDisabled();
+    expect(zoomIn).toHaveAttribute("aria-disabled", "true");
+    await userEvent.click(zoomIn);
+    expect(screen.getByText("200%")).toBeInTheDocument();
     for (let i = 0; i < 5; i++) await userEvent.click(zoomOut);
     expect(screen.getByText("50%")).toBeInTheDocument();
-    expect(zoomOut).toBeDisabled();
+    expect(zoomOut).toHaveAttribute("aria-disabled", "true");
+    expect(zoomIn).not.toHaveAttribute("aria-disabled");
   });
 
   it("shows an error card when loading fails; Retry fetches a new link and shows the page", async () => {
@@ -121,6 +126,32 @@ describe("DocumentViewer", () => {
     await waitFor(() => expect(screen.queryByText("Archived · read-only")).not.toBeInTheDocument());
     expect(screen.queryByRole("button", { name: "Restore" })).not.toBeInTheDocument();
     expect(screen.getByText("p. 1 / 3")).toBeInTheDocument();
+    // The Restore button is gone; focus moves to the title instead of dropping to <body>.
+    expect(screen.getByRole("heading", { level: 2, name: "ReAct" })).toHaveFocus();
+  });
+
+  it("keeps focus on Restore while it is in flight", async () => {
+    const pending = deferred<DocumentResponse>();
+    renderViewer({ loadFile: vi.fn().mockResolvedValue(file({ archived: true })), restore: vi.fn(() => pending.promise) });
+    await ready();
+    const restoreButton = screen.getByRole("button", { name: "Restore" });
+    restoreButton.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(restoreButton).toHaveAttribute("aria-disabled", "true");
+    expect(restoreButton).toHaveFocus();
+    await act(async () => pending.resolve(doc()));
+    expect(screen.getByRole("heading", { level: 2, name: "ReAct" })).toHaveFocus();
+  });
+
+  it("keeps focus on Next when Enter reaches the last page", async () => {
+    renderViewer();
+    await ready();
+    const next = screen.getByRole("button", { name: "Next page" });
+    next.focus();
+    await userEvent.keyboard("{Enter}{Enter}");
+    expect(screen.getByText("p. 3 / 3")).toBeInTheDocument();
+    expect(next).toHaveAttribute("aria-disabled", "true");
+    expect(next).toHaveFocus();
   });
 
   it("says when restoring failed", async () => {

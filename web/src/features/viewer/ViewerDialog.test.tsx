@@ -46,6 +46,24 @@ describe("ViewerDialog", () => {
     expect(onClose).toHaveBeenCalledWith(2);
   });
 
+  it("keeps focus inside when Next reaches the last page: Tab wraps and Escape still closes", async () => {
+    const { onClose } = open();
+    await ready();
+    const dialog = screen.getByRole("dialog");
+    const next = screen.getByRole("button", { name: "Next page" });
+    next.focus();
+    await userEvent.keyboard("{Enter}{Enter}");
+    expect(screen.getByText("p. 3 / 3")).toBeInTheDocument();
+    expect(next).toHaveFocus();
+    await userEvent.tab(); // Zoom out
+    await userEvent.tab(); // Zoom in, the last control
+    await userEvent.tab(); // wraps to the first
+    expect(screen.getByRole("button", { name: "Close" })).toHaveFocus();
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    await userEvent.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalledWith(3);
+  });
+
   it("shows the details strip", async () => {
     open();
     await ready();

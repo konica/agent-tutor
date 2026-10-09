@@ -38,6 +38,20 @@ describe("DocumentPane", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("still closes on Escape after Next reaches the last page", async () => {
+    const { onClose } = renderPane();
+    await ready();
+    const next = screen.getByRole("button", { name: "Next page" });
+    next.focus();
+    await userEvent.keyboard("{Enter}{Enter}");
+    expect(screen.getByText("p. 3 / 3")).toBeInTheDocument();
+    expect(next).toHaveFocus();
+    await userEvent.keyboard("{PageUp}");
+    expect(screen.getByText("p. 2 / 3")).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("opens the dialog at the pane's page; Escape closes only the dialog and refocuses Open in dialog", async () => {
     const { onClose } = renderPane();
     await ready();
