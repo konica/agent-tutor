@@ -7,6 +7,7 @@ import {
   loadDocuments,
   loadSubjectSuggestions,
   loadUploadLimits,
+  loadUploadStatus,
   postForm,
   rejectionReason,
   RetriesUsedUpError,
@@ -71,15 +72,15 @@ describe("uploadPdf", () => {
     expect(form.get("file")).toBe(file);
   });
 
-  it("reports the new document id, then the progress, then 1 when storage accepts the file", async () => {
+  it("reports the new document and upload ids, then the progress, then 1 when storage accepts the file", async () => {
     const { apiClient } = api(() => json(started, 201));
     const seen: string[] = [];
     const post = vi.fn(async (_url: string, _form: FormData, onProgress: (f: number) => void) => {
       onProgress(0.5);
       return 204;
     });
-    await uploadPdf(new File(["%PDF"], "p.pdf"), { onStarted: (id) => seen.push(`started ${id}`), onProgress: (f) => seen.push(`progress ${f}`) }, apiClient, post);
-    expect(seen).toEqual(["started d1", "progress 0.5", "progress 1"]);
+    await uploadPdf(new File(["%PDF"], "p.pdf"), { onStarted: (id, uploadId) => seen.push(`started ${id} ${uploadId}`), onProgress: (f) => seen.push(`progress ${f}`) }, apiClient, post);
+    expect(seen).toEqual(["started d1 u1", "progress 0.5", "progress 1"]);
   });
 
   it("rejects when S3 refuses the file, and never reports 1", async () => {
@@ -87,6 +88,27 @@ describe("uploadPdf", () => {
     const onProgress = vi.fn();
     await expect(uploadPdf(new File(["x"], "x.pdf"), { onProgress }, apiClient, async () => 403)).rejects.toThrow("403");
     expect(onProgress).not.toHaveBeenCalledWith(1);
+  });
+});
+
+describe("loadUploadStatus", () => {
+  it("asks what became of the upload and returns the answer", async () => {
+    const body = { upload_id: "u1", outcome: "duplicate", document_id: "d1", archived: false };
+    const { apiClient, fetch } = api(() => json(body));
+    await expect(loadUploadStatus("u1", apiClient)).resolves.toEqual(body);
+    const request = fetch.mock.calls[0]![0] as Request;
+    expect(request.method).toBe("GET");
+    expect(request.url).toBe("http://api.test/uploads/u1");
+  });
+
+  it("rejects with SessionExpiredError on 401", async () => {
+    const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
+    await expect(loadUploadStatus("u1", apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+
+  it("rejects with the status otherwise", async () => {
+    const { apiClient } = api(() => json({ detail: "Not found" }, 404));
+    await expect(loadUploadStatus("u1", apiClient)).rejects.toThrow("404");
   });
 });
 

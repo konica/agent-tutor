@@ -16,23 +16,24 @@ export function subjectHue(hueKey: string): SubjectHue {
 type Props = {
   name: string;
   hueKey: string;
-  size?: "sm" | "md" | "lg"; // lg is the picker's 40px touch size
+  size?: "sm" | "md" | "lg"; // lg is the picker's 32px size
   origin?: string;
   pressed?: boolean;
   disabled?: boolean;
+  truncate?: boolean; // let a long name shrink to an ellipsis (the Library cell)
   onToggle?: () => void;
 };
 
 // The colour marks the dot only; the text keeps the main text colour (DESIGN.md → Tokens).
-export function SubjectChip({ name, hueKey, size = "md", origin, pressed = false, disabled, onToggle }: Props) {
-  const className = size === "md" ? styles.chip : `${styles.chip} ${styles[size]}`;
+export function SubjectChip({ name, hueKey, size = "md", origin, pressed = false, disabled, truncate = false, onToggle }: Props) {
+  const className = [styles.chip, size !== "md" && styles[size], truncate && styles.truncate].filter(Boolean).join(" ");
   const hue = { "--h": `var(--subj-${subjectHue(hueKey)})` } as CSSProperties;
   const dot = <span className={styles.dot} aria-hidden="true" />;
   if (!onToggle) {
     return (
       <span className={className} style={hue}>
         {dot}
-        {name}
+        {truncate ? <span className={styles.name}>{name}</span> : name}
       </span>
     );
   }

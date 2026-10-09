@@ -1,8 +1,11 @@
+import { Tag } from "lucide-react";
 import { forwardRef } from "react";
 
 import type { DocumentFilters } from "../../api/documents";
 import type { SubjectResponse } from "../../api/generated/types.gen";
-import { FilterBar, FilterField, FilterRange, FilterRangeDash } from "../../components/FilterBar/FilterBar";
+import { FilterBar, FilterField } from "../../components/FilterBar/FilterBar";
+import styles from "./LibraryFilters.module.css";
+import { UploadedFilter } from "./UploadedFilter";
 
 // Same wording as StateBadge; the value is the API's state.
 const STATES: { value: NonNullable<DocumentFilters["state"]>; label: string }[] = [
@@ -21,11 +24,12 @@ type Props = {
   onChange: (filters: DocumentFilters) => void;
   subjects: SubjectResponse[];
   count: number | null;
+  needsSubjects: number; // documents in the loaded list that wait for subjects
   onClear: () => void;
 };
 
-// Single-select Subject and State, an inclusive From–To date range, and the result count. Every change reloads the list through the API.
-export const LibraryFilters = forwardRef<HTMLSelectElement, Props>(function LibraryFilters({ filters, onChange, subjects, count, onClear }, subjectRef) {
+// Single-select Subject and State, an upload-date popover, a needs-subjects chip, and the result count. Every change reloads the list through the API.
+export const LibraryFilters = forwardRef<HTMLSelectElement, Props>(function LibraryFilters({ filters, onChange, subjects, count, needsSubjects, onClear }, subjectRef) {
   const set = (patch: Partial<DocumentFilters>) => {
     const next = { ...filters, ...patch };
     // Absent means unfiltered, so an emptied control drops its key.
@@ -47,15 +51,7 @@ export const LibraryFilters = forwardRef<HTMLSelectElement, Props>(function Libr
           ))}
         </select>
       </FilterField>
-      <FilterRange>
-        <FilterField id="filter-from" label="From">
-          <input id="filter-from" type="date" value={filters.uploaded_from ?? ""} max={filters.uploaded_to || undefined} onChange={(e) => set({ uploaded_from: e.target.value })} />
-        </FilterField>
-        <FilterRangeDash />
-        <FilterField id="filter-to" label="To">
-          <input id="filter-to" type="date" value={filters.uploaded_to ?? ""} min={filters.uploaded_from || undefined} onChange={(e) => set({ uploaded_to: e.target.value })} />
-        </FilterField>
-      </FilterRange>
+      <UploadedFilter from={filters.uploaded_from} to={filters.uploaded_to} onChange={set} />
       <FilterField id="filter-state" label="State">
         <select id="filter-state" value={filters.state ?? ""} onChange={(e) => set({ state: (e.target.value || undefined) as DocumentFilters["state"] })}>
           <option value="">All states</option>
@@ -66,6 +62,12 @@ export const LibraryFilters = forwardRef<HTMLSelectElement, Props>(function Libr
           ))}
         </select>
       </FilterField>
+      {(needsSubjects > 0 || filters.state === "awaiting_subjects") && (
+        <button type="button" className={styles.chip} aria-pressed={filters.state === "awaiting_subjects"} onClick={() => set({ state: filters.state === "awaiting_subjects" ? undefined : "awaiting_subjects" })}>
+          <Tag className={styles.chipIcon} strokeWidth={1.5} aria-hidden="true" />
+          {needsSubjects === 0 ? "Needs subjects" : needsSubjects === 1 ? "1 needs subjects" : `${needsSubjects} need subjects`}
+        </button>
+      )}
     </FilterBar>
   );
 });

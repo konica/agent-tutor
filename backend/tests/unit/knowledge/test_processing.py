@@ -57,13 +57,17 @@ def test_a_stored_pdf_becomes_chunks_pages_json_and_a_ready_document() -> None:
 
     content = w.library.state.contents[content_id]
     assert content.state is ContentState.READY
-    assert (content.pages, content.text_key, content.chunker) == (2, pages_key(content.sha256), "fake:100:v1")
+    assert (content.pages, content.text_key, content.chunker) == (
+        2,
+        pages_key(content.owner_id, content.content_id),
+        "fake:100:v1",
+    )
     assert (content.embedding_model, content.embedding_dim) == ("fake-embedding", 8)
     assert content.failure_reason is None
 
-    stored = w.objects.objects[pages_key(content.sha256)]
+    stored = w.objects.objects[pages_key(content.owner_id, content.content_id)]
     assert json.loads(stored) == {"pages": [{"page": 1, "text": SENTENCE}, {"page": 2, "text": SENTENCE}]}
-    assert w.objects.content_types[pages_key(content.sha256)] == "application/json"
+    assert w.objects.content_types[pages_key(content.owner_id, content.content_id)] == "application/json"
 
     document = w.library.state.documents[document_id]
     assert (document.state, document.subject_ids) == ("awaiting_subjects", [])
@@ -76,7 +80,7 @@ def test_blank_pages_make_no_chunks_and_pages_keep_physical_numbers() -> None:
     assert {c.page for c in w.library.state.chunks[content_id]} == {1, 3}
     content = w.library.state.contents[content_id]
     assert content.pages == 3
-    pages = json.loads(w.objects.objects[pages_key(content.sha256)])["pages"]
+    pages = json.loads(w.objects.objects[pages_key(content.owner_id, content.content_id)])["pages"]
     assert [p["page"] for p in pages] == [1, 2, 3] and pages[1]["text"] == "  \n "
 
 
@@ -89,7 +93,7 @@ def test_unreadable_pdf_fails_content_and_document() -> None:
     document = w.library.state.documents[document_id]
     assert (document.state, document.failure_reason) == ("failed", UNREADABLE_PDF)
     assert content_id not in w.library.state.chunks
-    assert pages_key(content.sha256) not in w.objects.objects
+    assert pages_key(content.owner_id, content.content_id) not in w.objects.objects
 
 
 def test_pdf_without_text_layer_fails() -> None:
@@ -101,7 +105,7 @@ def test_pdf_without_text_layer_fails() -> None:
     document = w.library.state.documents[document_id]
     assert (document.state, document.failure_reason) == ("failed", NO_TEXT_LAYER)
     assert content_id not in w.library.state.chunks
-    assert pages_key(content.sha256) not in w.objects.objects
+    assert pages_key(content.owner_id, content.content_id) not in w.objects.objects
 
 
 def test_processing_twice_keeps_one_set_of_chunks() -> None:
@@ -185,7 +189,7 @@ def test_text_that_yields_no_chunks_fails_without_leaving_pages_json() -> None:
 
     content = w.library.state.contents[content_id]
     assert (content.state, content.failure_reason) == (ContentState.FAILED, NO_TEXT_LAYER)
-    assert pages_key(content.sha256) not in w.objects.objects
+    assert pages_key(content.owner_id, content.content_id) not in w.objects.objects
 
 
 def test_wrong_embedding_dimension_crashes_and_stores_nothing() -> None:
@@ -251,7 +255,7 @@ def _assert_failed_without_output(w: World, document_id: str, content_id: str, r
     document = w.library.state.documents[document_id]
     assert (document.state, document.failure_reason) == ("failed", reason)
     assert content_id not in w.library.state.chunks
-    assert pages_key(content.sha256) not in w.objects.objects
+    assert pages_key(content.owner_id, content.content_id) not in w.objects.objects
 
 
 def test_a_pdf_over_the_page_limit_fails_with_its_reason_and_stores_no_chunks() -> None:

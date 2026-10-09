@@ -78,8 +78,9 @@ describe("ChatPage", () => {
     // The question is the header title and also the learner's bubble in the conversation.
     expect(screen.getByRole("heading", { level: 1, name: "What is attention?" })).toBeInTheDocument();
     expect(screen.getByText("You asked:").parentElement).toHaveTextContent("You asked: What is attention?");
-    expect(screen.getByText("a.pdf, p. 3")).toBeInTheDocument();
-    expect(screen.getByText("b.pdf, page unavailable")).toBeInTheDocument();
+    expect(screen.getByText("Sources")).toBeVisible();
+    expect(screen.getByTitle("a.pdf, p. 3")).toBeInTheDocument();
+    expect(screen.getByTitle("b.pdf, page unavailable")).toHaveTextContent("page unavailable");
   });
 
   it("numbers each citation with the marker the answer uses for it", async () => {
@@ -94,10 +95,35 @@ describe("ChatPage", () => {
     renderChat({ ask });
     await userEvent.type(await question(), "What is attention?");
     await userEvent.click(askButton());
-    const citations = await screen.findByRole("region", { name: "Citations" });
-    const [item] = within(citations).getAllByRole("listitem");
-    expect(item).toHaveTextContent(/^\[2\] b\.pdf, p\. 4$/);
-    expect(within(citations).queryByText("[1]")).not.toBeInTheDocument();
+    const sources = await screen.findByRole("list", { name: "Sources" });
+    const [item] = within(sources).getAllByRole("listitem");
+    expect(item).toHaveTextContent(/^\[2\] b\.pdf · p\. 4$/);
+    expect(within(sources).queryByText("[1]")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Citations" })).not.toBeInTheDocument();
+  });
+
+  it("shows one Sources line whose chip carries the full citation in its title", async () => {
+    const title = "ReAct: Synergizing Reasoning and Acting";
+    const ask = vi.fn(() =>
+      events(
+        { type: "thread", thread_id: "t1" },
+        { type: "delta", text: "Yes [1]." },
+        { type: "citations", citations: [{ n: 1, chunk_id: "c1", document_title: title, page: 3 }] },
+        { type: "done" },
+      ),
+    );
+    renderChat({ ask });
+    await userEvent.type(await question(), "How does ReAct work?");
+    await userEvent.click(askButton());
+    expect(await screen.findByText("Sources")).toBeVisible();
+    expect(screen.getByTitle(`${title}, p. 3`)).toHaveTextContent(title);
+    expect(screen.getByRole("heading", { level: 1, name: "How does ReAct work?" })).toHaveAttribute("title", "How does ReAct work?");
+  });
+
+  it("shows the keyboard hint under the composer", async () => {
+    renderChat();
+    await question();
+    expect(screen.getByText("Enter to send · Shift + Enter for a new line")).toBeVisible();
   });
 
   it("shows another refusal's message without pointing to the Library", async () => {

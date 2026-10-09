@@ -15,9 +15,10 @@ from smart_tutor.shared.domain.ids import ContentId, DocumentId, SubjectId, Uplo
 class ContentRepository(ABC):
     @abstractmethod
     def insert_or_get(self, content: Content) -> tuple[Content, bool]:
-        """Insert unless the sha256 exists; return the stored content and whether this call created it.
+        """Insert unless the owner has this sha256 (unique `(owner_id, sha256)`); return the stored content and
+        whether this call created it.
 
-        Concurrent callers with the same sha256 get one row: the second waits for the first to commit.
+        Concurrent callers with the same owner and hash get one row: the second waits for the first to commit.
         """
 
     @abstractmethod
@@ -43,6 +44,14 @@ class DocumentRepository(ABC):
     @abstractmethod
     def save(self, document: Document) -> None:
         """Write back content_id, state, failure_reason, and replace the document's subject rows."""
+
+    @abstractmethod
+    def get_by_content(self, content_id: ContentId) -> Document | None:
+        """The document linked to this content (one per content: contents are per owner). No access check."""
+
+    @abstractmethod
+    def remove(self, document_id: DocumentId) -> None:
+        """Delete a document row and its subject rows."""
 
     @abstractmethod
     def list_processing_for_content_for_update(self, content_id: ContentId) -> list[Document]:
@@ -81,7 +90,11 @@ class UploadRepository(ABC):
     def add(self, upload: Upload) -> None: ...
 
     @abstractmethod
-    def record_outcome(self, upload_id: UploadId, size: int, outcome: UploadOutcome) -> None: ...
+    def record_outcome(self, upload_id: UploadId, size: int, outcome: UploadOutcome, document_id: DocumentId) -> None:
+        """What the worker found, and the document the upload ended in."""
+
+    @abstractmethod
+    def get(self, upload_id: UploadId) -> Upload | None: ...
 
 
 class ChunkRepository(ABC):

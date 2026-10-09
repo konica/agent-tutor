@@ -11,6 +11,7 @@ from smart_tutor.knowledge.application.upload_service import (
     PDF_CONTENT_TYPE,
     StartedUpload,
     UploadService,
+    UploadStatus,
 )
 from smart_tutor.knowledge.domain.content import ContentState
 from smart_tutor.knowledge.domain.errors import (
@@ -58,6 +59,7 @@ __all__ = [
     "UnreadablePdfError",
     "UploadOutcome",
     "UploadService",
+    "UploadStatus",
     "load_file_limits",
     "load_max_attempts",
     "retried_content",

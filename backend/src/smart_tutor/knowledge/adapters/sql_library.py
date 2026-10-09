@@ -36,7 +36,7 @@ def _content(row: Any) -> Content:
         row.bytes,
         ContentState(row.state),
         row.attempts,
-        UserId(row.processed_by_user_id) if row.processed_by_user_id else None,
+        UserId(row.owner_id),
         failure_reason=row.failure_reason,
         pages=row.pages,
         text_key=row.text_key,
@@ -88,16 +88,18 @@ class _Contents(ContentRepository):
                 bytes=content.size,
                 state=content.state.value,
                 attempts=content.attempts,
-                processed_by_user_id=content.processed_by_user_id,
+                owner_id=content.owner_id,
                 processed_at=func.now(),
             )
-            .on_conflict_do_nothing(index_elements=["sha256"])
+            .on_conflict_do_nothing(index_elements=["owner_id", "sha256"])
             .returning(contents.c.content_id)
         ).first()
         if inserted is not None:
             return content, True
         # READ COMMITTED: this statement sees the row the concurrent winner just committed.
-        row = self._conn.execute(select(contents).where(contents.c.sha256 == content.sha256)).one()
+        row = self._conn.execute(
+            select(contents).where(contents.c.owner_id == content.owner_id, contents.c.sha256 == content.sha256)
+        ).one()
         return _content(row), False
 
     def get(self, content_id: ContentId) -> Content | None:
@@ -152,6 +154,14 @@ class _Documents(DocumentRepository):
     def get_by_upload_for_update(self, upload_id: UploadId) -> Document | None:
         row = self._conn.execute(select(documents).where(documents.c.upload_id == upload_id).with_for_update()).first()
         return self._load([row])[0] if row else None
+
+    def get_by_content(self, content_id: ContentId) -> Document | None:
+        row = self._conn.execute(select(documents).where(documents.c.content_id == content_id)).first()
+        return self._load([row])[0] if row else None
+
+    def remove(self, document_id: DocumentId) -> None:
+        self._conn.execute(delete(document_subjects).where(document_subjects.c.document_id == document_id))
+        self._conn.execute(delete(documents).where(documents.c.document_id == document_id))
 
     def save(self, document: Document) -> None:
         self._conn.execute(
@@ -273,9 +283,24 @@ class _Uploads(UploadRepository):
             uploads.insert().values(upload_id=upload.upload_id, user_id=upload.user_id, created_at=upload.created_at)
         )
 
-    def record_outcome(self, upload_id: UploadId, size: int, outcome: UploadOutcome) -> None:
+    def get(self, upload_id: UploadId) -> Upload | None:
+        row = self._conn.execute(select(uploads).where(uploads.c.upload_id == upload_id)).first()
+        if row is None:
+            return None
+        return Upload(
+            UploadId(str(row.upload_id)),
+            UserId(row.user_id),
+            row.created_at,
+            row.bytes,
+            UploadOutcome(row.outcome) if row.outcome else None,
+            DocumentId(str(row.document_id)) if row.document_id else None,
+        )
+
+    def record_outcome(self, upload_id: UploadId, size: int, outcome: UploadOutcome, document_id: DocumentId) -> None:
         self._conn.execute(
-            update(uploads).where(uploads.c.upload_id == upload_id).values(bytes=size, outcome=outcome.value)
+            update(uploads)
+            .where(uploads.c.upload_id == upload_id)
+            .values(bytes=size, outcome=outcome.value, document_id=document_id)
         )
 
 

@@ -23,9 +23,9 @@ class DocumentView:
     failure_reason: str | None
     created_at: datetime
     subject_ids: tuple[SubjectId, ...]
-    authors: tuple[str, ...]  # of the shared content; empty until it is described
+    authors: tuple[str, ...]  # of the learner's own content; empty until it is described
     year: int | None
-    attempt: int | None  # of the shared content; None until the upload is hashed
+    attempt: int | None  # of the learner's own content; None until the upload is hashed
     max_attempts: int
     can_retry: bool
 

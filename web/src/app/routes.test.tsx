@@ -2,7 +2,7 @@ import { act, render, screen, within } from "@testing-library/react";
 import { StrictMode, type ReactNode } from "react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { loadDocuments } from "../api/documents";
 import type { DocumentResponse } from "../api/generated/types.gen";
@@ -185,5 +185,19 @@ describe("app shell routes", () => {
     renderAt("/library", { strict: true });
     await screen.findByRole("heading", { level: 1, name: "Library" });
     expect(screen.getByRole("main")).not.toHaveFocus();
+  });
+});
+
+describe("collapsible nav", () => {
+  afterEach(() => localStorage.clear());
+
+  it("collapses to the rail from the keyboard and remembers it", async () => {
+    renderAt("/library");
+    const toggle = nav().getByRole("button", { name: "Collapse navigation" });
+    for (let i = 0; i < 30 && document.activeElement !== toggle; i += 1) await userEvent.tab();
+    expect(toggle).toHaveFocus();
+    await userEvent.keyboard("{Enter}");
+    expect(nav().getByRole("button", { name: "Expand navigation" })).toBeInTheDocument();
+    expect(localStorage.getItem("smart-tutor.nav-collapsed")).toBe("1");
   });
 });

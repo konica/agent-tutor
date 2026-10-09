@@ -1,27 +1,40 @@
 .table {
-  width: 100%; border-collapse: separate; border-spacing: 0;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden;
+  width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
 }
+/* Widths sit on the th cells: Chrome ignores calc() and clamp() with % in table cells, so plain %. The Document column takes the rest: about 280px at the 1024px minimum width, wider above. */
+.table th.colSubjects { width: 18%; }
+.table th.colState { width: 20%; }
+.table th.colUploaded { width: 76px; }
+.table th.colActions { width: 144px; }
 .table th {
-  text-align: left; padding: var(--sp-3) var(--sp-5); background: var(--surface-2); color: var(--text-2);
-  font-size: var(--fs-12); font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase;
+  position: sticky; top: 0; z-index: 1; height: 28px; text-align: left; padding: 0 var(--sp-3);
+  background: var(--surface-2); color: var(--text-2);
+  font-size: var(--fs-12); font-weight: 600; letter-spacing: 0; text-transform: none;
   border-bottom: 1px solid var(--border);
 }
-.table td { padding: var(--sp-4) var(--sp-5); vertical-align: middle; border-bottom: 1px solid var(--border); }
+.table td { height: 40px; padding: 0 var(--sp-3); vertical-align: middle; border-bottom: 1px solid var(--border); }
 .table tbody tr:last-child td { border-bottom: 0; }
 .table tbody tr { scroll-margin-top: var(--sp-6); }
-.table tbody tr:target { background: var(--accent-soft); }
-.doc { display: flex; align-items: center; gap: var(--sp-3); }
-.fileIcon {
-  display: inline-grid; place-items: center; width: 32px; height: 36px; flex: none;
-  border: 1px solid var(--border-strong); border-radius: var(--r-sm); color: var(--text-2);
-}
-.fileIcon svg { width: 18px; height: 18px; }
-.title { font-weight: 650; color: var(--text); overflow-wrap: anywhere; }
-.titleStack { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; }
-.byline { font-size: var(--fs-14); color: var(--text-2); }
-.muted { color: var(--text-2); }
-.hint, .reason { margin: var(--sp-1) 0 0; font-size: var(--fs-12); max-width: 22ch; }
-.hint { color: var(--text-2); }
-.reason { color: var(--danger); }
+.table tbody tr:hover td { background: var(--surface-2); }
+.table tbody tr.needs td { background: color-mix(in oklab, var(--attn-soft) 60%, var(--surface)); }
+.table tbody tr:target td { background: var(--accent-soft); }
+.doc { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; white-space: nowrap; }
+.fileIcon { width: 16px; height: 16px; flex: none; color: var(--text-2); }
+.title { flex: 0 1 auto; min-width: 0; font-size: var(--fs-14); font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; }
+.byline { flex: 0 100 auto; min-width: 0; font-size: var(--fs-13); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; }
+.subjects { display: flex; align-items: center; gap: var(--sp-1); min-width: 0; white-space: nowrap; overflow: hidden; }
+.muted { color: var(--text-2); font-size: var(--fs-13); }
+.state { display: flex; align-items: center; gap: var(--sp-2); white-space: nowrap; }
+.stateFailed { flex-direction: column; align-items: flex-start; gap: var(--sp-1); padding: var(--sp-2) 0; }
+.hint { min-width: 0; font-size: var(--fs-12); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; }
+.reason { display: flex; align-items: flex-start; gap: var(--sp-1); white-space: normal; font-size: var(--fs-13); color: var(--danger); }
+.reasonIcon { width: 14px; height: 14px; flex: none; margin-top: 2px; }
+.date { font-size: var(--fs-12); color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .actions { text-align: right; white-space: nowrap; }
+/* No overflow clipping on the table, so the sticky header works and focus rings show; corners are rounded per cell. */
+.table thead th:first-child { border-top-left-radius: calc(var(--r-md) - 1px); }
+.table thead th:last-child { border-top-right-radius: calc(var(--r-md) - 1px); }
+.table tbody tr:last-child td:first-child { border-bottom-left-radius: calc(var(--r-md) - 1px); }
+.table tbody tr:last-child td:last-child { border-bottom-right-radius: calc(var(--r-md) - 1px); }
+.table tbody tr.needs:hover td { background: color-mix(in oklab, var(--attn-soft) 60%, var(--surface-2)); }
