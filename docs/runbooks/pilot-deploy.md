@@ -2,6 +2,8 @@
 
 Deploys the pilot's infrastructure and the `web`, `keycloak`, `api`, `agent`, `mcp-server`, and `worker` charts, so the CloudFront address serves the app shell, Keycloak at `/auth` on RDS, and the API at `/api`. The pilot now runs upload, processing, and chat: a learner uploads a PDF and asks a question about it (PRD §9.12, ADRs 0009 and 0010). It needs an account admin. Do [`pilot-aws-prerequisites.md`](pilot-aws-prerequisites.md) (#55) first. The big picture is in [`pilot-environment-overview.md`](pilot-environment-overview.md). After the first deploy, every merge to `main` deploys automatically (section 12); this runbook stays the manual path and the reference for what the workflow does.
 
+To stop paying for the pilot, see [`pilot-teardown.md`](pilot-teardown.md) (#177).
+
 Commands are for **PowerShell 7** (`pwsh`). Run them from the repository root with your admin profile.
 
 ## 1. Before you start
@@ -245,42 +247,7 @@ The agent receives the app database secret but doesn't use it yet, so restarting
 
 ## 10. Tear down
 
-This keeps the #55 prerequisites, which cost nothing. `SmartTutor-prod-Data` keeps a final RDS snapshot, because documents and threads are never deleted. `SmartTutor-prod-Storage` keeps the documents bucket (see below). First note the VPC ID, which you need if the `Network` destroy fails (see below):
-
-```powershell
-$VpcId = Get-Output Network VpcId
-```
-
-Uninstall the app first, so the controller deregisters targets and removes its finalizers:
-
-```powershell
-helm uninstall smart-tutor -n smart-tutor --wait
-helm uninstall aws-load-balancer-controller -n kube-system
-helm uninstall external-secrets -n external-secrets
-helm uninstall metrics-server -n kube-system
-Push-Location infra
-npx aws-cdk@latest destroy -c smart-tutor:mode=native-cloud SmartTutor-prod-Storage SmartTutor-prod-Edge SmartTutor-prod-Cluster SmartTutor-prod-Registry SmartTutor-prod-Budgets SmartTutor-prod-Data SmartTutor-prod-Config SmartTutor-prod-Network
-Pop-Location
-```
-
-Destroy `SmartTutor-prod-Storage` **before** `SmartTutor-prod-Edge`, because Storage imports Edge's domain for its CORS rule. The command above lists it first. Never use `--all` here: it would delete the GitHub deploy role. CloudFront takes about 15 min to disable and delete. If `Network` fails because the VPC origin's network interfaces are still being released, wait 10 minutes and run the destroy for `SmartTutor-prod-Network` again.
-
-If it still fails, CloudFront may have left its `CloudFront-VPCOrigins-Service-SG` security group in the VPC. Find and delete it, then run the `Network` destroy again:
-
-```powershell
-$Sg = aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VpcId" "Name=group-name,Values=CloudFront-VPCOrigins-Service-SG" --query "SecurityGroups[0].GroupId" --output text
-aws ec2 delete-security-group --group-id $Sg
-```
-
-ECR images are deleted with their repositories. List the final snapshot:
-
-```powershell
-aws rds describe-db-snapshots --db-instance-identifier smart-tutor-prod
-```
-
-The **documents bucket is retained**, so learners' PDFs survive a teardown (`smart-tutor-documents-<account id>`; the stack deletes the queues but not the bucket). Delete it by hand only if the data must go. `aws s3 rm s3://$Bucket --recursive` does not remove object versions, so use the console: **S3 → the bucket → Empty**, then **Delete**. A redeploy reuses the same bucket name, so CloudFormation fails if the bucket still exists outside the stack: import it into the stack or delete it first.
-
-Delete old snapshots you don't need, because they cost storage. A fresh deploy starts with an empty database. Restoring a snapshot is a manual step outside this runbook. Secrets in the CDK stacks are deleted at once (CloudFormation force-deletes them with no recovery window), so a redeploy with the same names works.
+Use the script in [`pilot-teardown.md`](pilot-teardown.md) (#177). It uninstalls the release and add-ons, destroys the stacks one at a time with `--exclusively` (a plain destroy of `Network` would also delete the shared `Registry`), and keeps the final RDS snapshot and the documents bucket unless you pass a switch.
 
 ## 11. Costs
 

@@ -12,6 +12,9 @@ jobs:
     uses: ./.github/workflows/ci.yml
 
   deploy:
+    # Set the repository variable NATIVE_CLOUD_AUTO_DEPLOY to `false` while the pilot is torn down
+    # (docs/runbooks/pilot-teardown.md), or the next merge rebuilds it. Unset keeps deploying (#150 makes it opt-in).
+    if: vars.NATIVE_CLOUD_AUTO_DEPLOY != 'false'
     needs: checks
     permissions:
       contents: read
