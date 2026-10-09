@@ -33,10 +33,8 @@ def _user_data(t: Template) -> str:
 
 
 def _statements(t: Template) -> dict[str, dict[str, Any]]:
-    statements = [
-        s for p in t.find_resources("AWS::IAM::Policy").values() for s in p["Properties"]["PolicyDocument"]["Statement"]
-    ]
-    return {s.get("Sid", json.dumps(s["Action"])): s for s in statements}
+    """The named statements by Sid; guards over every statement use `_all_statements`."""
+    return {s["Sid"]: s for s in _all_statements(t) if "Sid" in s}
 
 
 # --- network -------------------------------------------------------------------------------------------------------
@@ -162,14 +160,15 @@ def test_instance_role_pulls_images_reads_its_own_settings_and_secrets_and_is_ma
     assert statements["EcrLogin"]["Resource"] == "*"
     pull = json.dumps(statements["EcrPullAppImages"]["Resource"])
     assert all(f"repository/smart-tutor/{s}" in pull for s in ("api", "web", "keycloak", "agent", "mcp", "worker"))
-    assert "ecr:PutImage" not in json.dumps(statements)
+    assert "ecr:PutImage" not in json.dumps(_all_statements(t))
     assert "parameter/smart-tutor-on-premise/*" in json.dumps(statements["ReadSettings"]["Resource"])
     assert "secret:smart-tutor-on-premise/*" in json.dumps(statements["ReadSecrets"]["Resource"])
     # Nothing of native-cloud's.
-    assert "parameter/smart-tutor/" not in json.dumps(statements)
-    assert "secret:smart-tutor/" not in json.dumps(statements)
+    every = _all_statements(t)
+    assert "parameter/smart-tutor/" not in json.dumps(every)
+    assert "secret:smart-tutor/" not in json.dumps(every)
     # Only the ECR login and metrics, which have no resource, may use "*".
-    assert [sid for sid, s in statements.items() if s["Resource"] == "*"] == ["EcrLogin", "PublishJobMetrics"]
+    assert sorted(s.get("Sid", "<unnamed>") for s in every if s["Resource"] == "*") == ["EcrLogin", "PublishJobMetrics"]
 
 
 def test_instance_role_writes_the_on_premise_bucket_only_where_a_service_or_the_backup_does(t: Template) -> None:
@@ -293,6 +292,14 @@ def test_data_volume_is_snapshotted_daily_and_snapshots_are_kept_7_days(t: Templ
         if "dlm.amazonaws.com" in json.dumps(r["Properties"]["AssumeRolePolicyDocument"])
     )
     assert props["ExecutionRoleArn"] == {"Fn::GetAtt": [role_id, "Arn"]}
+
+
+def test_snapshot_policy_description_matches_the_pattern_aws_accepts(t: Template) -> None:
+    (policy,) = t.find_resources("AWS::DLM::LifecyclePolicy").values()
+    description = policy["Properties"]["Description"]
+
+    assert re.fullmatch(r"[0-9A-Za-z _-]+", description), description
+    assert description == "smart-tutor-on-premise-prod data volume daily snapshots kept 7 days"
 
 
 def test_only_the_data_volume_carries_the_snapshot_tag(t: Template) -> None:
@@ -603,6 +610,9 @@ def test_deploy_script_asserts_the_running_workers_isolation_and_the_inner_servi
     assert "ps -q worker" in check
     for fragment in ("docker inspect", ".Config.User", "10001:10001", "ReadonlyRootfs", "CapDrop", "no-new-privileges"):
         assert fragment in check, fragment
+    # A worker that isn't isolated is stopped before the deploy fails, so it parses no more untrusted PDFs.
+    failed = check[check.index("The worker is not isolated") :]
+    assert failed.index('docker stop "$worker"') < failed.index("exit 1")
     assert "exec -T api python" in check
     assert "http://agent:8080/healthz" in check
     assert "http://mcp:8000/mcp" in check and "401" in check

@@ -7,8 +7,8 @@
 # 2. Pulls the images, starts Postgres, and creates or updates the app and Keycloak roles and databases.
 # 3. Migrates, then starts every service and waits until all are healthy. Compose recreates only the services whose
 #    image or settings changed, so the same tag again changes nothing. Fails unless the running worker is isolated
-#    (non-root, read-only root, no capabilities) and the agent and MCP server answer. Installs and enables the
-#    scheduled jobs' systemd units (the nightly backup, #151).
+#    (non-root, read-only root, no capabilities; a worker that isn't is stopped) and the agent and MCP server answer.
+#    Installs and enables the scheduled jobs' systemd units (the nightly backup, #151).
 # 4. Creates the test learner if it is missing.
 #
 # It prints no secret: never add `set -x`, `docker compose config`, or an echo of the env file.
@@ -107,6 +107,9 @@ problems=()
 [[ $security_opt == *'"no-new-privileges:true"'* ]] || problems+=("SecurityOpt $security_opt lacks no-new-privileges")
 if ((${#problems[@]})); then
   printf 'The worker is not isolated: %s\n' "${problems[@]}" >&2
+  # Don't leave it consuming uploads after the deploy is marked failed.
+  docker stop "$worker" >/dev/null
+  echo "Stopped the worker" >&2
   exit 1
 fi
 

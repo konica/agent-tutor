@@ -160,7 +160,7 @@ Never run `dc config` or `cat` on the env file in a session that someone records
 docker inspect --format 'user={{.Config.User}} readonly={{.HostConfig.ReadonlyRootfs}} capdrop={{.HostConfig.CapDrop}} secopt={{.HostConfig.SecurityOpt}}' "$(dc ps -q worker)"
 ```
 
-It prints `user=10001:10001 readonly=true capdrop=[ALL] secopt=[no-new-privileges:true]`. The worker parses each PDF in a child process, which it stops after `SMART_TUTOR_EXTRACTION_TIMEOUT_SECONDS` (300); the document then fails with "This PDF took too long to read". The worker can still reach the internet: the egress allowlist is #153.
+It prints `user=10001:10001 readonly=true capdrop=[ALL] secopt=[no-new-privileges:true]`. The worker parses each PDF in a child process, which it stops after `SMART_TUTOR_EXTRACTION_TIMEOUT_SECONDS` (300); the document then fails with "This PDF took too long to read". Each extraction starts a fresh Python interpreter, and its start-up counts toward the limit. The worker can still reach the internet: the egress allowlist is #153.
 
 **Dead-letter drill.** A message the worker fails on 5 times moves to `smart-tutor-on-premise-ingest-dlq`. To check the redrive, stop the worker so it doesn't take the message, send one, receive it 5 times without deleting it, and look in the DLQ. From your laptop, with `dc stop worker` done on the VM first:
 
@@ -194,7 +194,7 @@ npx aws-cdk@latest destroy SmartTutor-OnPremise-prod-Host -c smart-tutor:mode=on
 Pop-Location
 ```
 
-This deletes the VM, the Elastic IP, and the VPC. The data volume is deleted after a final snapshot. Note the `DataVolumeId` output before you destroy, and delete that volume's snapshot by hand when the data must go (EC2 → Snapshots, filter by volume id). The Storage stack keeps the documents bucket, as in native-cloud.
+This deletes the VM, the Elastic IP, and the VPC. The data volume is deleted after a final snapshot. Note the `DataVolumeId` output before you destroy, and delete that volume's snapshot by hand when the data must go (EC2 → Snapshots, filter by volume id). The Storage stack keeps the documents bucket, as in native-cloud. No other stack references the Host (Storage's CORS names `*.sslip.io` or the configured domain, not the Elastic IP), so the Host can be destroyed on its own.
 
 ## Troubleshooting
 
@@ -205,6 +205,6 @@ This deletes the VM, the Elastic IP, and the VPC. The data volume is deleted aft
 | The browser warns about the certificate | Caddy couldn't get one: `dc logs caddy`. Let's Encrypt needs port 80 open (it is in the security group) and the domain to resolve to the Elastic IP. sslip.io names resolve to the IP they contain. Too many attempts hit Let's Encrypt's rate limits; the certificate is kept on `/data/caddy`, so replacing the VM doesn't request a new one. |
 | `docker compose up` times out on `keycloak` | The first start creates the schema and imports the realm, which takes up to 3 minutes. Check `dc logs keycloak`. |
 | Sign-in says "Invalid parameter: redirect_uri" | The domain changed after the realm was imported. Keycloak imports the realm once, so update the `smart-tutor-web` client's redirect URIs, web origins, and post-logout redirect URIs in the admin console (#154). |
-| `The worker container isn't isolated` (deploy fails) | `compose.yaml` lost one of the worker's `user`, `read_only`, `cap_drop`, or `security_opt` settings. Restore them; never deploy the worker without them. |
+| `The worker is not isolated: ...` (deploy fails) | `compose.yaml` lost one of the worker's `user`, `read_only`, `cap_drop`, or `security_opt` settings. The deploy stops the worker, so uploads wait in the queue. Restore the settings and deploy again; never run the worker without them. |
 | A document stays processing | The worker isn't running or can't reach AWS: `dc ps worker`, `dc logs --tail 100 worker`. `AccessDenied` means the instance role lacks a permission (Host stack); a Bedrock `ThrottlingException` retries on its own. |
 | `Warning: could not check the test learner` | The bootstrap admin was deleted. The deploy still succeeded; create the test learner by hand if you need it. |

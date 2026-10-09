@@ -64,16 +64,18 @@ def _cors_rules(**context: str) -> list[dict[str, Any]]:
     return rules
 
 
-def test_on_premise_bucket_cors_allows_the_host_address_to_post_uploads_and_get_documents() -> None:
-    # GET is the document viewer's presigned link (#123); the default address is the Elastic IP on sslip.io.
+def test_on_premise_bucket_cors_allows_sslip_io_to_post_uploads_and_get_documents() -> None:
+    # GET is the document viewer's presigned link (#123); until #154 claims a name the host is <Elastic IP>.sslip.io.
     (rule,) = _cors_rules()
 
     assert rule["AllowedMethods"] == ["GET", "POST"]
     assert rule["AllowedHeaders"] == ["*"]
-    (origin,) = rule["AllowedOrigins"]
-    assert '"https://"' in json.dumps(origin)
-    assert "SmartTutor-OnPremise-prod-Host:" in json.dumps(origin)  # an Fn::ImportValue of the Elastic IP
-    assert "Fn::ImportValue" in json.dumps(origin) and ".sslip.io" in json.dumps(origin)
+    assert rule["AllowedOrigins"] == ["https://*.sslip.io"]
+
+
+def test_on_premise_storage_imports_nothing_from_the_host() -> None:
+    # An import of the Elastic IP would block `cdk destroy` of the Host and the switch to a domain (#154).
+    assert "Fn::ImportValue" not in json.dumps(on_premise("Storage").to_json())
 
 
 def test_on_premise_bucket_cors_names_the_configured_domain() -> None:

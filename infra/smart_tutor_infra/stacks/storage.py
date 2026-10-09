@@ -2,8 +2,9 @@
 
 `uploads/<user>/<id>.pdf` (browser presigned POST, expires after 1 day; each upload notifies the ingest queue) and
 `contents/<owner_id>/<content_id>.pdf` and `.pages.json` (the worker's per-learner copies and page text). Versioned and
-retained on teardown. CORS lets only the web app's address in: native-cloud's CloudFront address may POST (the upload);
-#149 gives on-premise CORS for the Host's address; GET is for the document viewer's presigned link. On-premise also
+retained on teardown. CORS lets only the web app's address in: native-cloud's CloudFront address may POST (the upload).
+On-premise (#149) allows POST and GET (the document viewer's presigned link) from `https://<domain>`, or from
+`https://*.sslip.io` until the DuckDNS name is claimed (#154); it never references the Host stack. On-premise also
 keeps its nightly database dumps under `backups/` (#151), which expire.
 """
 

@@ -3,8 +3,8 @@
 - Network: a VPC of its own with one public subnet, no NAT, and an S3 gateway endpoint. The security group admits only
   TCP 80 and 443; there is no SSH and no key pair (operators use SSM Session Manager).
 - Instance: Amazon Linux 2023, IMDSv2 with a hop limit of 2 so containers get the instance profile's credentials, and an
-  Elastic IP. The address is `<eip>.sslip.io` unless the context `smart-tutor:on-premise-domain` names one;
-  `public_url` is `https://<address>`, the origin StorageStack's CORS allows.
+  Elastic IP. The address is `<eip>.sslip.io` unless the context `smart-tutor:on-premise-domain` names one (output
+  `PublicUrl`); StorageStack's CORS allows it without referencing this stack.
 - Services (#149): the API, worker, agent, and MCP server reach S3, SQS, SSM, and Bedrock with the instance profile,
   which grants what native-cloud's per-service roles grant (ServicePermissions), as one role. The ARNs come from
   ModeNames, so the Host never references StorageStack.
@@ -12,10 +12,10 @@
   instance: at first boot the instance attaches it by id, waiting until a replaced instance has let go of it, so the
   data survives replacing the instance. Deleting the stack keeps a snapshot.
 - Backups (#151): Data Lifecycle Manager snapshots the data volume daily and keeps 7 days; a systemd timer on the VM
-  dumps both databases nightly to the documents bucket's `backups/` (the only prefix the instance may write). A failed
-  snapshot or dump raises an alarm that emails the alert addresses. A volume restored from a snapshot is the context
-  `smart-tutor:on-premise-data-snapshot-id`; it replaces the instance, whose first boot attaches it. Runbook:
-  docs/runbooks/on-premise-backups.md.
+  dumps both databases nightly to the documents bucket's `backups/` (the instance writes only there and where the
+  services do, `uploads/` and `contents/`). A failed snapshot or dump raises an alarm that emails the alert addresses.
+  A volume restored from a snapshot is the context `smart-tutor:on-premise-data-snapshot-id`; it replaces the
+  instance, whose first boot attaches it. Runbook: docs/runbooks/on-premise-backups.md.
 - Deploy: `cdk deploy` uploads `deploy/` as an asset; the SSM document `<prefix>-deploy` downloads it and runs
   `deploy/on-premise/deploy.sh <image tag>`, which renders settings and secrets into a root-only env file on the VM.
   No secret is in the template, the outputs, or the user data.
@@ -211,7 +211,8 @@ class HostStack(cdk.Stack):
             if not any(statement is seen for seen in added):
                 added.append(statement)
                 role.add_to_policy(statement)
-        # The nightly pg_dump (deploy/on-premise/backup.sh) is the only S3 write; restore.sh reads the dumps back.
+        # The nightly pg_dump (deploy/on-premise/backup.sh) writes only under backups/, apart from the services' writes
+        # above; restore.sh reads the dumps back.
         documents_bucket = names.documents_bucket(self.account)
         backups = f"arn:{self.partition}:s3:::{documents_bucket}/{BACKUPS_PREFIX}*"
         role.add_to_policy(
@@ -274,8 +275,7 @@ class HostStack(cdk.Stack):
             self, "AddressAssociation", allocation_id=address.attr_allocation_id, instance_id=instance.instance_id
         )
         domain = domain or cdk.Fn.join("", [address.attr_public_ip, ".sslip.io"])
-        # The web app's one origin; StorageStack's CORS allows only it.
-        self.public_url = f"https://{domain}"
+        public_url = f"https://{domain}"
 
         # Database and test-learner secrets (Keycloak's are in ConfigStack). deploy.sh resets the database passwords to
         # these values on every deploy, so a restored volume or a rotated secret gets back in sync.
@@ -355,7 +355,7 @@ class HostStack(cdk.Stack):
 
         cdk.CfnOutput(self, "InstanceId", value=instance.instance_id)
         cdk.CfnOutput(self, "PublicIp", value=address.attr_public_ip)
-        cdk.CfnOutput(self, "PublicUrl", value=self.public_url)
+        cdk.CfnOutput(self, "PublicUrl", value=public_url)
         cdk.CfnOutput(self, "DataVolumeId", value=volume.volume_id)
         cdk.CfnOutput(self, "DeployDocumentName", value=document.ref)
 
@@ -374,7 +374,7 @@ class HostStack(cdk.Stack):
         policy = dlm.CfnLifecyclePolicy(
             self,
             "DataVolumeSnapshots",
-            description=f"{names.resource_prefix} data volume: daily, kept {SNAPSHOT_RETENTION_DAYS} days",
+            description=f"{names.resource_prefix} data volume daily snapshots kept {SNAPSHOT_RETENTION_DAYS} days",
             state="ENABLED",
             execution_role_arn=snapshot_role.role_arn,
             policy_details=dlm.CfnLifecyclePolicy.PolicyDetailsProperty(
