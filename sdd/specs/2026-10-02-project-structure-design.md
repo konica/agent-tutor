@@ -37,7 +37,7 @@ Architecture decisions after this spec are recorded as ADRs in `sdd/adr/` (0001 
 ```
 agent-tutor/
 ├── README.md
-├── Makefile                 # one entry point: make up, make test, make lint, make sweep, make glacier-tag, make retention
+├── Makefile                 # one entry point: make up, make test, make lint, make sweep, make retention
 ├── compose.yaml             # local dependencies (default) + `app` profile (same images as prod)
 ├── .env.example
 ├── .gitignore  .editorconfig  .pre-commit-config.yaml
@@ -100,7 +100,7 @@ backend/src/smart_tutor/
     ├── agent/         # server.py, graph.py, state.py, nodes/ (search, gate, answer, summarize)
     ├── mcp_server/    # server.py, tools.py (search, get_chunk) → knowledge.application
     ├── worker/        # SQS consumer → knowledge.application.IngestionService
-    └── jobs/          # migrate.py, record_sweeper.py, glacier_tagger.py, retention.py, (R3) learner_reports.py
+    └── jobs/          # migrate.py, record_sweeper.py, retention.py, (R3) learner_reports.py
 ```
 
 Every module has the same shape:
@@ -179,7 +179,7 @@ deploy/
 └── helm/
     ├── smart-tutor/                # umbrella chart: Chart.yaml, values.yaml, values-prod.yaml
     │   ├── templates/              # SecretStore and the db-bootstrap hook (files/db-bootstrap.sql)
-    │   └── charts/                 # api, agent, mcp-server, worker, web, jobs (sweeper, Glacier tagger, retention), keycloak
+    │   └── charts/                 # api, agent, mcp-server, worker, web, jobs (sweeper, retention), keycloak
     │                               # each sub-chart owns its NetworkPolicy and ExternalSecret
     └── addons/                     # values for AWS Load Balancer Controller, External Secrets Operator, metrics-server
 ```
