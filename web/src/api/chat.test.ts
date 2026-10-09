@@ -83,10 +83,10 @@ describe("askInNewThread", () => {
   });
 
   it("rejects with AskRefusedError carrying the detail on any other 409", async () => {
-    const { apiClient } = api(() => json({ detail: "Subject detection isn't available yet" }, 409));
+    const { apiClient } = api(() => json({ detail: "The tutor can't answer that right now" }, 409));
     const failure = collect(askInNewThread("q", apiClient));
     await expect(failure).rejects.toBeInstanceOf(AskRefusedError);
-    await expect(failure).rejects.toThrow("Subject detection isn't available yet");
+    await expect(failure).rejects.toThrow("The tutor can't answer that right now");
     await expect(failure).rejects.not.toBeInstanceOf(NoDocumentsError);
   });
 

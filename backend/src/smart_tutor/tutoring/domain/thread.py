@@ -1,4 +1,4 @@
-"""One conversation (PRD §9.4 Thread). It has no subjects; its documents used are only ever added (US-4b)."""
+"""One conversation (PRD §9.4 Thread). It has no subjects; its documents used (US-4b) are still to come."""
 
 from dataclasses import dataclass
 from datetime import datetime

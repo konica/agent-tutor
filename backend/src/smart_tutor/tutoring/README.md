@@ -1,6 +1,6 @@
 # `tutoring` module (Release 1)
 
-**Owns** (PRD §9.2, US-3, US-4 to US-6, US-13): Threads (no subjects; their documents used are only ever added), relevance gate, the ask path, conversation management.
+**Owns** (PRD §9.2, US-3, US-4 to US-6, US-13): Threads (no subjects; their documents used (US-4b) are still to come), relevance gate, the ask path, conversation management.
 
 **Key classes:** `Thread`, `RelevanceGate`; services `AskService`, `ConversationService`; ports `Retriever`, `ThreadRepository`.
 

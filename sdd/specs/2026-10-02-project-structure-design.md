@@ -6,7 +6,7 @@
 | **Date** | 2026-10-02 (rev. 2026-10-03) |
 | **Based on** | `sdd/prd.md` v2.2 (§9.4, §9.11–§9.16, §10, §14); ADRs 0001–0004 |
 | **Revision 2026-10-03** | PRD v2.0 (learner uploads, shared subject catalog, SHA-256 dedupe, sharing-ready model): `knowledge` owns library, contents, subjects, and access (`can_read`); `accounts` loses enrollment; `insights` becomes the decline log; new Release 3 module `graph`; module order puts `knowledge` below `tutoring`. |
-| **Revision 2026-10-03 (PRD v2.1)** | Release order changed: `graph` is Release 2 (research map) and Release 5 (deep graph); `catalog`, `quizzes`, `recommendations`, `reports` are Release 3. Documents have 1–3 subjects (`document_subjects`); threads hold 1–3 `subject_ids`. No admin functions. |
+| **Revision 2026-10-03 (PRD v2.1)** | Release order changed: `graph` is Release 2 (research map) and Release 5 (deep graph); `catalog`, `quizzes`, `recommendations`, `reports` are Release 3. Documents have 1–3 subjects (`document_subjects`); threads have no subjects (PRD v2.21). No admin functions. |
 | **Revision 2026-10-03 (PRD v2.2)** | New Release 1 module `subjects` split out of `knowledge` (ADR 0004); module order `… tutoring → graph → knowledge → subjects → accounts \| insights`; retention CronJob; `evals/seed_corpus/` manifest; ADRs recorded in `sdd/adr/`. |
 | **Scope** | Folder structure for the whole repository, Python packaging, module boundaries, and the import rules CI enforces |
 
@@ -85,7 +85,7 @@ backend/src/smart_tutor/
 │
 ├── knowledge/         # library: contents (SHA-256, states, retry), documents (1–3 subjects, states), can_read, upload, ingestion, chunks, search
 ├── subjects/          # shared subject catalog, personal names, suggestion ranking, name checks
-├── tutoring/          # threads (1–3 subjects, growth), subject detection, ask
+├── tutoring/          # threads (no subjects), relevance gate, ask
 ├── learning/          # Lesson Notes, learning records
 ├── accounts/          # rate limits and daily caps, token usage (learner profile from R3)
 ├── insights/          # decline log (scrubbed, 90-day retention), quality monitoring queries
@@ -97,7 +97,7 @@ backend/src/smart_tutor/
 │
 └── apps/              # entrypoints: parse input, call application services, format output; no business rules
     ├── api/           # main.py, deps.py (wiring), routes/ (one file per module), sse.py, rate_limit.py
-    ├── agent/         # server.py, graph.py, state.py, nodes/ (resolve_subject, search, gate, answer, summarize)
+    ├── agent/         # server.py, graph.py, state.py, nodes/ (search, gate, answer, summarize)
     ├── mcp_server/    # server.py, tools.py (search, get_chunk) → knowledge.application
     ├── worker/        # SQS consumer → knowledge.application.IngestionService
     └── jobs/          # migrate.py, record_sweeper.py, glacier_tagger.py, retention.py, (R3) learner_reports.py
@@ -120,7 +120,7 @@ Every module has the same shape:
 |---|---|---|---|
 | `knowledge` | Library (PRD §9.2 document processing, §9.3–§9.5, US-2, US-2b, US-10, US-11): contents deduplicated by SHA-256 (states, shared retry), documents (library entries, 1–3 subjects, states, archive flag, visibility, grants), the single `can_read` rule, upload flow, ingestion (first pages, saved page text, work key), chunks, search | `Content`, `Document` (`set_subjects()`, `can_be_read_by()`), `Chunk`; `UploadService`, `DeduplicationService`, `IngestionService`, `DocumentService`, `SearchService`; ports `PdfExtractor` (`extract_pages(..., first=2)` reads the first pages), `ObjectStore`, `ContentRepository`, `DocumentRepository`, `ChunkRepository` | `subjects` (suggestions, get-or-create), `accounts` (rate limits, processing usage) |
 | `subjects` | Shared subject catalog (PRD D1, D20, D21, US-2b, US-10b; ADR 0003, 0004): stable `subject_id`s, canonical names, personal names (rename, reset), suggestion ranking, name checks | `Subject`, `SubjectName`, `PersonalSubjectName`; `SubjectCatalogService`, `SubjectSuggester`, `SubjectNameChecker`; ports `SubjectRepository`, `PersonalNameRepository` | — |
-| `tutoring` | Threads (1–3 subjects, growth with notices), subject detection, relevance gate, growth check, ask path (§9.2, US-3–US-6, US-3b, US-13) | `Thread` (`add_subject()`), `DetectionPolicy`, `RelevanceGate`, `GrowthPolicy`; `SubjectDetector`, `AskService`, `ConversationService`; ports `Retriever`, `ThreadRepository` | `knowledge` (the learner's subjects), `subjects` (names), `accounts`, `insights` (log declines) |
+| `tutoring` | Threads (no subjects), relevance gate, ask path (§9.2, US-3–US-6, US-3b, US-13) | `Thread`, `RelevanceGate`; `AskService`, `ConversationService`; ports `Retriever`, `ThreadRepository` | `knowledge` (whether the learner has a ready document), `accounts`, `insights` (log declines) |
 | `learning` | Lesson Notes, learning records, idle sweep (§9.4, US-7, US-8, US-13b) | `LessonNote`, `LearningRecord`; `NoteService`, `LearningRecordService`; ports `NoteRepository`, `LearningMemory` | `tutoring` (thread content) |
 | `accounts` | Rate limits and daily caps; token usage (chat, document processing, background, system) (US-9); learner profile with time zone from Release 3 (D13) | `Learner`, `RateLimits`; `UsageService`, `LearnerService` | — |
 | `insights` | Anonymized decline log (scrubbed, 90-day retention) and quality monitoring queries (§9.6) | `Decline`; `DeclineLogService` | — |
@@ -156,7 +156,7 @@ backend/tests/
 
 backend/evals/              # datasets live in LangSmith (versioned there); the repo holds what builds and runs them
 ├── seed_corpus/            # manifest.yaml: openly licensed eval documents with labels (PDFs downloaded to data/seed_corpus/)
-├── generators/             # synthetic Q&A, negatives, detection and thread-growth cases, synthetic learners
+├── generators/             # synthetic Q&A, negatives, synthetic learners
 ├── adversarial/            # taxonomy.yaml + seed prompts, incl. document-embedded attacks (PRD §10.3)
 ├── evaluators/             # one file per PRD §10.1 evaluator; rubrics/ for Qwen judge prompts
 ├── targets.py              # how an evaluation run invokes the agent

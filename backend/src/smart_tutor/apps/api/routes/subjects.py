@@ -12,7 +12,7 @@ from smart_tutor.apps.api.routes.knowledge import SubjectResponse
 
 router = APIRouter(tags=["subjects"])
 
-UNNAMED_SUBJECT = "Unnamed subject"  # the agent refuses an empty name
+UNNAMED_SUBJECT = "Unnamed subject"  # display placeholder when a subject has no name
 
 
 class SubjectMatchResponse(BaseModel):
