@@ -7,8 +7,8 @@ import { SessionExpiredError } from "../../auth/authClient";
 import { LibraryPage } from "./LibraryPage";
 
 const today = new Date().toISOString();
-const processing: DocumentResponse = { document_id: "d1", title: "lewis-rag-2020.pdf", state: "processing", failure_reason: null, created_at: today, subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: [], year: null };
-const duplicate: DocumentResponse = { document_id: "d2", title: "copy.pdf", state: "failed", failure_reason: "This file isn't a readable PDF", created_at: today, subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: [], year: null };
+const processing: DocumentResponse = { document_id: "d1", title: "lewis-rag-2020.pdf", state: "processing", failure_reason: null, created_at: today, subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: [], year: null, archived: false };
+const duplicate: DocumentResponse = { document_id: "d2", title: "copy.pdf", state: "failed", failure_reason: "This file isn't a readable PDF", created_at: today, subjects: [], attempt: null, max_attempts: 3, can_retry: false, authors: [], year: null, archived: false };
 
 const notInLibrary = async () => null;
 const noSubjects = async () => [];
@@ -645,7 +645,7 @@ describe("LibraryPage choose subjects", () => {
   });
 });
 
-const scan: DocumentResponse = { document_id: "d3", title: "scan.pdf", state: "failed", failure_reason: "No text layer (scanned PDFs are not supported yet)", created_at: today, subjects: [], attempt: 1, max_attempts: 3, can_retry: true, authors: [], year: null };
+const scan: DocumentResponse = { document_id: "d3", title: "scan.pdf", state: "failed", failure_reason: "No text layer (scanned PDFs are not supported yet)", created_at: today, subjects: [], attempt: 1, max_attempts: 3, can_retry: true, authors: [], year: null, archived: false };
 
 describe("LibraryPage retry", () => {
   it("retries a failed document and refreshes the list", async () => {

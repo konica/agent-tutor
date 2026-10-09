@@ -45,6 +45,10 @@
       },
       "DocumentResponse": {
         "properties": {
+          "archived": {
+            "title": "Archived",
+            "type": "boolean"
+          },
           "attempt": {
             "anyOf": [
               {
@@ -135,7 +139,8 @@
           "created_at",
           "subjects",
           "authors",
-          "year"
+          "year",
+          "archived"
         ],
         "title": "DocumentResponse",
         "type": "object"
@@ -499,7 +504,7 @@
   "paths": {
     "/documents": {
       "get": {
-        "description": "The caller's documents, newest first, narrowed by any subset of the filters (PRD \u00a78 US-10).\n\n`subject_id` and `state` repeat; a document matches when it has any of the subjects and is in any of the states.\n`uploaded_from` and `uploaded_to` are inclusive calendar days in the app time zone (D27). The filters combine.",
+        "description": "The caller's documents, newest first, narrowed by any subset of the filters (PRD \u00a78 US-10).\n\n`subject_id` and `state` repeat; a document matches when it has any of the subjects and is in any of the states.\n`uploaded_from` and `uploaded_to` are inclusive calendar days in the app time zone (D27). The filters combine.\nActive documents by default; `archived=true` lists the archived ones.",
         "operationId": "list_documents",
         "parameters": [
           {
@@ -568,6 +573,16 @@
                 }
               ],
               "title": "Uploaded To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Archived",
+              "type": "boolean"
             }
           }
         ],
@@ -650,6 +665,104 @@
           }
         ],
         "summary": "Check Duplicate",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/documents/{document_id}/archive": {
+      "post": {
+        "description": "Archive the caller's document: it leaves search and My subjects; content and chunks stay (PRD \u00a78 US-10).\n\nArchiving an archived document changes nothing.",
+        "operationId": "archive_document",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Archive Document",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/documents/{document_id}/restore": {
+      "post": {
+        "description": "Bring an archived document back into search and My subjects; restoring an active one changes nothing.",
+        "operationId": "restore_document",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Restore Document",
         "tags": [
           "knowledge"
         ]

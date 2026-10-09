@@ -175,3 +175,18 @@ def test_a_learners_own_duplicate_points_to_their_document() -> None:
         "document_id": first["document_id"],
         "archived": False,
     }
+
+
+def test_b_cannot_archive_restore_or_see_as_archived_document() -> None:
+    client, objects, ingestion = setup()
+    stored = client.post("/uploads", json={"file_name": "a1.pdf"}, headers=A).json()
+    objects.objects[stored["fields"]["key"]] = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
+    ingestion.ingest_upload(stored["fields"]["key"])
+    doc = stored["document_id"]
+
+    assert client.post(f"/documents/{doc}/archive", headers=B).status_code == 404
+    assert [d["archived"] for d in client.get("/documents", headers=A).json()] == [False]
+    assert client.post(f"/documents/{doc}/archive", headers=A).status_code == 200
+    assert client.get("/documents", headers=B, params={"archived": "true"}).json() == []
+    assert client.post(f"/documents/{doc}/restore", headers=B).status_code == 404
+    assert [d["document_id"] for d in client.get("/documents", headers=A, params={"archived": "true"}).json()] == [doc]

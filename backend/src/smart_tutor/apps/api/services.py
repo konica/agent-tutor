@@ -9,6 +9,7 @@ from smart_tutor.apps.api.agent_client import AgentClient
 from smart_tutor.knowledge.adapters.s3_object_store import S3ObjectStore
 from smart_tutor.knowledge.adapters.sql_library import SqlLibraryUnitOfWork
 from smart_tutor.knowledge.application import (
+    ArchiveService,
     DocumentService,
     RetryService,
     SubjectChoiceService,
@@ -35,6 +36,7 @@ class ApiServices:
     documents: DocumentService
     subjects: SubjectNames
     retries: RetryService
+    archive: ArchiveService
     subject_choice: SubjectChoiceService
     conversations: ConversationService
     agent: AgentClient
@@ -59,6 +61,7 @@ def build_services(settings: Settings) -> ApiServices:
         documents=documents,
         subjects=names,
         retries=RetryService(library, queue, max_attempts),
+        archive=ArchiveService(library, SystemClock(), max_attempts),
         subject_choice=SubjectChoiceService(
             library,
             SubjectSuggester(subject_repo, names),

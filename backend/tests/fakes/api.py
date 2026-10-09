@@ -13,7 +13,13 @@ from fakes.subjects import InMemorySubjects
 from fakes.tutoring import InMemoryThreads
 from smart_tutor.apps.api.agent_client import AgentClient
 from smart_tutor.apps.api.services import ApiServices
-from smart_tutor.knowledge.application import DocumentService, RetryService, SubjectChoiceService, UploadService
+from smart_tutor.knowledge.application import (
+    ArchiveService,
+    DocumentService,
+    RetryService,
+    SubjectChoiceService,
+    UploadService,
+)
 from smart_tutor.subjects.application import SubjectCatalogService, SubjectNames, SubjectSearch, SubjectSuggester
 from smart_tutor.tutoring.application import ConversationService
 
@@ -52,6 +58,7 @@ def api_services(
         "documents": documents,
         "subjects": names,
         "retries": RetryService(library.unit_of_work, queue, max_attempts=3),
+        "archive": ArchiveService(library.unit_of_work, clock, max_attempts=3),
         "subject_choice": SubjectChoiceService(
             library.unit_of_work,
             SubjectSuggester(catalog, names),
