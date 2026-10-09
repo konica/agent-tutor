@@ -22,11 +22,11 @@ function write(open: boolean) {
 /** Whether the chat's conversation panel is open; the learner's choice is remembered (DESIGN.md → Chat). */
 export function usePanelOpen(): [open: boolean, toggle: () => void] {
   const [open, setOpen] = useState(read);
+  // The next value comes from this render, so the write stays out of the state updater (which must be pure).
   const toggle = useCallback(() => {
-    setOpen((was) => {
-      write(!was);
-      return !was;
-    });
-  }, []);
+    const next = !open;
+    write(next);
+    setOpen(next);
+  }, [open]);
   return [open, toggle];
 }
