@@ -120,7 +120,7 @@ export function DocumentTable({ documents, onRetry, retrying, onChooseSubjects, 
               <td>
                 <span className={styles.doc}>
                   <FileText className={styles.fileIcon} strokeWidth={1.5} aria-hidden="true" />
-                  {onOpen ? (
+                  {onOpen && !uploading.has(doc.document_id) ? (
                     <button type="button" className={`${styles.title} ${styles.titleButton}`} title={doc.title} onClick={() => onOpen(doc)}>
                       {doc.title}
                     </button>

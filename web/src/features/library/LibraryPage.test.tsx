@@ -1016,13 +1016,13 @@ describe("LibraryPage document details", () => {
     expect(opener).toHaveFocus();
   });
 
-  it("moves focus to the row title when the panel opened from the More menu closes", async () => {
+  it("returns focus to the More button when the panel opened from the More menu closes", async () => {
     setup();
     await userEvent.click(await screen.findByRole("button", { name: "More actions for Toolformer" }));
     await userEvent.click(screen.getByRole("menuitem", { name: "Details" }));
     await userEvent.click(await screen.findByRole("button", { name: "Close document details" }));
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(document.body).not.toHaveFocus();
+    expect(screen.getByRole("button", { name: "More actions for Toolformer" })).toHaveFocus(); // RowMenu keeps the toggle as the opener once its item is gone
   });
 
   it("opens Edit title from the More menu with the field focused", async () => {

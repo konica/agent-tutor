@@ -152,6 +152,12 @@ describe("DocumentTable open details", () => {
     expect(onOpen).toHaveBeenCalledExactlyOnceWith(doc, { editTitle: true });
   });
 
+  it("keeps the title of a row still uploading as plain text", () => {
+    render(<DocumentTable documents={[doc]} {...props} onOpen={vi.fn()} onArchive={vi.fn()} uploading={new Set(["d1"])} />);
+    expect(screen.queryByRole("button", { name: "Toolformer" })).toBeNull();
+    expect(screen.getByText("Toolformer")).toBeVisible();
+  });
+
   it("offers no Edit title on a failed row", async () => {
     const failed = { ...doc, state: "failed" as const, failure_reason: "Unreadable" };
     render(<DocumentTable documents={[failed]} {...props} onOpen={vi.fn()} onArchive={vi.fn()} />);
