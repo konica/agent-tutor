@@ -1,7 +1,11 @@
 import { SessionExpiredError } from "../auth/authClient";
 import type { Client } from "./generated/client";
 import { client } from "./generated/client.gen";
-import { listThreadDocuments } from "./generated/sdk.gen";
+import {
+  addThreadDocuments as addThreadDocumentsSdk,
+  listThreadDocuments,
+  removeThreadDocument as removeThreadDocumentSdk,
+} from "./generated/sdk.gen";
 import type {
   AskInNewThreadData,
   AskInNewThreadErrors,
@@ -97,6 +101,31 @@ export async function loadDocumentsUsed(threadId: string, apiClient: Client = cl
   if (sessionOver(error, response)) throw new SessionExpiredError();
   if (!data) throw new Error(`GET /threads/${threadId}/documents failed (${response?.status ?? "no response"})`);
   return data;
+}
+
+// Adds the learner's ready documents to the conversation's list and returns the full list. All or nothing: a document
+// that isn't the learner's ready, non-archived one, or another learner's thread, is a 404 and nothing is added.
+export async function addThreadDocuments(threadId: string, documentIds: string[], apiClient: Client = client): Promise<ThreadDocumentResponse[]> {
+  const { data, error, response } = await addThreadDocumentsSdk({
+    client: apiClient,
+    path: { thread_id: threadId },
+    body: { document_ids: documentIds },
+    throwOnError: false,
+  });
+  if (sessionOver(error, response)) throw new SessionExpiredError();
+  if (!data) throw new Error(`POST /threads/${threadId}/documents failed (${response?.status ?? "no response"})`);
+  return data;
+}
+
+// Takes a document off the conversation's list; the document and earlier answers stay as they are. Not listed is fine (204).
+export async function removeThreadDocument(threadId: string, documentId: string, apiClient: Client = client): Promise<void> {
+  const { error, response } = await removeThreadDocumentSdk({
+    client: apiClient,
+    path: { thread_id: threadId, document_id: documentId },
+    throwOnError: false,
+  });
+  if (sessionOver(error, response)) throw new SessionExpiredError();
+  if (!response?.ok) throw new Error(`DELETE /threads/${threadId}/documents/${documentId} failed (${response?.status ?? "no response"})`);
 }
 
 export function formatCitation(c: ChatCitation): string {

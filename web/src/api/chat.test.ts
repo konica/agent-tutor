@@ -1,7 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { SessionExpiredError } from "../auth/authClient";
-import { askInNewThread, AskRefusedError, formatCitation, loadDocumentsUsed, NoDocumentsError, type ChatEvent } from "./chat";
+import {
+  addThreadDocuments,
+  askInNewThread,
+  AskRefusedError,
+  formatCitation,
+  loadDocumentsUsed,
+  NoDocumentsError,
+  removeThreadDocument,
+  type ChatEvent,
+} from "./chat";
 import { configureApiClient } from "./client";
 import { createClient, createConfig } from "./generated/client";
 
@@ -144,6 +153,59 @@ describe("loadDocumentsUsed", () => {
   it("rejects with a plain Error on 404", async () => {
     const { apiClient } = api(() => json({ detail: "Not found" }, 404));
     const failure = loadDocumentsUsed("t1", apiClient);
+    await expect(failure).rejects.toThrow("404");
+    await expect(failure).rejects.not.toBeInstanceOf(SessionExpiredError);
+  });
+});
+
+describe("addThreadDocuments", () => {
+  const list = [
+    { document_id: "d1", title: "ReAct", authors: ["Yao"], year: 2023, archived: false, deleted: false, added_by: "answer", used: true },
+    { document_id: "d2", title: "RAG", authors: [], year: null, archived: false, deleted: false, added_by: "learner", used: false },
+  ];
+
+  it("posts the document ids with the token and returns the full list", async () => {
+    const { apiClient, fetch } = api(() => json(list));
+    expect(await addThreadDocuments("t1", ["d2"], apiClient)).toEqual(list);
+    const request = fetch.mock.calls[0]![0] as Request;
+    expect(request.method).toBe("POST");
+    expect(request.url).toBe("http://api.test/threads/t1/documents");
+    expect(request.headers.get("Authorization")).toBe("Bearer t");
+    expect(await request.json()).toEqual({ document_ids: ["d2"] });
+  });
+
+  it("rejects with SessionExpiredError on 401 and reports it", async () => {
+    const { apiClient, onUnauthorized } = api(() => json({ detail: "Not authenticated" }, 401));
+    await expect(addThreadDocuments("t1", ["d2"], apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+    expect(onUnauthorized).toHaveBeenCalled();
+  });
+
+  it("rejects with a plain Error on 404", async () => {
+    const { apiClient } = api(() => json({ detail: "Document not found" }, 404));
+    const failure = addThreadDocuments("t1", ["d2"], apiClient);
+    await expect(failure).rejects.toThrow("404");
+    await expect(failure).rejects.not.toBeInstanceOf(SessionExpiredError);
+  });
+});
+
+describe("removeThreadDocument", () => {
+  it("deletes the document from the thread's list with the token", async () => {
+    const { apiClient, fetch } = api(() => new Response(null, { status: 204 }));
+    await expect(removeThreadDocument("t1", "d1", apiClient)).resolves.toBeUndefined();
+    const request = fetch.mock.calls[0]![0] as Request;
+    expect(request.method).toBe("DELETE");
+    expect(request.url).toBe("http://api.test/threads/t1/documents/d1");
+    expect(request.headers.get("Authorization")).toBe("Bearer t");
+  });
+
+  it("rejects with SessionExpiredError on 401", async () => {
+    const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
+    await expect(removeThreadDocument("t1", "d1", apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+
+  it("rejects with a plain Error on 404", async () => {
+    const { apiClient } = api(() => json({ detail: "Conversation not found" }, 404));
+    const failure = removeThreadDocument("t1", "d1", apiClient);
     await expect(failure).rejects.toThrow("404");
     await expect(failure).rejects.not.toBeInstanceOf(SessionExpiredError);
   });
