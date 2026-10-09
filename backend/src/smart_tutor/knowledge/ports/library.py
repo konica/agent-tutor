@@ -127,8 +127,11 @@ class ChunkRepository(ABC):
         """Delete every chunk of the content."""
 
     @abstractmethod
-    def search(self, user_id: UserId, embedding: list[float], k: int) -> list[ChunkHit]:
-        """`can_read` in SQL: chunks of the caller's ready, non-archived documents."""
+    def search(
+        self, user_id: UserId, embedding: list[float], k: int, document_ids: Collection[DocumentId] | None = None
+    ) -> list[ChunkHit]:
+        """`can_read` in SQL: chunks of the caller's ready, non-archived documents; with `document_ids`, only those of
+        them (ids the caller can't read match nothing)."""
 
 
 class LibraryUnitOfWork(ABC):

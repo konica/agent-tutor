@@ -1,29 +1,33 @@
 """Thread routes (tutoring module): ask the first question of a new thread, optionally started from one of the
-learner's documents; it answers from all of the learner's ready documents. Answered as SSE (PRD §9.2); the
-documents an answer drew on are recorded when it is done and listed per thread; the learner adds documents to
-that list and removes them (US-4c). The learner can rename a thread."""
+learner's documents, or a later one in an existing thread; an answer draws on all of the learner's ready documents, or
+only the thread's listed ones once the learner limits its search scope (US-4c). Answered as SSE (PRD §9.2); the
+documents an answer drew on are recorded when it is done and listed per thread; the learner adds documents to that
+list and removes them (US-4c). The learner can rename a thread and set or read its search scope."""
 
 import json
 import logging
 import uuid
-from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
-from typing import Annotated, Literal
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Sequence
+from typing import Annotated, Literal, Self
 
 import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from smart_tutor.apps.api.agent_client import AgentAnswer, AgentUnavailableError
 from smart_tutor.apps.api.deps import Agent, BearerToken, Conversations, CurrentPrincipal
 from smart_tutor.shared.domain.errors import UnauthenticatedError
-from smart_tutor.shared.domain.ids import DocumentId, ThreadId
+from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.tutoring.application import (
     DocumentNotAvailableError,
     DocumentUsed,
     InvalidTitleError,
     NoDocumentsError,
+    NoListedDocumentsError,
+    SearchScope,
+    Thread,
     ThreadArchivedError,
     ThreadNotFoundError,
 )
@@ -42,13 +46,21 @@ SSE_RESPONSE: dict[int | str, dict[str, object]] = {
     404: {"description": "A document that isn't the caller's ready one."},
     409: {"description": "The learner has no ready documents."},
 }
+ASK_IN_THREAD_RESPONSE: dict[int | str, dict[str, object]] = {
+    **SSE_RESPONSE,
+    404: {"description": "Not the caller's conversation."},
+    409: {"description": "The conversation is archived, or the learner has no ready documents."},
+}
 
 
-class AskRequest(BaseModel):
+class QuestionRequest(BaseModel):
     # No user id: the thread's owner comes from the token (PRD §9.3). Unknown fields are refused.
     model_config = ConfigDict(extra="forbid")
     # Stripped before the length check, so a blank question is a 422; the agent gets the stripped text.
     question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)]
+
+
+class AskRequest(QuestionRequest):
     # Started from a document (US-4c): listed in the new thread; answers still search all documents.
     document_id: uuid.UUID | None = None
 
@@ -156,6 +168,35 @@ async def _relay(answer: AgentAnswer, start: StartThread, record: RecordAnswer) 
         await answer.aclose()
 
 
+async def _open(agent: Agent, token: str, question: str, document_ids: Sequence[str] | None) -> AgentAnswer:
+    try:
+        return await agent.open_answer(token, question, document_ids)
+    except UnauthenticatedError:
+        raise HTTPException(401, "Not authenticated", headers={"WWW-Authenticate": "Bearer"}) from None
+    except AgentUnavailableError:
+        raise HTTPException(503, UNAVAILABLE) from None
+
+
+def _recorder(conversations: Conversations, user_id: UserId, thread_id: Callable[[], ThreadId | None]) -> RecordAnswer:
+    """Records an answer's documents in the thread `thread_id()` gives (None: none started, so nothing to record)."""
+
+    async def record(document_ids: list[str]) -> None:
+        tid = thread_id()
+        if tid is None:
+            return
+        try:
+            await run_in_threadpool(conversations.record_answer, tid, user_id, [DocumentId(d) for d in document_ids])
+        except Exception:
+            # The learner already has the answer: log it and still end the stream with `done`.
+            logger.exception("recording the documents used failed")
+
+    return record
+
+
+def _stream(answer: AgentAnswer, start: StartThread, record: RecordAnswer) -> StreamingResponse:
+    return StreamingResponse(_relay(answer, start, record), media_type="text/event-stream", headers=SSE_HEADERS)
+
+
 @router.post("/threads", operation_id="ask_in_new_thread", response_class=StreamingResponse, responses=SSE_RESPONSE)
 async def ask_in_new_thread(
     body: AskRequest,
@@ -174,12 +215,7 @@ async def ask_in_new_thread(
             await run_in_threadpool(conversations.require_readable, principal.user_id, document_id)
         except DocumentNotAvailableError as e:
             raise HTTPException(404, str(e)) from None
-    try:
-        answer = await agent.open_answer(token, body.question)
-    except UnauthenticatedError:
-        raise HTTPException(401, "Not authenticated", headers={"WWW-Authenticate": "Bearer"}) from None
-    except AgentUnavailableError:
-        raise HTTPException(503, UNAVAILABLE) from None
+    answer = await _open(agent, token, body.question, None)
 
     thread_id: ThreadId | None = None
 
@@ -197,53 +233,103 @@ async def ask_in_new_thread(
         thread_id = ThreadId(thread.thread_id)
         return _sse("thread", {"thread_id": thread.thread_id})
 
-    async def record(document_ids: list[str]) -> None:
-        if thread_id is None:
-            return
-        try:
-            await run_in_threadpool(
-                conversations.record_answer, thread_id, principal.user_id, [DocumentId(d) for d in document_ids]
-            )
-        except Exception:
-            # The learner already has the answer: log it and still end the stream with `done`.
-            logger.exception("recording the documents used failed")
-
-    return StreamingResponse(_relay(answer, start, record), media_type="text/event-stream", headers=SSE_HEADERS)
+    return _stream(answer, start, _recorder(conversations, principal.user_id, lambda: thread_id))
 
 
-class RenameThreadRequest(BaseModel):
+@router.post(
+    "/threads/{thread_id}/questions",
+    operation_id="ask_in_thread",
+    response_class=StreamingResponse,
+    responses=ASK_IN_THREAD_RESPONSE,
+)
+async def ask_in_thread(
+    thread_id: uuid.UUID,
+    body: QuestionRequest,
+    principal: CurrentPrincipal,
+    token: BearerToken,
+    conversations: Conversations,
+    agent: Agent,
+) -> StreamingResponse:
+    """Ask in the learner's conversation (US-4c): a limited conversation searches only its listed documents, whose
+    ids are read here, never from the question."""
+    tid = ThreadId(str(thread_id))
+    try:
+        # Ownership first, so another learner's thread is a 404 whatever their library holds.
+        listed = await run_in_threadpool(conversations.search_documents, tid, principal.user_id)
+        await run_in_threadpool(conversations.require_documents, principal.user_id)
+    except ThreadNotFoundError as e:
+        raise HTTPException(404, str(e)) from None
+    except (NoDocumentsError, ThreadArchivedError) as e:
+        raise HTTPException(409, str(e)) from None
+    answer = await _open(agent, token, body.question, listed)
+
+    async def start() -> bytes | None:
+        return _sse("thread", {"thread_id": tid})
+
+    return _stream(answer, start, _recorder(conversations, principal.user_id, lambda: tid))
+
+
+class UpdateThreadRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     # Checked by the thread (trimmed, 1-120 characters), so a refusal carries the learner's message.
-    title: str
+    title: str | None = None
+    search_scope: Literal["library", "listed"] | None = None
+
+    @model_validator(mode="after")
+    def _one_change(self) -> Self:
+        if self.title is None and self.search_scope is None:
+            raise ValueError("Change the title or the search scope")
+        return self
 
 
 class ThreadResponse(BaseModel):
     thread_id: str
     title: str | None
+    search_scope: Literal["library", "listed"]
+
+
+def _thread_response(thread: Thread) -> ThreadResponse:
+    return ThreadResponse(thread_id=thread.thread_id, title=thread.title, search_scope=thread.search_scope.value)
+
+
+@router.get(
+    "/threads/{thread_id}",
+    operation_id="get_thread",
+    responses={404: {"description": "Not the caller's conversation."}},
+)
+def get_thread(thread_id: uuid.UUID, principal: CurrentPrincipal, conversations: Conversations) -> ThreadResponse:
+    """The learner's conversation: its title and search scope (PRD US-4c)."""
+    try:
+        return _thread_response(conversations.get_thread(ThreadId(str(thread_id)), principal.user_id))
+    except ThreadNotFoundError as e:
+        raise HTTPException(404, str(e)) from None
 
 
 @router.patch(
     "/threads/{thread_id}",
-    operation_id="rename_thread",
+    operation_id="update_thread",
     responses={
         404: {"description": "Not the caller's conversation."},
-        409: {"description": "The conversation is archived."},
-        422: {"description": "The title is empty or longer than 120 characters."},
+        409: {"description": "The conversation is archived, or has no documents to limit the search to."},
+        422: {"description": "Nothing to change, or the title is empty or longer than 120 characters."},
     },
 )
-def rename_thread(
-    thread_id: uuid.UUID, body: RenameThreadRequest, principal: CurrentPrincipal, conversations: Conversations
+def update_thread(
+    thread_id: uuid.UUID, body: UpdateThreadRequest, principal: CurrentPrincipal, conversations: Conversations
 ) -> ThreadResponse:
-    """Rename the learner's conversation from its header (PRD US-13)."""
+    """Rename the learner's conversation (PRD US-13) and/or limit its search to its documents (US-4c)."""
+    scope = SearchScope(body.search_scope) if body.search_scope is not None else None
     try:
-        thread = conversations.rename_thread(ThreadId(str(thread_id)), principal.user_id, body.title)
+        thread = conversations.update_thread(
+            ThreadId(str(thread_id)), principal.user_id, title=body.title, search_scope=scope
+        )
     except ThreadNotFoundError as e:
         raise HTTPException(404, str(e)) from None
-    except ThreadArchivedError as e:
+    except (ThreadArchivedError, NoListedDocumentsError) as e:
         raise HTTPException(409, str(e)) from None
     except InvalidTitleError as e:
         raise HTTPException(422, str(e)) from None
-    return ThreadResponse(thread_id=thread.thread_id, title=thread.title)
+    return _thread_response(thread)
 
 
 class ThreadDocumentResponse(BaseModel):

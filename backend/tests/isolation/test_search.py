@@ -68,3 +68,19 @@ async def test_search_covers_documents_in_any_subject() -> None:
     chunks = result.structured_content["chunks"]
     assert {c["text"] for c in chunks} == {"Attention scales with heads.", A_TEXT}
     assert all("subject_ids" not in c for c in chunks)
+
+
+async def test_another_learners_document_ids_return_nothing_from_them() -> None:
+    library, verifier, a_doc = world()
+    result = await search_as(library, verifier, "token-b", query=A_TEXT, document_ids=[a_doc])
+    assert not result.is_error
+    assert result.structured_content["chunks"] == []
+    assert A_TEXT not in json.dumps(result.structured_content)
+
+
+async def test_document_ids_only_narrow_the_callers_own_search() -> None:
+    library, verifier, a_doc = world()
+    b_doc = str(ingest_ready(library, "learner-b", "Mitochondria make ATP.", subject_ids=[GENERAL_SUBJECT_ID]))
+    result = await search_as(library, verifier, "token-a", query=A_TEXT, document_ids=[a_doc, b_doc], k=5)
+    chunks = result.structured_content["chunks"]
+    assert chunks and {c["document_id"] for c in chunks} == {a_doc}

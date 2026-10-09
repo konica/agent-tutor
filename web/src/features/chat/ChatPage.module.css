@@ -74,6 +74,15 @@
 }
 .problemIcon { width: 16px; height: 16px; flex: none; margin-top: 2px; }
 
+/* The limited decline: what the conversation's documents can't answer, and two ways out. */
+.declineCard {
+  display: grid; gap: var(--sp-2); padding: var(--sp-3);
+  border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface);
+  color: var(--text); font-size: var(--fs-14);
+}
+.muted { color: var(--text-2); font-size: var(--fs-13); }
+.declineActions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+
 .thinking { margin: var(--sp-3) 0 0; color: var(--text-2); font-size: var(--fs-13); }
 
 /* The composer row is pinned under the messages, as wide as their column (the column plus the pane's side padding). */
@@ -81,6 +90,15 @@
   flex: none; width: 100%; max-width: calc(var(--chat-w) + 2 * var(--sp-4)); margin: 0 auto;
   padding: var(--sp-2) var(--sp-4) var(--sp-3); background: var(--bg);
 }
+/* One quiet 12px line above the box while the conversation searches only its documents. */
+.scopeLine { display: flex; align-items: center; gap: var(--sp-1); margin: 0 0 var(--sp-2); font-size: var(--fs-12); color: var(--text-2); }
+.scopeIcon { width: 14px; height: 14px; flex: none; }
+.linkButton {
+  padding: 0; border: 0; border-radius: var(--r-sm); background: none;
+  color: var(--accent-text); font: inherit; text-decoration: underline; cursor: pointer;
+}
+.linkButton:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
 /* 40px box; the 2px focus ring sits outside it with a 2px offset, inside the form's padding so it is never clipped. */
 .composer {
   display: flex; align-items: flex-end; gap: var(--sp-2); min-height: 40px; padding: 0 var(--sp-1) 0 0;
