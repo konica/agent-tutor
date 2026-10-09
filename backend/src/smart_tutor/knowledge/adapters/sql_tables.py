@@ -17,7 +17,7 @@ contents = Table(
     Column("bytes", BigInteger),
     Column("state", Text),
     Column("attempts", Integer),
-    Column("processed_by_user_id", Text),
+    Column("owner_id", Text),
     Column("processed_at", DateTime(timezone=True)),
     Column("failure_reason", Text),
     Column("pages", Integer),
@@ -43,6 +43,7 @@ uploads = Table(
     Column("bytes", BigInteger),
     Column("created_at", DateTime(timezone=True)),
     Column("outcome", Text),
+    Column("document_id", Uuid(as_uuid=False)),
 )
 
 documents = Table(

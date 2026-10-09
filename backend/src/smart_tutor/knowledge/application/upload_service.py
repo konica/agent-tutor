@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from smart_tutor.knowledge.domain.document import Document
 from smart_tutor.knowledge.domain.limits import FileLimits
-from smart_tutor.knowledge.domain.upload import Upload
+from smart_tutor.knowledge.domain.upload import Upload, UploadOutcome
 from smart_tutor.knowledge.ports.library import LibraryUnitOfWork
 from smart_tutor.knowledge.ports.object_store import ObjectStore
 from smart_tutor.shared.domain.ids import DocumentId, UploadId, UserId
@@ -26,6 +26,15 @@ class StartedUpload:
     upload_id: UploadId
     url: str
     fields: dict[str, str]
+
+
+@dataclass(frozen=True)
+class UploadStatus:
+    """What became of an upload: `None` until the worker hashed it; the document it ended in (PRD US-11)."""
+
+    outcome: UploadOutcome | None
+    document_id: DocumentId | None
+    archived: bool
 
 
 class UploadService:
@@ -55,3 +64,14 @@ class UploadService:
             tx.documents.add(document)
             tx.commit()
         return StartedUpload(document.document_id, upload.upload_id, post.url, post.fields)
+
+    def upload_status(self, user_id: UserId, upload_id: UploadId) -> UploadStatus | None:
+        """The caller's upload only; another learner's reads as unknown (None)."""
+        with self._uow() as tx:
+            upload = tx.uploads.get(upload_id)
+            if upload is None or upload.user_id != user_id:
+                return None
+            document = tx.documents.get(upload.document_id) if upload.document_id else None
+        if document is None or not document.can_be_read_by(user_id):
+            return UploadStatus(upload.outcome, None, False)
+        return UploadStatus(upload.outcome, document.document_id, document.archived)

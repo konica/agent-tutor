@@ -1,4 +1,4 @@
-"""A unique file, keyed by the SHA-256 the server computed from its bytes (PRD §9.4, §9.5; ADR 0002). No owner."""
+"""A learner's file, keyed by `(owner_id, SHA-256)` the server computed from its bytes (PRD §9.4, §9.5; ADR 0011)."""
 
 import re
 from dataclasses import dataclass, field
@@ -28,12 +28,12 @@ class ContentState(StrEnum):
     FAILED = "failed"
 
 
-def content_key(sha256: str) -> str:
-    return f"contents/{sha256}.pdf"
+def content_key(owner_id: UserId, content_id: ContentId) -> str:
+    return f"contents/{owner_id}/{content_id}.pdf"
 
 
-def pages_key(sha256: str) -> str:
-    return f"contents/{sha256}.pages.json"
+def pages_key(owner_id: UserId, content_id: ContentId) -> str:
+    return f"contents/{owner_id}/{content_id}.pages.json"
 
 
 def has_text_layer(pages: list[str]) -> bool:
@@ -49,7 +49,7 @@ class Content:
     size: int  # column `bytes`
     state: ContentState
     attempts: int
-    processed_by_user_id: UserId | None
+    owner_id: UserId
     failure_reason: str | None = None
     pages: int | None = None
     text_key: str | None = None
@@ -67,11 +67,12 @@ class Content:
     work_key: str | None = None
 
     @classmethod
-    def first_upload(cls, content_id: ContentId, sha256: str, size: int, uploader: UserId) -> "Content":
-        """The first server-verified upload of these bytes starts processing (attempt 1 of 3)."""
+    def first_upload(cls, content_id: ContentId, sha256: str, size: int, owner_id: UserId) -> "Content":
+        """The learner's first server-verified upload of these bytes starts processing (attempt 1 of 3)."""
         if not _SHA256.fullmatch(sha256):
             raise ValueError("sha256 must be 64 lowercase hex characters")
-        return cls(content_id, sha256, content_key(sha256), size, ContentState.PROCESSING, 1, uploader)
+        key = content_key(owner_id, content_id)
+        return cls(content_id, sha256, key, size, ContentState.PROCESSING, 1, owner_id)
 
     def ready(self, *, pages: int, text_key: str, chunker: str, embedding_model: str, embedding_dim: int) -> None:
         """processing → ready once its chunks are embedded and stored; records how, so a change can be reprocessed."""
@@ -89,8 +90,7 @@ class Content:
         return self.state is ContentState.FAILED and self.attempts < max_attempts
 
     def retry(self, max_attempts: int) -> None:
-        """failed → processing for another attempt (Retry or, with US-11, a re-upload).
-        At most `max_attempts` in all."""
+        """failed → processing for another attempt (Retry by the owner). At most `max_attempts` in all."""
         if self.state is not ContentState.FAILED:
             raise ContentStateError("Only failed content can be retried")
         if self.attempts >= max_attempts:

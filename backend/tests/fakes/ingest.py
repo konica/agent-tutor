@@ -9,7 +9,7 @@ from fakes.models import fake_embeddings
 from fakes.parameters import TEST_LIMITS
 from smart_tutor.knowledge.application import UploadService
 from smart_tutor.knowledge.domain.chunk import Chunk
-from smart_tutor.knowledge.domain.content import Content
+from smart_tutor.knowledge.domain.content import Content, pages_key
 from smart_tutor.shared.domain.ids import ContentId, DocumentId, SubjectId, UserId
 from smart_tutor.subjects.application import GENERAL_SUBJECT_ID
 
@@ -29,11 +29,15 @@ def ingest_ready(
     )
     with library.unit_of_work() as tx:
         content, created = tx.contents.insert_or_get(
-            Content.first_upload(ContentId(sha[:32]), sha, len(text), UserId(owner))
+            Content.first_upload(ContentId(f"{owner}-{sha[:24]}"), sha, len(text), UserId(owner))  # one per learner
         )
-        if created:  # an identical file of another learner is already processed: share its chunks
+        if created:
             content.ready(
-                pages=1, text_key=f"contents/{sha}.pages.json", chunker="fake", embedding_model="fake", embedding_dim=8
+                pages=1,
+                text_key=pages_key(content.owner_id, content.content_id),
+                chunker="fake",
+                embedding_model="fake",
+                embedding_dim=8,
             )
             tx.contents.save(content)
             tx.chunks.replace(

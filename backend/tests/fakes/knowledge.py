@@ -46,7 +46,7 @@ class _Contents(ContentRepository):
 
     def insert_or_get(self, content: Content) -> tuple[Content, bool]:
         for existing in self._s.contents.values():
-            if existing.sha256 == content.sha256:
+            if existing.owner_id == content.owner_id and existing.sha256 == content.sha256:
                 return copy.deepcopy(existing), False
         self._s.contents[content.content_id] = copy.deepcopy(content)
         return content, True
@@ -73,6 +73,13 @@ class _Documents(DocumentRepository):
     def get_by_upload_for_update(self, upload_id: UploadId) -> Document | None:
         found = [d for d in self._s.documents.values() if d.upload_id == upload_id]
         return copy.deepcopy(found[0]) if found else None
+
+    def get_by_content(self, content_id: ContentId) -> Document | None:
+        found = [d for d in self._s.documents.values() if d.content_id == content_id]
+        return copy.deepcopy(found[0]) if found else None
+
+    def remove(self, document_id: DocumentId) -> None:
+        self._s.documents.pop(document_id, None)
 
     def save(self, document: Document) -> None:
         if document.content_id is not None and any(
@@ -155,9 +162,13 @@ class _Uploads(UploadRepository):
     def add(self, upload: Upload) -> None:
         self._s.uploads[upload.upload_id] = copy.deepcopy(upload)
 
-    def record_outcome(self, upload_id: UploadId, size: int, outcome: UploadOutcome) -> None:
+    def get(self, upload_id: UploadId) -> Upload | None:
+        found = self._s.uploads.get(upload_id)
+        return copy.deepcopy(found) if found else None
+
+    def record_outcome(self, upload_id: UploadId, size: int, outcome: UploadOutcome, document_id: DocumentId) -> None:
         upload = self._s.uploads[upload_id]
-        upload.size, upload.outcome = size, outcome
+        upload.size, upload.outcome, upload.document_id = size, outcome, document_id
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
