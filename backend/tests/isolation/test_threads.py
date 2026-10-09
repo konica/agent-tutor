@@ -1,4 +1,5 @@
-"""US-12: each learner's POST /threads starts a thread owned by that learner; no one else can get it."""
+"""US-12: each learner's POST /threads starts a thread owned by that learner; no one else can get it, nor its
+documents used (GET /threads/{id}/documents)."""
 
 import httpx
 from fastapi.testclient import TestClient
@@ -43,6 +44,30 @@ def test_each_learner_starts_their_own_thread() -> None:
 
     assert threads.get_owned(ThreadId(a_thread.thread_id), UserId("learner-b")) is None
     assert threads.get_owned(ThreadId(b_thread.thread_id), UserId("learner-a")) is None
+
+
+def test_only_the_owner_lists_a_threads_documents_used() -> None:
+    library, threads = InMemoryLibrary(), InMemoryThreads()
+    a_document = ingest_ready(library, "learner-a", "Attention weighs tokens.")
+    ingest_ready(library, "learner-b", "Gradient descent follows the slope.")
+    a_title = library.state.documents[a_document].file_name
+    body = (
+        b'event: delta\ndata: {"text": "Hi"}\n\n'
+        + f'event: sources\ndata: {{"document_ids": ["{a_document}"]}}\n\n'.encode()
+        + b"event: done\ndata: {}\n\n"
+    )
+    agent = fake_agent(lambda request: httpx.Response(200, content=body, headers={"content-type": "text/event-stream"}))
+    services = api_services(library, threads=threads, agent=agent)
+    client = TestClient(create_app(Settings(), verifier=learners(), services=services))
+
+    assert client.post("/threads", json={"question": "What is attention?"}, headers=A).status_code == 200
+    [thread] = threads.threads.values()
+
+    mine = client.get(f"/threads/{thread.thread_id}/documents", headers=A)
+    assert [d["document_id"] for d in mine.json()] == [a_document]
+    theirs = client.get(f"/threads/{thread.thread_id}/documents", headers=B)
+    assert theirs.status_code == 404
+    assert a_title not in theirs.text and a_document not in theirs.text
 
 
 def test_a_learner_without_documents_starts_no_thread_even_when_another_has_documents_in_their_subject() -> None:

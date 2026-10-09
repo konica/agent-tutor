@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponse, AskInNewThreadResponses, CheckDuplicateData, CheckDuplicateErrors, CheckDuplicateResponses, ChooseSubjectsData, ChooseSubjectsErrors, ChooseSubjectsResponses, GetMeData, GetMeResponses, GetSubjectSuggestionsData, GetSubjectSuggestionsErrors, GetSubjectSuggestionsResponses, GetUploadData, GetUploadErrors, GetUploadLimitsData, GetUploadLimitsResponses, GetUploadResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListMySubjectsData, ListMySubjectsResponses, RetryDocumentData, RetryDocumentErrors, RetryDocumentResponses, SearchSubjectsData, SearchSubjectsErrors, SearchSubjectsResponses, StartUploadData, StartUploadErrors, StartUploadResponses } from './types.gen';
+import type { AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponse, AskInNewThreadResponses, CheckDuplicateData, CheckDuplicateErrors, CheckDuplicateResponses, ChooseSubjectsData, ChooseSubjectsErrors, ChooseSubjectsResponses, GetMeData, GetMeResponses, GetSubjectSuggestionsData, GetSubjectSuggestionsErrors, GetSubjectSuggestionsResponses, GetUploadData, GetUploadErrors, GetUploadLimitsData, GetUploadLimitsResponses, GetUploadResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListMySubjectsData, ListMySubjectsResponses, ListThreadDocumentsData, ListThreadDocumentsErrors, ListThreadDocumentsResponses, RetryDocumentData, RetryDocumentErrors, RetryDocumentResponses, SearchSubjectsData, SearchSubjectsErrors, SearchSubjectsResponses, StartUploadData, StartUploadErrors, StartUploadResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -126,6 +126,17 @@ export const askInNewThread = <ThrowOnError extends boolean = false>(options: Op
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * List Thread Documents
+ *
+ * The documents the conversation's answers drew on, in order of first use (PRD US-4b).
+ */
+export const listThreadDocuments = <ThrowOnError extends boolean = false>(options: Options<ListThreadDocumentsData, ThrowOnError>): RequestResult<ListThreadDocumentsResponses, ListThreadDocumentsErrors, ThrowOnError> => (options.client ?? client).get<ListThreadDocumentsResponses, ListThreadDocumentsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/threads/{thread_id}/documents',
+    ...options
 });
 
 /**

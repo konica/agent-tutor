@@ -295,6 +295,19 @@ def test_get_readable_is_owner_only_and_skips_archived(engine: Engine) -> None:
         assert tx.documents.get_readable(UserId(owner), doc.document_id) is None
 
 
+def test_list_readable_by_ids_includes_archived_and_is_owner_only(engine: Engine) -> None:
+    owner, other = f"ada-{uid()}", f"bob-{uid()}"
+    doc = start(engine, owner)
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE documents SET archived = true WHERE document_id = :d"), {"d": doc.document_id})
+    with SqlLibraryUnitOfWork(engine) as tx:
+        mine = tx.documents.list_readable_by_ids(UserId(owner), [doc.document_id, DocumentId(uid())])
+        theirs = tx.documents.list_readable_by_ids(UserId(other), [doc.document_id])
+        nothing = tx.documents.list_readable_by_ids(UserId(owner), [])
+    assert [(d.document_id, d.archived) for d in mine] == [(doc.document_id, True)]
+    assert theirs == [] and nothing == []
+
+
 def test_subject_ids_readable_by_counts_only_ready_documents(engine: Engine) -> None:
     owner, other = f"ada-{uid()}", f"bob-{uid()}"
     waiting, chosen, theirs = start(engine, owner), start(engine, owner), start(engine, other)

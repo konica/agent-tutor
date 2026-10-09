@@ -1,11 +1,20 @@
 import { SessionExpiredError } from "../auth/authClient";
 import type { Client } from "./generated/client";
 import { client } from "./generated/client.gen";
-import type { AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponses } from "./generated/types.gen";
+import { listThreadDocuments } from "./generated/sdk.gen";
+import type {
+  AskInNewThreadData,
+  AskInNewThreadErrors,
+  AskInNewThreadResponses,
+  ThreadDocumentResponse,
+} from "./generated/types.gen";
+import { sessionOver } from "./documents";
 import { parseSse } from "./sse";
 
+export type { ThreadDocumentResponse };
+
 /** `n` is the number of the answer's inline [n] marker that points at this citation. */
-export type ChatCitation = { n: number; chunk_id: string; document_title: string; page: number | null };
+export type ChatCitation = { n: number; chunk_id: string; document_id: string; document_title: string; page: number | null };
 
 export type ChatEvent =
   | { type: "thread"; thread_id: string }
@@ -80,6 +89,14 @@ export async function* askInNewThread(question: string, apiClient: Client = clie
     const event = toEvent(message.event, message.data);
     if (event) yield event;
   }
+}
+
+// The documents a conversation's answers drew on, in the API's order (owner only; another learner's thread is a 404).
+export async function loadDocumentsUsed(threadId: string, apiClient: Client = client): Promise<ThreadDocumentResponse[]> {
+  const { data, error, response } = await listThreadDocuments({ client: apiClient, path: { thread_id: threadId }, throwOnError: false });
+  if (sessionOver(error, response)) throw new SessionExpiredError();
+  if (!data) throw new Error(`GET /threads/${threadId}/documents failed (${response?.status ?? "no response"})`);
+  return data;
 }
 
 export function formatCitation(c: ChatCitation): string {

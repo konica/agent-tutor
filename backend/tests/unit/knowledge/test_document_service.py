@@ -158,3 +158,19 @@ def test_has_ready_documents_ignores_archived_and_unfinished_documents() -> None
     ingest_ready(library, "ada", "Ready and not archived.")
     assert docs.has_ready_documents(ada) is True
     assert docs.has_ready_documents(UserId("carol")) is False
+
+
+def test_documents_by_id_returns_the_learners_documents_archived_included() -> None:
+    library = InMemoryLibrary()
+    a = ingest_ready(library, "learner-a", "Attention weighs tokens.")
+    b = ingest_ready(library, "learner-a", "Gradient descent follows the slope.")
+    other = ingest_ready(library, "learner-b", "Someone else's.")
+    library.state.documents[b].archived = True
+    service = DocumentService(library.unit_of_work, max_attempts=3)
+
+    found = service.documents_by_id(UserId("learner-a"), [a, b, other, DocumentId("missing")])
+
+    assert set(found) == {a, b}
+    assert found[a].archived is False
+    assert found[b].archived is True
+    assert service.documents_by_id(UserId("learner-a"), []) == {}

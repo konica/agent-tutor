@@ -1,10 +1,10 @@
 # `tutoring` module (Release 1)
 
-**Owns** (PRD §9.2, US-3, US-4 to US-6, US-13): Threads (no subjects; their documents used (US-4b) are still to come), relevance gate, the ask path, conversation management.
+**Owns** (PRD §9.2, US-3, US-4 to US-6, US-13): Threads (no subjects; they keep their documents used (US-4b)), relevance gate, the ask path, conversation management.
 
 **Key classes:** `Thread`, `RelevanceGate`; services `AskService`, `ConversationService`; ports `Retriever`, `ThreadRepository`.
 
-**Built so far:** `Thread` and `ThreadRepository` (`SqlThreadRepository`); `ConversationService.require_documents` / `start_thread(user_id)` (a learner with no ready, non-archived document gets "Upload a document first"); `Retriever` with its MCP client adapter `McpRetriever` (`search(query, k)` over all of the learner's ready documents); `answer_messages` / `cited_chunks` (the quoted answer prompt and its citations). The rest above is still to come.
+**Built so far:** `Thread` and `ThreadRepository` (`SqlThreadRepository`); `ConversationService.require_documents` / `start_thread(user_id)` (a learner with no ready, non-archived document gets "Upload a document first"); `Retriever` with its MCP client adapter `McpRetriever` (`search(query, k)` over all of the learner's ready documents); `answer_messages` / `cited_chunks` (the quoted answer prompt and its citations); documents used: `ConversationService.record_answer` (adds an answer's documents in order of first use, no duplicates) and `documents_used` (resolved now: title, authors, year, archived, or "Deleted document"), stored as `ThreadDocument` rows. `AskService`, `RelevanceGate`, and conversation management are still to come.
 
 **May use (application layer only):** `knowledge` (whether the learner has a ready document), `subjects`, `accounts`, `insights` (log declines). Everyone may use `shared`.
 

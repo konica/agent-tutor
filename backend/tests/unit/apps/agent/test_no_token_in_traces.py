@@ -18,7 +18,7 @@ from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 
 TOKEN = "eyJhbGciOi.token-under-test.signature-xyz"
 INPUT = {"question": "What is attention?"}
-CHUNKS = [RetrievedChunk("c1", "a.pdf", 3, "Attention weighs tokens.", 0.9)]
+CHUNKS = [RetrievedChunk("c1", "d1", "a.pdf", 3, "Attention weighs tokens.", 0.9)]
 
 
 class RecordingClient(langsmith.Client):

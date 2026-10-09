@@ -379,6 +379,54 @@
         "title": "SuggestionResponse",
         "type": "object"
       },
+      "ThreadDocumentResponse": {
+        "properties": {
+          "archived": {
+            "title": "Archived",
+            "type": "boolean"
+          },
+          "authors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Authors",
+            "type": "array"
+          },
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          }
+        },
+        "required": [
+          "document_id",
+          "title",
+          "authors",
+          "year",
+          "archived",
+          "deleted"
+        ],
+        "title": "ThreadDocumentResponse",
+        "type": "object"
+      },
       "UploadLimitsResponse": {
         "properties": {
           "max_bytes": {
@@ -959,6 +1007,62 @@
           }
         ],
         "summary": "Ask In New Thread",
+        "tags": [
+          "tutoring"
+        ]
+      }
+    },
+    "/threads/{thread_id}/documents": {
+      "get": {
+        "description": "The documents the conversation's answers drew on, in order of first use (PRD US-4b).",
+        "operationId": "list_thread_documents",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "thread_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Thread Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ThreadDocumentResponse"
+                  },
+                  "title": "Response List Thread Documents",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not the caller's conversation."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Thread Documents",
         "tags": [
           "tutoring"
         ]

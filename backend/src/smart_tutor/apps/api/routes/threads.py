@@ -1,8 +1,10 @@
 """Thread routes (tutoring module): ask the first question of a new thread; it answers from all of the learner's
-ready documents. Answered as SSE (PRD §9.2)."""
+ready documents. Answered as SSE (PRD §9.2); the documents an answer drew on are recorded when it is done and
+listed per thread."""
 
 import json
 import logging
+import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
 from typing import Annotated
 
@@ -15,7 +17,8 @@ from pydantic import BaseModel, ConfigDict, StringConstraints
 from smart_tutor.apps.api.agent_client import AgentAnswer, AgentUnavailableError
 from smart_tutor.apps.api.deps import Agent, BearerToken, Conversations, CurrentPrincipal
 from smart_tutor.shared.domain.errors import UnauthenticatedError
-from smart_tutor.tutoring.application import NoDocumentsError
+from smart_tutor.shared.domain.ids import DocumentId, ThreadId
+from smart_tutor.tutoring.application import NoDocumentsError, ThreadNotFoundError
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["tutoring"])
@@ -48,6 +51,8 @@ _UNAVAILABLE_EVENT = _sse("error", {"code": "unavailable", "message": UNAVAILABL
 
 # Starts the thread; its `thread` event, or None when it couldn't start.
 StartThread = Callable[[], Awaitable[bytes | None]]
+# Records the documents an answer drew on, in the thread that started; never raises.
+RecordAnswer = Callable[[list[str]], Awaitable[None]]
 
 
 class _EndedInsideEventError(Exception):
@@ -87,12 +92,24 @@ async def _opening(first: bytes | None, start: StartThread) -> bytes | None:
     return await start()
 
 
-async def _relay(answer: AgentAnswer, start: StartThread) -> AsyncIterator[bytes]:
+def _document_ids(data: object) -> list[str] | None:
+    """The document ids of a `sources` event's data; None when it isn't one."""
+    ids = data.get("document_ids") if isinstance(data, dict) else None
+    if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
+        logger.warning("the agent's sources event was malformed")
+        return None
+    return ids
+
+
+async def _relay(answer: AgentAnswer, start: StartThread, record: RecordAnswer) -> AsyncIterator[bytes]:
     """The agent's events after a `thread` event, each forwarded only once complete.
 
     The thread starts on the agent's first event unless it is an `error`, which is relayed as-is and starts none. If
     the stream drops inside an event, the partial event is dropped so the error event that follows stays a
     well-formed event of its own.
+
+    The agent's `sources` event is kept back; on `done`, if the thread started, its documents are recorded before
+    `done` is forwarded. A stream that ends without `done` or `error` ends with an unavailable error event.
     """
     events = _events(answer)
     try:
@@ -103,9 +120,24 @@ async def _relay(answer: AgentAnswer, start: StartThread) -> AsyncIterator[bytes
             return
         if opening:
             yield opening
-        yield first
-        async for event in events:
-            yield event
+        started = bool(opening)
+        document_ids: list[str] | None = None
+        ended = False
+        event: bytes | None = first
+        while event is not None:
+            parsed = _event(event)
+            name = parsed[0] if parsed else None
+            if parsed and name == "sources":
+                document_ids = _document_ids(parsed[1])
+            else:
+                if name == "done" and started and document_ids is not None:
+                    await record(document_ids)
+                ended = name in ("done", "error")
+                yield event
+            event = await anext(events, None)
+        if not ended:
+            logger.warning("the agent's stream ended without done or error")
+            yield _UNAVAILABLE_EVENT
     except (httpx.HTTPError, _EndedInsideEventError):
         yield _UNAVAILABLE_EVENT
     finally:
@@ -132,7 +164,10 @@ async def ask_in_new_thread(
     except AgentUnavailableError:
         raise HTTPException(503, UNAVAILABLE) from None
 
+    thread_id: ThreadId | None = None
+
     async def start() -> bytes | None:
+        nonlocal thread_id
         try:
             thread = await run_in_threadpool(conversations.start_thread, principal.user_id)
         except NoDocumentsError as e:
@@ -142,6 +177,53 @@ async def ask_in_new_thread(
             # The 200 headers are already sent: end the stream with an error event rather than cut it off.
             logger.exception("starting a thread failed")
             return None
+        thread_id = ThreadId(thread.thread_id)
         return _sse("thread", {"thread_id": thread.thread_id})
 
-    return StreamingResponse(_relay(answer, start), media_type="text/event-stream", headers=SSE_HEADERS)
+    async def record(document_ids: list[str]) -> None:
+        if thread_id is None:
+            return
+        try:
+            await run_in_threadpool(
+                conversations.record_answer, thread_id, principal.user_id, [DocumentId(d) for d in document_ids]
+            )
+        except Exception:
+            # The learner already has the answer: log it and still end the stream with `done`.
+            logger.exception("recording the documents used failed")
+
+    return StreamingResponse(_relay(answer, start, record), media_type="text/event-stream", headers=SSE_HEADERS)
+
+
+class ThreadDocumentResponse(BaseModel):
+    document_id: str
+    title: str
+    authors: list[str]
+    year: int | None
+    archived: bool
+    deleted: bool
+
+
+@router.get(
+    "/threads/{thread_id}/documents",
+    operation_id="list_thread_documents",
+    responses={404: {"description": "Not the caller's conversation."}},
+)
+def list_thread_documents(
+    thread_id: uuid.UUID, principal: CurrentPrincipal, conversations: Conversations
+) -> list[ThreadDocumentResponse]:
+    """The documents the conversation's answers drew on, in order of first use (PRD US-4b)."""
+    try:
+        used = conversations.documents_used(ThreadId(str(thread_id)), principal.user_id)
+    except ThreadNotFoundError as e:
+        raise HTTPException(404, str(e)) from None
+    return [
+        ThreadDocumentResponse(
+            document_id=d.document_id,
+            title=d.title,
+            authors=list(d.authors),
+            year=d.year,
+            archived=d.archived,
+            deleted=d.deleted,
+        )
+        for d in used
+    ]

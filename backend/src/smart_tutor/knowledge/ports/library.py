@@ -1,6 +1,7 @@
 """Persistence of contents, documents, and uploads, committed together (one unit of work per use case)."""
 
 from abc import ABC, abstractmethod
+from collections.abc import Collection
 from types import TracebackType
 from typing import Self
 
@@ -68,6 +69,13 @@ class DocumentRepository(ABC):
     @abstractmethod
     def list_readable_by(self, user_id: UserId, document_filter: DocumentFilter = NO_FILTER) -> list[Document]:
         """`can_read` in storage: the caller's non-archived documents matching the filter, newest first.
+
+        Each carries its content's title, attempts, authors, and year.
+        """
+
+    @abstractmethod
+    def list_readable_by_ids(self, user_id: UserId, document_ids: Collection[DocumentId]) -> list[Document]:
+        """`can_read` in storage: the caller's documents with these ids, archived included.
 
         Each carries its content's title, attempts, authors, and year.
         """
