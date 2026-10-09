@@ -58,6 +58,8 @@ jobs:
         run: |
           npm run api:generate
           if [ -n "$(git status --porcelain -- src/api)" ]; then git status --porcelain -- src/api; exit 1; fi
+      - name: Keycloak theme tokens match the app
+        run: npm run keycloak:tokens -- --check
       - run: npm test
       - run: npm run build
 

@@ -43,6 +43,7 @@ services:
     ports: ["10401:8080"]
     volumes:
       - ./local/keycloak:/opt/keycloak/data/import:ro
+      - ./local/keycloak/themes/smart-tutor:/opt/keycloak/themes/smart-tutor:ro
     depends_on:
       postgres: {condition: service_healthy}
       mailpit: {condition: service_started}

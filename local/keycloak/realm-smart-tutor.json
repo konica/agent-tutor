@@ -1,10 +1,15 @@
 {
   "realm": "smart-tutor",
   "enabled": true,
+  "displayName": "Smart Tutor",
+  "displayNameHtml": "Smart Tutor",
+  "loginTheme": "smart-tutor",
   "registrationAllowed": true,
   "registrationEmailAsUsername": true,
   "verifyEmail": true,
   "loginWithEmailAllowed": true,
+  "rememberMe": true,
+  "resetPasswordAllowed": true,
   "sslRequired": "none",
   "accessTokenLifespan": 900,
   "smtpServer": {
