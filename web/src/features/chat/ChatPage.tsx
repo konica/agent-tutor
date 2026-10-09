@@ -124,8 +124,7 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
         if (event.type === "thread") {
           thread = event.thread_id;
           setThreadId(thread);
-        }
-        else if (event.type === "delta") setExchange((e) => e && { ...e, answer: e.answer + event.text });
+        } else if (event.type === "delta") setExchange((e) => e && { ...e, answer: e.answer + event.text });
         else if (event.type === "citations") setExchange((e) => e && { ...e, citations: event.citations });
         else if (event.type === "error") {
           // The token stopped working mid-answer: the session screen asks the learner to sign in again.
@@ -178,7 +177,7 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
 
   if (noDocuments) {
     return (
-      <div className={styles.conversation}>
+      <div className={styles.fallback}>
         <div className={styles.column}>
           <EmptyState
             icon={Upload}
@@ -200,7 +199,7 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
 
   if (library.status !== "ready") {
     return (
-      <div className={styles.conversation}>
+      <div className={styles.fallback}>
         <div className={styles.column}>
           <PageHeader title="New conversation" />
           {library.status === "failed" && (
@@ -250,96 +249,99 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
           />
         )}
 
+        {/* The messages scroll; the composer row stays pinned under them (DESIGN.md → Chat). */}
         <div className={styles.conversation}>
-          <div className={styles.column}>
-            {!exchange && (
-              <section className={styles.welcome}>
-                <h2 className={styles.welcomeTitle}>Ask about your documents</h2>
-                <p className={styles.welcomeText}>
-                  I answer only from the documents in your Library and show the page each answer came from. There's
-                  nothing to choose first: just ask.
-                </p>
-              </section>
-            )}
-
-            {exchange && (
-              <p className={styles.question}>
-                <span className="visually-hidden">You asked: </span>
-                {exchange.question}
-              </p>
-            )}
-
-            {/* Announced once when the answer is complete, never word by word (DESIGN.md → Accessibility). */}
-            <div className={styles.answerRegion} aria-live="polite" aria-busy={answering}>
-              {exchange && exchange.answer && <p className={styles.answer}>{exchange.answer}</p>}
-              {exchange && showCitations && exchange.citations.length > 0 && (
-                <div className={styles.sources}>
-                  <span className={styles.sourcesLabel} id={sourcesId}>
-                    Sources
-                  </span>
-                  {/* Each source shows the [n] the answer's text uses for it; an answer may cite [2] without [1]. */}
-                  <ul className={styles.sourceList} aria-labelledby={sourcesId}>
-                    {exchange.citations.map((c) => (
-                      <li key={c.chunk_id}>
-                        <span className={styles.source} title={formatCitation(c)}>
-                          <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
-                          <span className={styles.sourceMarker}>[{c.n}]</span>{" "}
-                          <span className={styles.sourceTitle}>{c.document_title}</span>{" "}
-                          <span>· {c.page === null ? "page unavailable" : `p. ${c.page}`}</span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+          <div className={styles.messages}>
+            <div className={styles.column}>
+              {!exchange && (
+                <section className={styles.welcome}>
+                  <h2 className={styles.welcomeTitle}>Ask about your documents</h2>
+                  <p className={styles.welcomeText}>
+                    I answer only from the documents in your Library and show the page each answer came from. There's
+                    nothing to choose first: just ask.
+                  </p>
+                </section>
               )}
-              {problem && (
-                <p className={styles.problem}>
-                  <CircleAlert className={styles.problemIcon} strokeWidth={1.5} aria-hidden="true" />
-                  {problem.message}
+
+              {exchange && (
+                <p className={styles.question}>
+                  <span className="visually-hidden">You asked: </span>
+                  {exchange.question}
                 </p>
               )}
+
+              {/* Announced once when the answer is complete, never word by word (DESIGN.md → Accessibility). */}
+              <div className={styles.answerRegion} aria-live="polite" aria-busy={answering}>
+                {exchange && exchange.answer && <p className={styles.answer}>{exchange.answer}</p>}
+                {exchange && showCitations && exchange.citations.length > 0 && (
+                  <div className={styles.sources}>
+                    <span className={styles.sourcesLabel} id={sourcesId}>
+                      Sources
+                    </span>
+                    {/* Each source shows the [n] the answer's text uses for it; an answer may cite [2] without [1]. */}
+                    <ul className={styles.sourceList} aria-labelledby={sourcesId}>
+                      {exchange.citations.map((c) => (
+                        <li key={c.chunk_id}>
+                          <span className={styles.source} title={formatCitation(c)}>
+                            <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
+                            <span className={styles.sourceMarker}>[{c.n}]</span>{" "}
+                            <span className={styles.sourceTitle}>{c.document_title}</span>{" "}
+                            <span>· {c.page === null ? "page unavailable" : `p. ${c.page}`}</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {problem && (
+                  <p className={styles.problem}>
+                    <CircleAlert className={styles.problemIcon} strokeWidth={1.5} aria-hidden="true" />
+                    {problem.message}
+                  </p>
+                )}
+              </div>
+
+              {answering && <p className={styles.thinking}>The tutor is answering…</p>}
             </div>
-
-            {answering && <p className={styles.thinking}>The tutor is answering…</p>}
-
-            <form className={styles.form} onSubmit={onSubmit}>
-              <label htmlFor="chat-question" className="visually-hidden">
-                Your question
-              </label>
-              <div className={styles.composer}>
-                <textarea
-                  id="chat-question"
-                  className={styles.input}
-                  rows={1}
-                  maxLength={MAX_QUESTION}
-                  placeholder="Ask about your documents"
-                  value={question}
-                  disabled={answering}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  onKeyDown={onKeyDown}
-                />
-                <IconButton
-                  type="submit"
-                  label="Ask"
-                  icon={ArrowUp}
-                  tip={false}
-                  disabled={!canAsk}
-                  className={styles.send}
-                />
-              </div>
-              <div className={styles.statusLine}>
-                <span className={styles.hint}>
-                  {processing > 0 && (
-                    <>
-                      <Clock className={styles.hintIcon} strokeWidth={1.5} aria-hidden="true" />
-                      {processingHint(processing)}
-                    </>
-                  )}
-                </span>
-                <span>Enter to send · Shift + Enter for a new line</span>
-              </div>
-            </form>
           </div>
+
+          <form className={styles.form} onSubmit={onSubmit}>
+            <label htmlFor="chat-question" className="visually-hidden">
+              Your question
+            </label>
+            <div className={styles.composer}>
+              <textarea
+                id="chat-question"
+                className={styles.input}
+                rows={1}
+                maxLength={MAX_QUESTION}
+                placeholder="Ask about your documents"
+                value={question}
+                disabled={answering}
+                onChange={(e) => setQuestion(e.target.value)}
+                onKeyDown={onKeyDown}
+              />
+              <IconButton
+                type="submit"
+                label="Ask"
+                icon={ArrowUp}
+                tip={false}
+                disabled={!canAsk}
+                className={styles.send}
+              />
+            </div>
+            <div className={styles.statusLine}>
+              <span className={styles.hint}>
+                {processing > 0 && (
+                  <>
+                    <Clock className={styles.hintIcon} strokeWidth={1.5} aria-hidden="true" />
+                    {processingHint(processing)}
+                  </>
+                )}
+              </span>
+              <span>Enter to send · Shift + Enter for a new line</span>
+            </div>
+          </form>
         </div>
       </div>
     </div>
