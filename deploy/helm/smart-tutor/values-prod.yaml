@@ -19,9 +19,9 @@ api:
 jobs:
   enabled: true  # the migrate hook; CronJobs come with their slices
 agent:
-  enabled: false
+  enabled: true
   replicaCount: 2
 mcp-server:
-  enabled: false
+  enabled: true
 worker:
-  enabled: false
+  enabled: true

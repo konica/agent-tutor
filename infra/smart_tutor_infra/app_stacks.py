@@ -46,10 +46,19 @@ def build_app(app: cdk.App, env_name: str = "prod") -> list[cdk.Stack]:
         cluster_security_group_id=cluster.cluster_security_group_id,
         name_prefix=name,
     )
+    edge = EdgeStack(
+        app,
+        f"{prefix}-Edge",
+        env=env,
+        vpc=network.vpc,
+        cluster_security_group_id=cluster.cluster_security_group_id,
+        name_prefix=name,
+    )
     stacks: list[cdk.Stack] = [
         network,
         data,
-        StorageStack(app, f"{prefix}-Storage", env=env),
+        # The bucket's CORS allows only the CloudFront address, so Storage deploys after Edge.
+        StorageStack(app, f"{prefix}-Storage", env=env, web_origin=edge.public_url),
         cluster,
         RegistryStack(app, f"{prefix}-Registry", env=env),
         ConfigStack(app, f"{prefix}-Config", env=env),
@@ -65,14 +74,5 @@ def build_app(app: cdk.App, env_name: str = "prod") -> list[cdk.Stack]:
     for stack in stacks[1:]:
         stack.add_stack_dependency(network)
     stacks.append(deploy)
-    stacks.append(
-        EdgeStack(
-            app,
-            f"{prefix}-Edge",
-            env=env,
-            vpc=network.vpc,
-            cluster_security_group_id=cluster.cluster_security_group_id,
-            name_prefix=name,
-        )
-    )
+    stacks.append(edge)
     return stacks

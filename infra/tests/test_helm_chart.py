@@ -68,7 +68,9 @@ def test_keycloak_runs_optimized_at_auth_on_the_public_address() -> None:
 
 
 def test_keycloak_without_public_url_has_no_hostname() -> None:
-    docs = render(*PROD, "--set", "global.imageTag=abc123", "--set", "api.enabled=false")  # the API refuses to render
+    docs = render(*PROD, "--set", "global.imageTag=abc123", "--set", "api.enabled=false",
+                  "--set", "agent.enabled=false", "--set", "mcp-server.enabled=false",
+                  "--set", "worker.enabled=false")  # these refuse to render
 
     assert "KC_HOSTNAME" not in keycloak_env(docs)  # Keycloak then refuses to start instead of using a wrong issuer
 
@@ -149,7 +151,8 @@ def test_api_reads_its_secrets_from_secrets_manager() -> None:
 
 def test_api_refuses_to_render_for_aws_without_public_url() -> None:
     with pytest.raises(subprocess.CalledProcessError) as e:
-        render(*PROD, "--set", "global.imageTag=abc123")
+        render(*PROD, "--set", "global.imageTag=abc123", "--set", "global.documentsBucket=docs-bucket",
+               "--set", f"global.ingestQueueUrl={QUEUE}")
     assert "global.publicUrl" in e.value.stderr
 
 
@@ -173,7 +176,98 @@ def test_migrate_runs_as_a_hook_after_db_bootstrap() -> None:
     assert secret["spec"]["dataFrom"] == [{"extract": {"key": "smart-tutor/db/app"}}]
 
 
-def test_production_keeps_the_agent_mcp_and_worker_off() -> None:
-    names = {(d["kind"], d["metadata"]["name"]) for d in render(*PROD, *DEPLOY)}
-    for service in ("agent", "mcp-server", "worker"):
-        assert not any(name.startswith(service) for _, name in names), service
+def test_agent_runs_with_the_production_issuer_and_reaches_mcp() -> None:
+    docs = render(*PROD, *DEPLOY)
+    deploy = find(docs, "Deployment", "agent")
+    pod = deploy["spec"]["template"]["spec"]
+    (c,) = pod["containers"]
+    env = env_of(c)
+    assert c["image"] == "reg.example/smart-tutor/agent:abc123"
+    assert pod["serviceAccountName"] == "agent"
+    assert deploy["spec"]["replicas"] == 2
+    assert env["SMART_TUTOR_KEYCLOAK_ISSUER"] == "https://d111.cloudfront.net/auth/realms/smart-tutor"
+    assert env["SMART_TUTOR_KEYCLOAK_INTERNAL_URL"] == "http://keycloak/auth/realms/smart-tutor"
+    assert env["SMART_TUTOR_KEYCLOAK_CLIENT_ID"] == "smart-tutor-api"
+    assert env["SMART_TUTOR_KEYCLOAK_CLIENT_SECRET"] == {"secretKeyRef": {"name": "agent-keycloak", "key": "client-secret"}}
+    assert env["SMART_TUTOR_DATABASE_URL"] == {"secretKeyRef": {"name": "agent-db", "key": "url"}}
+    assert env["SMART_TUTOR_MCP_URL"] == "http://mcp-server/mcp"
+    assert c["readinessProbe"]["httpGet"]["path"] == "/healthz"
+    assert c["securityContext"]["readOnlyRootFilesystem"] is True
+
+
+def test_mcp_server_introspects_as_rag_mcp() -> None:
+    docs = render(*PROD, *DEPLOY)
+    pod = find(docs, "Deployment", "mcp-server")["spec"]["template"]["spec"]
+    (c,) = pod["containers"]
+    env = env_of(c)
+    assert c["image"] == "reg.example/smart-tutor/mcp:abc123"
+    assert pod["serviceAccountName"] == "mcp-server"
+    assert env["SMART_TUTOR_KEYCLOAK_CLIENT_ID"] == "rag-mcp"
+    assert env["SMART_TUTOR_KEYCLOAK_AUDIENCE"] == "rag-mcp"
+    assert env["SMART_TUTOR_KEYCLOAK_CLIENT_SECRET"] == {"secretKeyRef": {"name": "mcp-keycloak", "key": "client-secret"}}
+    assert env["SMART_TUTOR_MCP_PORT"] == "8000"
+    assert env["SMART_TUTOR_MCP_URL"] == "http://mcp-server/mcp"
+    assert c["readinessProbe"]["tcpSocket"]["port"] == 8000
+    secret = find(docs, "ExternalSecret", "mcp-keycloak")["spec"]
+    assert secret["data"] == [{"secretKey": "client-secret", "remoteRef": {"key": "smart-tutor/keycloak/mcp-client"}}]
+
+
+def test_api_agent_and_mcp_find_each_other() -> None:
+    docs = render(*PROD, *DEPLOY)
+    api_env = env_of(find(docs, "Deployment", "api")["spec"]["template"]["spec"]["containers"][0])
+    assert api_env["SMART_TUTOR_AGENT_URL"] == "http://agent"
+    agent_svc = find(docs, "Service", "agent")["spec"]["ports"][0]
+    mcp_svc = find(docs, "Service", "mcp-server")["spec"]["ports"][0]
+    assert (agent_svc["port"], agent_svc["targetPort"]) == (80, "http")
+    assert (mcp_svc["port"], mcp_svc["targetPort"]) == (80, "http")
+    agent_port = find(docs, "Deployment", "agent")["spec"]["template"]["spec"]["containers"][0]["ports"][0]
+    mcp_port = find(docs, "Deployment", "mcp-server")["spec"]["template"]["spec"]["containers"][0]["ports"][0]
+    assert (agent_port["name"], agent_port["containerPort"]) == ("http", 8080)
+    assert (mcp_port["name"], mcp_port["containerPort"]) == ("http", 8000)
+    for name in ("agent", "mcp-server"):
+        assert find(docs, "ServiceAccount", name)
+
+
+QUEUE = "https://sqs.us-east-1.amazonaws.com/123/smart-tutor-ingest"
+
+
+def test_worker_polls_the_ingest_queue_for_the_documents_bucket() -> None:
+    docs = render(*PROD, *DEPLOY)
+    deploy = find(docs, "Deployment", "worker")
+    pod = deploy["spec"]["template"]["spec"]
+    (c,) = pod["containers"]
+    env = env_of(c)
+    assert c["image"] == "reg.example/smart-tutor/worker:abc123"
+    assert pod["serviceAccountName"] == "worker"
+    assert env["SMART_TUTOR_DOCUMENTS_BUCKET"] == "docs-bucket"
+    assert env["SMART_TUTOR_INGEST_QUEUE_URL"] == QUEUE
+    assert env["SMART_TUTOR_DATABASE_URL"] == {"secretKeyRef": {"name": "worker-db", "key": "url"}}
+    assert "ports" not in c and "readinessProbe" not in c  # a queue poller with no HTTP server
+    assert c["securityContext"]["readOnlyRootFilesystem"] is True
+    assert find(docs, "ServiceAccount", "worker")
+
+
+def test_worker_pods_are_not_selected_by_the_api_service() -> None:
+    docs = render(*PROD, *DEPLOY)
+    deploy = find(docs, "Deployment", "worker")
+    pod_labels = deploy["spec"]["template"]["metadata"]["labels"]
+    assert deploy["spec"]["selector"]["matchLabels"]["app.kubernetes.io/name"] == "worker"
+    assert pod_labels["app.kubernetes.io/name"] == "worker"
+    selector = find(docs, "Service", "api")["spec"]["selector"]
+    assert not all(pod_labels.get(k) == v for k, v in selector.items())
+
+
+def test_api_signs_uploads_for_the_bucket_and_sends_retries_to_the_queue() -> None:
+    env = env_of(find(render(*PROD, *DEPLOY), "Deployment", "api")["spec"]["template"]["spec"]["containers"][0])
+    assert env["SMART_TUTOR_DOCUMENTS_BUCKET"] == "docs-bucket"
+    assert env["SMART_TUTOR_INGEST_QUEUE_URL"] == QUEUE
+
+
+@pytest.mark.parametrize("missing", ["global.documentsBucket", "global.ingestQueueUrl"])
+def test_aws_render_refuses_a_missing_bucket_or_queue(missing: str) -> None:
+    args = [a for a in DEPLOY]
+    i = next(i for i, a in enumerate(args) if a.startswith(missing + "="))
+    del args[i - 1 : i + 1]  # drop "--set" and its value
+    with pytest.raises(subprocess.CalledProcessError) as e:
+        render(*PROD, *args)
+    assert missing in e.value.stderr

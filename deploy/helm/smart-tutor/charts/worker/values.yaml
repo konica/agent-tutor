@@ -1,6 +1,12 @@
-# Ingestion worker consuming SQS (image includes the ingest extra).
-image:
-  repository: smart-tutor-worker
-  tag: ""  # defaults to global.imageTag
+# The ingestion worker: long-polls the ingest queue (S3 uploads/ events and Retry messages), extracts, describes,
+# chunks, and embeds (PRD §9.5). No HTTP server, so no Service or probes. Image: backend/Dockerfile, target worker.
 replicaCount: 1
-# Owns its NetworkPolicy and ExternalSecret (spec §8).
+image:
+  repository: smart-tutor/worker
+  tag: ""  # defaults to global.imageTag
+awsRegion: us-east-1
+secrets:
+  database: smart-tutor/db/app
+resources:
+  requests: {cpu: 250m, memory: 512Mi}
+  limits: {memory: 1536Mi}  # pypdf on a 500-page PDF

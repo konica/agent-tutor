@@ -1,7 +1,17 @@
-# RAG MCP server, internal ClusterIP at :8000/mcp; ingress only from agent pods.
+# The RAG MCP server (streamable HTTP at /mcp on 8000). Only the agent calls it, in-cluster at http://mcp-server/mcp,
+# forwarding the learner's token; it introspects as rag-mcp (ADR 0007). Image: backend/Dockerfile, target mcp.
+replicaCount: 1
 image:
-  repository: smart-tutor-mcp
+  repository: smart-tutor/mcp
   tag: ""  # defaults to global.imageTag
 port: 8000
-replicaCount: 1
-# Owns its NetworkPolicy and ExternalSecret (spec §8).
+awsRegion: us-east-1
+keycloakInternalUrl: http://keycloak/auth/realms/smart-tutor
+keycloakClientId: rag-mcp
+mcpUrl: http://mcp-server/mcp  # its own public URL in the MCP auth metadata; the agent uses the same
+secrets:
+  database: smart-tutor/db/app
+  keycloakClient: smart-tutor/keycloak/mcp-client
+resources:
+  requests: {cpu: 100m, memory: 256Mi}
+  limits: {memory: 512Mi}

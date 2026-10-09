@@ -11,6 +11,7 @@ awsRegion: us-east-1
 # How the API reaches Keycloak for token introspection (ADR 0007): the in-cluster Service, not CloudFront.
 keycloakInternalUrl: http://keycloak/auth/realms/smart-tutor
 keycloakClientId: smart-tutor-api
+agentUrl: http://agent  # in-cluster Service of the agent chart
 # Secrets Manager entries (CDK DataStack and ConfigStack), read through global.secretStore.
 secrets:
   database: smart-tutor/db/app

@@ -89,7 +89,7 @@ jobs:
           version: v4.2.1
       - run: helm lint deploy/helm/smart-tutor
       - name: Production values lint
-        run: helm lint deploy/helm/smart-tutor -f deploy/helm/smart-tutor/values-prod.yaml --set global.publicUrl=https://d111.cloudfront.net
+        run: helm lint deploy/helm/smart-tutor -f deploy/helm/smart-tutor/values-prod.yaml --set global.publicUrl=https://d111.cloudfront.net --set global.documentsBucket=b --set global.ingestQueueUrl=q
 
   infra:
     runs-on: ubuntu-latest

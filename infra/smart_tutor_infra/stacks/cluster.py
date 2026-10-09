@@ -1,4 +1,4 @@
-"""EKS cluster with a small managed node group, access entries, and Pod Identity for the cluster add-ons and the API (#56, #58).
+"""EKS cluster with a small managed node group, access entries, and Pod Identity for the cluster add-ons and the app services (#56, #58, #139).
 
 The add-ons themselves (AWS Load Balancer Controller, External Secrets, metrics-server) are Helm releases with the
 values in deploy/helm/addons/; this stack only gives them IAM roles through Pod Identity.
@@ -14,6 +14,14 @@ from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_eks_v2 as eks
 from aws_cdk import aws_iam as iam
 from constructs import Construct
+
+from smart_tutor_infra.models import (
+    AGENT_MODEL,
+    AGENT_MODEL_REGIONS,
+    AGENT_PROFILE,
+    EMBEDDING_MODEL,
+)
+from smart_tutor_infra.names import INGEST_QUEUE, documents_bucket_name
 
 # The controller's official policy, unmodified, at the chart's app version (docs/install/iam_policy.json, v3.5.0).
 LB_CONTROLLER_POLICY = Path(__file__).parents[1] / "policies" / "aws-load-balancer-controller-v3.5.0.json"
@@ -92,20 +100,73 @@ class ClusterStack(cdk.Stack):
                 ]
             ),
         )
-        # The API reads its startup parameters (PRD §11, §9.5, D27). S3, SQS, and Bedrock arrive with upload and chat.
+        bucket_arn = f"arn:aws:s3:::{documents_bucket_name(self.account)}"
+        queue_arn = f"arn:aws:sqs:{self.region}:{self.account}:{INGEST_QUEUE}"
+        ssm = iam.PolicyStatement(
+            actions=["ssm:GetParameter", "ssm:GetParameters"],
+            resources=[f"arn:aws:ssm:{self.region}:{self.account}:parameter/smart-tutor/*"],
+        )
+        invoke = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
+        chat = iam.PolicyStatement(
+            actions=invoke,
+            resources=[
+                f"arn:aws:bedrock:{self.region}:{self.account}:inference-profile/{AGENT_PROFILE}",
+                *(f"arn:aws:bedrock:{r}::foundation-model/{AGENT_MODEL}" for r in AGENT_MODEL_REGIONS),
+            ],
+        )
+        embed = iam.PolicyStatement(
+            actions=invoke, resources=[f"arn:aws:bedrock:{self.region}::foundation-model/{EMBEDDING_MODEL}"]
+        )
+
+        # The API signs uploads into uploads/ (the browser's POST is authorised as this role), sends Retry messages
+        # (#95), reads its startup parameters, and embeds subject names.
         self._pod_identity(
             "Api",
             "smart-tutor",
             "api",
             iam.PolicyDocument(
                 statements=[
-                    iam.PolicyStatement(
-                        actions=["ssm:GetParameter", "ssm:GetParameters"],
-                        resources=[f"arn:aws:ssm:{self.region}:{self.account}:parameter/smart-tutor/*"],
-                    )
+                    ssm,
+                    iam.PolicyStatement(actions=["s3:PutObject"], resources=[f"{bucket_arn}/uploads/*"]),
+                    iam.PolicyStatement(actions=["sqs:SendMessage"], resources=[queue_arn]),
+                    embed,
                 ]
             ),
         )
+        # The worker moves an upload into contents/<sha256>.pdf, writes its page text, and deletes the upload; it
+        # describes first pages with the agent model and embeds chunks.
+        self._pod_identity(
+            "Worker",
+            "smart-tutor",
+            "worker",
+            iam.PolicyDocument(
+                statements=[
+                    ssm,
+                    iam.PolicyStatement(
+                        actions=["s3:GetObject"], resources=[f"{bucket_arn}/uploads/*", f"{bucket_arn}/contents/*"]
+                    ),
+                    iam.PolicyStatement(actions=["s3:PutObject"], resources=[f"{bucket_arn}/contents/*"]),
+                    iam.PolicyStatement(actions=["s3:DeleteObject"], resources=[f"{bucket_arn}/uploads/*"]),
+                    # GetObject on a missing key returns 404 (NoSuchKey) only when the caller may list the bucket,
+                    # else 403. S3 makes that check implicitly and it carries no s3:prefix context key, so a prefix
+                    # condition would never match; the grant is on the bucket ARN with no condition.
+                    iam.PolicyStatement(actions=["s3:ListBucket"], resources=[bucket_arn]),
+                    iam.PolicyStatement(
+                        actions=[
+                            "sqs:ReceiveMessage",
+                            "sqs:DeleteMessage",
+                            "sqs:ChangeMessageVisibility",
+                            "sqs:GetQueueAttributes",
+                        ],
+                        resources=[queue_arn],
+                    ),
+                    chat,
+                    embed,
+                ]
+            ),
+        )
+        self._pod_identity("Agent", "smart-tutor", "agent", iam.PolicyDocument(statements=[ssm, chat]))
+        self._pod_identity("Mcp", "smart-tutor", "mcp-server", iam.PolicyDocument(statements=[embed]))
         cdk.CfnOutput(self, "ClusterName", value=self.cluster.cluster_name)
 
     def _pod_identity(self, name: str, namespace: str, service_account: str, document: iam.PolicyDocument) -> None:

@@ -115,17 +115,33 @@ def test_merge_builds_pushes_and_deploys_in_order() -> None:
     ]
     positions = [text.index(marker) for marker in order]
     assert positions == sorted(positions)
-    for image in ("smart-tutor/api", "smart-tutor/web", "smart-tutor/keycloak"):
+    for image in (
+        "smart-tutor/api",
+        "smart-tutor/web",
+        "smart-tutor/keycloak",
+        "smart-tutor/agent",
+        "smart-tutor/mcp",
+        "smart-tutor/worker",
+    ):
         assert image in text
-    assert "--target api" in text
+    for target in ("api", "agent", "mcp", "worker"):
+        assert f"--target {target}" in text
     assert "VITE_API_URL=/api" in text and "VITE_KEYCLOAK_URL=/auth" in text
 
 
 def test_release_uses_the_tag_and_the_stack_outputs() -> None:
     text = steps_text(deploy_job())
     assert 'global.imageTag="$IMAGE_TAG"' in text
-    for output in ("RegistryUri", "CloudFrontUrl", "VpcId"):
+    for output in (
+        "RegistryUri",
+        "CloudFrontUrl",
+        "VpcId",
+        "DocumentsBucketName",
+        "IngestQueueUrl",
+    ):
         assert output in text
+    assert 'global.documentsBucket="$DOCUMENTS_BUCKET"' in text
+    assert 'global.ingestQueueUrl="$INGEST_QUEUE_URL"' in text
     assert "values-prod.yaml" in text and "--timeout 15m" in text
 
 
@@ -157,8 +173,29 @@ def test_stack_outputs_fail_loudly_when_missing() -> None:
         s for s in deploy_job()["steps"] if s.get("name") == "Read the stack outputs"
     )
     run = str(step["run"])
-    assert run.count("!= None") == 3
-    assert run.count("::error::") == 3
+    assert run.count("!= None") == 5
+    assert run.count("::error::") == 5
+
+
+def test_rollback_checks_every_image() -> None:
+    step = next(
+        s for s in deploy_job()["steps"] if "describe-images" in str(s.get("run", ""))
+    )
+    for repo in ("api", "web", "keycloak", "agent", "mcp", "worker"):
+        assert repo in step["run"]
+
+
+def test_release_is_followed_by_an_in_cluster_service_check() -> None:
+    steps = deploy_job()["steps"]
+    names = [s.get("name") for s in steps]
+    check = steps[names.index("Check the in-cluster services")]
+    assert (
+        names.index("Release the app (Helm)")
+        < names.index("Check the in-cluster services")
+        < names.index("Smoke test the public address")
+    )
+    assert "http://agent/healthz" in check["run"]
+    assert "http://mcp-server/mcp" in check["run"]
 
 
 def test_third_party_actions_are_pinned_and_set_up_before_credentials() -> None:

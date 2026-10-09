@@ -1,12 +1,71 @@
-"""Documents bucket: uploads/ (presigned POST, expires after 1 day, events -> SQS + DLQ) and contents/<sha256>.pdf
-(versioning; tagged unreferenced contents -> Glacier Flexible Retrieval after 30 days), CORS for the web origin (M1)."""
+"""Documents bucket and ingest queue (#139, PRD §9.5).
+
+`uploads/<user>/<id>.pdf` (browser presigned POST, expires after 1 day; each upload notifies the ingest queue) and
+`contents/<sha256>.pdf` (the worker's deduplicated copies). Versioned and retained on teardown: documents are archived,
+never deleted. CORS lets only the CloudFront address POST (the web app's upload).
+"""
 
 from typing import Any
 
 import aws_cdk as cdk
+from aws_cdk import aws_s3 as s3
+from aws_cdk import aws_s3_notifications as s3n
+from aws_cdk import aws_sqs as sqs
 from constructs import Construct
+
+from smart_tutor_infra.names import INGEST_DLQ, INGEST_QUEUE, documents_bucket_name
+
+# A 500-page PDF is extracted, described, chunked, and embedded in one receive; the SQS default (30 s) would hand the
+# same upload to the worker again while it's still working.
+INGEST_VISIBILITY = cdk.Duration.minutes(15)
 
 
 class StorageStack(cdk.Stack):
-    def __init__(self, scope: Construct, construct_id: str, **kwargs: Any) -> None:
+    def __init__(self, scope: Construct, construct_id: str, *, web_origin: str, **kwargs: Any) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        dlq = sqs.Queue(
+            self,
+            "IngestDeadLetterQueue",
+            queue_name=INGEST_DLQ,
+            retention_period=cdk.Duration.days(14),
+            encryption=sqs.QueueEncryption.SQS_MANAGED,
+            removal_policy=cdk.RemovalPolicy.DESTROY,
+        )
+        queue = sqs.Queue(
+            self,
+            "IngestQueue",
+            queue_name=INGEST_QUEUE,
+            visibility_timeout=INGEST_VISIBILITY,
+            encryption=sqs.QueueEncryption.SQS_MANAGED,
+            dead_letter_queue=sqs.DeadLetterQueue(queue=dlq, max_receive_count=5),
+            removal_policy=cdk.RemovalPolicy.DESTROY,
+        )
+
+        bucket = s3.Bucket(
+            self,
+            "DocumentsBucket",
+            bucket_name=documents_bucket_name(self.account),
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            encryption=s3.BucketEncryption.S3_MANAGED,
+            enforce_ssl=True,
+            versioned=True,
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+            lifecycle_rules=[
+                s3.LifecycleRule(
+                    prefix="uploads/",
+                    expiration=cdk.Duration.days(1),
+                    noncurrent_version_expiration=cdk.Duration.days(1),
+                    abort_incomplete_multipart_upload_after=cdk.Duration.days(1),
+                )
+            ],
+            cors=[
+                s3.CorsRule(allowed_methods=[s3.HttpMethods.POST], allowed_origins=[web_origin], allowed_headers=["*"])
+            ],
+        )
+        bucket.add_event_notification(
+            s3.EventType.OBJECT_CREATED, s3n.SqsDestination(queue), s3.NotificationKeyFilter(prefix="uploads/")
+        )
+
+        cdk.CfnOutput(self, "DocumentsBucketName", value=bucket.bucket_name)
+        cdk.CfnOutput(self, "IngestQueueUrl", value=queue.queue_url)
