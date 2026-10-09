@@ -18,7 +18,7 @@ QUEUE_URL=$(awslocal sqs create-queue --queue-name "$QUEUE" \
 QUEUE_ARN=$(awslocal sqs get-queue-attributes --queue-url "$QUEUE_URL" --attribute-names QueueArn --query Attributes.QueueArn --output text)
 
 # Learner uploads (presigned POST to uploads/<user_id>/<upload_id>.pdf) -> SQS -> worker (PRD §9.5).
-# The worker hashes the bytes and stores new contents at contents/<sha256>.pdf (no events there).
+# The worker hashes the bytes and stores new contents at contents/<owner_id>/<content_id>.pdf (no events there).
 awslocal s3api put-bucket-notification-configuration --bucket "$BUCKET" --notification-configuration "{
   \"QueueConfigurations\": [{
     \"QueueArn\": \"$QUEUE_ARN\",

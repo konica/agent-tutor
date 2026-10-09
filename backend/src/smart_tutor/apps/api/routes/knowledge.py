@@ -70,12 +70,12 @@ class DocumentResponse(BaseModel):
     title: str
     state: DocumentState
     failure_reason: str | None
-    attempt: int | None  # processing attempts of the shared content so far; null until the upload is hashed
+    attempt: int | None  # processing attempts of the learner's own content so far; null until the upload is hashed
     max_attempts: int
     can_retry: bool
     created_at: datetime
     subjects: list[SubjectResponse]
-    authors: list[str]  # from the shared content; empty when the PDF names none
+    authors: list[str]  # from the learner's own content; empty when the PDF names none
     year: int | None
 
 
