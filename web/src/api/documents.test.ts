@@ -8,6 +8,7 @@ import {
   deleteDocument,
   DocumentProcessingError,
   findInLibrary,
+  loadDocumentDetails,
   loadDocuments,
   loadSubjectSuggestions,
   loadUploadLimits,
@@ -17,6 +18,7 @@ import {
   restoreDocument,
   RetriesUsedUpError,
   retryProcessing,
+  saveDocumentTitle,
   saveSubjects,
   sha256Hex,
   uploadPdf,
@@ -369,6 +371,47 @@ describe("saveSubjects", () => {
   it("rejects with the server's detail on 409", async () => {
     const { apiClient } = api(() => json({ detail: "Document is not ready for subjects" }, 409));
     await expect(saveSubjects("d1", choice, apiClient)).rejects.toThrow("Document is not ready for subjects");
+  });
+});
+
+describe("document details", () => {
+  const details = { document_id: "d1", title: "ReAct", file_name: "react.pdf", extracted_title: "ReAct", title_overridden: false };
+
+  it("loads a document's details", async () => {
+    const { apiClient, fetch } = api(() => json(details));
+    await expect(loadDocumentDetails("d1", apiClient)).resolves.toEqual(details);
+    expect(new URL((fetch.mock.calls[0][0] as Request).url).pathname).toBe("/documents/d1");
+  });
+
+  it("rejects with SessionExpiredError on 401", async () => {
+    const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
+    await expect(loadDocumentDetails("d1", apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+
+  it("turns a 404 into 'Document not found'", async () => {
+    const { apiClient } = api(() => json({ detail: "Document not found" }, 404));
+    await expect(loadDocumentDetails("d1", apiClient)).rejects.toThrow("Document not found");
+  });
+
+  it("sends the title, or null to reset it", async () => {
+    const { apiClient, fetch } = api(() => json(details));
+    await saveDocumentTitle("d1", "Mine", apiClient);
+    await saveDocumentTitle("d1", null, apiClient);
+    const first = fetch.mock.calls[0][0] as Request;
+    expect(first.method).toBe("PUT");
+    expect(new URL(first.url).pathname).toBe("/documents/d1/title");
+    expect(await first.clone().json()).toEqual({ title: "Mine" });
+    expect(await (fetch.mock.calls[1][0] as Request).clone().json()).toEqual({ title: null });
+  });
+
+  it("throws the server's message on 422", async () => {
+    const { apiClient } = api(() => json({ detail: "Enter a title" }, 422));
+    await expect(saveDocumentTitle("d1", " ", apiClient)).rejects.toThrow("Enter a title");
+  });
+
+  it("rejects with SessionExpiredError on 401 when saving", async () => {
+    const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
+    await expect(saveDocumentTitle("d1", "x", apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
   });
 });
 

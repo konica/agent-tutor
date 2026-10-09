@@ -14,13 +14,14 @@ from smart_tutor.knowledge.domain.content import (
     pages_key,
     too_many_pages,
 )
-from smart_tutor.knowledge.domain.document import Document, DocumentFilter, DocumentState
+from smart_tutor.knowledge.domain.document import MAX_TITLE, Document, DocumentFilter, DocumentState, clean_title
 from smart_tutor.knowledge.domain.errors import (
     ContentStateError,
     DocumentStateError,
     InvalidChunkError,
     InvalidFileNameError,
     InvalidSubjectsError,
+    InvalidTitleError,
     RetryLimitError,
 )
 from smart_tutor.knowledge.domain.upload import Upload, parse_upload_key, upload_key
@@ -386,6 +387,47 @@ def test_subjects_of_an_archived_document_cant_change() -> None:
     with pytest.raises(DocumentStateError):
         doc.choose_subjects([SubjectId("s1")])
     assert doc.subject_ids == [] and doc.state is DocumentState.AWAITING_SUBJECTS
+
+
+def test_clean_title_collapses_whitespace_and_drops_controls() -> None:
+    assert clean_title("  ReAct\n(Yao\t et al.) ‮ ") == "ReAct (Yao et al.)"
+
+
+@pytest.mark.parametrize("raw", ["", "   ", "‎‪\x07", "\n\t"])
+def test_clean_title_refuses_an_empty_title(raw: str) -> None:
+    with pytest.raises(InvalidTitleError, match="Enter a title"):
+        clean_title(raw)
+
+
+def test_clean_title_refuses_a_title_over_the_limit() -> None:
+    assert clean_title("x" * MAX_TITLE) == "x" * MAX_TITLE
+    with pytest.raises(InvalidTitleError, match="300 characters"):
+        clean_title("x" * (MAX_TITLE + 1))
+
+
+def test_set_title_overrides_and_clears() -> None:
+    doc = new_document()
+    doc.content_title = "Extracted"
+    doc.set_title(" Mine ")
+    assert (doc.title_override, doc.title) == ("Mine", "Mine")
+    doc.set_title(None)
+    assert (doc.title_override, doc.title) == (None, "Extracted")
+
+
+def test_set_title_equal_to_the_extracted_title_clears_the_override() -> None:
+    doc = new_document()
+    doc.content_title = "Extracted"
+    doc.set_title("Mine")
+    doc.set_title("Extracted ")
+    assert doc.title_override is None
+
+
+def test_set_title_refusal_keeps_the_old_override() -> None:
+    doc = new_document()
+    doc.set_title("Mine")
+    with pytest.raises(InvalidTitleError):
+        doc.set_title("   ")
+    assert doc.title_override == "Mine"
 
 
 def test_only_a_processing_document_cant_be_deleted() -> None:
