@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Same mark as web/src/components/BrandMark; colors are the accent and on-accent tokens (light, then dark). -->
+  <style>
+    .tile { fill: #0B6B66; }
+    .line { fill: none; stroke: #FFFFFF; stroke-width: 1.6; stroke-linejoin: round; }
+    @media (prefers-color-scheme: dark) {
+      .tile { fill: #4CC2B8; }
+      .line { stroke: #06221F; }
+    }
+  </style>
+  <rect class="tile" width="32" height="32" rx="8"/>
+  <path class="line" d="M6.5 10.2c3-.9 6.2-.5 9.5 1.3v11.3c-3.3-1.8-6.5-2.2-9.5-1.3z"/>
+  <path class="line" d="M25.5 10.2c-3-.9-6.2-.5-9.5 1.3v11.3c3.3-1.8 6.5-2.2 9.5-1.3z"/>
+  <path class="line" d="m18.6 16.4 1.7 1.7 3-3.4" stroke-linecap="round"/>
+</svg>

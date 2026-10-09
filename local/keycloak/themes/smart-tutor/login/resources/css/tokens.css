@@ -1,0 +1,106 @@
+/* Generated from web/src/styles/tokens.css by `npm run keycloak:tokens` (web/). Do not edit. */
+/* Smart Tutor design tokens, ported from sdd/design/prototype at tag design-v0.3 (smart-tutor-ds v0.3). Single source of truth: DESIGN.md → Tokens. */
+
+:root, [data-theme="light"] {
+  color-scheme: light;
+  --bg: #F6F7F9;
+  --surface: #FFFFFF;
+  --surface-2: #EEF1F4;
+  --surface-3: #E3E8ED;
+  --border: #D5DBE1;
+  --border-strong: #A9B4BE;
+  --text: #14202B;
+  --text-2: #4A5866;
+  --text-3: #5B6875;
+  --accent: #0B6B66;
+  --accent-hover: #08524E;
+  --accent-soft: #E3F1EF;
+  --accent-text: #0A625D;
+  --on-accent: #FFFFFF;
+  --success: #1F7A3A;
+  --success-soft: #E4F3E8;
+  --warn: #7F5300;
+  --warn-soft: #FBF1DA;
+  --danger: #B42318;
+  --danger-soft: #FCEBE9;
+  --info: #1D5FA8;
+  --info-soft: #E7EFF9;
+  --focus: #0A5FB4;
+  --scrim: rgba(12, 20, 27, .48);
+  --shadow-sm: 0 1px 2px rgba(20, 32, 43, .06);
+  --shadow-lg: 0 16px 48px rgba(20, 32, 43, .18), 0 2px 6px rgba(20, 32, 43, .08);
+
+  --font-display: Charter, "Bitstream Charter", "Iowan Old Style", "Palatino Linotype", Cambria, Georgia, serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+
+  --fs-12: 12px; --fs-14: 14px; --fs-16: 16px; --fs-18: 18px;
+  --fs-20: 20px; --fs-24: 24px; --fs-32: 32px; --fs-40: 40px; --fs-64: 64px;
+  --lh-body: 1.55; --lh-head: 1.2;
+
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px;
+  --sp-6: 24px; --sp-8: 32px; --sp-12: 48px; --sp-16: 64px;
+
+  --r-sm: 6px; --r-md: 10px; --r-pill: 999px;
+
+  --dur-fast: 150ms; --dur-base: 220ms; --dur-exit: 150ms; --dur-spin: 800ms;
+  --ease-out: cubic-bezier(.2, .7, .2, 1);
+  --ease-in: cubic-bezier(.5, 0, .75, .2);
+
+  --control-h: 40px;
+  --filter-field-w: 160px;
+  --nav-w: 240px;
+  --chat-w: 760px;
+  --page-w: 1120px;
+  --page-w-wide: 1200px;
+
+  --subj-llm: #2563A8;
+  --subj-agents: #7A4BAE;
+  --subj-rag: #B4456A;
+  --subj-rl: #5F7019;
+  --subj-tool: #A4532A;
+  --subj-other: #5B6875;
+  --attn: #8A4B00;
+  --attn-soft: #FDEFD9;
+  --panel-w: 480px;
+  --tray-w: 384px;
+}
+
+.pf-v5-theme-dark {
+  color-scheme: dark;
+  --bg: #0E1418;
+  --surface: #151D23;
+  --surface-2: #1C262E;
+  --surface-3: #24313A;
+  --border: #2E3B45;
+  --border-strong: #4A5A66;
+  --text: #E8EEF2;
+  --text-2: #B3BFC9;
+  --text-3: #A0ADB8;
+  --accent: #4CC2B8;
+  --accent-hover: #6FD3CA;
+  --accent-soft: #143532;
+  --accent-text: #6BD0C6;
+  --on-accent: #06221F;
+  --success: #6CCB86;
+  --success-soft: #16301F;
+  --warn: #E8B44A;
+  --warn-soft: #33270F;
+  --danger: #F28B80;
+  --danger-soft: #3A1916;
+  --info: #8BBDF3;
+  --info-soft: #172A40;
+  --focus: #8EC5FF;
+  --scrim: rgba(0, 0, 0, .6);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .3);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, .5), 0 2px 6px rgba(0, 0, 0, .3);
+
+  --subj-llm: #7FB2F0;
+  --subj-agents: #C3A0EC;
+  --subj-rag: #F09AB8;
+  --subj-rl: #C2D373;
+  --subj-tool: #EBA57F;
+  --subj-other: #A0ADB8;
+  --attn: #F2B866;
+  --attn-soft: #382812;
+}

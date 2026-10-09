@@ -1,0 +1,131 @@
+/* Smart Tutor login theme (#48): keycloak.v2's stock layout with our logo, colors, and font only.
+   Colors and fonts come from tokens.css (generated from web/src/styles/tokens.css); dark mode follows the
+   .pf-v5-theme-dark class keycloak.v2 sets from prefers-color-scheme. Selectors start at html.login-pf so they
+   win over PatternFly's :root and :where(.pf-v5-theme-dark) defaults. */
+
+html.login-pf {
+  --pf-v5-global--FontFamily--text: var(--font-body);
+  --pf-v5-global--FontFamily--heading: var(--font-body);
+  --pf-v5-global--FontFamily--text--vf: var(--font-body);
+  --pf-v5-global--FontFamily--heading--vf: var(--font-body);
+  --pf-v5-global--FontFamily--monospace: var(--font-mono);
+
+  --pf-v5-global--BackgroundColor--100: var(--surface);
+  --pf-v5-global--BackgroundColor--200: var(--bg);
+  --pf-v5-global--BackgroundColor--400: var(--surface);
+  --pf-v5-global--BorderColor--400: var(--border-strong);
+  --pf-v5-global--Color--100: var(--text);
+  --pf-v5-global--Color--200: var(--text-2);
+  --pf-v5-global--BorderColor--100: var(--border-strong);
+  --pf-v5-global--BorderColor--200: var(--border-strong);
+  --pf-v5-global--BorderColor--300: var(--border);
+
+  --pf-v5-global--primary-color--100: var(--accent);
+  --pf-v5-global--primary-color--200: var(--accent-hover);
+  --pf-v5-global--active-color--100: var(--accent);
+  --pf-v5-global--link--Color: var(--accent-text);
+  --pf-v5-global--link--Color--hover: var(--accent-hover);
+  --pf-v5-global--danger-color--100: var(--danger);
+  --pf-v5-global--danger-color--200: var(--danger);
+  --pf-v5-global--success-color--100: var(--success);
+  --pf-v5-global--warning-color--100: var(--warn);
+  --pf-v5-global--info-color--100: var(--info);
+
+  --keycloak-card-top-color: var(--accent);
+}
+
+/* Page and card */
+html.login-pf body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+}
+html.login-pf .pf-v5-c-login__main {
+  --pf-v5-c-login__main--BackgroundColor: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-sm);
+}
+html.login-pf .pf-v5-c-login__main-header { border-radius: var(--r-sm) var(--r-sm) 0 0; }
+html.login-pf #kc-page-title { font-size: var(--fs-20); font-weight: 600; color: var(--text); }
+
+/* Header: logo and the display name "Smart Tutor" instead of keycloak.v2's white uppercase title */
+html.login-pf #kc-header-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  color: var(--text) !important;
+  font-family: var(--font-body);
+  font-size: var(--fs-20);
+  font-weight: 600;
+  letter-spacing: -.01em;
+  text-transform: none;
+}
+html.login-pf #kc-header-wrapper::before {
+  content: "";
+  flex: none;
+  width: 36px;
+  height: 36px;
+  background: url("../img/logo.svg") no-repeat center / contain;
+}
+
+/* Controls */
+html.login-pf .pf-v5-c-button.pf-m-primary {
+  --pf-v5-c-button--m-primary--BackgroundColor: var(--accent);
+  --pf-v5-c-button--m-primary--Color: var(--on-accent);
+  --pf-v5-c-button--m-primary--hover--BackgroundColor: var(--accent-hover);
+  --pf-v5-c-button--m-primary--hover--Color: var(--on-accent);
+  --pf-v5-c-button--m-primary--focus--BackgroundColor: var(--accent-hover);
+  --pf-v5-c-button--m-primary--focus--Color: var(--on-accent);
+  --pf-v5-c-button--m-primary--active--BackgroundColor: var(--accent-hover);
+  --pf-v5-c-button--m-primary--active--Color: var(--on-accent);
+}
+html.login-pf .pf-v5-c-button.pf-m-link {
+  --pf-v5-c-button--m-link--Color: var(--accent-text);
+  --pf-v5-c-button--m-link--hover--Color: var(--accent-hover);
+  --pf-v5-c-button--m-link--focus--Color: var(--accent-hover);
+}
+html.login-pf .pf-v5-c-form-control {
+  --pf-v5-c-form-control--BackgroundColor: var(--surface);
+  --pf-v5-c-form-control--Color: var(--text);
+  /* PatternFly's dark mode keeps only a bottom border on a gray field; keep the app's bordered field in both. */
+  --pf-v5-c-form-control--before--BorderColor: var(--border-strong);
+  --pf-v5-c-form-control--before--BorderTopColor: var(--border-strong);
+  --pf-v5-c-form-control--before--BorderRightColor: var(--border-strong);
+  --pf-v5-c-form-control--before--BorderLeftColor: var(--border-strong);
+  --pf-v5-c-form-control--after--BorderColor: var(--border-strong);
+  --pf-v5-c-form-control--hover--after--BorderBottomColor: var(--accent);
+  --pf-v5-c-form-control--focus--after--BorderBottomColor: var(--accent);
+  --pf-v5-c-form-control--m-error--after--BorderBottomColor: var(--danger);
+}
+/* The show-password button next to the password field */
+html.login-pf .pf-v5-c-button.pf-m-control {
+  --pf-v5-c-button--m-control--Color: var(--text-2);
+  --pf-v5-c-button--m-control--BackgroundColor: var(--surface);
+  --pf-v5-c-button--m-control--hover--BackgroundColor: var(--surface-2);
+  --pf-v5-c-button--m-control--focus--BackgroundColor: var(--surface-2);
+  --pf-v5-c-button--m-control--active--BackgroundColor: var(--surface-2);
+  --pf-v5-c-button--m-control--after--BorderTopColor: var(--border-strong);
+  --pf-v5-c-button--m-control--after--BorderRightColor: var(--border-strong);
+  --pf-v5-c-button--m-control--after--BorderBottomColor: var(--border-strong);
+  --pf-v5-c-button--m-control--after--BorderLeftColor: var(--border-strong);
+}
+html.login-pf .pf-v5-c-form__label-required,
+html.login-pf .pf-v5-c-helper-text__item.pf-m-error { color: var(--danger); }
+
+/* Alerts keep keycloak.v2's markup; the colors follow the tokens so messages read in both themes. */
+html.login-pf .pf-v5-c-alert {
+  --pf-v5-c-alert--BackgroundColor: var(--surface);
+  --pf-v5-c-alert__title--Color: var(--text);
+}
+html.login-pf .pf-v5-c-alert.pf-m-info { --pf-v5-c-alert--BorderTopColor: var(--info); --pf-v5-c-alert__icon--Color: var(--info); --pf-v5-c-alert--m-info__title--Color: var(--text); background: var(--info-soft); }
+html.login-pf .pf-v5-c-alert.pf-m-success { --pf-v5-c-alert--BorderTopColor: var(--success); --pf-v5-c-alert__icon--Color: var(--success); --pf-v5-c-alert--m-success__title--Color: var(--text); background: var(--success-soft); }
+html.login-pf .pf-v5-c-alert.pf-m-warning { --pf-v5-c-alert--BorderTopColor: var(--warn); --pf-v5-c-alert__icon--Color: var(--warn); --pf-v5-c-alert--m-warning__title--Color: var(--text); background: var(--warn-soft); }
+html.login-pf .pf-v5-c-alert.pf-m-danger { --pf-v5-c-alert--BorderTopColor: var(--danger); --pf-v5-c-alert__icon--Color: var(--danger); --pf-v5-c-alert--m-danger__title--Color: var(--text); background: var(--danger-soft); }
+
+/* A visible 2px focus ring on every control, as in the app (DESIGN.md → Accessibility). */
+html.login-pf :is(a, button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}

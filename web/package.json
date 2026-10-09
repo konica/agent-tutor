@@ -13,7 +13,8 @@
     "design:states": "node scripts/design/states.mjs",
     "design:accept": "node scripts/design/accept.mjs",
     "design:shots": "node scripts/design/shots.mjs",
-    "design:diff": "node scripts/design/diff.mjs"
+    "design:diff": "node scripts/design/diff.mjs",
+    "keycloak:tokens": "node scripts/keycloak-tokens.mjs"
   },
   "dependencies": {
     "keycloak-js": "^26.2.4",
