@@ -63,12 +63,44 @@ describe("ConversationPanel", () => {
       ],
     });
     const rows = within(documentsSection()).getAllByRole("listitem");
-    expect(rows.map((r) => r.textContent)).toEqual(["ReAct", "RAGArchived", "PPODeleted"]);
+    expect(rows.map((r) => r.textContent)).toEqual(["ReAct", "RAGArchived", "Deleted: PPODeleted"]);
     expect(rows[0]).toHaveAttribute("title", "ReAct\nYao, Zhao · 2023");
     expect(within(documentsSection()).getByText("3")).toBeInTheDocument();
     expect(screen.queryByText("Documents used to answer will appear here.")).not.toBeInTheDocument();
     // Opening a document from a row comes with #123.
     expect(within(documentsSection()).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("marks a deleted document with an icon badge, no link, and one note below the list", () => {
+    const { rerender } = render(
+      <ConversationPanel
+        id="p"
+        documents={[used("A"), used("B", { deleted: true }), used("C", { deleted: true })]}
+        threadId={null}
+        answered
+        showCitations
+        onShowCitationsChange={vi.fn()}
+      />,
+    );
+    const row = within(documentsSection()).getAllByRole("listitem")[1];
+    const badge = within(row).getByText("Deleted");
+    expect(badge.querySelector("svg")).not.toBeNull();
+    expect(within(row).getByText("Deleted:")).toBeInTheDocument();
+    expect(within(row).queryByRole("link")).not.toBeInTheDocument();
+    expect(within(row).queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Deleted documents can't be opened.")).toHaveLength(1);
+
+    rerender(
+      <ConversationPanel
+        id="p"
+        documents={[used("A"), used("R", { archived: true })]}
+        threadId={null}
+        answered
+        showCitations
+        onShowCitationsChange={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText("Deleted documents can't be opened.")).not.toBeInTheDocument();
   });
 
   it("offers a disabled Summarize lesson after the first answer", () => {

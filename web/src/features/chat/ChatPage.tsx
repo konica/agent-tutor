@@ -216,6 +216,8 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
     );
   }
 
+  // A citation to a deleted document keeps its [n] but loses the title and page: references read "Deleted document".
+  const deletedIds = new Set(used.filter((d) => d.deleted).map((d) => d.document_id));
   const title = exchange ? exchange.question : "New conversation";
   const toggleLabel = panelOpen ? "Hide panel" : "Show panel";
 
@@ -284,16 +286,25 @@ export function ChatPage({ ask = defaultAsk, loadDocs = defaultLoadDocs, loadUse
                     </span>
                     {/* Each source shows the [n] the answer's text uses for it; an answer may cite [2] without [1]. */}
                     <ul className={styles.sourceList} aria-labelledby={sourcesId}>
-                      {exchange.citations.map((c) => (
-                        <li key={c.chunk_id}>
-                          <span className={styles.source} title={formatCitation(c)}>
-                            <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
-                            <span className={styles.sourceMarker}>[{c.n}]</span>{" "}
-                            <span className={styles.sourceTitle}>{c.document_title}</span>{" "}
-                            <span>· {c.page === null ? "page unavailable" : `p. ${c.page}`}</span>
-                          </span>
-                        </li>
-                      ))}
+                      {exchange.citations.map((c) =>
+                        deletedIds.has(c.document_id) ? (
+                          <li key={c.chunk_id}>
+                            <span className={`${styles.source} ${styles.sourceDeleted}`} title="Deleted document">
+                              <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
+                              <span className={styles.sourceMarker}>[{c.n}]</span> Deleted document
+                            </span>
+                          </li>
+                        ) : (
+                          <li key={c.chunk_id}>
+                            <span className={styles.source} title={formatCitation(c)}>
+                              <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
+                              <span className={styles.sourceMarker}>[{c.n}]</span>{" "}
+                              <span className={styles.sourceTitle}>{c.document_title}</span>{" "}
+                              <span>· {c.page === null ? "page unavailable" : `p. ${c.page}`}</span>
+                            </span>
+                          </li>
+                        ),
+                      )}
                     </ul>
                   </div>
                 )}

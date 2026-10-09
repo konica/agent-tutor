@@ -340,6 +340,34 @@ describe("ChatPage", () => {
       expect(within(panel()!).getByRole("button", { name: "Summarize lesson" })).toBeDisabled();
     });
 
+    it("shows a deleted document's citation as Deleted document, without its title or page", async () => {
+      const ask = vi.fn(() =>
+        events(
+          { type: "thread", thread_id: "t1" },
+          { type: "delta", text: "A [1] and B [2]." },
+          {
+            type: "citations",
+            citations: [
+              { n: 1, chunk_id: "c1", document_id: "d1", document_title: "a.pdf", page: 3 },
+              { n: 2, chunk_id: "c2", document_id: "d2", document_title: "b.pdf", page: 7 },
+            ],
+          },
+          { type: "done" },
+        ),
+      );
+      const loadUsed = vi.fn(async () => [used("d1", "a.pdf"), { ...used("d2", "b.pdf"), deleted: true }]);
+      renderChat({ ask, loadUsed });
+      await userEvent.type(await question(), "What?");
+      await userEvent.click(askButton());
+      const sources = await screen.findByRole("list", { name: "Sources" });
+      await waitFor(() => expect(within(sources).getByText("Deleted document")).toBeInTheDocument());
+      const [first, second] = within(sources).getAllByRole("listitem");
+      expect(first).toHaveTextContent("[1] a.pdf · p. 3");
+      expect(second).toHaveTextContent("[2] Deleted document");
+      expect(second).not.toHaveTextContent("b.pdf");
+      expect(second).not.toHaveTextContent("p. 7");
+    });
+
     it("does not look up documents used when the answer failed", async () => {
       const loadUsed = vi.fn(async () => []);
       const ask = vi.fn(() =>

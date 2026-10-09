@@ -1,4 +1,4 @@
-import { Archive, FileText, NotebookPen } from "lucide-react";
+import { Archive, FileText, Info, NotebookPen, X } from "lucide-react";
 
 import type { ThreadDocumentResponse } from "../../api/generated/types.gen";
 import { Button } from "../../components/Button/Button";
@@ -50,16 +50,26 @@ export function ConversationPanel({
           <ul className={styles.list}>
             {documents.map((d) => (
               <li key={d.document_id} className={styles.row} title={tooltip(d)}>
+                {d.deleted && <span className="visually-hidden">Deleted: </span>}
                 <FileText className={styles.rowIcon} strokeWidth={1.5} aria-hidden="true" />
                 <span className={`${styles.title} ${d.deleted ? styles.gone : ""}`}>{d.title}</span>
                 {d.deleted ? (
-                  <span className={styles.badge}>Deleted</span>
+                  <span className={styles.badge}>
+                    <X className={styles.badgeIcon} strokeWidth={1.5} aria-hidden="true" />
+                    Deleted
+                  </span>
                 ) : (
                   d.archived && <span className={styles.badge}>Archived</span>
                 )}
               </li>
             ))}
           </ul>
+        )}
+        {!documentsFailed && documents.some((d) => d.deleted) && (
+          <p className={styles.note}>
+            <Info className={styles.noteIcon} strokeWidth={1.5} aria-hidden="true" />
+            Deleted documents can't be opened.
+          </p>
         )}
       </section>
 

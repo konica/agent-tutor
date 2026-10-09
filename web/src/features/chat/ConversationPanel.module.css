@@ -32,6 +32,10 @@
   background: var(--surface-2); color: var(--text-2); font-size: var(--fs-12); font-weight: 600;
 }
 
+.badgeIcon { width: 12px; height: 12px; margin-right: var(--sp-1); }
+.note { display: flex; align-items: flex-start; gap: var(--sp-2); margin: 0; color: var(--text-2); font-size: var(--fs-12); }
+.noteIcon { width: 14px; height: 14px; flex: none; margin-top: 2px; }
+
 .action { justify-self: start; }
 
 /* A switch: the track shows on/off by position and fill, the label sits beside it. */
