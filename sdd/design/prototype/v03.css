@@ -405,8 +405,10 @@ button.du-row:hover { background: var(--surface-2); border-color: var(--border-s
 /* ---------- M3 · app shell ---------- */
 .app { grid-template-columns: var(--nav-w) minmax(0, 1fr); }
 .app.nav-collapsed { grid-template-columns: var(--nav-w-collapsed) minmax(0, 1fr); }
-.sidenav { gap: var(--sp-0); padding: var(--sp-3) var(--sp-2) var(--sp-2); }
-.brand { gap: var(--sp-2); padding: var(--sp-1) var(--sp-2) var(--sp-3); }
+.sidenav { gap: var(--sp-0); padding: 0 var(--sp-2) var(--sp-2); }
+/* P8: one 40px brand row, aligned with the chat header: brand left, collapse chevron right */
+.nav-head { display: flex; align-items: center; gap: var(--sp-1); min-height: 40px; margin-bottom: var(--sp-2); }
+.brand { gap: var(--sp-2); padding: 0 var(--sp-2); min-width: 0; }
 .brand .word { font-size: var(--fs-16); }
 .sidenav .logo { width: 24px; height: 24px; }
 .nav-list { gap: var(--sp-0); }
@@ -419,8 +421,9 @@ button.du-row:hover { background: var(--surface-2); border-color: var(--border-s
 .nav-sub a[aria-current="page"] { background: var(--surface-2); color: var(--text); font-weight: 600; }
 .nav-count { min-width: 20px; height: 20px; padding: 0 6px; font-size: var(--fs-12); }
 .nav-foot { display: grid; gap: var(--sp-1); padding-top: var(--sp-2); border-top: 1px solid var(--border); }
-.nav-collapse { justify-self: end; width: 28px; height: 28px; display: grid; place-items: center; background: transparent; border: 0; border-radius: var(--r-sm); color: var(--text-2); }
+.nav-collapse { flex: none; margin-left: auto; width: 28px; height: 28px; display: grid; place-items: center; background: transparent; border: 0; border-radius: var(--r-sm); color: var(--text-2); }
 .nav-collapse:hover { background: var(--surface-2); color: var(--text); }
+.nav-collapse[data-tip]::after { left: auto; right: 0; transform: none; }
 .user-btn { min-height: 36px; gap: var(--sp-2); padding: 0 var(--sp-2); border-radius: var(--r-sm); }
 .user-btn .avatar { width: 24px; height: 24px; font-size: var(--fs-12); }
 .ub-name { flex: 1 1 0; min-width: 0; font-size: var(--fs-14); font-weight: 600; }
@@ -428,11 +431,12 @@ button.du-row:hover { background: var(--surface-2); border-color: var(--border-s
 .user-menu .um-head { padding: var(--sp-2); margin-bottom: var(--sp-1); }
 /* collapsed: the 56px icon rail; names move to tooltips and aria-labels */
 .nav-collapsed .sidenav { overflow: visible; padding-left: var(--sp-2); padding-right: var(--sp-2); }
-.nav-collapsed .brand { justify-content: center; padding: var(--sp-1) 0 var(--sp-3); }
+.nav-collapsed .nav-head { flex-direction: column; gap: var(--sp-1); padding-top: var(--sp-2); }
+.nav-collapsed .brand { justify-content: center; min-height: 32px; padding: 0; }
 .nav-collapsed .brand .word, .nav-collapsed .nl-text, .nav-collapsed .ub-name, .nav-collapsed .user-btn > .icon, .nav-collapsed .nav-tag { display: none; }
 .nav-collapsed .nav-link { justify-content: center; padding: 0; }
 .nav-collapsed .nav-count { position: absolute; top: 1px; right: 1px; min-width: 16px; height: 16px; padding: 0 4px; font-size: var(--fs-12); line-height: 16px; }
-.nav-collapsed .nav-collapse { justify-self: center; }
+.nav-collapsed .nav-collapse { margin-left: 0; }
 .nav-collapsed .user-btn { justify-content: center; padding: 0; }
 .nav-collapsed .sidenav [data-tip]::after { left: calc(100% + 10px); top: 50%; transform: translateY(-50%); }
 .nav-collapsed .nav-hr { margin: var(--sp-2) var(--sp-1); }

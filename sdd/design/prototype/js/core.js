@@ -260,7 +260,8 @@
   ];
   ST.NAV_LATER = { map: { label: 'Research map', icon: 'map', after: 'library', href: '#/r2-map' }, quizzes: { label: 'Quizzes', icon: 'quiz', after: 'notes', href: '#/r3-quizzes-list' }, reports: { label: 'Reports', icon: 'report', after: 'quizzes', href: '#/r3-reports' } };
 
-  /* M3: 208px nav, 32px items in hairline-separated groups, collapsible to a 56px icon rail (names in tooltips). */
+  /* M3: 208px nav, 32px items in hairline-separated groups, collapsible to a 56px icon rail (names in tooltips).
+     P8: the collapse chevron sits in the 40px brand row at the top, aligned with the chat header; below the logo on the rail. */
   ST.NAV_GROUPS = [['library', 'chat'], ['conversations', 'notes'], ['subjects', 'usage']];
   ST.shell = ({ nav = '', content = '', currentConv = null }) => {
     const S = ST.S;
@@ -287,10 +288,12 @@
     }).join('<hr class="nav-hr">');
     return `<div class="app ${rail ? 'nav-collapsed' : ''}">
       <nav class="sidenav" aria-label="Main" data-od-id="side-nav">
-        <a class="brand" href="#/library-default" aria-label="Smart Tutor, Library" ${rail ? 'data-tip="Smart Tutor"' : ''}>${ST.logo()}<span class="word">Smart Tutor</span></a>
+        <div class="nav-head">
+          <a class="brand" href="#/library-default" aria-label="Smart Tutor, Library" ${rail ? 'data-tip="Smart Tutor"' : ''}>${ST.logo()}<span class="word">Smart Tutor</span></a>
+          <button class="nav-collapse" type="button" data-action="nav-collapse" aria-expanded="${!rail}" aria-label="${rail ? 'Expand navigation' : 'Collapse navigation'}" data-tip="${rail ? 'Expand navigation' : 'Collapse navigation'}" data-od-id="nav-collapse">${ST.ic(rail ? 'chevronRight' : 'chevronLeft', 'sm')}</button>
+        </div>
         ${groups}
         <div class="nav-foot">
-          <button class="nav-collapse" type="button" data-action="nav-collapse" aria-expanded="${!rail}" aria-label="${rail ? 'Expand navigation' : 'Collapse navigation'}" data-tip="${rail ? 'Expand navigation' : 'Collapse navigation'}" data-od-id="nav-collapse">${ST.ic(rail ? 'chevronRight' : 'chevronLeft', 'sm')}</button>
           ${S.userMenu ? `<div class="user-menu" id="user-menu">
             <div class="um-head od-stack" style="--od-gap:0"><strong>${ST.esc(ST.USER.name)}</strong><span class="small muted od-truncate">${ST.esc(ST.USER.email)}</span></div>
             <button class="menu-item" type="button" data-action="theme-toggle">${ST.ic(S.theme === 'dark' ? 'sun' : 'moon')}${S.theme === 'dark' ? 'Light theme' : 'Dark theme'}</button>
