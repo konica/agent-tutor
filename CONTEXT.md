@@ -76,11 +76,11 @@ _Avoid_: Memory, history
 ## Deployment
 
 **Deployment mode**:
-How one installation of Smart Tutor is hosted: **on-premise** (the default) or **native-cloud** (opt-in). The product behaves the same in both.
+How one installation of Smart Tutor is hosted: **on-premise** (the default) or **native-cloud** (opt-in). The product behaves the same in both. Each mode has its own copy of every cloud resource it uses, image registry included; they share only the account's one-time setup.
 _Avoid_: Environment, flavor, target
 
 **On-premise mode**:
-Smart Tutor's own services (web, API, agent, MCP server, worker, sign-in) run on a virtual machine we operate instead of managed Kubernetes. File storage, the ingest queue, settings, and the image registry stay on the cloud provider's managed services; the model provider and the tracing service are external. It is the default and is deployed on every merge to `main`.
+Smart Tutor's own services (web, API, agent, MCP server, worker, sign-in) run on a virtual machine we operate instead of managed Kubernetes. File storage, the ingest queue, settings, and its own image registry stay on the cloud provider's managed services; the model provider and the tracing service are external. It is the default and is deployed on every merge to `main`.
 _Avoid_: Self-host, local, EC2 mode
 
 **Native-cloud mode**:

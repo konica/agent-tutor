@@ -31,3 +31,4 @@ Product decisions are recorded in `sdd/prd.md` (§6, §13); ADRs cover architect
 | [0012](0012-on-premise-default-deployment-mode.md) | On-premise (Docker Compose on one EC2 VM, Caddy, DuckDNS) is the default deployment mode; native-cloud (EKS) is opt-in (narrows 0009 and 0010 to native-cloud) |
 | [0013](0013-secrets-stay-in-aws-secrets-manager.md) | Secrets stay in AWS Secrets Manager (no SOPS for now); no credential-shaped strings in the repository; GitGuardian findings are triaged, not silenced (proposed) |
 | [0014](0014-on-premise-worker-egress-proxy.md) | On-premise worker egress: an internal Compose network whose only way out is an allowlisting Squid proxy (narrows 0012's egress gap: no internet) |
+| [0015](0015-deployment-modes-share-no-stack.md) | Deployment modes share no stack: each has its own ECR repositories; only the CDK bootstrap and the GitHub OIDC provider (native-cloud's GitHubDeploy owns it) are shared (supersedes 0012's "ECR is shared") |
