@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 
-import { DocumentGoneError, DocumentProcessingError, RetriesUsedUpError, type DocumentFilters, type DocumentResponse, type UploadEvents, type UploadStatus } from "../../api/documents";
+import { DocumentGoneError, DocumentProcessingError, RetriesUsedUpError, UploadLimitError, type DocumentFilters, type DocumentResponse, type UploadEvents, type UploadRateLimit, type UploadStatus } from "../../api/documents";
 import { SessionExpiredError } from "../../auth/authClient";
 import { LibraryPage } from "./LibraryPage";
 
@@ -1281,5 +1281,79 @@ describe("LibraryPage change subjects", () => {
     const panel = await screen.findByRole("dialog", { name: "Toolformer" });
     expect(await within(panel).findByText("LLMs")).toBeVisible();
     expect(within(panel).queryByText("AI Agents")).toBeNull();
+  });
+});
+
+const open = async (): Promise<UploadRateLimit> => ({ per_hour: 20, per_day: 100, limit: null, retry_at: null });
+const hourly = (retry_at: string): UploadRateLimit => ({ per_hour: 20, per_day: 100, limit: "hour", retry_at });
+
+describe("LibraryPage upload limits", () => {
+  it("shows the limit and disables Upload when the learner is limited on load", async () => {
+    const future = new Date(Date.now() + 30 * 60_000).toISOString();
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => [processing]} upload={vi.fn()} loadRateLimit={async () => hourly(future)} />);
+    expect(await screen.findByText("Upload limit reached.")).toBeVisible();
+    expect(screen.getByText(/You can upload up to 20 files per hour and 100 per day\. You can upload again at \d\d:\d\d \(GMT\+7\)\./)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Upload" })).toBeDisabled();
+  });
+
+  it("shows only the daily limit's time when the daily cap is hit", async () => {
+    // retry_at is 00:00 GMT+7 tomorrow
+    const midnight = new Date();
+    midnight.setUTCHours(17, 0, 0, 0);
+    if (midnight.getTime() <= Date.now()) midnight.setUTCDate(midnight.getUTCDate() + 1);
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => [processing]} upload={vi.fn()} loadRateLimit={async () => ({ per_hour: 20, per_day: 100, limit: "day", retry_at: midnight.toISOString() })} />);
+    expect(await screen.findByText(/You can upload again at 00:00 \(GMT\+7\)\./)).toBeVisible();
+    expect(screen.queryByText(/11:40/)).toBeNull();
+  });
+
+  it("disables Choose PDFs on the first-run card too", async () => {
+    const future = new Date(Date.now() + 30 * 60_000).toISOString();
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => []} upload={vi.fn()} loadRateLimit={async () => hourly(future)} />);
+    expect(await screen.findByText("Upload limit reached.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Choose PDFs" })).toBeDisabled();
+  });
+
+  it("stops a batch at the 429: the rest are not sent and the banner appears", async () => {
+    const future = new Date(Date.now() + 30 * 60_000).toISOString();
+    const upload = vi.fn(async () => {
+      throw new UploadLimitError(hourly(future), "Upload limit reached. You can upload again at 11:40 (GMT+7).");
+    });
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => [processing]} upload={upload} loadRateLimit={open} />);
+    await screen.findByText("lewis-rag-2020.pdf");
+    const files = ["a.pdf", "b.pdf", "c.pdf", "d.pdf", "e.pdf"].map((n) => new File(["%PDF"], n, { type: "application/pdf" }));
+    await userEvent.upload(screen.getByLabelText("Upload PDFs"), files);
+
+    expect(await screen.findByText("Upload limit reached.")).toBeVisible();
+    const notUploaded = screen.getByRole("list", { name: "Files not uploaded" });
+    for (const f of files) expect(within(notUploaded).getByText(f.name)).toBeVisible();
+    expect(within(notUploaded).getAllByText("Not uploaded. Upload limit reached.")).toHaveLength(5);
+    expect(upload.mock.calls.length).toBeLessThanOrEqual(3); // only the files already sending when the 429 came
+    expect(screen.queryByText(/Couldn't upload/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Upload" })).toBeDisabled();
+  });
+
+  it("ignores dropped files while limited", async () => {
+    const future = new Date(Date.now() + 30 * 60_000).toISOString();
+    const upload = vi.fn();
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => [processing]} upload={upload} loadRateLimit={async () => hourly(future)} />);
+    await screen.findByText("Upload limit reached.");
+    const file = new File(["%PDF"], "a.pdf", { type: "application/pdf" });
+    fireEvent.drop(document.body, { dataTransfer: { types: ["Files"], files: [file] } });
+    await act(async () => {});
+    expect(upload).not.toHaveBeenCalled();
+  });
+
+  it("enables Upload again when the limit ends", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const retryAt = new Date(Date.now() + 60_000).toISOString();
+    let calls = 0;
+    const loadRateLimit = async () => (calls++ === 0 ? hourly(retryAt) : { per_hour: 20, per_day: 100, limit: null, retry_at: null });
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => [processing]} upload={vi.fn()} loadRateLimit={loadRateLimit} />);
+    expect(await screen.findByText("Upload limit reached.")).toBeVisible();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(61_000);
+    });
+    await waitFor(() => expect(screen.queryByText("Upload limit reached.")).toBeNull());
+    expect(screen.getByRole("button", { name: "Upload" })).toBeEnabled();
   });
 });
