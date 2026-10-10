@@ -65,13 +65,20 @@ def _cors_rules(**context: str) -> list[dict[str, Any]]:
     return rules
 
 
-def test_on_premise_bucket_cors_allows_sslip_io_to_post_uploads_and_get_documents() -> None:
-    # GET is the document viewer's presigned link (#123); until #154 claims a name the host is <Elastic IP>.sslip.io.
+def test_on_premise_bucket_cors_allows_the_duckdns_name_to_post_uploads_and_get_documents() -> None:
+    # GET is the document viewer's presigned link (#123); the host is the DuckDNS name in cdk.json (#154).
     (rule,) = _cors_rules()
 
     assert rule["AllowedMethods"] == ["POST", "GET"]
     assert rule["ExposedHeaders"] == ["Accept-Ranges", "Content-Range", "Content-Length"]
     assert rule["AllowedHeaders"] == ["*"]
+    assert rule["AllowedOrigins"] == ["https://smart-tutor.duckdns.org"]
+
+
+def test_on_premise_bucket_cors_allows_sslip_io_without_a_domain() -> None:
+    # Without a domain the host is <Elastic IP>.sslip.io, which Storage names without referencing the Host.
+    (rule,) = _cors_rules(**{"smart-tutor:on-premise-domain": ""})
+
     assert rule["AllowedOrigins"] == ["https://*.sslip.io"]
 
 

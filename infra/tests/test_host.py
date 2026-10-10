@@ -372,15 +372,14 @@ def _parameter(t: Template, name: str) -> Any:
     return value
 
 
-def test_domain_defaults_to_the_elastic_ip_on_sslip_io(t: Template) -> None:
+def test_domain_is_the_duckdns_name(t: Template) -> None:
+    assert _parameter(t, "domain") == "smart-tutor.duckdns.org"
+
+
+def test_an_empty_domain_falls_back_to_the_elastic_ip_on_sslip_io() -> None:
+    t = host(**{"smart-tutor:on-premise-domain": ""})
     (eip_id,) = t.find_resources("AWS::EC2::EIP")
     assert _parameter(t, "domain") == {"Fn::Join": ["", [{"Fn::GetAtt": [eip_id, "PublicIp"]}, ".sslip.io"]]}
-
-
-def test_domain_is_a_setting() -> None:
-    assert _parameter(host(**{"smart-tutor:on-premise-domain": "smart-tutor.duckdns.org"}), "domain") == (
-        "smart-tutor.duckdns.org"
-    )
 
 
 def test_deploy_settings_name_on_premise_resources(t: Template) -> None:
@@ -656,6 +655,30 @@ def test_no_credential_shaped_url_is_in_the_repository() -> None:
         assert not re.search(r"://[^\s/:@]+:[^\s/@]+@", path.read_text(encoding="utf-8")), path
 
 
+def test_deploy_script_points_a_duckdns_name_at_the_instance_before_caddy_starts() -> None:
+    script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
+    start = script.index("if [[ $domain == *.duckdns.org ]]")
+    update = script[start : script.index("\nfi\n", start)]
+    assert "secret duckdns/token" in update
+    # The token reaches curl on stdin (-K -), never a command line; only "OK" counts as updated.
+    assert 'curl -sS --max-time 20 -K - <<<"url = ' in update
+    assert "[[ $duckdns_answer == OK ]]" in update
+    assert "Warning: could not update" in update and "exit" not in update  # warns, never fails the deploy
+    assert start < script.index("up -d --wait --wait-timeout")
+
+
+def test_deploy_script_points_the_sign_in_client_at_the_domain() -> None:
+    # Keycloak imports the realm once, so a domain change must reach the existing smart-tutor-web client (#154).
+    script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
+    start = script.index("clientId=smart-tutor-web")
+    sync = script[start : script.index("id=\\$(learner_id)", start)]
+    assert '!= "https://$domain"' in sync
+    assert '-s "redirectUris=[\\"https://$domain/*\\"]"' in sync
+    assert '-s "webOrigins=[\\"https://$domain\\"]"' in sync
+    assert '-s "attributes.\\"post.logout.redirect.uris\\"=https://$domain/*"' in sync
+    assert script.index("exec -T keycloak bash -s <<EOF") < start
+
+
 def test_deploy_script_migrates_before_it_starts_the_new_tag() -> None:
     script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
     assert script.index("run --rm migrate") < script.index("up -d --wait --wait-timeout")
@@ -834,22 +857,22 @@ def test_system_status_check_alarm_recovers_the_instance_and_emails(t: Template)
 def test_uptime_check_probes_the_api_health_route_over_https_on_the_domain(t: Template) -> None:
     (check,) = t.find_resources("AWS::Route53::HealthCheck").values()
     config = check["Properties"]["HealthCheckConfig"]
-    (eip_id,) = t.find_resources("AWS::EC2::EIP")
 
     assert config["Type"] == "HTTPS"
     assert config["Port"] == 443
     assert config["ResourcePath"] == "/api/healthz"
     # Through DNS, as a learner reaches it: a lapsed DuckDNS name fails the check too.
-    assert config["FullyQualifiedDomainName"] == {
-        "Fn::Join": ["", [{"Fn::GetAtt": [eip_id, "PublicIp"]}, ".sslip.io"]]
-    }
+    assert config["FullyQualifiedDomainName"] == "smart-tutor.duckdns.org"
     assert "IPAddress" not in config
 
 
-def test_uptime_check_follows_the_domain_setting() -> None:
-    t = host(**{"smart-tutor:on-premise-domain": "smart-tutor.duckdns.org"})
+def test_uptime_check_follows_the_sslip_io_fallback() -> None:
+    t = host(**{"smart-tutor:on-premise-domain": ""})
     (check,) = t.find_resources("AWS::Route53::HealthCheck").values()
-    assert check["Properties"]["HealthCheckConfig"]["FullyQualifiedDomainName"] == "smart-tutor.duckdns.org"
+    (eip_id,) = t.find_resources("AWS::EC2::EIP")
+    assert check["Properties"]["HealthCheckConfig"]["FullyQualifiedDomainName"] == {
+        "Fn::Join": ["", [{"Fn::GetAtt": [eip_id, "PublicIp"]}, ".sslip.io"]]
+    }
 
 
 def test_uptime_alarm_emails_when_the_check_fails_and_when_it_recovers(t: Template) -> None:

@@ -60,8 +60,8 @@ def _on_premise(app: cdk.App, env: cdk.Environment, names: ModeNames) -> list[cd
             env=env,
             names=names,
             # Storage never references the Host: an export of the Elastic IP would lock the VM's address (no
-            # `cdk destroy` of the Host, no switch to the DuckDNS name in #154). Presigned URLs and policies stay the
-            # credential, so the sslip.io wildcard only widens which page origins may read the bucket's responses.
+            # `cdk destroy` of the Host, no switch of the domain). Presigned URLs and policies stay the credential, so
+            # the sslip.io wildcard (no domain set) only widens which page origins may read the bucket's responses.
             web_origin=f"https://{domain}" if domain else "https://*.sslip.io",
             backups_retention=cdk.Duration.days(30),
         ),
@@ -74,7 +74,7 @@ def _on_premise(app: cdk.App, env: cdk.Environment, names: ModeNames) -> list[cd
             env=env,
             names=names,
             instance_type=app.node.get_context("smart-tutor:on-premise-instance-type"),
-            # Empty: <Elastic IP>.sslip.io until the DuckDNS name is claimed (#154).
+            # The DuckDNS name (#154); empty: <Elastic IP>.sslip.io.
             domain=domain,
             # Empty: a blank data volume. Set only to restore one (docs/runbooks/on-premise-backups.md); clearing it
             # again replaces the restored volume with a blank one.
