@@ -2,7 +2,7 @@
 
 On-premise mode keeps PDFs and page text in the versioned documents bucket. The VM holds only PostgreSQL: the app database `smart_tutor` and Keycloak's `keycloak` (users, sessions, the realm). This runbook covers how the database is backed up, how to check the backups, how to restore it in two ways, the restore drill, and the pattern for scheduled jobs on the VM.
 
-Commands are for **PowerShell 7** with the shell set up as in `on-premise-deploy.md` §1. Commands marked `bash` run on the VM in a Session Manager shell (`on-premise-deploy.md` §6). No command here prints a secret.
+Commands are for **PowerShell 7** with the shell set up as in `on-premise-deploy.md` §1. Commands marked `bash` run on the VM in a Session Manager shell (`on-premise-deploy.md` §7). No command here prints a secret.
 
 ## What is backed up
 
@@ -51,7 +51,7 @@ journalctl -u smart-tutor-backup -n 20           # ends with "Backed up smart_tu
 
 ## Restore from a snapshot
 
-Use this when the volume or the database on it is damaged and a snapshot from before the damage is good enough. You lose the data written since that snapshot. A new volume is created from the snapshot, and the instance is replaced so its first boot attaches it, as in `on-premise-deploy.md` §6 "Replace the instance".
+Use this when the volume or the database on it is damaged and a snapshot from before the damage is good enough. You lose the data written since that snapshot. A new volume is created from the snapshot, and the instance is replaced so its first boot attaches it, as in `on-premise-deploy.md` §7 "Replace the instance".
 
 1. **Pick the snapshot** (see "Check the backups"). Note its id, `snap-…`.
 2. **Set it in `infra/cdk.json`:** `"smart-tutor:on-premise-data-snapshot-id": "snap-…"`. Commit it to `main` through a PR, because every deploy reads `cdk.json`. **Leave it set afterwards.** Changing it again replaces the volume again, and clearing it replaces the restored volume with a **blank** one. CloudFormation snapshots the volume it replaces, so even that mistake can be undone the same way.
@@ -65,7 +65,7 @@ Use this when the volume or the database on it is damaged and a snapshot from be
    ```
 
    CloudFormation creates the volume from the snapshot and starts a new instance that attaches it, then moves the Elastic IP. It terminates the old instance and deletes the old volume after taking a final snapshot of it. That final snapshot isn't managed by the policy: delete it by hand once the restore is checked.
-4. **Deploy an image tag** (`on-premise-deploy.md` §3, with the new `$InstanceId`). Use the tag that is running now: migrations only move forward, so a snapshot from an older schema is migrated up.
+4. **Deploy an image tag** (`on-premise-deploy.md` §4, with the new `$InstanceId`). Use the tag that is running now: migrations only move forward, so a snapshot from an older schema is migrated up.
 5. **Check:** a learner signs in and their library and threads are as they were at the snapshot time. Caddy keeps its certificate (it is on the volume).
 
 A volume restored from a snapshot loads its blocks from S3 the first time each is read, so the first minutes are slow.
@@ -74,7 +74,7 @@ A volume restored from a snapshot loads its blocks from S3 the first time each i
 
 Use this when the volume and its snapshots are gone (the Host stack was destroyed, the account lost them), or to recover a single bad night's change from up to 30 days back. You lose the data written since that dump.
 
-1. **A running VM with an empty database.** If the Host stack is gone, deploy the stacks and a tag (`on-premise-deploy.md` §2 and §3, with `smart-tutor:on-premise-data-snapshot-id` empty). The deploy creates the roles and databases, and the restore needs them.
+1. **A running VM with an empty database.** If the Host stack is gone, deploy the stacks and a tag (`on-premise-deploy.md` §2 and §4, with `smart-tutor:on-premise-data-snapshot-id` empty). The deploy creates the roles and databases, and the restore needs them.
 2. **Pick the dump** (`aws s3 ls "s3://$Bucket/backups/postgres/"`). The timestamp is the folder name, for example `2026-10-09T200312Z`.
 3. **Restore it** in a Session Manager shell:
 
@@ -83,7 +83,7 @@ Use this when the volume and its snapshots are gone (the Host stack was destroye
    ```
 
    It downloads both dumps (nothing changes if either is missing), stops every service but Postgres, then drops and recreates `smart_tutor` and `keycloak` from the dumps. The product is down from here until step 4.
-4. **Deploy the same image tag again** (`on-premise-deploy.md` §3). It resets the roles' passwords to the secrets, migrates the restored schema to head, and starts the services.
+4. **Deploy the same image tag again** (`on-premise-deploy.md` §4). It resets the roles' passwords to the secrets, migrates the restored schema to head, and starts the services.
 5. **Check:** a learner signs in with their old password, and their library and threads are back. The test learner has the password from the dump. A new Elastic IP means a new `<ip>.sslip.io` address: the restored realm still lists the old one, so sign-in says "Invalid parameter: redirect_uri". Fix it as in `on-premise-deploy.md` Troubleshooting (a DuckDNS name, #154, avoids this). Caddy requests a new certificate.
 
 Documents follow the database, not the bucket. Documents uploaded after the backup are missing from the library, though their files stay in the bucket. Documents deleted after it come back in the library, but their PDF is gone. Restore the PDF's previous version in S3 if it is needed.

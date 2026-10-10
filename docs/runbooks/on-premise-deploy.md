@@ -1,8 +1,8 @@
-# On-premise deploy (#148, #149, #153)
+# On-premise deploy (#148, #149, #150, #153)
 
-Deploys on-premise mode (ADR 0012, PRD §9.12): one EC2 VM runs Smart Tutor with Docker Compose, and Caddy serves it over HTTPS at `https://<Elastic IP>.sslip.io` with a Let's Encrypt certificate. This runbook covers the first deploy and a manual redeploy. It brings up Postgres, Keycloak, the API, the web app, Caddy, the agent, the MCP server, and the worker, so a learner can sign in, upload a PDF, and ask about it (#149). Deploy on merge is #150. Backups and restore: `on-premise-backups.md` (#151). Alarms and weekly patching: `on-premise-monitoring.md` (#152); after the first deploy, every alert recipient confirms the subscription email.
+Deploys on-premise mode (ADR 0012, PRD §9.12): one EC2 VM runs Smart Tutor with Docker Compose, and Caddy serves it over HTTPS at `https://<Elastic IP>.sslip.io` with a Let's Encrypt certificate. Every merge to `main` deploys on-premise automatically (section 3). This runbook also covers the one-time setup, the first deploy, and a deploy by hand. It brings up Postgres, Keycloak, the API, the web app, Caddy, the agent, the MCP server, and the worker, so a learner can sign in, upload a PDF, and ask about it (#149). Backups and restore: `on-premise-backups.md` (#151). Alarms and weekly patching: `on-premise-monitoring.md` (#152); after the first deploy, every alert recipient confirms the subscription email.
 
-Commands are for **PowerShell 7** (`pwsh`). Run them from the repository root with your admin profile. No command here prints a secret. Don't paste the values you read in step 4 anywhere.
+Commands are for **PowerShell 7** (`pwsh`). Run them from the repository root with your admin profile. No command here prints a secret. Don't paste the values you read in step 5 anywhere.
 
 ## What runs where
 
@@ -20,7 +20,7 @@ The Host stack creates a VPC with one public subnet, no NAT, and an S3 gateway e
 ## 1. Before you start
 
 - CDK is bootstrapped in the account (`pilot-aws-prerequisites.md` §2), and the GitHub OIDC provider exists (native-cloud's `SmartTutor-prod-GitHubDeploy` created it; the on-premise deploy role reuses it).
-- The ECR repositories exist (`SmartTutor-prod-Registry`) and hold images for the commit you want. Every merge to `main` pushes them, tagged with the full commit SHA. On-premise needs `api`, `web`, `keycloak`, `agent`, `mcp`, and `worker`.
+- The ECR repositories exist (`SmartTutor-prod-Registry`; see `pilot-aws-prerequisites.md`) and hold images for the commit you want. `deploy.yml` builds and pushes them for every merge to `main` (`build-images.yml`), tagged with the full commit SHA. On-premise needs `api`, `web`, `keycloak`, `agent`, `mcp`, and `worker`. A commit merged while no images were built (before #150, while `NATIVE_CLOUD_AUTO_DEPLOY=false`) has none: build them by hand (section 4, "Build images by hand").
 - Tools: Node 22+, uv, AWS CLI v2, and the [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) to open a shell on the VM.
 - Set up the shell for real AWS (the same as `pilot-deploy.md` §1):
 
@@ -58,7 +58,44 @@ $InstanceId; $Url
 aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$InstanceId" --query "InstanceInformationList[0].PingStatus" --output text
 ```
 
-## 3. Deploy an image tag
+## 3. Deploy on merge (#150)
+
+**What runs.** On every push to `main`, `deploy.yml` runs the CI checks, then `build-images.yml` (it builds the six images and pushes them, unless all six are already there), then `deploy-on-premise.yml` in the GitHub environment `on-premise`. That workflow checks the images exist, runs `cdk deploy --all -c smart-tutor:mode=on-premise` (uploading `deploy/` as the bundle), reads the Host outputs, and waits until the VM is `Online` in SSM (a deploy that replaces the instance gives it a new id). It then runs the SSM document with the commit SHA and prints its output, and runs `deploy/pilot/smoke_test.py` against `PublicUrl`. The run fails if any step fails, including the smoke test. One on-premise deploy runs at a time (concurrency group `deploy-on-premise`): a later merge waits. GitHub keeps only the newest waiting run per group, so a waiting run can be replaced by a newer one. Native-cloud doesn't deploy unless chosen (see "Native-cloud is optional" in `pilot-deploy.md`).
+
+**One-time setup** (an admin, once):
+
+1. Deploy the on-premise GitHubDeploy stack from your laptop, so the role can run the deploy document (`ssm:SendCommand` on `smart-tutor-on-premise-deploy` only, plus reading the command's status):
+
+   ```powershell
+   Push-Location infra
+   npx aws-cdk@latest deploy SmartTutor-OnPremise-prod-GitHubDeploy --require-approval broadening -c smart-tutor:mode=on-premise
+   $RoleArn = aws cloudformation describe-stacks --stack-name SmartTutor-OnPremise-prod-GitHubDeploy --query "Stacks[0].Outputs[?OutputKey=='DeployRoleArn'].OutputValue" --output text
+   Pop-Location
+   ```
+
+2. Create the GitHub environment `on-premise`, limited to `main`, with its variables:
+
+   ```powershell
+   $Repo = "konica/agent-tutor"
+   gh api -X PUT "repos/$Repo/environments/on-premise" -F "deployment_branch_policy[protected_branches]=false" -F "deployment_branch_policy[custom_branch_policies]=true" | Out-Null
+   gh api -X POST "repos/$Repo/environments/on-premise/deployment-branch-policies" -f name=main -f type=branch | Out-Null
+   gh variable set AWS_ROLE_ARN --env on-premise --repo $Repo --body $RoleArn
+   gh variable set AWS_REGION --env on-premise --repo $Repo --body us-east-1
+   ```
+
+   The role trusts only jobs in this environment (subject `...:environment:on-premise`), and the environment accepts only `main`, so a pull request can't deploy.
+
+**Deploy again by hand.** Actions, **deploy**, *Run workflow* from `main`, mode `on-premise`. It runs the same checks, images, and deploy for the head of `main`.
+
+**Roll back.** Actions, **rollback** (`rollback.yml`), *Run workflow* from `main`, mode `on-premise`, `image_tag` = the full SHA to go back to. It skips CDK and the build; the VM keeps the deploy files of the last `cdk deploy`. Migrations don't run backwards (see section 6, "To roll back").
+
+**When it fails.** The step "Deploy the images on the VM (SSM Run Command)" prints `deploy.sh`'s output; the Troubleshooting table applies. If the log says "is not Online in SSM after 10 minutes", the instance is still booting or was replaced: read `/var/log/cloud-init-output.log` through Session Manager.
+
+**Every merge can replace the VM.** The AMI is the latest Amazon Linux 2023, read at each `cdk deploy`. After Amazon publishes a new image, the next merge replaces the instance (section 7, "Replace the instance"). The deploy waits for the VM to be `Online`, and the deploy document first waits for the VM's first boot to finish (`cloud-init status --wait`), so it doesn't run before Docker is installed. The data survives; expect a few more minutes of downtime.
+
+## 4. Deploy an image tag by hand
+
+Use this when GitHub Actions can't deploy (for example before the one-time setup), or to deploy a commit outside `main`'s head.
 
 Pick the commit whose images to run. It must be a full 40-character SHA with images in ECR:
 
@@ -91,7 +128,26 @@ The first deploy of #153 recreates Postgres once (it joins the worker network); 
 
 The output lists each service's status and ends with `Deployed <tag> to https://...`. It never contains a secret.
 
-## 4. Check
+### Build images by hand
+
+Use this for a commit that has no images in ECR. The commands match `build-images.yml`:
+
+```powershell
+git switch --detach $Tag
+$Registry = "$(aws sts get-caller-identity --query Account --output text).dkr.ecr.$env:AWS_REGION.amazonaws.com"
+aws ecr get-login-password | docker login --username AWS --password-stdin $Registry
+$P = "--platform", "linux/amd64"    # the VM is x86_64
+docker build @P --target api    -t "$Registry/smart-tutor/api:$Tag" backend
+docker build @P --build-arg VITE_API_URL=/api --build-arg VITE_KEYCLOAK_URL=/auth -t "$Registry/smart-tutor/web:$Tag" web
+docker build @P -t "$Registry/smart-tutor/keycloak:$Tag" deploy/keycloak
+docker build @P --target agent  -t "$Registry/smart-tutor/agent:$Tag" backend
+docker build @P --target mcp    -t "$Registry/smart-tutor/mcp:$Tag" backend
+docker build @P --target worker -t "$Registry/smart-tutor/worker:$Tag" backend
+foreach ($Repo in "api", "web", "keycloak", "agent", "mcp", "worker") { docker push "$Registry/smart-tutor/${Repo}:$Tag" }
+git switch -
+```
+
+## 5. Check
 
 1. **Certificate and routes.** Open `$Url` in a browser: the padlock shows a valid Let's Encrypt certificate, and the app shell loads. Plain HTTP redirects to HTTPS. The pilot smoke test also passes against the on-premise address:
 
@@ -109,7 +165,7 @@ python deploy/pilot/smoke_test.py $Url --end-to-end
 Remove-Item Env:SMOKE_TEST_USERNAME, Env:SMOKE_TEST_PASSWORD; Remove-Variable Learner
 ```
 
-The first upload after a deploy takes a minute or two (the worker describes and embeds it with Bedrock). If it fails, read `dc logs --tail 100 worker` (section 6). Keep `--deadline-seconds` under 900: the access token lasts 15 minutes and isn't refreshed.
+The first upload after a deploy takes a minute or two (the worker describes and embeds it with Bedrock). If it fails, read `dc logs --tail 100 worker` (section 7). Keep `--deadline-seconds` under 900: the access token lasts 15 minutes and isn't refreshed.
 
 2. **Only 80 and 443 are open.** `Test-NetConnection` reports `TcpTestSucceeded : False` for SSH:
 
@@ -128,16 +184,16 @@ Open `$Url` in a private window, choose **Sign in**, and sign in as `test-learne
 
 4. **Admin console.** `$Url/auth/admin`, as the bootstrap admin in `smart-tutor-on-premise/keycloak/admin`. Create learners' accounts as in `pilot-deploy.md` §8. If you delete the bootstrap admin, later deploys skip the test-learner check and print a warning.
 
-## 5. Redeploy
+## 6. Redeploy
 
-Run step 3 again with another `$Tag`.
+A merge to `main` redeploys on its own (section 3). By hand: run step 4 again with another `$Tag`.
 
 - **A new tag:** it pulls the new images and migrates, then Compose recreates only the services whose image or settings changed. Postgres and Caddy keep running (unless their settings changed). Expect a short gap in sign-in while Keycloak restarts.
 - **The same tag:** nothing changes. Migrations are already at head, every container keeps running, and the test learner already exists.
 - **A rotated secret** (for example `smart-tutor-on-premise/db/app`): the redeploy resets the role's password to the new value and recreates the services that read it.
 - **To roll back:** deploy an older SHA. Migrations don't run backwards, so only roll back across commits without a schema change, or restore the database (`on-premise-backups.md`).
 
-## 6. Operate the VM
+## 7. Operate the VM
 
 There is no SSH. Open a shell through Session Manager:
 
@@ -192,11 +248,11 @@ The receive counts go 1 to 5, the sixth receive returns nothing (`None`), and th
 
 1. CloudFormation starts the new instance and moves the Elastic IP to it. The new instance waits for the data volume, which the old instance holds until CloudFormation terminates it at the end of the update.
 2. Once it has the volume, the new instance mounts it (it doesn't format a volume that has a file system) and installs Docker.
-3. Then run step 3. The database, Keycloak's users, and Caddy's certificates are as they were. The deploy waits up to 15 minutes for `/data`.
+3. Then run step 4. The database, Keycloak's users, and Caddy's certificates are as they were. The deploy waits up to 15 minutes for `/data`.
 
 The data volume keeps a snapshot if the stack is deleted (`DeletionPolicy: Snapshot`). The instance is also replaced when its user data changes, for example a new Compose version or a data volume restored from a snapshot (`on-premise-backups.md`).
 
-## 7. Tear down
+## 8. Tear down
 
 ```powershell
 Push-Location infra

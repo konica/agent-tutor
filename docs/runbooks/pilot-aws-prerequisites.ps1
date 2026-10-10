@@ -6,7 +6,7 @@
     1. Bootstraps CDK in the account and region, unless the CDKToolkit stack already exists.
     2. Deploys the CDK stack SmartTutor-prod-GitHubDeploy: the GitHub OIDC provider and the deploy role
        smart-tutor-github-deploy (infra/smart_tutor_infra/stacks/github_deploy.py).
-    3. Creates the GitHub environment `pilot`, limited to `main`, with the variables the deploy workflow reads.
+    3. Creates the GitHub environment `native-cloud`, limited to `main`, with the variables the deploy workflow reads.
     4. Optionally deletes a hand-made budget.
     Safe to run again. Run with -DryRun first: it only reads (AWS and GitHub), prints the template-only cdk diff, and
     lists what it would do.

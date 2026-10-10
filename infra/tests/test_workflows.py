@@ -409,3 +409,14 @@ def test_workflow_files_parse_as_json_compatible_yaml() -> None:
     # Guards against tabs and duplicate keys slipping into the new files.
     for name in ("deploy.yml", "rollback.yml", *ENVIRONMENT_WORKFLOWS):
         json.dumps(workflow(name))
+
+
+def test_runbooks_name_the_current_workflows_and_environments() -> None:
+    docs = [*RUNBOOKS.glob("*.md"), *RUNBOOKS.glob("*.ps1"), WORKFLOWS.parents[1] / "README.md"]
+    for path in docs:
+        text = path.read_text(encoding="utf-8")
+        assert "deploy-pilot.yml" not in text, path.name
+        assert "environment `pilot`" not in text and "`pilot` environment" not in text, path.name
+    on_premise = (RUNBOOKS / "on-premise-deploy.md").read_text(encoding="utf-8")
+    for needle in ("deploy-on-premise.yml", "build-images.yml", "rollback.yml", "gh api -X PUT", "on-premise"):
+        assert needle in on_premise, needle

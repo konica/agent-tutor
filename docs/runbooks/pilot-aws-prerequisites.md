@@ -17,7 +17,7 @@ The deploy role's permissions use these names, so #56–#59 must use them too. I
 | Region | `us-east-1` |
 | Admin CLI profile (your laptop) | Any profile with admin rights (pilot account: `default`); pass it with `-AwsProfile` |
 | GitHub Actions deploy role | `smart-tutor-github-deploy` |
-| GitHub environment | `pilot` (deploys from `main` only) |
+| GitHub environment | `native-cloud` (deploys from `main` only) |
 | ECR repositories | `smart-tutor/<service>` (`api`, `web`, `keycloak`; later `agent`, `mcp`, `worker`) |
 | EKS cluster | `smart-tutor-prod` |
 | CloudFormation stacks | `SmartTutor-prod-*` (already set in `infra/smart_tutor_infra/app_stacks.py`) |
@@ -98,7 +98,7 @@ Add `-DeleteBudget "<name>"` to also remove a hand-made budget (see step 5). If 
 gh api repos/konica/agent-tutor/actions/oidc/customization/sub
 ```
 
-This repository uses GitHub's **immutable** subject: the answer has `"use_immutable_subject":true` and `"sub_claim_prefix":"repo:konica@1114311/agent-tutor@1399048529"` (owner and repository IDs, so a renamed or re-created repo can't inherit the trust). A job in the `pilot` environment gets the subject `repo:konica@1114311/agent-tutor@1399048529:environment:pilot`. `infra/cdk.json` holds the prefix (`smart-tutor:github-oidc-subject-prefix`) and the environment name (`smart-tutor:github-environment`). The script stops if the prefix differs from GitHub's.
+This repository uses GitHub's **immutable** subject: the answer has `"use_immutable_subject":true` and `"sub_claim_prefix":"repo:konica@1114311/agent-tutor@1399048529"` (owner and repository IDs, so a renamed or re-created repo can't inherit the trust). A job in the `native-cloud` environment gets the subject `repo:konica@1114311/agent-tutor@1399048529:environment:native-cloud`. `infra/cdk.json` holds the prefix (`smart-tutor:github-oidc-subject-prefix`) and the environment name (`smart-tutor:github-environment`, now `native-cloud`). The script stops if the prefix differs from GitHub's.
 
 ### 3b. Deploys `SmartTutor-prod-GitHubDeploy`: the OIDC provider
 
@@ -106,7 +106,7 @@ The stack creates the IAM OIDC provider for `https://token.actions.githubusercon
 
 ### 3c. … and the role `smart-tutor-github-deploy`
 
-The role trusts **only jobs in the `pilot` environment** (`StringEquals` on `aud` and `sub`). Step 4 limits that environment to the `main` branch, so a pull request or another branch can never assume it. Together this is the "only `main` and environment-protected jobs" rule from #55 and #59. Maximum session: 1 hour.
+The role trusts **only jobs in the `native-cloud` environment** (`StringEquals` on `aud` and `sub`). Step 4 limits that environment to the `main` branch, so a pull request or another branch can never assume it. Together this is the "only `main` and environment-protected jobs" rule from #55 and #59. Maximum session: 1 hour.
 
 ### 3d. Gives it only what deployment needs (inline policy `deploy`)
 
@@ -120,23 +120,33 @@ The role trusts **only jobs in the `pilot` environment** (`StringEquals` on `aud
 
 If #59 finds a missing permission, add it to `github_deploy.py` with a specific resource, never `*` on a service, and extend `infra/tests/test_synth.py`. The merge deploys it.
 
-### 4. Creates the GitHub environment `pilot`
+### 4. Creates the GitHub environment `native-cloud`
 
 - **Deployment branches:** `main` only (custom branch policy).
 - **Variables:** `AWS_ROLE_ARN`, `AWS_REGION`, `AWS_ACCOUNT_ID`. There are no AWS keys to store, because OIDC replaces them.
 
-Optional: in **Settings → Environments → pilot**, add **Required reviewers** if every deploy should wait for an approval.
+Optional: in **Settings → Environments → native-cloud**, add **Required reviewers** if every deploy should wait for an approval.
 
-The deploy workflow in #59 declares `environment: pilot`, `permissions: id-token: write`, and calls `aws-actions/configure-aws-credentials` with `role-to-assume: ${{ vars.AWS_ROLE_ARN }}`. Nothing here can be tested end to end before #59, but a wrong `sub` or a missing environment shows up there as `Not authorized to perform sts:AssumeRoleWithWebIdentity`.
+The deploy workflow in #59 declares `environment: native-cloud`, `permissions: id-token: write`, and calls `aws-actions/configure-aws-credentials` with `role-to-assume: ${{ vars.AWS_ROLE_ARN }}`. Nothing here can be tested end to end before #59, but a wrong `sub` or a missing environment shows up there as `Not authorized to perform sts:AssumeRoleWithWebIdentity`.
+
+**Moving from `pilot` (#150).** Before #150 the environment was named `pilot`. Run the script again: it redeploys `SmartTutor-prod-GitHubDeploy` (the role now trusts `native-cloud`) and creates the `native-cloud` environment with the variables. Then delete the old environment:
+
+```powershell
+gh api -X DELETE repos/konica/agent-tutor/environments/pilot
+```
+
+Until then, a native-cloud deploy fails at sign-in.
+
+**Shared ECR repositories.** On a fresh account the ECR repositories (`smart-tutor/<service>`) come from native-cloud's `SmartTutor-prod-Registry` stack. Images are built before any `cdk deploy`, so that stack must exist before the first deploy of either mode: deploy it from your laptop with `npx aws-cdk@latest deploy SmartTutor-prod-Registry -c smart-tutor:mode=native-cloud`.
 
 ### Check
 
 ```powershell
 aws iam get-role --role-name smart-tutor-github-deploy --query "Role.[Arn,AssumeRolePolicyDocument.Statement[0].Condition]" --output json
 aws iam get-role-policy --role-name smart-tutor-github-deploy --policy-name deploy --query "PolicyDocument.Statement[].Sid" --output text
-gh api repos/konica/agent-tutor/environments/pilot --jq "{name, deployment_branch_policy}"
-gh api repos/konica/agent-tutor/environments/pilot/deployment-branch-policies --jq ".branch_policies[].name"   # main
-gh variable list --repo konica/agent-tutor --env pilot
+gh api repos/konica/agent-tutor/environments/native-cloud --jq "{name, deployment_branch_policy}"
+gh api repos/konica/agent-tutor/environments/native-cloud/deployment-branch-policies --jq ".branch_policies[].name"   # main
+gh variable list --repo konica/agent-tutor --env native-cloud
 ```
 
 ## 5. Decide the budget and the alert email (decision, about 5 min)
@@ -203,8 +213,8 @@ $Record = @'
 | Region | us-east-1 |
 | CDK bootstrap | CDKToolkit stack, bootstrap version <N>, done <date> |
 | Admin principal for EKS access (#56) | <admin role or user ARN from step 1> |
-| GitHub deploy role | arn:aws:iam::<ACCOUNT_ID>:role/smart-tutor-github-deploy (trusts repo:konica@1114311/agent-tutor@1399048529:environment:pilot) |
-| GitHub environment | pilot, deployment branches: main; required reviewers: <yes/no>; vars AWS_ROLE_ARN, AWS_REGION, AWS_ACCOUNT_ID |
+| GitHub deploy role | arn:aws:iam::<ACCOUNT_ID>:role/smart-tutor-github-deploy (trusts repo:konica@1114311/agent-tutor@1399048529:environment:native-cloud) |
+| GitHub environment | native-cloud, deployment branches: main; required reviewers: <yes/no>; vars AWS_ROLE_ARN, AWS_REGION, AWS_ACCOUNT_ID |
 | Monthly budget | $<amount> |
 | Budget alert email(s) | <address(es)> |
 | Budget thresholds | 80% actual, 100% forecasted |
@@ -236,7 +246,7 @@ The agent builds #56–#59; a human still does these:
 | #56 public web app | Review and merge the PR. Run the first `cdk deploy` and add-on install from your laptop with your admin profile, following [`pilot-deploy.md`](pilot-deploy.md). Open the CloudFront address and check that the app shell loads and the load balancer has no public address. Check that the budget email address is right in the Budgets console. |
 | #57 Keycloak | Run the deploy update and create the client's account, following [Manage client accounts](pilot-deploy.md#8-manage-client-accounts). Do the #57 demo there. |
 | #58 sign-in end to end | Run or watch the demo against the public address: sign-in reaches the Library with the user's name; `GET /api/me` with the token gives 200; after sign-out the token gets 401; without a token, 401 with `WWW-Authenticate: Bearer`. Then send the client the address and username, and the temporary password **through a separate channel**. **The client has access from here.** |
-| #59 deploy on merge | Merge the workflow PR. If you turned on required reviewers, approve the `pilot` deployment in the Actions run. Check that the first run's smoke test passes. Practice one rollback to the previous image tag, following the runbook. |
+| #59 deploy on merge | Merge the workflow PR. If you turned on required reviewers, approve the `native-cloud` deployment in the Actions run. Check that the first run's smoke test passes. Practice one rollback to the previous image tag, following the runbook. |
 
 ### Cost control while the pilot is idle
 

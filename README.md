@@ -12,7 +12,7 @@ An AI tutor for your own documents: learners upload PDFs, the system suggests su
 | `infra/` | AWS CDK app (Python), us-east-1 |
 | `deploy/helm/` | Umbrella Helm chart for EKS and cluster add-on values |
 | `local/` | Files used only by Docker Compose (Keycloak realm, LocalStack and Postgres init) |
-| `docs/` | The AWS pilot's [solution architecture](docs/architecture/solution-architecture.md) for stakeholders, and [runbooks](docs/runbooks/) for engineers (deploy, environment overview, AWS prerequisites) |
+| `docs/` | The native-cloud pilot's [solution architecture](docs/architecture/solution-architecture.md) for stakeholders, and [runbooks](docs/runbooks/) for engineers (on-premise deploy first; native-cloud deploy, environment overview, AWS prerequisites) |
 
 ## Local development
 
@@ -125,6 +125,12 @@ Notes:
 - Debug runs don't reload on change: restart the session after you edit code.
 - To stop before startup code runs (settings, app factory), add `--wait-for-client` after the `--listen` port in the `make` target. The process then waits until a debugger attaches.
 - Breakpoints in requests: use **API**, open http://localhost:10453 (or http://localhost:10450/docs), and act in the app. Breakpoints in ingestion: use **Worker**, then upload a PDF from the Library.
+
+## Deploy
+
+**On-premise (default).** Every merge to `main` runs the checks, builds the images to ECR, and deploys them to the on-premise VM (`cdk deploy`, then SSM Run Command, then a smoke test): `.github/workflows/deploy.yml`. Setup, a deploy by hand, rollback, and operations: [`docs/runbooks/on-premise-deploy.md`](docs/runbooks/on-premise-deploy.md); backups and monitoring: `on-premise-backups.md`, `on-premise-monitoring.md`.
+
+**Native-cloud (optional).** EKS, RDS, and CloudFront. It deploys only when you run **deploy** by hand with mode `native-cloud`, or on every merge while the repository variable `NATIVE_CLOUD_AUTO_DEPLOY` is `true`: [`docs/runbooks/pilot-deploy.md`](docs/runbooks/pilot-deploy.md), teardown in `pilot-teardown.md`.
 
 ## Architecture rules
 

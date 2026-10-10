@@ -6,15 +6,15 @@ How the pilot environment (#54) fits together across GitHub and AWS: who deploys
 
 ## 1. Platforms and trust
 
-Nothing on GitHub holds an AWS key. A deploy job in the `pilot` environment gets a short-lived GitHub OIDC token. AWS STS swaps it for a one-hour session of the deploy role, and the role can only do the five things in its policy. CloudFormation, not the role, creates the infrastructure, through the CDK bootstrap roles.
+Nothing on GitHub holds an AWS key. A deploy job in the `native-cloud` environment gets a short-lived GitHub OIDC token. AWS STS swaps it for a one-hour session of the deploy role, and the role can only do the five things in its policy. CloudFormation, not the role, creates the infrastructure, through the CDK bootstrap roles.
 
 ```mermaid
 flowchart TB
   subgraph GH["GitHub — konica/agent-tutor"]
     PR["Pull request"] -->|merge| MAIN["main branch"]
     MAIN -->|push event| WF["Actions workflow<br/>deploy (#59)"]
-    WF -.->|"job runs in"| ENV["Environment pilot<br/>branches: main only<br/>vars: AWS_ROLE_ARN, AWS_REGION, AWS_ACCOUNT_ID"]
-    WF -->|"id-token: write"| TOK["OIDC token<br/>sub = repo:konica@1114311/agent-tutor@1399048529:environment:pilot"]
+    WF -.->|"job runs in"| ENV["Environment native-cloud<br/>branches: main only<br/>vars: AWS_ROLE_ARN, AWS_REGION, AWS_ACCOUNT_ID"]
+    WF -->|"id-token: write"| TOK["OIDC token<br/>sub = repo:konica@1114311/agent-tutor@1399048529:environment:native-cloud"]
   end
 
   subgraph AWS["AWS account 685394474162 — us-east-1"]
@@ -44,9 +44,9 @@ The only real dependency is that GitHub stores the role's ARN, so the role has t
 |---|---|---|---|
 | 0 | GitHub (read only) | Read the repository's OIDC subject prefix `repo:konica@1114311/agent-tutor@1399048529`; it must match `infra/cdk.json` | Nothing; GitHub fixes it for the repository |
 | 1 | AWS | `cdk bootstrap` (`CDKToolkit` stack) | Admin credentials |
-| 2 | AWS | Deploy `SmartTutor-prod-GitHubDeploy`: the OIDC provider, then the role that trusts `…:environment:pilot` | Step 1, and the prefix from step 0 |
-| 3 | GitHub | Create the environment `pilot`, limited to `main` | Nothing (it can run before step 2) |
-| 4 | GitHub | Set the variables `AWS_ROLE_ARN`, `AWS_REGION`, `AWS_ACCOUNT_ID` in `pilot` | The role ARN from step 2 |
+| 2 | AWS | Deploy `SmartTutor-prod-GitHubDeploy`: the OIDC provider, then the role that trusts `…:environment:native-cloud` | Step 1, and the prefix from step 0 |
+| 3 | GitHub | Create the environment `native-cloud`, limited to `main` | Nothing (it can run before step 2) |
+| 4 | GitHub | Set the variables `AWS_ROLE_ARN`, `AWS_REGION`, `AWS_ACCOUNT_ID` in `native-cloud` | The role ARN from step 2 |
 | 5 | Both, from #59 on | A deploy job sends its token; AWS STS checks it against the role's trust and returns 1-hour credentials | Steps 2–4 |
 
 ```mermaid
@@ -59,11 +59,11 @@ sequenceDiagram
   GH-->>A: repo:konica@1114311/agent-tutor@1399048529
   A->>AWS: cdk bootstrap (step 1)
   A->>AWS: cdk deploy SmartTutor-prod-GitHubDeploy (step 2)
-  AWS-->>A: role ARN (trusts ...:environment:pilot)
-  A->>GH: create environment pilot, main only (step 3)
+  AWS-->>A: role ARN (trusts ...:environment:native-cloud)
+  A->>GH: create environment native-cloud, main only (step 3)
   A->>GH: set AWS_ROLE_ARN, AWS_REGION, AWS_ACCOUNT_ID (step 4)
   Note over GH,AWS: Later, on every merge to main (issue 59)
-  GH->>AWS: deploy job in pilot sends its OIDC token (step 5)
+  GH->>AWS: deploy job in native-cloud sends its OIDC token (step 5)
   AWS-->>GH: token matches the role's trust, so 1-hour credentials
 ```
 
@@ -149,7 +149,7 @@ Merging to `main` runs one deployment at a time:
 sequenceDiagram
   autonumber
   actor D as Developer
-  participant GH as GitHub Actions (env pilot)
+  participant GH as GitHub Actions (env native-cloud)
   participant STS as AWS STS
   participant ECR as ECR
   participant CFN as CloudFormation (via CDK)
@@ -169,19 +169,19 @@ sequenceDiagram
   CF-->>GH: pass, or the run fails visibly
 ```
 
-The files: `deploy.yml` (trigger), `ci.yml` (checks), `deploy-pilot.yml` (the job in `pilot`), and `rollback.yml`. The add-ons install also runs on each deploy.
+The files: `deploy.yml` (trigger), `ci.yml` (checks), `build-images.yml` (builds the images; since #150 native-cloud deploys only when chosen), `deploy-native-cloud.yml` (the job in `native-cloud`), and `rollback.yml`. The add-ons install also runs on each deploy.
 
-To roll back, run `rollback.yml` with an earlier commit SHA as the image tag (`pilot-deploy.md` section 12).
+To roll back, run `rollback.yml` with mode `native-cloud` and an earlier commit SHA as the image tag (`pilot-deploy.md` section 12).
 
 ## 5. Who builds which piece
 
 | Piece | Built in | By | How |
 |---|---|---|---|
-| CDK bootstrap, OIDC provider, deploy role, GitHub environment `pilot`, quota checks, budget decision | #55 | Human (admin) runs one script, once | CDK `GitHubDeployStack`; `pilot-aws-prerequisites.ps1` for bootstrap and the GitHub environment |
+| CDK bootstrap, OIDC provider, deploy role, GitHub environment `native-cloud`, quota checks, budget decision | #55 | Human (admin) runs one script, once | CDK `GitHubDeployStack`; `pilot-aws-prerequisites.ps1` for bootstrap and the GitHub environment |
 | VPC, NAT, EKS + node group, Pod Identity, ECR, add-ons (load balancer controller, External Secrets, metrics-server), internal load balancer, CloudFront with VPC origin, `web`, budget alarm, ADR + PRD update | #56 | Agent; human runs the first deploy | CDK `NetworkStack`, `ClusterStack`, `RegistryStack`, `EdgeStack`, `BudgetsStack`; `deploy/helm/addons/`; chart `web` |
 | RDS (DB app, DB keycloak), Secrets Manager entries, `keycloak` at `/auth`, production realm | #57 | Agent; human creates the client's account | CDK `DataStack`, `ConfigStack`; chart `keycloak`; `deploy/keycloak/Dockerfile`; the `db-bootstrap` hook; ADR 0010 |
 | `api` at `/api`, `migrate` hook Job, same-origin web build, probes | #58 | Agent; human runs the demo and hands over access | chart `api`, `values-prod.yaml` |
-| Deploy-on-merge workflow, smoke test, rollback runbook | #59 | Agent; human merges and approves | `.github/workflows/deploy.yml`, `deploy-pilot.yml`, `rollback.yml`; `deploy/pilot/smoke_test.py` |
+| Deploy-on-merge workflow, smoke test, rollback runbook | #59 | Agent; human merges and approves | `.github/workflows/deploy.yml`, `build-images.yml`, `deploy-native-cloud.yml`, `rollback.yml`; `deploy/pilot/smoke_test.py` |
 | S3 documents bucket, SQS, agent, MCP server, worker, Bedrock access | #139 | Agent; human runs the demo | CDK `StorageStack`; Pod Identity roles in `ClusterStack`; charts `agent`, `mcp-server`, `worker` |
 
 ## Cost
