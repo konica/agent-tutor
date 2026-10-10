@@ -2,12 +2,8 @@
 
 from typing import Any
 
-import aws_cdk as cdk
-from aws_cdk import aws_s3 as s3
-from aws_cdk.assertions import Match, Template
+from aws_cdk.assertions import Match
 
-from smart_tutor_infra.names import ON_PREMISE, mode_names
-from smart_tutor_infra.stacks.storage import StorageStack
 from tests.test_synth import make_app, template
 
 
@@ -63,8 +59,9 @@ def test_documents_bucket_cors_allows_only_the_cloudfront_address() -> None:
             "CorsConfiguration": {
                 "CorsRules": [
                     {
-                        "AllowedMethods": ["POST"],
+                        "AllowedMethods": ["POST", "GET"],
                         "AllowedHeaders": ["*"],
+                        "ExposedHeaders": ["Accept-Ranges", "Content-Range", "Content-Length"],
                         "AllowedOrigins": [
                             {
                                 "Fn::Join": [
@@ -85,21 +82,6 @@ def test_documents_bucket_cors_allows_only_the_cloudfront_address() -> None:
             }
         },
     )
-
-
-def test_cors_methods_are_a_parameter() -> None:
-    app = cdk.App()
-    stack = StorageStack(
-        app,
-        "Storage",
-        names=mode_names(ON_PREMISE),
-        web_origin="https://tutor.example.org",
-        cors_methods=(s3.HttpMethods.GET, s3.HttpMethods.POST),
-    )
-    (bucket,) = Template.from_stack(stack).find_resources("AWS::S3::Bucket").values()
-    (rule,) = bucket["Properties"]["CorsConfiguration"]["CorsRules"]
-    assert rule["AllowedMethods"] == ["GET", "POST"]
-    assert rule["AllowedOrigins"] == ["https://tutor.example.org"]
 
 
 def test_ingest_queue_outlasts_a_long_ingestion_and_dead_letters_after_5() -> None:

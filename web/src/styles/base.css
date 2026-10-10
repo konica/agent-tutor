@@ -17,7 +17,7 @@ a { color: var(--accent-text); text-underline-offset: 3px; }
 a:hover { color: var(--accent-hover); }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
-button:disabled { cursor: not-allowed; }
+button:disabled, button[aria-disabled="true"] { cursor: not-allowed; }
 /* Tooltips: [data-tip] shows on hover and keyboard focus; the accessible name carries the same text (DESIGN.md → Density). */
 [data-tip] { position: relative; }
 [data-tip]:hover::after, [data-tip]:focus-visible::after {

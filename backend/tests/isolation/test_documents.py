@@ -77,6 +77,22 @@ def test_b_never_sees_the_subjects_of_a_document() -> None:
     assert client.get("/documents", headers=B).json() == []
 
 
+def test_b_cannot_get_a_documents_file_link() -> None:
+    client, objects, ingestion = setup()
+    stored = client.post("/uploads", json={"file_name": "a1.pdf"}, headers=A).json()
+    objects.objects[stored["fields"]["key"]] = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
+    ingestion.ingest_upload(stored["fields"]["key"])
+    doc = stored["document_id"]
+
+    assert client.get(f"/documents/{doc}/file", headers=B).status_code == 404
+    assert objects.presigned_gets == []  # B's request signed nothing
+    mine = client.get(f"/documents/{doc}/file", headers=A)
+    assert mine.status_code == 200 and mine.json()["expires_in"] == 300
+    [(key, _)] = objects.presigned_gets
+    assert key.startswith("contents/learner-a/")
+    assert mine.json()["document"]["document_id"] == doc
+
+
 def test_b_cannot_read_a_suggestions_or_set_a_subjects() -> None:
     client, objects, ingestion = setup()
     stored = client.post("/uploads", json={"file_name": "a1.pdf"}, headers=A).json()
@@ -90,6 +106,23 @@ def test_b_cannot_read_a_suggestions_or_set_a_subjects() -> None:
     [mine] = client.get("/documents", headers=A).json()
     assert (mine["state"], mine["subjects"]) == ("awaiting_subjects", [])
     assert client.get(f"/documents/{doc}/subject-suggestions", headers=A).status_code == 200
+
+
+def test_b_cannot_change_the_subjects_of_a_ready_document() -> None:
+    client, objects, ingestion = setup()
+    stored = client.post("/uploads", json={"file_name": "a1.pdf"}, headers=A).json()
+    objects.objects[stored["fields"]["key"]] = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
+    ingestion.ingest_upload(stored["fields"]["key"])
+    doc = stored["document_id"]
+    general = "00000000-0000-4000-8000-000000000001"
+    assert client.put(f"/documents/{doc}/subjects", json={"subject_ids": [general]}, headers=A).status_code == 200
+
+    put = client.put(f"/documents/{doc}/subjects", json={"new_names": ["Deep Learning"]}, headers=B)
+
+    assert put.status_code == 404
+    [mine] = client.get("/documents", headers=A).json()
+    assert (mine["state"], [s["subject_id"] for s in mine["subjects"]]) == ("ready", [general])
+    assert client.get("/me/subjects", headers=B).json() == []
 
 
 def test_b_cannot_get_a_presigned_post_for_a_key() -> None:

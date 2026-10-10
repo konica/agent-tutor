@@ -312,4 +312,24 @@ describe("DocumentDetailsPanel", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't archive this document. Try again.");
     expect(props.onChanged).not.toHaveBeenCalled();
   });
+
+  it("changes a ready document's subjects from the Subjects section", async () => {
+    const user = userEvent.setup();
+    const onChangeSubjects = vi.fn();
+    setup(details(), { onChangeSubjects });
+    await user.click(await screen.findByRole("button", { name: "Change subjects" }));
+    expect(onChangeSubjects).toHaveBeenCalledExactlyOnceWith(details());
+  });
+
+  it("offers no Change subjects for an archived document and says to restore it", async () => {
+    setup(details({ archived: true }), { onChangeSubjects: vi.fn() });
+    expect(await screen.findByText(/Restore it to change its subjects\./)).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Change subjects" })).toBeNull();
+  });
+
+  it("offers no Change subjects before a document is ready", async () => {
+    setup(details({ state: "awaiting_subjects", subjects: [] }), { onChangeSubjects: vi.fn() });
+    expect(await screen.findByRole("heading", { name: "ReAct" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Change subjects" })).toBeNull();
+  });
 });

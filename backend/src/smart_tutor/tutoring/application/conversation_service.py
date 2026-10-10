@@ -1,4 +1,4 @@
-"""Start a thread (PRD §8 US-3) and manage its documents (US-4b, US-4c): it answers from all ready documents."""
+"""Start a thread (PRD §8 US-3) and manage its documents and search scope (US-4b, US-4c)."""
 
 import uuid
 from collections.abc import Sequence
@@ -7,8 +7,13 @@ from smart_tutor.knowledge.application import DocumentService
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.shared.ports.clock import Clock
 from smart_tutor.tutoring.domain.document_used import DELETED_DOCUMENT, DocumentUsed
-from smart_tutor.tutoring.domain.errors import DocumentNotAvailableError, NoDocumentsError, ThreadNotFoundError
-from smart_tutor.tutoring.domain.thread import Thread
+from smart_tutor.tutoring.domain.errors import (
+    DocumentNotAvailableError,
+    NoDocumentsError,
+    ThreadArchivedError,
+    ThreadNotFoundError,
+)
+from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
 from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
 
@@ -45,13 +50,33 @@ class ConversationService:
             self._threads.add_documents(ThreadId(thread.thread_id), [document_id], now)
         return thread
 
-    def rename_thread(self, thread_id: ThreadId, user_id: UserId, title: str) -> Thread:
-        """The learner renames their conversation (US-13): trimmed, 1-120 characters; not while archived."""
-        thread = self._threads.get_owned(thread_id, user_id)
-        if thread is None:
-            raise ThreadNotFoundError("Conversation not found")
-        self._threads.set_title(thread_id, thread.rename(title))
+    def update_thread(
+        self, thread_id: ThreadId, user_id: UserId, *, title: str | None = None, search_scope: SearchScope | None = None
+    ) -> Thread:
+        """The learner renames the conversation (US-13) and/or limits its search to its documents (US-4c). Every
+        check runs before anything is saved."""
+        thread = self._get(thread_id, user_id)
+        new_title = thread.rename(title) if title is not None else None
+        if search_scope is not None:
+            thread.limit_search(search_scope, len(self._threads.documents_used(thread_id)))
+        if new_title is not None:
+            self._threads.set_title(thread_id, new_title)
+        if search_scope is not None:
+            self._threads.set_search_scope(thread_id, search_scope)
         return thread
+
+    def get_thread(self, thread_id: ThreadId, user_id: UserId) -> Thread:
+        return self._get(thread_id, user_id)
+
+    def search_documents(self, thread_id: ThreadId, user_id: UserId) -> list[DocumentId] | None:
+        """What a new question in the thread searches: None for the whole library, else the listed documents' ids,
+        read here and never from the prompt (US-4c). MCP search keeps only those the learner can read."""
+        thread = self._get(thread_id, user_id)
+        if thread.status is ThreadStatus.ARCHIVED:
+            raise ThreadArchivedError("An archived conversation is read-only. Restore it first.")
+        if thread.search_scope is SearchScope.LIBRARY:
+            return None
+        return [row.document_id for row in self._threads.documents_used(thread_id)]
 
     def record_answer(self, thread_id: ThreadId, user_id: UserId, document_ids: Sequence[DocumentId]) -> None:
         """Add the documents an answer drew on to the thread's documents used (a decline passes none)."""
@@ -84,12 +109,20 @@ class ConversationService:
 
     def remove_document(self, thread_id: ThreadId, user_id: UserId, document_id: DocumentId) -> None:
         """Take a document off the list; the document and old citations to it are unchanged (US-4c)."""
-        self._owned(thread_id, user_id)
+        thread = self._get(thread_id, user_id)
         self._threads.remove_document(thread_id, document_id)
+        # A limited thread never has an empty list: the last removal turns the limit off.
+        if thread.search_scope is SearchScope.LISTED and not self._threads.documents_used(thread_id):
+            self._threads.set_search_scope(thread_id, SearchScope.LIBRARY)
+
+    def _get(self, thread_id: ThreadId, user_id: UserId) -> Thread:
+        thread = self._threads.get_owned(thread_id, user_id)
+        if thread is None:
+            raise ThreadNotFoundError("Conversation not found")
+        return thread
 
     def _owned(self, thread_id: ThreadId, user_id: UserId) -> None:
-        if self._threads.get_owned(thread_id, user_id) is None:
-            raise ThreadNotFoundError("Conversation not found")
+        self._get(thread_id, user_id)
 
     def _views(self, user_id: UserId, rows: Sequence[ThreadDocument]) -> list[DocumentUsed]:
         views = self._documents.documents_by_id(user_id, [row.document_id for row in rows])

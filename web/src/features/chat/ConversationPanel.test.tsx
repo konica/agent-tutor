@@ -28,6 +28,7 @@ function renderPanel(props: Partial<ComponentProps<typeof ConversationPanel>> = 
       answered={false}
       showCitations
       onShowCitationsChange={onShowCitationsChange}
+      searchListed={false}
       {...props}
     />,
   );
@@ -70,10 +71,22 @@ describe("ConversationPanel", () => {
     expect(rows[0]).toHaveAttribute("title", "ReAct\nYao, Zhao · 2023");
     expect(within(documentsSection()).getByText("3")).toBeInTheDocument();
     expect(screen.queryByText("Documents used to answer will appear here.")).not.toBeInTheDocument();
-    // Opening a document from a row comes with #123: a row's only button removes it.
-    expect(within(rows[0]!).getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual([
+    // A row has two sibling buttons, never nested: one opens the document (#123), the other removes it.
+    const buttons = within(rows[0]!).getAllByRole("button");
+    expect(buttons.map((b) => b.getAttribute("aria-label") ?? b.textContent)).toEqual([
+      "ReAct",
       "Remove ReAct from this conversation",
     ]);
+    expect(buttons[0]!.querySelector("button")).toBeNull();
+    expect(buttons[1]!.closest("[data-document-id]")).toBeNull();
+  });
+
+  it("removes a deleted document's row, which still opens nothing", () => {
+    renderPanel({ threadId: "t1", onOpen: vi.fn(), onRemoveDocument: vi.fn(), documents: [used("PPO", { deleted: true })] });
+    expect(within(documentsSection()).getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual([
+      "Remove PPO from this conversation",
+    ]);
+    expect(documentsSection().querySelector("[data-document-id]")).toBeNull();
   });
 
   it("offers Add documents once the conversation exists", async () => {
@@ -125,6 +138,7 @@ describe("ConversationPanel", () => {
         answered: true,
         showCitations: true,
         onShowCitationsChange: vi.fn(),
+        searchListed: false,
         onAddDocuments: vi.fn(),
         onRemoveDocument,
       };
@@ -174,6 +188,7 @@ describe("ConversationPanel", () => {
         answered
         showCitations
         onShowCitationsChange={vi.fn()}
+        searchListed={false}
       />,
     );
     const row = within(documentsSection()).getAllByRole("listitem")[1];
@@ -191,9 +206,31 @@ describe("ConversationPanel", () => {
         answered
         showCitations
         onShowCitationsChange={vi.fn()}
+        searchListed={false}
       />,
     );
     expect(screen.queryByText("Deleted documents can't be opened.")).not.toBeInTheDocument();
+  });
+
+  it("opens a document from its row: one button per row named by its title, archived too", async () => {
+    const onOpen = vi.fn();
+    renderPanel({ answered: true, onOpen, documents: [used("ReAct"), used("RAG", { archived: true })] });
+    const react = within(documentsSection()).getByRole("button", { name: "ReAct" });
+    await userEvent.click(react);
+    expect(onOpen).toHaveBeenCalledWith("ReAct", react);
+    expect(within(documentsSection()).getByRole("button", { name: /^RAG/ })).toBeInTheDocument();
+  });
+
+  it("does not make a deleted document's row a button", () => {
+    renderPanel({ answered: true, onOpen: vi.fn(), documents: [used("PPO", { deleted: true })] });
+    expect(within(documentsSection()).getByText("PPO")).toBeInTheDocument();
+    expect(within(documentsSection()).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("marks the open document's row as current", () => {
+    renderPanel({ answered: true, openId: "RAG", documents: [used("ReAct"), used("RAG")] });
+    expect(within(documentsSection()).getByRole("button", { name: "RAG" })).toHaveAttribute("aria-current", "true");
+    expect(within(documentsSection()).getByRole("button", { name: "ReAct" })).not.toHaveAttribute("aria-current");
   });
 
   it("offers a disabled Summarize lesson after the first answer", () => {
@@ -210,6 +247,51 @@ describe("ConversationPanel", () => {
   it("offers no Archive conversation before there is a conversation", () => {
     renderPanel({ threadId: null });
     expect(screen.queryByRole("button", { name: "Archive conversation" })).not.toBeInTheDocument();
+  });
+
+  describe("Only search these documents", () => {
+    const scopeSwitch = () => screen.getByRole("switch", { name: "Only search these documents" });
+
+    it("is off by default and disabled while the list is empty, saying why", () => {
+      renderPanel({ threadId: "t1", searchListed: false, onSearchListedChange: vi.fn() });
+      expect(scopeSwitch()).toHaveAttribute("aria-checked", "false");
+      expect(scopeSwitch()).toBeDisabled();
+      expect(scopeSwitch()).toHaveAccessibleDescription("Add documents to limit the search.");
+      expect(within(documentsSection()).getByText("Add documents to limit the search.")).toBeInTheDocument();
+    });
+
+    it("turns the limit on", async () => {
+      const onSearchListedChange = vi.fn();
+      renderPanel({ threadId: "t1", documents: [used("ReAct")], searchListed: false, onSearchListedChange });
+      expect(screen.queryByText("Add documents to limit the search.")).not.toBeInTheDocument();
+      expect(scopeSwitch()).not.toHaveAccessibleDescription();
+      await userEvent.click(scopeSwitch());
+      expect(onSearchListedChange).toHaveBeenCalledWith(true);
+    });
+
+    it("turns the limit off", async () => {
+      const onSearchListedChange = vi.fn();
+      renderPanel({ threadId: "t1", documents: [used("ReAct")], searchListed: true, onSearchListedChange });
+      expect(scopeSwitch()).toHaveAttribute("aria-checked", "true");
+      await userEvent.click(scopeSwitch());
+      expect(onSearchListedChange).toHaveBeenCalledWith(false);
+    });
+
+    it("sits under Add documents", () => {
+      renderPanel({ threadId: "t1", documents: [used("ReAct")], searchListed: false, onAddDocuments: vi.fn(), onSearchListedChange: vi.fn() });
+      const add = within(documentsSection()).getByRole("button", { name: "Add documents" });
+      expect(add.compareDocumentPosition(scopeSwitch()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("is disabled before there is a conversation, and when the documents couldn't be loaded", () => {
+      const { unmount } = render(
+        <ConversationPanel id="p" documents={[used("ReAct")]} threadId={null} answered={false} showCitations onShowCitationsChange={vi.fn()} searchListed={false} />,
+      );
+      expect(scopeSwitch()).toBeDisabled();
+      unmount();
+      renderPanel({ threadId: "t1", documentsFailed: true, searchListed: false, onSearchListedChange: vi.fn() });
+      expect(scopeSwitch()).toBeDisabled();
+    });
   });
 
   it("turns citations off with the switch", async () => {

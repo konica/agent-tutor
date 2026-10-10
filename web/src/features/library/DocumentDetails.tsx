@@ -1,4 +1,4 @@
-import { Archive, CircleAlert, Pencil, RotateCcw } from "lucide-react";
+import { Archive, CircleAlert, Pencil, RotateCcw, Tag } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import type { DocumentDetails } from "../../api/documents";
@@ -21,6 +21,7 @@ type Props = {
   archive: (id: string) => Promise<unknown>;
   restore: (id: string) => Promise<unknown>;
   onChanged: () => void; // the Library re-lists after a title, archive, or restore change
+  onChangeSubjects?: (details: DocumentDetails) => void; // a ready document's subjects; archived ones are restored first (PRD US-10)
   onClose: () => void;
 };
 
@@ -33,7 +34,7 @@ function emptyHint(details: DocumentDetails): string {
 }
 
 // The side panel behind a Library row (PRD US-10): facts, summary, subjects, the editable display title, and Archive or Restore.
-export function DocumentDetailsPanel({ documentId, startEditing = false, load, saveTitle, archive, restore, onChanged, onClose }: Props) {
+export function DocumentDetailsPanel({ documentId, startEditing = false, load, saveTitle, archive, restore, onChanged, onChangeSubjects, onClose }: Props) {
   const [details, setDetails] = useState<DocumentDetails | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [editing, setEditing] = useState(startEditing);
@@ -309,6 +310,11 @@ export function DocumentDetailsPanel({ documentId, startEditing = false, load, s
             </div>
           ) : (
             <p className={styles.muted}>{emptyHint(details)}</p>
+          )}
+          {onChangeSubjects && details.state === "ready" && !details.archived && (
+            <Button size="sm" icon={Tag} className={styles.changeSubjects} disabled={busy || isEditing} onClick={() => onChangeSubjects(details)}>
+              Change subjects
+            </Button>
           )}
         </section>
         <p role="status" aria-live="polite" className="visually-hidden">

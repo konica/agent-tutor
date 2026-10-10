@@ -68,7 +68,8 @@ def test_on_premise_bucket_cors_allows_sslip_io_to_post_uploads_and_get_document
     # GET is the document viewer's presigned link (#123); until #154 claims a name the host is <Elastic IP>.sslip.io.
     (rule,) = _cors_rules()
 
-    assert rule["AllowedMethods"] == ["GET", "POST"]
+    assert rule["AllowedMethods"] == ["POST", "GET"]
+    assert rule["ExposedHeaders"] == ["Accept-Ranges", "Content-Range", "Content-Length"]
     assert rule["AllowedHeaders"] == ["*"]
     assert rule["AllowedOrigins"] == ["https://*.sslip.io"]
 

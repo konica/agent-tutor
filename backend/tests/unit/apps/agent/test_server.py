@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import logging
 from typing import Any
@@ -21,10 +22,12 @@ AUTH = {"Authorization": "Bearer t-ada"}
 CHUNK = RetrievedChunk("c1", "d1", "a.pdf", 3, "Attention weighs tokens.", 0.9)
 
 
-def client(retriever: FakeRetriever, reply: str = "It weighs tokens [1].") -> tuple[TestClient, FakeTokenVerifier]:
+def client(
+    retriever: FakeRetriever, reply: str = "It weighs tokens [1].", answer_floor: float = 0.3
+) -> tuple[TestClient, FakeTokenVerifier]:
     verifier = FakeTokenVerifier()
     verifier.add("t-ada", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
-    graph = build_graph(lambda token: retriever, fake_chat_model(AIMessage(reply)))
+    graph = build_graph(lambda token: retriever, fake_chat_model(AIMessage(reply)), answer_floor)
     return TestClient(create_app(Settings(), verifier=verifier, graph=graph)), verifier
 
 
@@ -149,3 +152,45 @@ def test_startup_fails_without_a_client_secret() -> None:
         TestClient(create_app(Settings(keycloak_client_secret=""))),
     ):
         pass
+
+
+def test_document_ids_go_to_the_search_and_a_covered_question_is_answered() -> None:
+    retriever = FakeRetriever([CHUNK])
+    c, _ = client(retriever)
+    body = c.post("/ask", json={"question": "q", "document_ids": ["d1"]}, headers=AUTH).text
+    names = [name for name, _ in events(body)]
+    assert retriever.calls == [("q", 5, ["d1"])]
+    assert names[-1] == "done" and "delta" in names and "decline" not in names
+
+
+def test_a_limited_search_with_no_chunks_declines() -> None:
+    c, _ = client(FakeRetriever([]))
+    body = c.post("/ask", json={"question": "q", "document_ids": ["d1"]}, headers=AUTH).text
+    assert events(body) == [
+        ("decline", {"code": "limited", "message": "These documents don't cover this."}),
+        ("done", {}),
+    ]
+
+
+def test_a_limited_search_below_the_floor_declines_without_calling_the_model() -> None:
+    weak = dataclasses.replace(CHUNK, score=0.1)
+    retriever = FakeRetriever([weak])
+    verifier = FakeTokenVerifier()
+    verifier.add("t-ada", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
+    graph = build_graph(lambda token: retriever, fake_chat_model(), 0.3)  # no replies: any model call fails
+    c = TestClient(create_app(Settings(), verifier=verifier, graph=graph))
+    body = c.post("/ask", json={"question": "q", "document_ids": ["d1"]}, headers=AUTH).text
+    assert [name for name, _ in events(body)] == ["decline", "done"]
+
+
+def test_without_document_ids_the_whole_library_is_searched_and_never_declined() -> None:
+    retriever = FakeRetriever([dataclasses.replace(CHUNK, score=0.1)])
+    c, _ = client(retriever, answer_floor=0.3)
+    names = [name for name, _ in events(c.post("/ask", json={"question": "q"}, headers=AUTH).text)]
+    assert retriever.calls == [("q", 5, None)] and "decline" not in names
+
+
+def test_more_than_200_document_ids_are_refused() -> None:
+    c, _ = client(FakeRetriever([CHUNK]))
+    ids = [f"d{i}" for i in range(201)]
+    assert c.post("/ask", json={"question": "q", "document_ids": ids}, headers=AUTH).status_code == 422

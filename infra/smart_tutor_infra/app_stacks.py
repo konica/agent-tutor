@@ -2,7 +2,6 @@
 later). The mode comes from the context `smart-tutor:mode` (`on-premise` by default, or `native-cloud`; #147)."""
 
 import aws_cdk as cdk
-from aws_cdk import aws_s3 as s3
 
 from smart_tutor_infra.names import DEFAULT_MODE, NATIVE_CLOUD, ModeNames, mode_names
 from smart_tutor_infra.stacks.budgets import BudgetsStack
@@ -64,8 +63,6 @@ def _on_premise(app: cdk.App, env: cdk.Environment, names: ModeNames) -> list[cd
             # `cdk destroy` of the Host, no switch to the DuckDNS name in #154). Presigned URLs and policies stay the
             # credential, so the sslip.io wildcard only widens which page origins may read the bucket's responses.
             web_origin=f"https://{domain}" if domain else "https://*.sslip.io",
-            # POST is the upload; GET is the document viewer's presigned link.
-            cors_methods=(s3.HttpMethods.GET, s3.HttpMethods.POST),
             backups_retention=cdk.Duration.days(30),
         ),
         ConfigStack(app, f"{prefix}-Config", env=env, names=names),

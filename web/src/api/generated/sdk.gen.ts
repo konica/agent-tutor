@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddThreadDocumentsData, AddThreadDocumentsErrors, AddThreadDocumentsResponses, ArchiveDocumentData, ArchiveDocumentErrors, ArchiveDocumentResponses, AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponse, AskInNewThreadResponses, CheckDuplicateData, CheckDuplicateErrors, CheckDuplicateResponses, ChooseSubjectsData, ChooseSubjectsErrors, ChooseSubjectsResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, GetDocumentData, GetDocumentErrors, GetDocumentResponses, GetMeData, GetMeResponses, GetSubjectSuggestionsData, GetSubjectSuggestionsErrors, GetSubjectSuggestionsResponses, GetUploadData, GetUploadErrors, GetUploadLimitsData, GetUploadLimitsResponses, GetUploadResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListMySubjectsData, ListMySubjectsResponses, ListThreadDocumentsData, ListThreadDocumentsErrors, ListThreadDocumentsResponses, RemoveThreadDocumentData, RemoveThreadDocumentErrors, RemoveThreadDocumentResponses, RenameThreadData, RenameThreadErrors, RenameThreadResponses, RestoreDocumentData, RestoreDocumentErrors, RestoreDocumentResponses, RetryDocumentData, RetryDocumentErrors, RetryDocumentResponses, SearchSubjectsData, SearchSubjectsErrors, SearchSubjectsResponses, SetDocumentTitleData, SetDocumentTitleErrors, SetDocumentTitleResponses, StartUploadData, StartUploadErrors, StartUploadResponses } from './types.gen';
+import type { AddThreadDocumentsData, AddThreadDocumentsErrors, AddThreadDocumentsResponses, ArchiveDocumentData, ArchiveDocumentErrors, ArchiveDocumentResponses, AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponse, AskInNewThreadResponses, AskInThreadData, AskInThreadErrors, AskInThreadResponse, AskInThreadResponses, CheckDuplicateData, CheckDuplicateErrors, CheckDuplicateResponses, ChooseSubjectsData, ChooseSubjectsErrors, ChooseSubjectsResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, GetDocumentData, GetDocumentErrors, GetDocumentFileData, GetDocumentFileErrors, GetDocumentFileResponses, GetDocumentResponses, GetMeData, GetMeResponses, GetSubjectSuggestionsData, GetSubjectSuggestionsErrors, GetSubjectSuggestionsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUploadData, GetUploadErrors, GetUploadLimitsData, GetUploadLimitsResponses, GetUploadResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListMySubjectsData, ListMySubjectsResponses, ListThreadDocumentsData, ListThreadDocumentsErrors, ListThreadDocumentsResponses, RemoveThreadDocumentData, RemoveThreadDocumentErrors, RemoveThreadDocumentResponses, RestoreDocumentData, RestoreDocumentErrors, RestoreDocumentResponses, RetryDocumentData, RetryDocumentErrors, RetryDocumentResponses, SearchSubjectsData, SearchSubjectsErrors, SearchSubjectsResponses, SetDocumentTitleData, SetDocumentTitleErrors, SetDocumentTitleResponses, StartUploadData, StartUploadErrors, StartUploadResponses, UpdateThreadData, UpdateThreadErrors, UpdateThreadResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -88,6 +88,17 @@ export const archiveDocument = <ThrowOnError extends boolean = false>(options: O
 });
 
 /**
+ * Get Document File
+ *
+ * A 5-minute link to the PDF for the document viewer (PRD §8 US-4b, §9.3 step 5); archived documents open too.
+ */
+export const getDocumentFile = <ThrowOnError extends boolean = false>(options: Options<GetDocumentFileData, ThrowOnError>): RequestResult<GetDocumentFileResponses, GetDocumentFileErrors, ThrowOnError> => (options.client ?? client).get<GetDocumentFileResponses, GetDocumentFileErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/documents/{document_id}/file',
+    ...options
+});
+
+/**
  * Restore Document
  *
  * Bring an archived document back into search and My subjects; restoring an active one changes nothing.
@@ -124,6 +135,9 @@ export const getSubjectSuggestions = <ThrowOnError extends boolean = false>(opti
  * Choose Subjects
  *
  * Save the learner's 1-3 subjects; the document becomes ready to use (PRD §8 US-2b).
+ *
+ * A ready document's subjects change without processing it again; an archived document's are refused (409) until it
+ * is restored (PRD §8 US-10).
  */
 export const chooseSubjects = <ThrowOnError extends boolean = false>(options: Options<ChooseSubjectsData, ThrowOnError>): RequestResult<ChooseSubjectsResponses, ChooseSubjectsErrors, ThrowOnError> => (options.client ?? client).put<ChooseSubjectsResponses, ChooseSubjectsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -193,11 +207,22 @@ export const askInNewThread = <ThrowOnError extends boolean = false>(options: Op
 });
 
 /**
- * Rename Thread
+ * Get Thread
  *
- * Rename the learner's conversation from its header (PRD US-13).
+ * The learner's conversation: its title and search scope (PRD US-4c).
  */
-export const renameThread = <ThrowOnError extends boolean = false>(options: Options<RenameThreadData, ThrowOnError>): RequestResult<RenameThreadResponses, RenameThreadErrors, ThrowOnError> => (options.client ?? client).patch<RenameThreadResponses, RenameThreadErrors, ThrowOnError>({
+export const getThread = <ThrowOnError extends boolean = false>(options: Options<GetThreadData, ThrowOnError>): RequestResult<GetThreadResponses, GetThreadErrors, ThrowOnError> => (options.client ?? client).get<GetThreadResponses, GetThreadErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/threads/{thread_id}',
+    ...options
+});
+
+/**
+ * Update Thread
+ *
+ * Rename the learner's conversation (PRD US-13) and/or limit its search to its documents (US-4c).
+ */
+export const updateThread = <ThrowOnError extends boolean = false>(options: Options<UpdateThreadData, ThrowOnError>): RequestResult<UpdateThreadResponses, UpdateThreadErrors, ThrowOnError> => (options.client ?? client).patch<UpdateThreadResponses, UpdateThreadErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/threads/{thread_id}',
     ...options,
@@ -242,6 +267,22 @@ export const removeThreadDocument = <ThrowOnError extends boolean = false>(optio
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/threads/{thread_id}/documents/{document_id}',
     ...options
+});
+
+/**
+ * Ask In Thread
+ *
+ * Ask in the learner's conversation (US-4c): a limited conversation searches only its listed documents, whose
+ * ids are read here, never from the question.
+ */
+export const askInThread = <ThrowOnError extends boolean = false>(options: Options<AskInThreadData, ThrowOnError, AskInThreadResponse>): Promise<ServerSentEventsResult<AskInThreadResponses>> => (options.client ?? client).sse.post<AskInThreadResponses, AskInThreadErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/threads/{thread_id}/questions',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**

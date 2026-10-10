@@ -2,13 +2,12 @@
 
 `uploads/<user>/<id>.pdf` (browser presigned POST, expires after 1 day; each upload notifies the ingest queue) and
 `contents/<owner_id>/<content_id>.pdf` and `.pages.json` (the worker's per-learner copies and page text). Versioned and
-retained on teardown. CORS lets only the web app's address in: native-cloud's CloudFront address may POST (the upload).
-On-premise (#149) allows POST and GET (the document viewer's presigned link) from `https://<domain>`, or from
-`https://*.sslip.io` until the DuckDNS name is claimed (#154); it never references the Host stack. On-premise also
-keeps its nightly database dumps under `backups/` (#151), which expire.
+retained on teardown. CORS lets only the web app's address POST (the upload) and GET (the document viewer's
+presigned link): native-cloud's CloudFront address, and on-premise's `https://<domain>`, or `https://*.sslip.io`
+until the DuckDNS name is claimed (#154; on-premise never references the Host stack). On-premise also keeps its
+nightly database dumps under `backups/` (#151), which expire.
 """
 
-from collections.abc import Sequence
 from typing import Any
 
 import aws_cdk as cdk
@@ -34,7 +33,6 @@ class StorageStack(cdk.Stack):
         *,
         names: ModeNames,
         web_origin: str | None,
-        cors_methods: Sequence[s3.HttpMethods] = (s3.HttpMethods.POST,),
         backups_retention: cdk.Duration | None = None,
         **kwargs: Any,
     ) -> None:
@@ -87,7 +85,13 @@ class StorageStack(cdk.Stack):
             removal_policy=cdk.RemovalPolicy.RETAIN,
             lifecycle_rules=lifecycle_rules,
             cors=[
-                s3.CorsRule(allowed_methods=list(cors_methods), allowed_origins=[web_origin], allowed_headers=["*"])
+                s3.CorsRule(
+                    allowed_methods=[s3.HttpMethods.POST, s3.HttpMethods.GET],
+                    allowed_origins=[web_origin],
+                    allowed_headers=["*"],
+                    # pdf.js reads these to fetch the viewer's PDF in byte ranges instead of all at once.
+                    exposed_headers=["Accept-Ranges", "Content-Range", "Content-Length"],
+                )
             ]
             if web_origin
             else None,

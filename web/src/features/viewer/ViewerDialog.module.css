@@ -1,0 +1,17 @@
+.scrim {
+  position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
+  background: var(--scrim); animation: fade-in var(--dur-base) var(--ease-out);
+}
+/* --viewer-w resolves its 100% against the scrim, i.e. the viewport. */
+.dialog {
+  display: flex; flex-direction: column; width: var(--viewer-w); height: calc(100dvh - 32px); overflow: hidden;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow-lg);
+  animation: rise-in var(--dur-base) var(--ease-out);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(8px); }
+}

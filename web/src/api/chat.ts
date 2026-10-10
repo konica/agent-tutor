@@ -5,12 +5,15 @@ import {
   addThreadDocuments as addThreadDocumentsSdk,
   listThreadDocuments,
   removeThreadDocument as removeThreadDocumentSdk,
-  renameThread,
+  updateThread,
 } from "./generated/sdk.gen";
 import type {
   AskInNewThreadData,
   AskInNewThreadErrors,
   AskInNewThreadResponses,
+  AskInThreadData,
+  AskInThreadErrors,
+  AskInThreadResponses,
   ThreadDocumentResponse,
 } from "./generated/types.gen";
 import { failure, sessionOver } from "./documents";
@@ -25,6 +28,7 @@ export type ChatEvent =
   | { type: "thread"; thread_id: string }
   | { type: "delta"; text: string }
   | { type: "citations"; citations: ChatCitation[] }
+  | { type: "decline"; code: "limited"; message: string }
   | { type: "error"; code: "unauthenticated" | "unavailable"; message: string }
   | { type: "done" };
 
@@ -62,6 +66,8 @@ function toEvent(event: string, data: string): ChatEvent | null {
       return { type: "delta", text: payload().text as string };
     case "citations":
       return { type: "citations", citations: payload().citations as ChatCitation[] };
+    case "decline":
+      return { type: "decline", ...(payload() as { code: "limited"; message: string }) };
     case "error":
       return { type: "error", ...(payload() as { code: "unauthenticated" | "unavailable"; message: string }) };
     case "done":
@@ -76,11 +82,27 @@ function toEvent(event: string, data: string): ChatEvent | null {
 // session) and retries failed connections, which would post the question again and start another thread.
 // `documentId` is the document the conversation starts from (listed first in its documents); a 404 means it isn't
 // the learner's ready, non-archived document, and nothing was started.
-export async function* askInNewThread(question: string, documentId?: string, apiClient: Client = client): AsyncGenerator<ChatEvent> {
+export function askInNewThread(question: string, documentId?: string, apiClient: Client = client): AsyncGenerator<ChatEvent> {
   const body: AskInNewThreadData["body"] = documentId === undefined ? { question } : { question, document_id: documentId };
-  const { error, response } = await apiClient.post<AskInNewThreadResponses, AskInNewThreadErrors, false>({
+  return stream("/threads", body, apiClient, DOCUMENT_UNUSABLE);
+}
+
+// POST /threads/{id}/questions: the same stream for a question in an existing conversation.
+export function askInThread(threadId: string, question: string, apiClient: Client = client): AsyncGenerator<ChatEvent> {
+  const body: AskInThreadData["body"] = { question };
+  return stream(`/threads/${encodeURIComponent(threadId)}/questions`, body, apiClient);
+}
+
+// `notFound` is the message for a 404 the server gave no detail for; without it a 404 is a plain failure.
+async function* stream(
+  url: string,
+  body: AskInNewThreadData["body"] | AskInThreadData["body"],
+  apiClient: Client,
+  notFound?: string,
+): AsyncGenerator<ChatEvent> {
+  const { error, response } = await apiClient.post<AskInNewThreadResponses & AskInThreadResponses, AskInNewThreadErrors & AskInThreadErrors, false>({
     security: [{ scheme: "bearer", type: "http" }],
-    url: "/threads",
+    url,
     body,
     headers: { "Content-Type": "application/json" },
     parseAs: "stream",
@@ -92,8 +114,8 @@ export async function* askInNewThread(question: string, documentId?: string, api
     if (message === NO_DOCUMENTS) throw new NoDocumentsError(message);
     if (message !== null) throw new AskRefusedError(message);
   }
-  if (response?.status === 404) throw new AskRefusedError(detail(error) ?? DOCUMENT_UNUSABLE);
-  if (!response?.ok || !response.body) throw new Error(`POST /threads failed (${response?.status ?? "no response"})`);
+  if (response?.status === 404 && notFound !== undefined) throw new AskRefusedError(detail(error) ?? notFound);
+  if (!response?.ok || !response.body) throw new Error(`POST ${url} failed (${response?.status ?? "no response"})`);
   for await (const message of parseSse(response.body)) {
     const event = toEvent(message.event, message.data);
     if (event) yield event;
@@ -136,7 +158,7 @@ export async function removeThreadDocument(threadId: string, documentId: string,
 // Renames the learner's conversation and returns the saved (trimmed) title. A refusal (empty, over 120 characters,
 // archived, not theirs) rejects with the server's message, or an empty one when it gave none.
 export async function renameConversation(threadId: string, title: string, apiClient: Client = client): Promise<string> {
-  const { data, error, response } = await renameThread({
+  const { data, error, response } = await updateThread({
     client: apiClient,
     path: { thread_id: threadId },
     body: { title },
@@ -145,6 +167,22 @@ export async function renameConversation(threadId: string, title: string, apiCli
   if (sessionOver(error, response)) throw new SessionExpiredError();
   if (!data) throw failure(error);
   return data.title ?? title.trim();
+}
+
+export type SearchScope = "library" | "listed";
+
+// Limits the conversation's search to its listed documents ("listed") or opens it to the whole library ("library") and
+// returns the saved scope. A refusal (409 when limiting an empty list, not theirs) rejects with the server's message.
+export async function setSearchScope(threadId: string, scope: SearchScope, apiClient: Client = client): Promise<SearchScope> {
+  const { data, error, response } = await updateThread({
+    client: apiClient,
+    path: { thread_id: threadId },
+    body: { search_scope: scope },
+    throwOnError: false,
+  });
+  if (sessionOver(error, response)) throw new SessionExpiredError();
+  if (!data) throw failure(error);
+  return data.search_scope;
 }
 
 export function formatCitation(c: ChatCitation): string {

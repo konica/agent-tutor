@@ -14,6 +14,8 @@ class AgentContext:
 
 class AskState(TypedDict, total=False):
     question: str
+    document_ids: list[str] | None
     chunks: list[RetrievedChunk]
     answer: str
     citations: list[Citation]
+    declined: bool

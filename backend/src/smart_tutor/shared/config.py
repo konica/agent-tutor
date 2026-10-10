@@ -79,6 +79,9 @@ class Settings(BaseSettings):
     # into instants. An invalid name stops startup.
     app_time_zone_param: str = "/smart-tutor/app-time-zone"
     rate_limit_per_minute: int = 20
+    # Relevance gate for a conversation limited to its documents (US-4c): a best cosine score below it declines.
+    # A starting value; US-5 tunes it on the decline dataset and moves it to SSM answer-floor.
+    answer_floor: float = 0.3
     models: ModelsConfig = ModelsConfig()
     chunking: ChunkingConfig = ChunkingConfig()
 

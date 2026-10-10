@@ -8,7 +8,12 @@ references Storage.
 import aws_cdk as cdk
 from aws_cdk import aws_iam as iam
 
-from smart_tutor_infra.models import AGENT_MODEL, AGENT_MODEL_REGIONS, AGENT_PROFILE, EMBEDDING_MODEL
+from smart_tutor_infra.models import (
+    AGENT_MODEL,
+    AGENT_MODEL_REGIONS,
+    AGENT_PROFILE,
+    EMBEDDING_MODEL,
+)
 from smart_tutor_infra.names import ModeNames
 
 
@@ -33,8 +38,9 @@ class ServicePermissions:
         )
 
     def api(self) -> list[iam.PolicyStatement]:
-        """The API signs uploads into uploads/ (the browser's POST is authorised as this role), sends Retry messages
-        (#95), reads its startup parameters, embeds subject names, and deletes a document's files, every version."""
+        """The API signs uploads into uploads/ (the browser's POST is authorised as this role), presigns the document
+        viewer's GET on contents/*.pdf, never the page text (US-4b), sends Retry messages (#95), reads its startup
+        parameters, embeds subject names, and deletes a document's files, every version."""
         bucket_arn = self.bucket_arn
         return [
             self.ssm,
@@ -45,6 +51,7 @@ class ServicePermissions:
                 conditions={"StringLike": {"s3:prefix": ["contents/*"]}},
             ),
             iam.PolicyStatement(actions=["s3:DeleteObjectVersion"], resources=[f"{bucket_arn}/contents/*"]),
+            iam.PolicyStatement(actions=["s3:GetObject"], resources=[f"{bucket_arn}/contents/*.pdf"]),
             iam.PolicyStatement(actions=["sqs:SendMessage"], resources=[self.queue_arn]),
             self.embed,
         ]

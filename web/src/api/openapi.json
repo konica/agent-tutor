@@ -235,6 +235,28 @@
         "title": "DocumentDetailsResponse",
         "type": "object"
       },
+      "DocumentFileResponse": {
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/DocumentResponse"
+          },
+          "expires_in": {
+            "title": "Expires In",
+            "type": "integer"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "expires_in",
+          "document"
+        ],
+        "title": "DocumentFileResponse",
+        "type": "object"
+      },
       "DocumentResponse": {
         "properties": {
           "archived": {
@@ -411,18 +433,20 @@
         "title": "MeResponse",
         "type": "object"
       },
-      "RenameThreadRequest": {
+      "QuestionRequest": {
         "additionalProperties": false,
         "properties": {
-          "title": {
-            "title": "Title",
+          "question": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Question",
             "type": "string"
           }
         },
         "required": [
-          "title"
+          "question"
         ],
-        "title": "RenameThreadRequest",
+        "title": "QuestionRequest",
         "type": "object"
       },
       "SetTitleRequest": {
@@ -676,6 +700,14 @@
       },
       "ThreadResponse": {
         "properties": {
+          "search_scope": {
+            "enum": [
+              "library",
+              "listed"
+            ],
+            "title": "Search Scope",
+            "type": "string"
+          },
           "thread_id": {
             "title": "Thread Id",
             "type": "string"
@@ -694,9 +726,43 @@
         },
         "required": [
           "thread_id",
-          "title"
+          "title",
+          "search_scope"
         ],
         "title": "ThreadResponse",
+        "type": "object"
+      },
+      "UpdateThreadRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "search_scope": {
+            "anyOf": [
+              {
+                "enum": [
+                  "library",
+                  "listed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Search Scope"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "UpdateThreadRequest",
         "type": "object"
       },
       "UploadLimitsResponse": {
@@ -1123,6 +1189,61 @@
         ]
       }
     },
+    "/documents/{document_id}/file": {
+      "get": {
+        "description": "A 5-minute link to the PDF for the document viewer (PRD \u00a78 US-4b, \u00a79.3 step 5); archived documents open too.",
+        "operationId": "get_document_file",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentFileResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not the caller's document."
+          },
+          "409": {
+            "description": "Still processing or failed."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Document File",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
     "/documents/{document_id}/restore": {
       "post": {
         "description": "Bring an archived document back into search and My subjects; restoring an active one changes nothing.",
@@ -1265,7 +1386,7 @@
     },
     "/documents/{document_id}/subjects": {
       "put": {
-        "description": "Save the learner's 1-3 subjects; the document becomes ready to use (PRD \u00a78 US-2b).",
+        "description": "Save the learner's 1-3 subjects; the document becomes ready to use (PRD \u00a78 US-2b).\n\nA ready document's subjects change without processing it again; an archived document's are refused (409) until it\nis restored (PRD \u00a78 US-10).",
         "operationId": "choose_subjects",
         "parameters": [
           {
@@ -1544,9 +1665,59 @@
       }
     },
     "/threads/{thread_id}": {
+      "get": {
+        "description": "The learner's conversation: its title and search scope (PRD US-4c).",
+        "operationId": "get_thread",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "thread_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Thread Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not the caller's conversation."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Thread",
+        "tags": [
+          "tutoring"
+        ]
+      },
       "patch": {
-        "description": "Rename the learner's conversation from its header (PRD US-13).",
-        "operationId": "rename_thread",
+        "description": "Rename the learner's conversation (PRD US-13) and/or limit its search to its documents (US-4c).",
+        "operationId": "update_thread",
         "parameters": [
           {
             "in": "path",
@@ -1563,7 +1734,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RenameThreadRequest"
+                "$ref": "#/components/schemas/UpdateThreadRequest"
               }
             }
           },
@@ -1584,10 +1755,10 @@
             "description": "Not the caller's conversation."
           },
           "409": {
-            "description": "The conversation is archived."
+            "description": "The conversation is archived, or has no documents to limit the search to."
           },
           "422": {
-            "description": "The title is empty or longer than 120 characters."
+            "description": "Nothing to change, or the title is empty or longer than 120 characters."
           }
         },
         "security": [
@@ -1595,7 +1766,7 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Rename Thread",
+        "summary": "Update Thread",
         "tags": [
           "tutoring"
         ]
@@ -1771,6 +1942,71 @@
           }
         ],
         "summary": "Remove Thread Document",
+        "tags": [
+          "tutoring"
+        ]
+      }
+    },
+    "/threads/{thread_id}/questions": {
+      "post": {
+        "description": "Ask in the learner's conversation (US-4c): a limited conversation searches only its listed documents, whose\nids are read here, never from the question.",
+        "operationId": "ask_in_thread",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "thread_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Thread Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuestionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Server-sent events: thread, then delta*, citations, done (or error)."
+          },
+          "404": {
+            "description": "Not the caller's conversation."
+          },
+          "409": {
+            "description": "The conversation is archived, or the learner has no ready documents."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ask In Thread",
         "tags": [
           "tutoring"
         ]

@@ -22,6 +22,10 @@ class ObjectStore(ABC):
         """A POST that stores exactly `key`, only with this content type and 1..max_bytes bytes."""
 
     @abstractmethod
+    def presign_get(self, key: str, *, expires_in: int) -> str:
+        """A link that serves `key` as a PDF to whoever holds it for `expires_in` seconds."""
+
+    @abstractmethod
     def read(self, key: str) -> bytes:
         """The object's bytes; raises ObjectNotFoundError."""
 

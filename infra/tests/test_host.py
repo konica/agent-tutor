@@ -279,6 +279,7 @@ def test_data_volume_is_snapshotted_daily_and_snapshots_are_kept_7_days(t: Templ
     (policy,) = t.find_resources("AWS::DLM::LifecyclePolicy").values()
     props = policy["Properties"]
     assert props["State"] == "ENABLED"
+    assert re.fullmatch(r"[0-9A-Za-z _-]{0,500}", props["Description"])  # DLM rejects anything else at deploy time
     details = props["PolicyDetails"]
     assert details["ResourceTypes"] == ["VOLUME"]
     assert details["TargetTags"] == [{"Key": "smart-tutor:snapshots", "Value": "smart-tutor-on-premise-prod"}]
@@ -292,14 +293,6 @@ def test_data_volume_is_snapshotted_daily_and_snapshots_are_kept_7_days(t: Templ
         if "dlm.amazonaws.com" in json.dumps(r["Properties"]["AssumeRolePolicyDocument"])
     )
     assert props["ExecutionRoleArn"] == {"Fn::GetAtt": [role_id, "Arn"]}
-
-
-def test_snapshot_policy_description_matches_the_pattern_aws_accepts(t: Template) -> None:
-    (policy,) = t.find_resources("AWS::DLM::LifecyclePolicy").values()
-    description = policy["Properties"]["Description"]
-
-    assert re.fullmatch(r"[0-9A-Za-z _-]+", description), description
-    assert description == "smart-tutor-on-premise-prod data volume daily snapshots kept 7 days"
 
 
 def test_only_the_data_volume_carries_the_snapshot_tag(t: Template) -> None:

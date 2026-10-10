@@ -2,15 +2,21 @@ import { useEffect, useRef, type KeyboardEvent, type RefObject } from "react";
 
 const FOCUSABLE = 'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
 
-// Modal focus handling (DESIGN.md → Accessibility): focus moves in, Tab stays in, Escape closes, focus goes back.
-export function useModal(onClose: () => void): { ref: RefObject<HTMLDivElement | null>; onKeyDown: (event: KeyboardEvent) => void } {
+// Modal focus handling (DESIGN.md → Accessibility): focus moves in, Tab stays in, Escape closes, focus goes back —
+// to `returnTo` when given (the document viewer's "Open in dialog" button), else to what had it before.
+export function useModal(
+  onClose: () => void,
+  returnTo?: RefObject<HTMLElement | null>,
+): { ref: RefObject<HTMLDivElement | null>; onKeyDown: (event: KeyboardEvent) => void } {
   const ref = useRef<HTMLDivElement>(null);
+  const returnToRef = useRef(returnTo);
+  returnToRef.current = returnTo;
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     const root = ref.current!;
     (root.querySelector<HTMLElement>("[data-autofocus]") ?? root.querySelector<HTMLElement>(FOCUSABLE))?.focus();
-    return () => previous?.focus();
+    return () => (returnToRef.current?.current ?? previous)?.focus();
   }, []);
 
   function onKeyDown(event: KeyboardEvent) {

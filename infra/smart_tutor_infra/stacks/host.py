@@ -374,7 +374,8 @@ class HostStack(cdk.Stack):
         policy = dlm.CfnLifecyclePolicy(
             self,
             "DataVolumeSnapshots",
-            description=f"{names.resource_prefix} data volume daily snapshots kept {SNAPSHOT_RETENTION_DAYS} days",
+            # DLM accepts only letters, digits, spaces, "_" and "-" here.
+            description=f"{names.resource_prefix} data volume daily kept {SNAPSHOT_RETENTION_DAYS} days",
             state="ENABLED",
             execution_role_arn=snapshot_role.role_arn,
             policy_details=dlm.CfnLifecyclePolicy.PolicyDetailsProperty(
