@@ -486,9 +486,13 @@ def _user_data(volume_id: str, region: str, data_snapshot_id: str | None) -> ec2
 
 
 def _deploy_commands(names: ModeNames, region: str) -> list[str]:
-    """The SSM document's script: fetch the bundle this stack uploaded, then run deploy.sh with the tag."""
+    """The SSM document's script: wait for first boot, fetch the bundle this stack uploaded, run deploy.sh with the tag."""
     return [
         "set -euo pipefail",
+        # A replaced instance is Online in SSM before its user data has installed Docker, unzip, and Compose. Waiting
+        # is instant on an instance that has finished booting. A non-zero status only warns, because newer cloud-init
+        # exits 2 for mere warnings; a real failure still stops at the next command.
+        "cloud-init status --wait > /dev/null || echo 'Warning: first boot (cloud-init) reported an error; see /var/log/cloud-init-output.log' >&2",
         f"export AWS_REGION={region} AWS_DEFAULT_REGION={region}",
         f"bundle=$(aws ssm get-parameter --name {names.ssm_path}/host/bundle --query Parameter.Value --output text)",
         "rm -rf /opt/smart-tutor.new /tmp/smart-tutor-bundle.zip",

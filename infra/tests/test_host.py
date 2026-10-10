@@ -420,6 +420,16 @@ def test_deploy_document_takes_only_a_commit_sha_and_runs_the_bundled_script(t: 
     )
 
 
+def test_deploy_document_waits_for_first_boot_before_using_unzip(t: Template) -> None:
+    (document,) = t.find_resources("AWS::SSM::Document").values()
+    commands = document["Properties"]["Content"]["mainSteps"][0]["inputs"]["runCommand"]
+    text = [json.dumps(c) for c in commands]
+    wait = next(i for i, c in enumerate(text) if "cloud-init status --wait" in c)
+    download = next(i for i, c in enumerate(text) if "aws s3 cp" in c)
+    unzip = next(i for i, c in enumerate(text) if "unzip" in c)
+    assert wait < download < unzip
+
+
 def test_no_secret_reaches_the_outputs_or_the_template(t: Template) -> None:
     rendered = json.dumps(t.to_json())
     assert "resolve:secretsmanager" not in rendered

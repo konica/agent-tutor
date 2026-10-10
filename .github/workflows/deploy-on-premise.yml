@@ -87,7 +87,8 @@ jobs:
             echo "DEPLOY_DOCUMENT=$deploy_document"
           } >> "$GITHUB_ENV"
 
-      # A replaced instance installs Docker and registers with SSM within a few minutes of starting.
+      # A replaced instance registers with SSM within a few minutes of starting; the deploy document then waits for its
+      # first boot (Docker, Compose) to finish.
       - name: Wait until the VM is online in SSM
         run: |
           status=None
