@@ -79,7 +79,7 @@ An **instance** status check failure (the VM's own OS, such as memory exhaustion
 2. Check that a deploy isn't running or failed: in the Systems Manager console, **Run Command → Command history**, look for `smart-tutor-on-premise-deploy`. A failed deploy stops before or during `docker compose up`, so redeploy the last good tag (`on-premise-deploy.md` §4).
 3. Check the instance (the `describe-instance-status` command above). If it is stopped, start it. If its **instance** status check failed, reboot it: `aws ec2 reboot-instances --instance-ids $InstanceId`.
 4. If the instance is running, [bring the services back](#bring-the-services-back) and read the logs of the unhealthy service.
-5. If the services are healthy but the check still fails, check DNS: `Resolve-DnsName <domain>` must return the Elastic IP. With a DuckDNS name, update its address (#154).
+5. If the services are healthy but the check still fails, check DNS: `Resolve-DnsName smart-tutor.duckdns.org` must return the Elastic IP. If it does not, run a deploy (it points the name at the instance) or update the address on duckdns.org (`on-premise-deploy.md` section 9).
 
 ### Patching failed
 

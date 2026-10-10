@@ -28,6 +28,7 @@ make web                      # http://localhost:10453
 
 Keycloak admin console: http://localhost:10401 (admin / admin). Test users: `learner@example.com` / `learner`, `learner2@example.com` / `learner2`, `admin@example.com` / `admin`.
 Sign up from the app's sign-in page: Keycloak sends the verification email to Mailpit, http://localhost:10403. After pulling a realm change, run `docker compose down -v` so the realm re-imports.
+LocalStack (Community) keeps S3 in memory: restarting its container empties the bucket while Postgres keeps the documents, so earlier documents still look ready but can't be opened ("We couldn't open this document"). Delete and re-upload them, or reset both with `docker compose down -v`.
 Keycloak's sign-in, sign-up, and email pages use the `smart-tutor` login theme in `local/keycloak/themes/` (stock `keycloak.v2` layout, our logo, colors, and font; no template overrides). Its `css/tokens.css` is a copy of `web/src/styles/tokens.css`: after changing tokens, run `npm run keycloak:tokens` in `web/` (CI fails when the copy is stale). Keycloak in Compose reads theme edits on reload.
 
 No `make` on Windows? Each target in the `Makefile` is a one-line command you can run directly.
