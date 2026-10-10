@@ -2,7 +2,8 @@
 
 An admin deploys this stack once from a laptop, because GitHub Actions can't create the role it signs in with.
 After that the deploy workflow (#59) updates it like any other stack. Each deployment mode has its own copy (#147):
-its own role, trusted by its own GitHub environment.
+its own role, trusted by its own GitHub environment. The account's GitHub OIDC provider is the one resource the modes
+share (ADR 0015): AWS allows one per URL, so native-cloud's copy creates it and on-premise's imports it.
 """
 
 from typing import Any
@@ -20,7 +21,7 @@ class GitHubDeployStack(cdk.Stack):
     """The role trusts only jobs in one GitHub environment, which is limited to `main` on GitHub's side.
 
     It can assume the CDK bootstrap roles (so CloudFormation, not the role, changes infrastructure), push app images
-    to the shared `smart-tutor/*` ECR repositories, read its mode's stack outputs, and, with `eks`, describe the EKS
+    to its mode's ECR repositories (`<repository prefix>/*`, #206), read its mode's stack outputs, and, with `eks`, describe the EKS
     cluster. With `deploy_document` (on-premise, #150), it runs that one SSM document on the mode's instances and reads
     the result.
     """
@@ -85,7 +86,7 @@ class GitHubDeployStack(cdk.Stack):
                     "ecr:PutImage",
                     "ecr:DescribeImages",
                 ],
-                resources=[f"arn:aws:ecr:{region}:{account}:repository/smart-tutor/*"],
+                resources=[f"arn:aws:ecr:{region}:{account}:repository/{names.repository_prefix}/*"],
             ),
             *(
                 [

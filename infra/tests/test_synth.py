@@ -82,6 +82,8 @@ def test_deploy_role_gets_only_the_deployment_permissions() -> None:
     assert [s["Sid"] for s in statements if s["Resource"] == "*"] == ["EcrLogin"]
     actions = [a for s in statements for a in ([s["Action"]] if isinstance(s["Action"], str) else s["Action"])]
     assert not [a for a in actions if a.startswith(("iam:", "cloudformation:Create", "cloudformation:Update"))]
+    push = next(s for s in statements if s["Sid"] == "EcrPushAppImages")
+    assert ":repository/smart-tutor/*" in json.dumps(push["Resource"])
 
 
 def test_an_existing_oidc_provider_is_imported_instead_of_created() -> None:

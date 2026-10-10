@@ -212,6 +212,14 @@ def test_no_on_premise_template_names_a_native_cloud_repository() -> None:
         assert not re.search(r"smart-tutor/(api|web|keycloak|agent|mcp|worker)\b", rendered), stack.stack_name
 
 
+def test_on_premise_deploy_role_pushes_only_to_its_own_repositories() -> None:
+    (policy,) = on_premise("GitHubDeploy").find_resources("AWS::IAM::Policy").values()
+    push = next(s for s in policy["Properties"]["PolicyDocument"]["Statement"] if s["Sid"] == "EcrPushAppImages")
+    resource = json.dumps(push["Resource"])
+    assert ":repository/smart-tutor-on-premise/*" in resource
+    assert ":repository/smart-tutor/*" not in resource
+
+
 
 def test_native_cloud_access_patterns_match_none_of_on_premise_names() -> None:
     native, onprem = mode_names(NATIVE_CLOUD), mode_names(ON_PREMISE)
