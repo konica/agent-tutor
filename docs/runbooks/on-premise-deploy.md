@@ -87,6 +87,8 @@ aws ssm get-command-invocation --command-id $CommandId --instance-id $InstanceId
 4. It checks the worker's isolation (user 10001, read-only root filesystem, all capabilities dropped, no new privileges) and fails the deploy otherwise, and proves the worker's egress block from inside it (`check-egress.py`): a direct connection or a proxied one to another host must fail, and S3, SQS, SSM, Bedrock, and Postgres must answer. It also checks from the API container that the agent answers `/healthz` and the MCP server refuses a call without a token.
 5. It creates the test learner if it is missing.
 
+The first deploy of #153 recreates Postgres once (it joins the worker network); the API, Keycloak, and worker reconnect within seconds.
+
 The output lists each service's status and ends with `Deployed <tag> to https://...`. It never contains a secret.
 
 ## 4. Check
@@ -168,7 +170,7 @@ It prints `user=10001:10001 readonly=true capdrop=[ALL] secopt=[no-new-privilege
 dc exec -T worker python - < /opt/smart-tutor/on-premise/check-egress.py
 ```
 
-It exits 0 when the worker reaches nothing it must not and everything it needs. The proxy's log shows what it refused: `dc logs --tail 50 egress-proxy`; `TCP_DENIED/403` lines are refused requests. To let the worker reach a new AWS endpoint, add it to the `acl aws` line in `compose.yaml`; until then the deploy check fails.
+It exits 0 when the worker reaches nothing it must not and everything it needs. It exits 1 (or crashes) when the worker reached something it must not, or the check couldn't run: the deploy stops the worker. It exits 2 when a needed destination is unreachable: the deploy fails, and the worker keeps running. The proxy's log shows what it refused: `dc logs --tail 50 egress-proxy`; `TCP_DENIED/403` lines are refused requests. To let the worker reach a new AWS endpoint, add it to the `acl aws` line in `compose.yaml`; until then the deploy check fails.
 
 **Dead-letter drill.** A message the worker fails on 5 times moves to `smart-tutor-on-premise-ingest-dlq`. To check the redrive, stop the worker so it doesn't take the message, send one, receive it 5 times without deleting it, and look in the DLQ. From your laptop, with `dc stop worker` done on the VM first:
 
@@ -213,8 +215,8 @@ This deletes the VM, the Elastic IP, and the VPC. The data volume is deleted aft
 | The browser warns about the certificate | Caddy couldn't get one: `dc logs caddy`. Let's Encrypt needs port 80 open (it is in the security group) and the domain to resolve to the Elastic IP. sslip.io names resolve to the IP they contain. Too many attempts hit Let's Encrypt's rate limits; the certificate is kept on `/data/caddy`, so replacing the VM doesn't request a new one. |
 | `docker compose up` times out on `keycloak` | The first start creates the schema and imports the realm, which takes up to 3 minutes. Check `dc logs keycloak`. |
 | Sign-in says "Invalid parameter: redirect_uri" | The domain changed after the realm was imported. Keycloak imports the realm once, so update the `smart-tutor-web` client's redirect URIs, web origins, and post-logout redirect URIs in the admin console (#154). |
-| `The worker is not isolated: ...` (deploy fails) | `compose.yaml` lost one of the worker's `user`, `read_only`, `cap_drop`, or `security_opt` settings. The deploy stops the worker, so uploads wait in the queue. Restore the settings and deploy again; never run the worker without them. |
-| `Stopped the worker: its egress is not limited` (deploy fails) | `compose.yaml` lost the worker's `networks: [worker]`, or the proxy's rules allow more than they should. The deploy stops the worker, so uploads wait in the queue. Restore the file and deploy again. |
+| `The worker is not isolated: ...` (deploy or patch window fails) | `compose.yaml` lost one of the worker's `user`, `read_only`, `cap_drop`, or `security_opt` settings. The check stops the worker, so uploads wait in the queue. Restore the settings and deploy again; never run the worker without them. |
+| `Stopped the worker: the egress check found a leak or could not run (see above)` (deploy or patch window fails) | The output above names the host the worker reached (lines `The worker can reach what it must not: ...`) or the error that kept the check from running. A reached host means `compose.yaml` lost the worker's `networks: [worker]`, or the proxy's rules allow more than they should. The worker is stopped, so uploads wait in the queue. Restore the file and deploy again. The weekly patch window runs the same checks. |
 | `The worker cannot reach a destination it needs` (deploy fails) | `dc logs egress-proxy` shows `TCP_DENIED` for a host the worker needs (a new endpoint: add it to `acl aws`), or AWS answered with errors. The worker keeps running. |
 | A document stays processing | The worker isn't running or can't reach AWS: `dc ps worker`, `dc logs --tail 100 worker`, `dc logs --tail 50 egress-proxy`. `AccessDenied` means the instance role lacks a permission (Host stack); a Bedrock `ThrottlingException` retries on its own. |
 | `Warning: could not check the test learner` | The bootstrap admin was deleted. The deploy still succeeded; create the test learner by hand if you need it. |

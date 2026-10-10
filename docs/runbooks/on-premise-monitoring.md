@@ -118,7 +118,7 @@ An **instance** status check failure (the VM's own OS, such as memory exhaustion
 | Window | `smart-tutor-on-premise-prod-patching`, targeting the Host instance by id |
 | Patches | The baseline `smart-tutor-on-premise-prod-security`: Amazon Linux 2023 updates classified **Security**, every severity, approved as soon as they are released. The instance's `PatchGroup` tag selects it. Patch Manager reads the latest AL2023 repository, not the one the image pinned. |
 | Task 1, `PatchTask` | `AWS-RunPatchBaseline` with `Install` and `RebootIfNeeded`. It reboots only when an installed patch needs it (a kernel, for example). |
-| Task 2, `HealthTask` | `bash /opt/smart-tutor/on-premise/ensure-healthy.sh`: starts Docker and any service that isn't running, with the last deploy's images and settings, and waits up to 15 minutes until every service is healthy. It runs even if task 1 failed. |
+| Task 2, `HealthTask` | `bash /opt/smart-tutor/on-premise/ensure-healthy.sh`: starts Docker and any service that isn't running, with the last deploy's images and settings, and waits up to 15 minutes until every service is healthy. Then it re-runs the worker's isolation and egress checks, as a deploy does (`check-worker.sh`), and fails the window (an email) if they fail. It runs even if task 1 failed. |
 | On failure | An email to the alarm topic (EventBridge rule on the window's `FAILED` or `TIMED_OUT` state) |
 
 A reboot takes the product down for a few minutes, which the uptime alarm tolerates. Patching doesn't touch our images: they change only with a deploy. A **deploy that replaces the instance** (when CDK reads a newer Amazon Linux 2023 image) also brings the operating system up to date.
@@ -134,7 +134,7 @@ To move the window, change `PATCH_SCHEDULE` in `host.py` (a cron expression in t
 
 ## Bring the services back
 
-`ensure-healthy.sh` is safe to run at any time. It changes nothing that is running and healthy:
+`ensure-healthy.sh` is safe to run at any time. It changes nothing that is running and healthy, except that it stops a worker that fails its isolation or egress check:
 
 ```powershell
 $Command = aws ssm send-command --document-name AWS-RunShellScript --instance-ids $InstanceId `
