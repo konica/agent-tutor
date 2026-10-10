@@ -1,16 +1,30 @@
-"""Threads in Postgres. The table schemas live in migrations 0005, 0007, 0009, 0010 and 0011."""
+"""Threads in Postgres. The table schemas live in migrations 0005, 0007, 0009, 0010, 0011 and 0014."""
 
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, Column, DateTime, Engine, Identity, MetaData, Table, Text, Uuid, func, select, update
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import (
+    BigInteger,
+    Column,
+    Connection,
+    DateTime,
+    Engine,
+    Identity,
+    MetaData,
+    Table,
+    Text,
+    Uuid,
+    func,
+    select,
+    update,
+)
+from sqlalchemy.dialects.postgresql import JSONB, insert
 
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
-from smart_tutor.tutoring.domain.turn import Turn
+from smart_tutor.tutoring.domain.turn import Decline, Turn, TurnCitation
 from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
 
 threads = Table(
@@ -36,6 +50,46 @@ thread_documents = Table(
     Column("deleted_title", Text),
     Column("seq", BigInteger, Identity(always=True)),
 )
+
+thread_turns = Table(
+    "thread_turns",
+    threads.metadata,
+    Column("turn_id", BigInteger, Identity(always=True), primary_key=True),
+    Column("thread_id", Uuid(as_uuid=False)),
+    Column("user_id", Text),
+    Column("question", Text),
+    Column("answer", Text),
+    Column("citations", JSONB),
+    Column("decline_code", Text),
+    Column("decline_message", Text),
+    Column("created_at", DateTime(timezone=True)),
+)
+
+
+def _add_documents_used(
+    conn: Connection, thread_id: ThreadId, document_ids: Sequence[DocumentId], at: datetime
+) -> None:
+    for document_id in document_ids:
+        stmt = insert(thread_documents).values(
+            thread_id=thread_id, document_id=document_id, added_by="answer", added_at=at, first_used_at=at
+        )
+        # A listed document keeps its place; one the learner added is now used.
+        conn.execute(
+            stmt.on_conflict_do_update(
+                index_elements=["thread_id", "document_id"],
+                set_={"first_used_at": func.coalesce(thread_documents.c.first_used_at, stmt.excluded.first_used_at)},
+            )
+        )
+
+
+def _turn(row: Any) -> Turn:
+    decline = Decline(row.decline_code, row.decline_message) if row.decline_code is not None else None
+    citations = tuple(
+        TurnCitation(c["n"], DocumentId(c["document_id"]), c["chunk_id"], c["page"]) for c in row.citations
+    )
+    return Turn(
+        ThreadId(str(row.thread_id)), UserId(row.user_id), row.question, row.answer, citations, decline, row.created_at
+    )
 
 
 def _thread(row: Any) -> Thread:
@@ -87,21 +141,7 @@ class SqlThreadRepository(ThreadRepository):
         if not document_ids:
             return
         with self._engine.begin() as conn:
-            for document_id in document_ids:
-                stmt = insert(thread_documents).values(
-                    thread_id=thread_id, document_id=document_id, added_by="answer", added_at=at, first_used_at=at
-                )
-                # A listed document keeps its place; one the learner added is now used.
-                conn.execute(
-                    stmt.on_conflict_do_update(
-                        index_elements=["thread_id", "document_id"],
-                        set_={
-                            "first_used_at": func.coalesce(
-                                thread_documents.c.first_used_at, stmt.excluded.first_used_at
-                            )
-                        },
-                    )
-                )
+            _add_documents_used(conn, thread_id, document_ids, at)
 
     def add_documents(self, thread_id: ThreadId, document_ids: Sequence[DocumentId], at: datetime) -> None:
         if not document_ids:
@@ -151,7 +191,29 @@ class SqlThreadRepository(ThreadRepository):
         ]
 
     def add_turn(self, turn: Turn, document_ids: Sequence[DocumentId]) -> None:
-        raise NotImplementedError("Task 2")
+        with self._engine.begin() as conn:
+            conn.execute(
+                thread_turns.insert().values(
+                    thread_id=turn.thread_id,
+                    user_id=turn.user_id,
+                    question=turn.question,
+                    answer=turn.answer,
+                    citations=[
+                        {"n": c.n, "document_id": c.document_id, "chunk_id": c.chunk_id, "page": c.page}
+                        for c in turn.citations
+                    ],
+                    decline_code=turn.decline.code if turn.decline else None,
+                    decline_message=turn.decline.message if turn.decline else None,
+                    created_at=turn.created_at,
+                )
+            )
+            _add_documents_used(conn, turn.thread_id, document_ids, turn.created_at)
 
     def turns(self, thread_id: ThreadId, user_id: UserId) -> list[Turn]:
-        raise NotImplementedError("Task 2")
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                select(thread_turns)
+                .where(thread_turns.c.thread_id == thread_id, thread_turns.c.user_id == user_id)
+                .order_by(thread_turns.c.turn_id)
+            ).all()
+        return [_turn(r) for r in rows]
