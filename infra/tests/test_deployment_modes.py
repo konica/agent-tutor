@@ -1,6 +1,7 @@
 """The CDK app builds one deployment mode, chosen by the context `smart-tutor:mode` (#147, PRD §9.12)."""
 
 import json
+import re
 from fnmatch import fnmatch
 from typing import Any
 
@@ -164,3 +165,31 @@ def test_on_premise_budget_alerts_the_same_recipients_as_native_cloud() -> None:
 
     native = subscribers(template(make_app(), "Budgets"))
     assert native and subscribers(on_premise("Budgets")) == native
+
+
+# EC2 accepts only these characters in a security group or rule description, and rejects others only at deploy time.
+EC2_DESCRIPTION = re.compile(r"[a-zA-Z0-9 ._\-:/()#,@\[\]+=&;{}!$*]{0,255}")
+
+
+def _security_group_descriptions(resource: dict[str, Any]) -> list[Any]:
+    properties = resource.get("Properties", {})
+    if resource["Type"] == "AWS::EC2::SecurityGroup":
+        rules = properties.get("SecurityGroupIngress", []) + properties.get("SecurityGroupEgress", [])
+        return [properties.get("GroupDescription")] + [rule.get("Description") for rule in rules]
+    if resource["Type"] in ("AWS::EC2::SecurityGroupIngress", "AWS::EC2::SecurityGroupEgress"):
+        return [properties.get("Description")]
+    return []
+
+
+@pytest.mark.parametrize("mode", [ON_PREMISE, NATIVE_CLOUD])
+def test_security_group_and_rule_descriptions_use_only_characters_ec2_accepts(mode: str) -> None:
+    descriptions = [
+        description
+        for stack in build_app(make_app(**{"smart-tutor:mode": mode}))
+        for resource in Template.from_stack(stack).to_json().get("Resources", {}).values()
+        for description in _security_group_descriptions(resource)
+        if isinstance(description, str)
+    ]
+
+    assert descriptions
+    assert [d for d in descriptions if not EC2_DESCRIPTION.fullmatch(d)] == []
