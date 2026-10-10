@@ -446,6 +446,77 @@ export type ThreadResponse = {
 };
 
 /**
+ * TurnCitationResponse
+ */
+export type TurnCitationResponse = {
+    /**
+     * Archived
+     */
+    archived: boolean;
+    /**
+     * Chunk Id
+     */
+    chunk_id: string;
+    /**
+     * Deleted
+     */
+    deleted: boolean;
+    /**
+     * Document Id
+     */
+    document_id: string;
+    /**
+     * Document Title
+     */
+    document_title: string;
+    /**
+     * N
+     */
+    n: number;
+    /**
+     * Page
+     */
+    page: number | null;
+};
+
+/**
+ * TurnDeclineResponse
+ */
+export type TurnDeclineResponse = {
+    /**
+     * Code
+     */
+    code: string;
+    /**
+     * Message
+     */
+    message: string;
+};
+
+/**
+ * TurnResponse
+ */
+export type TurnResponse = {
+    /**
+     * Answer
+     */
+    answer: string;
+    /**
+     * Citations
+     */
+    citations: Array<TurnCitationResponse>;
+    /**
+     * Created At
+     */
+    created_at: string;
+    decline: TurnDeclineResponse | null;
+    /**
+     * Question
+     */
+    question: string;
+};
+
+/**
  * UpdateThreadRequest
  */
 export type UpdateThreadRequest = {
@@ -1272,6 +1343,42 @@ export type AskInThreadResponses = {
 };
 
 export type AskInThreadResponse = AskInThreadResponses[keyof AskInThreadResponses];
+
+export type ListThreadTurnsData = {
+    body?: never;
+    path: {
+        /**
+         * Thread Id
+         */
+        thread_id: string;
+    };
+    query?: never;
+    url: '/threads/{thread_id}/turns';
+};
+
+export type ListThreadTurnsErrors = {
+    /**
+     * Not the caller's conversation.
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListThreadTurnsError = ListThreadTurnsErrors[keyof ListThreadTurnsErrors];
+
+export type ListThreadTurnsResponses = {
+    /**
+     * Response List Thread Turns
+     *
+     * Successful Response
+     */
+    200: Array<TurnResponse>;
+};
+
+export type ListThreadTurnsResponse = ListThreadTurnsResponses[keyof ListThreadTurnsResponses];
 
 export type StartUploadData = {
     body: StartUploadRequest;

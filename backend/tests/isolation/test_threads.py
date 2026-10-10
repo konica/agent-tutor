@@ -1,6 +1,6 @@
 """US-12: each learner's POST /threads starts a thread owned by that learner; no one else can get it, its
-documents used (GET /threads/{id}/documents), or rename it (PATCH /threads/{id}). A thread starts from a document
-only if it is the learner's own ready, active one."""
+documents used (GET /threads/{id}/documents), its turns (GET /threads/{id}/turns), or rename it (PATCH
+/threads/{id}). A thread starts from a document only if it is the learner's own ready, active one."""
 
 import httpx
 from fastapi.testclient import TestClient
@@ -228,3 +228,20 @@ def test_a_learner_starts_a_thread_only_from_their_own_ready_document() -> None:
     [thread] = threads.threads.values()
     listed = client.get(f"/threads/{thread.thread_id}/documents", headers=A).json()
     assert [d["document_id"] for d in listed] == [a_ready]
+
+
+def test_only_the_owner_reads_a_threads_turns() -> None:
+    library, threads = InMemoryLibrary(), InMemoryThreads()
+    ingest_ready(library, "learner-a", "Attention weighs tokens.")
+    ingest_ready(library, "learner-b", "Gradient descent follows the slope.")
+    services = api_services(library, threads=threads, agent=fake_agent(answers))
+    client = TestClient(create_app(Settings(), verifier=learners(), services=services))
+    assert client.post("/threads", json={"question": "What is attention?"}, headers=A).status_code == 200
+    [thread] = threads.threads.values()
+
+    mine = client.get(f"/threads/{thread.thread_id}/turns", headers=A)
+    theirs = client.get(f"/threads/{thread.thread_id}/turns", headers=B)
+
+    assert [t["question"] for t in mine.json()] == ["What is attention?"]
+    assert theirs.status_code == 404 and theirs.json() == {"detail": "Conversation not found"}
+    assert threads.turns(ThreadId(thread.thread_id), UserId("learner-b")) == []
