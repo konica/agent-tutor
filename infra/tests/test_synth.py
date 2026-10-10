@@ -115,6 +115,9 @@ def test_registry_has_one_repository_per_service_and_empties_them_on_delete() ->
     assert names == [f"smart-tutor/{s}" for s in ["agent", "api", "keycloak", "mcp", "web", "worker"]]
     t.has_resource_properties("AWS::ECR::Repository", {"ImageScanningConfiguration": {"ScanOnPush": True}})
     assert all(r["Properties"]["EmptyOnDelete"] is True for r in repos.values())  # teardown works with images inside
+    for repo in repos.values():
+        assert repo["DeletionPolicy"] == "Delete"
+        assert '"countNumber":30' in repo["Properties"]["LifecyclePolicy"]["LifecyclePolicyText"]
     t.has_output("RegistryUri", {})
 
 
