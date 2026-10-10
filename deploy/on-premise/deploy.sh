@@ -3,14 +3,15 @@
 # <prefix>-deploy (HostStack), after unpacking the deploy bundle to /opt/smart-tutor:
 #   SMART_TUTOR_PREFIX=smart-tutor-on-premise AWS_REGION=us-east-1 deploy.sh <full commit SHA>
 #
-# 1. Renders settings (SSM) and secrets (Secrets Manager) into a root-only env file.
+# 1. Renders settings (SSM) and secrets (Secrets Manager) into a root-only env file. A DuckDNS domain is pointed at this
+#    instance's Elastic IP (#154).
 # 2. Pulls the images, starts Postgres, and creates or updates the app and Keycloak roles and databases.
 # 3. Migrates, then starts every service and waits until all are healthy. Compose recreates only the services whose
 #    image or settings changed, so the same tag again changes nothing. Fails unless the running worker is isolated
 #    (non-root, read-only root, no capabilities) and egress-limited (check-worker.sh, which ensure-healthy.sh runs
 #    too), and the agent and MCP server answer. A worker that fails either check is stopped.
 #    Installs and enables the scheduled jobs' systemd units (the nightly backup, #151).
-# 4. Creates the test learner if it is missing.
+# 4. Points the sign-in client at the domain if it changed, and creates the test learner if it is missing.
 #
 # It prints no secret: never add `set -x`, `docker compose config`, or an echo of the env file.
 set -euo pipefail
@@ -76,6 +77,20 @@ MCP_CLIENT_SECRET=$mcp_client_secret
 EOF
 mv "$rendered" "$env_file"
 
+# A DuckDNS name follows the Elastic IP (#154): without an `ip`, DuckDNS uses the address the request comes from, so a
+# re-created Host needs no manual DNS step. The operator creates the token's secret (docs/runbooks/on-premise-deploy.md);
+# it reaches curl on stdin, never its command line. A failure only warns: the name most likely still points here.
+if [[ $domain == *.duckdns.org ]]; then
+  duckdns_url="https://www.duckdns.org/update?domains=${domain%.duckdns.org}&token="
+  if duckdns_token=$(secret duckdns/token 2>/dev/null) &&
+    duckdns_answer=$(curl -sS --max-time 20 -K - <<<"url = \"$duckdns_url$duckdns_token\"") &&
+    [[ $duckdns_answer == OK ]]; then
+    echo "Pointed $domain at this instance"
+  else
+    echo "Warning: could not update $domain on DuckDNS (is the secret $prefix/duckdns/token set?)" >&2
+  fi
+fi
+
 echo "Pulling $tag from $registry"
 aws ecr get-login-password --region "$region" | docker login --username AWS --password-stdin "$registry" >/dev/null
 "${compose[@]}" pull --quiet
@@ -117,10 +132,12 @@ for timer in "$here"/systemd/*.timer; do
   systemctl enable --now --quiet "$(basename "$timer")"
 done
 
+# Keycloak imports the realm once, with the address of the first deploy, so the sign-in client (smart-tutor-web) gets
+# the domain's redirect URIs, web origins, and post-logout redirect URIs again when the domain changes (#154).
 # The test learner is created once (the realm uses the email as the username) and gets the secret's password while it
 # has none; later changes go through the admin console. The script reaches the container on stdin, so the password is
 # on no command line outside it. A missing bootstrap admin (deleted after the first sign-in, as the runbook allows)
-# skips the check instead of failing the deploy.
+# skips both instead of failing the deploy.
 learner_username=$(field username <<<"$test_learner")
 learner_password=$(field password <<<"$test_learner")
 if ! "${compose[@]}" exec -T keycloak bash -s <<EOF
@@ -130,6 +147,12 @@ learner_id() { kc get users -r smart-tutor -q exact=true -q username=$learner_us
 trap 'rm -f /tmp/kcadm.config' EXIT
 kc config credentials --server http://localhost:8080/auth --realm master \
   --user "\$KC_BOOTSTRAP_ADMIN_USERNAME" --password "\$KC_BOOTSTRAP_ADMIN_PASSWORD" >/dev/null 2>&1
+web_id=\$(kc get clients -r smart-tutor -q clientId=smart-tutor-web --fields id --format csv --noquotes)
+if [ "\$(kc get "clients/\$web_id" -r smart-tutor --fields webOrigins --format csv --noquotes)" != "https://$domain" ]; then
+  kc update "clients/\$web_id" -r smart-tutor -s "redirectUris=[\"https://$domain/*\"]" \
+    -s "webOrigins=[\"https://$domain\"]" -s "attributes.\"post.logout.redirect.uris\"=https://$domain/*"
+  echo "Pointed the sign-in client at https://$domain"
+fi
 id=\$(learner_id)
 if [ -z "\$id" ]; then
   kc create users -r smart-tutor -s username=$learner_username -s email=$learner_username -s emailVerified=true \
@@ -143,7 +166,7 @@ if ! kc get "users/\$id/credentials" -r smart-tutor --fields type --format csv -
 fi
 EOF
 then
-  echo "Warning: could not check the test learner (is Keycloak's bootstrap admin still there?)" >&2
+  echo "Warning: could not check the sign-in client or the test learner (is Keycloak's bootstrap admin still there?)" >&2
 fi
 
 docker image prune -af >/dev/null

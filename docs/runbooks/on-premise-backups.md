@@ -84,7 +84,7 @@ Use this when the volume and its snapshots are gone (the Host stack was destroye
 
    It downloads both dumps (nothing changes if either is missing), stops every service but Postgres, then drops and recreates `smart_tutor` and `keycloak` from the dumps. The product is down from here until step 4.
 4. **Deploy the same image tag again** (`on-premise-deploy.md` §3). It resets the roles' passwords to the secrets, migrates the restored schema to head, and starts the services.
-5. **Check:** a learner signs in with their old password, and their library and threads are back. The test learner has the password from the dump. A new Elastic IP means a new `<ip>.sslip.io` address: the restored realm still lists the old one, so sign-in says "Invalid parameter: redirect_uri". Fix it as in `on-premise-deploy.md` Troubleshooting (a DuckDNS name, #154, avoids this). Caddy requests a new certificate.
+5. **Check:** a learner signs in with their old password, and their library and threads are back. The test learner has the password from the dump. If the Elastic IP changed, the deploy points the DuckDNS name at the new one (`on-premise-deploy.md` section 8); with the sslip.io fallback the address changes too, and the deploy points the sign-in client at it. Caddy requests a new certificate if `/data/caddy` was lost.
 
 Documents follow the database, not the bucket. Documents uploaded after the backup are missing from the library, though their files stay in the bucket. Documents deleted after it come back in the library, but their PDF is gone. Restore the PDF's previous version in S3 if it is needed.
 
