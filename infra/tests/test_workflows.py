@@ -481,6 +481,10 @@ def test_runbooks_no_longer_call_ecr_shared_and_explain_old_rollbacks() -> None:
     assert "smart-tutor-on-premise/<service>" in on_premise
     assert "before #206" in on_premise  # what a rollback to an older commit does
     assert '"$Registry/smart-tutor/' not in on_premise  # the hand build pushes to on-premise's repositories
+    assert "runs outside the `deploy-on-premise` queue" in on_premise  # the build can overlap a deploy
     assert "before #206" in (RUNBOOKS / "pilot-deploy.md").read_text(encoding="utf-8")
+    for runbook in RUNBOOKS.glob("on-premise-*.md"):
+        text = runbook.read_text(encoding="utf-8")
+        assert not re.search(r"/smart-tutor/(api|web|keycloak|agent|mcp|worker)[:\"]", text), runbook.name
     teardown = (RUNBOOKS / "pilot-teardown.ps1").read_text(encoding="utf-8")
     assert '"Registry"' in teardown.split("$DeleteStacks")[1].split("$KeepStacks")[0]
