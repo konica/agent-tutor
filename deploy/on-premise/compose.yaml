@@ -208,7 +208,8 @@ services:
   # instance profile's credentials); everything else gets 403. The config is an environment variable rather than a
   # file so a changed bucket or region recreates the container (Compose can't inject a config into a read-only one).
   egress-proxy:
-    image: ubuntu/squid:6.6-24.04_edge
+    # Pinned by digest: the tag is Canonical's mutable edge channel; bump it deliberately.
+    image: ubuntu/squid:6.6-24.04_edge@sha256:8a3baed477e2c282ab8aa5edad442f69873246964f225c5c2ae8364b6610963c
     restart: unless-stopped
     logging: *logging
     entrypoint: [bash, -c, 'printf "%s" "$$SQUID_CONF" > /tmp/squid.conf && exec squid -N -f /tmp/squid.conf']
@@ -243,6 +244,7 @@ services:
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     mem_limit: 128m
+    pids_limit: 64
     networks: [default, worker]
     healthcheck:
       # A request Squid refuses (403) without a DNS lookup: it answers, and the healthcheck ACL keeps it out of the log.

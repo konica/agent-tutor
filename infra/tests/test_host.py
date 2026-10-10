@@ -572,6 +572,8 @@ def test_worker_reaches_only_postgres_and_the_egress_proxy(compose: dict[str, An
             assert "networks" not in service, name
     env = compose["services"]["worker"]["environment"]
     assert env["HTTPS_PROXY"] == env["HTTP_PROXY"] == "http://egress-proxy:3128"
+    assert env["AWS_METADATA_SERVICE_TIMEOUT"] == "2"
+    assert env["AWS_METADATA_SERVICE_NUM_ATTEMPTS"] == "3"
     assert compose["services"]["worker"]["depends_on"]["egress-proxy"] == {"condition": "service_healthy"}
 
 
@@ -602,7 +604,11 @@ def test_egress_proxy_allows_only_the_workers_aws_endpoints_and_imds(compose: di
 
 def test_egress_proxy_runs_unprivileged_on_a_read_only_root(compose: dict[str, Any]) -> None:
     proxy = compose["services"]["egress-proxy"]
-    assert proxy["image"] == "ubuntu/squid:6.6-24.04_edge"
+    # Pinned by digest: the tag is Canonical's mutable edge channel.
+    assert proxy["image"] == (
+        "ubuntu/squid:6.6-24.04_edge@sha256:8a3baed477e2c282ab8aa5edad442f69873246964f225c5c2ae8364b6610963c"
+    )
+    assert proxy["pids_limit"] == 64
     assert proxy["user"] == "proxy"
     assert proxy["read_only"] is True
     assert proxy["cap_drop"] == ["ALL"]
