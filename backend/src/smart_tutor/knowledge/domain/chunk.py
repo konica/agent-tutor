@@ -15,6 +15,14 @@ class Chunk:
     page: int | None
     text: str
     embedding: list[float]
+    start_index: int | None = None  # offset in the page's cleaned text; None when unknown
+
+
+def start_index_of(value: object) -> int | None:
+    """The splitter's start offset, or None when it couldn't find the chunk (it reports -1) or gave none."""
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
 
 
 def validate_chunk(page: object, text: str) -> int:

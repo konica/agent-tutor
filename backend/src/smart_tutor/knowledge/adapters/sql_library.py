@@ -350,6 +350,7 @@ class _Chunks(ChunkRepository):
                         "page": c.page,
                         "text": c.text,
                         "embedding": c.embedding,
+                        "start_index": c.start_index,
                     }
                     for c in new_chunks
                 ],

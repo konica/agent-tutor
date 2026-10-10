@@ -18,7 +18,7 @@ from langchain_core.documents import Document as TextDocument
 from langchain_core.embeddings import Embeddings
 
 from smart_tutor.knowledge.application.describer import FIRST_PAGES, DocumentDescriber
-from smart_tutor.knowledge.domain.chunk import Chunk, validate_chunk
+from smart_tutor.knowledge.domain.chunk import Chunk, start_index_of, validate_chunk
 from smart_tutor.knowledge.domain.content import (
     NO_TEXT_LAYER,
     UNREADABLE_PDF,
@@ -223,16 +223,23 @@ class IngestionService:
             if text.strip()
         ]
         pieces = list(self._tools.chunker.transform_documents(sources))
-        found = [(validate_chunk(p.metadata.get("page"), p.page_content), p.page_content) for p in pieces]
+        found = [
+            (
+                validate_chunk(p.metadata.get("page"), p.page_content),
+                p.page_content,
+                start_index_of(p.metadata.get("start_index")),
+            )
+            for p in pieces
+        ]
         if not found:
             return []
-        vectors = self._tools.embeddings.embed_documents([text for _, text in found])
+        vectors = self._tools.embeddings.embed_documents([text for _, text, _ in found])
         dim = self._tools.embedding_dim
         if len(vectors) != len(found) or any(len(v) != dim for v in vectors):
             raise ValueError(f"The embedding model must return {dim} floats per chunk (dimension mismatch)")
         return [
-            Chunk(content_id, seq, page, text, v)
-            for seq, ((page, text), v) in enumerate(zip(found, vectors, strict=True))
+            Chunk(content_id, seq, page, text, v, start)
+            for seq, ((page, text, start), v) in enumerate(zip(found, vectors, strict=True))
         ]
 
     def _fail(self, content_id: ContentId, reason: str) -> ContentState | None:
