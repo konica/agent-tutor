@@ -4,6 +4,7 @@ from fakes.api import api_services, fake_agent
 from fakes.auth import FakeTokenVerifier
 from fakes.clock import FixedClock
 from fakes.ingest import ingest_ready
+from fakes.insights import InMemoryHighlightMisses
 from fakes.knowledge import FakeObjectStore, InMemoryLibrary
 from fakes.mcp import in_process_mcp
 from fakes.models import (
@@ -33,6 +34,7 @@ __all__ = [
     "fake_embeddings",
     "FakeTokenVerifier",
     "FixedClock",
+    "InMemoryHighlightMisses",
     "InMemoryLibrary",
     "InMemorySubjects",
     "InMemoryThreads",
