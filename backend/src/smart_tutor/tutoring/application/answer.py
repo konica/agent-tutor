@@ -9,6 +9,7 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 
 NO_CHUNKS_ANSWER = "I couldn't find anything about that in your documents."
+LIMITED_DECLINE = "These documents don't cover this."
 
 _SYSTEM = """You are Smart Tutor. You answer a learner's question using only chunks of their own documents.
 
@@ -19,6 +20,11 @@ like [1]. If the chunks don't answer the question, say so briefly instead of gue
 
 _MARKER = re.compile(r"\[(\d+(?:\s*[-\u2013,]\s*\d+)*)\]")  # [1], [1, 2], [1-3], and [1-3] with an en dash
 _RANGE = re.compile(r"\s*[-\u2013]\s*")
+
+
+def covers(chunks: Sequence[RetrievedChunk], floor: float) -> bool:
+    """A limited search covers the question when its best chunk scores at least `floor` (US-4c; US-5 tunes it)."""
+    return any(c.score >= floor for c in chunks)
 
 
 def _quote(text: str) -> str:

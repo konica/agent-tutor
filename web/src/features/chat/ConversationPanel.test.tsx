@@ -28,6 +28,7 @@ function renderPanel(props: Partial<ComponentProps<typeof ConversationPanel>> = 
       answered={false}
       showCitations
       onShowCitationsChange={onShowCitationsChange}
+      searchListed={false}
       {...props}
     />,
   );
@@ -137,6 +138,7 @@ describe("ConversationPanel", () => {
         answered: true,
         showCitations: true,
         onShowCitationsChange: vi.fn(),
+        searchListed: false,
         onAddDocuments: vi.fn(),
         onRemoveDocument,
       };
@@ -186,6 +188,7 @@ describe("ConversationPanel", () => {
         answered
         showCitations
         onShowCitationsChange={vi.fn()}
+        searchListed={false}
       />,
     );
     const row = within(documentsSection()).getAllByRole("listitem")[1];
@@ -203,6 +206,7 @@ describe("ConversationPanel", () => {
         answered
         showCitations
         onShowCitationsChange={vi.fn()}
+        searchListed={false}
       />,
     );
     expect(screen.queryByText("Deleted documents can't be opened.")).not.toBeInTheDocument();
@@ -243,6 +247,51 @@ describe("ConversationPanel", () => {
   it("offers no Archive conversation before there is a conversation", () => {
     renderPanel({ threadId: null });
     expect(screen.queryByRole("button", { name: "Archive conversation" })).not.toBeInTheDocument();
+  });
+
+  describe("Only search these documents", () => {
+    const scopeSwitch = () => screen.getByRole("switch", { name: "Only search these documents" });
+
+    it("is off by default and disabled while the list is empty, saying why", () => {
+      renderPanel({ threadId: "t1", searchListed: false, onSearchListedChange: vi.fn() });
+      expect(scopeSwitch()).toHaveAttribute("aria-checked", "false");
+      expect(scopeSwitch()).toBeDisabled();
+      expect(scopeSwitch()).toHaveAccessibleDescription("Add documents to limit the search.");
+      expect(within(documentsSection()).getByText("Add documents to limit the search.")).toBeInTheDocument();
+    });
+
+    it("turns the limit on", async () => {
+      const onSearchListedChange = vi.fn();
+      renderPanel({ threadId: "t1", documents: [used("ReAct")], searchListed: false, onSearchListedChange });
+      expect(screen.queryByText("Add documents to limit the search.")).not.toBeInTheDocument();
+      expect(scopeSwitch()).not.toHaveAccessibleDescription();
+      await userEvent.click(scopeSwitch());
+      expect(onSearchListedChange).toHaveBeenCalledWith(true);
+    });
+
+    it("turns the limit off", async () => {
+      const onSearchListedChange = vi.fn();
+      renderPanel({ threadId: "t1", documents: [used("ReAct")], searchListed: true, onSearchListedChange });
+      expect(scopeSwitch()).toHaveAttribute("aria-checked", "true");
+      await userEvent.click(scopeSwitch());
+      expect(onSearchListedChange).toHaveBeenCalledWith(false);
+    });
+
+    it("sits under Add documents", () => {
+      renderPanel({ threadId: "t1", documents: [used("ReAct")], searchListed: false, onAddDocuments: vi.fn(), onSearchListedChange: vi.fn() });
+      const add = within(documentsSection()).getByRole("button", { name: "Add documents" });
+      expect(add.compareDocumentPosition(scopeSwitch()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("is disabled before there is a conversation, and when the documents couldn't be loaded", () => {
+      const { unmount } = render(
+        <ConversationPanel id="p" documents={[used("ReAct")]} threadId={null} answered={false} showCitations onShowCitationsChange={vi.fn()} searchListed={false} />,
+      );
+      expect(scopeSwitch()).toBeDisabled();
+      unmount();
+      renderPanel({ threadId: "t1", documentsFailed: true, searchListed: false, onSearchListedChange: vi.fn() });
+      expect(scopeSwitch()).toBeDisabled();
+    });
   });
 
   it("turns citations off with the switch", async () => {

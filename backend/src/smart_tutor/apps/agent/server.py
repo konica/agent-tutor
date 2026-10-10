@@ -5,7 +5,9 @@ Events, each ``event: <name>\\ndata: <json>\\n\\n``: ``delta`` {"text"} in order
 were, as in the fixed no-chunks reply; meant for the API, which records them and never forwards the event), then
 ``citations`` once ({"citations": [{"n", "chunk_id", "document_id", "document_title", "page"}]}, ``n`` being the
 answer's ``[n]`` marker), then ``done``; or ``error`` {"code": "unauthenticated" | "unavailable", "message"}, which
-ends the stream and may come first.
+ends the stream and may come first. A request with ``document_ids`` searches only those documents; when none
+of the chunks found scores at least ``answer_floor``, the turn is ``decline`` {"code": "limited", "message"} then
+``done``, with no ``delta``, ``sources``, or ``citations``.
 """
 
 import json
@@ -28,7 +30,7 @@ from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.ports.token_verifier import TokenVerifier
 from smart_tutor.tutoring.adapters.mcp_retriever import McpRetriever
-from smart_tutor.tutoring.application import RetrievedChunk
+from smart_tutor.tutoring.application import LIMITED_DECLINE, RetrievedChunk
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,7 @@ STREAM_MODES: list[Literal["messages", "updates"]] = ["messages", "updates"]
 class AskRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     question: str = Field(min_length=1, max_length=4000)
+    document_ids: list[str] | None = Field(default=None, max_length=200)
 
 
 def sse(event: str, data: dict[str, Any]) -> str:
@@ -49,7 +52,7 @@ def sse(event: str, data: dict[str, Any]) -> str:
 
 
 async def answer_events(graph: AskGraph, body: AskRequest, token: str) -> AsyncIterator[str]:
-    state: AskState = {"question": body.question}
+    state: AskState = {"question": body.question, "document_ids": body.document_ids}
     streamed = False
     chunks: list[RetrievedChunk] = []  # what search found; the answer node gives the model exactly these
     try:
@@ -65,6 +68,9 @@ async def answer_events(graph: AskGraph, body: AskRequest, token: str) -> AsyncI
                 chunks = part["data"]["search"].get("chunks", [])
             elif part["type"] == "updates" and "answer" in part["data"]:
                 update = part["data"]["answer"]
+                if update.get("declined"):
+                    yield sse("decline", {"code": "limited", "message": LIMITED_DECLINE})
+                    continue
                 if not streamed:  # the fixed no-chunks answer never went through the model
                     yield sse("delta", {"text": update["answer"]})
                 if chunks:  # non-empty exactly when the answer node gave them to the model
@@ -104,7 +110,9 @@ def create_app(
             raise RuntimeError("SMART_TUTOR_KEYCLOAK_CLIENT_SECRET is not set")
         if graph is None:
             model = ModelFactory(settings).chat(ChatRole.AGENT)
-            app.state.graph = build_graph(lambda token: McpRetriever(settings.mcp_url, token), model)
+            app.state.graph = build_graph(
+                lambda token: McpRetriever(settings.mcp_url, token), model, settings.answer_floor
+            )
         async with httpx.AsyncClient(timeout=5) as http:
             app.state.verifier = keycloak_verifier(settings, http)
             yield

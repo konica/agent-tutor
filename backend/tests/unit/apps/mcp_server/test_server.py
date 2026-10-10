@@ -78,7 +78,7 @@ async def test_an_invalid_argument_is_a_tool_error_with_the_reason() -> None:
 async def test_the_tool_takes_no_user_id() -> None:
     mcp = build(InMemoryLibrary(), verifier_with("t", "ada"))
     [tool] = [t for t in await mcp.list_tools() if t.name == "search"]
-    assert set(tool.input_schema["properties"]) == {"query", "k"}
+    assert set(tool.input_schema["properties"]) == {"query", "k", "document_ids"}
 
 
 class FailingVerifier(TokenVerifier):

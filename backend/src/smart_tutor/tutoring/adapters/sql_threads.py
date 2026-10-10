@@ -1,4 +1,4 @@
-"""Threads in Postgres. The table schemas live in migrations 0005, 0007, 0009 and 0010."""
+"""Threads in Postgres. The table schemas live in migrations 0005, 0007, 0009, 0010 and 0011."""
 
 from collections.abc import Sequence
 from datetime import datetime
@@ -8,7 +8,7 @@ from sqlalchemy import BigInteger, Column, DateTime, Engine, Identity, MetaData,
 from sqlalchemy.dialects.postgresql import insert
 
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
-from smart_tutor.tutoring.domain.thread import Thread, ThreadStatus
+from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
 from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
 
@@ -19,6 +19,7 @@ threads = Table(
     Column("user_id", Text),
     Column("title", Text),
     Column("status", Text),
+    Column("search_scope", Text),
     Column("created_at", DateTime(timezone=True)),
     Column("last_learner_message_at", DateTime(timezone=True)),
 )
@@ -43,6 +44,7 @@ def _thread(row: Any) -> Thread:
         created_at=row.created_at,
         status=ThreadStatus(row.status),
         title=row.title,
+        search_scope=SearchScope(row.search_scope),
         last_learner_message_at=row.last_learner_message_at,
     )
 
@@ -59,6 +61,7 @@ class SqlThreadRepository(ThreadRepository):
                     user_id=thread.user_id,
                     title=thread.title,
                     status=thread.status.value,
+                    search_scope=thread.search_scope.value,
                     created_at=thread.created_at,
                     last_learner_message_at=thread.last_learner_message_at,
                 )
@@ -74,6 +77,10 @@ class SqlThreadRepository(ThreadRepository):
     def set_title(self, thread_id: ThreadId, title: str) -> None:
         with self._engine.begin() as conn:
             conn.execute(threads.update().where(threads.c.thread_id == thread_id).values(title=title))
+
+    def set_search_scope(self, thread_id: ThreadId, scope: SearchScope) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(threads.update().where(threads.c.thread_id == thread_id).values(search_scope=scope.value))
 
     def add_documents_used(self, thread_id: ThreadId, document_ids: Sequence[DocumentId], at: datetime) -> None:
         if not document_ids:

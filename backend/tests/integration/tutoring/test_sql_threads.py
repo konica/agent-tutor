@@ -11,7 +11,7 @@ from smart_tutor.shared.adapters.postgres.migrate import upgrade_to_head
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.tutoring.adapters.sql_threads import SqlThreadRepository, thread_documents
-from smart_tutor.tutoring.domain.thread import Thread
+from smart_tutor.tutoring.domain.thread import SearchScope, Thread
 
 pytestmark = pytest.mark.integration
 
@@ -126,3 +126,17 @@ def test_a_row_inserted_as_before_0010_gets_the_column_defaults(engine: Engine) 
 
     rows = repo.documents_used(ThreadId(thread.thread_id))
     assert [(r.document_id, r.added_by, r.first_used_at) for r in rows] == [(doc, "answer", used_at)]
+
+
+def test_a_thread_keeps_its_search_scope(engine: Engine) -> None:
+    repo = SqlThreadRepository(engine)
+    owner = UserId(f"ada-{uuid.uuid4()}")
+    thread = Thread.start(ThreadId(str(uuid.uuid4())), owner, datetime.now(UTC))
+    repo.add(thread)
+    stored = repo.get_owned(thread.thread_id, owner)
+    assert stored is not None and stored.search_scope is SearchScope.LIBRARY
+
+    repo.set_search_scope(thread.thread_id, SearchScope.LISTED)
+
+    stored = repo.get_owned(thread.thread_id, owner)
+    assert stored is not None and stored.search_scope is SearchScope.LISTED

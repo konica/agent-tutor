@@ -25,3 +25,7 @@ class InvalidTitleError(DomainError):
 
 class ThreadArchivedError(DomainError):
     """An archived conversation is read-only until it is restored (PRD §8 US-13)."""
+
+
+class NoListedDocumentsError(DomainError):
+    """A search can only be limited to documents when the conversation lists at least one (PRD §8 US-4c)."""

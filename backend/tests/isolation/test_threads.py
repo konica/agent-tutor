@@ -168,6 +168,32 @@ def test_only_the_owner_adds_or_removes_a_threads_documents() -> None:
     assert [d["document_id"] for d in client.get(url, headers=A).json()] == [a_document]
 
 
+def test_only_the_owner_reads_limits_or_asks_in_a_thread() -> None:
+    library, threads = InMemoryLibrary(), InMemoryThreads()
+    ingest_ready(library, "learner-a", "Attention weighs tokens.")
+    seen: list[httpx.Request] = []
+
+    def agent_called(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return answers(request)
+
+    services = api_services(library, threads=threads, agent=fake_agent(agent_called))
+    client = TestClient(create_app(Settings(), verifier=learners(), services=services))
+    assert client.post("/threads", json={"question": "What is attention?"}, headers=A).status_code == 200
+    [thread] = threads.threads.values()
+    url = f"/threads/{thread.thread_id}"
+    seen.clear()
+
+    # B has no documents either: ownership is checked first, so B gets 404, not 409.
+    assert client.get(url, headers=B).status_code == 404
+    assert client.patch(url, json={"search_scope": "listed"}, headers=B).status_code == 404
+    assert client.post(f"{url}/questions", json={"question": "Hi"}, headers=B).status_code == 404
+
+    assert seen == []
+    assert threads.threads[thread.thread_id].search_scope == "library"
+    assert client.get(url, headers=A).status_code == 200
+
+
 def test_a_learner_starts_a_thread_only_from_their_own_ready_document() -> None:
     library, threads = InMemoryLibrary(), InMemoryThreads()
     a_ready = ingest_ready(library, "learner-a", "Attention weighs tokens.")

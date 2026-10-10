@@ -3,8 +3,8 @@ from datetime import UTC, datetime
 import pytest
 
 from smart_tutor.shared.domain.ids import ThreadId, UserId
-from smart_tutor.tutoring.domain.errors import InvalidTitleError, ThreadArchivedError
-from smart_tutor.tutoring.domain.thread import Thread, ThreadStatus
+from smart_tutor.tutoring.domain.errors import InvalidTitleError, NoListedDocumentsError, ThreadArchivedError
+from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
 
 NOW = datetime(2026, 10, 9, tzinfo=UTC)
 
@@ -51,3 +51,25 @@ def test_a_new_thread_belongs_to_its_learner_and_records_the_first_question() ->
     assert thread.is_owned_by(UserId("ada")) and not thread.is_owned_by(UserId("bob"))
     assert thread.created_at == thread.last_learner_message_at == now
     assert thread.status is ThreadStatus.ACTIVE
+
+
+def test_a_new_thread_searches_the_library() -> None:
+    assert new_thread().search_scope is SearchScope.LIBRARY
+
+
+def test_limiting_the_search_needs_a_listed_document() -> None:
+    thread = new_thread()
+    with pytest.raises(NoListedDocumentsError, match="Add documents"):
+        thread.limit_search(SearchScope.LISTED, 0)
+    assert thread.search_scope is SearchScope.LIBRARY
+    thread.limit_search(SearchScope.LISTED, 2)
+    assert thread.search_scope is SearchScope.LISTED
+    thread.limit_search(SearchScope.LIBRARY, 0)
+    assert thread.search_scope is SearchScope.LIBRARY
+
+
+def test_an_archived_thread_cannot_change_its_search_scope() -> None:
+    thread = new_thread()
+    thread.status = ThreadStatus.ARCHIVED
+    with pytest.raises(ThreadArchivedError, match="Restore it first"):
+        thread.limit_search(SearchScope.LISTED, 1)

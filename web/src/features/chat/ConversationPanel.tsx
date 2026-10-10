@@ -25,6 +25,10 @@ type Props = {
   onOpen?: (documentId: string, opener: HTMLElement) => void;
   /** The document open beside the conversation, if any: its row is marked current. */
   openId?: string | null;
+  /** The conversation searches only its listed documents (US-4c). */
+  searchListed: boolean;
+  /** Turns the limit on or off; the switch is disabled without it (no conversation yet). */
+  onSearchListedChange?: (on: boolean) => void;
 };
 
 // Where focus goes once a removed row is gone: a row's remove button, or Add documents.
@@ -41,7 +45,8 @@ function tooltip(d: ThreadDocumentResponse): string {
  * A row opens the document beside the conversation (US-4b), and its remove button, a sibling of that open button, takes it
  * off the list (US-4c); Add documents opens the picker once the conversation exists. A document the learner added that no
  * answer has used yet is marked "Added". Summarize lesson (US-7) and Archive conversation (US-13) stay disabled until
- * their stories.
+ * their stories. "Only search these documents" limits the conversation's search to its list; it is disabled while the
+ * list is empty, since there is nothing to limit the search to.
  */
 export function ConversationPanel({
   id,
@@ -55,6 +60,8 @@ export function ConversationPanel({
   onRemoveDocument,
   onOpen,
   openId = null,
+  searchListed,
+  onSearchListedChange,
 }: Props) {
   const panel = useRef<HTMLElement>(null);
   const focusAfterRemove = useRef<FocusTarget | null>(null);
@@ -75,6 +82,8 @@ export function ConversationPanel({
     focusAfterRemove.current = { removed: documentId, next: next ? next.document_id : "add" };
     onRemoveDocument?.(documentId);
   }
+
+  const listEmpty = !documentsFailed && documents.length === 0;
 
   return (
     <aside ref={panel} id={id} className={styles.panel} aria-label="Conversation">
@@ -155,6 +164,26 @@ export function ConversationPanel({
           >
             Add documents
           </Button>
+        )}
+        <button
+          type="button"
+          role="switch"
+          aria-checked={searchListed}
+          aria-describedby={listEmpty ? `${id}-scope-hint` : undefined}
+          className={styles.switch}
+          data-scope-switch
+          disabled={!onSearchListedChange || documents.length === 0 || documentsFailed}
+          onClick={() => onSearchListedChange?.(!searchListed)}
+        >
+          <span className={styles.track} aria-hidden="true">
+            <span className={styles.thumb} />
+          </span>
+          Only search these documents
+        </button>
+        {listEmpty && (
+          <p id={`${id}-scope-hint`} className={styles.text}>
+            Add documents to limit the search.
+          </p>
         )}
       </section>
 
