@@ -16,8 +16,10 @@ const ORIGIN_LABEL: Record<Suggestion["origin"], string> = { shared: "Shared sub
 
 type Choice = { subject_ids: string[]; new_names: string[] };
 
+export type PickerDocument = Pick<DocumentResponse, "document_id" | "title" | "state" | "subjects">; // a Library row or its details
+
 type Props = {
-  document: DocumentResponse;
+  document: PickerDocument;
   load?: (documentId: string) => Promise<SubjectSuggestions>;
   save?: (documentId: string, choice: Choice) => Promise<DocumentResponse>;
   search?: (query: string) => Promise<SubjectMatch[]>;
@@ -37,7 +39,9 @@ type Option = { kind: "match"; match: SubjectMatch } | { kind: "create" };
 
 // The learner picks 1-3 subjects for a document (PRD §8 US-2b): from three ranked suggestions (the first is
 // pre-selected) or by typing a name, with type-ahead over the shared catalog. Typed chips follow the suggestions.
+// For a ready document it changes them (US-10): its current subjects start selected, after the suggestions when not among them.
 export function SubjectPicker({ document, load = defaultLoad, save = defaultSave, search = defaultSearch, onClose, onSaved }: Props) {
+  const changing = document.state === "ready";
   const [loaded, setLoaded] = useState<SubjectSuggestions | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set([0]));
@@ -54,6 +58,7 @@ export function SubjectPicker({ document, load = defaultLoad, save = defaultSave
   const searchRef = useRef(search);
   const requestRef = useRef(0);
   const alive = useRef(true);
+  const current = useRef(changing ? document.subjects : []); // as the picker opened; a later list refresh doesn't reset the choice
   useEffect(() => {
     loadRef.current = load;
   }, [load]);
@@ -71,7 +76,16 @@ export function SubjectPicker({ document, load = defaultLoad, save = defaultSave
     setLoadFailed(false);
     try {
       const result = await loadRef.current(document.document_id);
-      if (alive.current) setLoaded(result);
+      if (!alive.current) return;
+      setLoaded(result);
+      if (current.current.length) {
+        const same = (a: Suggestion, b: Suggestion) => (a.subject_id !== null && a.subject_id === b.subject_id) || normalize(a.name) === normalize(b.name);
+        const mine = current.current.map((s): Suggestion => ({ subject_id: s.subject_id, name: s.name, origin: "yours" }));
+        const extra = mine.filter((s) => !result.suggestions.some((c) => same(c, s)));
+        const all = [...result.suggestions, ...extra];
+        setAdded(extra);
+        setSelected(new Set(mine.map((s) => all.findIndex((c) => same(c, s)))));
+      }
     } catch {
       // A 401 is handled by the API client: the session screen replaces this page.
       if (alive.current) setLoadFailed(true);
@@ -200,13 +214,14 @@ export function SubjectPicker({ document, load = defaultLoad, save = defaultSave
     setSaving(false);
   }
 
-  const kicker = document.state === "ready" ? "Ready document" : "Processing finished";
+  const kicker = changing ? "Ready document" : "Processing finished";
+  const title = changing ? "Change subjects" : "Choose subjects";
 
   if (savedDoc) {
     return (
       <Dialog
         key="saved" // a fresh dialog, so focus moves to Done
-        title="Choose subjects"
+        title={title}
         kicker={kicker}
         wide
         onClose={onClose}
@@ -218,7 +233,7 @@ export function SubjectPicker({ document, load = defaultLoad, save = defaultSave
       >
         <div role="status">
           <Banner variant="success" title="Subjects saved.">
-            <em>{document.title}</em> is ready to use.
+            <em>{document.title}</em> {changing ? `now uses ${savedDoc.subjects.map((s) => s.name).join(", ")}.` : "is ready to use."}
           </Banner>
         </div>
         <div className={styles.chips}>
@@ -234,7 +249,7 @@ export function SubjectPicker({ document, load = defaultLoad, save = defaultSave
 
   return (
     <Dialog
-      title="Choose subjects"
+      title={title}
       kicker={kicker}
       wide
       onClose={onClose}

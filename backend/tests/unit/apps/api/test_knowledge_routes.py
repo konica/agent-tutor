@@ -497,6 +497,40 @@ def test_choosing_subjects_of_an_archived_document_is_409(client: TestClient) ->
     assert client.get(f"/documents/{doc}/subject-suggestions", headers=AUTH).status_code == 409
 
 
+def test_changing_a_ready_documents_subjects_keeps_it_ready(client: TestClient) -> None:
+    doc = ready_document(client)
+
+    r = client.put(f"/documents/{doc}/subjects", json={"new_names": ["Tool Use", "Agents"]}, headers=AUTH)
+
+    assert (r.status_code, r.json()["state"]) == (200, "ready")
+    assert sorted(s["name"] for s in r.json()["subjects"]) == ["Agents", "Tool Use"]
+    mine = {s["name"]: s["subject_id"] for s in client.get("/me/subjects", headers=AUTH).json()}
+    assert sorted(mine) == ["Agents", "Tool Use"]  # General left My subjects
+    assert listed_ids(client, {"subject_id": GENERAL}) == set()
+    assert listed_ids(client, {"subject_id": mine["Agents"]}) == {doc}
+
+
+def test_a_ready_document_takes_one_to_three_subjects(client: TestClient) -> None:
+    doc = ready_document(client)
+    for body in ({"subject_ids": []}, {"new_names": ["A", "B", "C", "D"]}):
+        assert client.put(f"/documents/{doc}/subjects", json=body, headers=AUTH).status_code == 422
+    [listed] = client.get("/documents", headers=AUTH).json()
+    assert [s["subject_id"] for s in listed["subjects"]] == [GENERAL]
+
+
+def test_changing_an_archived_ready_documents_subjects_is_409_until_restored(client: TestClient) -> None:
+    doc = ready_document(client)
+    client.post(f"/documents/{doc}/archive", headers=AUTH)
+
+    r = client.put(f"/documents/{doc}/subjects", json={"new_names": ["Tool Use"]}, headers=AUTH)
+    assert (r.status_code, r.json()["detail"]) == (409, "Restore this document to change its subjects")
+
+    client.post(f"/documents/{doc}/restore", headers=AUTH)
+    r = client.put(f"/documents/{doc}/subjects", json={"new_names": ["Tool Use"]}, headers=AUTH)
+    assert r.status_code == 200
+    assert [s["name"] for s in r.json()["subjects"]] == ["Tool Use"]
+
+
 def test_archive_routes_need_a_token(client: TestClient) -> None:
     unknown = "00000000-0000-4000-8000-0000000000aa"
     assert client.post(f"/documents/{unknown}/archive").status_code == 401

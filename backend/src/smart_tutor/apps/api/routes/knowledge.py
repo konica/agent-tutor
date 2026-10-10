@@ -286,7 +286,11 @@ def choose_subjects(
     choice: SubjectChoice,
     subjects: Subjects,
 ) -> DocumentResponse:
-    """Save the learner's 1-3 subjects; the document becomes ready to use (PRD §8 US-2b)."""
+    """Save the learner's 1-3 subjects; the document becomes ready to use (PRD §8 US-2b).
+
+    A ready document's subjects change without processing it again; an archived document's are refused (409) until it
+    is restored (PRD §8 US-10).
+    """
     try:
         view = choice.choose(
             principal.user_id,
