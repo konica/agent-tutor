@@ -69,6 +69,11 @@
   --attn-soft: #FDEFD9;
   --panel-w: 340px;
   --tray-w: 320px;
+
+  /* Citation highlight, fixed: the PDF page stays white in both themes. */
+  --cite-fill: rgba(11, 107, 102, 0.16);
+  --cite-mark: #0B6B66;
+  --cite-on-mark: #FFFFFF;
 }
 
 .pf-v5-theme-dark {
