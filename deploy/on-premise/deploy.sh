@@ -7,7 +7,8 @@
 # 2. Pulls the images, starts Postgres, and creates or updates the app and Keycloak roles and databases.
 # 3. Migrates, then starts every service and waits until all are healthy. Compose recreates only the services whose
 #    image or settings changed, so the same tag again changes nothing. Fails unless the running worker is isolated
-#    (non-root, read-only root, no capabilities; a worker that isn't is stopped) and the agent and MCP server answer.
+#    (non-root, read-only root, no capabilities) and egress-limited (check-worker.sh, which ensure-healthy.sh runs
+#    too), and the agent and MCP server answer. A worker that fails either check is stopped.
 #    Installs and enables the scheduled jobs' systemd units (the nightly backup, #151).
 # 4. Creates the test learner if it is missing.
 #
@@ -21,6 +22,8 @@ region=${AWS_REGION:?}
 here=$(cd "$(dirname "$0")" && pwd)
 env_file=/etc/smart-tutor/smart-tutor.env
 compose=(docker compose --project-directory "$here" -f "$here/compose.yaml" --env-file "$env_file")
+# shellcheck source=check-worker.sh
+source "$here/check-worker.sh"
 
 param() { aws ssm get-parameter --name "/$prefix/$1" --query Parameter.Value --output text; }
 secret() { aws secretsmanager get-secret-value --secret-id "$prefix/$1" --query SecretString --output text; }
@@ -92,26 +95,7 @@ echo "Migrating"
 echo "Starting the services"
 "${compose[@]}" up -d --wait --wait-timeout 900 --remove-orphans
 
-# The worker parses untrusted PDFs: fail the deploy unless the running container really is isolated, whatever
-# compose.yaml says (an override file or a hand-started container would otherwise go unnoticed).
-echo "Checking the worker's isolation"
-worker=$("${compose[@]}" ps -q worker)
-[[ -n $worker ]] || { echo "The worker container is not running" >&2; exit 1; }
-isolation=$(docker inspect --format \
-  '{{.Config.User}}|{{.HostConfig.ReadonlyRootfs}}|{{json .HostConfig.CapDrop}}|{{json .HostConfig.SecurityOpt}}' "$worker")
-IFS='|' read -r user readonly_rootfs cap_drop security_opt <<<"$isolation"
-problems=()
-[[ $user == 10001:10001 ]] || problems+=("runs as '$user', not 10001:10001")
-[[ $readonly_rootfs == true ]] || problems+=("ReadonlyRootfs is $readonly_rootfs")
-[[ $cap_drop == *'"ALL"'* ]] || problems+=("CapDrop $cap_drop does not drop ALL")
-[[ $security_opt == *'"no-new-privileges:true"'* ]] || problems+=("SecurityOpt $security_opt lacks no-new-privileges")
-if ((${#problems[@]})); then
-  printf 'The worker is not isolated: %s\n' "${problems[@]}" >&2
-  # Don't leave it consuming uploads after the deploy is marked failed.
-  docker stop "$worker" >/dev/null
-  echo "Stopped the worker" >&2
-  exit 1
-fi
+check_worker || exit 1
 
 # The agent and MCP server have no public route; check them from inside the API container, as the API reaches them.
 echo "Checking the agent and the MCP server"
