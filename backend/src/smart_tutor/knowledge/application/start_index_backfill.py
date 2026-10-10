@@ -35,7 +35,13 @@ class StartIndexBackfill:
             content_ids = tx.chunks.contents_missing_start_index()
         located = missing = 0
         for content_id in content_ids:
-            found, lost = self._content(content_id)
+            try:
+                found, lost = self._content(content_id)
+            except Exception:
+                # One bad content must not stop the worker from starting. It isn't counted as missing: we may not
+                # have listed its chunks yet.
+                logger.exception("content %s: start_index backfill failed; its chunks keep no start_index", content_id)
+                continue
             located, missing = located + found, missing + lost
         return BackfillResult(located, missing)
 

@@ -18,9 +18,12 @@ class CountingObjectStore(FakeObjectStore):
     def __init__(self) -> None:
         super().__init__()
         self.reads: list[str] = []
+        self.fail_on: str | None = None  # a key whose read raises an unexpected error
 
     def read(self, key: str) -> bytes:
         self.reads.append(key)
+        if key == self.fail_on:
+            raise RuntimeError("storage unavailable")
         return super().read(key)
 
 
@@ -114,3 +117,28 @@ def test_running_twice_changes_nothing_the_second_time() -> None:
     assert w.backfill.run() == BackfillResult(located=0, missing=0)
     assert w.offsets(cid) == [0, 17]
     assert (w.library.commits, len(w.objects.reads)) == (commits, reads)
+
+
+def test_a_corrupt_pages_file_is_logged_and_the_other_contents_are_still_processed(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    w = World()
+    bad = w.content("a-bad", [(1, "second", None)], [PAGE_ONE])
+    w.objects.objects[pages_key(OWNER, bad)] = b"not json"
+    good = w.content("b-good", [(1, "second", None)], [PAGE_ONE])
+    with caplog.at_level(logging.WARNING):
+        assert w.backfill.run() == BackfillResult(located=1, missing=0)
+    assert w.offsets(bad) == [None]
+    assert w.offsets(good) == [17]
+    [record] = [r for r in caplog.records if bad in r.getMessage()]
+    assert "second" not in record.getMessage()
+
+
+def test_an_unexpected_storage_error_skips_that_content_and_the_others_are_still_processed() -> None:
+    w = World()
+    broken = w.content("a-broken", [(1, "second", None)], [PAGE_ONE])
+    good = w.content("b-good", [(1, "second", None)], [PAGE_ONE])
+    w.objects.fail_on = pages_key(OWNER, broken)
+    assert w.backfill.run() == BackfillResult(located=1, missing=0)
+    assert w.offsets(broken) == [None]
+    assert w.offsets(good) == [17]
