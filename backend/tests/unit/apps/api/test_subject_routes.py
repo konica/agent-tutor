@@ -4,7 +4,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from fakes import (
+    APP_TZ,
     TEST_LIMITS,
+    TEST_UPLOAD_LIMITS,
     FakeObjectStore,
     FakeTokenVerifier,
     FixedClock,
@@ -57,9 +59,9 @@ def test_lists_the_subjects_of_ready_documents_by_name() -> None:
 
 def test_no_ready_documents_is_an_empty_list() -> None:
     library = InMemoryLibrary()  # an upload still processing has no subjects
-    UploadService(library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS).start_upload(
-        UserId("ada"), "a.pdf"
-    )
+    UploadService(
+        library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ
+    ).start_upload(UserId("ada"), "a.pdf")
 
     assert make_client(library).get("/me/subjects", headers=AUTH).json() == []
 

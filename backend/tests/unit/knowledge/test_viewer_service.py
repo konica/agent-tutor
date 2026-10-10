@@ -2,7 +2,7 @@
 
 import pytest
 
-from fakes import TEST_LIMITS, FakeObjectStore, FixedClock, InMemoryLibrary, ingest_ready
+from fakes import APP_TZ, TEST_LIMITS, TEST_UPLOAD_LIMITS, FakeObjectStore, FixedClock, InMemoryLibrary, ingest_ready
 from smart_tutor.knowledge.application import (
     VIEWER_LINK_SECONDS,
     ArchiveService,
@@ -54,7 +54,9 @@ def test_an_archived_document_can_be_opened() -> None:
 
 def test_a_processing_document_has_no_file_yet() -> None:
     library, objects = InMemoryLibrary(), FakeObjectStore()
-    started = UploadService(library.unit_of_work, objects, FixedClock(), TEST_LIMITS).start_upload(ADA, "p.pdf")
+    started = UploadService(
+        library.unit_of_work, objects, FixedClock(), TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ
+    ).start_upload(ADA, "p.pdf")
     with pytest.raises(DocumentStateError, match="can't be opened until it has been processed"):
         viewer(library, objects).file(ADA, DocumentId(started.document_id))
     assert objects.presigned_gets == []

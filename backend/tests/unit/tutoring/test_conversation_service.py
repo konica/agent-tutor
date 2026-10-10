@@ -4,7 +4,16 @@ from dataclasses import replace
 
 import pytest
 
-from fakes import TEST_LIMITS, FakeObjectStore, FixedClock, InMemoryLibrary, InMemoryThreads, ingest_ready
+from fakes import (
+    APP_TZ,
+    TEST_LIMITS,
+    TEST_UPLOAD_LIMITS,
+    FakeObjectStore,
+    FixedClock,
+    InMemoryLibrary,
+    InMemoryThreads,
+    ingest_ready,
+)
 from smart_tutor.knowledge.application import DocumentService, UploadService
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.tutoring.application import (
@@ -49,9 +58,9 @@ def test_a_learner_without_documents_cannot_start_a_thread() -> None:
 
 def test_a_processing_document_is_not_enough_to_start_a_thread() -> None:
     library, threads = InMemoryLibrary(), InMemoryThreads()
-    UploadService(library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS).start_upload(
-        UserId("ada"), "processing.pdf"
-    )
+    UploadService(
+        library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ
+    ).start_upload(UserId("ada"), "processing.pdf")
 
     with pytest.raises(NoDocumentsError, match="Upload a document first"):
         service(library, threads, FixedClock()).require_documents(UserId("ada"))
@@ -261,7 +270,14 @@ def test_only_the_learners_ready_active_documents_can_be_added(kind: str) -> Non
         library.state.documents[bad].archived = True
     elif kind == "processing":
         bad = (
-            UploadService(library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS)
+            UploadService(
+                library.unit_of_work,
+                FakeObjectStore(),
+                FixedClock(),
+                TEST_LIMITS,
+                rate=TEST_UPLOAD_LIMITS,
+                time_zone=APP_TZ,
+            )
             .start_upload(LEARNER, "processing.pdf")
             .document_id
         )
@@ -392,7 +408,14 @@ def test_a_thread_starts_only_from_the_learners_ready_active_document(kind: str)
         library.state.documents[bad].archived = True
     elif kind == "processing":
         bad = (
-            UploadService(library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS)
+            UploadService(
+                library.unit_of_work,
+                FakeObjectStore(),
+                FixedClock(),
+                TEST_LIMITS,
+                rate=TEST_UPLOAD_LIMITS,
+                time_zone=APP_TZ,
+            )
             .start_upload(LEARNER, "processing.pdf")
             .document_id
         )

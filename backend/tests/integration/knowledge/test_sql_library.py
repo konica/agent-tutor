@@ -3,7 +3,7 @@
 import hashlib
 import threading
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import Engine, text
@@ -54,6 +54,19 @@ def test_documents_list_only_for_their_owner(engine: Engine) -> None:
         mine = tx.documents.list_readable_by(UserId(ada))
     assert [d.document_id for d in mine] == [second.document_id, first.document_id]
     assert all(d.owner_id == ada for d in mine)
+
+
+def test_created_since_returns_only_the_learners_recent_uploads(engine: Engine) -> None:
+    ada, bob = UserId(f"ada-{uid()}"), UserId(f"bob-{uid()}")
+    t0 = datetime(2026, 10, 10, 3, 0, tzinfo=UTC)
+    with SqlLibraryUnitOfWork(engine) as tx:
+        tx.uploads.add(Upload(UploadId(uid()), ada, t0 - timedelta(hours=2)))
+        tx.uploads.add(Upload(UploadId(uid()), ada, t0))
+        tx.uploads.add(Upload(UploadId(uid()), bob, t0))
+        tx.commit()
+    with SqlLibraryUnitOfWork(engine) as tx:
+        tx.uploads.lock_learner(ada)
+        assert tx.uploads.created_since(ada, t0 - timedelta(hours=1)) == [t0]
 
 
 def test_uncommitted_work_rolls_back(engine: Engine) -> None:

@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Collection
+from datetime import datetime
 from types import TracebackType
 from typing import Self
 
@@ -115,6 +116,14 @@ class UploadRepository(ABC):
 
     @abstractmethod
     def get(self, upload_id: UploadId) -> Upload | None: ...
+
+    @abstractmethod
+    def lock_learner(self, user_id: UserId) -> None:
+        """Hold the learner's upload starts one at a time until this unit of work ends (limits count exactly)."""
+
+    @abstractmethod
+    def created_since(self, user_id: UserId, since: datetime) -> list[datetime]:
+        """When each of the learner's uploads at or after `since` started (rate limits, PRD §11)."""
 
 
 class ChunkRepository(ABC):

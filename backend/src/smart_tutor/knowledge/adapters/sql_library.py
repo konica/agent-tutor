@@ -2,10 +2,11 @@
 
 import uuid
 from collections.abc import Collection
+from datetime import datetime
 from types import TracebackType
 from typing import Any, Self
 
-from sqlalchemy import ColumnElement, Connection, Engine, Select, delete, exists, func, select, text, update
+from sqlalchemy import ColumnElement, Connection, Engine, Select, delete, exists, func, literal, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 
 from smart_tutor.knowledge.adapters.sql_tables import chunks, contents, document_subjects, documents, uploads
@@ -308,6 +309,16 @@ class _Uploads(UploadRepository):
         self._conn.execute(
             uploads.insert().values(upload_id=upload.upload_id, user_id=upload.user_id, created_at=upload.created_at)
         )
+
+    def lock_learner(self, user_id: UserId) -> None:
+        # A transaction-level advisory lock per learner: concurrent starts count one after another (released at commit).
+        self._conn.execute(select(func.pg_advisory_xact_lock(func.hashtextextended(literal("uploads:") + user_id, 0))))
+
+    def created_since(self, user_id: UserId, since: datetime) -> list[datetime]:
+        rows = self._conn.execute(
+            select(uploads.c.created_at).where(uploads.c.user_id == user_id, uploads.c.created_at >= since)
+        )
+        return [row.created_at for row in rows]
 
     def get(self, upload_id: UploadId) -> Upload | None:
         row = self._conn.execute(select(uploads).where(uploads.c.upload_id == upload_id)).first()

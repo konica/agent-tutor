@@ -6,8 +6,10 @@ from langchain_core.documents import BaseDocumentTransformer, Document
 from langchain_core.messages import AIMessage
 
 from fakes import (
+    APP_TZ,
     DESCRIPTION_ARGS,
     TEST_LIMITS,
+    TEST_UPLOAD_LIMITS,
     FakeObjectStore,
     FixedClock,
     InMemoryLibrary,
@@ -49,7 +51,14 @@ class World:
         limits: FileLimits = TEST_LIMITS,
     ) -> None:
         self.library, self.objects = InMemoryLibrary(), FakeObjectStore()
-        self.uploads = UploadService(self.library.unit_of_work, self.objects, FixedClock(), TEST_LIMITS)
+        self.uploads = UploadService(
+            self.library.unit_of_work,
+            self.objects,
+            FixedClock(),
+            TEST_LIMITS,
+            rate=TEST_UPLOAD_LIMITS,
+            time_zone=APP_TZ,
+        )
         self.ingestion = IngestionService(
             self.library.unit_of_work, self.objects, fake_tools(chat=chat, chunker=chunker), limits
         )

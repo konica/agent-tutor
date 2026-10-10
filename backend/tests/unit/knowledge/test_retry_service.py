@@ -1,6 +1,15 @@
 import pytest
 
-from fakes import TEST_LIMITS, FakeObjectStore, FakeQueue, FixedClock, InMemoryLibrary, fake_tools
+from fakes import (
+    APP_TZ,
+    TEST_LIMITS,
+    TEST_UPLOAD_LIMITS,
+    FakeObjectStore,
+    FakeQueue,
+    FixedClock,
+    InMemoryLibrary,
+    fake_tools,
+)
 from smart_tutor.knowledge.application import (
     DocumentNotFoundError,
     DocumentService,
@@ -20,7 +29,9 @@ SCAN = b"%PDF-1.7 tiny"  # fake extractor: too little text → "No text layer"
 def failed_upload(data: bytes = SCAN) -> tuple[InMemoryLibrary, FakeObjectStore, IngestionService, DocumentId]:
     """Ada's document, failed after its first attempt."""
     library, objects = InMemoryLibrary(), FakeObjectStore()
-    started = UploadService(library.unit_of_work, objects, FixedClock(), TEST_LIMITS).start_upload(ADA, "scan.pdf")
+    started = UploadService(
+        library.unit_of_work, objects, FixedClock(), TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ
+    ).start_upload(ADA, "scan.pdf")
     objects.objects[started.fields["key"]] = data
     ingestion = IngestionService(library.unit_of_work, objects, fake_tools(), TEST_LIMITS)
     ingestion.ingest_upload(started.fields["key"])
@@ -79,9 +90,9 @@ def test_a_second_retry_while_processing_changes_nothing() -> None:
 
 def test_a_failed_document_without_content_is_left_alone() -> None:
     library = InMemoryLibrary()
-    started = UploadService(library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS).start_upload(
-        ADA, "a.pdf"
-    )
+    started = UploadService(
+        library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ
+    ).start_upload(ADA, "a.pdf")
     with library.unit_of_work() as tx:  # failed before its bytes were stored
         document = tx.documents.get_by_upload_for_update(started.upload_id)
         assert document is not None

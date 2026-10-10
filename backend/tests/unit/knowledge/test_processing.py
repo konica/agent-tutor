@@ -5,7 +5,16 @@ import pytest
 from langchain_core.documents import BaseDocumentTransformer, Document
 from langchain_core.embeddings import Embeddings
 
-from fakes import TEST_LIMITS, FakeObjectStore, FixedClock, InMemoryLibrary, fake_embeddings, fake_tools
+from fakes import (
+    APP_TZ,
+    TEST_LIMITS,
+    TEST_UPLOAD_LIMITS,
+    FakeObjectStore,
+    FixedClock,
+    InMemoryLibrary,
+    fake_embeddings,
+    fake_tools,
+)
 from fakes.pdfs import make_pdf, make_scanned_pdf
 from smart_tutor.knowledge.adapters.pypdf_extractor import PypdfExtractor
 from smart_tutor.knowledge.application import (
@@ -26,7 +35,14 @@ SENTENCE = "A sentence about attention mechanisms. " * 5  # 190 characters: two 
 class World:
     def __init__(self, tools: ProcessingTools | None = None, limits: FileLimits = TEST_LIMITS) -> None:
         self.library, self.objects = InMemoryLibrary(), FakeObjectStore()
-        self.uploads = UploadService(self.library.unit_of_work, self.objects, FixedClock(), TEST_LIMITS)
+        self.uploads = UploadService(
+            self.library.unit_of_work,
+            self.objects,
+            FixedClock(),
+            TEST_LIMITS,
+            rate=TEST_UPLOAD_LIMITS,
+            time_zone=APP_TZ,
+        )
         self.tools = tools or fake_tools()
         self.ingestion = IngestionService(self.library.unit_of_work, self.objects, self.tools, limits)
 

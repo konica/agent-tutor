@@ -7,7 +7,7 @@ import httpx
 from fakes.clock import FixedClock
 from fakes.knowledge import FakeObjectStore, InMemoryLibrary
 from fakes.models import fake_embeddings
-from fakes.parameters import TEST_LIMITS
+from fakes.parameters import APP_TZ, TEST_LIMITS, TEST_UPLOAD_LIMITS
 from fakes.queue import FakeQueue
 from fakes.subjects import InMemorySubjects
 from fakes.tutoring import InMemoryThreads
@@ -57,7 +57,9 @@ def api_services(
     documents = DocumentService(library.unit_of_work, max_attempts=3)
     conversations = ConversationService(threads, documents, clock)
     fields: dict[str, Any] = {
-        "uploads": UploadService(library.unit_of_work, objects, clock, TEST_LIMITS),
+        "uploads": UploadService(
+            library.unit_of_work, objects, clock, TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ
+        ),
         "documents": documents,
         "subjects": names,
         "retries": RetryService(library.unit_of_work, queue, max_attempts=3),
