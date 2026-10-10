@@ -12,7 +12,6 @@ from smart_tutor.tutoring.domain.document_used import DELETED_DOCUMENT, Document
 from smart_tutor.tutoring.domain.errors import (
     DocumentNotAvailableError,
     InvalidTitleError,
-    NoDocumentsError,
     NoListedDocumentsError,
     RetrievalError,
     ThreadArchivedError,
@@ -35,7 +34,6 @@ __all__ = [
     "DocumentNotAvailableError",
     "DocumentUsed",
     "InvalidTitleError",
-    "NoDocumentsError",
     "NoListedDocumentsError",
     "RetrievalError",
     "RetrievedChunk",

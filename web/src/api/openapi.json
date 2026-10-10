@@ -1934,9 +1934,6 @@
           "404": {
             "description": "A document that isn't the caller's ready one."
           },
-          "409": {
-            "description": "The learner has no ready documents."
-          },
           "422": {
             "content": {
               "application/json": {
@@ -2283,7 +2280,7 @@
             "description": "Not the caller's conversation."
           },
           "409": {
-            "description": "The conversation is archived, or the learner has no ready documents."
+            "description": "The conversation is archived."
           },
           "422": {
             "content": {

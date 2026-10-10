@@ -1106,10 +1106,6 @@ export type AskInNewThreadErrors = {
      */
     404: unknown;
     /**
-     * The learner has no ready documents.
-     */
-    409: unknown;
-    /**
      * Validation Error
      */
     422: HttpValidationError;
@@ -1324,7 +1320,7 @@ export type AskInThreadErrors = {
      */
     404: unknown;
     /**
-     * The conversation is archived, or the learner has no ready documents.
+     * The conversation is archived.
      */
     409: unknown;
     /**

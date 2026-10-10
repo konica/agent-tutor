@@ -3,10 +3,6 @@
 from smart_tutor.shared.domain.errors import DomainError
 
 
-class NoDocumentsError(DomainError):
-    """The learner has no ready documents to answer from (PRD §8 US-3)."""
-
-
 class DocumentNotAvailableError(DomainError):
     """The document isn't the learner's ready, non-archived document, so it can't join a conversation (US-4c)."""
 
