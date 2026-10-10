@@ -67,9 +67,10 @@
   border: 1px solid var(--border-strong); border-radius: var(--r-sm); background: var(--surface);
   font-family: inherit; font-size: var(--fs-12); color: var(--text); white-space: nowrap;
 }
-/* The chip is a button. The ::before widens the hit area to 24px without changing the 22px chip. */
+/* The chip is a button. The ::before widens the hit area to 24px without changing the 22px chip: it is offset from the
+   padding box (22px - 2 x 1px border = 20px), so -2px top and bottom make 24px. */
 button.source { position: relative; cursor: pointer; }
-button.source::before { content: ""; position: absolute; inset: -1px 0; }
+button.source::before { content: ""; position: absolute; inset: -2px 0; }
 button.source:hover { border-color: var(--accent); }
 button.source:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 /* The chip whose passage is open beside the conversation (DESIGN.md: --accent-soft marks the selected item). */
