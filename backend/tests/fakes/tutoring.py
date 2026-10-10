@@ -10,6 +10,7 @@ from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 from smart_tutor.tutoring.domain.thread import SearchScope, Thread
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
+from smart_tutor.tutoring.domain.turn import Turn
 from smart_tutor.tutoring.ports.retriever import Retriever
 from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
 
@@ -18,6 +19,7 @@ class InMemoryThreads(ThreadRepository):
     def __init__(self) -> None:
         self.threads: dict[str, Thread] = {}
         self.documents_used_rows: dict[str, list[ThreadDocument]] = {}
+        self.turn_rows: list[Turn] = []
 
     def add(self, thread: Thread) -> None:
         self.threads[thread.thread_id] = copy.deepcopy(thread)
@@ -60,6 +62,14 @@ class InMemoryThreads(ThreadRepository):
 
     def documents_used(self, thread_id: ThreadId) -> list[ThreadDocument]:
         return list(self.documents_used_rows.get(thread_id, []))
+
+    def add_turn(self, turn: Turn, document_ids: Sequence[DocumentId]) -> None:
+        self.turn_rows.append(turn)
+        if document_ids:
+            self.add_documents_used(turn.thread_id, document_ids, turn.created_at)
+
+    def turns(self, thread_id: ThreadId, user_id: UserId) -> list[Turn]:
+        return [t for t in self.turn_rows if t.thread_id == thread_id and t.user_id == user_id]
 
 
 class FakeRetriever(Retriever):

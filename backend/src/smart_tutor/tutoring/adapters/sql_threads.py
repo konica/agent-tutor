@@ -10,6 +10,7 @@ from sqlalchemy.dialects.postgresql import insert
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
+from smart_tutor.tutoring.domain.turn import Turn
 from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
 
 threads = Table(
@@ -148,3 +149,9 @@ class SqlThreadRepository(ThreadRepository):
             )
             for r in rows
         ]
+
+    def add_turn(self, turn: Turn, document_ids: Sequence[DocumentId]) -> None:
+        raise NotImplementedError("Task 2")
+
+    def turns(self, thread_id: ThreadId, user_id: UserId) -> list[Turn]:
+        raise NotImplementedError("Task 2")

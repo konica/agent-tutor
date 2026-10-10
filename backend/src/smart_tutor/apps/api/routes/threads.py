@@ -21,6 +21,7 @@ from smart_tutor.apps.api.deps import Agent, BearerToken, Conversations, Current
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.tutoring.application import (
+    AnsweredTurn,
     DocumentNotAvailableError,
     DocumentUsed,
     InvalidTitleError,
@@ -185,7 +186,12 @@ def _recorder(conversations: Conversations, user_id: UserId, thread_id: Callable
         if tid is None:
             return
         try:
-            await run_in_threadpool(conversations.record_answer, tid, user_id, [DocumentId(d) for d in document_ids])
+            await run_in_threadpool(
+                conversations.record_turn,
+                tid,
+                user_id,
+                AnsweredTurn("", document_ids=tuple(DocumentId(d) for d in document_ids)),
+            )
         except Exception:
             # The learner already has the answer: log it and still end the stream with `done`.
             logger.exception("recording the documents used failed")

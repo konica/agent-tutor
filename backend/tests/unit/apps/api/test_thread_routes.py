@@ -3,7 +3,7 @@ used on `done`; GET /threads/{id}/documents lists them."""
 
 import json
 import uuid
-from collections.abc import AsyncIterator, Callable, Sequence
+from collections.abc import AsyncIterator, Callable
 from typing import Any
 
 import httpx
@@ -24,7 +24,7 @@ from smart_tutor.knowledge.application import DocumentService
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.shared.domain.principal import Principal
-from smart_tutor.tutoring.application import ConversationService, Thread
+from smart_tutor.tutoring.application import AnsweredTurn, ConversationService, Thread
 from smart_tutor.tutoring.domain.thread import ThreadStatus
 
 AUTH = {"Authorization": "Bearer t-ada"}
@@ -432,7 +432,7 @@ def test_a_decline_records_nothing() -> None:
 
 
 class _FailingRecord(ConversationService):
-    def record_answer(self, thread_id: ThreadId, user_id: UserId, document_ids: Sequence[DocumentId]) -> None:
+    def record_turn(self, thread_id: ThreadId, user_id: UserId, turn: AnsweredTurn) -> None:
         raise RuntimeError("database down")
 
 
