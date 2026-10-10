@@ -1,6 +1,6 @@
 # Deploys native-cloud mode (PRD §9.12, #59): cdk deploy, the cluster add-ons, and the Helm release. Opt-in since #150:
 # deploy.yml calls it when started by hand with mode native-cloud, or on a push when the repository variable
-# NATIVE_CLOUD_AUTO_DEPLOY is `true`; rollback.yml calls it with infrastructure false. deploy.yml builds the images first.
+# NATIVE_CLOUD_AUTO_DEPLOY is `true`; rollback.yml calls it with infrastructure false. deploy.yml builds its images into `smart-tutor/*` first.
 # Signs in with the native-cloud deploy role (#55), which trusts only jobs in the `native-cloud` environment.
 name: deploy-native-cloud
 
@@ -28,6 +28,7 @@ jobs:
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
       IMAGE_TAG: ${{ inputs.image_tag }}
+      REPOSITORY_PREFIX: smart-tutor  # its own ECR repositories (#206)
       JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION: "1"
     steps:
       # Reject a malformed tag before checking out or signing in.
@@ -59,8 +60,8 @@ jobs:
       - name: Check the images exist
         run: |
           for repo in api web keycloak agent mcp worker; do
-            aws ecr describe-images --repository-name "smart-tutor/$repo" --image-ids imageTag="$IMAGE_TAG" > /dev/null \
-              || { echo "::error::smart-tutor/$repo:$IMAGE_TAG is not in ECR (it keeps the last 30 images)"; exit 1; }
+            aws ecr describe-images --repository-name "$REPOSITORY_PREFIX/$repo" --image-ids imageTag="$IMAGE_TAG" > /dev/null \
+              || { echo "::error::$REPOSITORY_PREFIX/$repo:$IMAGE_TAG is not in ECR (it keeps the last 30 images; only commits deployed to native-cloud have images here)"; exit 1; }
           done
 
       - name: Deploy the infrastructure (CDK)

@@ -7,6 +7,7 @@ from typing import Any
 import yaml
 
 from smart_tutor_infra.app_stacks import ON_PREMISE_GITHUB_ENVIRONMENT
+from smart_tutor_infra.names import MODES, NATIVE_CLOUD, ON_PREMISE, mode_names
 from tests.test_synth import CDK_CONTEXT
 
 WORKFLOWS = Path(__file__).parents[2] / ".github/workflows"
@@ -103,7 +104,7 @@ def test_only_main_and_rollback_reach_the_deploy_environments() -> None:
                 assert job["permissions"] == {"contents": "read", "id-token": "write"}, (name, job_name)
             else:
                 assert job["permissions"] == {"contents": "read"}, (name, job_name)
-    assert callers == 5  # deploy: images, on-premise, native-cloud; rollback: on-premise, native-cloud
+    assert callers == 6  # deploy: images per mode, on-premise, native-cloud; rollback: on-premise, native-cloud
     # Only the environment workflows name a deploy role (openwiki-update.yml has its own Bedrock-only role).
     for path in WORKFLOWS.glob("*.yml"):
         if path.name not in ENVIRONMENT_WORKFLOWS:
@@ -163,29 +164,31 @@ def test_deployments_of_one_mode_queue_and_never_cancel() -> None:
 # --- deploy.yml: what a push and a manual run deploy ---------------------------------------------------------
 
 
-def test_a_push_checks_builds_then_deploys_on_premise() -> None:
+ON_PREMISE_IF = "github.event_name == 'push' || inputs.mode == 'on-premise'"
+NATIVE_CLOUD_IF = (
+    "(github.event_name == 'push' && vars.NATIVE_CLOUD_AUTO_DEPLOY == 'true') || inputs.mode == 'native-cloud'"
+)
+
+
+def test_each_mode_gets_its_images_built_with_its_own_role_before_it_deploys() -> None:
     jobs = workflow("deploy.yml")["jobs"]
     assert jobs["checks"]["uses"] == "./.github/workflows/ci.yml"
-    assert jobs["images"]["needs"] == "checks"
-    assert jobs["images"]["uses"] == "./.github/workflows/build-images.yml"
-    # a push builds with the on-premise role; a manual run with the role of the mode it deploys
-    assert jobs["images"]["with"] == {"image_tag": "${{ github.sha }}", "environment": "${{ inputs.mode || 'on-premise' }}"}
-    on_premise = jobs["on-premise"]
-    assert on_premise["needs"] == "images"
-    assert on_premise["uses"] == "./.github/workflows/deploy-on-premise.yml"
-    assert on_premise["with"] == {"image_tag": "${{ github.sha }}", "infrastructure": True}
-    assert on_premise["if"] == "github.event_name == 'push' || inputs.mode == 'on-premise'"
-
-
-def test_native_cloud_deploys_only_when_chosen() -> None:
-    native_cloud = workflow("deploy.yml")["jobs"]["native-cloud"]
-    assert native_cloud["needs"] == "images"
-    assert native_cloud["uses"] == "./.github/workflows/deploy-native-cloud.yml"
-    assert native_cloud["with"] == {"image_tag": "${{ github.sha }}", "infrastructure": True}
-    # Unset or anything but `true` keeps it off (#150 made it opt-in; it used to be opt-out).
-    assert native_cloud["if"] == (
-        "(github.event_name == 'push' && vars.NATIVE_CLOUD_AUTO_DEPLOY == 'true') || inputs.mode == 'native-cloud'"
-    )
+    for mode, condition, deploy_workflow in (
+        ("on-premise", ON_PREMISE_IF, "deploy-on-premise.yml"),
+        ("native-cloud", NATIVE_CLOUD_IF, "deploy-native-cloud.yml"),
+    ):
+        images = jobs[f"images-{mode}"]
+        assert images["needs"] == "checks"
+        assert images["uses"] == "./.github/workflows/build-images.yml"
+        assert images["with"] == {"image_tag": "${{ github.sha }}", "environment": mode}
+        # built exactly when the mode deploys, so its repositories have the images it checks for
+        assert images["if"] == condition
+        deploy = jobs[mode]
+        assert deploy["needs"] == f"images-{mode}"
+        assert deploy["if"] == condition
+        assert deploy["uses"] == f"./.github/workflows/{deploy_workflow}"
+        assert deploy["with"] == {"image_tag": "${{ github.sha }}", "infrastructure": True}
+    assert "images" not in jobs
 
 
 def test_rollback_redeploys_the_chosen_mode_without_infrastructure() -> None:
@@ -201,20 +204,50 @@ def test_rollback_redeploys_the_chosen_mode_without_infrastructure() -> None:
 # --- build-images.yml ------------------------------------------------------------------------------------------
 
 
-def test_images_are_built_for_the_commit_and_pushed() -> None:
+def test_images_are_built_for_the_commit_and_pushed_to_the_modes_repositories() -> None:
     job = images_job()
     text = steps_text(job)
     checkout = next(s for s in job["steps"] if "actions/checkout" in str(s.get("uses")))
     assert checkout["with"]["ref"] == "${{ inputs.image_tag }}"
     for image in IMAGES:
-        assert f'"$REGISTRY/smart-tutor/{image}:$IMAGE_TAG"' in text, image
+        assert f'"$REGISTRY/$REPOSITORY_PREFIX/{image}:$IMAGE_TAG"' in text, image
+    assert "/smart-tutor/" not in text  # no repository is written out; the mode names them
     for target in ("api", "agent", "mcp", "worker"):
         assert f"--target {target}" in text
     assert "VITE_API_URL=/api" in text and "VITE_KEYCLOAK_URL=/auth" in text
     assert "docker push" in text
-    # The shared registry is the account's, in the role's region (both modes push to it).
     assert "aws sts get-caller-identity --query Account" in text
     assert index_of(job, "docker build") < index_of(job, "docker push")
+
+
+def test_build_maps_each_mode_to_its_stacks_and_repositories() -> None:
+    job = images_job()
+    assert job["env"]["MODE"] == "${{ inputs.environment }}"
+    run = step(job, "Name the mode's stacks and repositories")["run"]
+    pattern = r"^\s*([\w-]+)\) stack_prefix=(\S+) repository_prefix=(\S+) ;;$"
+    arms = {m: (s, r) for m, s, r in re.findall(pattern, run, re.MULTILINE)}
+    assert arms == {m: (mode_names(m).stack_prefix, mode_names(m).repository_prefix) for m in MODES}
+    # an unknown mode fails instead of falling back to one mode's repositories
+    assert re.search(r"^\s*\*\) .*::error::.*exit 1", run, re.MULTILINE)
+    assert index_of(job, "stack_prefix=") < index_of(job, "describe-images")
+
+
+def test_build_creates_the_modes_registry_and_push_permission_before_pushing() -> None:
+    # The first merge after #206 builds with a role that can't push to smart-tutor-on-premise/* yet, into repositories
+    # that don't exist yet: the build deploys both stacks first (a no-op once they are current).
+    job = images_job()
+    cdk = step(job, "Deploy the deploy role and the registry (CDK)")
+    assert cdk["if"] == "steps.existing.outputs.all != 'true'"
+    assert cdk["working-directory"] == "infra"
+    assert "uv sync --frozen" in cdk["run"]
+    assert (
+        'npx --yes aws-cdk@2.1145.0 deploy --exclusively "$STACK_PREFIX-GitHubDeploy" "$STACK_PREFIX-Registry"'
+        ' --require-approval never -c smart-tutor:mode="$MODE"'
+    ) in cdk["run"]
+    assert index_of(job, "describe-images") < job["steps"].index(cdk) < index_of(job, "docker login")
+    assert job["env"]["JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION"] == "1"
+    assert any("setup-node" in str(s.get("uses")) for s in job["steps"])
+    assert any("setup-uv" in str(s.get("uses")) for s in job["steps"])
 
 
 def test_images_are_built_only_when_missing() -> None:
@@ -229,6 +262,20 @@ def test_images_are_built_only_when_missing() -> None:
         if "docker build" in run or "docker push" in run or "docker login" in run:
             assert s["if"] == "steps.existing.outputs.all != 'true'", s.get("name")
     assert index_of(job, "describe-images") < index_of(job, "docker build")
+
+
+def test_deploys_check_their_own_modes_repositories() -> None:
+    for job, mode in ((on_premise_job(), ON_PREMISE), (native_cloud_job(), NATIVE_CLOUD)):
+        assert job["env"]["REPOSITORY_PREFIX"] == mode_names(mode).repository_prefix, mode
+        check = step(job, "Check the images exist")["run"]
+        assert '--repository-name "$REPOSITORY_PREFIX/$repo"' in check, mode
+        assert "smart-tutor/$repo" not in check, mode
+
+
+def test_on_premise_explains_a_rollback_to_a_commit_from_before_its_own_registry() -> None:
+    check = step(on_premise_job(), "Check the images exist")["run"]
+    # images of commits merged before #206 are only in native-cloud's smart-tutor/*; the check never pulls them
+    assert "before #206" in check and "on-premise-deploy.md" in check
 
 
 # --- deploy-on-premise.yml -------------------------------------------------------------------------------------

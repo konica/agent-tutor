@@ -1,4 +1,5 @@
-# Every push to main: the CI checks, the images, then the on-premise deploy (PRD §9.12, ADR 0012, #150).
+# Every push to main: the CI checks, then per deployed mode its images (built into that mode's own repositories, #206)
+# and its deploy. On-premise deploys on every push (PRD §9.12, ADR 0012, #150).
 # Native-cloud is opt-in: run this workflow by hand with mode native-cloud, or set the repository variable
 # NATIVE_CLOUD_AUTO_DEPLOY to `true` to deploy it on every push as well (unset or anything else keeps it off).
 # Runbooks: docs/runbooks/on-premise-deploy.md, docs/runbooks/pilot-deploy.md (native-cloud).
@@ -21,19 +22,32 @@ jobs:
       contents: read
     uses: ./.github/workflows/ci.yml
 
-  images:
+  # Each mode's images go to its own repositories with its own deploy role (#206), so a push that deploys both modes
+  # builds twice.
+  images-on-premise:
     needs: checks
+    if: github.event_name == 'push' || inputs.mode == 'on-premise'
     permissions:
       contents: read
-      id-token: write  # OIDC sign-in to AWS, used only inside the deploy environment
+      id-token: write  # OIDC sign-in to AWS, used only inside the `on-premise` environment
     uses: ./.github/workflows/build-images.yml
     with:
       image_tag: ${{ github.sha }}
-      # A push builds with the on-premise role; a manual run with the role of the mode it deploys.
-      environment: ${{ inputs.mode || 'on-premise' }}
+      environment: on-premise
+
+  images-native-cloud:
+    needs: checks
+    if: (github.event_name == 'push' && vars.NATIVE_CLOUD_AUTO_DEPLOY == 'true') || inputs.mode == 'native-cloud'
+    permissions:
+      contents: read
+      id-token: write  # OIDC sign-in to AWS, used only inside the `native-cloud` environment
+    uses: ./.github/workflows/build-images.yml
+    with:
+      image_tag: ${{ github.sha }}
+      environment: native-cloud
 
   on-premise:
-    needs: images
+    needs: images-on-premise
     if: github.event_name == 'push' || inputs.mode == 'on-premise'
     permissions:
       contents: read
@@ -44,7 +58,7 @@ jobs:
       infrastructure: true
 
   native-cloud:
-    needs: images
+    needs: images-native-cloud
     if: (github.event_name == 'push' && vars.NATIVE_CLOUD_AUTO_DEPLOY == 'true') || inputs.mode == 'native-cloud'
     permissions:
       contents: read

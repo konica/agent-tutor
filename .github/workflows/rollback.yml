@@ -1,5 +1,6 @@
 # Redeploys an earlier commit's images, without CDK or a build (#59, #150). Runbooks: docs/runbooks/on-premise-deploy.md
 # (on-premise keeps the deploy files of the last cdk deploy), docs/runbooks/pilot-deploy.md (native-cloud).
+# Each mode checks for the images in its own repositories (#206).
 # The deploy environments only accept runs from main: start it from main with the SHA to go back to.
 name: rollback
 
@@ -12,7 +13,7 @@ on:
         options: [on-premise, native-cloud]
         default: on-premise
       image_tag:
-        description: Full commit SHA of an earlier deploy (its images must still be in ECR)
+        description: Full commit SHA of an earlier deploy of this mode (its images must still be in the mode's ECR repositories)
         type: string
         required: true
 
