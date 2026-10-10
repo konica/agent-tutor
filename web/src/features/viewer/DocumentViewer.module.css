@@ -32,8 +32,23 @@
 
 .canvasArea { position: relative; flex: 1; min-height: 0; overflow: auto; background: var(--surface-3); }
 /* The PDF page stays white in both themes, like paper. */
-.page { width: fit-content; margin: var(--sp-4) auto; background: #fff; box-shadow: var(--shadow-sm); }
+.page { position: relative; width: fit-content; margin: var(--sp-4) auto; background: #fff; box-shadow: var(--shadow-sm); }
 .page canvas { display: block; }
+
+/* The cited passage over the page: a fill per line, a marker beside them, a label above (fixed colors: the page is white). */
+.hlBox { position: absolute; background: var(--cite-fill); border-radius: 2px; pointer-events: none; }
+.hlMarker { position: absolute; width: 2px; background: var(--cite-mark); border-radius: 1px; pointer-events: none; }
+.hlLabel {
+  position: absolute; transform: translateY(-100%); padding: 0 var(--sp-1); border-radius: var(--r-sm); pointer-events: none;
+  background: var(--cite-mark); color: var(--cite-on-mark); font-size: var(--fs-12); font-weight: 600; line-height: 1.5; white-space: nowrap;
+}
+
+/* The passage wasn't found on its page: a pill above the page. */
+.note {
+  display: flex; align-items: center; gap: var(--sp-2); width: fit-content; margin: var(--sp-4) auto 0; padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--border); border-radius: var(--r-pill); background: var(--surface); color: var(--text); font-size: var(--fs-13);
+}
+.noteIcon { width: 16px; height: 16px; flex: none; color: var(--text-2); }
 
 .skeleton {
   display: flex; flex-direction: column; gap: var(--sp-3);

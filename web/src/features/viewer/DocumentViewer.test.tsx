@@ -4,9 +4,11 @@ import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { DocumentNotFoundError, DocumentNotOpenableError, type DocumentResponse } from "../../api/documents";
-import { DocumentViewer } from "./DocumentViewer";
+import type { ChunkPassage } from "../../api/chunks";
+import { DocumentViewer, type Passage } from "./DocumentViewer";
+import type { TextItem } from "./passage";
 import type { PdfDoc } from "./pdf";
-import { fakeDocument, fakeFile, fakePdf } from "./testFakes";
+import { fakeDocument, fakeFile, fakePdf, fakeViewerDeps } from "./testFakes";
 
 const doc = fakeDocument;
 const file = fakeFile;
@@ -274,5 +276,166 @@ describe("DocumentViewer", () => {
     await ready();
     expect(screen.queryByRole("button", { name: /download/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /download/i })).not.toBeInTheDocument();
+  });
+});
+
+// Page items: the first chunk's text on one line at y 300, the second chunk's at y 400.
+const CITED: TextItem = { str: "Cited text here.", hasEOL: true, x: 50, y: 300, width: 200, height: 12 };
+const SECOND: TextItem = { str: "Second passage.", hasEOL: true, x: 60, y: 400, width: 150, height: 12 };
+const OTHER: TextItem = { str: "Something else entirely.", hasEOL: true, x: 50, y: 100, width: 220, height: 12 };
+
+const chunk = (id: string, page: number, text: string): ChunkPassage => ({ chunkId: id, documentId: "d1", page, startIndex: 0, text });
+
+function renderCited(items: TextItem[], props: Partial<Props> = {}) {
+  const deps = fakeViewerDeps();
+  deps.loadPdfDoc.mockImplementation(async () => fakePdf(3, items));
+  const passage: Passage = { chunkId: "c1", page: 2 };
+  const all: Props = { documentId: "d1", mode: "pane", onClose: vi.fn(), ...deps, passage, ...props };
+  const view = render(<DocumentViewer {...all} />);
+  return { ...view, ...deps, ...all, props: all };
+}
+
+const status = () => document.querySelector("[aria-live=polite]")!;
+const boxes = () => screen.queryAllByTestId("passage-box");
+
+describe("DocumentViewer citation highlight", () => {
+  it("a citation opens its page with the passage highlighted", async () => {
+    const { recordMiss, loadChunk } = renderCited([OTHER, CITED]);
+    expect(await screen.findByText("p. 2 / 3")).toBeInTheDocument();
+    expect(await screen.findByTestId("passage-box")).toBeInTheDocument();
+    expect(loadChunk).toHaveBeenCalledWith("c1");
+    expect(screen.getByText("Cited passage")).toBeInTheDocument();
+    expect(screen.getByText("Cited passage begins. Cited text here. Cited passage ends.")).toBeInTheDocument();
+    await waitFor(() => expect(status()).toHaveTextContent("Opened page 2 of 3. Cited passage highlighted."));
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    expect(recordMiss).not.toHaveBeenCalled();
+  });
+
+  it("draws the boxes and the label out of the accessibility tree", async () => {
+    renderCited([CITED]);
+    const box = await screen.findByTestId("passage-box");
+    expect(box.closest("[aria-hidden=true]")).not.toBeNull();
+    expect(screen.getByText("Cited passage").closest("[aria-hidden=true]")).not.toBeNull();
+    expect(screen.getByText(/Cited passage begins\./).closest("[aria-hidden=true]")).toBeNull();
+    expect(box.style.left).toBe("50px");
+    expect(box.style.top).toBe("300px");
+    expect(box.style.height).toBe("12px");
+  });
+
+  it("no match shows the page with the note", async () => {
+    const { recordMiss, rerender, props } = renderCited([OTHER]);
+    const note = await screen.findByRole("note");
+    expect(note).toHaveTextContent("Couldn't highlight the passage on this page.");
+    expect(screen.getByText("p. 2 / 3")).toBeInTheDocument();
+    expect(boxes()).toHaveLength(0);
+    await waitFor(() => expect(status()).toHaveTextContent("Opened page 2 of 3. Couldn't highlight the passage on this page."));
+    expect(recordMiss).toHaveBeenCalledTimes(1);
+    rerender(<DocumentViewer {...props} />);
+    await act(async () => {});
+    expect(recordMiss).toHaveBeenCalledTimes(1);
+  });
+
+  it("a failed chunk request shows the page without highlight", async () => {
+    const loadChunk = vi.fn().mockRejectedValue(new Error("offline"));
+    const { recordMiss } = renderCited([CITED], { loadChunk });
+    expect(await screen.findByRole("note")).toHaveTextContent("Couldn't highlight the passage on this page.");
+    expect(screen.getByText("p. 2 / 3")).toBeInTheDocument();
+    expect(boxes()).toHaveLength(0);
+    expect(recordMiss).toHaveBeenCalledTimes(1);
+  });
+
+  it("a second chip of the same document moves the highlight", async () => {
+    const loadChunk = vi.fn(async (id: string) => (id === "c2" ? chunk("c2", 3, "Second passage.") : chunk("c1", 2, "Cited text here.")));
+    const { rerender, props, loadPdfDoc } = renderCited([CITED, SECOND], { loadChunk });
+    const first = await screen.findByTestId("passage-box");
+    expect(first.style.top).toBe("300px");
+    rerender(<DocumentViewer {...props} passage={{ chunkId: "c2", page: 3 }} />);
+    expect(screen.getByText("p. 3 / 3")).toBeInTheDocument();
+    expect(boxes()).toHaveLength(0);
+    await waitFor(() => expect(boxes()).toHaveLength(1));
+    expect(boxes()[0]!.style.top).toBe("400px");
+    await waitFor(() => expect(status()).toHaveTextContent("Opened page 3 of 3. Cited passage highlighted."));
+    expect(loadPdfDoc).toHaveBeenCalledTimes(1);
+  });
+
+  it("a late chunk of a swapped-out passage is ignored", async () => {
+    let resolveFirst!: (c: ChunkPassage) => void;
+    const loadChunk = vi.fn((id: string) =>
+      id === "c1" ? new Promise<ChunkPassage>((r) => (resolveFirst = r)) : Promise.resolve(chunk("c2", 2, "Not on the page.")),
+    );
+    const { rerender, props } = renderCited([CITED], { loadChunk });
+    await screen.findByText("p. 2 / 3");
+    rerender(<DocumentViewer {...props} passage={{ chunkId: "c2", page: 2 }} />);
+    expect(await screen.findByRole("note")).toBeInTheDocument();
+    await act(async () => resolveFirst(chunk("c1", 2, "Cited text here.")));
+    expect(boxes()).toHaveLength(0);
+    expect(screen.getByRole("note")).toBeInTheDocument();
+  });
+
+  it("the highlight follows zoom", async () => {
+    renderCited([CITED]);
+    const box = await screen.findByTestId("passage-box");
+    expect(box.style.width).toBe("200px");
+    await userEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    expect(screen.getByText("125%")).toBeInTheDocument();
+    expect(screen.getByTestId("passage-box").style.width).toBe("250px");
+    expect(screen.getByTestId("passage-box").style.top).toBe("375px");
+  });
+
+  it("the highlight shows only on its page", async () => {
+    const { container, recordMiss } = renderCited([CITED]);
+    await screen.findByTestId("passage-box");
+    const area = container.querySelector<HTMLElement>(".canvasArea")!;
+    area.scrollTop = 10; // the learner scrolls away
+    const title = screen.getByRole("heading", { level: 2 });
+    fireEvent.keyDown(title, { key: "PageDown" });
+    expect(screen.getByText("p. 3 / 3")).toBeInTheDocument();
+    expect(boxes()).toHaveLength(0);
+    expect(screen.queryByText(/Cited passage begins/)).not.toBeInTheDocument();
+    await waitFor(() => expect(status()).toHaveTextContent(/^Page 3 of 3$/));
+    fireEvent.keyDown(title, { key: "PageUp" });
+    expect(await screen.findByTestId("passage-box")).toBeInTheDocument();
+    await waitFor(() => expect(status()).toHaveTextContent(/^Page 2 of 3$/));
+    expect(area.scrollTop).toBe(10); // scrolled once per passage, not on every return
+    expect(recordMiss).not.toHaveBeenCalled();
+  });
+
+  it("scrolls the passage to a third from the top", async () => {
+    const clientHeight = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(600);
+    const offsetTop = vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockReturnValue(40);
+    try {
+      const { container } = renderCited([CITED]);
+      await screen.findByTestId("passage-box");
+      const area = container.querySelector<HTMLElement>(".canvasArea")!;
+      await waitFor(() => expect(area.scrollTop).toBe(40 + 300 * 1 - 600 / 3));
+    } finally {
+      clientHeight.mockRestore();
+      offsetTop.mockRestore();
+    }
+  });
+
+  it("does not scroll above the top", async () => {
+    const clientHeight = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(1200);
+    try {
+      const { container } = renderCited([CITED]);
+      await screen.findByTestId("passage-box");
+      expect(container.querySelector<HTMLElement>(".canvasArea")!.scrollTop).toBe(0);
+    } finally {
+      clientHeight.mockRestore();
+    }
+  });
+
+  it("an explicit initialPage wins over the passage's page", async () => {
+    renderCited([CITED], { initialPage: 3 });
+    expect(await screen.findByText("p. 3 / 3")).toBeInTheDocument();
+    await waitFor(() => expect(status()).toHaveTextContent(/^Page 3 of 3$/));
+    expect(boxes()).toHaveLength(0);
+  });
+
+  it("without a passage, asks for no chunk and announces the page", async () => {
+    const { loadChunk } = renderCited([CITED], { passage: undefined });
+    expect(await screen.findByText("Page 1 of 3")).toBeInTheDocument();
+    expect(loadChunk).not.toHaveBeenCalled();
+    expect(boxes()).toHaveLength(0);
   });
 });
