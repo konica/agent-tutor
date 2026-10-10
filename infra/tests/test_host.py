@@ -206,6 +206,7 @@ def test_data_volume_is_snapshotted_daily_and_snapshots_are_kept_7_days(t: Templ
     (policy,) = t.find_resources("AWS::DLM::LifecyclePolicy").values()
     props = policy["Properties"]
     assert props["State"] == "ENABLED"
+    assert re.fullmatch(r"[0-9A-Za-z _-]{0,500}", props["Description"])  # DLM rejects anything else at deploy time
     details = props["PolicyDetails"]
     assert details["ResourceTypes"] == ["VOLUME"]
     assert details["TargetTags"] == [{"Key": "smart-tutor:snapshots", "Value": "smart-tutor-on-premise-prod"}]
