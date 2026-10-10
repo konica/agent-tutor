@@ -3,8 +3,9 @@
 - Network: a VPC of its own with one public subnet, no NAT, and an S3 gateway endpoint. The security group admits only
   TCP 80 and 443; there is no SSH and no key pair (operators use SSM Session Manager).
 - Instance: Amazon Linux 2023, IMDSv2 with a hop limit of 2 so containers get the instance profile's credentials, and an
-  Elastic IP. The address is `<eip>.sslip.io` unless the context `smart-tutor:on-premise-domain` names one (output
-  `PublicUrl`); StorageStack's CORS allows it without referencing this stack.
+  Elastic IP. The address is the context `smart-tutor:on-premise-domain` (the DuckDNS name, #154), or `<eip>.sslip.io`
+  when it is empty (output `PublicUrl`); StorageStack's CORS allows it without referencing this stack. deploy.sh points
+  a DuckDNS name at the Elastic IP with the token the operator stores in Secrets Manager.
 - Services (#149): the API, worker, agent, and MCP server reach S3, SQS, SSM, and Bedrock with the instance profile,
   which grants what native-cloud's per-service roles grant (ServicePermissions), as one role. The ARNs come from
   ModeNames, so the Host never references StorageStack.
