@@ -3,15 +3,19 @@
 - Network: a VPC of its own with one public subnet, no NAT, and an S3 gateway endpoint. The security group admits only
   TCP 80 and 443; there is no SSH and no key pair (operators use SSM Session Manager).
 - Instance: Amazon Linux 2023, IMDSv2 with a hop limit of 2 so containers get the instance profile's credentials, and an
-  Elastic IP. The address is `<eip>.sslip.io` unless the context `smart-tutor:on-premise-domain` names one.
+  Elastic IP. The address is `<eip>.sslip.io` unless the context `smart-tutor:on-premise-domain` names one (output
+  `PublicUrl`); StorageStack's CORS allows it without referencing this stack.
+- Services (#149): the API, worker, agent, and MCP server reach S3, SQS, SSM, and Bedrock with the instance profile,
+  which grants what native-cloud's per-service roles grant (ServicePermissions), as one role. The ARNs come from
+  ModeNames, so the Host never references StorageStack.
 - Data: a separate encrypted gp3 volume mounted at /data (Postgres and Caddy's certificates). It is not part of the
   instance: at first boot the instance attaches it by id, waiting until a replaced instance has let go of it, so the
   data survives replacing the instance. Deleting the stack keeps a snapshot.
 - Backups (#151): Data Lifecycle Manager snapshots the data volume daily and keeps 7 days; a systemd timer on the VM
-  dumps both databases nightly to the documents bucket's `backups/` (the only prefix the instance may write). A failed
-  snapshot or dump raises an alarm that emails the alert addresses. A volume restored from a snapshot is the context
-  `smart-tutor:on-premise-data-snapshot-id`; it replaces the instance, whose first boot attaches it. Runbook:
-  docs/runbooks/on-premise-backups.md.
+  dumps both databases nightly to the documents bucket's `backups/` (the instance writes only there and where the
+  services do, `uploads/` and `contents/`). A failed snapshot or dump raises an alarm that emails the alert addresses.
+  A volume restored from a snapshot is the context `smart-tutor:on-premise-data-snapshot-id`; it replaces the
+  instance, whose first boot attaches it. Runbook: docs/runbooks/on-premise-backups.md.
 - Deploy: `cdk deploy` uploads `deploy/` as an asset; the SSM document `<prefix>-deploy` downloads it and runs
   `deploy/on-premise/deploy.sh <image tag>`, which renders settings and secrets into a root-only env file on the VM.
   No secret is in the template, the outputs, or the user data.
@@ -46,6 +50,7 @@ from aws_cdk import aws_ssm as ssm
 from constructs import Construct
 
 from smart_tutor_infra.names import ModeNames
+from smart_tutor_infra.service_permissions import ServicePermissions
 from smart_tutor_infra.stacks.config import APP_TIME_ZONE
 from smart_tutor_infra.stacks.registry import SERVICES
 from smart_tutor_infra.stacks.storage import BACKUPS_PREFIX
@@ -148,7 +153,8 @@ class HostStack(cdk.Stack):
             self,
             "InstanceRole",
             assumed_by=iam.ServicePrincipal("ec2.amazonaws.com"),
-            description="Smart Tutor on-premise host: pull images, read its settings and secrets, managed by SSM",
+            description="Smart Tutor on-premise host: run the app services, pull images, read its settings and secrets,"
+            " managed by SSM",
             managed_policies=[iam.ManagedPolicy.from_aws_managed_policy_name("AmazonSSMManagedInstanceCore")],
         )
         role.add_to_policy(iam.PolicyStatement(sid="EcrLogin", actions=["ecr:GetAuthorizationToken"], resources=["*"]))
@@ -197,7 +203,16 @@ class HostStack(cdk.Stack):
             )
         )
         bundle.grant_read(role)
-        # The nightly pg_dump (deploy/on-premise/backup.sh) is the only S3 write; restore.sh reads the dumps back.
+        # Every service runs on this VM with the instance profile's credentials (#149), so the role holds what
+        # native-cloud gives the API, worker, agent, and MCP server one role each; a statement two share is added once.
+        permissions = ServicePermissions(self, names)
+        added: list[iam.PolicyStatement] = []
+        for statement in (*permissions.api(), *permissions.worker(), *permissions.agent(), *permissions.mcp()):
+            if not any(statement is seen for seen in added):
+                added.append(statement)
+                role.add_to_policy(statement)
+        # The nightly pg_dump (deploy/on-premise/backup.sh) writes only under backups/, apart from the services' writes
+        # above; restore.sh reads the dumps back.
         documents_bucket = names.documents_bucket(self.account)
         backups = f"arn:{self.partition}:s3:::{documents_bucket}/{BACKUPS_PREFIX}*"
         role.add_to_policy(
@@ -260,6 +275,7 @@ class HostStack(cdk.Stack):
             self, "AddressAssociation", allocation_id=address.attr_allocation_id, instance_id=instance.instance_id
         )
         domain = domain or cdk.Fn.join("", [address.attr_public_ip, ".sslip.io"])
+        public_url = f"https://{domain}"
 
         # Database and test-learner secrets (Keycloak's are in ConfigStack). deploy.sh resets the database passwords to
         # these values on every deploy, so a restored volume or a rotated secret gets back in sync.
@@ -339,7 +355,7 @@ class HostStack(cdk.Stack):
 
         cdk.CfnOutput(self, "InstanceId", value=instance.instance_id)
         cdk.CfnOutput(self, "PublicIp", value=address.attr_public_ip)
-        cdk.CfnOutput(self, "PublicUrl", value=f"https://{domain}")
+        cdk.CfnOutput(self, "PublicUrl", value=public_url)
         cdk.CfnOutput(self, "DataVolumeId", value=volume.volume_id)
         cdk.CfnOutput(self, "DeployDocumentName", value=document.ref)
 

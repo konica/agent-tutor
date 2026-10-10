@@ -57,6 +57,14 @@ def test_a_new_file_is_stored_under_its_owner_and_the_upload_copy_removed() -> N
     assert (upload.size, upload.outcome, upload.document_id) == (len(PDF), UploadOutcome.STORED, a.document_id)
 
 
+def test_each_chunk_keeps_its_offset_in_its_pages_text() -> None:
+    w = World()
+    a = w.upload("ada", b"%PDF-1.7 " + b"x" * 250)
+    w.ingestion.ingest_upload(a.fields["key"])
+    [content] = w.library.state.contents.values()
+    assert [(c.page, c.start_index) for c in w.library.state.chunks[content.content_id]] == [(1, 0), (1, 100), (1, 200)]
+
+
 def test_another_learners_identical_file_is_their_own_content() -> None:
     w = World()
     a, b = w.upload("ada"), w.upload("bob")

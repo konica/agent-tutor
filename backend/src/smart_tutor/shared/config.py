@@ -5,7 +5,7 @@ Secrets come from Secrets Manager (via External Secrets) in prod.
 
 from typing import Any
 
-from pydantic import BaseModel, SecretStr
+from pydantic import BaseModel, PositiveInt, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -71,6 +71,8 @@ class Settings(BaseSettings):
     # File limits (PRD §11), read once at startup by the API (presigned POST, GET /uploads/limits) and the worker.
     max_upload_mb_param: str = "/smart-tutor/max-upload-mb"
     max_pages_param: str = "/smart-tutor/max-pages"
+    # Seconds the worker lets the PDF parser run per extraction before the document fails (PRD §9.5, worker isolation).
+    extraction_timeout_seconds: PositiveInt = 300
     # Processing attempts per content (PRD §9.5), read once at startup by the API.
     max_processing_attempts_param: str = "/smart-tutor/max-processing-attempts"
     # Upload rate limits and daily caps per learner (PRD §11): a rolling hour and a day in app-time-zone, read once at

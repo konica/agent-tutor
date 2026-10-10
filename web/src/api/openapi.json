@@ -75,6 +75,53 @@
         "title": "ChooseSubjectsRequest",
         "type": "object"
       },
+      "ChunkResponse": {
+        "properties": {
+          "chunk_id": {
+            "title": "Chunk Id",
+            "type": "string"
+          },
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          },
+          "start_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Index"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "chunk_id",
+          "document_id",
+          "page",
+          "start_index",
+          "text"
+        ],
+        "title": "ChunkResponse",
+        "type": "object"
+      },
       "DocumentDetailsResponse": {
         "properties": {
           "archived": {
@@ -968,6 +1015,58 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/chunks/{chunk_id}": {
+      "get": {
+        "description": "A cited passage for the viewer's highlight (PRD \u00a78 US-4b, \u00a79.3 step 5), through a readable document only.",
+        "operationId": "get_chunk",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chunk_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Chunk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChunkResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not the caller's chunk."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Chunk",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
     "/documents": {
       "get": {
         "description": "The caller's documents, newest first, narrowed by any subset of the filters (PRD \u00a78 US-10).\n\n`subject_id` and `state` repeat; a document matches when it has any of the subjects and is in any of the states.\n`uploaded_from` and `uploaded_to` are inclusive calendar days in the app time zone (D27). The filters combine.\nActive documents by default; `archived=true` lists the archived ones.",
@@ -2253,6 +2352,26 @@
         "summary": "Get Upload",
         "tags": [
           "knowledge"
+        ]
+      }
+    },
+    "/viewer/highlight-misses": {
+      "post": {
+        "description": "Add one to today's count. Takes no body and stores nothing about the caller: the route needs a signed-in\nlearner only to keep the endpoint from being open to the internet.",
+        "operationId": "record_highlight_miss",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Record Highlight Miss",
+        "tags": [
+          "insights"
         ]
       }
     }

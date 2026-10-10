@@ -65,6 +65,17 @@ def test_chunks_break_at_sentence_ends_when_there_are_no_newlines() -> None:
     assert all(c.page_content.removeprefix(". ").startswith("Sentence number") for c in chunks)
 
 
+def test_each_chunk_knows_its_offset_in_the_cleaned_page_text() -> None:
+    chunker, _ = build_chunker(ChunkingConfig())
+    raw = " ".join(f"ﬁeld{i} exam-\nple." for i in range(300))
+    chunks = chunker.transform_documents([Document(page_content=raw, metadata={"page": 2})])
+    cleaned = clean_page_text(raw)
+    assert len(chunks) > 1
+    for c in chunks:
+        start = c.metadata["start_index"]
+        assert cleaned[start : start + len(c.page_content)] == c.page_content
+
+
 def test_unknown_method_raises() -> None:
     with pytest.raises(ValueError, match="semantic"):
         build_chunker(ChunkingConfig(method="semantic"))

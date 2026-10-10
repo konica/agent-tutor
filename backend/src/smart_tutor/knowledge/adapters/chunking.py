@@ -1,21 +1,15 @@
 """Chunkers by configured method (ADR 0008): a LangChain document transformer plus an id stored with each chunk."""
 
-import re
-import unicodedata
 from collections.abc import Sequence
 from typing import Any
 
 from langchain_core.documents import BaseDocumentTransformer, Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+from smart_tutor.knowledge.domain.page_text import clean_page_text
 from smart_tutor.shared.config import ChunkingConfig
 
-
-def clean_page_text(text: str) -> str:
-    """Fold ligatures, rejoin words hyphenated across lines, and drop control characters except \\n and \\t."""
-    text = unicodedata.normalize("NFKC", text)
-    text = re.sub(r"(?<=[a-z])-\n(?=[a-z])", "", text)
-    return "".join(c for c in text if c in "\n\t" or unicodedata.category(c) != "Cc")
+__all__ = ["CleanedSplitter", "build_chunker", "clean_page_text"]
 
 
 class CleanedSplitter(BaseDocumentTransformer):
@@ -41,6 +35,8 @@ def build_chunker(config: ChunkingConfig) -> tuple[BaseDocumentTransformer, str]
             separators=["\n\n", "\n", ". ", " ", ""],
             length_function=len,
             is_separator_regex=False,
+            # metadata["start_index"]: the chunk's offset in the cleaned page text (the viewer's highlight, PRD §9.4)
+            add_start_index=True,
         )
         return CleanedSplitter(splitter), f"recursive_character:{size}/{overlap}:v1"
     raise ValueError(f"Unknown chunking method: {config.method!r}")

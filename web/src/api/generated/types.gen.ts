@@ -43,6 +43,32 @@ export type ChooseSubjectsRequest = {
 };
 
 /**
+ * ChunkResponse
+ */
+export type ChunkResponse = {
+    /**
+     * Chunk Id
+     */
+    chunk_id: string;
+    /**
+     * Document Id
+     */
+    document_id: string;
+    /**
+     * Page
+     */
+    page: number | null;
+    /**
+     * Start Index
+     */
+    start_index: number | null;
+    /**
+     * Text
+     */
+    text: string;
+};
+
+/**
  * DocumentDetailsResponse
  */
 export type DocumentDetailsResponse = {
@@ -544,6 +570,40 @@ export type ValidationError = {
      */
     type: string;
 };
+
+export type GetChunkData = {
+    body?: never;
+    path: {
+        /**
+         * Chunk Id
+         */
+        chunk_id: string;
+    };
+    query?: never;
+    url: '/chunks/{chunk_id}';
+};
+
+export type GetChunkErrors = {
+    /**
+     * Not the caller's chunk.
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetChunkError = GetChunkErrors[keyof GetChunkErrors];
+
+export type GetChunkResponses = {
+    /**
+     * Successful Response
+     */
+    200: ChunkResponse;
+};
+
+export type GetChunkResponse = GetChunkResponses[keyof GetChunkResponses];
 
 export type ListDocumentsData = {
     body?: never;
@@ -1303,3 +1363,19 @@ export type GetUploadResponses = {
 };
 
 export type GetUploadResponse = GetUploadResponses[keyof GetUploadResponses];
+
+export type RecordHighlightMissData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/viewer/highlight-misses';
+};
+
+export type RecordHighlightMissResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type RecordHighlightMissResponse = RecordHighlightMissResponses[keyof RecordHighlightMissResponses];

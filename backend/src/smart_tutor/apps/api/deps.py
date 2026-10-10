@@ -6,6 +6,7 @@ from fastapi import Depends, Request
 
 from smart_tutor.apps.api.agent_client import AgentClient
 from smart_tutor.apps.api.services import ApiServices
+from smart_tutor.insights.application import HighlightMissService
 from smart_tutor.knowledge.application import (
     ArchiveService,
     DeleteService,
@@ -27,6 +28,7 @@ __all__ = [
     "Conversations",
     "CurrentPrincipal",
     "Documents",
+    "HighlightMisses",
     "Retries",
     "SubjectChoice",
     "Subjects",
@@ -77,6 +79,10 @@ def _conversations(request: Request) -> ConversationService:
     return _services(request).conversations
 
 
+def _highlight_misses(request: Request) -> HighlightMissService:
+    return _services(request).highlight_misses
+
+
 def _agent(request: Request) -> AgentClient:
     return _services(request).agent
 
@@ -90,4 +96,5 @@ Viewer = Annotated[ViewerService, Depends(_viewer)]
 Subjects = Annotated[SubjectNames, Depends(_subject_names)]
 SubjectChoice = Annotated[SubjectChoiceService, Depends(_subject_choice)]
 Conversations = Annotated[ConversationService, Depends(_conversations)]
+HighlightMisses = Annotated[HighlightMissService, Depends(_highlight_misses)]
 Agent = Annotated[AgentClient, Depends(_agent)]

@@ -1,7 +1,7 @@
 """Library routes (knowledge module): start an upload, report the caller's upload limits and
 what became of an upload (US-11), list the caller's documents, check a file hash against them, retry a failed
 one, suggest and save its subjects, archive and restore a document, show a document's details and set its
-display title, delete one for good, and link to its PDF for the viewer."""
+display title, delete one for good, link to its PDF for the viewer, and serve a cited chunk for its highlight."""
 
 import math
 from datetime import date, datetime
@@ -25,6 +25,7 @@ from smart_tutor.apps.api.deps import (
     Viewer,
 )
 from smart_tutor.knowledge.application import (
+    ChunkNotFoundError,
     DocumentDetails,
     DocumentNotFoundError,
     DocumentStateError,
@@ -433,4 +434,28 @@ def get_document_file(
     names = subjects.names_for(principal.user_id, set(found.view.subject_ids))
     return DocumentFileResponse(
         url=found.url, expires_in=found.expires_in, document=_document_response(found.view, names)
+    )
+
+
+class ChunkResponse(BaseModel):
+    chunk_id: str
+    document_id: str
+    page: int | None
+    start_index: int | None  # offset in the page's cleaned text; null when unknown
+    text: str
+
+
+@router.get("/chunks/{chunk_id}", operation_id="get_chunk", responses={404: {"description": "Not the caller's chunk."}})
+def get_chunk(chunk_id: UUID, principal: CurrentPrincipal, viewer: Viewer) -> ChunkResponse:
+    """A cited passage for the viewer's highlight (PRD §8 US-4b, §9.3 step 5), through a readable document only."""
+    try:
+        found = viewer.passage(principal.user_id, str(chunk_id))
+    except ChunkNotFoundError:
+        raise HTTPException(404, "Chunk not found") from None
+    return ChunkResponse(
+        chunk_id=found.chunk_id,
+        document_id=found.document_id,
+        page=found.page,
+        start_index=found.start_index,
+        text=found.text,
     )

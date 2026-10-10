@@ -19,13 +19,21 @@ from fakes.pdfs import make_pdf, make_scanned_pdf
 from smart_tutor.knowledge.adapters.pypdf_extractor import PypdfExtractor
 from smart_tutor.knowledge.application import (
     ContentState,
+    ExtractionTimeoutError,
     FileLimits,
     IngestionService,
+    PdfExtractor,
     ProcessingTools,
     UnreadablePdfError,
     UploadService,
 )
-from smart_tutor.knowledge.domain.content import NO_TEXT_LAYER, UNREADABLE_PDF, pages_key, too_many_pages
+from smart_tutor.knowledge.domain.content import (
+    EXTRACTION_TIMED_OUT,
+    NO_TEXT_LAYER,
+    UNREADABLE_PDF,
+    pages_key,
+    too_many_pages,
+)
 from smart_tutor.knowledge.domain.errors import InvalidChunkError
 from smart_tutor.shared.domain.ids import ContentId, UserId
 
@@ -110,6 +118,18 @@ def test_unreadable_pdf_fails_content_and_document() -> None:
     assert (document.state, document.failure_reason) == ("failed", UNREADABLE_PDF)
     assert content_id not in w.library.state.chunks
     assert pages_key(content.owner_id, content.content_id) not in w.objects.objects
+
+
+class TimesOut(PdfExtractor):
+    def extract_pages(self, data: bytes, max_pages: int, first: int | None = None) -> list[str]:
+        raise ExtractionTimeoutError("too slow")
+
+
+def test_a_pdf_that_takes_too_long_to_read_fails() -> None:
+    w = World(fake_tools(extractor=TimesOut()))
+    document_id, content_id = w.upload(pdf(SENTENCE))
+
+    _assert_failed_without_output(w, document_id, content_id, EXTRACTION_TIMED_OUT)
 
 
 def test_pdf_without_text_layer_fails() -> None:

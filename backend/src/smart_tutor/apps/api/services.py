@@ -7,6 +7,8 @@ import httpx
 
 from smart_tutor.accounts.application import load_upload_limits
 from smart_tutor.apps.api.agent_client import AgentClient
+from smart_tutor.insights.adapters.sql_highlight_misses import SqlHighlightMisses
+from smart_tutor.insights.application import HighlightMissService
 from smart_tutor.knowledge.adapters.s3_object_store import S3ObjectStore
 from smart_tutor.knowledge.adapters.sql_library import SqlLibraryUnitOfWork
 from smart_tutor.knowledge.application import (
@@ -44,6 +46,7 @@ class ApiServices:
     viewer: ViewerService
     subject_choice: SubjectChoiceService
     conversations: ConversationService
+    highlight_misses: HighlightMissService
     agent: AgentClient
 
 
@@ -86,6 +89,7 @@ def build_services(settings: Settings) -> ApiServices:
             max_attempts,
         ),
         conversations=conversations,
+        highlight_misses=HighlightMissService(SqlHighlightMisses(engine), SystemClock()),
         # Answers stream for a while: a long read timeout between SSE events, a short one to connect.
         agent=AgentClient(settings.agent_url, httpx.AsyncClient(timeout=httpx.Timeout(10, read=120))),
     )

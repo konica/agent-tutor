@@ -1,20 +1,27 @@
-import { CircleAlert, RefreshCw } from "lucide-react";
+import { CircleAlert, Info, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type Ref } from "react";
 
+import { recordHighlightMiss, type ChunkPassage } from "../../api/chunks";
 import { restoreDocument, type DocumentFile, type DocumentResponse } from "../../api/documents";
 import { Button } from "../../components/Button/Button";
 import { SubjectChip } from "../../components/SubjectChip/SubjectChip";
 import styles from "./DocumentViewer.module.css";
+import { PassageHighlight } from "./PassageHighlight";
 import type { PdfDoc, PdfLoader } from "./pdf";
+import { useChunk, usePassageHighlight, usePassageReveal, type Highlight } from "./useChunk";
 import { useDocumentFile } from "./useDocumentFile";
 import { ViewerToolbar, ZOOM_STEPS } from "./ViewerToolbar";
+
+/** A cited passage to show (PRD US-4b). Each new object means "jump to it", even for the same chunk. */
+export type Passage = { chunkId: string; page: number };
 
 type Props = {
   documentId: string;
   /** "pane": toolbar ends with Open in dialog + Close (X). "dialog": toolbar starts with a back/close text button. */
   mode: "pane" | "dialog";
-  initialPage?: number; // default 1
+  initialPage?: number; // default: the passage's page, else 1
   jumpTo?: { page: number }; // each new object moves to that page, keeping the loaded PDF (the pane, back from the dialog)
+  passage?: Passage; // each new object moves to its page and highlights it there
   titleRef?: Ref<HTMLHeadingElement>; // the parent focuses it on open
   titleId?: string; // for aria-labelledby on the region/dialog
   onClose: () => void;
@@ -26,12 +33,15 @@ type Props = {
   loadFile?: (id: string) => Promise<DocumentFile>; // tests
   loadPdfDoc?: PdfLoader; // tests
   restore?: (id: string) => Promise<DocumentResponse>; // tests
+  loadChunk?: (id: string) => Promise<ChunkPassage>; // tests
+  recordMiss?: () => void; // tests; the dialog opened from the pane passes a no-op (the pane counted that view)
 };
 export type DocumentViewerProps = Props;
 
 // Loaded lazily so pdf.js stays out of the main bundle and out of tests that pass a fake loader.
 const defaultLoadPdf: PdfLoader = (url) => import("./pdf").then((m) => m.loadPdf(url));
 const defaultRestore = (id: string) => restoreDocument(id);
+const defaultRecordMiss = () => recordHighlightMiss();
 
 type PdfState = { status: "loading" } | { status: "ready"; doc: PdfDoc } | { status: "failed" };
 
@@ -43,8 +53,9 @@ export function DocumentViewer(props: Props) {
 function Viewer({
   documentId,
   mode,
-  initialPage = 1,
+  initialPage,
   jumpTo,
+  passage,
   titleRef,
   titleId,
   onClose,
@@ -56,13 +67,18 @@ function Viewer({
   loadFile,
   loadPdfDoc = defaultLoadPdf,
   restore = defaultRestore,
+  loadChunk,
+  recordMiss = defaultRecordMiss,
 }: Props) {
   const { state: file, retry, setDocument } = useDocumentFile(documentId, loadFile);
   const [pdf, setPdf] = useState<PdfState>({ status: "loading" });
-  const [page, setPage] = useState(Math.max(1, initialPage));
+  // An explicit initialPage wins: the dialog opened from the pane starts at the pane's page, which may not be the passage's.
+  const [page, setPage] = useState(Math.max(1, initialPage ?? passage?.page ?? 1));
   const [zoom, setZoom] = useState(100);
   const [rendered, setRendered] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasAreaRef = useRef<HTMLDivElement>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
   const renderChain = useRef<Promise<void>>(Promise.resolve());
 
   // The document stays known while Retry fetches a new link, so the title doesn't flicker back to "Document".
@@ -127,17 +143,34 @@ function Viewer({
 
   const numPages = doc?.numPages ?? null;
 
+  // Whether the page changed since the passage opened; then the status goes back to "Page n of N".
+  const [moved, setMoved] = useState(false);
   const [jumped, setJumped] = useState(jumpTo);
   if (jumpTo !== jumped) {
     setJumped(jumpTo);
+    setMoved(true);
     if (jumpTo) setPage(Math.min(Math.max(1, jumpTo.page), numPages ?? Infinity));
   }
+  const [opened, setOpened] = useState(passage);
+  if (passage !== opened) {
+    setOpened(passage);
+    setMoved(false);
+    if (passage) setPage(Math.min(Math.max(1, passage.page), numPages ?? Infinity));
+  }
+
+  const chunk = useChunk(passage?.chunkId, loadChunk);
+  const highlight = usePassageHighlight(doc, page, chunk, passage, () => renderChain.current);
+  const scale = zoom / 100;
+  usePassageReveal(highlight, passage, scale, canvasAreaRef, pageRef, recordMiss);
+  const boxes = highlight?.boxes ?? null;
+  const missed = highlight !== null && boxes === null;
 
   const goTo = (next: number) => {
     if (numPages === null) return;
     const clamped = Math.min(Math.max(1, next), numPages);
     if (clamped === page) return;
     setPage(clamped);
+    setMoved(true);
     onPageChange?.(clamped);
   };
 
@@ -207,7 +240,7 @@ function Viewer({
         openInDialogRef={openInDialogRef}
       />
       {showDetails && document && <Details document={document} numPages={numPages} />}
-      <div className={styles.canvasArea}>
+      <div ref={canvasAreaRef} className={styles.canvasArea}>
         {failed ? (
           <div className={styles.failure} role="alert">
             <CircleAlert className={styles.failureIcon} strokeWidth={1.5} aria-hidden="true" />
@@ -227,9 +260,18 @@ function Viewer({
             )}
           </div>
         ) : doc ? (
-          <div className={styles.page}>
-            <canvas ref={canvasRef} role="img" aria-label={`Page ${page} of ${doc.numPages}`} />
-          </div>
+          <>
+            {missed && (
+              <p className={styles.note} role="note">
+                <Info className={styles.noteIcon} strokeWidth={1.5} aria-hidden="true" />
+                Couldn't highlight the passage on this page.
+              </p>
+            )}
+            <div ref={pageRef} className={styles.page}>
+              <canvas ref={canvasRef} role="img" aria-label={`Page ${page} of ${doc.numPages}`} />
+              {boxes && chunk.status === "ready" && <PassageHighlight boxes={boxes} scale={scale} text={chunk.chunk.text} />}
+            </div>
+          </>
         ) : (
           <div className={styles.skeleton} aria-busy="true">
             <span className="visually-hidden">Loading document</span>
@@ -241,10 +283,22 @@ function Viewer({
         )}
       </div>
       <p className="visually-hidden" aria-live="polite">
-        {rendered && numPages !== null ? `Page ${page} of ${numPages}` : ""}
+        {status(rendered, page, numPages, passage !== undefined && !moved && page === passage.page, highlight)}
       </p>
     </div>
   );
+}
+
+// The polite status line. While a just-opened passage is on screen it waits for the match (silent rather than announcing
+// the page twice), then says how it went; otherwise it reads the page.
+function status(rendered: boolean, page: number, numPages: number | null, opening: boolean, highlight: Highlight | null): string {
+  if (numPages === null) return "";
+  if (opening) {
+    if (!highlight) return "";
+    const result = highlight.boxes ? "Cited passage highlighted." : "Couldn't highlight the passage on this page.";
+    return `Opened page ${page} of ${numPages}. ${result}`;
+  }
+  return rendered ? `Page ${page} of ${numPages}` : "";
 }
 
 function Details({ document, numPages }: { document: DocumentResponse; numPages: number | null }) {
