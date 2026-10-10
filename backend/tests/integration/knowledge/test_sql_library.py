@@ -3,6 +3,7 @@
 import hashlib
 import threading
 import uuid
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
@@ -209,6 +210,46 @@ def test_replace_chunks_is_idempotent(engine: Engine) -> None:
     assert [len(v) for v in vectors] == [1024, 1024]
     assert vectors[0][0] == pytest.approx(0.5)
     assert vectors[1][-1] == pytest.approx(0.25)
+
+
+def test_chunks_without_a_start_index_are_listed_and_filled(engine: Engine) -> None:
+    content = stored_content(engine, f"ada-{uid()}")
+    with SqlLibraryUnitOfWork(engine) as tx:
+        tx.chunks.replace(
+            content.content_id,
+            [chunk(content, 0, 1, 0.1), replace(chunk(content, 1, 1, 0.2), start_index=5)],
+        )
+        tx.commit()
+    with SqlLibraryUnitOfWork(engine) as tx:
+        assert tx.chunks.contents_missing_start_index().count(content.content_id) == 1
+        stored = tx.chunks.list_for_content(content.content_id)
+    assert [(c.seq, c.page, c.text, c.start_index) for c in stored] == [(0, 1, "text 0", None), (1, 1, "text 1", 5)]
+    with SqlLibraryUnitOfWork(engine) as tx:
+        tx.chunks.set_start_indexes({stored[0].chunk_id: 3, uid(): 9})  # an unknown id updates nothing
+        tx.commit()
+    with SqlLibraryUnitOfWork(engine) as tx:
+        assert content.content_id not in tx.chunks.contents_missing_start_index()
+        assert [c.start_index for c in tx.chunks.list_for_content(content.content_id)] == [3, 5]
+
+
+def test_a_chunk_is_readable_only_through_its_owners_document_archived_included(engine: Engine) -> None:
+    owner, other = f"ada-{uid()}", f"bob-{uid()}"
+    doc = searchable_document(engine, owner, [3])
+    with SqlLibraryUnitOfWork(engine) as tx:
+        loaded = tx.documents.get(doc.document_id)
+        assert loaded is not None and loaded.content_id is not None
+        [stored] = tx.chunks.list_for_content(loaded.content_id)
+    with SqlLibraryUnitOfWork(engine) as tx:
+        mine = tx.chunks.get_readable(UserId(owner), stored.chunk_id)
+        assert tx.chunks.get_readable(UserId(other), stored.chunk_id) is None
+        assert tx.chunks.get_readable(UserId(owner), "not-a-uuid") is None
+        assert tx.chunks.get_readable(UserId(owner), str(uuid.uuid4())) is None
+    assert mine is not None
+    assert (mine.document_id, mine.page, mine.start_index, mine.text) == (doc.document_id, 1, None, "chunk 3")
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE documents SET archived = true WHERE document_id = :d"), {"d": doc.document_id})
+    with SqlLibraryUnitOfWork(engine) as tx:
+        assert tx.chunks.get_readable(UserId(owner), stored.chunk_id) is not None
 
 
 def test_replace_with_no_chunks_only_deletes(engine: Engine) -> None:

@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 
 from fakes.clock import FixedClock
+from fakes.insights import InMemoryHighlightMisses
 from fakes.knowledge import FakeObjectStore, InMemoryLibrary
 from fakes.models import fake_embeddings
 from fakes.parameters import TEST_LIMITS
@@ -13,6 +14,7 @@ from fakes.subjects import InMemorySubjects
 from fakes.tutoring import InMemoryThreads
 from smart_tutor.apps.api.agent_client import AgentClient
 from smart_tutor.apps.api.services import ApiServices
+from smart_tutor.insights.application import HighlightMissService
 from smart_tutor.knowledge.application import (
     ArchiveService,
     DeleteService,
@@ -72,6 +74,7 @@ def api_services(
             max_attempts=3,
         ),
         "conversations": conversations,
+        "highlight_misses": HighlightMissService(InMemoryHighlightMisses(), clock),
         "agent": fake_agent(),
     }
     fields.update(overrides)
