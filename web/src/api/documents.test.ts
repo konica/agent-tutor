@@ -15,6 +15,7 @@ import {
   loadDocuments,
   loadSubjectSuggestions,
   loadUploadLimits,
+  loadUploadRateLimit,
   loadUploadStatus,
   postForm,
   rejectionReason,
@@ -24,6 +25,7 @@ import {
   saveDocumentTitle,
   saveSubjects,
   sha256Hex,
+  UploadLimitError,
   uploadPdf,
 } from "./documents";
 import { createClient, createConfig } from "./generated/client";
@@ -487,5 +489,35 @@ describe("loadDocumentFile", () => {
     await expect(rejection).rejects.toThrow("500");
     await expect(rejection).rejects.not.toBeInstanceOf(DocumentNotFoundError);
     await expect(rejection).rejects.not.toBeInstanceOf(DocumentNotOpenableError);
+  });
+});
+
+describe("upload limits", () => {
+  const limited = { detail: "Upload limit reached. You can upload again at 11:40 (GMT+7).", per_hour: 20, per_day: 100, limit: "hour", retry_at: "2026-10-10T04:40:00Z" };
+
+  it("throws UploadLimitError with the limit on a 429 and posts nothing", async () => {
+    const { apiClient } = api(() => json(limited, 429));
+    const post = vi.fn(async () => 204);
+    const error = await uploadPdf(new File(["%PDF"], "a.pdf", { type: "application/pdf" }), {}, apiClient, post).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(UploadLimitError);
+    expect((error as UploadLimitError).rateLimit).toEqual({ per_hour: 20, per_day: 100, limit: "hour", retry_at: "2026-10-10T04:40:00Z" });
+    expect((error as Error).message).toBe(limited.detail);
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it("treats a 429 without a limit body as a plain failure", async () => {
+    const { apiClient } = api(() => new Response("Too Many Requests", { status: 429 }));
+    const post = vi.fn(async () => 204);
+    const rejection = uploadPdf(new File(["%PDF"], "a.pdf", { type: "application/pdf" }), {}, apiClient, post);
+    await expect(rejection).rejects.toThrow("POST /uploads failed (429)");
+    await expect(rejection).rejects.not.toBeInstanceOf(UploadLimitError);
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it("loads the caller's rate limit", async () => {
+    const open = { per_hour: 20, per_day: 100, limit: null, retry_at: null };
+    const { apiClient, fetch } = api(() => json(open));
+    await expect(loadUploadRateLimit(apiClient)).resolves.toEqual(open);
+    expect((fetch.mock.calls[0]![0] as Request).url).toBe("http://api.test/uploads/rate-limit");
   });
 });

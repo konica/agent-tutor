@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddThreadDocumentsData, AddThreadDocumentsErrors, AddThreadDocumentsResponses, ArchiveDocumentData, ArchiveDocumentErrors, ArchiveDocumentResponses, AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponse, AskInNewThreadResponses, AskInThreadData, AskInThreadErrors, AskInThreadResponse, AskInThreadResponses, CheckDuplicateData, CheckDuplicateErrors, CheckDuplicateResponses, ChooseSubjectsData, ChooseSubjectsErrors, ChooseSubjectsResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, GetChunkData, GetChunkErrors, GetChunkResponses, GetDocumentData, GetDocumentErrors, GetDocumentFileData, GetDocumentFileErrors, GetDocumentFileResponses, GetDocumentResponses, GetMeData, GetMeResponses, GetSubjectSuggestionsData, GetSubjectSuggestionsErrors, GetSubjectSuggestionsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUploadData, GetUploadErrors, GetUploadLimitsData, GetUploadLimitsResponses, GetUploadResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListMySubjectsData, ListMySubjectsResponses, ListThreadDocumentsData, ListThreadDocumentsErrors, ListThreadDocumentsResponses, RecordHighlightMissData, RecordHighlightMissResponses, RemoveThreadDocumentData, RemoveThreadDocumentErrors, RemoveThreadDocumentResponses, RestoreDocumentData, RestoreDocumentErrors, RestoreDocumentResponses, RetryDocumentData, RetryDocumentErrors, RetryDocumentResponses, SearchSubjectsData, SearchSubjectsErrors, SearchSubjectsResponses, SetDocumentTitleData, SetDocumentTitleErrors, SetDocumentTitleResponses, StartUploadData, StartUploadErrors, StartUploadResponses, UpdateThreadData, UpdateThreadErrors, UpdateThreadResponses } from './types.gen';
+import type { AddThreadDocumentsData, AddThreadDocumentsErrors, AddThreadDocumentsResponses, ArchiveDocumentData, ArchiveDocumentErrors, ArchiveDocumentResponses, AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponse, AskInNewThreadResponses, AskInThreadData, AskInThreadErrors, AskInThreadResponse, AskInThreadResponses, CheckDuplicateData, CheckDuplicateErrors, CheckDuplicateResponses, ChooseSubjectsData, ChooseSubjectsErrors, ChooseSubjectsResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, GetChunkData, GetChunkErrors, GetChunkResponses, GetDocumentData, GetDocumentErrors, GetDocumentFileData, GetDocumentFileErrors, GetDocumentFileResponses, GetDocumentResponses, GetMeData, GetMeResponses, GetSubjectSuggestionsData, GetSubjectSuggestionsErrors, GetSubjectSuggestionsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUploadData, GetUploadErrors, GetUploadLimitsData, GetUploadLimitsResponses, GetUploadRateLimitData, GetUploadRateLimitResponses, GetUploadResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListMySubjectsData, ListMySubjectsResponses, ListThreadDocumentsData, ListThreadDocumentsErrors, ListThreadDocumentsResponses, RecordHighlightMissData, RecordHighlightMissResponses, RemoveThreadDocumentData, RemoveThreadDocumentErrors, RemoveThreadDocumentResponses, RestoreDocumentData, RestoreDocumentErrors, RestoreDocumentResponses, RetryDocumentData, RetryDocumentErrors, RetryDocumentResponses, SearchSubjectsData, SearchSubjectsErrors, SearchSubjectsResponses, SetDocumentTitleData, SetDocumentTitleErrors, SetDocumentTitleResponses, StartUploadData, StartUploadErrors, StartUploadResponses, UpdateThreadData, UpdateThreadErrors, UpdateThreadResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -317,6 +317,17 @@ export const startUpload = <ThrowOnError extends boolean = false>(options: Optio
 export const getUploadLimits = <ThrowOnError extends boolean = false>(options?: Options<GetUploadLimitsData, ThrowOnError>): RequestResult<GetUploadLimitsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetUploadLimitsResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/uploads/limits',
+    ...options
+});
+
+/**
+ * Get Upload Rate Limit
+ *
+ * The caller's upload limits and, when one is reached, which and until when (PRD §11, US-9).
+ */
+export const getUploadRateLimit = <ThrowOnError extends boolean = false>(options?: Options<GetUploadRateLimitData, ThrowOnError>): RequestResult<GetUploadRateLimitResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetUploadRateLimitResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/uploads/rate-limit',
     ...options
 });
 

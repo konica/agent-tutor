@@ -15,7 +15,7 @@ from fakes import (
     fake_agent,
     ingest_ready,
 )
-from fakes.parameters import TEST_LIMITS
+from fakes.parameters import APP_TZ, TEST_LIMITS, TEST_UPLOAD_LIMITS
 from smart_tutor.apps.api.main import create_app
 from smart_tutor.knowledge.application import UploadService
 from smart_tutor.shared.config import Settings
@@ -137,7 +137,9 @@ def test_a_learner_can_add_only_their_own_ready_active_documents() -> None:
     a_ready = ingest_ready(library, "learner-a", "Backpropagation applies the chain rule.")
     a_archived = ingest_ready(library, "learner-a", "Dropout regularises networks.")
     library.state.documents[a_archived].archived = True
-    upload = UploadService(library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS)
+    upload = UploadService(
+        library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ
+    )
     a_processing = upload.start_upload(UserId("learner-a"), "processing.pdf").document_id  # never made ready
 
     def listed_ids() -> list[str]:
@@ -201,7 +203,9 @@ def test_a_learner_starts_a_thread_only_from_their_own_ready_document() -> None:
     b_title = library.state.documents[b_document].file_name
     a_archived = ingest_ready(library, "learner-a", "Dropout regularises networks.")
     library.state.documents[a_archived].archived = True
-    upload = UploadService(library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS)
+    upload = UploadService(
+        library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ
+    )
     a_processing = upload.start_upload(UserId("learner-a"), "processing.pdf").document_id  # never made ready
     seen: list[httpx.Request] = []
 

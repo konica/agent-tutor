@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from fakes.clock import FixedClock
 from fakes.knowledge import FakeObjectStore, InMemoryLibrary
 from fakes.models import fake_embeddings
-from fakes.parameters import TEST_LIMITS
+from fakes.parameters import APP_TZ, TEST_LIMITS, TEST_UPLOAD_LIMITS
 from smart_tutor.knowledge.application import UploadService
 from smart_tutor.knowledge.domain.chunk import Chunk
 from smart_tutor.knowledge.domain.content import Content, pages_key
@@ -24,9 +24,9 @@ def ingest_ready(
     Built through the domain (not `IngestionService`) because ingestion rejects pages too short to be a text layer.
     """
     sha = hashlib.sha256(text.encode()).hexdigest()
-    started = UploadService(library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS).start_upload(
-        UserId(owner), f"{sha[:8]}.pdf"
-    )
+    started = UploadService(
+        library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ
+    ).start_upload(UserId(owner), f"{sha[:8]}.pdf")
     with library.unit_of_work() as tx:
         content, created = tx.contents.insert_or_get(
             Content.first_upload(ContentId(f"{owner}-{sha[:24]}"), sha, len(text), UserId(owner))  # one per learner

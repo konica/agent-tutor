@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
+from smart_tutor.accounts.application import load_upload_limits
 from smart_tutor.apps.api.agent_client import AgentClient
 from smart_tutor.insights.adapters.sql_highlight_misses import SqlHighlightMisses
 from smart_tutor.insights.application import HighlightMissService
@@ -62,10 +63,18 @@ def build_services(settings: Settings) -> ApiServices:
     queue = SqsMessageQueue(sqs_client(settings), settings.ingest_queue_url)
     subject_repo = SqlSubjectRepository(engine)
     names = SubjectNames(subject_repo)
-    documents = DocumentService(library, max_attempts, time_zone=ZoneInfo(params.get(settings.app_time_zone_param)))
+    time_zone = ZoneInfo(params.get(settings.app_time_zone_param))
+    documents = DocumentService(library, max_attempts, time_zone=time_zone)
     conversations = ConversationService(SqlThreadRepository(engine), documents, SystemClock())
     return ApiServices(
-        uploads=UploadService(library, objects, SystemClock(), limits),
+        uploads=UploadService(
+            library,
+            objects,
+            SystemClock(),
+            limits,
+            rate=load_upload_limits(params, settings.max_uploads_per_hour_param, settings.max_uploads_per_day_param),
+            time_zone=time_zone,
+        ),
         documents=documents,
         subjects=names,
         retries=RetryService(library, queue, max_attempts),

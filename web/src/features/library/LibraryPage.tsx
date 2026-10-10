@@ -3,14 +3,16 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "reac
 import { useNavigate } from "react-router";
 
 import { SessionExpiredError } from "../../auth/authClient";
-import { archiveDocument, deleteDocument, DocumentGoneError, DocumentProcessingError, findInLibrary, loadDocumentDetails, loadDocuments, loadSubjectSuggestions, loadUploadLimits, loadUploadStatus, megabytes, rejectionReason, restoreDocument, RetriesUsedUpError, retryProcessing, saveDocumentTitle, saveSubjects as saveChosenSubjects, uploadPdf, type DocumentDetails, type DocumentFilters, type DocumentResponse, type SubjectSuggestions, type UploadEvents, type UploadLimits, type UploadStatus } from "../../api/documents";
+import { archiveDocument, deleteDocument, DocumentGoneError, DocumentProcessingError, findInLibrary, loadDocumentDetails, loadDocuments, loadSubjectSuggestions, loadUploadLimits, loadUploadRateLimit, loadUploadStatus, megabytes, rejectionReason, restoreDocument, RetriesUsedUpError, retryProcessing, saveDocumentTitle, saveSubjects as saveChosenSubjects, UploadLimitError, uploadPdf, type DocumentDetails, type DocumentFilters, type DocumentResponse, type SubjectSuggestions, type UploadEvents, type UploadLimits, type UploadRateLimit, type UploadStatus } from "../../api/documents";
 import type { SubjectResponse } from "../../api/generated/types.gen";
 import { loadMySubjects } from "../../api/subjects";
+import { Banner } from "../../components/Banner/Banner";
 import { Button } from "../../components/Button/Button";
 import { EmptyState } from "../../components/EmptyState/EmptyState";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
 import { Tabs } from "../../components/Tabs/Tabs";
 import { UploadTray, type TrayItem } from "../../components/UploadTray/UploadTray";
+import { limitTime } from "../../time";
 import { DeleteDialog } from "./DeleteDialog";
 import { DocumentDetailsPanel } from "./DocumentDetails";
 import { DocumentTable } from "./DocumentTable";
@@ -28,6 +30,7 @@ type Props = {
   upload?: (file: File, events: UploadEvents) => Promise<void>;
   retry?: (documentId: string) => Promise<void>;
   loadLimits?: () => Promise<UploadLimits>;
+  loadRateLimit?: () => Promise<UploadRateLimit>;
   check?: (file: File) => Promise<string | null>;
   loadSuggestions?: (documentId: string) => Promise<SubjectSuggestions>;
   saveSubjects?: (documentId: string, choice: { subject_ids: string[]; new_names: string[] }) => Promise<DocumentResponse>;
@@ -57,6 +60,10 @@ const MAX_PARALLEL_UPLOADS = 3; // each check hashes a whole file in memory, and
 const defaultUpload = (file: File, events: UploadEvents) => uploadPdf(file, events);
 const defaultRetry = (id: string) => retryProcessing(id);
 const defaultLoadLimits = () => loadUploadLimits();
+const defaultLoadRateLimit = () => loadUploadRateLimit();
+const LIMIT_REASON = "Not uploaded. Upload limit reached.";
+// How long to wait before asking again when the server still reports a limit the browser thinks has ended.
+const RECHECK_MS = 5_000;
 const defaultCheck = (file: File) => findInLibrary(file);
 const defaultLoadUpload = (uploadId: string) => loadUploadStatus(uploadId);
 const defaultArchive = (id: string) => archiveDocument(id);
@@ -70,7 +77,7 @@ const defaultLoadSuggestions = (id: string) => loadSubjectSuggestions(id);
 const defaultSaveSubjects = (id: string, choice: { subject_ids: string[]; new_names: string[] }) => saveChosenSubjects(id, choice);
 
 // Library: upload by picking or dropping PDFs (US-2), the upload tray, and the Active and Archived lists narrowed by subject, upload dates and state (US-10).
-export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSubjects, upload = defaultUpload, retry = defaultRetry, loadLimits = defaultLoadLimits, check = defaultCheck, loadSuggestions = defaultLoadSuggestions, saveSubjects = defaultSaveSubjects, loadUpload = defaultLoadUpload, archive = defaultArchive, restore = defaultRestore, loadDetails = defaultLoadDetails, saveTitle = defaultSaveTitle, remove = defaultRemove, pollMs = 2000 }: Props) {
+export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSubjects, upload = defaultUpload, retry = defaultRetry, loadLimits = defaultLoadLimits, loadRateLimit = defaultLoadRateLimit, check = defaultCheck, loadSuggestions = defaultLoadSuggestions, saveSubjects = defaultSaveSubjects, loadUpload = defaultLoadUpload, archive = defaultArchive, restore = defaultRestore, loadDetails = defaultLoadDetails, saveTitle = defaultSaveTitle, remove = defaultRemove, pollMs = 2000 }: Props) {
   const navigate = useNavigate();
   const [filters, setFilters] = useState<DocumentFilters>({});
   const [view, setView] = useState<View>("active");
@@ -220,6 +227,44 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
     };
   }, []);
 
+  // The caller's upload limit (PRD §11): while one is reached, Upload and the page drop are off until retry_at.
+  const [rateLimit, setRateLimit] = useState<UploadRateLimit | null>(null);
+  const limited = rateLimit?.limit != null && rateLimit.retry_at != null;
+  const limitedRef = useRef(false); // files already queued in a batch read it, not the render's value
+  useEffect(() => {
+    limitedRef.current = limited;
+  }, [limited]);
+  const loadRateLimitRef = useRef(loadRateLimit);
+  useEffect(() => {
+    loadRateLimitRef.current = loadRateLimit;
+  }, [loadRateLimit]);
+  // A failed load leaves uploads open: the API still refuses past the limit.
+  const refreshRateLimit = useCallback(async () => {
+    try {
+      const loaded = await loadRateLimitRef.current();
+      // A 429 is firsthand: a stale "open" answer must not lift the banner before its retry time (the expiry timer does that).
+      const staleOpen = loaded.limit === null && limitedRef.current;
+      if (alive.current && !staleOpen) setRateLimit(loaded);
+    } catch {
+      // keep the last known state
+    }
+  }, []);
+  useEffect(() => {
+    void refreshRateLimit();
+  }, [refreshRateLimit]);
+  // Open again when the limit ends, without a reload.
+  useEffect(() => {
+    if (!limited || !rateLimit?.retry_at) return;
+    // A retry time already past by this browser's clock (skew) must not make the re-check loop: wait before asking again.
+    const remaining = new Date(rateLimit.retry_at).getTime() - Date.now();
+    const wait = remaining > 0 ? remaining : RECHECK_MS;
+    const timer = setTimeout(() => {
+      setRateLimit((current) => (current ? { ...current, limit: null, retry_at: null } : current));
+      void refreshRateLimit();
+    }, wait);
+    return () => clearTimeout(timer);
+  }, [limited, rateLimit?.retry_at, refreshRateLimit]);
+
   const acquireSlot = () => {
     if (slots.current.free > 0) {
       slots.current.free--;
@@ -273,7 +318,14 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
       await Promise.all(files.map((file, n) => one(file, slots[n], current, say)));
     } finally {
       inFlight.current--;
+      if (inFlight.current === 0) void refreshRateLimit(); // the last upload of a batch can reach the limit
     }
+  }
+
+  function refuseForLimit(file: File, i: number, say: () => void) {
+    setRejected((list) => [...list, { name: file.name, reason: LIMIT_REASON }]);
+    parts.current[i] = `${file.name}: ${LIMIT_REASON}`;
+    say();
   }
 
   async function one(file: File, i: number, current: UploadLimits | null, say: () => void) {
@@ -284,6 +336,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
       say();
       return;
     }
+    if (limitedRef.current) return refuseForLimit(file, i, say);
     parts.current[i] = `Checking ${file.name}…`;
     say();
     const id = `upload-${++traySeq.current}`;
@@ -297,6 +350,12 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
   }
 
   async function send(file: File, i: number, id: string, current: UploadLimits | null, say: () => void) {
+    if (limitedRef.current) {
+      // An earlier file of the batch reached the limit while this one waited for a slot.
+      setTray((items) => items.filter((t) => t.id !== id));
+      refuseForLimit(file, i, say);
+      return;
+    }
     let existing: string | null = null;
     try {
       existing = await check(file);
@@ -330,7 +389,16 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
       updateTray(id, { status: "uploaded", progress: 1 });
       parts.current[i] = `Uploaded ${file.name}. Processing.`;
       if (started.uploadId) void watchUpload(id, started.uploadId, file.name);
-    } catch {
+    } catch (error) {
+      if (error instanceof UploadLimitError) {
+        limitedRef.current = error.rateLimit.retry_at != null;
+        setRateLimit(error.rateLimit);
+        setTray((items) => items.filter((t) => t.id !== id));
+        setRejected((list) => [...list, { name: file.name, reason: LIMIT_REASON }]);
+        parts.current[i] = `${file.name}: ${LIMIT_REASON}${error.rateLimit.retry_at ? ` You can upload again at ${limitTime(new Date(error.rateLimit.retry_at))}.` : ""}`;
+        say();
+        return;
+      }
       // A 401 is handled by the API client: the session screen replaces this page.
       updateTray(id, { status: "failed" });
       parts.current[i] = `Upload failed: ${file.name}.`;
@@ -372,7 +440,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
   }
 
   const dragging = usePageDrop((files) => {
-    if (!picking && !details) void addFiles(files); // the dialogs are modal
+    if (!picking && !details && !limitedRef.current) void addFiles(files); // the dialogs are modal
   });
 
   function closeTray() {
@@ -507,7 +575,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
           documents !== null && !firstRun ? (
             <>
               <p className={styles.rights}>Only upload documents you have the right to use.</p>
-              <Button variant="primary" icon={Upload} onClick={pick}>Upload</Button>
+              <Button variant="primary" icon={Upload} onClick={pick} disabled={limited} aria-describedby={limited ? "upload-limit" : undefined}>Upload</Button>
             </>
           ) : undefined
         }
@@ -524,6 +592,15 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
       <p ref={statusRegion} tabIndex={-1} role="status" aria-live="polite" className={styles.status}>
         {status}
       </p>
+      {limited && rateLimit?.retry_at && (
+        <div id="upload-limit" className={styles.limit}>
+          <Banner variant="attn" title="Upload limit reached.">
+            <p>
+              You can upload up to {rateLimit.per_hour} files per hour and {rateLimit.per_day} per day. You can upload again at {limitTime(new Date(rateLimit.retry_at))}.
+            </p>
+          </Banner>
+        </div>
+      )}
       {failed.map((name, i) => (
         <p key={`${name}-${i}`} className={styles.error}>
           Couldn't upload {name}. Try again.
@@ -596,7 +673,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
           icon={Archive}
           title="No active documents"
           actions={
-            <Button variant="primary" icon={Upload} onClick={pick}>
+            <Button variant="primary" icon={Upload} onClick={pick} disabled={limited} aria-describedby={limited ? "upload-limit" : undefined}>
               Upload
             </Button>
           }
@@ -611,7 +688,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
           title="Upload your first document"
           note="Or drop files anywhere on this page. You can add several at once."
           actions={
-            <Button variant="primary" size="lg" icon={Upload} onClick={pick}>
+            <Button variant="primary" size="lg" icon={Upload} onClick={pick} disabled={limited} aria-describedby={limited ? "upload-limit" : undefined}>
               Choose PDFs
             </Button>
           }
@@ -657,7 +734,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
         />
       )}
       {deleting && <DeleteDialog doc={deleting} busy={deleteBusy} error={deleteError} onCancel={cancelDelete} onDelete={() => void confirmDelete(deleting)} onArchive={() => archiveInstead(deleting)} />}
-      {dragging && !picking && !details && <DropOverlay />}
+      {dragging && !picking && !details && !limited && <DropOverlay />}
       <UploadTray items={tray} onClose={closeTray} onRestore={(item) => void restoreFromTray(item)} />
     </>
   );

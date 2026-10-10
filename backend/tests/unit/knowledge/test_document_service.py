@@ -5,7 +5,9 @@ from typing import Any
 import pytest
 
 from fakes import (
+    APP_TZ,
     TEST_LIMITS,
+    TEST_UPLOAD_LIMITS,
     FakeObjectStore,
     FixedClock,
     InMemoryLibrary,
@@ -28,7 +30,9 @@ from smart_tutor.subjects.application import GENERAL_SUBJECT_ID
 
 def test_lists_only_the_callers_documents_newest_first() -> None:
     library, clock = InMemoryLibrary(), FixedClock()
-    uploads = UploadService(library.unit_of_work, FakeObjectStore(), clock, TEST_LIMITS)
+    uploads = UploadService(
+        library.unit_of_work, FakeObjectStore(), clock, TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ
+    )
     uploads.start_upload(UserId("ada"), "first.pdf")
     clock.current += timedelta(minutes=1)
     uploads.start_upload(UserId("ada"), "second.pdf")
@@ -56,9 +60,9 @@ def test_a_view_carries_the_authors_and_year_of_its_content() -> None:
     described = ingest_ready(library, "ada", "Attention is all you need.")
     content = library.state.contents[library.state.documents[described].content_id or ""]
     content.authors, content.year = ["Ashish Vaswani", "Noam Shazeer"], 2017
-    UploadService(library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS).start_upload(
-        UserId("ada"), "uploading.pdf"
-    )
+    UploadService(
+        library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ
+    ).start_upload(UserId("ada"), "uploading.pdf")
 
     views = {v.title: v for v in DocumentService(library.unit_of_work, max_attempts=3).list_documents(UserId("ada"))}
 
@@ -72,9 +76,9 @@ def test_the_list_narrows_by_subject_state_and_upload_dates_in_gmt_plus_7() -> N
     # 2026-10-01T17:30Z is 00:30 on 2 Oct in GMT+7
     late = _ready_at(library, "ada", "late", datetime(2026, 10, 1, 17, 30, tzinfo=UTC), ART)
     early = _ready_at(library, "ada", "early", datetime(2026, 10, 1, 16, 30, tzinfo=UTC), BIO)
-    UploadService(library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS).start_upload(
-        UserId("ada"), "processing.pdf"
-    )
+    UploadService(
+        library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ
+    ).start_upload(UserId("ada"), "processing.pdf")
     docs = DocumentService(library.unit_of_work, max_attempts=3)
 
     def ids(**kwargs: Any) -> set[str]:
@@ -111,9 +115,9 @@ def test_learner_subjects_are_those_of_ready_unarchived_documents_only() -> None
     docs = DocumentService(library.unit_of_work, max_attempts=3)
     ada_doc = ingest_ready(library, "ada", "Attention is all you need.")
     ingest_ready(library, "bob", "Gradient descent.")
-    UploadService(library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS).start_upload(
-        UserId("carol"), "processing.pdf"
-    )
+    UploadService(
+        library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ
+    ).start_upload(UserId("carol"), "processing.pdf")
 
     assert docs.learner_subjects(UserId("ada")) == frozenset({GENERAL_SUBJECT_ID})
     assert docs.learner_subjects(UserId("carol")) == frozenset()  # only a processing document
@@ -127,7 +131,9 @@ SHA = hashlib.sha256(PDF).hexdigest()
 
 
 def _ingested(library: InMemoryLibrary, objects: FakeObjectStore, owner: str) -> str:
-    uploads = UploadService(library.unit_of_work, objects, FixedClock(), TEST_LIMITS)
+    uploads = UploadService(
+        library.unit_of_work, objects, FixedClock(), TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ
+    )
     started = uploads.start_upload(UserId(owner), "paper.pdf")
     objects.objects[started.fields["key"]] = PDF
     IngestionService(library.unit_of_work, objects, fake_tools(), TEST_LIMITS).ingest_upload(started.fields["key"])
@@ -152,7 +158,9 @@ def test_an_unlinked_or_duplicate_failed_document_never_matches() -> None:
     library, objects = InMemoryLibrary(), FakeObjectStore()
     first = _ingested(library, objects, "ada")
     _ingested(library, objects, "ada")  # fails as a duplicate; its content_id stays null
-    uploads = UploadService(library.unit_of_work, objects, FixedClock(), TEST_LIMITS)
+    uploads = UploadService(
+        library.unit_of_work, objects, FixedClock(), TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ
+    )
     uploads.start_upload(UserId("carol"), "paper.pdf")  # still processing: no content yet
     service = DocumentService(library.unit_of_work, max_attempts=3)
     assert service.find_in_library(UserId("ada"), SHA) == first
@@ -163,7 +171,9 @@ def test_has_ready_documents_ignores_archived_and_unfinished_documents() -> None
     library = InMemoryLibrary()
     docs = DocumentService(library.unit_of_work, max_attempts=3)
     ada = UserId("ada")
-    UploadService(library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS).start_upload(ada, "p.pdf")
+    UploadService(
+        library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ
+    ).start_upload(ada, "p.pdf")
     choosing = ingest_ready(library, "ada", "Awaiting subjects.")
     library.state.documents[choosing].state = DocumentState.AWAITING_SUBJECTS
     archived = ingest_ready(library, "ada", "Archived.")
@@ -253,9 +263,9 @@ def test_details_of_an_archived_document() -> None:
 
 def test_details_of_a_document_still_uploading_have_no_content_facts() -> None:
     library = InMemoryLibrary()
-    started = UploadService(library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS).start_upload(
-        ADA, "p.pdf"
-    )
+    started = UploadService(
+        library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ
+    ).start_upload(ADA, "p.pdf")
     details = DocumentService(library.unit_of_work, max_attempts=3).details(ADA, DocumentId(started.document_id))
     assert (details.document.title, details.extracted_title, details.pages, details.summary) == (
         "p.pdf",

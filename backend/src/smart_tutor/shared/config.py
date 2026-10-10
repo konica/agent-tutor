@@ -75,6 +75,10 @@ class Settings(BaseSettings):
     extraction_timeout_seconds: PositiveInt = 300
     # Processing attempts per content (PRD §9.5), read once at startup by the API.
     max_processing_attempts_param: str = "/smart-tutor/max-processing-attempts"
+    # Upload rate limits and daily caps per learner (PRD §11): a rolling hour and a day in app-time-zone, read once at
+    # startup by the API.
+    max_uploads_per_hour_param: str = "/smart-tutor/max-uploads-per-hour"
+    max_uploads_per_day_param: str = "/smart-tutor/max-uploads-per-day"
     # The one app time zone (PRD D27), an IANA name; the API reads it at startup to turn the Library's upload dates
     # into instants. An invalid name stops startup.
     app_time_zone_param: str = "/smart-tutor/app-time-zone"

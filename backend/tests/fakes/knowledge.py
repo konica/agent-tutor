@@ -5,6 +5,7 @@ import math
 import uuid
 from collections.abc import Collection, Mapping
 from dataclasses import replace
+from datetime import datetime
 from types import TracebackType
 from typing import Self
 
@@ -37,6 +38,7 @@ class InMemoryLibrary:
         self.state = _State()
         self.commits = 0
         self.locked_contents: list[str] = []  # ids read with get_for_update, in order
+        self.locked_learners: list[str] = []  # learners whose upload starts were serialized, in order
 
     def unit_of_work(self) -> "FakeLibraryUnitOfWork":
         return FakeLibraryUnitOfWork(self)
@@ -173,8 +175,15 @@ class _Documents(DocumentRepository):
 
 
 class _Uploads(UploadRepository):
-    def __init__(self, state: _State) -> None:
+    def __init__(self, state: _State, library: "InMemoryLibrary") -> None:
         self._s = state
+        self._library = library
+
+    def lock_learner(self, user_id: UserId) -> None:
+        self._library.locked_learners.append(user_id)
+
+    def created_since(self, user_id: UserId, since: datetime) -> list[datetime]:
+        return [u.created_at for u in self._s.uploads.values() if u.user_id == user_id and u.created_at >= since]
 
     def add(self, upload: Upload) -> None:
         self._s.uploads[upload.upload_id] = copy.deepcopy(upload)
@@ -269,7 +278,7 @@ class FakeLibraryUnitOfWork(LibraryUnitOfWork):
         self._staged = copy.deepcopy(library.state)
         self.contents = _Contents(self._staged, library)
         self.documents = _Documents(self._staged)
-        self.uploads = _Uploads(self._staged)
+        self.uploads = _Uploads(self._staged, library)
         self.chunks = _Chunks(self._staged)
 
     def commit(self) -> None:

@@ -1,4 +1,4 @@
-"""SSM parameters (per-file limits, processing attempts) and the Keycloak secrets in Secrets Manager (#57)."""
+"""SSM parameters (per-file limits, processing attempts, upload rate limits and daily caps) and the Keycloak secrets in Secrets Manager (#57)."""
 
 import json
 from typing import Any
@@ -18,12 +18,14 @@ class ConfigStack(cdk.Stack):
     def __init__(self, scope: Construct, construct_id: str, *, names: ModeNames, **kwargs: Any) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # Per-file limits and processing attempts (PRD §11, §9.5), read at startup by the API and the worker, and the
+        # Per-file limits, processing attempts, and upload rate limits and daily caps (PRD §11, §9.5), read at startup by the API and the worker, and the
         # app time zone (D27), read by the API; change them here, not in code.
         for name, value in (
             ("max-upload-mb", "50"),
             ("max-pages", "500"),
             ("max-processing-attempts", "3"),
+            ("max-uploads-per-hour", "20"),
+            ("max-uploads-per-day", "100"),
             ("app-time-zone", APP_TIME_ZONE),
         ):
             ssm.StringParameter(self, f"Param-{name}", parameter_name=f"{names.ssm_path}/{name}", string_value=value)

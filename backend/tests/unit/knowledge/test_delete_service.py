@@ -5,7 +5,7 @@ import uuid
 
 import pytest
 
-from fakes import TEST_LIMITS, FakeObjectStore, FixedClock, InMemoryLibrary, ingest_ready
+from fakes import APP_TZ, TEST_LIMITS, TEST_UPLOAD_LIMITS, FakeObjectStore, FixedClock, InMemoryLibrary, ingest_ready
 from fakes.knowledge import _Documents
 from smart_tutor.knowledge.application import DeleteService, DocumentNotFoundError, DocumentStateError, UploadService
 from smart_tutor.knowledge.domain.content import content_key, pages_key
@@ -24,9 +24,9 @@ def service(
 
 
 def _started(library: InMemoryLibrary, owner: str) -> DocumentId:
-    started = UploadService(library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS).start_upload(
-        UserId(owner), "paper.pdf"
-    )
+    started = UploadService(
+        library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ
+    ).start_upload(UserId(owner), "paper.pdf")
     return started.document_id
 
 

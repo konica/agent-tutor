@@ -2,7 +2,7 @@ import hashlib
 
 import pytest
 
-from fakes import TEST_LIMITS, FakeObjectStore, FixedClock, InMemoryLibrary, fake_tools
+from fakes import APP_TZ, TEST_LIMITS, TEST_UPLOAD_LIMITS, FakeObjectStore, FixedClock, InMemoryLibrary, fake_tools
 from smart_tutor.knowledge.application import (
     IngestionService,
     StartedUpload,
@@ -20,7 +20,14 @@ SHA = hashlib.sha256(PDF).hexdigest()
 class World:
     def __init__(self) -> None:
         self.library, self.objects = InMemoryLibrary(), FakeObjectStore()
-        self.uploads = UploadService(self.library.unit_of_work, self.objects, FixedClock(), TEST_LIMITS)
+        self.uploads = UploadService(
+            self.library.unit_of_work,
+            self.objects,
+            FixedClock(),
+            TEST_LIMITS,
+            rate=TEST_UPLOAD_LIMITS,
+            time_zone=APP_TZ,
+        )
         self.ingestion = IngestionService(self.library.unit_of_work, self.objects, fake_tools(), TEST_LIMITS)
 
     def upload(self, user: str, data: bytes = PDF, name: str = "paper.pdf") -> StartedUpload:

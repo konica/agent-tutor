@@ -41,6 +41,10 @@ awslocal ssm put-parameter --name /smart-tutor/max-pages --type String --value 5
 # Processing attempts per content (PRD §9.5): the API refuses a Retry after this many.
 awslocal ssm put-parameter --name /smart-tutor/max-processing-attempts --type String --value 3 --overwrite
 
+# Upload rate limits and daily caps per learner (PRD §11): the API refuses a presigned POST past them.
+awslocal ssm put-parameter --name /smart-tutor/max-uploads-per-hour --type String --value 20 --overwrite
+awslocal ssm put-parameter --name /smart-tutor/max-uploads-per-day --type String --value 100 --overwrite
+
 # Keep app-time-zone the last parameter written: the LocalStack healthcheck in compose.yaml waits for it.
 awslocal ssm put-parameter --name /smart-tutor/app-time-zone --type String --value Asia/Ho_Chi_Minh --overwrite
 

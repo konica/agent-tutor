@@ -5,7 +5,9 @@ import copy
 import pytest
 
 from fakes import (
+    APP_TZ,
     TEST_LIMITS,
+    TEST_UPLOAD_LIMITS,
     FakeObjectStore,
     FixedClock,
     InMemoryLibrary,
@@ -94,7 +96,9 @@ def test_archiving_twice_keeps_the_first_time() -> None:
 
 def test_a_processing_document_archived_before_the_worker_finishes_stays_archived() -> None:
     library, clock, objects = InMemoryLibrary(), FixedClock(), FakeObjectStore()
-    started = UploadService(library.unit_of_work, objects, clock, TEST_LIMITS).start_upload(ADA, "paper.pdf")
+    started = UploadService(
+        library.unit_of_work, objects, clock, TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ
+    ).start_upload(ADA, "paper.pdf")
     doc = DocumentId(started.document_id)
     ArchiveService(library.unit_of_work, clock, max_attempts=3).archive(ADA, doc)
     archived_at = library.state.documents[doc].archived_at

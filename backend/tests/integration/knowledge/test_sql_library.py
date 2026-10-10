@@ -4,13 +4,16 @@ import hashlib
 import threading
 import uuid
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import Engine, text
 
+from fakes import APP_TZ, TEST_LIMITS, FakeObjectStore, FixedClock
+from smart_tutor.accounts.application import UploadLimitReachedError, UploadLimits
 from smart_tutor.knowledge.adapters.sql_library import SqlLibraryUnitOfWork
 from smart_tutor.knowledge.application import ArchiveService, DocumentService
+from smart_tutor.knowledge.application.upload_service import UploadService
 from smart_tutor.knowledge.domain.chunk import Chunk
 from smart_tutor.knowledge.domain.content import UNREADABLE_PDF, Content
 from smart_tutor.knowledge.domain.description import DocumentDescription, parse_description
@@ -57,6 +60,19 @@ def test_documents_list_only_for_their_owner(engine: Engine) -> None:
     assert all(d.owner_id == ada for d in mine)
 
 
+def test_created_since_returns_only_the_learners_recent_uploads(engine: Engine) -> None:
+    ada, bob = UserId(f"ada-{uid()}"), UserId(f"bob-{uid()}")
+    t0 = datetime(2026, 10, 10, 3, 0, tzinfo=UTC)
+    with SqlLibraryUnitOfWork(engine) as tx:
+        tx.uploads.add(Upload(UploadId(uid()), ada, t0 - timedelta(hours=2)))
+        tx.uploads.add(Upload(UploadId(uid()), ada, t0))
+        tx.uploads.add(Upload(UploadId(uid()), bob, t0))
+        tx.commit()
+    with SqlLibraryUnitOfWork(engine) as tx:
+        tx.uploads.lock_learner(ada)
+        assert tx.uploads.created_since(ada, t0 - timedelta(hours=1)) == [t0]
+
+
 def test_uncommitted_work_rolls_back(engine: Engine) -> None:
     owner = f"ada-{uid()}"
     with SqlLibraryUnitOfWork(engine) as tx:
@@ -88,6 +104,39 @@ def test_concurrent_insert_or_get_by_one_owner_makes_one_content_row(engine: Eng
     assert sorted(results) == [False, True]
     with engine.connect() as conn:
         rows = conn.execute(text("select count(*) from contents where sha256 = :s"), {"s": sha}).scalar_one()
+    assert rows == 1
+
+
+def test_concurrent_starts_at_the_limit_let_only_one_through(engine: Engine) -> None:
+    owner = UserId(f"ada-{uid()}")
+    service = UploadService(
+        lambda: SqlLibraryUnitOfWork(engine),
+        FakeObjectStore(),
+        FixedClock(),
+        TEST_LIMITS,
+        rate=UploadLimits(per_hour=1, per_day=100),
+        time_zone=APP_TZ,
+    )
+    barrier = threading.Barrier(2, timeout=10)
+    outcomes: list[str] = []
+
+    def worker() -> None:
+        barrier.wait()
+        try:
+            service.start_upload(owner, "paper.pdf")
+            outcomes.append("started")
+        except UploadLimitReachedError:
+            outcomes.append("limited")
+
+    threads = [threading.Thread(target=worker, daemon=True) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=30)
+    assert not any(t.is_alive() for t in threads)
+    assert sorted(outcomes) == ["limited", "started"]
+    with engine.connect() as conn:
+        rows = conn.execute(text("select count(*) from uploads where user_id = :u"), {"u": owner}).scalar_one()
     assert rows == 1
 
 

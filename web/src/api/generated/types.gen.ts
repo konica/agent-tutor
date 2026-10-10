@@ -460,6 +460,32 @@ export type UpdateThreadRequest = {
 };
 
 /**
+ * UploadLimitReachedResponse
+ */
+export type UploadLimitReachedResponse = {
+    /**
+     * Detail
+     */
+    detail: string;
+    /**
+     * Limit
+     */
+    limit: 'hour' | 'day';
+    /**
+     * Per Day
+     */
+    per_day: number;
+    /**
+     * Per Hour
+     */
+    per_hour: number;
+    /**
+     * Retry At
+     */
+    retry_at: string;
+};
+
+/**
  * UploadLimitsResponse
  */
 export type UploadLimitsResponse = {
@@ -471,6 +497,28 @@ export type UploadLimitsResponse = {
      * Max Pages
      */
     max_pages: number;
+};
+
+/**
+ * UploadRateLimitResponse
+ */
+export type UploadRateLimitResponse = {
+    /**
+     * Limit
+     */
+    limit: 'hour' | 'day' | null;
+    /**
+     * Per Day
+     */
+    per_day: number;
+    /**
+     * Per Hour
+     */
+    per_hour: number;
+    /**
+     * Retry At
+     */
+    retry_at: string | null;
 };
 
 /**
@@ -1237,6 +1285,10 @@ export type StartUploadErrors = {
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * An upload limit is reached (PRD §11)
+     */
+    429: UploadLimitReachedResponse;
 };
 
 export type StartUploadError = StartUploadErrors[keyof StartUploadErrors];
@@ -1265,6 +1317,22 @@ export type GetUploadLimitsResponses = {
 };
 
 export type GetUploadLimitsResponse = GetUploadLimitsResponses[keyof GetUploadLimitsResponses];
+
+export type GetUploadRateLimitData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/uploads/rate-limit';
+};
+
+export type GetUploadRateLimitResponses = {
+    /**
+     * Successful Response
+     */
+    200: UploadRateLimitResponse;
+};
+
+export type GetUploadRateLimitResponse = GetUploadRateLimitResponses[keyof GetUploadRateLimitResponses];
 
 export type GetUploadData = {
     body?: never;

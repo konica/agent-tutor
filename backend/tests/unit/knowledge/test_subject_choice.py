@@ -4,8 +4,10 @@ import pytest
 from langchain_core.messages import AIMessage
 
 from fakes import (
+    APP_TZ,
     DESCRIPTION_ARGS,
     TEST_LIMITS,
+    TEST_UPLOAD_LIMITS,
     FakeObjectStore,
     FixedClock,
     InMemoryLibrary,
@@ -47,7 +49,14 @@ class World:
     def __init__(self, chat: AIMessage | None = None) -> None:
         self.library, self.objects = InMemoryLibrary(), FakeObjectStore()
         self.subjects = InMemorySubjects()
-        self.uploads = UploadService(self.library.unit_of_work, self.objects, FixedClock(), TEST_LIMITS)
+        self.uploads = UploadService(
+            self.library.unit_of_work,
+            self.objects,
+            FixedClock(),
+            TEST_LIMITS,
+            rate=TEST_UPLOAD_LIMITS,
+            time_zone=APP_TZ,
+        )
         self.ingestion = IngestionService(
             self.library.unit_of_work, self.objects, fake_tools(chat=describing_chat_model(chat)), TEST_LIMITS
         )

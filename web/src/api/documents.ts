@@ -1,8 +1,8 @@
 import { SessionExpiredError } from "../auth/authClient";
 import type { Client } from "./generated/client";
 import { client } from "./generated/client.gen";
-import { archiveDocument as postArchive, checkDuplicate, chooseSubjects, deleteDocument as sendDelete, getDocument, getDocumentFile, getSubjectSuggestions, getUpload, getUploadLimits, listDocuments, restoreDocument as postRestore, retryDocument, setDocumentTitle, startUpload } from "./generated/sdk.gen";
-import type { DocumentDetailsResponse, DocumentResponse, SubjectSuggestionsResponse, SuggestionResponse, UploadLimitsResponse, UploadStatusResponse } from "./generated/types.gen";
+import { archiveDocument as postArchive, checkDuplicate, chooseSubjects, deleteDocument as sendDelete, getDocument, getDocumentFile, getSubjectSuggestions, getUpload, getUploadLimits, getUploadRateLimit, listDocuments, restoreDocument as postRestore, retryDocument, setDocumentTitle, startUpload } from "./generated/sdk.gen";
+import type { DocumentDetailsResponse, DocumentResponse, SubjectSuggestionsResponse, SuggestionResponse, UploadLimitReachedResponse, UploadLimitsResponse, UploadRateLimitResponse, UploadStatusResponse } from "./generated/types.gen";
 
 export type { DocumentResponse };
 export type DocumentDetails = DocumentDetailsResponse;
@@ -10,6 +10,23 @@ export type UploadLimits = UploadLimitsResponse;
 export type SubjectSuggestions = SubjectSuggestionsResponse;
 export type Suggestion = SuggestionResponse;
 export type UploadStatus = UploadStatusResponse;
+export type UploadRateLimit = UploadRateLimitResponse;
+
+// The learner reached an upload limit (PRD §11): the API refused the presigned POST until rateLimit.retry_at.
+export class UploadLimitError extends Error {
+  constructor(readonly rateLimit: UploadRateLimit, message = "") {
+    super(message);
+    this.name = "UploadLimitError";
+  }
+}
+
+// The caller's own limits, and which one is reached (null while uploads are open).
+export async function loadUploadRateLimit(apiClient: Client = client): Promise<UploadRateLimit> {
+  const { data, error, response } = await getUploadRateLimit({ client: apiClient, throwOnError: false });
+  if (sessionOver(error, response)) throw new SessionExpiredError();
+  if (!data) throw new Error(`GET /uploads/rate-limit failed (${response?.status ?? "no response"})`);
+  return data;
+}
 
 export function sessionOver(error: unknown, response: Response | undefined): boolean {
   return error instanceof SessionExpiredError || response?.status === 401;
@@ -206,11 +223,22 @@ export function postForm(url: string, form: FormData, onProgress: (fraction: num
   });
 }
 
+// A 429 from anything but the upload limit (an edge limiter, a text body) has no retry time to show, so it is a plain failure.
+function isUploadLimitBody(body: unknown): body is UploadLimitReachedResponse {
+  if (typeof body !== "object" || body === null) return false;
+  const { limit, retry_at } = body as Record<string, unknown>;
+  return (limit === "hour" || limit === "day") && typeof retry_at === "string";
+}
+
 // The API presigns a POST for this learner's key and creates the row; the browser then sends the file straight to S3 (PRD §9.3).
 // Callers check the file first with rejectionReason.
 export async function uploadPdf(file: File, events: UploadEvents = {}, apiClient: Client = client, post: PostForm = postForm): Promise<void> {
   const { data, error, response } = await startUpload({ client: apiClient, body: { file_name: file.name }, throwOnError: false });
   if (sessionOver(error, response)) throw new SessionExpiredError();
+  if (response?.status === 429 && isUploadLimitBody(error)) {
+    const { detail, ...rateLimit } = error;
+    throw new UploadLimitError(rateLimit, detail);
+  }
   if (!data) throw new Error(`POST /uploads failed (${response?.status ?? "no response"})`);
   events.onStarted?.(data.document_id, data.upload_id);
   const form = new FormData();

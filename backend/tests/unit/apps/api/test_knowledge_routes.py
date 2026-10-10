@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from fakes import (
+    APP_TZ,
     TEST_LIMITS,
     FakeObjectStore,
     FakeQueue,
@@ -14,8 +15,9 @@ from fakes import (
     api_services,
     fake_tools,
 )
+from smart_tutor.accounts.application import UploadLimits
 from smart_tutor.apps.api.main import create_app
-from smart_tutor.knowledge.application import IngestionService, retried_content
+from smart_tutor.knowledge.application import IngestionService, UploadService, retried_content
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.domain.principal import Principal
@@ -632,3 +634,61 @@ def test_a_deleted_documents_subject_leaves_my_subjects_unless_another_document_
 
     assert [s["subject_id"] for s in client.get("/me/subjects", headers=AUTH).json()] == [GENERAL]
     assert listed_ids(client, {}) == {shared}
+
+
+def limited_client(per_hour: int = 2, per_day: int = 100) -> tuple[TestClient, FixedClock]:
+    verifier = FakeTokenVerifier()
+    verifier.add("ada-token", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
+    library, objects = InMemoryLibrary(), FakeObjectStore()
+    clock = FixedClock(datetime(2026, 10, 10, 4, 0, tzinfo=UTC))  # 11:00 GMT+7
+    uploads = UploadService(
+        library.unit_of_work, objects, clock, TEST_LIMITS, rate=UploadLimits(per_hour, per_day), time_zone=APP_TZ
+    )
+    services = api_services(library, objects, clock=clock, uploads=uploads)
+    return TestClient(create_app(Settings(), verifier=verifier, services=services)), clock
+
+
+def test_the_upload_over_the_limit_is_429_with_the_time_it_opens_again() -> None:
+    client, clock = limited_client()
+    clock.current = datetime(2026, 10, 10, 3, 40, tzinfo=UTC)  # 10:40 GMT+7
+    assert client.post("/uploads", json={"file_name": "a.pdf"}, headers=AUTH).status_code == 201
+    clock.current = datetime(2026, 10, 10, 3, 50, tzinfo=UTC)
+    assert client.post("/uploads", json={"file_name": "b.pdf"}, headers=AUTH).status_code == 201
+
+    clock.current = datetime(2026, 10, 10, 4, 0, tzinfo=UTC)
+    refused = client.post("/uploads", json={"file_name": "c.pdf"}, headers=AUTH)
+
+    assert refused.status_code == 429
+    assert refused.headers["Retry-After"] == "2400"
+    assert refused.json() == {
+        "detail": "Upload limit reached. You can upload again at 11:40 (GMT+7).",
+        "per_hour": 2,
+        "per_day": 100,
+        "limit": "hour",
+        "retry_at": "2026-10-10T04:40:00Z",
+    }
+
+
+def test_rate_limit_status_reports_the_open_and_the_limited_state() -> None:
+    client, _ = limited_client(per_hour=1)
+    assert client.get("/uploads/rate-limit", headers=AUTH).json() == {
+        "per_hour": 1,
+        "per_day": 100,
+        "limit": None,
+        "retry_at": None,
+    }
+    client.post("/uploads", json={"file_name": "a.pdf"}, headers=AUTH)
+    assert client.get("/uploads/rate-limit", headers=AUTH).json() == {
+        "per_hour": 1,
+        "per_day": 100,
+        "limit": "hour",
+        "retry_at": "2026-10-10T05:00:00Z",
+    }
+
+
+def test_the_daily_cap_says_midnight_gmt7() -> None:
+    client, _ = limited_client(per_hour=50, per_day=1)
+    client.post("/uploads", json={"file_name": "a.pdf"}, headers=AUTH)
+    refused = client.post("/uploads", json={"file_name": "b.pdf"}, headers=AUTH)
+    assert refused.json()["detail"] == "Upload limit reached. You can upload again at 00:00 (GMT+7)."
+    assert refused.json()["limit"] == "day"
