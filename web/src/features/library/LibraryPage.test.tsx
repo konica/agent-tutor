@@ -1356,4 +1356,35 @@ describe("LibraryPage upload limits", () => {
     await waitFor(() => expect(screen.queryByText("Upload limit reached.")).toBeNull());
     expect(screen.getByRole("button", { name: "Upload" })).toBeEnabled();
   });
+
+  it("keeps the banner after a batch's 429 even when the reload answers open", async () => {
+    const future = new Date(Date.now() + 30 * 60_000).toISOString();
+    const upload = vi.fn(async () => {
+      throw new UploadLimitError(hourly(future), "Upload limit reached.");
+    });
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => [processing]} upload={upload} loadRateLimit={open} />);
+    await screen.findByText("lewis-rag-2020.pdf");
+    await userEvent.upload(screen.getByLabelText("Upload PDFs"), new File(["%PDF"], "a.pdf", { type: "application/pdf" }));
+    expect(await screen.findByText("Upload limit reached.")).toBeVisible();
+    await act(async () => {}); // let the post-batch refresh answer "open"
+    expect(screen.getByText("Upload limit reached.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Upload" })).toBeDisabled();
+  });
+
+  it("re-checks at a bounded rate when the browser clock is ahead of the server", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const pastByClientClock = new Date(Date.now() - 1_000).toISOString();
+    const loadRateLimit = vi.fn(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300)); // a network round trip: React renders the open state in between
+      return hourly(pastByClientClock);
+    });
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={async () => [processing]} upload={vi.fn()} loadRateLimit={loadRateLimit} />);
+    expect(await screen.findByText("Upload limit reached.")).toBeVisible();
+    for (let elapsed = 0; elapsed < 20_000; elapsed += 250) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250); // a separate act per step, so React renders between timers
+      });
+    }
+    expect(loadRateLimit.mock.calls.length).toBeLessThanOrEqual(6);
+  });
 });

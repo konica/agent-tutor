@@ -505,6 +505,15 @@ describe("upload limits", () => {
     expect(post).not.toHaveBeenCalled();
   });
 
+  it("treats a 429 without a limit body as a plain failure", async () => {
+    const { apiClient } = api(() => new Response("Too Many Requests", { status: 429 }));
+    const post = vi.fn(async () => 204);
+    const rejection = uploadPdf(new File(["%PDF"], "a.pdf", { type: "application/pdf" }), {}, apiClient, post);
+    await expect(rejection).rejects.toThrow("POST /uploads failed (429)");
+    await expect(rejection).rejects.not.toBeInstanceOf(UploadLimitError);
+    expect(post).not.toHaveBeenCalled();
+  });
+
   it("loads the caller's rate limit", async () => {
     const open = { per_hour: 20, per_day: 100, limit: null, retry_at: null };
     const { apiClient, fetch } = api(() => json(open));

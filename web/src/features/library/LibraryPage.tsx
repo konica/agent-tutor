@@ -62,7 +62,9 @@ const defaultRetry = (id: string) => retryProcessing(id);
 const defaultLoadLimits = () => loadUploadLimits();
 const defaultLoadRateLimit = () => loadUploadRateLimit();
 const LIMIT_REASON = "Not uploaded. Upload limit reached.";
-const defaultCheck =(file: File) => findInLibrary(file);
+// How long to wait before asking again when the server still reports a limit the browser thinks has ended.
+const RECHECK_MS = 5_000;
+const defaultCheck = (file: File) => findInLibrary(file);
 const defaultLoadUpload = (uploadId: string) => loadUploadStatus(uploadId);
 const defaultArchive = (id: string) => archiveDocument(id);
 const defaultRestore = (id: string) => restoreDocument(id);
@@ -253,7 +255,9 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
   // Open again when the limit ends, without a reload.
   useEffect(() => {
     if (!limited || !rateLimit?.retry_at) return;
-    const wait = Math.max(0, new Date(rateLimit.retry_at).getTime() - Date.now());
+    // A retry time already past by this browser's clock (skew) must not make the re-check loop: wait before asking again.
+    const remaining = new Date(rateLimit.retry_at).getTime() - Date.now();
+    const wait = remaining > 0 ? remaining : RECHECK_MS;
     const timer = setTimeout(() => {
       setRateLimit((current) => (current ? { ...current, limit: null, retry_at: null } : current));
       void refreshRateLimit();
@@ -387,11 +391,11 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
       if (started.uploadId) void watchUpload(id, started.uploadId, file.name);
     } catch (error) {
       if (error instanceof UploadLimitError) {
-        limitedRef.current = true;
+        limitedRef.current = error.rateLimit.retry_at != null;
         setRateLimit(error.rateLimit);
         setTray((items) => items.filter((t) => t.id !== id));
-        refuseForLimit(file, i, say);
-        if (error.rateLimit.retry_at) parts.current[i] = `${file.name}: ${LIMIT_REASON} You can upload again at ${limitTime(new Date(error.rateLimit.retry_at))}.`;
+        setRejected((list) => [...list, { name: file.name, reason: LIMIT_REASON }]);
+        parts.current[i] = `${file.name}: ${LIMIT_REASON}${error.rateLimit.retry_at ? ` You can upload again at ${limitTime(new Date(error.rateLimit.retry_at))}.` : ""}`;
         say();
         return;
       }

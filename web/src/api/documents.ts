@@ -223,13 +223,20 @@ export function postForm(url: string, form: FormData, onProgress: (fraction: num
   });
 }
 
+// A 429 from anything but the upload limit (an edge limiter, a text body) has no retry time to show, so it is a plain failure.
+function isUploadLimitBody(body: unknown): body is UploadLimitReachedResponse {
+  if (typeof body !== "object" || body === null) return false;
+  const { limit, retry_at } = body as Record<string, unknown>;
+  return (limit === "hour" || limit === "day") && typeof retry_at === "string";
+}
+
 // The API presigns a POST for this learner's key and creates the row; the browser then sends the file straight to S3 (PRD §9.3).
 // Callers check the file first with rejectionReason.
 export async function uploadPdf(file: File, events: UploadEvents = {}, apiClient: Client = client, post: PostForm = postForm): Promise<void> {
   const { data, error, response } = await startUpload({ client: apiClient, body: { file_name: file.name }, throwOnError: false });
   if (sessionOver(error, response)) throw new SessionExpiredError();
-  if (response?.status === 429) {
-    const { detail, ...rateLimit } = error as UploadLimitReachedResponse;
+  if (response?.status === 429 && isUploadLimitBody(error)) {
+    const { detail, ...rateLimit } = error;
     throw new UploadLimitError(rateLimit, detail);
   }
   if (!data) throw new Error(`POST /uploads failed (${response?.status ?? "no response"})`);

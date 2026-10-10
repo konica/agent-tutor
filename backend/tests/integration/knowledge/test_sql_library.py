@@ -8,8 +8,11 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy import Engine, text
 
+from fakes import APP_TZ, TEST_LIMITS, FakeObjectStore, FixedClock
+from smart_tutor.accounts.application import UploadLimitReachedError, UploadLimits
 from smart_tutor.knowledge.adapters.sql_library import SqlLibraryUnitOfWork
 from smart_tutor.knowledge.application import ArchiveService, DocumentService
+from smart_tutor.knowledge.application.upload_service import UploadService
 from smart_tutor.knowledge.domain.chunk import Chunk
 from smart_tutor.knowledge.domain.content import UNREADABLE_PDF, Content
 from smart_tutor.knowledge.domain.description import DocumentDescription, parse_description
@@ -100,6 +103,39 @@ def test_concurrent_insert_or_get_by_one_owner_makes_one_content_row(engine: Eng
     assert sorted(results) == [False, True]
     with engine.connect() as conn:
         rows = conn.execute(text("select count(*) from contents where sha256 = :s"), {"s": sha}).scalar_one()
+    assert rows == 1
+
+
+def test_concurrent_starts_at_the_limit_let_only_one_through(engine: Engine) -> None:
+    owner = UserId(f"ada-{uid()}")
+    service = UploadService(
+        lambda: SqlLibraryUnitOfWork(engine),
+        FakeObjectStore(),
+        FixedClock(),
+        TEST_LIMITS,
+        rate=UploadLimits(per_hour=1, per_day=100),
+        time_zone=APP_TZ,
+    )
+    barrier = threading.Barrier(2, timeout=10)
+    outcomes: list[str] = []
+
+    def worker() -> None:
+        barrier.wait()
+        try:
+            service.start_upload(owner, "paper.pdf")
+            outcomes.append("started")
+        except UploadLimitReachedError:
+            outcomes.append("limited")
+
+    threads = [threading.Thread(target=worker, daemon=True) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=30)
+    assert not any(t.is_alive() for t in threads)
+    assert sorted(outcomes) == ["limited", "started"]
+    with engine.connect() as conn:
+        rows = conn.execute(text("select count(*) from uploads where user_id = :u"), {"u": owner}).scalar_one()
     assert rows == 1
 
 
