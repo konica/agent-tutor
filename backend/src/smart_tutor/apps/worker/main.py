@@ -21,6 +21,7 @@ from smart_tutor.knowledge.application import (
     DocumentDescriber,
     IngestionService,
     ProcessingTools,
+    StartIndexBackfill,
     load_file_limits,
     retried_content,
 )
@@ -90,7 +91,10 @@ def main() -> None:
     limits = load_file_limits(
         SsmParameterStore(ssm_client(settings)), settings.max_upload_mb_param, settings.max_pages_param
     )
-    ingestion = IngestionService(library, S3ObjectStore(s3_client(settings), settings.documents_bucket), tools, limits)
+    library_objects = S3ObjectStore(s3_client(settings), settings.documents_bucket)
+    offsets = StartIndexBackfill(library, library_objects).run()  # chunks from before start_index (#124)
+    logger.info("start_index backfill: %d located, %d left null", offsets.located, offsets.missing)
+    ingestion = IngestionService(library, library_objects, tools, limits)
     queue = SqsMessageQueue(sqs_client(settings), settings.ingest_queue_url)
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stop.set())

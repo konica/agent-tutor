@@ -18,6 +18,17 @@ class Chunk:
     start_index: int | None = None  # offset in the page's cleaned text; None when unknown
 
 
+@dataclass(frozen=True)
+class StoredChunk:
+    """A stored chunk without its embedding, as the start_index backfill reads it."""
+
+    chunk_id: str
+    seq: int
+    page: int | None
+    text: str
+    start_index: int | None
+
+
 def start_index_of(value: object) -> int | None:
     """The splitter's start offset, or None when it couldn't find the chunk (it reports -1) or gave none."""
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:

@@ -3,6 +3,7 @@
 import hashlib
 import threading
 import uuid
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
@@ -209,6 +210,26 @@ def test_replace_chunks_is_idempotent(engine: Engine) -> None:
     assert [len(v) for v in vectors] == [1024, 1024]
     assert vectors[0][0] == pytest.approx(0.5)
     assert vectors[1][-1] == pytest.approx(0.25)
+
+
+def test_chunks_without_a_start_index_are_listed_and_filled(engine: Engine) -> None:
+    content = stored_content(engine, f"ada-{uid()}")
+    with SqlLibraryUnitOfWork(engine) as tx:
+        tx.chunks.replace(
+            content.content_id,
+            [chunk(content, 0, 1, 0.1), replace(chunk(content, 1, 1, 0.2), start_index=5)],
+        )
+        tx.commit()
+    with SqlLibraryUnitOfWork(engine) as tx:
+        assert tx.chunks.contents_missing_start_index().count(content.content_id) == 1
+        stored = tx.chunks.list_for_content(content.content_id)
+    assert [(c.seq, c.page, c.text, c.start_index) for c in stored] == [(0, 1, "text 0", None), (1, 1, "text 1", 5)]
+    with SqlLibraryUnitOfWork(engine) as tx:
+        tx.chunks.set_start_indexes({stored[0].chunk_id: 3, uid(): 9})  # an unknown id updates nothing
+        tx.commit()
+    with SqlLibraryUnitOfWork(engine) as tx:
+        assert content.content_id not in tx.chunks.contents_missing_start_index()
+        assert [c.start_index for c in tx.chunks.list_for_content(content.content_id)] == [3, 5]
 
 
 def test_replace_with_no_chunks_only_deletes(engine: Engine) -> None:
