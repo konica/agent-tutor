@@ -765,6 +765,44 @@
         "title": "UpdateThreadRequest",
         "type": "object"
       },
+      "UploadLimitReachedResponse": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "limit": {
+            "enum": [
+              "hour",
+              "day"
+            ],
+            "title": "Limit",
+            "type": "string"
+          },
+          "per_day": {
+            "title": "Per Day",
+            "type": "integer"
+          },
+          "per_hour": {
+            "title": "Per Hour",
+            "type": "integer"
+          },
+          "retry_at": {
+            "format": "date-time",
+            "title": "Retry At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "detail",
+          "per_hour",
+          "per_day",
+          "limit",
+          "retry_at"
+        ],
+        "title": "UploadLimitReachedResponse",
+        "type": "object"
+      },
       "UploadLimitsResponse": {
         "properties": {
           "max_bytes": {
@@ -781,6 +819,53 @@
           "max_pages"
         ],
         "title": "UploadLimitsResponse",
+        "type": "object"
+      },
+      "UploadRateLimitResponse": {
+        "properties": {
+          "limit": {
+            "anyOf": [
+              {
+                "enum": [
+                  "hour",
+                  "day"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "per_day": {
+            "title": "Per Day",
+            "type": "integer"
+          },
+          "per_hour": {
+            "title": "Per Hour",
+            "type": "integer"
+          },
+          "retry_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry At"
+          }
+        },
+        "required": [
+          "per_hour",
+          "per_day",
+          "limit",
+          "retry_at"
+        ],
+        "title": "UploadRateLimitResponse",
         "type": "object"
       },
       "UploadStatusResponse": {
@@ -2045,6 +2130,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadLimitReachedResponse"
+                }
+              }
+            },
+            "description": "An upload limit is reached (PRD \u00a711)"
           }
         },
         "security": [
@@ -2080,6 +2175,33 @@
           }
         ],
         "summary": "Get Upload Limits",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/uploads/rate-limit": {
+      "get": {
+        "description": "The caller's upload limits and, when one is reached, which and until when (PRD \u00a711, US-9).",
+        "operationId": "get_upload_rate_limit",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadRateLimitResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Upload Rate Limit",
         "tags": [
           "knowledge"
         ]

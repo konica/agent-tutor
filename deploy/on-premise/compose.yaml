@@ -113,6 +113,8 @@ services:
       SMART_TUTOR_MAX_UPLOAD_MB_PARAM: ${SSM_PATH:?}/max-upload-mb
       SMART_TUTOR_MAX_PAGES_PARAM: ${SSM_PATH:?}/max-pages
       SMART_TUTOR_MAX_PROCESSING_ATTEMPTS_PARAM: ${SSM_PATH:?}/max-processing-attempts
+      SMART_TUTOR_MAX_UPLOADS_PER_HOUR_PARAM: ${SSM_PATH:?}/max-uploads-per-hour
+      SMART_TUTOR_MAX_UPLOADS_PER_DAY_PARAM: ${SSM_PATH:?}/max-uploads-per-day
       SMART_TUTOR_APP_TIME_ZONE_PARAM: ${SSM_PATH:?}/app-time-zone
       SMART_TUTOR_LEARNING_RECORD_IDLE_MINUTES_PARAM: ${SSM_PATH:?}/learning-record-idle-minutes
       HOME: /tmp  # botocore looks for ~/.aws; the image user has no home. Credentials come from the instance profile.

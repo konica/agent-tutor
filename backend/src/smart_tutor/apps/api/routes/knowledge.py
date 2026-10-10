@@ -1,15 +1,18 @@
-"""Library routes (knowledge module): start an upload, report what became of it (US-11), list the caller's
-documents, check a file hash against them, retry a failed one, suggest and save its subjects, archive and restore a
-document, show a document's details and set its display title, delete one for good, and link to its PDF
-for the viewer."""
+"""Library routes (knowledge module): start an upload, report the caller's upload limits and
+what became of an upload (US-11), list the caller's documents, check a file hash against them, retry a failed
+one, suggest and save its subjects, archive and restore a document, show a document's details and set its
+display title, delete one for good, and link to its PDF for the viewer."""
 
+import math
 from datetime import date, datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
+from smart_tutor.accounts.application import UploadLimitReachedError
 from smart_tutor.apps.api.deps import (
     Archive,
     CurrentPrincipal,
@@ -59,6 +62,21 @@ class UploadStatusResponse(BaseModel):
     outcome: Literal["stored", "duplicate"] | None  # null until the worker has hashed the file
     document_id: str | None  # the upload's document, or the learner's existing one for a duplicate
     archived: bool
+
+
+class UploadRateLimitResponse(BaseModel):
+    per_hour: int
+    per_day: int
+    limit: Literal["hour", "day"] | None  # the limit reached, null while the learner can upload
+    retry_at: datetime | None  # when uploads open again
+
+
+class UploadLimitReachedResponse(BaseModel):
+    detail: str  # "Upload limit reached. You can upload again at 11:40 (GMT+7)."
+    per_hour: int
+    per_day: int
+    limit: Literal["hour", "day"]
+    retry_at: datetime
 
 
 class DuplicateCheckRequest(BaseModel):
@@ -131,12 +149,32 @@ class ChooseSubjectsRequest(BaseModel):
     )
 
 
-@router.post("/uploads", operation_id="start_upload", status_code=status.HTTP_201_CREATED)
-def start_upload(body: StartUploadRequest, principal: CurrentPrincipal, uploads: Uploads) -> StartUploadResponse:
+@router.post(
+    "/uploads",
+    operation_id="start_upload",
+    status_code=status.HTTP_201_CREATED,
+    response_model=StartUploadResponse,
+    responses={429: {"model": UploadLimitReachedResponse, "description": "An upload limit is reached (PRD §11)"}},
+)
+def start_upload(
+    body: StartUploadRequest, principal: CurrentPrincipal, uploads: Uploads
+) -> StartUploadResponse | JSONResponse:
     try:
         started = uploads.start_upload(principal.user_id, body.file_name)
     except InvalidFileNameError as e:
         raise HTTPException(422, str(e)) from None
+    except UploadLimitReachedError as e:
+        wait = math.ceil((e.block.retry_at - uploads.now()).total_seconds())
+        refused = UploadLimitReachedResponse(
+            detail=str(e),
+            per_hour=e.limits.per_hour,
+            per_day=e.limits.per_day,
+            limit=e.block.window.value,
+            retry_at=e.block.retry_at,
+        )
+        return JSONResponse(
+            refused.model_dump(mode="json"), status_code=429, headers={"Retry-After": str(max(wait, 1))}
+        )
     return StartUploadResponse(
         document_id=started.document_id, upload_id=started.upload_id, url=started.url, fields=started.fields
     )
@@ -146,6 +184,18 @@ def start_upload(body: StartUploadRequest, principal: CurrentPrincipal, uploads:
 def get_upload_limits(uploads: Uploads) -> UploadLimitsResponse:
     """The per-file limits, so the browser can refuse a file before uploading it (PRD §8 US-2)."""
     return UploadLimitsResponse(max_bytes=uploads.limits.max_bytes, max_pages=uploads.limits.max_pages)
+
+
+@router.get("/uploads/rate-limit", operation_id="get_upload_rate_limit")
+def get_upload_rate_limit(principal: CurrentPrincipal, uploads: Uploads) -> UploadRateLimitResponse:
+    """The caller's upload limits and, when one is reached, which and until when (PRD §11, US-9)."""
+    block = uploads.upload_block(principal.user_id)
+    return UploadRateLimitResponse(
+        per_hour=uploads.rate_limits.per_hour,
+        per_day=uploads.rate_limits.per_day,
+        limit=block.window.value if block else None,
+        retry_at=block.retry_at if block else None,
+    )
 
 
 @router.get("/uploads/{upload_id}", operation_id="get_upload")

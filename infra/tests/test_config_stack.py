@@ -20,6 +20,17 @@ def test_max_processing_attempts_is_an_ssm_parameter() -> None:
     )
 
 
+def test_upload_rate_limits_are_ssm_parameters() -> None:
+    template = Template.from_stack(ConfigStack(cdk.App(), "Config", names=mode_names(NATIVE_CLOUD)))
+
+    template.has_resource_properties(
+        "AWS::SSM::Parameter", {"Name": "/smart-tutor/max-uploads-per-hour", "Value": "20"}
+    )
+    template.has_resource_properties(
+        "AWS::SSM::Parameter", {"Name": "/smart-tutor/max-uploads-per-day", "Value": "100"}
+    )
+
+
 def test_no_subject_detection_parameters() -> None:
     template = Template.from_stack(ConfigStack(cdk.App(), "Config", names=mode_names(NATIVE_CLOUD)))
 
