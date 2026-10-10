@@ -1,11 +1,11 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
-import { MemoryRouter, useLocation } from "react-router";
+import { Link, MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AskRefusedError, NoDocumentsError, type ChatEvent } from "../../api/chat";
-import type { DocumentResponse, ThreadDocumentResponse } from "../../api/generated/types.gen";
+import { AskRefusedError, ConversationNotFoundError, NoDocumentsError, type ChatEvent } from "../../api/chat";
+import type { DocumentResponse, ThreadDocumentResponse, ThreadResponse, TurnResponse } from "../../api/generated/types.gen";
 import { SessionExpiredError, sessionExpiry } from "../../auth/authClient";
 import { fakeViewerDeps } from "../viewer/testFakes";
 import { ChatPage } from "./ChatPage";
@@ -41,11 +41,22 @@ function controlledStream() {
 
 const doc = (state: string) => ({ state }) as DocumentResponse;
 
-// The page loads the learner's documents first; tests that don't care get one ready document.
+function Location() {
+  const location = useLocation();
+  // Not an <output>: its implicit status role would clash with the page's status region.
+  return <p data-testid="location">{location.pathname + location.search}</p>;
+}
+
+// The page loads the learner's documents first; tests that don't care get one ready document. The page sits on its
+// route, so it sees the conversation's id; the location and a Chat link sit beside it.
 function renderChat(props: ComponentProps<typeof ChatPage> = {}, entry = "/chat") {
   return render(
     <MemoryRouter initialEntries={[entry]}>
-      <ChatPage loadDocs={async () => [doc("ready")]} loadUsed={async () => []} {...props} />
+      <Routes>
+        <Route path="/chat/:threadId?" element={<ChatPage loadDocs={async () => [doc("ready")]} loadUsed={async () => []} {...props} />} />
+      </Routes>
+      <Location />
+      <Link to="/chat">Chat</Link>
     </MemoryRouter>,
   );
 }
@@ -588,7 +599,8 @@ describe("ChatPage", () => {
         await userEvent.click(askButton());
         await waitFor(() => expect(askIn).toHaveBeenCalledWith("t1", "And RAG?"));
         expect(ask).toHaveBeenCalledTimes(1);
-        expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
+        // The answer is a second turn under the first.
+        await waitFor(() => expect(screen.getAllByText("It weighs tokens [1].")).toHaveLength(2));
         // The same conversation: its title and its documents stay.
         expect(screen.getByRole("button", { name: "What is attention?. Edit title" })).toBeInTheDocument();
         expect(within(panel()!).getByText("a.pdf")).toBeInTheDocument();
@@ -661,7 +673,8 @@ describe("ChatPage", () => {
         const card = screen.getByText("These documents don't cover this.").parentElement!;
         expect(within(card).getByRole("button", { name: "Add documents" })).toBeEnabled();
         expect(within(card).getByRole("button", { name: "Search all my documents" })).toBeEnabled();
-        expect(screen.queryByText("Sources")).not.toBeInTheDocument();
+        // The first turn keeps its Sources; the decline's turn has none.
+        expect(within(card.parentElement!).queryByText("Sources")).not.toBeInTheDocument();
       });
 
       it("Add documents in the decline opens the picker", async () => {
@@ -683,8 +696,10 @@ describe("ChatPage", () => {
         await waitFor(() => expect(askIn).toHaveBeenLastCalledWith("t1", "How does PPO clip?"));
         expect(askIn).toHaveBeenCalledTimes(2);
         expect(ask).toHaveBeenCalledTimes(1);
-        expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
-        expect(screen.queryByText("These documents don't cover this.")).not.toBeInTheDocument();
+        // The answer is a new turn under the decline, which keeps its message but no longer offers its way out.
+        await waitFor(() => expect(screen.getAllByText("It weighs tokens [1].")).toHaveLength(2));
+        expect(screen.getByText("These documents don't cover this.")).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Search all my documents" })).not.toBeInTheDocument();
         expect(scopeSwitch()).toHaveAttribute("aria-checked", "false");
         expect(screen.queryByText("Searching 1 document")).not.toBeInTheDocument();
       });
@@ -1187,17 +1202,7 @@ describe("ChatPage", () => {
       expect(localStorage.getItem("smart-tutor.chat-panel-open")).toBe("false");
     });
 
-    function Location() {
-      const location = useLocation();
-      return <output data-testid="location">{location.pathname + location.search}</output>;
-    }
-    const startChatAt = (props: ComponentProps<typeof ChatPage>) =>
-      render(
-        <MemoryRouter initialEntries={["/chat?document=d1"]}>
-          <ChatPage loadDocs={async () => [library()]} loadUsed={async () => []} {...props} />
-          <Location />
-        </MemoryRouter>,
-      );
+    const startChatAt = (props: ComponentProps<typeof ChatPage>) => renderChat({ loadDocs: async () => [library()], ...props }, "/chat?document=d1");
 
     it("takes the document param out of the URL once the first question uses it, without resetting the page", async () => {
       const control = controlledStream();
@@ -1221,6 +1226,226 @@ describe("ChatPage", () => {
       await userEvent.click(await within(panel()!).findByRole("button", { name: `Remove ${TITLE} from this conversation` }));
       expect(screen.getByTestId("location").textContent).toBe("/chat");
       expect(notice()).not.toBeInTheDocument();
+    });
+  });
+
+  describe("a conversation at its URL", () => {
+    const turn = (over: Partial<TurnResponse> = {}): TurnResponse => ({
+      question: "What is attention?",
+      answer: "It weighs tokens [1].",
+      citations: [{ n: 1, chunk_id: "c1", document_id: "d1", document_title: "a.pdf", page: 3, archived: false, deleted: false }],
+      decline: null,
+      created_at: "2026-10-10T09:00:00Z",
+      ...over,
+    });
+    const cited = (over: Partial<TurnResponse["citations"][number]>) => turn({ citations: [{ ...turn().citations[0]!, ...over }] });
+    const conversation = (turns: TurnResponse[], over: Partial<ThreadResponse> = {}) =>
+      vi.fn(async () => ({ thread: { thread_id: "t1", title: "Attention basics", search_scope: "library" as const, ...over }, turns }));
+    const usedDoc: ThreadDocumentResponse = { document_id: "d1", title: "a.pdf", authors: [], year: null, archived: false, deleted: false, added_by: "answer", used: true };
+    const panel = () => screen.queryByRole("complementary", { name: "Conversation" });
+    const location = () => screen.getByTestId("location").textContent;
+    const asked = () => screen.getAllByText("You asked:").map((label) => label.parentElement!.textContent);
+
+    it("opens a conversation at its URL with its title, history, documents used, and scope", async () => {
+      const loadConversation = conversation(
+        [turn(), turn({ question: "And in RAG?", answer: "", citations: [], decline: { code: "limited", message: "These documents don't cover this." } })],
+        { search_scope: "listed" },
+      );
+      renderChat({ loadConversation, loadUsed: async () => [usedDoc] }, "/chat/t1");
+      expect(await screen.findByRole("button", { name: "Attention basics. Edit title" })).toBeInTheDocument();
+      expect(loadConversation).toHaveBeenCalledWith("t1");
+      expect(asked()).toEqual(["You asked: What is attention?", "You asked: And in RAG?"]);
+      expect(screen.getByText("It weighs tokens [1].")).toBeInTheDocument();
+      expect(screen.getByText("These documents don't cover this.")).toBeInTheDocument();
+      const sources = screen.getAllByRole("list", { name: "Sources" });
+      expect(sources).toHaveLength(1);
+      expect(within(sources[0]!).getByRole("listitem")).toHaveTextContent("[1] a.pdf · p. 3");
+      expect(await within(panel()!).findByText("a.pdf")).toBeInTheDocument();
+      const form = screen.getByRole("textbox", { name: /question/i }).closest("form")!;
+      expect(within(form).getByText("Searching 1 document")).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Ask about your documents" })).not.toBeInTheDocument();
+    });
+
+    it("a history citation opens the document beside the conversation at its page", async () => {
+      const deps = fakeViewerDeps();
+      renderChat({ loadConversation: conversation([cited({ document_title: "ReAct", page: 2 })]), viewerDeps: deps }, "/chat/t1");
+      const chip = await screen.findByRole("button", { name: /^ReAct, p\. 2\. Open beside the conversation/ });
+      await userEvent.click(chip);
+      expect(await screen.findByText("p. 2 / 3", {}, { timeout: 3000 })).toBeInTheDocument();
+      expect(screen.getByRole("region", { name: "ReAct" })).toBeInTheDocument();
+      expect(deps.loadChunk).toHaveBeenCalledWith("c1");
+      expect(chip).toHaveAccessibleName(/Shown beside the conversation$/);
+      expect(chip).toHaveAttribute("aria-current", "true");
+    });
+
+    it("a deleted document's history citation reads Deleted document with no link", async () => {
+      renderChat({ loadConversation: conversation([cited({ document_title: "Deleted document", deleted: true })]) }, "/chat/t1");
+      const sources = await screen.findByRole("list", { name: "Sources" });
+      expect(within(sources).getByRole("listitem")).toHaveTextContent("[1] Deleted document");
+      expect(within(sources).queryByRole("button")).not.toBeInTheDocument();
+    });
+
+    it("an archived document's history citation says Archived and still opens", async () => {
+      renderChat(
+        { loadConversation: conversation([cited({ document_title: "ReAct", page: 2, archived: true })]), viewerDeps: fakeViewerDeps() },
+        "/chat/t1",
+      );
+      const chip = await screen.findByRole("button", { name: "ReAct, p. 2, archived. Open beside the conversation" });
+      expect(within(chip).getByText("Archived")).toBeInTheDocument();
+      await userEvent.click(chip);
+      expect(await screen.findByText("p. 2 / 3", {}, { timeout: 3000 })).toBeInTheDocument();
+      expect(screen.getByRole("region", { name: "ReAct" })).toBeInTheDocument();
+    });
+
+    it("an unknown conversation shows Conversation not found with a way back to Chat", async () => {
+      const loadConversation = vi.fn(async () => {
+        throw new ConversationNotFoundError();
+      });
+      renderChat({ loadConversation }, "/chat/nope");
+      expect(await screen.findByRole("heading", { name: "Conversation not found" })).toBeInTheDocument();
+      expect(screen.getByText("This conversation doesn't exist, or it isn't yours.")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Back to Chat" })).toHaveAttribute("href", "/chat");
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    });
+
+    it("a conversation that can't be loaded says so", async () => {
+      const loadConversation = vi.fn(async () => {
+        throw new Error("boom");
+      });
+      renderChat({ loadConversation }, "/chat/t1");
+      expect(await screen.findByText("This conversation couldn't be loaded. Reload the page to try again.")).toBeInTheDocument();
+    });
+
+    it("titles the page Conversation while it loads, not New conversation", async () => {
+      renderChat({ loadConversation: vi.fn(() => new Promise<never>(() => {})) }, "/chat/t1");
+      // The composer shows once the documents load; the conversation is still loading.
+      await question();
+      expect(screen.getByRole("heading", { level: 1, name: "Conversation" })).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "New conversation" })).not.toBeInTheDocument();
+    });
+
+    it("titles a conversation without a title Conversation", async () => {
+      renderChat({ loadConversation: conversation([turn()], { title: null }) }, "/chat/t1");
+      expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Conversation. Edit title" })).toBeInTheDocument();
+    });
+
+    it("an unlimited question that fails before its thread moves to /chat, and Back reopens the conversation", async () => {
+      function Back() {
+        const navigate = useNavigate();
+        return (
+          <button type="button" onClick={() => void navigate(-1)}>
+            Go back
+          </button>
+        );
+      }
+      const loadConversation = conversation([turn()]);
+      const ask = vi.fn(() => events({ type: "error", code: "unavailable", message: "The tutor is unavailable. Try again in a moment." }));
+      render(
+        <MemoryRouter initialEntries={["/chat/t1"]}>
+          <Routes>
+            <Route path="/chat/:threadId?" element={<ChatPage loadDocs={async () => [doc("ready")]} loadUsed={async () => []} loadConversation={loadConversation} ask={ask} />} />
+          </Routes>
+          <Location />
+          <Back />
+        </MemoryRouter>,
+      );
+      expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
+      await userEvent.type(await question(), "Next?");
+      await userEvent.click(askButton());
+      expect(await screen.findByText("The tutor is unavailable. Try again in a moment.")).toBeInTheDocument();
+      await waitFor(() => expect(location()).toBe("/chat"));
+      // The page stays as it is: the failed question and its message, not the welcome of a fresh /chat.
+      expect(asked()).toEqual(["You asked: Next?"]);
+      expect(screen.queryByRole("heading", { name: "Ask about your documents" })).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Go back" }));
+      await waitFor(() => expect(location()).toBe("/chat/t1"));
+      expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
+      expect(loadConversation).toHaveBeenCalledTimes(2);
+    });
+
+    it("a new conversation moves to its URL when its thread is created, and keeps streaming", async () => {
+      const control = controlledStream();
+      const loadConversation = vi.fn();
+      renderChat({ ask: vi.fn(() => control.stream()), loadConversation });
+      await userEvent.type(await question(), "What is attention?");
+      await userEvent.click(askButton());
+      control.push({ type: "thread", thread_id: "t1" });
+      await waitFor(() => expect(location()).toBe("/chat/t1"));
+      control.push({ type: "delta", text: "It weighs" });
+      expect(await screen.findByText("It weighs")).toBeInTheDocument();
+      control.push({ type: "done" });
+      control.push(null);
+      await waitFor(() => expect(screen.getByRole("textbox", { name: /question/i })).toBeEnabled());
+      expect(loadConversation).not.toHaveBeenCalled();
+    });
+
+    it("an unlimited question in a reopened conversation starts a new conversation at a new URL", async () => {
+      const ask = vi.fn(() => events({ type: "thread", thread_id: "t2" }, { type: "delta", text: "Next answer." }, { type: "done" }));
+      const askIn = vi.fn();
+      renderChat({ loadConversation: conversation([turn()]), ask, askIn }, "/chat/t1");
+      expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
+      await userEvent.type(await question(), "Next?");
+      await userEvent.click(askButton());
+      expect(await screen.findByText("Next answer.")).toBeInTheDocument();
+      await waitFor(() => expect(location()).toBe("/chat/t2"));
+      expect(screen.queryByText("It weighs tokens [1].")).not.toBeInTheDocument();
+      expect(asked()).toEqual(["You asked: Next?"]);
+      expect(ask).toHaveBeenCalledWith("Next?", undefined);
+      expect(askIn).not.toHaveBeenCalled();
+    });
+
+    it("a question in a limited conversation adds a turn under the history", async () => {
+      const askIn = vi.fn(() => events({ type: "thread", thread_id: "t1" }, { type: "delta", text: "More." }, { type: "done" }));
+      renderChat({ loadConversation: conversation([turn()], { search_scope: "listed" }), loadUsed: async () => [usedDoc], askIn }, "/chat/t1");
+      expect(await screen.findByText("Searching 1 document")).toBeInTheDocument();
+      await userEvent.type(await question(), "More?");
+      await userEvent.click(askButton());
+      expect(await screen.findByText("More.")).toBeInTheDocument();
+      expect(asked()).toEqual(["You asked: What is attention?", "You asked: More?"]);
+      expect(screen.getByText("It weighs tokens [1].")).toBeInTheDocument();
+      expect(location()).toBe("/chat/t1");
+      expect(askIn).toHaveBeenCalledWith("t1", "More?");
+    });
+
+    it("the Chat link starts a new conversation", async () => {
+      renderChat({ loadConversation: conversation([turn()]) }, "/chat/t1");
+      expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("link", { name: "Chat" }));
+      expect(await screen.findByRole("heading", { name: "Ask about your documents" })).toBeInTheDocument();
+      expect(screen.queryByText("It weighs tokens [1].")).not.toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 1, name: "New conversation" })).toBeInTheDocument();
+    });
+
+    it("leaving for another conversation mid-answer drops the old stream's events", async () => {
+      const control = controlledStream();
+      renderChat({ ask: vi.fn(() => control.stream()) });
+      await userEvent.type(await question(), "What is attention?");
+      await userEvent.click(askButton());
+      control.push({ type: "thread", thread_id: "t1" });
+      await waitFor(() => expect(location()).toBe("/chat/t1"));
+      await userEvent.click(screen.getByRole("link", { name: "Chat" }));
+      expect(await screen.findByRole("heading", { name: "Ask about your documents" })).toBeInTheDocument();
+      control.push({ type: "delta", text: "Late." });
+      await act(async () => {});
+      expect(screen.queryByText("Late.")).not.toBeInTheDocument();
+      control.push(null);
+    });
+
+    it("a reopened conversation shows its history even with no ready documents", async () => {
+      renderChat({ loadConversation: conversation([turn()]), loadDocs: async () => [] }, "/chat/t1");
+      expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Upload a document first" })).not.toBeInTheDocument();
+    });
+
+    it("the same passage cited in two turns highlights only the clicked chip", async () => {
+      renderChat({ loadConversation: conversation([turn(), turn({ question: "Again?" })]), viewerDeps: fakeViewerDeps() }, "/chat/t1");
+      const chips = await screen.findAllByRole("button", { name: /^a\.pdf, p\. 3\. Open/ });
+      expect(chips).toHaveLength(2);
+      await userEvent.click(chips[1]!);
+      expect(await screen.findByRole("region", { name: "ReAct" }, { timeout: 3000 })).toBeInTheDocument();
+      expect(chips[1]).toHaveAttribute("aria-current", "true");
+      expect(chips[0]).not.toHaveAttribute("aria-current");
     });
   });
 });

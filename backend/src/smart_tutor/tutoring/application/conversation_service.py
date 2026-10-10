@@ -3,7 +3,7 @@
 import uuid
 from collections.abc import Sequence
 
-from smart_tutor.knowledge.application import DocumentService
+from smart_tutor.knowledge.application import DocumentService, DocumentView
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.shared.ports.clock import Clock
 from smart_tutor.tutoring.domain.document_used import DELETED_DOCUMENT, DocumentUsed
@@ -15,6 +15,7 @@ from smart_tutor.tutoring.domain.errors import (
 )
 from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
+from smart_tutor.tutoring.domain.turn import AnsweredTurn, CitationView, Turn, TurnCitation, TurnView
 from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
 
 
@@ -78,12 +79,31 @@ class ConversationService:
             return None
         return [row.document_id for row in self._threads.documents_used(thread_id)]
 
-    def record_answer(self, thread_id: ThreadId, user_id: UserId, document_ids: Sequence[DocumentId]) -> None:
-        """Add the documents an answer drew on to the thread's documents used (a decline passes none)."""
+    def record_turn(self, thread_id: ThreadId, user_id: UserId, turn: AnsweredTurn) -> None:
+        """Keep a turn whose answer ended with `done` (US-13) with the documents it drew on (US-4b), together.
+        A decline draws on none."""
         self._owned(thread_id, user_id)
-        if not document_ids:
-            return
-        self._threads.add_documents_used(thread_id, list(dict.fromkeys(document_ids)), self._clock.now())
+        kept = Turn(thread_id, user_id, turn.question, turn.answer, turn.citations, turn.decline, self._clock.now())
+        self._threads.add_turn(kept, list(dict.fromkeys(turn.document_ids)))
+
+    def turns(self, thread_id: ThreadId, user_id: UserId) -> list[TurnView]:
+        """The thread's turns, oldest first, citations resolved now: display title and archived, or "Deleted
+        document" for one that no longer exists."""
+        self._owned(thread_id, user_id)
+        kept = self._threads.turns(thread_id, user_id)
+        views = self._documents.documents_by_id(
+            user_id, list(dict.fromkeys(c.document_id for t in kept for c in t.citations))
+        )
+        return [
+            TurnView(
+                t.question,
+                t.answer,
+                tuple(_citation(c, views.get(c.document_id)) for c in t.citations),
+                t.decline,
+                t.created_at,
+            )
+            for t in kept
+        ]
 
     def keep_deleted_title(self, user_id: UserId, document_id: DocumentId, title: str) -> None:
         """Called by the document delete before it commits, so documents used keep the title (US-10c)."""
@@ -157,3 +177,9 @@ class ConversationService:
                     )
                 )
         return used
+
+
+def _citation(c: TurnCitation, view: DocumentView | None) -> CitationView:
+    if view is None:
+        return CitationView(c.n, c.document_id, c.chunk_id, c.page, DELETED_DOCUMENT, archived=False, deleted=True)
+    return CitationView(c.n, c.document_id, c.chunk_id, c.page, view.title, archived=view.archived, deleted=False)

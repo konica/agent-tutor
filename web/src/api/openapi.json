@@ -779,6 +779,117 @@
         "title": "ThreadResponse",
         "type": "object"
       },
+      "TurnCitationResponse": {
+        "properties": {
+          "archived": {
+            "title": "Archived",
+            "type": "boolean"
+          },
+          "chunk_id": {
+            "title": "Chunk Id",
+            "type": "string"
+          },
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "document_title": {
+            "title": "Document Title",
+            "type": "string"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          }
+        },
+        "required": [
+          "n",
+          "chunk_id",
+          "document_id",
+          "document_title",
+          "page",
+          "archived",
+          "deleted"
+        ],
+        "title": "TurnCitationResponse",
+        "type": "object"
+      },
+      "TurnDeclineResponse": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "TurnDeclineResponse",
+        "type": "object"
+      },
+      "TurnResponse": {
+        "properties": {
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/TurnCitationResponse"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TurnDeclineResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question",
+          "answer",
+          "citations",
+          "decline",
+          "created_at"
+        ],
+        "title": "TurnResponse",
+        "type": "object"
+      },
       "UpdateThreadRequest": {
         "additionalProperties": false,
         "properties": {
@@ -2191,6 +2302,62 @@
           }
         ],
         "summary": "Ask In Thread",
+        "tags": [
+          "tutoring"
+        ]
+      }
+    },
+    "/threads/{thread_id}/turns": {
+      "get": {
+        "description": "The conversation's turns, oldest first: each question with its answer and citations, or its decline (PRD\nUS-13). Citations resolve now: display title, archived, or \"Deleted document\".",
+        "operationId": "list_thread_turns",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "thread_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Thread Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TurnResponse"
+                  },
+                  "title": "Response List Thread Turns",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not the caller's conversation."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Thread Turns",
         "tags": [
           "tutoring"
         ]

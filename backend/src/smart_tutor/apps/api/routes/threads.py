@@ -1,13 +1,16 @@
 """Thread routes (tutoring module): ask the first question of a new thread, optionally started from one of the
 learner's documents, or a later one in an existing thread; an answer draws on all of the learner's ready documents, or
 only the thread's listed ones once the learner limits its search scope (US-4c). Answered as SSE (PRD §9.2); the
-documents an answer drew on are recorded when it is done and listed per thread; the learner adds documents to that
-list and removes them (US-4c). The learner can rename a thread and set or read its search scope."""
+answer is kept as a turn when it is done, with the documents it drew on, and the turns and documents are listed per
+thread; the learner adds documents to that list and removes them (US-4c). The learner can rename a thread and set or
+read its search scope."""
 
 import json
 import logging
 import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Sequence
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Annotated, Literal, Self
 
 import httpx
@@ -21,6 +24,8 @@ from smart_tutor.apps.api.deps import Agent, BearerToken, Conversations, Current
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.tutoring.application import (
+    AnsweredTurn,
+    Decline,
     DocumentNotAvailableError,
     DocumentUsed,
     InvalidTitleError,
@@ -30,6 +35,8 @@ from smart_tutor.tutoring.application import (
     Thread,
     ThreadArchivedError,
     ThreadNotFoundError,
+    TurnCitation,
+    TurnView,
 )
 
 logger = logging.getLogger(__name__)
@@ -74,8 +81,20 @@ _UNAVAILABLE_EVENT = _sse("error", {"code": "unavailable", "message": UNAVAILABL
 
 # Starts the thread; its `thread` event, or None when it couldn't start.
 StartThread = Callable[[], Awaitable[bytes | None]]
-# Records the documents an answer drew on, in the thread that started; never raises.
-RecordAnswer = Callable[[list[str]], Awaitable[None]]
+
+
+@dataclass
+class _Seen:
+    """What the learner saw of one answer; kept as a turn when it ends with `done`."""
+
+    answer: str = ""
+    citations: tuple[TurnCitation, ...] = ()
+    decline: Decline | None = None
+    document_ids: tuple[DocumentId, ...] = ()
+
+
+# Keeps the answer as a turn of the thread that started, with its documents used; never raises.
+RecordAnswer = Callable[[_Seen], Awaitable[None]]
 
 
 class _EndedInsideEventError(Exception):
@@ -115,13 +134,67 @@ async def _opening(first: bytes | None, start: StartThread) -> bytes | None:
     return await start()
 
 
-def _document_ids(data: object) -> list[str] | None:
-    """The document ids of a `sources` event's data; None when it isn't one."""
+def _document_ids(data: object) -> tuple[DocumentId, ...]:
+    """The document ids of a `sources` event's data, canonical; () when it isn't one.
+
+    An id that isn't a UUID is dropped rather than failing the insert, which would lose the whole turn.
+    """
     ids = data.get("document_ids") if isinstance(data, dict) else None
-    if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
+    if not isinstance(ids, list):
         logger.warning("the agent's sources event was malformed")
+        return ()
+    kept = tuple(DocumentId(str(uuid.UUID(i))) for i in ids if _is_uuid(i))
+    if len(kept) != len(ids):
+        logger.warning("the agent's sources were partly malformed")
+    return kept
+
+
+def _is_uuid(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        uuid.UUID(value)
+    except ValueError:
+        return False
+    return True
+
+
+def _citation(item: object) -> TurnCitation | None:
+    if not isinstance(item, dict):
         return None
-    return ids
+    n, chunk_id, document_id, page = item.get("n"), item.get("chunk_id"), item.get("document_id"), item.get("page")
+    if not isinstance(n, int) or isinstance(n, bool) or not isinstance(chunk_id, str) or not _is_uuid(document_id):
+        return None
+    if page is not None and (not isinstance(page, int) or isinstance(page, bool)):
+        return None
+    # Canonical, so a braced or upper-case id still matches the document at read time.
+    return TurnCitation(n, DocumentId(str(uuid.UUID(str(document_id)))), chunk_id, page)
+
+
+def _citations(data: object) -> tuple[TurnCitation, ...]:
+    """The well-formed citations of a `citations` event; the learner already has the event as sent."""
+    items = data.get("citations") if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        logger.warning("the agent's citations event was malformed")
+        return ()
+    kept = tuple(c for c in map(_citation, items) if c is not None)
+    if len(kept) != len(items):
+        logger.warning("the agent's citations were partly malformed")
+    return kept
+
+
+def _decline(data: object) -> Decline | None:
+    code = data.get("code") if isinstance(data, dict) else None
+    message = data.get("message") if isinstance(data, dict) else None
+    if not isinstance(code, str) or not isinstance(message, str):
+        logger.warning("the agent's decline event was malformed")
+        return None
+    return Decline(code, message)
+
+
+def _delta(data: object) -> str:
+    text = data.get("text") if isinstance(data, dict) else None
+    return text if isinstance(text, str) else ""
 
 
 async def _relay(answer: AgentAnswer, start: StartThread, record: RecordAnswer) -> AsyncIterator[bytes]:
@@ -131,8 +204,8 @@ async def _relay(answer: AgentAnswer, start: StartThread, record: RecordAnswer) 
     the stream drops inside an event, the partial event is dropped so the error event that follows stays a
     well-formed event of its own.
 
-    The agent's `sources` event is kept back; on `done`, if the thread started, its documents are recorded before
-    `done` is forwarded. A stream that ends without `done` or `error` ends with an unavailable error event.
+    The agent's `sources` event is kept back; on `done`, if the thread started, the turn and its documents are kept
+    before `done` is forwarded. A stream that ends without `done` or `error` ends with an unavailable error event.
     """
     events = _events(answer)
     try:
@@ -144,17 +217,23 @@ async def _relay(answer: AgentAnswer, start: StartThread, record: RecordAnswer) 
         if opening:
             yield opening
         started = bool(opening)
-        document_ids: list[str] | None = None
+        seen = _Seen()
         ended = False
         event: bytes | None = first
         while event is not None:
             parsed = _event(event)
             name = parsed[0] if parsed else None
             if parsed and name == "sources":
-                document_ids = _document_ids(parsed[1])
+                seen.document_ids = _document_ids(parsed[1])
             else:
-                if name == "done" and started and document_ids is not None:
-                    await record(document_ids)
+                if parsed and name == "delta":
+                    seen.answer += _delta(parsed[1])
+                elif parsed and name == "citations":
+                    seen.citations = _citations(parsed[1])
+                elif parsed and name == "decline":
+                    seen.decline = _decline(parsed[1])
+                if name == "done" and started:
+                    await record(seen)
                 ended = name in ("done", "error")
                 yield event
             event = await anext(events, None)
@@ -177,18 +256,22 @@ async def _open(agent: Agent, token: str, question: str, document_ids: Sequence[
         raise HTTPException(503, UNAVAILABLE) from None
 
 
-def _recorder(conversations: Conversations, user_id: UserId, thread_id: Callable[[], ThreadId | None]) -> RecordAnswer:
-    """Records an answer's documents in the thread `thread_id()` gives (None: none started, so nothing to record)."""
+def _recorder(
+    conversations: Conversations, user_id: UserId, question: str, thread_id: Callable[[], ThreadId | None]
+) -> RecordAnswer:
+    """Keeps an answer as a turn of the thread `thread_id()` gives (None: none started, so nothing to keep)."""
 
-    async def record(document_ids: list[str]) -> None:
+    async def record(seen: _Seen) -> None:
         tid = thread_id()
         if tid is None:
             return
+        turn = AnsweredTurn(question, seen.answer, seen.citations, seen.decline, seen.document_ids)
         try:
-            await run_in_threadpool(conversations.record_answer, tid, user_id, [DocumentId(d) for d in document_ids])
-        except Exception:
-            # The learner already has the answer: log it and still end the stream with `done`.
-            logger.exception("recording the documents used failed")
+            await run_in_threadpool(conversations.record_turn, tid, user_id, turn)
+        except Exception as e:
+            # The learner already has the answer: log it and still end the stream with `done`. Only the class name:
+            # a database error's message carries the bound question, answer, and user id.
+            logger.error("keeping the turn failed (%s)", type(e).__name__)
 
     return record
 
@@ -233,7 +316,7 @@ async def ask_in_new_thread(
         thread_id = ThreadId(thread.thread_id)
         return _sse("thread", {"thread_id": thread.thread_id})
 
-    return _stream(answer, start, _recorder(conversations, principal.user_id, lambda: thread_id))
+    return _stream(answer, start, _recorder(conversations, principal.user_id, body.question, lambda: thread_id))
 
 
 @router.post(
@@ -266,7 +349,7 @@ async def ask_in_thread(
     async def start() -> bytes | None:
         return _sse("thread", {"thread_id": tid})
 
-    return _stream(answer, start, _recorder(conversations, principal.user_id, lambda: tid))
+    return _stream(answer, start, _recorder(conversations, principal.user_id, body.question, lambda: tid))
 
 
 class UpdateThreadRequest(BaseModel):
@@ -409,3 +492,64 @@ def remove_thread_document(
         conversations.remove_document(ThreadId(str(thread_id)), principal.user_id, DocumentId(str(document_id)))
     except ThreadNotFoundError as e:
         raise HTTPException(404, str(e)) from None
+
+
+class TurnCitationResponse(BaseModel):
+    n: int
+    chunk_id: str
+    document_id: str
+    document_title: str
+    page: int | None
+    archived: bool
+    deleted: bool
+
+
+class TurnDeclineResponse(BaseModel):
+    code: str
+    message: str
+
+
+class TurnResponse(BaseModel):
+    question: str
+    answer: str
+    citations: list[TurnCitationResponse]
+    decline: TurnDeclineResponse | None
+    created_at: datetime
+
+
+def _turn_response(t: TurnView) -> TurnResponse:
+    return TurnResponse(
+        question=t.question,
+        answer=t.answer,
+        citations=[
+            TurnCitationResponse(
+                n=c.n,
+                chunk_id=c.chunk_id,
+                document_id=c.document_id,
+                document_title=c.title,
+                page=c.page,
+                archived=c.archived,
+                deleted=c.deleted,
+            )
+            for c in t.citations
+        ],
+        decline=TurnDeclineResponse(code=t.decline.code, message=t.decline.message) if t.decline else None,
+        created_at=t.created_at,
+    )
+
+
+@router.get(
+    "/threads/{thread_id}/turns",
+    operation_id="list_thread_turns",
+    responses={404: {"description": "Not the caller's conversation."}},
+)
+def list_thread_turns(
+    thread_id: uuid.UUID, principal: CurrentPrincipal, conversations: Conversations
+) -> list[TurnResponse]:
+    """The conversation's turns, oldest first: each question with its answer and citations, or its decline (PRD
+    US-13). Citations resolve now: display title, archived, or "Deleted document"."""
+    try:
+        turns = conversations.turns(ThreadId(str(thread_id)), principal.user_id)
+    except ThreadNotFoundError as e:
+        raise HTTPException(404, str(e)) from None
+    return [_turn_response(t) for t in turns]

@@ -4,14 +4,15 @@ import uuid
 from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy import Engine, inspect
+from sqlalchemy import Engine, inspect, select
 
 from smart_tutor.shared.adapters.postgres.engine import create_db_engine
 from smart_tutor.shared.adapters.postgres.migrate import upgrade_to_head
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
-from smart_tutor.tutoring.adapters.sql_threads import SqlThreadRepository, thread_documents
+from smart_tutor.tutoring.adapters.sql_threads import SqlThreadRepository, thread_documents, thread_turns
 from smart_tutor.tutoring.domain.thread import SearchScope, Thread
+from smart_tutor.tutoring.domain.turn import Decline, Turn, TurnCitation
 
 pytestmark = pytest.mark.integration
 
@@ -140,3 +141,57 @@ def test_a_thread_keeps_its_search_scope(engine: Engine) -> None:
 
     stored = repo.get_owned(thread.thread_id, owner)
     assert stored is not None and stored.search_scope is SearchScope.LISTED
+
+
+def test_turns_round_trip_oldest_first_for_the_owner_only(engine: Engine) -> None:
+    repo = SqlThreadRepository(engine)
+    owner = UserId(f"ada-{uuid.uuid4()}")
+    thread = Thread.start(ThreadId(str(uuid.uuid4())), owner, datetime.now(UTC), title="Q1")
+    repo.add(thread)
+    doc = DocumentId(str(uuid.uuid4()))  # no row in documents: turns don't reference it
+    t0 = datetime(2026, 10, 10, 9, 0, tzinfo=UTC)
+    first = Turn(
+        thread.thread_id,
+        owner,
+        "Q1",
+        "A [1].",
+        (TurnCitation(1, doc, "c1", 3), TurnCitation(2, doc, "c2", None)),
+        None,
+        t0,
+    )
+    second = Turn(thread.thread_id, owner, "Q2", "", (), Decline("limited", "These documents don't cover this."), t0)
+
+    repo.add_turn(first, [doc])
+    repo.add_turn(second, [])
+
+    assert repo.turns(thread.thread_id, owner) == [first, second]
+    assert repo.turns(thread.thread_id, UserId("bob")) == []
+    assert [row.document_id for row in repo.documents_used(thread.thread_id)] == [doc]
+
+
+def test_a_turn_row_holds_no_title_or_text_beyond_what_the_learner_saw(engine: Engine) -> None:
+    repo = SqlThreadRepository(engine)
+    owner = UserId(f"ada-{uuid.uuid4()}")
+    thread = Thread.start(ThreadId(str(uuid.uuid4())), owner, datetime.now(UTC))
+    repo.add(thread)
+    doc = DocumentId(str(uuid.uuid4()))
+    turn = Turn(thread.thread_id, owner, "Q", "A [1].", (TurnCitation(1, doc, "c1", 3),), None, datetime.now(UTC))
+    repo.add_turn(turn, [doc])
+
+    columns = {c["name"] for c in inspect(engine).get_columns("thread_turns")}
+    assert columns == {
+        "turn_id",
+        "thread_id",
+        "user_id",
+        "question",
+        "answer",
+        "citations",
+        "decline_code",
+        "decline_message",
+        "created_at",
+    }
+    with engine.connect() as conn:
+        [citations] = conn.execute(
+            select(thread_turns.c.citations).where(thread_turns.c.thread_id == thread.thread_id)
+        ).scalars()
+    assert citations == [{"n": 1, "document_id": doc, "chunk_id": "c1", "page": 3}]
