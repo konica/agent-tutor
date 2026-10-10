@@ -31,18 +31,21 @@ export function AppShell({ loadDocuments = defaultLoadDocuments }: { loadDocumen
   const { pathname } = useLocation();
   const navigationType = useNavigationType();
   const main = useRef<HTMLElement>(null);
-  const settledPath = useRef<string | null>(null);
+  const settledPage = useRef<string | null>(null);
   const needs = useNeedsSubjectsState(loadDocuments, pathname);
+  // The page is the first path segment: /chat and a conversation's /chat/<id> are the same page, so the chat moving to
+  // its new conversation's URL mid-answer neither moves focus nor changes the title.
+  const page = `/${pathname.split("/")[1] ?? ""}`;
 
   useEffect(() => {
-    const label = NAV.find((item) => item.path === pathname)?.label;
+    const label = NAV.find((item) => item.path === page)?.label;
     document.title = label ? `${label} · Smart Tutor` : "Smart Tutor";
     // Move focus only when the learner went to another page: not on first load (StrictMode
     // runs this twice with the same path) and not on a redirect such as an unknown path → /library.
-    const moved = settledPath.current !== null && settledPath.current !== pathname && navigationType !== "REPLACE";
-    settledPath.current = pathname;
+    const moved = settledPage.current !== null && settledPage.current !== page && navigationType !== "REPLACE";
+    settledPage.current = page;
     if (moved) main.current?.focus();
-  }, [pathname, navigationType]);
+  }, [page, navigationType]);
 
   return (
     <NavRailContext.Provider value={setForced}>

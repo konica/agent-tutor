@@ -435,15 +435,21 @@ export function ChatPage({
       }
     } catch (error) {
       if (!current()) return;
-      // The last ready document was archived since the page loaded. A reopened conversation keeps its history and
-      // says so under it; a new conversation shows the upload prompt.
+      // The last ready document was archived since the page loaded. A limited conversation keeps its history and says
+      // so under it; a new conversation (its history already cleared) shows the upload prompt.
       if (error instanceof NoDocumentsError) {
         setNoDocuments(true);
-        if (routeThreadId !== undefined) setProblem({ message: error.message });
+        if (!newThread) setProblem({ message: error.message });
       } else if (error instanceof AskRefusedError) setProblem({ message: error.message });
       // A SessionExpiredError was already reported by the API client; the session screen replaces this page.
       else if (!(error instanceof SessionExpiredError)) setProblem({ message: GENERIC_FAILURE });
     } finally {
+      // A new conversation asked from a conversation URL that failed before its thread existed: the old history is
+      // already cleared, so the URL moves to /chat to match. A push, so Back returns to the old conversation.
+      if (newThread && thread === null && shown.current !== null && current()) {
+        shown.current = null;
+        navigate("/chat");
+      }
       // Otherwise a newer conversation has already reset these.
       if (turn.current === thisTurn) {
         busy.current = false;
@@ -661,11 +667,12 @@ export function ChatPage({
 
   // A citation to a deleted document keeps its [n] but loses the title and page: references read "Deleted document".
   const deletedIds = new Set(used.filter((d) => d.deleted).map((d) => d.document_id));
-  // The title starts as the first question until the learner renames it (PRD §9.4).
-  const title = renamed ?? firstQuestion ?? "New conversation";
+  // The title starts as the first question until the learner renames it (PRD §9.4). A conversation URL that is still
+  // loading, or whose thread has no title, is not a new conversation.
+  const title = renamed ?? firstQuestion ?? (routeThreadId === undefined ? "New conversation" : "Conversation");
   const showPanel = viewer ? panelDuringViewer : panelOpen;
   const toggleLabel = showPanel ? "Hide panel" : "Show panel";
-  const onTogglePanel = viewer ? () => setPanelDuringViewer((shown) => !shown) : toggle;
+  const onTogglePanel = viewer ? () => setPanelDuringViewer((open) => !open) : toggle;
   const bodyClass = [styles.body, showPanel && styles.withPanel, viewer && styles.withViewer].filter(Boolean).join(" ");
 
   return (
@@ -810,17 +817,17 @@ export function ChatPage({
                                 );
                               }
                               // The chip whose passage is open beside the conversation; a panel row's open clears it.
-                              const shown = viewer?.chunkId === c.chunk_id && viewer.turn === index;
+                              const isShown = viewer?.chunkId === c.chunk_id && viewer.turn === index;
                               const pageText = c.page === null ? "page unavailable" : `p. ${c.page}`;
-                              const state = shown ? "Shown beside the conversation" : "Open beside the conversation";
+                              const state = isShown ? "Shown beside the conversation" : "Open beside the conversation";
                               return (
                                 <li key={c.chunk_id}>
                                   <button
                                     type="button"
-                                    className={shown ? `${styles.source} ${styles.sourceShown}` : styles.source}
+                                    className={isShown ? `${styles.source} ${styles.sourceShown}` : styles.source}
                                     title={formatCitation(c)}
                                     aria-label={`${c.document_title}, ${pageText}${c.archived ? ", archived" : ""}. ${state}`}
-                                    aria-current={shown ? "true" : undefined}
+                                    aria-current={isShown ? "true" : undefined}
                                     data-chunk-id={c.chunk_id}
                                     onClick={(event) => openCitation(c, index, event.currentTarget)}
                                   >

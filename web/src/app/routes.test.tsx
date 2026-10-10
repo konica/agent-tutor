@@ -183,6 +183,24 @@ describe("app shell routes", () => {
     expect(document.title).toBe("Notes · Smart Tutor");
   });
 
+  it("titles a conversation's URL as the Chat page", async () => {
+    renderAt("/chat/t1");
+    await screen.findByRole("button", { name: "Attention basics. Edit title" });
+    expect(document.title).toBe("Chat · Smart Tutor");
+  });
+
+  it("leaves focus alone when the chat moves to its conversation's URL", async () => {
+    vi.mocked(loadDocuments).mockResolvedValueOnce([{ state: "ready" } as DocumentResponse]);
+    const router = renderAt("/chat");
+    const box = await screen.findByRole("textbox", { name: "Your question" });
+    box.focus();
+    // A push, as the chat does when the server creates the conversation.
+    await act(() => router.navigate("/chat/t1"));
+    await screen.findByRole("button", { name: "Attention basics. Edit title" });
+    expect(screen.getByRole("main")).not.toHaveFocus();
+    expect(document.title).toBe("Chat · Smart Tutor");
+  });
+
   it("shows the learner's name and signs out from the user menu", async () => {
     renderAt("/library");
     await userEvent.click(nav().getByRole("button", { name: /Ada Lovelace/ }));

@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
-import { Link, MemoryRouter, Route, Routes, useLocation } from "react-router";
+import { Link, MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AskRefusedError, ConversationNotFoundError, NoDocumentsError, type ChatEvent } from "../../api/chat";
@@ -1314,6 +1314,54 @@ describe("ChatPage", () => {
       });
       renderChat({ loadConversation }, "/chat/t1");
       expect(await screen.findByText("This conversation couldn't be loaded. Reload the page to try again.")).toBeInTheDocument();
+    });
+
+    it("titles the page Conversation while it loads, not New conversation", async () => {
+      renderChat({ loadConversation: vi.fn(() => new Promise<never>(() => {})) }, "/chat/t1");
+      // The composer shows once the documents load; the conversation is still loading.
+      await question();
+      expect(screen.getByRole("heading", { level: 1, name: "Conversation" })).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "New conversation" })).not.toBeInTheDocument();
+    });
+
+    it("titles a conversation without a title Conversation", async () => {
+      renderChat({ loadConversation: conversation([turn()], { title: null }) }, "/chat/t1");
+      expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Conversation. Edit title" })).toBeInTheDocument();
+    });
+
+    it("an unlimited question that fails before its thread moves to /chat, and Back reopens the conversation", async () => {
+      function Back() {
+        const navigate = useNavigate();
+        return (
+          <button type="button" onClick={() => void navigate(-1)}>
+            Go back
+          </button>
+        );
+      }
+      const loadConversation = conversation([turn()]);
+      const ask = vi.fn(() => events({ type: "error", code: "unavailable", message: "The tutor is unavailable. Try again in a moment." }));
+      render(
+        <MemoryRouter initialEntries={["/chat/t1"]}>
+          <Routes>
+            <Route path="/chat/:threadId?" element={<ChatPage loadDocs={async () => [doc("ready")]} loadUsed={async () => []} loadConversation={loadConversation} ask={ask} />} />
+          </Routes>
+          <Location />
+          <Back />
+        </MemoryRouter>,
+      );
+      expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
+      await userEvent.type(await question(), "Next?");
+      await userEvent.click(askButton());
+      expect(await screen.findByText("The tutor is unavailable. Try again in a moment.")).toBeInTheDocument();
+      await waitFor(() => expect(location()).toBe("/chat"));
+      // The page stays as it is: the failed question and its message, not the welcome of a fresh /chat.
+      expect(asked()).toEqual(["You asked: Next?"]);
+      expect(screen.queryByRole("heading", { name: "Ask about your documents" })).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Go back" }));
+      await waitFor(() => expect(location()).toBe("/chat/t1"));
+      expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
+      expect(loadConversation).toHaveBeenCalledTimes(2);
     });
 
     it("a new conversation moves to its URL when its thread is created, and keeps streaming", async () => {
