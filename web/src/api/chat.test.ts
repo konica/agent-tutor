@@ -6,7 +6,9 @@ import {
   askInNewThread,
   askInThread,
   AskRefusedError,
+  ConversationNotFoundError,
   formatCitation,
+  loadConversation,
   loadDocumentsUsed,
   NoDocumentsError,
   removeThreadDocument,
@@ -328,5 +330,58 @@ describe("setSearchScope", () => {
   it("rejects with SessionExpiredError on 401", async () => {
     const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
     await expect(setSearchScope("t1", "library", apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+});
+
+describe("loadConversation", () => {
+  const thread = { thread_id: "t1", title: "Attention basics", search_scope: "listed" };
+  const turns = [
+    {
+      question: "What is attention?",
+      answer: "It weighs tokens [1].",
+      citations: [{ n: 1, chunk_id: "c1", document_id: "d1", document_title: "a.pdf", page: 3, archived: false, deleted: false }],
+      decline: null,
+      created_at: "2026-10-10T09:00:00Z",
+    },
+  ];
+  // GET /threads/t1 answers with `thread`, GET /threads/t1/turns with `turnsResponse`.
+  const routes = (threadResponse: () => Response, turnsResponse: () => Response) => (request: Request) =>
+    new URL(request.url).pathname.endsWith("/turns") ? turnsResponse() : threadResponse();
+
+  it("gets the thread and its turns with the token", async () => {
+    const { apiClient, fetch } = api(routes(() => json(thread), () => json(turns)));
+    expect(await loadConversation("t1", apiClient)).toEqual({ thread, turns });
+    const requests = fetch.mock.calls.map(([r]) => r as Request);
+    expect(requests.map((r) => `${r.method} ${r.url}`).sort()).toEqual([
+      "GET http://api.test/threads/t1",
+      "GET http://api.test/threads/t1/turns",
+    ]);
+    for (const r of requests) expect(r.headers.get("Authorization")).toBe("Bearer t");
+  });
+
+  it.each([
+    ["the thread", () => json({ detail: "Conversation not found" }, 404), () => json(turns)],
+    ["its turns", () => json(thread), () => json({ detail: "Conversation not found" }, 404)],
+  ])("rejects with ConversationNotFoundError when %s is a 404", async (_, threadResponse, turnsResponse) => {
+    const { apiClient } = api(routes(threadResponse, turnsResponse));
+    await expect(loadConversation("t1", apiClient)).rejects.toBeInstanceOf(ConversationNotFoundError);
+  });
+
+  it("rejects with ConversationNotFoundError on 422 (not a conversation id)", async () => {
+    const { apiClient } = api(() => json({ detail: [{ msg: "Input should be a valid UUID" }] }, 422));
+    await expect(loadConversation("nope", apiClient)).rejects.toBeInstanceOf(ConversationNotFoundError);
+  });
+
+  it("rejects with SessionExpiredError on 401", async () => {
+    const { apiClient } = api(() => json({ detail: "Not authenticated" }, 401));
+    await expect(loadConversation("t1", apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+
+  it("rejects with a plain Error on 500", async () => {
+    const { apiClient } = api(routes(() => json(thread), () => json({ detail: "boom" }, 500)));
+    const failure = loadConversation("t1", apiClient);
+    await expect(failure).rejects.toThrow("500");
+    await expect(failure).rejects.not.toBeInstanceOf(ConversationNotFoundError);
+    await expect(failure).rejects.not.toBeInstanceOf(SessionExpiredError);
   });
 });

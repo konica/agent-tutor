@@ -27,7 +27,9 @@ export function createRoutes({ auth, RequireSession }: RouteDeps): RouteObject[]
       ),
       children: [
         { path: "library", element: <LibraryPage />, handle: { wide: true } },
-        { path: "chat", element: <ChatPage />, handle: { bleed: true } },
+        // One route for a new conversation and one at its URL, so moving from /chat to /chat/<id> while the answer
+        // streams keeps the page mounted.
+        { path: "chat/:threadId?", element: <ChatPage />, handle: { bleed: true } },
         ...NAV.filter((item) => item.path !== "/library" && item.path !== "/chat").map((item) => ({
           path: item.path.slice(1),
           element: <PlaceholderPage title={item.label} description={item.description} />,

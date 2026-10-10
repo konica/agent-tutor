@@ -50,6 +50,9 @@
   white-space: pre-wrap; overflow-wrap: anywhere;
 }
 
+/* Stacked turns: each question and its answer, set apart from the turn before. */
+.turn + .turn { margin-top: var(--sp-6); }
+
 .answerRegion { display: grid; gap: var(--sp-3); }
 /* The tutor's words: plain prose on the page, never smaller than --fs-16 (DESIGN.md → Density). */
 .answer {
@@ -77,6 +80,12 @@ button.source:focus-visible { outline: 2px solid var(--focus); outline-offset: 2
 .sourceShown { background: var(--accent-soft); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .sourceShown .sourceTitle, .sourceShown .sourcePage { color: var(--accent-text); }
 .sourceDeleted { border-style: dashed; background: var(--surface-2); color: var(--text-2); }
+/* An archived document's chip still opens it; the badge has DESIGN.md's archived look. */
+.sourceBadge {
+  margin-left: var(--sp-1); padding: 0 var(--sp-1);
+  border: 1px dashed var(--border-strong); border-radius: var(--r-sm);
+  background: var(--surface-2); color: var(--text-2); font-size: var(--fs-12);
+}
 .sourceIcon { width: 14px; height: 14px; flex: none; color: var(--text-2); }
 .sourceMarker { color: var(--text-2); font-variant-numeric: tabular-nums; }
 .sourceTitle { max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

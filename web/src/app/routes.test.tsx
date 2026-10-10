@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { loadConversation } from "../api/chat";
 import { loadDocuments } from "../api/documents";
 import type { DocumentResponse } from "../api/generated/types.gen";
 import { SessionContext, SessionProvider } from "../auth/SessionProvider";
@@ -17,6 +18,16 @@ vi.mock("../api/documents", async (importOriginal) => ({
   loadDocuments: vi.fn(async (): Promise<DocumentResponse[]> => []),
   loadUploadLimits: async () => ({ max_bytes: 52_428_800, max_pages: 500 }),
   uploadPdf: vi.fn(),
+}));
+
+// A conversation's URL loads it from the API; these tests are about routing, so it is an empty conversation.
+vi.mock("../api/chat", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/chat")>()),
+  loadConversation: vi.fn(async (threadId: string) => ({
+    thread: { thread_id: threadId, title: "Attention basics", search_scope: "library" as const },
+    turns: [],
+  })),
+  loadDocumentsUsed: vi.fn(async () => []),
 }));
 
 const signOut = vi.fn();
@@ -131,6 +142,15 @@ describe("app shell routes", () => {
     renderAt("/chat");
     expect(await screen.findByRole("textbox", { name: "Your question" })).toBeEnabled();
     expect(screen.getByRole("heading", { level: 1, name: "New conversation" })).toBeInTheDocument();
+  });
+
+  it("opens a conversation at its URL in the Chat page", async () => {
+    vi.mocked(loadDocuments).mockResolvedValueOnce([{ state: "ready" } as DocumentResponse]);
+    renderAt("/chat/t1");
+    expect(await screen.findByRole("textbox", { name: "Your question" })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "Attention basics. Edit title" })).toBeInTheDocument();
+    expect(loadConversation).toHaveBeenCalledWith("t1");
+    expect(nav().getByRole("link", { name: "Chat" })).toHaveAttribute("aria-current", "page");
   });
 
   it("shows the needs-subjects badge on Library from any page", async () => {

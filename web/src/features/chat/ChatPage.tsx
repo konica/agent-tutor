@@ -1,13 +1,27 @@
-import { ArrowUp, CircleAlert, Clock, FileText, Filter, PanelLeft, Plus, Search, Upload } from "lucide-react";
+import {
+  ArrowUp,
+  CircleAlert,
+  Clock,
+  FileText,
+  Filter,
+  MessageSquare,
+  MessageSquareX,
+  PanelLeft,
+  Plus,
+  Search,
+  Upload,
+} from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { useSearchParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import {
   addThreadDocuments,
   askInNewThread,
   askInThread,
   AskRefusedError,
+  ConversationNotFoundError,
   formatCitation,
+  loadConversation as loadConversationApi,
   loadDocumentsUsed,
   NoDocumentsError,
   removeThreadDocument,
@@ -15,6 +29,7 @@ import {
   setSearchScope,
   type ChatCitation,
   type ChatEvent,
+  type Conversation,
   type SearchScope,
 } from "../../api/chat";
 import { loadDocuments } from "../../api/documents";
@@ -52,6 +67,8 @@ type Props = {
   viewerDeps?: ViewerDeps;
   /** Resolves with the saved scope; a refusal rejects with the server's message. */
   setScope?: (threadId: string, scope: SearchScope) => Promise<SearchScope>;
+  /** The conversation `/chat/<id>` names; rejects with ConversationNotFoundError for an unknown or another learner's. */
+  loadConversation?: (threadId: string) => Promise<Conversation>;
 };
 
 type Exchange = {
@@ -67,8 +84,12 @@ type Library = { status: "loading" | "failed" | "ended" } | { status: "ready" };
 
 type Problem = { message: string };
 
-// `chunkId` and `passage` are set only when a Sources chip opened the document; a panel row's open leaves them out.
-type Viewer = { documentId: string; chunkId?: string; passage?: Passage };
+// Loading the conversation a URL names; "none" once it is shown, or at /chat.
+type Opened = { status: "none" | "loading" | "not-found" | "failed" };
+
+// `chunkId`, `turn`, and `passage` are set only when a Sources chip opened the document; a panel row's open leaves
+// them out. `turn` tells apart the same passage cited in two turns.
+type Viewer = { documentId: string; chunkId?: string; turn?: number; passage?: Passage };
 
 const MAX_QUESTION = 4000;
 const PANEL_ID = "conversation-panel";
@@ -83,6 +104,7 @@ const defaultAddDocs = (threadId: string, documentIds: string[]) => addThreadDoc
 const defaultRemoveDoc = (threadId: string, documentId: string) => removeThreadDocument(threadId, documentId);
 const defaultRename = (threadId: string, title: string) => renameConversation(threadId, title);
 const defaultSetScope = (threadId: string, scope: SearchScope) => setSearchScope(threadId, scope);
+const defaultLoadConversation = (threadId: string) => loadConversationApi(threadId);
 
 const documentCount = (n: number) => (n === 1 ? "1 document" : `${n} documents`);
 
@@ -110,8 +132,9 @@ function processingHint(count: number) {
     : `${count} documents are still processing and can't be used yet.`;
 }
 
-// Single turn (#82): each question starts a new thread and replaces the previous exchange. A conversation limited to its
-// documents (US-4c) is the exception: its questions are asked in the same thread, so its scope applies to them.
+// Each unlimited question starts a new thread (and moves to its URL), replacing the turns shown. A conversation limited
+// to its documents (US-4c) is the exception: its questions are asked in the same thread and add a turn under the
+// history. `/chat/<id>` reopens a conversation with its turns (US-13).
 export function ChatPage({
   ask = defaultAsk,
   askIn = defaultAskIn,
@@ -123,10 +146,12 @@ export function ChatPage({
   rename = defaultRename,
   viewerDeps,
   setScope: saveScope = defaultSetScope,
+  loadConversation = defaultLoadConversation,
 }: Props) {
   const [question, setQuestion] = useState("");
   const [answering, setAnswering] = useState(false);
-  const [exchange, setExchange] = useState<Exchange | null>(null);
+  const [turns, setTurns] = useState<Exchange[]>([]);
+  const [opened, setOpened] = useState<Opened>({ status: "none" });
   const [problem, setProblem] = useState<Problem | null>(null);
   const [library, setLibrary] = useState<Library>({ status: "loading" });
   const [processing, setProcessing] = useState(0);
@@ -167,8 +192,24 @@ export function ChatPage({
   const alive = useRef(true);
   const busy = useRef(false);
   const sourcesId = useId();
-  // Counts questions, so a late documents-used reply never fills the panel of a newer conversation.
+  // Counts the conversations shown (a new thread, or one a URL opens), so a late reply or stream event of an earlier
+  // one never reaches a newer one. A question in the same thread keeps it.
   const turn = useRef(0);
+  const { threadId: routeThreadId } = useParams();
+  const navigate = useNavigate();
+  // The conversation the page shows, by its URL or just created: null at /chat.
+  const shown = useRef<string | null>(null);
+
+  // The URL names the conversation. A change the page made itself (a new thread's URL) is already shown; any other
+  // change (reload, Back, a pasted link, the Chat nav) opens that conversation, or a new one at /chat. Runs only when
+  // the URL changes.
+  useEffect(() => {
+    const target = routeThreadId ?? null;
+    if (target === shown.current) return;
+    shown.current = target;
+    if (target === null) reset();
+    else void openConversation(target);
+  }, [routeThreadId]);
 
   useEffect(() => {
     alive.current = true;
@@ -181,7 +222,8 @@ export function ChatPage({
     if (focusSwitch > 0) pageRef.current?.querySelector<HTMLElement>("[data-scope-switch]")?.focus();
   }, [focusSwitch]);
 
-  // The documents decide what the page is: none ready → upload first; still processing → a hint.
+  // The documents decide what a new conversation is: none ready → upload first; still processing → a hint. A
+  // conversation opened from its URL shows its history either way.
   useEffect(() => {
     let current = true;
     loadDocs().then(
@@ -190,8 +232,8 @@ export function ChatPage({
         setProcessing(docs.filter((d) => d.state === "processing").length);
         // Only the learner's ready, non-archived document can start a conversation; any other id is ignored.
         setStarting(docs.find((d) => d.document_id === startId && d.state === "ready" && !d.archived) ?? null);
-        if (docs.some((d) => d.state === "ready")) setLibrary({ status: "ready" });
-        else setNoDocuments(true);
+        setLibrary({ status: "ready" });
+        if (!docs.some((d) => d.state === "ready")) setNoDocuments(true);
       },
       (error: unknown) => current && setLibrary({ status: error instanceof SessionExpiredError ? "ended" : "failed" }),
     );
@@ -229,7 +271,7 @@ export function ChatPage({
   }
 
   // Only before the first question: a starting document never replaces a live conversation's list.
-  const pendingStart = threadId === null && !exchange ? starting : null;
+  const pendingStart = threadId === null && turns.length === 0 ? starting : null;
 
   // Once the pane has closed, focus goes back to the row that opened it. The panel re-mounts on close, so the row is
   // a new element: find it again by its document id. If it is not on screen (the panel stays hidden), the panel
@@ -255,11 +297,12 @@ export function ChatPage({
 
   // A Sources chip opens its document at the cited passage. `passage` is a new object on every click, so clicking the
   // same chip again jumps back to it; a citation without a page opens the document at page 1.
-  function openCitation(c: ChatCitation, from: HTMLElement) {
+  function openCitation(c: ChatCitation, turnIndex: number, from: HTMLElement) {
     opener.current = from;
     setViewer({
       documentId: c.document_id,
       chunkId: c.chunk_id,
+      turn: turnIndex,
       passage: c.page === null ? undefined : { chunkId: c.chunk_id, page: c.page },
     });
   }
@@ -281,77 +324,131 @@ export function ChatPage({
     void answer(trimmed, threadId !== null && scope === "listed" ? threadId : null);
   }
 
-  // Asks in the given thread, or in a new one when it is null: the panel, the title, and the scope then start over.
-  async function answer(text: string, inThread: string | null) {
-    busy.current = true;
-    setAnswering(true);
+  // Clears the page for another conversation: a new thread, a new one at /chat, or the one a URL opens. Bumping `turn`
+  // drops the late replies and stream events of the conversation shown before.
+  function reset() {
+    ++turn.current;
+    busy.current = false;
+    setAnswering(false);
+    setTurns([]);
     setProblem(null);
-    setExchange({ question: text, answer: "", citations: [], declined: null });
-    let thisTurn = turn.current;
+    setOpened({ status: "none" });
+    setUsed([]);
+    setUsedFailed(false);
+    setThreadId(null);
+    setFirstQuestion(null);
+    setRenamed(null);
+    setAnswered(false);
+    setPickerOpen(false);
+    setScope("library");
+    // The document closes (the panel starts over); focus stays where the learner is.
+    opener.current = null;
+    setViewer(null);
+    setPanelDuringViewer(false);
+  }
+
+  // Shows the conversation a URL names: its title, scope, turns, and documents used.
+  async function openConversation(id: string) {
+    reset();
+    const forTurn = turn.current;
+    setOpened({ status: "loading" });
+    try {
+      const { thread, turns } = await loadConversation(id);
+      if (!alive.current || turn.current !== forTurn) return;
+      setThreadId(thread.thread_id);
+      setFirstQuestion(thread.title ?? null);
+      setScope(thread.search_scope);
+      setTurns(turns.map((t) => ({ question: t.question, answer: t.answer, citations: t.citations, declined: t.decline?.message ?? null })));
+      setAnswered(turns.length > 0);
+      setOpened({ status: "none" });
+      // Its list agrees with the scope: the server turns the limit off for an empty list, as showList does.
+      void showDocumentsUsed(thread.thread_id, forTurn);
+    } catch (error) {
+      // A SessionExpiredError was already reported by the API client; the session screen replaces this page.
+      if (!alive.current || turn.current !== forTurn || error instanceof SessionExpiredError) return;
+      setOpened({ status: error instanceof ConversationNotFoundError ? "not-found" : "failed" });
+    }
+  }
+
+  // Asks in the given thread, adding a turn under the history, or in a new one when it is null: the turns, the panel,
+  // the title, and the scope then start over.
+  async function answer(text: string, inThread: string | null) {
     // The starting document goes with the first question only; later questions start library-wide threads.
     let documentId: string | undefined;
     if (inThread === null) {
-      thisTurn = ++turn.current;
-      setUsed([]);
-      setUsedFailed(false);
-      setThreadId(null);
-      setFirstQuestion(text);
-      setRenamed(null);
-      setAnswered(false);
-      setPickerOpen(false);
-      setScope("library");
-      // A new thread closes the document (the panel starts over); focus stays with the learner's question. A question in
-      // a limited conversation keeps its list, so the document stays open beside it.
-      opener.current = null;
-      setViewer(null);
-      setPanelDuringViewer(false);
       documentId = pendingStart?.document_id;
+      // A question in a limited conversation keeps its list, so an open document stays beside it; a new thread closes it.
+      reset();
+      setFirstQuestion(text);
       setStarting(null);
       forgetStartParam();
     }
-    await run(() => (inThread === null ? ask(text, documentId) : askIn(inThread, text)), thisTurn);
+    busy.current = true;
+    setAnswering(true);
+    setProblem(null);
+    const asked: Exchange = { question: text, answer: "", citations: [], declined: null };
+    setTurns((list) => [...list, asked]);
+    await run(() => (inThread === null ? ask(text, documentId) : askIn(inThread, text)), turn.current, inThread === null);
   }
 
-  // Reads one answer's events into the exchange. The protocol always ends with done or error; a stream that just stops
-  // (dropped connection) failed.
-  async function run(events: () => AsyncIterable<ChatEvent>, thisTurn: number) {
+  // Stream events fill the turn being answered: the last one.
+  const updateLast = (change: (e: Exchange) => Exchange) =>
+    setTurns((list) => (list.length === 0 ? list : [...list.slice(0, -1), change(list[list.length - 1]!)]));
+
+  // Reads one answer's events into the last turn. The protocol always ends with done or error; a stream that just stops
+  // (dropped connection) failed. A new thread moves to its URL once the server has created it.
+  async function run(events: () => AsyncIterable<ChatEvent>, thisTurn: number, newThread: boolean) {
+    // Leaving the page, or this conversation for another, stops reading, which closes the stream.
+    const current = () => alive.current && turn.current === thisTurn;
     let ended = false;
     let done = false;
     let thread: string | null = null;
     try {
       for await (const event of events()) {
-        if (!alive.current) break; // leaving the page stops reading, which closes the stream
+        if (!current()) break;
         if (event.type === "done" || event.type === "error") ended = true;
         if (event.type === "done") done = true;
         if (event.type === "thread") {
           thread = event.thread_id;
+          if (newThread) {
+            // A push, so Back returns to the conversation shown before. Marked shown first: the page stays as it is.
+            shown.current = thread;
+            navigate(`/chat/${thread}`);
+          }
           setThreadId(thread);
-        } else if (event.type === "delta") setExchange((e) => e && { ...e, answer: e.answer + event.text });
-        else if (event.type === "citations") setExchange((e) => e && { ...e, citations: event.citations });
-        else if (event.type === "decline") setExchange((e) => e && { ...e, declined: event.message });
+        } else if (event.type === "delta") updateLast((e) => ({ ...e, answer: e.answer + event.text }));
+        else if (event.type === "citations") updateLast((e) => ({ ...e, citations: event.citations }));
+        else if (event.type === "decline") updateLast((e) => ({ ...e, declined: event.message }));
         else if (event.type === "error") {
           // The token stopped working mid-answer: the session screen asks the learner to sign in again.
           if (event.code === "unauthenticated") sessionExpiry.notify();
           else setProblem({ message: event.message });
         }
       }
+      if (!current()) return;
       // Any partial answer stays visible above the message.
-      if (alive.current && !ended) setProblem({ message: GENERIC_FAILURE });
+      if (!ended) setProblem({ message: GENERIC_FAILURE });
       // A decline used no documents; reloading the list is harmless.
-      if (alive.current && done && thread) {
+      if (done && thread) {
         setAnswered(true);
         void showDocumentsUsed(thread, thisTurn);
       }
     } catch (error) {
-      if (!alive.current) return;
-      // The last ready document was archived since the page loaded.
-      if (error instanceof NoDocumentsError) setNoDocuments(true);
-      else if (error instanceof AskRefusedError) setProblem({ message: error.message });
+      if (!current()) return;
+      // The last ready document was archived since the page loaded. A reopened conversation keeps its history and
+      // says so under it; a new conversation shows the upload prompt.
+      if (error instanceof NoDocumentsError) {
+        setNoDocuments(true);
+        if (routeThreadId !== undefined) setProblem({ message: error.message });
+      } else if (error instanceof AskRefusedError) setProblem({ message: error.message });
       // A SessionExpiredError was already reported by the API client; the session screen replaces this page.
       else if (!(error instanceof SessionExpiredError)) setProblem({ message: GENERIC_FAILURE });
     } finally {
-      busy.current = false;
-      if (alive.current) setAnswering(false);
+      // Otherwise a newer conversation has already reset these.
+      if (turn.current === thisTurn) {
+        busy.current = false;
+        if (alive.current) setAnswering(false);
+      }
     }
   }
 
@@ -372,16 +469,19 @@ export function ChatPage({
   // limit can't be turned off, the problem line says why and nothing is asked.
   async function searchAll(threadId: string, text: string) {
     if (busy.current) return;
+    const forTurn = turn.current;
     busy.current = true;
     setProblem(null);
     try {
       await saveScope(threadId, "library");
     } catch (error) {
+      if (turn.current !== forTurn) return;
       busy.current = false;
       if (alive.current && !(error instanceof SessionExpiredError)) setProblem({ message: errorMessage(error) });
       return;
     }
-    if (!alive.current) return;
+    // The learner left for another conversation meanwhile: nothing is asked there.
+    if (!alive.current || turn.current !== forTurn) return;
     setScope("library");
     await answer(text, threadId);
   }
@@ -485,7 +585,8 @@ export function ChatPage({
     }
   }
 
-  if (noDocuments) {
+  // A conversation opened from its URL shows its history even without ready documents.
+  if (noDocuments && routeThreadId === undefined) {
     return (
       <div className={styles.fallback}>
         <div className={styles.column}>
@@ -507,11 +608,46 @@ export function ChatPage({
 
   if (library.status === "ended") return null;
 
+  // Unknown, another learner's, or not a conversation id: the server doesn't say which.
+  if (opened.status === "not-found") {
+    return (
+      <div className={styles.fallback}>
+        <div className={styles.column}>
+          <EmptyState
+            icon={MessageSquareX}
+            title="Conversation not found"
+            actions={
+              <LinkButton to="/chat" variant="primary" icon={MessageSquare}>
+                Back to Chat
+              </LinkButton>
+            }
+          >
+            This conversation doesn't exist, or it isn't yours.
+          </EmptyState>
+        </div>
+      </div>
+    );
+  }
+
+  if (opened.status === "failed") {
+    return (
+      <div className={styles.fallback}>
+        <div className={styles.column}>
+          <PageHeader title="Conversation" />
+          <p className={styles.problem}>
+            <CircleAlert className={styles.problemIcon} strokeWidth={1.5} aria-hidden="true" />
+            This conversation couldn't be loaded. Reload the page to try again.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (library.status !== "ready") {
     return (
       <div className={styles.fallback}>
         <div className={styles.column}>
-          <PageHeader title="New conversation" />
+          <PageHeader title={routeThreadId === undefined ? "New conversation" : "Conversation"} />
           {library.status === "failed" && (
             <p className={styles.problem}>
               <CircleAlert className={styles.problemIcon} strokeWidth={1.5} aria-hidden="true" />
@@ -601,7 +737,8 @@ export function ChatPage({
                   </span>
                 </p>
               )}
-              {!exchange && (
+              {/* While a conversation from its URL loads, its history is on its way: no welcome. */}
+              {turns.length === 0 && routeThreadId === undefined && (
                 <section className={styles.welcome}>
                   <h2 className={styles.welcomeTitle}>Ask about your documents</h2>
                   <p className={styles.welcomeText}>
@@ -611,85 +748,105 @@ export function ChatPage({
                 </section>
               )}
 
-              {exchange && (
-                <p className={styles.question}>
-                  <span className="visually-hidden">You asked: </span>
-                  {exchange.question}
-                </p>
-              )}
+              {turns.map((t, index) => {
+                const last = index === turns.length - 1;
+                const listId = `${sourcesId}-${index}`;
+                return (
+                  // Turns are only ever added at the end or all replaced, so the index is a stable key.
+                  <div key={index} className={styles.turn}>
+                    <p className={styles.question}>
+                      <span className="visually-hidden">You asked: </span>
+                      {t.question}
+                    </p>
 
-              {/* Announced once when the answer is complete, never word by word (DESIGN.md → Accessibility). */}
-              <div className={styles.answerRegion} aria-live="polite" aria-busy={answering}>
-                {exchange?.declined != null ? (
-                  <div className={styles.declineCard}>
-                    <p>{exchange.declined}</p>
-                    <p className={styles.muted}>This conversation only searches {documentCount(used.length)}.</p>
-                    <div className={styles.declineActions}>
-                      <Button icon={Plus} aria-haspopup="dialog" disabled={answering} onClick={() => setPickerOpen(true)}>
-                        Add documents
-                      </Button>
-                      <Button
-                        icon={Search}
-                        disabled={answering || threadId === null}
-                        onClick={() => threadId !== null && void searchAll(threadId, exchange.question)}
-                      >
-                        Search all my documents
-                      </Button>
+                    {/* Only the last turn's answer is announced, once when it is complete, never word by word; the
+                        history is not (DESIGN.md → Accessibility). */}
+                    <div
+                      className={styles.answerRegion}
+                      aria-live={last ? "polite" : undefined}
+                      aria-busy={last ? answering : undefined}
+                    >
+                      {t.declined != null ? (
+                        <div className={styles.declineCard}>
+                          <p>{t.declined}</p>
+                          {/* The way out is for the latest question only; an earlier decline keeps just its message. */}
+                          {last && (
+                            <>
+                              <p className={styles.muted}>This conversation only searches {documentCount(used.length)}.</p>
+                              <div className={styles.declineActions}>
+                                <Button icon={Plus} aria-haspopup="dialog" disabled={answering} onClick={() => setPickerOpen(true)}>
+                                  Add documents
+                                </Button>
+                                <Button
+                                  icon={Search}
+                                  disabled={answering || threadId === null}
+                                  onClick={() => threadId !== null && void searchAll(threadId, t.question)}
+                                >
+                                  Search all my documents
+                                </Button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        t.answer && <p className={styles.answer}>{t.answer}</p>
+                      )}
+                      {t.declined === null && showCitations && t.citations.length > 0 && (
+                        <div className={styles.sources}>
+                          <span className={styles.sourcesLabel} id={listId}>
+                            Sources
+                          </span>
+                          {/* Each source shows the [n] the answer's text uses for it; an answer may cite [2] without [1]. */}
+                          <ul className={styles.sourceList} aria-labelledby={listId}>
+                            {t.citations.map((c) => {
+                              if (c.deleted || deletedIds.has(c.document_id)) {
+                                return (
+                                  <li key={c.chunk_id}>
+                                    <span className={`${styles.source} ${styles.sourceDeleted}`} title="Deleted document">
+                                      <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
+                                      <span className={styles.sourceMarker}>[{c.n}]</span> Deleted document
+                                    </span>
+                                  </li>
+                                );
+                              }
+                              // The chip whose passage is open beside the conversation; a panel row's open clears it.
+                              const shown = viewer?.chunkId === c.chunk_id && viewer.turn === index;
+                              const pageText = c.page === null ? "page unavailable" : `p. ${c.page}`;
+                              const state = shown ? "Shown beside the conversation" : "Open beside the conversation";
+                              return (
+                                <li key={c.chunk_id}>
+                                  <button
+                                    type="button"
+                                    className={shown ? `${styles.source} ${styles.sourceShown}` : styles.source}
+                                    title={formatCitation(c)}
+                                    aria-label={`${c.document_title}, ${pageText}${c.archived ? ", archived" : ""}. ${state}`}
+                                    aria-current={shown ? "true" : undefined}
+                                    data-chunk-id={c.chunk_id}
+                                    onClick={(event) => openCitation(c, index, event.currentTarget)}
+                                  >
+                                    <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
+                                    <span className={styles.sourceMarker}>[{c.n}]</span>{" "}
+                                    <span className={styles.sourceTitle}>{c.document_title}</span>{" "}
+                                    <span className={styles.sourcePage}>· {pageText}</span>
+                                    {/* An archived document's citation still opens it, marked as archived. */}
+                                    {c.archived && <span className={styles.sourceBadge}>Archived</span>}
+                                  </button>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      )}
+                      {last && problem && (
+                        <p className={styles.problem}>
+                          <CircleAlert className={styles.problemIcon} strokeWidth={1.5} aria-hidden="true" />
+                          {problem.message}
+                        </p>
+                      )}
                     </div>
                   </div>
-                ) : (
-                  exchange?.answer && <p className={styles.answer}>{exchange.answer}</p>
-                )}
-                {exchange && exchange.declined === null && showCitations && exchange.citations.length > 0 && (
-                  <div className={styles.sources}>
-                    <span className={styles.sourcesLabel} id={sourcesId}>
-                      Sources
-                    </span>
-                    {/* Each source shows the [n] the answer's text uses for it; an answer may cite [2] without [1]. */}
-                    <ul className={styles.sourceList} aria-labelledby={sourcesId}>
-                      {exchange.citations.map((c) => {
-                        if (deletedIds.has(c.document_id)) {
-                          return (
-                            <li key={c.chunk_id}>
-                              <span className={`${styles.source} ${styles.sourceDeleted}`} title="Deleted document">
-                                <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
-                                <span className={styles.sourceMarker}>[{c.n}]</span> Deleted document
-                              </span>
-                            </li>
-                          );
-                        }
-                        // The chip whose passage is open beside the conversation; a panel row's open clears it.
-                        const shown = viewer?.chunkId === c.chunk_id;
-                        const pageText = c.page === null ? "page unavailable" : `p. ${c.page}`;
-                        return (
-                          <li key={c.chunk_id}>
-                            <button
-                              type="button"
-                              className={shown ? `${styles.source} ${styles.sourceShown}` : styles.source}
-                              title={formatCitation(c)}
-                              aria-label={`${c.document_title}, ${pageText}. ${shown ? "Shown beside the conversation" : "Open beside the conversation"}`}
-                              aria-current={shown ? "true" : undefined}
-                              data-chunk-id={c.chunk_id}
-                              onClick={(event) => openCitation(c, event.currentTarget)}
-                            >
-                              <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
-                              <span className={styles.sourceMarker}>[{c.n}]</span>{" "}
-                              <span className={styles.sourceTitle}>{c.document_title}</span>{" "}
-                              <span className={styles.sourcePage}>· {pageText}</span>
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                )}
-                {problem && (
-                  <p className={styles.problem}>
-                    <CircleAlert className={styles.problemIcon} strokeWidth={1.5} aria-hidden="true" />
-                    {problem.message}
-                  </p>
-                )}
-              </div>
+                );
+              })}
 
               {answering && <p className={styles.thinking}>The tutor is answering…</p>}
             </div>
