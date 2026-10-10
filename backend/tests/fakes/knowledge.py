@@ -3,11 +3,12 @@
 import copy
 import math
 import uuid
-from collections.abc import Collection
+from collections.abc import Collection, Mapping
+from dataclasses import replace
 from types import TracebackType
 from typing import Self
 
-from smart_tutor.knowledge.domain.chunk import Chunk
+from smart_tutor.knowledge.domain.chunk import Chunk, ChunkPassage, StoredChunk
 from smart_tutor.knowledge.domain.content import Content
 from smart_tutor.knowledge.domain.document import NO_FILTER, Document, DocumentFilter, DocumentState
 from smart_tutor.knowledge.domain.search import ChunkHit
@@ -192,6 +193,10 @@ def _cosine(a: list[float], b: list[float]) -> float:
     return sum(x * y for x, y in zip(a, b, strict=True)) / norms if norms else 0.0
 
 
+def fake_chunk_id(content_id: str, seq: int) -> str:
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"{content_id}:{seq}"))
+
+
 class _Chunks(ChunkRepository):
     def __init__(self, state: _State) -> None:
         self._s = state
@@ -202,6 +207,37 @@ class _Chunks(ChunkRepository):
     def remove_for_content(self, content_id: ContentId) -> None:
         self._s.chunks.pop(content_id, None)
 
+    def contents_missing_start_index(self) -> list[ContentId]:
+        return sorted(
+            ContentId(content_id)
+            for content_id, chunks in self._s.chunks.items()
+            if any(c.start_index is None for c in chunks)
+        )
+
+    def list_for_content(self, content_id: ContentId) -> list[StoredChunk]:
+        return [
+            StoredChunk(fake_chunk_id(c.content_id, c.seq), c.seq, c.page, c.text, c.start_index)
+            for c in sorted(self._s.chunks.get(content_id, []), key=lambda c: c.seq)
+        ]
+
+    def set_start_indexes(self, offsets: Mapping[str, int]) -> None:
+        for content_id, chunks in self._s.chunks.items():
+            self._s.chunks[content_id] = [
+                replace(c, start_index=offsets[fake_chunk_id(c.content_id, c.seq)])
+                if fake_chunk_id(c.content_id, c.seq) in offsets
+                else c
+                for c in chunks
+            ]
+
+    def get_readable(self, user_id: UserId, chunk_id: str) -> ChunkPassage | None:
+        for d in self._s.documents.values():
+            if d.content_id is None or not d.can_be_read_by(user_id):
+                continue
+            for c in self._s.chunks.get(d.content_id, []):
+                if fake_chunk_id(c.content_id, c.seq) == chunk_id:
+                    return ChunkPassage(chunk_id, d.document_id, c.page, c.start_index, c.text)
+        return None
+
     def search(
         self, user_id: UserId, embedding: list[float], k: int, document_ids: Collection[DocumentId] | None = None
     ) -> list[ChunkHit]:
@@ -211,7 +247,7 @@ class _Chunks(ChunkRepository):
 
         hits = [
             ChunkHit(
-                str(uuid.uuid5(uuid.NAMESPACE_URL, f"{c.content_id}:{c.seq}")),
+                fake_chunk_id(c.content_id, c.seq),
                 d.document_id,
                 title(d),
                 c.page,

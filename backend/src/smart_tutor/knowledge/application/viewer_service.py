@@ -1,12 +1,13 @@
-"""The document viewer's file link (PRD §8 US-4b, §9.3 step 5). Reads go through `can_read`, archived included."""
+"""The document viewer's file link and cited passage (PRD §8 US-4b, §9.3 step 5). Reads go through `can_read`."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from smart_tutor.knowledge.application.document_service import DocumentView, document_view
+from smart_tutor.knowledge.domain.chunk import ChunkPassage
 from smart_tutor.knowledge.domain.content import content_key
 from smart_tutor.knowledge.domain.document import DocumentState
-from smart_tutor.knowledge.domain.errors import DocumentNotFoundError, DocumentStateError
+from smart_tutor.knowledge.domain.errors import ChunkNotFoundError, DocumentNotFoundError, DocumentStateError
 from smart_tutor.knowledge.ports.library import LibraryUnitOfWork
 from smart_tutor.knowledge.ports.object_store import ObjectStore
 from smart_tutor.shared.domain.ids import DocumentId, UserId
@@ -39,3 +40,11 @@ class ViewerService:
             content_key(document.owner_id, document.content_id), expires_in=VIEWER_LINK_SECONDS
         )
         return DocumentFile(document_view(document, self._max_attempts), url, VIEWER_LINK_SECONDS)
+
+    def passage(self, user_id: UserId, chunk_id: str) -> ChunkPassage:
+        """A cited chunk, for the viewer's highlight: only through a document the caller can read, archived included."""
+        with self._uow() as tx:
+            found = tx.chunks.get_readable(user_id, chunk_id)
+        if found is None:
+            raise ChunkNotFoundError("This passage isn't in your library")
+        return found

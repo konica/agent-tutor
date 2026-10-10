@@ -31,7 +31,7 @@ class PageChunker(BaseDocumentTransformer):
 
     def transform_documents(self, documents: Sequence[Document], **kwargs: Any) -> Sequence[Document]:
         return [
-            Document(page_content=d.page_content[i : i + CHUNK_CHARS], metadata=dict(d.metadata))
+            Document(page_content=d.page_content[i : i + CHUNK_CHARS], metadata={**d.metadata, "start_index": i})
             for d in documents
             for i in range(0, len(d.page_content), CHUNK_CHARS)
         ]

@@ -27,6 +27,7 @@ import { EmptyState } from "../../components/EmptyState/EmptyState";
 import { useForceNavRail } from "../../components/AppShell/NavRail";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
 import { DocumentPane } from "../viewer/DocumentPane";
+import type { Passage } from "../viewer/DocumentViewer";
 import type { ViewerDeps } from "../viewer/ViewerDialog";
 import styles from "./ChatPage.module.css";
 import { ConversationPanel } from "./ConversationPanel";
@@ -66,7 +67,8 @@ type Library = { status: "loading" | "failed" | "ended" } | { status: "ready" };
 
 type Problem = { message: string };
 
-type Viewer = { documentId: string };
+// `chunkId` and `passage` are set only when a Sources chip opened the document; a panel row's open leaves them out.
+type Viewer = { documentId: string; chunkId?: string; passage?: Passage };
 
 const MAX_QUESTION = 4000;
 const PANEL_ID = "conversation-panel";
@@ -240,7 +242,8 @@ export function ChatPage({
     const id = from?.dataset.documentId;
     const rows = Array.from(document.querySelectorAll<HTMLElement>(`#${PANEL_ID} [data-document-id]`));
     const live = from?.isConnected ? from : rows.find((row) => row.dataset.documentId === id);
-    // The toggle fallback is for openers outside the panel (Sources chips, a later ticket) or a row no longer shown.
+    // Sources chips stay mounted while the pane is open, so they take focus back directly. The toggle is the fallback
+    // for a row that is no longer shown.
     (live ?? toggleRef.current)?.focus();
   }, [viewer]);
 
@@ -248,6 +251,17 @@ export function ChatPage({
   function openDocument(documentId: string, from: HTMLElement) {
     opener.current = from;
     setViewer({ documentId });
+  }
+
+  // A Sources chip opens its document at the cited passage. `passage` is a new object on every click, so clicking the
+  // same chip again jumps back to it; a citation without a page opens the document at page 1.
+  function openCitation(c: ChatCitation, from: HTMLElement) {
+    opener.current = from;
+    setViewer({
+      documentId: c.document_id,
+      chunkId: c.chunk_id,
+      passage: c.page === null ? undefined : { chunkId: c.chunk_id, page: c.page },
+    });
   }
 
   function closeDocument() {
@@ -633,25 +647,39 @@ export function ChatPage({
                     </span>
                     {/* Each source shows the [n] the answer's text uses for it; an answer may cite [2] without [1]. */}
                     <ul className={styles.sourceList} aria-labelledby={sourcesId}>
-                      {exchange.citations.map((c) =>
-                        deletedIds.has(c.document_id) ? (
+                      {exchange.citations.map((c) => {
+                        if (deletedIds.has(c.document_id)) {
+                          return (
+                            <li key={c.chunk_id}>
+                              <span className={`${styles.source} ${styles.sourceDeleted}`} title="Deleted document">
+                                <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
+                                <span className={styles.sourceMarker}>[{c.n}]</span> Deleted document
+                              </span>
+                            </li>
+                          );
+                        }
+                        // The chip whose passage is open beside the conversation; a panel row's open clears it.
+                        const shown = viewer?.chunkId === c.chunk_id;
+                        const pageText = c.page === null ? "page unavailable" : `p. ${c.page}`;
+                        return (
                           <li key={c.chunk_id}>
-                            <span className={`${styles.source} ${styles.sourceDeleted}`} title="Deleted document">
-                              <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
-                              <span className={styles.sourceMarker}>[{c.n}]</span> Deleted document
-                            </span>
-                          </li>
-                        ) : (
-                          <li key={c.chunk_id}>
-                            <span className={styles.source} title={formatCitation(c)}>
+                            <button
+                              type="button"
+                              className={shown ? `${styles.source} ${styles.sourceShown}` : styles.source}
+                              title={formatCitation(c)}
+                              aria-label={`${c.document_title}, ${pageText}. ${shown ? "Shown beside the conversation" : "Open beside the conversation"}`}
+                              aria-current={shown ? "true" : undefined}
+                              data-chunk-id={c.chunk_id}
+                              onClick={(event) => openCitation(c, event.currentTarget)}
+                            >
                               <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
                               <span className={styles.sourceMarker}>[{c.n}]</span>{" "}
                               <span className={styles.sourceTitle}>{c.document_title}</span>{" "}
-                              <span>· {c.page === null ? "page unavailable" : `p. ${c.page}`}</span>
-                            </span>
+                              <span className={styles.sourcePage}>· {pageText}</span>
+                            </button>
                           </li>
-                        ),
-                      )}
+                        );
+                      })}
                     </ul>
                   </div>
                 )}
@@ -718,7 +746,12 @@ export function ChatPage({
 
         {viewer && (
           <div className={styles.viewer}>
-            <DocumentPane documentId={viewer.documentId} onClose={closeDocument} viewerDeps={viewerDeps} />
+            <DocumentPane
+              documentId={viewer.documentId}
+              passage={viewer.passage}
+              onClose={closeDocument}
+              viewerDeps={viewerDeps}
+            />
           </div>
         )}
       </div>

@@ -1,11 +1,11 @@
 """Persistence of contents, documents, and uploads, committed together (one unit of work per use case)."""
 
 from abc import ABC, abstractmethod
-from collections.abc import Collection
+from collections.abc import Collection, Mapping
 from types import TracebackType
 from typing import Self
 
-from smart_tutor.knowledge.domain.chunk import Chunk
+from smart_tutor.knowledge.domain.chunk import Chunk, ChunkPassage, StoredChunk
 from smart_tutor.knowledge.domain.content import Content
 from smart_tutor.knowledge.domain.document import NO_FILTER, Document, DocumentFilter
 from smart_tutor.knowledge.domain.search import ChunkHit
@@ -125,6 +125,23 @@ class ChunkRepository(ABC):
     @abstractmethod
     def remove_for_content(self, content_id: ContentId) -> None:
         """Delete every chunk of the content."""
+
+    @abstractmethod
+    def contents_missing_start_index(self) -> list[ContentId]:
+        """Distinct ids, ordered, of contents with a chunk whose `start_index` is null (system job: no access check)."""
+
+    @abstractmethod
+    def list_for_content(self, content_id: ContentId) -> list[StoredChunk]:
+        """The content's chunks (without embeddings) ordered by `seq`."""
+
+    @abstractmethod
+    def set_start_indexes(self, offsets: Mapping[str, int]) -> None:
+        """Set `start_index` by chunk id (an id that no longer exists updates nothing)."""
+
+    @abstractmethod
+    def get_readable(self, user_id: UserId, chunk_id: str) -> ChunkPassage | None:
+        """`can_read` in SQL: the chunk through a document the caller can read (archived included, any state);
+        None for another learner's, an unknown, or a malformed id."""
 
     @abstractmethod
     def search(

@@ -39,5 +39,9 @@ class RetryLimitError(DomainError):
     """The content used all its processing attempts (PRD §9.5)."""
 
 
+class ChunkNotFoundError(DomainError):
+    """No such chunk behind a document this learner can read; entrypoints answer 404 either way."""
+
+
 class DocumentNotFoundError(DomainError):
     """No such document for this learner; entrypoints answer 404 whether it is missing or someone else's."""

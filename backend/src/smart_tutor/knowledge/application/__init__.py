@@ -8,6 +8,7 @@ from smart_tutor.knowledge.application.ingestion_service import IngestionService
 from smart_tutor.knowledge.application.limits import load_file_limits, load_max_attempts
 from smart_tutor.knowledge.application.retry_service import RetryService, retried_content, retry_message
 from smart_tutor.knowledge.application.search_service import SearchService
+from smart_tutor.knowledge.application.start_index_backfill import BackfillResult, StartIndexBackfill
 from smart_tutor.knowledge.application.subject_choice import SubjectChoiceService, SubjectSuggestions
 from smart_tutor.knowledge.application.upload_service import (
     PDF_CONTENT_TYPE,
@@ -16,8 +17,10 @@ from smart_tutor.knowledge.application.upload_service import (
     UploadStatus,
 )
 from smart_tutor.knowledge.application.viewer_service import VIEWER_LINK_SECONDS, DocumentFile, ViewerService
+from smart_tutor.knowledge.domain.chunk import ChunkPassage
 from smart_tutor.knowledge.domain.content import ContentState
 from smart_tutor.knowledge.domain.errors import (
+    ChunkNotFoundError,
     DocumentNotFoundError,
     DocumentStateError,
     InvalidFileNameError,
@@ -43,7 +46,10 @@ __all__ = [
     "PDF_CONTENT_TYPE",
     "VIEWER_LINK_SECONDS",
     "ArchiveService",
+    "BackfillResult",
     "ChunkHit",
+    "ChunkNotFoundError",
+    "ChunkPassage",
     "ContentState",
     "DeleteService",
     "Described",
@@ -68,6 +74,7 @@ __all__ = [
     "RetryLimitError",
     "RetryService",
     "SearchService",
+    "StartIndexBackfill",
     "StartedUpload",
     "SubjectChoiceService",
     "SubjectSuggestions",

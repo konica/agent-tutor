@@ -17,4 +17,52 @@
 #     adversarial: false                                       # true for PDFs with injected instructions
 #
 # Add entries in M1 after checking each document's license.
-documents: []
+documents:
+  - id: react-2022
+    source: {type: arxiv, ref: "2210.03629v3"}
+    license: "CC-BY-4.0"
+    sha256: "f285b0971ae4a790e402fb93966bed3adde2cf0a04977d08b2b40d6ab0cace69"
+    subjects: ["LLM agents"]
+    metadata:
+      title: "ReAct: Synergizing Reasoning and Acting in Language Models"
+      authors: ["Shunyu Yao", "Jeffrey Zhao", "Dian Yu", "Nan Du", "Izhak Shafran", "Karthik Narasimhan", "Yuan Cao"]
+      year: 2022
+    work_key: "title:react synergizing reasoning and acting in language models:2022"
+    cites: ["cot-2022"]
+    adversarial: false
+  - id: cot-2022
+    source: {type: arxiv, ref: "2201.11903v6"}
+    license: "CC-BY-4.0"
+    sha256: "7d9f878c23b460e4566aa4ec9201b1abfb3b8faefb2b1356e411cb90fef72a12"
+    subjects: ["Prompting"]
+    metadata:
+      title: "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models"
+      authors: ["Jason Wei", "Xuezhi Wang", "Dale Schuurmans", "Maarten Bosma", "Brian Ichter", "Fei Xia", "Ed Chi", "Quoc Le", "Denny Zhou"]
+      year: 2022
+    work_key: "title:chain of thought prompting elicits reasoning in large language models:2022"
+    cites: []
+    adversarial: false
+  - id: reflexion-2023
+    source: {type: arxiv, ref: "2303.11366v4"}
+    license: "CC-BY-4.0"
+    sha256: "6059b6f89fea9959bd3dab553fbb97756a3dfb1b15e3cbab2fbf3ab6664333bd"
+    subjects: ["LLM agents"]
+    metadata:
+      title: "Reflexion: Language Agents with Verbal Reinforcement Learning"
+      authors: ["Noah Shinn", "Federico Cassano", "Edward Berman", "Ashwin Gopinath", "Karthik Narasimhan", "Shunyu Yao"]
+      year: 2023
+    work_key: "title:reflexion language agents with verbal reinforcement learning:2023"
+    cites: ["react-2022", "cot-2022"]
+    adversarial: false
+  - id: self-rag-2023
+    source: {type: arxiv, ref: "2310.11511v1"}
+    license: "CC-BY-4.0"
+    sha256: "d9eaa1398abac0df67a9d0933a5bf8b6d9d83d2e72da2a486073cd842dd52978"
+    subjects: ["Retrieval-augmented generation", "LLM agents"]
+    metadata:
+      title: "Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection"
+      authors: ["Akari Asai", "Zeqiu Wu", "Yizhong Wang", "Avirup Sil", "Hannaneh Hajishirzi"]
+      year: 2023
+    work_key: "title:self rag learning to retrieve generate and critique through self reflection:2023"
+    cites: []
+    adversarial: false
