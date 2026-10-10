@@ -31,7 +31,12 @@ from smart_tutor.knowledge.domain.search import ChunkHit
 from smart_tutor.knowledge.domain.upload import UploadOutcome
 from smart_tutor.knowledge.ports.library import LibraryUnitOfWork
 from smart_tutor.knowledge.ports.object_store import ObjectStore
-from smart_tutor.knowledge.ports.pdf_extractor import PdfExtractor, TooManyPagesError, UnreadablePdfError
+from smart_tutor.knowledge.ports.pdf_extractor import (
+    ExtractionTimeoutError,
+    PdfExtractor,
+    TooManyPagesError,
+    UnreadablePdfError,
+)
 
 __all__ = [
     "FIRST_PAGES",
@@ -49,6 +54,7 @@ __all__ = [
     "DocumentService",
     "DocumentStateError",
     "DocumentView",
+    "ExtractionTimeoutError",
     "FileLimits",
     "IngestionService",
     "InvalidFileNameError",

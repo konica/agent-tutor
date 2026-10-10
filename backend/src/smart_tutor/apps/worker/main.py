@@ -17,6 +17,7 @@ from smart_tutor.knowledge.adapters.pypdf_extractor import PypdfExtractor
 from smart_tutor.knowledge.adapters.s3_object_store import S3ObjectStore
 from smart_tutor.knowledge.adapters.sql_library import SqlLibraryUnitOfWork
 from smart_tutor.knowledge.adapters.sql_tables import EMBEDDING_DIM
+from smart_tutor.knowledge.adapters.time_limited_extractor import TimeLimitedExtractor
 from smart_tutor.knowledge.application import (
     DocumentDescriber,
     IngestionService,
@@ -77,7 +78,7 @@ def main() -> None:
     embedding = settings.models.embedding
     embeddings = models.embedding()
     tools = ProcessingTools(
-        extractor=PypdfExtractor(),
+        extractor=TimeLimitedExtractor(PypdfExtractor(), settings.extraction_timeout_seconds),
         describer=DocumentDescriber(models.chat(ChatRole.AGENT)),  # PRD §9.13: document description
         chunker=chunker,
         chunker_id=chunker_id,

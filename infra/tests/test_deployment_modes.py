@@ -1,6 +1,8 @@
 """The CDK app builds one deployment mode, chosen by the context `smart-tutor:mode` (#147, PRD §9.12)."""
 
+import json
 from fnmatch import fnmatch
+from typing import Any
 
 import aws_cdk as cdk
 import pytest
@@ -55,10 +57,32 @@ def test_on_premise_has_its_own_bucket_and_queues() -> None:
     assert names == {"smart-tutor-on-premise-ingest", "smart-tutor-on-premise-ingest-dlq"}
 
 
-def test_on_premise_bucket_has_no_cors_until_the_host_has_an_address() -> None:
-    bucket = next(iter(on_premise("Storage").find_resources("AWS::S3::Bucket").values()))
+def _cors_rules(**context: str) -> list[dict[str, Any]]:
+    t = template(make_app(**{"smart-tutor:mode": ON_PREMISE, **context}), "Storage")
+    bucket = next(iter(t.find_resources("AWS::S3::Bucket").values()))
+    rules: list[dict[str, Any]] = bucket["Properties"]["CorsConfiguration"]["CorsRules"]
+    return rules
 
-    assert "CorsConfiguration" not in bucket["Properties"]
+
+def test_on_premise_bucket_cors_allows_sslip_io_to_post_uploads_and_get_documents() -> None:
+    # GET is the document viewer's presigned link (#123); until #154 claims a name the host is <Elastic IP>.sslip.io.
+    (rule,) = _cors_rules()
+
+    assert rule["AllowedMethods"] == ["POST", "GET"]
+    assert rule["ExposedHeaders"] == ["Accept-Ranges", "Content-Range", "Content-Length"]
+    assert rule["AllowedHeaders"] == ["*"]
+    assert rule["AllowedOrigins"] == ["https://*.sslip.io"]
+
+
+def test_on_premise_storage_imports_nothing_from_the_host() -> None:
+    # An import of the Elastic IP would block `cdk destroy` of the Host and the switch to a domain (#154).
+    assert "Fn::ImportValue" not in json.dumps(on_premise("Storage").to_json())
+
+
+def test_on_premise_bucket_cors_names_the_configured_domain() -> None:
+    (rule,) = _cors_rules(**{"smart-tutor:on-premise-domain": "tutor.example.org"})
+
+    assert rule["AllowedOrigins"] == ["https://tutor.example.org"]
 
 
 def test_on_premise_has_its_own_parameters_and_secrets() -> None:

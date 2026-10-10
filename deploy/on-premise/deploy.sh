@@ -6,8 +6,9 @@
 # 1. Renders settings (SSM) and secrets (Secrets Manager) into a root-only env file.
 # 2. Pulls the images, starts Postgres, and creates or updates the app and Keycloak roles and databases.
 # 3. Migrates, then starts every service and waits until all are healthy. Compose recreates only the services whose
-#    image or settings changed, so the same tag again changes nothing. Installs and enables the scheduled jobs'
-#    systemd units (the nightly backup, #151).
+#    image or settings changed, so the same tag again changes nothing. Fails unless the running worker is isolated
+#    (non-root, read-only root, no capabilities; a worker that isn't is stopped) and the agent and MCP server answer.
+#    Installs and enables the scheduled jobs' systemd units (the nightly backup, #151).
 # 4. Creates the test learner if it is missing.
 #
 # It prints no secret: never add `set -x`, `docker compose config`, or an echo of the env file.
@@ -90,6 +91,38 @@ echo "Migrating"
 
 echo "Starting the services"
 "${compose[@]}" up -d --wait --wait-timeout 900 --remove-orphans
+
+# The worker parses untrusted PDFs: fail the deploy unless the running container really is isolated, whatever
+# compose.yaml says (an override file or a hand-started container would otherwise go unnoticed).
+echo "Checking the worker's isolation"
+worker=$("${compose[@]}" ps -q worker)
+[[ -n $worker ]] || { echo "The worker container is not running" >&2; exit 1; }
+isolation=$(docker inspect --format \
+  '{{.Config.User}}|{{.HostConfig.ReadonlyRootfs}}|{{json .HostConfig.CapDrop}}|{{json .HostConfig.SecurityOpt}}' "$worker")
+IFS='|' read -r user readonly_rootfs cap_drop security_opt <<<"$isolation"
+problems=()
+[[ $user == 10001:10001 ]] || problems+=("runs as '$user', not 10001:10001")
+[[ $readonly_rootfs == true ]] || problems+=("ReadonlyRootfs is $readonly_rootfs")
+[[ $cap_drop == *'"ALL"'* ]] || problems+=("CapDrop $cap_drop does not drop ALL")
+[[ $security_opt == *'"no-new-privileges:true"'* ]] || problems+=("SecurityOpt $security_opt lacks no-new-privileges")
+if ((${#problems[@]})); then
+  printf 'The worker is not isolated: %s\n' "${problems[@]}" >&2
+  # Don't leave it consuming uploads after the deploy is marked failed.
+  docker stop "$worker" >/dev/null
+  echo "Stopped the worker" >&2
+  exit 1
+fi
+
+# The agent and MCP server have no public route; check them from inside the API container, as the API reaches them.
+echo "Checking the agent and the MCP server"
+"${compose[@]}" exec -T api python -c "import urllib.request as u; u.urlopen('http://agent:8080/healthz', timeout=10)"
+"${compose[@]}" exec -T api python -c "
+import urllib.error as e, urllib.request as u
+try:
+    u.urlopen('http://mcp:8000/mcp', timeout=10)
+except e.HTTPError as x:
+    raise SystemExit(0 if x.code == 401 else f'MCP answered {x.code} without a token, expected 401')
+raise SystemExit('MCP answered without a token')"
 
 # Scheduled jobs are systemd timers that call `docker compose run` (docs/runbooks/on-premise-backups.md). The units
 # read the env file rendered above, so they start only after the first deploy.

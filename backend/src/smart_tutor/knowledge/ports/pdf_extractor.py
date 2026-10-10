@@ -15,6 +15,10 @@ class TooManyPagesError(Exception):
         self.pages = pages
 
 
+class ExtractionTimeoutError(Exception):
+    """Reading the PDF took longer than the per-file time limit (PRD §9.5)."""
+
+
 class PdfExtractor(ABC):
     @abstractmethod
     def extract_pages(self, data: bytes, max_pages: int, first: int | None = None) -> list[str]:

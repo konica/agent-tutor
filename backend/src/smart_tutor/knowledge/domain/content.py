@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 UNREADABLE_PDF = "This file isn't a readable PDF"
 NO_TEXT_LAYER = "No text layer (scanned PDFs are not supported yet)"
+EXTRACTION_TIMED_OUT = "This PDF took too long to read"
 RETRIES_USED_UP = "This file could not be processed"
 MIN_AVERAGE_CHARS = 50  # non-whitespace characters per page below which a PDF counts as scanned
 _SHA256 = re.compile(r"[0-9a-f]{64}")
