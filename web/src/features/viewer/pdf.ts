@@ -1,6 +1,8 @@
 // The only file that imports pdf.js. Everything else depends on these types, so tests can fake the loader.
-import { getDocument, GlobalWorkerOptions, Util } from "pdfjs-dist";
-import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+// The legacy build: the default one calls APIs only the newest browsers have (Uint8Array.prototype.toHex,
+// Map.prototype.getOrInsertComputed), so Chrome 138 couldn't open any document.
+import { getDocument, GlobalWorkerOptions, Util } from "pdfjs-dist/legacy/build/pdf.mjs";
+import workerUrl from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 
 import type { TextItem } from "./passage";
 
