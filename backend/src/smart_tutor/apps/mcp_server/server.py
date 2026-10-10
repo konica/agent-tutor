@@ -72,13 +72,14 @@ def build_server(settings: Settings, verifier: TokenVerifier, search: SearchServ
     )
 
     @mcp.tool(name="search")
-    async def search_tool(query: str, k: int = 5) -> SearchResponse:
-        """Chunks of the caller's ready, non-archived documents, nearest first."""
+    async def search_tool(query: str, k: int = 5, document_ids: list[str] | None = None) -> SearchResponse:
+        """Chunks of the caller's ready, non-archived documents, nearest first; with `document_ids`, only those of
+        them that the caller can read (the list can only narrow the search, PRD US-4c)."""
         token = get_access_token()
         if token is None or not token.subject:
             raise ToolError("not authenticated")
         try:
-            hits = await asyncio.to_thread(search.search, UserId(token.subject), query, k)
+            hits = await asyncio.to_thread(search.search, UserId(token.subject), query, k, document_ids)
         except InvalidSearchError as e:
             raise ToolError(str(e)) from None
         return SearchResponse(

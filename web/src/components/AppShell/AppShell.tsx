@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useMatches, useNavigationType } from "react-router";
 
 import { loadDocuments as defaultLoadDocuments } from "../../api/documents";
@@ -7,6 +7,7 @@ import { NeedsSubjectsContext, needsSubjectsLabel, useNeedsSubjectsState } from 
 import { SideNav } from "../SideNav/SideNav";
 import { useNavCollapsed } from "../SideNav/useNavCollapsed";
 import styles from "./AppShell.module.css";
+import { NavRailContext } from "./NavRail";
 
 type Handle = { wide?: boolean; bleed?: boolean } | undefined;
 
@@ -14,6 +15,16 @@ type Handle = { wide?: boolean; bleed?: boolean } | undefined;
 // `handle: { bleed: true }` to fill the whole main area and lay out its own panes (the chat).
 export function AppShell({ loadDocuments = defaultLoadDocuments }: { loadDocuments?: typeof defaultLoadDocuments }) {
   const [collapsed, toggle] = useNavCollapsed();
+  // A page can force the rail for a while (the chat's split view). The learner can still open the nav: that ends the
+  // forcing without touching their saved choice.
+  const [forced, setForced] = useState(false);
+  const railed = collapsed || forced;
+  // Forced over an expanded choice: one click just ends the forcing. Forced over a saved rail: the learner asked for the
+  // nav, so the click also saves "expanded"; otherwise it would take two clicks to open.
+  const onToggle = () => {
+    if (forced) setForced(false);
+    if (!forced || collapsed) toggle();
+  };
   const matches = useMatches();
   const wide = matches.some((m) => (m.handle as Handle)?.wide);
   const bleed = matches.some((m) => (m.handle as Handle)?.bleed);
@@ -34,21 +45,23 @@ export function AppShell({ loadDocuments = defaultLoadDocuments }: { loadDocumen
   }, [pathname, navigationType]);
 
   return (
-    <NeedsSubjectsContext.Provider value={needs}>
-      <div className={collapsed ? `${styles.app} ${styles.collapsed}` : styles.app}>
-        {/* recent is filled when the conversations list exists (US-5) */}
-        <SideNav
-          collapsed={collapsed}
-          onToggle={toggle}
-          recent={[]}
-          badges={needs.count ? { "/library": { count: needs.count, label: needsSubjectsLabel(needs.count) } } : undefined}
-        />
-        <main ref={main} className={styles.main} id="main-content" tabIndex={-1}>
-          <div className={bleed ? styles.bleed : wide ? `${styles.page} ${styles.wide}` : styles.page}>
-            <Outlet />
-          </div>
-        </main>
-      </div>
-    </NeedsSubjectsContext.Provider>
+    <NavRailContext.Provider value={setForced}>
+      <NeedsSubjectsContext.Provider value={needs}>
+        <div className={railed ? `${styles.app} ${styles.collapsed}` : styles.app}>
+          {/* recent is filled when the conversations list exists (US-5) */}
+          <SideNav
+            collapsed={railed}
+            onToggle={onToggle}
+            recent={[]}
+            badges={needs.count ? { "/library": { count: needs.count, label: needsSubjectsLabel(needs.count) } } : undefined}
+          />
+          <main ref={main} className={styles.main} id="main-content" tabIndex={-1}>
+            <div className={bleed ? styles.bleed : wide ? `${styles.page} ${styles.wide}` : styles.page}>
+              <Outlet />
+            </div>
+          </main>
+        </div>
+      </NeedsSubjectsContext.Provider>
+    </NavRailContext.Provider>
   );
 }

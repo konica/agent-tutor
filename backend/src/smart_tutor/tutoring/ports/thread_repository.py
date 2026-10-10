@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
-from smart_tutor.tutoring.domain.thread import Thread
+from smart_tutor.tutoring.domain.thread import SearchScope, Thread
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
 
 
@@ -21,6 +21,10 @@ class ThreadRepository(ABC):
     @abstractmethod
     def set_title(self, thread_id: ThreadId, title: str) -> None:
         """Store the thread's title (committed when this returns). (Callers check ownership first with `get_owned`.)"""
+
+    @abstractmethod
+    def set_search_scope(self, thread_id: ThreadId, scope: SearchScope) -> None:
+        """Store the thread's search scope (committed when this returns). (Callers check ownership first.)"""
 
     @abstractmethod
     def add_documents_used(self, thread_id: ThreadId, document_ids: Sequence[DocumentId], at: datetime) -> None:

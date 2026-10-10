@@ -26,6 +26,13 @@ class S3ObjectStore(ObjectStore):
         )
         return PresignedPost(url=post["url"], fields={k: str(v) for k, v in post["fields"].items()})
 
+    def presign_get(self, key: str, *, expires_in: int) -> str:
+        return self._client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": self._bucket, "Key": key, "ResponseContentType": "application/pdf"},
+            ExpiresIn=expires_in,
+        )
+
     def read(self, key: str) -> bytes:
         try:
             return self._client.get_object(Bucket=self._bucket, Key=key)["Body"].read()

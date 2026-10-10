@@ -223,3 +223,30 @@ describe("DocumentTable open details", () => {
     expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Details", "Archive"]);
   });
 });
+
+describe("DocumentTable change subjects", () => {
+  const props = { onRetry: () => {}, retrying: new Set<string>(), onArchive: vi.fn(), onOpen: vi.fn(), onDelete: vi.fn() };
+  const ready = { ...doc, subjects: [{ subject_id: "s1", name: "AI Agents" }] };
+
+  it("lists Change subjects after Details in a ready row's menu and opens the picker for it", async () => {
+    const onChooseSubjects = vi.fn();
+    render(<DocumentTable documents={[ready]} {...props} onChooseSubjects={onChooseSubjects} />);
+    await userEvent.click(screen.getByRole("button", { name: "More actions for Toolformer" }));
+    expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Details", "Change subjects", "Edit title", "Archive", "Delete…"]);
+    await userEvent.click(screen.getByRole("menuitem", { name: "Change subjects" }));
+    expect(onChooseSubjects).toHaveBeenCalledExactlyOnceWith(ready);
+  });
+
+  it("offers no Change subjects on a row awaiting subjects; it has Choose subjects instead", async () => {
+    render(<DocumentTable documents={[{ ...doc, state: "awaiting_subjects" }]} {...props} onChooseSubjects={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Choose subjects for Toolformer" })).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "More actions for Toolformer" }));
+    expect(screen.queryByRole("menuitem", { name: "Change subjects" })).toBeNull();
+  });
+
+  it("offers no Change subjects on an archived ready row", async () => {
+    render(<DocumentTable documents={[{ ...ready, archived: true }]} {...props} onRestore={vi.fn()} onChooseSubjects={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "More actions for Toolformer" }));
+    expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Delete…"]);
+  });
+});

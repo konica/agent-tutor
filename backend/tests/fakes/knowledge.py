@@ -202,7 +202,9 @@ class _Chunks(ChunkRepository):
     def remove_for_content(self, content_id: ContentId) -> None:
         self._s.chunks.pop(content_id, None)
 
-    def search(self, user_id: UserId, embedding: list[float], k: int) -> list[ChunkHit]:
+    def search(
+        self, user_id: UserId, embedding: list[float], k: int, document_ids: Collection[DocumentId] | None = None
+    ) -> list[ChunkHit]:
         def title(d: Document) -> str:
             content = self._s.contents.get(d.content_id) if d.content_id is not None else None
             return d.title_override or (content.title if content else None) or d.file_name
@@ -217,7 +219,9 @@ class _Chunks(ChunkRepository):
                 _cosine(embedding, c.embedding),
             )
             for d in self._s.documents.values()
-            if d.content_id is not None and d.searchable_by(user_id)
+            if d.content_id is not None
+            and d.searchable_by(user_id)
+            and (document_ids is None or d.document_id in document_ids)
             for c in self._s.chunks.get(d.content_id, [])
         ]
         return sorted(hits, key=lambda h: (-h.score, h.chunk_id))[:k]
@@ -251,10 +255,15 @@ class FakeObjectStore(ObjectStore):
         self.content_types: dict[str, str] = {}  # of objects stored with `put`
         self.presigned: list[tuple[str, str, int, int]] = []  # key, content type, max bytes, expires in
         self.versions_deleted: list[str] = []  # keys passed to delete_all_versions
+        self.presigned_gets: list[tuple[str, int]] = []  # key, expires in
 
     def presign_post(self, key: str, *, content_type: str, max_bytes: int, expires_in: int) -> PresignedPost:
         self.presigned.append((key, content_type, max_bytes, expires_in))
         return PresignedPost(url="http://s3.test/bucket", fields={"key": key, "Content-Type": content_type})
+
+    def presign_get(self, key: str, *, expires_in: int) -> str:
+        self.presigned_gets.append((key, expires_in))
+        return f"https://s3.test/{key}?expires={expires_in}"
 
     def read(self, key: str) -> bytes:
         try:

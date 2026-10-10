@@ -21,6 +21,14 @@ type Props = {
   onAddDocuments?: () => void;
   /** Takes a document off the list; the parent drops its row, and focus moves to the next row's remove button. */
   onRemoveDocument?: (documentId: string) => void;
+  /** Opens a document beside the conversation; `opener` is the row's button, for focus to return to. */
+  onOpen?: (documentId: string, opener: HTMLElement) => void;
+  /** The document open beside the conversation, if any: its row is marked current. */
+  openId?: string | null;
+  /** The conversation searches only its listed documents (US-4c). */
+  searchListed: boolean;
+  /** Turns the limit on or off; the switch is disabled without it (no conversation yet). */
+  onSearchListedChange?: (on: boolean) => void;
 };
 
 // Where focus goes once a removed row is gone: a row's remove button, or Add documents.
@@ -34,9 +42,11 @@ function tooltip(d: ThreadDocumentResponse): string {
 
 /**
  * The chat's left pane (DESIGN.md → Chat, PRD Q60): the conversation's documents, its Lesson Note, and actions.
- * Each row has a remove button (US-4c); Add documents opens the picker once the conversation exists. A document the learner
- * added that no answer has used yet is marked "Added". Rows open nothing yet (#123); Summarize lesson (US-7) and Archive
- * conversation (US-13) stay disabled until their stories.
+ * A row opens the document beside the conversation (US-4b), and its remove button, a sibling of that open button, takes it
+ * off the list (US-4c); Add documents opens the picker once the conversation exists. A document the learner added that no
+ * answer has used yet is marked "Added". Summarize lesson (US-7) and Archive conversation (US-13) stay disabled until
+ * their stories. "Only search these documents" limits the conversation's search to its list; it is disabled while the
+ * list is empty, since there is nothing to limit the search to.
  */
 export function ConversationPanel({
   id,
@@ -48,6 +58,10 @@ export function ConversationPanel({
   onShowCitationsChange,
   onAddDocuments,
   onRemoveDocument,
+  onOpen,
+  openId = null,
+  searchListed,
+  onSearchListedChange,
 }: Props) {
   const panel = useRef<HTMLElement>(null);
   const focusAfterRemove = useRef<FocusTarget | null>(null);
@@ -69,6 +83,8 @@ export function ConversationPanel({
     onRemoveDocument?.(documentId);
   }
 
+  const listEmpty = !documentsFailed && documents.length === 0;
+
   return (
     <aside ref={panel} id={id} className={styles.panel} aria-label="Conversation">
       <section className={styles.section} aria-labelledby={`${id}-documents`}>
@@ -81,32 +97,53 @@ export function ConversationPanel({
           <p className={styles.text}>Documents used to answer will appear here.</p>
         ) : (
           <ul className={styles.list}>
-            {documents.map((d) => (
-              <li key={d.document_id} className={styles.row} title={tooltip(d)}>
-                <FileText className={styles.rowIcon} strokeWidth={1.5} aria-hidden="true" />
-                <span className={`${styles.title} ${d.deleted ? styles.gone : ""}`}>{d.title}</span>
-                {d.deleted ? (
-                  <span className={styles.badge}>
-                    <X className={styles.badgeIcon} strokeWidth={1.5} aria-hidden="true" />
-                    Deleted
-                  </span>
-                ) : d.archived ? (
-                  <span className={styles.badge}>Archived</span>
-                ) : (
-                  d.added_by === "learner" && !d.used && <span className={`${styles.badge} ${styles.added}`}>Added</span>
-                )}
-                {onRemoveDocument && (
-                  <IconButton
-                    label={`Remove ${d.title} from this conversation`}
-                    data-tip="Remove from this conversation"
-                    icon={X}
-                    className={styles.remove}
-                    data-remove={d.document_id}
-                    onClick={() => remove(d.document_id)}
-                  />
-                )}
-              </li>
-            ))}
+            {documents.map((d) => {
+              const badge = d.deleted ? (
+                <span className={styles.badge}>
+                  <X className={styles.badgeIcon} strokeWidth={1.5} aria-hidden="true" />
+                  Deleted
+                </span>
+              ) : d.archived ? (
+                <span className={styles.badge}>Archived</span>
+              ) : (
+                d.added_by === "learner" && !d.used && <span className={`${styles.badge} ${styles.added}`}>Added</span>
+              );
+              return (
+                <li key={d.document_id} className={styles.row} title={tooltip(d)}>
+                  {d.deleted ? (
+                    // A deleted document has nothing left to open; an archived one opens read-only.
+                    <>
+                      <FileText className={styles.rowIcon} strokeWidth={1.5} aria-hidden="true" />
+                      <span className={`${styles.title} ${styles.gone}`}>{d.title}</span>
+                      {badge}
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className={styles.rowButton}
+                      data-document-id={d.document_id}
+                      aria-current={openId === d.document_id ? "true" : undefined}
+                      onClick={(e) => onOpen?.(d.document_id, e.currentTarget)}
+                    >
+                      <FileText className={styles.rowIcon} strokeWidth={1.5} aria-hidden="true" />
+                      <span className={styles.title}>{d.title}</span>
+                      {badge}
+                    </button>
+                  )}
+                  {/* A sibling of the open button, never inside it: nested buttons are invalid. */}
+                  {onRemoveDocument && (
+                    <IconButton
+                      label={`Remove ${d.title} from this conversation`}
+                      data-tip="Remove from this conversation"
+                      icon={X}
+                      className={styles.remove}
+                      data-remove={d.document_id}
+                      onClick={() => remove(d.document_id)}
+                    />
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
         {!documentsFailed && documents.some((d) => d.deleted) && (
@@ -127,6 +164,26 @@ export function ConversationPanel({
           >
             Add documents
           </Button>
+        )}
+        <button
+          type="button"
+          role="switch"
+          aria-checked={searchListed}
+          aria-describedby={listEmpty ? `${id}-scope-hint` : undefined}
+          className={styles.switch}
+          data-scope-switch
+          disabled={!onSearchListedChange || documents.length === 0 || documentsFailed}
+          onClick={() => onSearchListedChange?.(!searchListed)}
+        >
+          <span className={styles.track} aria-hidden="true">
+            <span className={styles.thumb} />
+          </span>
+          Only search these documents
+        </button>
+        {listEmpty && (
+          <p id={`${id}-scope-hint`} className={styles.text}>
+            Add documents to limit the search.
+          </p>
         )}
       </section>
 

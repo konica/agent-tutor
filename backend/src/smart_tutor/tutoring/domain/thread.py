@@ -5,7 +5,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from smart_tutor.shared.domain.ids import ThreadId, UserId
-from smart_tutor.tutoring.domain.errors import InvalidTitleError, ThreadArchivedError
+from smart_tutor.tutoring.domain.errors import InvalidTitleError, NoListedDocumentsError, ThreadArchivedError
 
 MAX_TITLE = 120
 
@@ -15,6 +15,11 @@ class ThreadStatus(StrEnum):
     ARCHIVED = "archived"
 
 
+class SearchScope(StrEnum):
+    LIBRARY = "library"
+    LISTED = "listed"
+
+
 @dataclass
 class Thread:
     thread_id: ThreadId
@@ -22,6 +27,7 @@ class Thread:
     created_at: datetime
     status: ThreadStatus = ThreadStatus.ACTIVE
     title: str | None = None
+    search_scope: SearchScope = SearchScope.LIBRARY
     last_learner_message_at: datetime | None = None
 
     @classmethod
@@ -43,3 +49,12 @@ class Thread:
             raise InvalidTitleError(f"Use at most {MAX_TITLE} characters")
         self.title = trimmed
         return trimmed
+
+    def limit_search(self, scope: SearchScope, listed: int) -> None:
+        """Search all ready documents or only the listed ones (US-4c); limiting needs a listed document. An archived
+        thread can't be changed."""
+        if self.status is ThreadStatus.ARCHIVED:
+            raise ThreadArchivedError("An archived conversation can't be changed. Restore it first.")
+        if scope is SearchScope.LISTED and listed == 0:
+            raise NoListedDocumentsError("Add documents to limit the search.")
+        self.search_scope = scope

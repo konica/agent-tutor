@@ -26,7 +26,7 @@ async def test_searches_all_documents_with_the_context_token_then_answers_with_c
     graph = build_graph(retriever_for, fake_chat_model(AIMessage("It weighs tokens [1].")))
     out = await graph.ainvoke(INPUT, context=AgentContext(access_token="t-ada"))
     assert tokens == ["t-ada"]  # one retriever, for the search node
-    assert retriever.calls == [("What is attention?", 5)]
+    assert retriever.calls == [("What is attention?", 5, None)]
     assert out["answer"] == "It weighs tokens [1]."
     assert [c.chunk_id for c in out["citations"]] == ["c1"]
 

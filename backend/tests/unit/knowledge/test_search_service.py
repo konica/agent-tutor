@@ -1,5 +1,7 @@
 """SearchService: chunks only from the caller's ready, non-archived documents, in any subject."""
 
+import uuid
+
 import pytest
 
 from fakes import InMemoryLibrary, fake_embeddings, ingest_ready
@@ -65,3 +67,23 @@ def test_best_first_and_at_most_k() -> None:
 def test_rejects_invalid_requests(query: str, k: int) -> None:
     with pytest.raises(InvalidSearchError):
         service(InMemoryLibrary()).search(UserId("ada"), query, k)
+
+
+def test_document_ids_limit_the_search_to_those_documents() -> None:
+    library = InMemoryLibrary()
+    first = ingest_ready(library, "ada", "Attention weighs tokens.")
+    ingest_ready(library, "ada", "Photosynthesis makes glucose.")
+    hits = service(library).search(UserId("ada"), "Photosynthesis makes glucose.", 5, document_ids=[str(first)])
+    assert hits and {h.document_id for h in hits} == {first}
+
+
+def test_an_empty_list_finds_nothing_and_malformed_ids_are_ignored() -> None:
+    library = InMemoryLibrary()
+    ingest_ready(library, "ada", "Attention weighs tokens.")
+    assert service(library).search(UserId("ada"), "Attention", 5, document_ids=[]) == []
+    assert service(library).search(UserId("ada"), "Attention", 5, document_ids=["not-a-uuid"]) == []
+
+
+def test_too_many_document_ids_is_invalid() -> None:
+    with pytest.raises(InvalidSearchError):
+        service(InMemoryLibrary()).search(UserId("ada"), "q", 5, document_ids=[str(uuid.uuid4()) for _ in range(201)])

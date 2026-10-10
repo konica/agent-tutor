@@ -20,6 +20,7 @@ from smart_tutor.knowledge.application import (
     RetryService,
     SubjectChoiceService,
     UploadService,
+    ViewerService,
 )
 from smart_tutor.subjects.application import SubjectCatalogService, SubjectNames, SubjectSearch, SubjectSuggester
 from smart_tutor.tutoring.application import ConversationService
@@ -62,6 +63,7 @@ def api_services(
         "retries": RetryService(library.unit_of_work, queue, max_attempts=3),
         "archive": ArchiveService(library.unit_of_work, clock, max_attempts=3),
         "deletion": DeleteService(library.unit_of_work, objects, conversations.keep_deleted_title),
+        "viewer": ViewerService(library.unit_of_work, objects, max_attempts=3),
         "subject_choice": SubjectChoiceService(
             library.unit_of_work,
             SubjectSuggester(catalog, names),

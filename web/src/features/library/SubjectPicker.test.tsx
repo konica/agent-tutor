@@ -357,3 +357,48 @@ describe("SubjectPicker", () => {
     expect(input()).toBeDisabled();
   });
 });
+
+describe("SubjectPicker for a ready document", () => {
+  const ready: DocumentResponse = { ...doc, state: "ready", subjects: [{ subject_id: "s-llm", name: "LLMs" }, { subject_id: "s-rag", name: "RAG" }] };
+
+  it("opens as Change subjects with the document's subjects selected, the ones not suggested after the suggestions", async () => {
+    setup({ document: ready });
+    expect(screen.getByRole("dialog", { name: "Change subjects" })).toBeVisible();
+    expect(screen.getByText("Ready document")).toBeVisible();
+    expect(await chip(/LLMs/)).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /AI Agents/ })).toHaveAttribute("aria-pressed", "false"); // no pre-selected suggestion
+    expect(screen.getByRole("button", { name: /RAG/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /RAG/ })).toHaveTextContent("Your subject");
+    expect(within(screen.getByRole("group", { name: "Suggested subjects" })).getAllByRole("button").map((b) => b.textContent)).toEqual([
+      expect.stringContaining("AI Agents"),
+      expect.stringContaining("LLMs"),
+      expect.stringContaining("Tool Use"),
+      expect.stringContaining("RAG"),
+    ]);
+    expect(screen.getByText("2 of 3 selected")).toBeVisible();
+  });
+
+  it("saves the changed subjects and says what the document now uses", async () => {
+    const resolved: DocumentResponse = { ...ready, subjects: [{ subject_id: "s-rag", name: "RAG" }, { subject_id: "s-agents", name: "AI Agents" }] };
+    const props = setup({ document: ready, save: vi.fn(async () => resolved) });
+    await userEvent.click(await chip(/LLMs/));
+    await userEvent.click(screen.getByRole("button", { name: /AI Agents/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(props.save).toHaveBeenCalledWith("d1", { subject_ids: ["s-agents", "s-rag"], new_names: [] });
+    expect(await screen.findByRole("dialog", { name: "Change subjects" })).toBeVisible();
+    expect(screen.getByText("Subjects saved.")).toBeVisible();
+    expect(screen.getByText("now uses", { exact: false })).toHaveTextContent("Toolformer now uses RAG, AI Agents.");
+    expect(props.onSaved).toHaveBeenCalledWith(resolved);
+  });
+
+  it("keeps a ready document to 1-3 subjects", async () => {
+    const three: DocumentResponse = { ...ready, subjects: [...ready.subjects, { subject_id: "s-agents", name: "AI Agents" }] };
+    setup({ document: three });
+    expect(await screen.findByText("3 of 3 selected · the maximum")).toBeVisible();
+    expect(input()).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Tool Use/ })).toBeDisabled();
+    for (const name of [/AI Agents/, /LLMs/, /RAG/]) await userEvent.click(screen.getByRole("button", { name }));
+    expect(screen.getByText("0 of 3 selected")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+  });
+});

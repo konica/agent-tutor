@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter, useLocation } from "react-router";
@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AskRefusedError, NoDocumentsError, type ChatEvent } from "../../api/chat";
 import type { DocumentResponse, ThreadDocumentResponse } from "../../api/generated/types.gen";
 import { SessionExpiredError, sessionExpiry } from "../../auth/authClient";
+import { fakeViewerDeps } from "../viewer/testFakes";
 import { ChatPage } from "./ChatPage";
 
 async function* events(...list: ChatEvent[]) {
@@ -548,6 +549,192 @@ describe("ChatPage", () => {
       });
     });
 
+    describe("limiting the search", () => {
+      const scopeSwitch = () => within(panel()!).getByRole("switch", { name: "Only search these documents" });
+      const status = () => screen.getByRole("status");
+      const declined = () =>
+        events({ type: "thread", thread_id: "t1" }, { type: "decline", code: "limited", message: "These documents don't cover this." }, { type: "done" });
+
+      // Answers a first question (a new thread t1 that used a.pdf), then turns the limit on.
+      async function limit(props: ComponentProps<typeof ChatPage> = {}) {
+        const setScope = vi.fn(async (_threadId: string, scope: "library" | "listed") => scope);
+        const askIn = vi.fn(answered);
+        const ask = vi.fn(answered);
+        renderChat({ ask, askIn, setScope, loadUsed: vi.fn(async () => [used("d1", "a.pdf")]), ...props });
+        await userEvent.type(await question(), "What is attention?");
+        await userEvent.click(askButton());
+        expect(await within(panel()!).findByText("a.pdf")).toBeInTheDocument();
+        await userEvent.click(scopeSwitch());
+        return { ask, askIn, setScope };
+      }
+
+      it("disables the switch before the first answer", async () => {
+        renderChat();
+        await question();
+        expect(scopeSwitch()).toBeDisabled();
+        expect(scopeSwitch()).toHaveAttribute("aria-checked", "false");
+      });
+
+      it("limits the conversation, shows Searching 1 document, and asks within the conversation", async () => {
+        const { ask, askIn, setScope } = await limit();
+        expect(setScope).toHaveBeenCalledWith("t1", "listed");
+        expect(scopeSwitch()).toHaveAttribute("aria-checked", "true");
+        expect(status()).toHaveTextContent("Only searching 1 document.");
+        const form = screen.getByRole("textbox", { name: /question/i }).closest("form")!;
+        expect(within(form).getByText("Searching 1 document")).toBeInTheDocument();
+        expect(within(form).getByRole("button", { name: "Change" })).toBeInTheDocument();
+
+        await userEvent.type(await question(), "And RAG?");
+        await userEvent.click(askButton());
+        await waitFor(() => expect(askIn).toHaveBeenCalledWith("t1", "And RAG?"));
+        expect(ask).toHaveBeenCalledTimes(1);
+        expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
+        // The same conversation: its title and its documents stay.
+        expect(screen.getByRole("button", { name: "What is attention?. Edit title" })).toBeInTheDocument();
+        expect(within(panel()!).getByText("a.pdf")).toBeInTheDocument();
+        expect(scopeSwitch()).toHaveAttribute("aria-checked", "true");
+      });
+
+      it("turns the limit off again and says so", async () => {
+        const { setScope } = await limit();
+        await userEvent.click(scopeSwitch());
+        expect(setScope).toHaveBeenLastCalledWith("t1", "library");
+        expect(scopeSwitch()).toHaveAttribute("aria-checked", "false");
+        expect(status()).toHaveTextContent("Searching all your documents.");
+        expect(screen.queryByText("Searching 1 document")).not.toBeInTheDocument();
+      });
+
+      it("keeps the switch as it was and says why when saving the scope fails", async () => {
+        const setScope = vi.fn(() => Promise.reject(new Error("Add documents to limit the search.")));
+        await limit({ setScope });
+        expect(scopeSwitch()).toHaveAttribute("aria-checked", "false");
+        await waitFor(() => expect(status()).toHaveTextContent("Add documents to limit the search."));
+        expect(screen.queryByText("Searching 1 document")).not.toBeInTheDocument();
+      });
+
+      it("Change opens a closed panel and focuses the switch", async () => {
+        await limit();
+        await userEvent.click(toggle());
+        expect(panel()).not.toBeInTheDocument();
+        await userEvent.click(screen.getByRole("button", { name: "Change" }));
+        expect(panel()).toBeInTheDocument();
+        expect(scopeSwitch()).toHaveFocus();
+      });
+
+      it("Change focuses the switch when the panel is already open", async () => {
+        await limit();
+        await userEvent.click(screen.getByRole("button", { name: "Change" }));
+        expect(scopeSwitch()).toHaveFocus();
+      });
+
+      // Beside a document (US-4b) the panel is hidden; Change shows it for this split only, like the header toggle.
+      it("Change beside a document shows the panel without saving the choice, and focuses the switch", async () => {
+        await limit({ viewerDeps: fakeViewerDeps() });
+        await userEvent.click(within(panel()!).getByRole("button", { name: "a.pdf" }));
+        expect(await screen.findByRole("region", { name: "ReAct" }, { timeout: 3000 })).toBeInTheDocument();
+        expect(panel()).not.toBeInTheDocument();
+        const setItem = vi.spyOn(Storage.prototype, "setItem");
+        await userEvent.click(screen.getByRole("button", { name: "Change" }));
+        expect(panel()).toBeInTheDocument();
+        expect(scopeSwitch()).toHaveFocus();
+        expect(screen.getByRole("region", { name: "ReAct" })).toBeInTheDocument();
+        expect(setItem).not.toHaveBeenCalledWith("smart-tutor.chat-panel-open", expect.anything());
+        setItem.mockRestore();
+      });
+
+      it("keeps the document open beside a question asked within the limited conversation", async () => {
+        const { askIn } = await limit({ viewerDeps: fakeViewerDeps() });
+        await userEvent.click(within(panel()!).getByRole("button", { name: "a.pdf" }));
+        expect(await screen.findByRole("region", { name: "ReAct" }, { timeout: 3000 })).toBeInTheDocument();
+        await userEvent.type(await question(), "And RAG?");
+        await userEvent.click(askButton());
+        await waitFor(() => expect(askIn).toHaveBeenCalledWith("t1", "And RAG?"));
+        expect(screen.getByRole("region", { name: "ReAct" })).toBeInTheDocument();
+      });
+
+      it("shows the limited decline with its way out, and no Sources", async () => {
+        await limit({ askIn: vi.fn(declined) });
+        await userEvent.type(await question(), "How does PPO clip?");
+        await userEvent.click(askButton());
+        expect(await screen.findByText("These documents don't cover this.")).toBeInTheDocument();
+        expect(screen.getByText("This conversation only searches 1 document.")).toBeInTheDocument();
+        const card = screen.getByText("These documents don't cover this.").parentElement!;
+        expect(within(card).getByRole("button", { name: "Add documents" })).toBeEnabled();
+        expect(within(card).getByRole("button", { name: "Search all my documents" })).toBeEnabled();
+        expect(screen.queryByText("Sources")).not.toBeInTheDocument();
+      });
+
+      it("Add documents in the decline opens the picker", async () => {
+        await limit({ askIn: vi.fn(declined), loadReady: vi.fn(async () => []) });
+        await userEvent.type(await question(), "How does PPO clip?");
+        await userEvent.click(askButton());
+        const card = (await screen.findByText("These documents don't cover this.")).parentElement!;
+        await userEvent.click(within(card).getByRole("button", { name: "Add documents" }));
+        expect(await screen.findByRole("dialog", { name: "Add documents" })).toBeInTheDocument();
+      });
+
+      it("Search all my documents turns the limit off and asks the same question again in the conversation", async () => {
+        const askIn = vi.fn().mockImplementationOnce(declined).mockImplementationOnce(answered);
+        const { ask, setScope } = await limit({ askIn });
+        await userEvent.type(await question(), "How does PPO clip?");
+        await userEvent.click(askButton());
+        await userEvent.click(await screen.findByRole("button", { name: "Search all my documents" }));
+        expect(setScope).toHaveBeenLastCalledWith("t1", "library");
+        await waitFor(() => expect(askIn).toHaveBeenLastCalledWith("t1", "How does PPO clip?"));
+        expect(askIn).toHaveBeenCalledTimes(2);
+        expect(ask).toHaveBeenCalledTimes(1);
+        expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
+        expect(screen.queryByText("These documents don't cover this.")).not.toBeInTheDocument();
+        expect(scopeSwitch()).toHaveAttribute("aria-checked", "false");
+        expect(screen.queryByText("Searching 1 document")).not.toBeInTheDocument();
+      });
+
+      it("shows why and asks nothing when Search all my documents can't turn the limit off", async () => {
+        const askIn = vi.fn(declined);
+        const setScope = vi
+          .fn()
+          .mockImplementationOnce(async () => "listed")
+          .mockImplementationOnce(() => Promise.reject(new Error("The search scope couldn't be changed.")));
+        await limit({ askIn, setScope });
+        await userEvent.type(await question(), "How does PPO clip?");
+        await userEvent.click(askButton());
+        await userEvent.click(await screen.findByRole("button", { name: "Search all my documents" }));
+        expect(await screen.findByText("The search scope couldn't be changed.")).toBeInTheDocument();
+        expect(askIn).toHaveBeenCalledTimes(1);
+        expect(scopeSwitch()).toHaveAttribute("aria-checked", "true");
+      });
+
+      it("turns the limit off when the last listed document is removed", async () => {
+        await limit({ removeDoc: vi.fn(async () => {}) });
+        await userEvent.click(within(panel()!).getByRole("button", { name: "Remove a.pdf from this conversation" }));
+        expect(scopeSwitch()).toHaveAttribute("aria-checked", "false");
+        expect(scopeSwitch()).toBeDisabled();
+        expect(screen.queryByText("Searching 1 document")).not.toBeInTheDocument();
+      });
+
+      it("keeps the limit when removing the last listed document fails", async () => {
+        await limit({ removeDoc: vi.fn(() => Promise.reject(new Error("DELETE failed (500)"))) });
+        await userEvent.click(within(panel()!).getByRole("button", { name: "Remove a.pdf from this conversation" }));
+        expect(await within(panel()!).findByText("a.pdf")).toBeInTheDocument();
+        expect(scopeSwitch()).toHaveAttribute("aria-checked", "true");
+        expect(screen.getByText("Searching 1 document")).toBeInTheDocument();
+      });
+
+      it("starts a new conversation for a question while the limit is off", async () => {
+        const askIn = vi.fn(answered);
+        const ask = vi.fn(answered);
+        renderChat({ ask, askIn, loadUsed: vi.fn(async () => [used("d1", "a.pdf")]) });
+        await userEvent.type(await question(), "First?");
+        await userEvent.click(askButton());
+        expect(await within(panel()!).findByText("a.pdf")).toBeInTheDocument();
+        await userEvent.type(await question(), "Second?");
+        await userEvent.click(askButton());
+        await waitFor(() => expect(ask).toHaveBeenCalledTimes(2));
+        expect(ask).toHaveBeenLastCalledWith("Second?", undefined);
+        expect(askIn).not.toHaveBeenCalled();
+      });
+    });
+
     it("hides the citations when Show citations is off", async () => {
       renderChat({ ask: vi.fn(answered) });
       await userEvent.type(await question(), "What is attention?");
@@ -556,6 +743,123 @@ describe("ChatPage", () => {
       await userEvent.click(screen.getByRole("switch", { name: "Show citations" }));
       expect(screen.queryByRole("list", { name: "Sources" })).not.toBeInTheDocument();
       expect(screen.getByText("It weighs tokens [1].")).toBeInTheDocument();
+    });
+  });
+
+  describe("document viewer", () => {
+    const used = (document_id: string, title: string): ThreadDocumentResponse => ({
+      document_id,
+      title,
+      authors: [],
+      year: null,
+      archived: false,
+      deleted: false,
+      added_by: "answer",
+      used: true,
+    });
+    const answered = () =>
+      events({ type: "thread", thread_id: "t1" }, { type: "delta", text: "It weighs tokens [1]." }, { type: "done" });
+    const panel = () => screen.queryByRole("complementary", { name: "Conversation" });
+    const pane = (name: string) => screen.queryByRole("region", { name });
+    const row = (name: string) => within(panel()!).findByRole("button", { name });
+
+    // Asks one question and waits for the documents used to fill the panel.
+    async function answer(props: ComponentProps<typeof ChatPage> = {}) {
+      const ask = vi.fn().mockImplementation(answered);
+      renderChat({ ask, viewerDeps: fakeViewerDeps(), loadUsed: async () => [used("d1", "ReAct"), used("d2", "PPO")], ...props });
+      await userEvent.type(await question(), "How does ReAct work?");
+      await userEvent.click(askButton());
+      await row("ReAct");
+    }
+
+    async function openReAct() {
+      await userEvent.click(await row("ReAct"));
+      // The viewer loads its file link and PDF first; give it room when the suite runs under load.
+      expect(await screen.findByText("p. 1 / 3", {}, { timeout: 3000 })).toBeInTheDocument();
+    }
+
+    it("opens a used document beside the conversation with its title focused, hiding the panel", async () => {
+      await answer();
+      await openReAct();
+      expect(pane("ReAct")).toBeInTheDocument();
+      expect(within(pane("ReAct")!).getByRole("heading", { level: 2, name: "ReAct" })).toHaveFocus();
+      expect(panel()).not.toBeInTheDocument();
+      expect(screen.getByText("It weighs tokens [1].")).toBeInTheDocument();
+    });
+
+    it("swaps the document in place when another row is opened", async () => {
+      await answer();
+      await openReAct();
+      await userEvent.click(screen.getByRole("button", { name: "Show panel" }));
+      await userEvent.click(await row("PPO"));
+      expect(await screen.findByRole("region", { name: "PPO" })).toBeInTheDocument();
+      expect(pane("ReAct")).not.toBeInTheDocument();
+      expect(within(panel()!).getByRole("button", { name: "PPO" })).toHaveAttribute("aria-current", "true");
+    });
+
+    it("Close removes the pane, brings the panel back, and returns focus to the row", async () => {
+      await answer();
+      await openReAct();
+      await userEvent.click(within(pane("ReAct")!).getByRole("button", { name: "Close" }));
+      expect(pane("ReAct")).not.toBeInTheDocument();
+      expect(panel()).toBeInTheDocument();
+      await waitFor(() => expect(within(panel()!).getByRole("button", { name: "ReAct" })).toHaveFocus());
+    });
+
+    it("Escape in the pane does the same", async () => {
+      await answer();
+      await openReAct();
+      fireEvent.keyDown(within(pane("ReAct")!).getByRole("heading", { level: 2, name: "ReAct" }), { key: "Escape" });
+      expect(pane("ReAct")).not.toBeInTheDocument();
+      expect(panel()).toBeInTheDocument();
+      await waitFor(() => expect(within(panel()!).getByRole("button", { name: "ReAct" })).toHaveFocus());
+    });
+
+    it("shows the panel during the split without changing the saved choice", async () => {
+      await answer();
+      await openReAct();
+      const setItem = vi.spyOn(Storage.prototype, "setItem");
+      await userEvent.click(screen.getByRole("button", { name: "Show panel" }));
+      expect(panel()).toBeInTheDocument();
+      expect(pane("ReAct")).toBeInTheDocument();
+      expect(setItem).not.toHaveBeenCalledWith("smart-tutor.chat-panel-open", expect.anything());
+      setItem.mockRestore();
+    });
+
+    it("closes the document when a new question is asked", async () => {
+      await answer();
+      await openReAct();
+      await userEvent.type(await question(), "Second?");
+      await waitFor(() => expect(askButton()).toBeEnabled());
+      await userEvent.click(askButton());
+      await waitFor(() => expect(pane("ReAct")).not.toBeInTheDocument());
+      // The learner is asking: focus is not pulled back into the panel.
+      expect(panel()).toBeInTheDocument();
+      expect(panel()).not.toContainElement(document.activeElement as HTMLElement);
+    });
+
+    it("closes the pane when the open document is removed, focus moving to the next row's remove button", async () => {
+      const removeDoc = vi.fn(async () => {});
+      await answer({ removeDoc });
+      await openReAct();
+      await userEvent.click(screen.getByRole("button", { name: "Show panel" }));
+      await userEvent.click(within(panel()!).getByRole("button", { name: "Remove ReAct from this conversation" }));
+      expect(removeDoc).toHaveBeenCalledWith("t1", "d1");
+      await waitFor(() => expect(pane("ReAct")).not.toBeInTheDocument());
+      expect(panel()).toBeInTheDocument();
+      expect(within(panel()!).queryByRole("button", { name: "ReAct" })).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(within(panel()!).getByRole("button", { name: "Remove PPO from this conversation" })).toHaveFocus(),
+      );
+    });
+
+    it("keeps the pane open when another document is removed", async () => {
+      await answer({ removeDoc: vi.fn(async () => {}) });
+      await openReAct();
+      await userEvent.click(screen.getByRole("button", { name: "Show panel" }));
+      await userEvent.click(within(panel()!).getByRole("button", { name: "Remove PPO from this conversation" }));
+      expect(pane("ReAct")).toBeInTheDocument();
+      expect(within(panel()!).getByRole("button", { name: "ReAct" })).toHaveAttribute("aria-current", "true");
     });
   });
 

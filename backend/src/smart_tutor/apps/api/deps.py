@@ -13,6 +13,7 @@ from smart_tutor.knowledge.application import (
     RetryService,
     SubjectChoiceService,
     UploadService,
+    ViewerService,
 )
 from smart_tutor.shared.adapters.auth.bearer import BearerToken, CurrentPrincipal, current_principal
 from smart_tutor.subjects.application import SubjectNames
@@ -30,6 +31,7 @@ __all__ = [
     "SubjectChoice",
     "Subjects",
     "Uploads",
+    "Viewer",
     "current_principal",
 ]
 
@@ -59,6 +61,10 @@ def _deletion(request: Request) -> DeleteService:
     return _services(request).deletion
 
 
+def _viewer(request: Request) -> ViewerService:
+    return _services(request).viewer
+
+
 def _subject_choice(request: Request) -> SubjectChoiceService:
     return _services(request).subject_choice
 
@@ -80,6 +86,7 @@ Documents = Annotated[DocumentService, Depends(_documents)]
 Retries = Annotated[RetryService, Depends(_retries)]
 Archive = Annotated[ArchiveService, Depends(_archive)]
 Deletion = Annotated[DeleteService, Depends(_deletion)]
+Viewer = Annotated[ViewerService, Depends(_viewer)]
 Subjects = Annotated[SubjectNames, Depends(_subject_names)]
 SubjectChoice = Annotated[SubjectChoiceService, Depends(_subject_choice)]
 Conversations = Annotated[ConversationService, Depends(_conversations)]

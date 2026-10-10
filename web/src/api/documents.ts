@@ -1,7 +1,7 @@
 import { SessionExpiredError } from "../auth/authClient";
 import type { Client } from "./generated/client";
 import { client } from "./generated/client.gen";
-import { archiveDocument as postArchive, checkDuplicate, chooseSubjects, deleteDocument as sendDelete, getDocument, getSubjectSuggestions, getUpload, getUploadLimits, listDocuments, restoreDocument as postRestore, retryDocument, setDocumentTitle, startUpload } from "./generated/sdk.gen";
+import { archiveDocument as postArchive, checkDuplicate, chooseSubjects, deleteDocument as sendDelete, getDocument, getDocumentFile, getSubjectSuggestions, getUpload, getUploadLimits, listDocuments, restoreDocument as postRestore, retryDocument, setDocumentTitle, startUpload } from "./generated/sdk.gen";
 import type { DocumentDetailsResponse, DocumentResponse, SubjectSuggestionsResponse, SuggestionResponse, UploadLimitsResponse, UploadStatusResponse } from "./generated/types.gen";
 
 export type { DocumentResponse };
@@ -119,6 +119,32 @@ export async function deleteDocument(documentId: string, apiClient: Client = cli
   if (response?.status === 404) throw new DocumentGoneError();
   if (response?.status === 409) throw new DocumentProcessingError(failure(error).message);
   if (!response?.ok) throw failure(error);
+}
+
+export type DocumentFile = { url: string; expiresAt: number; document: DocumentResponse }; // expiresAt: epoch ms
+
+export class DocumentNotOpenableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DocumentNotOpenableError";
+  }
+}
+
+export class DocumentNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DocumentNotFoundError";
+  }
+}
+
+// A short-lived link to the learner's own PDF for the viewer. 404: gone or not theirs; 409: still processing or failed.
+export async function loadDocumentFile(documentId: string, apiClient: Client = client, now: () => number = Date.now): Promise<DocumentFile> {
+  const { data, error, response } = await getDocumentFile({ client: apiClient, path: { document_id: documentId }, throwOnError: false });
+  if (sessionOver(error, response)) throw new SessionExpiredError();
+  if (response?.status === 404) throw new DocumentNotFoundError("Document not found");
+  if (response?.status === 409) throw new DocumentNotOpenableError(failure(error).message);
+  if (!data) throw new Error(`GET /documents/${documentId}/file failed (${response?.status ?? "no response"})`);
+  return { url: data.url, expiresAt: now() + data.expires_in * 1000, document: data.document };
 }
 
 export async function loadUploadLimits(apiClient: Client = client): Promise<UploadLimits> {

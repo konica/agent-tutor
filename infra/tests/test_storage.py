@@ -59,8 +59,9 @@ def test_documents_bucket_cors_allows_only_the_cloudfront_address() -> None:
             "CorsConfiguration": {
                 "CorsRules": [
                     {
-                        "AllowedMethods": ["POST"],
+                        "AllowedMethods": ["POST", "GET"],
                         "AllowedHeaders": ["*"],
+                        "ExposedHeaders": ["Accept-Ranges", "Content-Range", "Content-Length"],
                         "AllowedOrigins": [
                             {
                                 "Fn::Join": [

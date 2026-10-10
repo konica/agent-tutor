@@ -18,7 +18,7 @@ import { DocumentDetailsPanel } from "./DocumentDetails";
 import { DocumentTable } from "./DocumentTable";
 import { DropOverlay } from "./DropOverlay";
 import { hasFilters, LibraryFilters } from "./LibraryFilters";
-import { SubjectPicker } from "./SubjectPicker";
+import { SubjectPicker, type PickerDocument } from "./SubjectPicker";
 import styles from "./LibraryPage.module.css";
 import { useDocuments } from "./useDocuments";
 import { useLibraryCounts } from "./useLibraryCounts";
@@ -43,7 +43,7 @@ type Props = {
 };
 
 type View = "active" | "archived";
-type Picking = { queue: DocumentResponse[]; index: number; saved: number }; // the documents to step through, where the picker is, and how many were saved
+type Picking = { queue: PickerDocument[]; index: number; saved: number }; // the documents to step through, where the picker is, and how many were saved
 
 const ARCHIVED_NOTICE = "Archived documents aren't used for answers, but citations to them in past conversations still work. Restore a document to change its subjects.";
 
@@ -115,6 +115,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
   const justSaved = useRef(new Set<string>()); // saved here, so the poll must not announce "is ready." over "Subjects saved."
   const [finished, setFinished] = useState(false); // a subjects save happened in this visit, so "all ready" is news
   const [picking, setPicking] = useState<Picking | null>(null);
+  const pickerFromDetails = useRef<string | null>(null); // the details panel to reopen when the picker closes
   const statusRegion = useRef<HTMLParagraphElement>(null);
   const wasPicking = useRef(false);
   const [details, setDetails] = useState<{ id: string; editing: boolean } | null>(null);
@@ -175,8 +176,9 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
   }
 
   // The queue is the clicked document, then every other waiting one in list order. The counts hold the whole active library; the visible list stands in until they load.
+  // Changing a ready document's subjects (US-10) opens the picker for that document alone.
   function choose(doc: DocumentResponse) {
-    const others = (counts.waiting ?? list ?? []).filter((d) => d.state === "awaiting_subjects" && !d.archived && d.document_id !== doc.document_id);
+    const others = doc.state === "awaiting_subjects" ? (counts.waiting ?? list ?? []).filter((d) => d.state === "awaiting_subjects" && !d.archived && d.document_id !== doc.document_id) : [];
     setPicking({ queue: [doc, ...others], index: 0, saved: 0 });
   }
 
@@ -191,16 +193,30 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
       return;
     }
     if (done) setStatus(`Subjects saved for ${done} ${done === 1 ? "document" : "documents"}. They're ready to use.`);
-    setPicking(null);
+    closePicker();
   }
 
-  // `announce` is false in a step-through, where advance() words the status.
-  async function onSaved(doc: DocumentResponse, announce: boolean) {
+  // `changed`: a ready document's subjects were changed, which isn't news that the library is ready. `announce` is false in a step-through, where advance() words the status.
+  async function onSaved(doc: DocumentResponse, changed: boolean, announce: boolean) {
     justSaved.current.add(doc.document_id);
     seen.current?.set(doc.document_id, "ready");
-    setFinished(true);
-    if (announce) setStatus(`Subjects saved. ${doc.title} is ready to use.`);
+    if (!changed) setFinished(true);
+    if (announce) setStatus(changed ? `Subjects saved. ${doc.title} now uses ${doc.subjects.map((s) => s.name).join(", ")}.` : `Subjects saved. ${doc.title} is ready to use.`);
     await Promise.all([refresh(), counts.refresh(), refreshSubjects()]); // the document no longer waits, so the counts change
+  }
+
+  // From details, the picker replaces the panel (both are modal) and gives it back when it closes.
+  function changeFromDetails(doc: DocumentDetails) {
+    pickerFromDetails.current = doc.document_id;
+    setDetails(null);
+    setPicking({ queue: [doc], index: 0, saved: 0 });
+  }
+
+  function closePicker() {
+    setPicking(null);
+    const back = pickerFromDetails.current;
+    pickerFromDetails.current = null;
+    if (back) setDetails({ id: back, editing: false });
   }
 
   // One polite live region carries upload results and processing-state changes (DESIGN.md → Accessibility).
@@ -690,9 +706,9 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
             onSkip={() => advance(false)}
             load={loadSuggestions}
             save={saveSubjects}
-            onClose={() => setPicking(null)}
+            onClose={closePicker}
             onSaved={(d) => {
-              void onSaved(d, !multi);
+              void onSaved(d, doc.state === "ready", !multi);
               if (multi) advance(true);
             }}
           />
@@ -708,6 +724,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
           archive={archive}
           restore={restore}
           onChanged={() => void Promise.all([refresh(), counts.refresh(), refreshSubjects()])}
+          onChangeSubjects={changeFromDetails}
           onClose={() => setDetails(null)}
         />
       )}

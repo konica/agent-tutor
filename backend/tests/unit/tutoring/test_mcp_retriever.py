@@ -39,6 +39,18 @@ async def test_returns_retrieved_chunks_for_the_tokens_learner() -> None:
     assert found.document_title.endswith(".pdf")
 
 
+async def test_document_ids_narrow_the_search_and_none_searches_everything() -> None:
+    library = InMemoryLibrary()
+    first = ingest_ready(library, "ada", "Attention is all you need.")
+    second = ingest_ready(library, "ada", "Convolutions slide a kernel.")
+    async with in_process_mcp(build(library, verifier_for_ada())) as transport:
+        retriever = McpRetriever(MCP_TEST_URL, "t-ada", transport)
+        limited = await retriever.search("q", 5, [second])
+        everything = await retriever.search("q", 5, None)
+    assert {c.document_id for c in limited} == {second}
+    assert {c.document_id for c in everything} == {first, second}
+
+
 async def test_a_refused_token_raises_unauthenticated() -> None:
     async with in_process_mcp(build(InMemoryLibrary(), FakeTokenVerifier())) as transport:
         retriever = McpRetriever(MCP_TEST_URL, "t-unknown", transport)
