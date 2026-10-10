@@ -31,7 +31,7 @@ def test_all_stacks_synthesize_in_us_east_1() -> None:
     assert len(assembly.stacks) == 9
 
 
-def test_deploy_role_trusts_only_the_pilot_environment_of_this_repository() -> None:
+def test_deploy_role_trusts_only_the_native_cloud_environment_of_this_repository() -> None:
     t = template(make_app(), "GitHubDeploy")
 
     t.resource_count_is("AWS::IAM::OIDCProvider", 1)
@@ -53,7 +53,7 @@ def test_deploy_role_trusts_only_the_pilot_environment_of_this_repository() -> N
                                 "StringEquals": {
                                     "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
                                     "token.actions.githubusercontent.com:sub": (
-                                        "repo:konica@1114311/agent-tutor@1399048529:environment:pilot"
+                                        "repo:konica@1114311/agent-tutor@1399048529:environment:native-cloud"
                                     ),
                                 }
                             },

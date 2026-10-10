@@ -134,9 +134,41 @@ def test_on_premise_deploy_role_trusts_its_own_environment_and_reads_only_its_st
         },
     )
     statements = next(iter(t.find_resources("AWS::IAM::Policy").values()))["Properties"]["PolicyDocument"]["Statement"]
-    assert [s["Sid"] for s in statements] == ["AssumeCdkBootstrapRoles", "EcrLogin", "EcrPushAppImages", "ReadStackOutputs"]
+    assert [s["Sid"] for s in statements] == [
+        "AssumeCdkBootstrapRoles",
+        "EcrLogin",
+        "EcrPushAppImages",
+        "RunDeployDocument",
+        "ReadDeployStatus",
+        "ReadStackOutputs",
+    ]
     (outputs,) = (s for s in statements if s["Sid"] == "ReadStackOutputs")
     assert "stack/SmartTutor-OnPremise-prod-*/*" in str(outputs["Resource"])
+
+
+def test_on_premise_deploy_role_runs_only_the_deploy_document() -> None:
+    statements = {
+        s["Sid"]: s
+        for s in next(iter(on_premise("GitHubDeploy").find_resources("AWS::IAM::Policy").values()))["Properties"][
+            "PolicyDocument"
+        ]["Statement"]
+    }
+    run = statements["RunDeployDocument"]
+    assert run["Action"] == "ssm:SendCommand"
+    resources = json.dumps(run["Resource"])
+    # SendCommand is authorized on the document and on the instance; the only document is the deploy one.
+    assert ":document/smart-tutor-on-premise-deploy" in resources
+    assert ":instance/*" in resources
+    assert "AWS-RunShellScript" not in resources and ":document/*" not in resources
+    status = statements["ReadDeployStatus"]
+    # Neither action supports resource-level permissions.
+    assert sorted(status["Action"]) == ["ssm:DescribeInstanceInformation", "ssm:GetCommandInvocation"]
+    assert status["Resource"] == "*"
+
+
+def test_deploy_document_name_comes_from_mode_names() -> None:
+    assert mode_names(ON_PREMISE).deploy_document == "smart-tutor-on-premise-deploy"
+    on_premise("Host").has_resource_properties("AWS::SSM::Document", {"Name": "smart-tutor-on-premise-deploy"})
 
 
 def test_on_premise_references_the_shared_registry_instead_of_creating_one() -> None:

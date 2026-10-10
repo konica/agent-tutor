@@ -322,7 +322,7 @@ class HostStack(cdk.Stack):
         document = ssm.CfnDocument(
             self,
             "DeployDocument",
-            name=f"{names.data_prefix}-deploy",
+            name=names.deploy_document,
             document_type="Command",
             update_method="NewVersion",  # a named document is otherwise replaced, which CloudFormation refuses
             content={
