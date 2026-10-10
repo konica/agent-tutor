@@ -2,8 +2,8 @@
 
     docker compose exec -T worker python - <check-egress.py
 
-The worker must not reach the internet, directly or through the proxy, while S3, SQS, SSM, Bedrock, and Postgres
-work. The AWS calls are read-only and use the instance profile, whose credentials come through the proxy too.
+The worker must not reach the internet, directly, by DNS, or through the proxy (CONNECT to another host or port, or
+plain HTTP), while S3, SQS, SSM, Bedrock, and Postgres work. The AWS calls are read-only and use the instance profile, whose credentials come through the proxy too.
 Exit 0: as expected. Exit 2: blocked, but a needed destination is unreachable. Exit 1, or a crash: treat as a leak.
 """
 
@@ -28,12 +28,34 @@ def _connects(host: str, port: int) -> bool:
     return True
 
 
-def _tunnel_status(host: str) -> int:
-    """The proxy's answer to CONNECT host:443 (200 when it opens the tunnel, 403 when it refuses)."""
-    proxy = urllib.parse.urlsplit(os.environ["HTTPS_PROXY"])
-    conn = http.client.HTTPConnection(proxy.hostname, proxy.port or 3128, timeout=TIMEOUT)
+def _resolves(name: str) -> bool:
     try:
-        conn.request("CONNECT", f"{host}:443", headers={"Host": f"{host}:443"})
+        socket.getaddrinfo(name, 443)
+    except socket.gaierror:
+        return False
+    return True
+
+
+def _proxy() -> http.client.HTTPConnection:
+    proxy = urllib.parse.urlsplit(os.environ["HTTPS_PROXY"])
+    return http.client.HTTPConnection(proxy.hostname, proxy.port or 3128, timeout=TIMEOUT)
+
+
+def _tunnel_status(host: str, port: int = 443) -> int:
+    """The proxy's answer to CONNECT host:port (200 when it opens the tunnel, 403 when it refuses)."""
+    conn = _proxy()
+    try:
+        conn.request("CONNECT", f"{host}:{port}", headers={"Host": f"{host}:{port}"})
+        return conn.getresponse().status
+    finally:
+        conn.close()
+
+
+def _proxied_get_status(url: str) -> int:
+    """The proxy's answer to a plain-HTTP GET of an absolute URL (403 when it refuses)."""
+    conn = _proxy()
+    try:
+        conn.request("GET", url)
         return conn.getresponse().status
     finally:
         conn.close()
@@ -47,10 +69,19 @@ def leaks() -> list[str]:
         for host in (ARBITRARY_HOST, ARBITRARY_IP, sqs_host)  # even an allowed host only through the proxy
         if _connects(host, 443)
     ]
-    for host in (ARBITRARY_HOST, ARBITRARY_IP, f"other-{os.getpid()}.s3.amazonaws.com"):
-        status = _tunnel_status(host)
+    # A name that exists: any answer means the worker has a DNS resolver outside the VM.
+    if _resolves(ARBITRARY_HOST):
+        problems.append(f"DNS resolved {ARBITRARY_HOST}")
+    url = f"http://{ARBITRARY_HOST}/"
+    status = _proxied_get_status(url)
+    if status != 403:
+        problems.append(f"the proxy answered {status} to GET {url}, not 403")
+    tunnels = [(host, 443) for host in (ARBITRARY_HOST, ARBITRARY_IP, f"other-{os.getpid()}.s3.amazonaws.com")]
+    tunnels.append((sqs_host, 80))  # an allowed host, but only on 443
+    for host, port in tunnels:
+        status = _tunnel_status(host, port)
         if status != 403:
-            problems.append(f"the proxy answered {status} to CONNECT {host}:443, not 403")
+            problems.append(f"the proxy answered {status} to CONNECT {host}:{port}, not 403")
     return problems
 
 

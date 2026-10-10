@@ -124,7 +124,7 @@ case $status in
   2) echo "The worker cannot reach a destination it needs (see above)" >&2; exit 1 ;;
   *)
     docker stop "$worker" >/dev/null
-    echo "Stopped the worker: its egress is not limited (see above)" >&2
+    echo "Stopped the worker: the egress check found a leak or could not run (see above)" >&2
     exit 1
     ;;
 esac

@@ -680,6 +680,7 @@ def test_deploy_script_proves_the_workers_egress_block_and_stops_a_leaking_worke
     assert "exit 1" in unreachable and "docker stop" not in unreachable
     leaked = egress[egress.index("*)") :]
     assert leaked.index('docker stop "$worker"') < leaked.index("exit 1")
+    assert "Stopped the worker: the egress check found a leak or could not run (see above)" in leaked
 
 
 ENSURE_HEALTHY = ON_PREMISE_DIR / "ensure-healthy.sh"
