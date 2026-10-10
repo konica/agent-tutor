@@ -150,7 +150,7 @@ A day with no row had no misses. A few a day is normal: a passage that spans a p
 dc exec postgres psql -U postgres -d smart_tutor -c "SELECT count(*) FILTER (WHERE start_index IS NULL) AS missing, count(*) AS total FROM chunks;"
 ```
 
-If the nulls are recent, the ingestion's chunking changed or the worker failed to backfill: read `dc logs worker`. If `start_index` is set and the count still climbs, compare the viewer's matcher with the seed-corpus test in `web/src/features/viewer/passage.seed.test.ts` and add the failing PDF to it.
+If the nulls are recent, the ingestion's chunking changed or the worker failed to backfill: read `dc logs worker` (the worker runs on-premise from #149; until then there is no backfill there). If `start_index` is set and the count still climbs, compare the viewer's matcher with the seed-corpus test in `web/src/features/viewer/passage.seed.test.ts` and add the failing PDF to it.
 
 ## Bring the services back
 
