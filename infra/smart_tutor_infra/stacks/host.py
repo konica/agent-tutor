@@ -26,7 +26,8 @@
 - Patching (#152): a weekly maintenance window installs security patches (rebooting if needed), then runs
   `deploy/on-premise/ensure-healthy.sh` so every service is back and healthy.
 
-ECR is native-cloud's RegistryStack; the Host only references it.
+ECR is on-premise's own RegistryStack (#206); the Host names its repositories through ModeNames instead of
+referencing that stack, so either can be destroyed on its own.
 """
 
 from collections.abc import Sequence
@@ -106,7 +107,7 @@ class HostStack(cdk.Stack):
         super().__init__(scope, construct_id, **kwargs)
         self.repositories = {
             service: ecr.Repository.from_repository_name(
-                self, f"{service.capitalize()}Repository", f"smart-tutor/{service}"
+                self, f"{service.capitalize()}Repository", names.repository(service)
             )
             for service in services
         }
@@ -313,6 +314,7 @@ class HostStack(cdk.Stack):
             ("domain", domain),
             ("bundle", bundle.s3_object_url),
             ("registry", f"{self.account}.dkr.ecr.{self.region}.{self.url_suffix}"),
+            ("repository-prefix", names.repository_prefix),
             ("documents-bucket", names.documents_bucket(self.account)),
             ("ingest-queue-url", f"https://sqs.{self.region}.{self.url_suffix}/{self.account}/{names.ingest_queue}"),
         ):

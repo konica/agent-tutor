@@ -160,7 +160,10 @@ def test_instance_role_pulls_images_reads_its_own_settings_and_secrets_and_is_ma
 
     assert statements["EcrLogin"]["Resource"] == "*"
     pull = json.dumps(statements["EcrPullAppImages"]["Resource"])
-    assert all(f"repository/smart-tutor/{s}" in pull for s in ("api", "web", "keycloak", "agent", "mcp", "worker"))
+    assert all(
+        f"repository/smart-tutor-on-premise/{s}" in pull for s in ("api", "web", "keycloak", "agent", "mcp", "worker")
+    )
+    assert "repository/smart-tutor/" not in pull  # never native-cloud's registry (#206)
     assert "ecr:PutImage" not in json.dumps(_all_statements(t))
     assert "parameter/smart-tutor-on-premise/*" in json.dumps(statements["ReadSettings"]["Resource"])
     assert "secret:smart-tutor-on-premise/*" in json.dumps(statements["ReadSecrets"]["Resource"])
@@ -386,6 +389,7 @@ def test_deploy_settings_name_on_premise_resources(t: Template) -> None:
     assert "smart-tutor-on-premise-documents-" in json.dumps(_parameter(t, "documents-bucket"))
     assert "/smart-tutor-on-premise-ingest" in json.dumps(_parameter(t, "ingest-queue-url"))
     assert ".dkr.ecr." in json.dumps(_parameter(t, "registry"))
+    assert _parameter(t, "repository-prefix") == "smart-tutor-on-premise"
     assert "s3://" in json.dumps(_parameter(t, "bundle"))
 
 
@@ -478,10 +482,20 @@ def test_only_caddy_publishes_ports_80_and_443(compose: dict[str, Any]) -> None:
     assert published == {"caddy": ["80:80", "443:443"]}
 
 
-def test_app_images_come_from_ecr_by_commit_tag(compose: dict[str, Any]) -> None:
+def test_app_images_come_from_the_on_premise_registry_by_commit_tag(compose: dict[str, Any]) -> None:
     images = {"keycloak": "keycloak", "api": "api", "migrate": "api", "web": "web", "agent": "agent", "mcp": "mcp"}
     for name, repo in {**images, "worker": "worker"}.items():
-        assert compose["services"][name]["image"] == f"${{REGISTRY:?}}/smart-tutor/{repo}:${{IMAGE_TAG:?}}"
+        assert compose["services"][name]["image"] == f"${{REGISTRY:?}}/${{REPOSITORY_PREFIX:?}}/{repo}:${{IMAGE_TAG:?}}"
+    text = (ON_PREMISE_DIR / "compose.yaml").read_text(encoding="utf-8")
+    assert not re.search(r"/smart-tutor/(api|web|keycloak|agent|mcp|worker):", text)
+
+
+def test_deploy_script_renders_the_repository_prefix_from_the_host_settings() -> None:
+    script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
+    assert "repository_prefix=$(param host/repository-prefix)" in script
+    assert "\nREPOSITORY_PREFIX=$repository_prefix\n" in script
+    # read before the env file is written, so a failed read stops the deploy before anything changes
+    assert script.index("param host/repository-prefix") < script.index('cat > "$rendered"')
 
 
 def test_data_lives_on_the_data_volume(compose: dict[str, Any]) -> None:

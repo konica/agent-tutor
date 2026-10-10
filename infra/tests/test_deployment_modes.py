@@ -203,7 +203,6 @@ def test_on_premise_has_a_registry_of_its_own() -> None:
     t.has_output("RegistryUri", {})
 
 
-@pytest.mark.xfail(strict=True, reason="Host still pulls smart-tutor/*; Task 3")
 def test_no_on_premise_template_names_a_native_cloud_repository() -> None:
     app = make_app(**{"smart-tutor:mode": ON_PREMISE})
 
@@ -218,7 +217,6 @@ def test_on_premise_deploy_role_pushes_only_to_its_own_repositories() -> None:
     resource = json.dumps(push["Resource"])
     assert ":repository/smart-tutor-on-premise/*" in resource
     assert ":repository/smart-tutor/*" not in resource
-
 
 
 def test_native_cloud_access_patterns_match_none_of_on_premise_names() -> None:

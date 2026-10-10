@@ -21,8 +21,8 @@ class GitHubDeployStack(cdk.Stack):
     """The role trusts only jobs in one GitHub environment, which is limited to `main` on GitHub's side.
 
     It can assume the CDK bootstrap roles (so CloudFormation, not the role, changes infrastructure), push app images
-    to its mode's ECR repositories (`<repository prefix>/*`, #206), read its mode's stack outputs, and, with `eks`, describe the EKS
-    cluster. With `deploy_document` (on-premise, #150), it runs that one SSM document on the mode's instances and reads
+    to its mode's ECR repositories (`<repository prefix>/*`, #206), read its mode's stack outputs, and, with `eks`,
+    describe the EKS cluster. With `deploy_document` (on-premise, #150), it runs that one SSM document on the mode's instances and reads
     the result.
     """
 
