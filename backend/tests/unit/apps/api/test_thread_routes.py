@@ -432,9 +432,24 @@ def test_an_answer_without_sources_records_no_documents() -> None:
     assert documents_of(client, threads) == []
 
 
+def test_a_sources_id_that_isnt_a_uuid_is_dropped_and_the_turn_kept(caplog: pytest.LogCaptureFixture) -> None:
+    client, _, threads, ids = ask_with(
+        lambda ids: DELTA + sources("not-a-uuid", "{" + ids[0].upper() + "}") + NO_CITATIONS + DONE
+    )
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    assert response.text.endswith(DONE.decode())
+    assert len(turns_of(client, threads)) == 1
+    [used] = documents_of(client, threads)
+    assert used["document_id"] == ids[0] and used["deleted"] is False
+    assert "the agent's sources were partly malformed" in caplog.text
+
+
 class _FailingRecord(ConversationService):
     def record_turn(self, thread_id: ThreadId, user_id: UserId, turn: AnsweredTurn) -> None:
-        raise RuntimeError("database down")
+        # Like a database error, whose message carries the bound parameters.
+        raise RuntimeError(f"database down: {turn.question}")
 
 
 def test_a_failed_record_still_ends_with_done(caplog: pytest.LogCaptureFixture) -> None:
@@ -443,7 +458,8 @@ def test_a_failed_record_still_ends_with_done(caplog: pytest.LogCaptureFixture) 
     response = client.post("/threads", json=QUESTION, headers=AUTH)
 
     assert response.status_code == 200 and response.text.endswith(DONE.decode())
-    assert "keeping the turn failed" in caplog.text
+    assert "keeping the turn failed (RuntimeError)" in caplog.text
+    assert QUESTION["question"] not in caplog.text and "Traceback" not in caplog.text
     assert turns_of(client, threads) == []
     assert documents_of(client, threads) == []
 
@@ -884,6 +900,21 @@ def test_a_malformed_citation_is_skipped_and_the_turn_is_kept(caplog: pytest.Log
     [turn] = turns_of(client, threads)
     assert [c["n"] for c in turn["citations"]] == [1]
     assert "the agent's citations were partly malformed" in caplog.text
+
+
+@pytest.mark.parametrize("form", ["upper", "braced", "urn", "hex"])
+def test_a_citation_document_id_is_kept_canonical(form: str) -> None:
+    def written(document_id: str) -> str:
+        value = uuid.UUID(document_id)
+        return {"upper": str(value).upper(), "braced": f"{{{value}}}", "urn": value.urn, "hex": value.hex}[form]
+
+    client, _, threads, ids = ask_with(lambda ids: DELTA + citations_event(cite(1, written(ids[0]))) + DONE)
+
+    client.post("/threads", json=QUESTION, headers=AUTH)
+
+    [turn] = turns_of(client, threads)
+    [citation] = turn["citations"]
+    assert citation["document_id"] == ids[0] and citation["deleted"] is False
 
 
 def test_turns_list_oldest_first_and_resolve_archived_and_deleted() -> None:

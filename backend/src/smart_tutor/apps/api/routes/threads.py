@@ -135,12 +135,18 @@ async def _opening(first: bytes | None, start: StartThread) -> bytes | None:
 
 
 def _document_ids(data: object) -> tuple[DocumentId, ...]:
-    """The document ids of a `sources` event's data; () when it isn't one."""
+    """The document ids of a `sources` event's data, canonical; () when it isn't one.
+
+    An id that isn't a UUID is dropped rather than failing the insert, which would lose the whole turn.
+    """
     ids = data.get("document_ids") if isinstance(data, dict) else None
-    if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
+    if not isinstance(ids, list):
         logger.warning("the agent's sources event was malformed")
         return ()
-    return tuple(DocumentId(i) for i in ids)
+    kept = tuple(DocumentId(str(uuid.UUID(i))) for i in ids if _is_uuid(i))
+    if len(kept) != len(ids):
+        logger.warning("the agent's sources were partly malformed")
+    return kept
 
 
 def _is_uuid(value: object) -> bool:
@@ -161,7 +167,8 @@ def _citation(item: object) -> TurnCitation | None:
         return None
     if page is not None and (not isinstance(page, int) or isinstance(page, bool)):
         return None
-    return TurnCitation(n, DocumentId(str(document_id)), chunk_id, page)
+    # Canonical, so a braced or upper-case id still matches the document at read time.
+    return TurnCitation(n, DocumentId(str(uuid.UUID(str(document_id)))), chunk_id, page)
 
 
 def _citations(data: object) -> tuple[TurnCitation, ...]:
@@ -261,9 +268,10 @@ def _recorder(
         turn = AnsweredTurn(question, seen.answer, seen.citations, seen.decline, seen.document_ids)
         try:
             await run_in_threadpool(conversations.record_turn, tid, user_id, turn)
-        except Exception:
-            # The learner already has the answer: log it and still end the stream with `done`.
-            logger.exception("keeping the turn failed")
+        except Exception as e:
+            # The learner already has the answer: log it and still end the stream with `done`. Only the class name:
+            # a database error's message carries the bound question, answer, and user id.
+            logger.error("keeping the turn failed (%s)", type(e).__name__)
 
     return record
 
