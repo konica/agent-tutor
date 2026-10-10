@@ -414,6 +414,44 @@ describe("DocumentViewer citation highlight", () => {
     }
   });
 
+  it("scrolls a passage beyond the visible width into view sideways", async () => {
+    const clientHeight = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(600);
+    const clientWidth = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(100);
+    const offsetTop = vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockReturnValue(40);
+    const offsetLeft = vi.spyOn(HTMLElement.prototype, "offsetLeft", "get").mockReturnValue(40);
+    try {
+      const { container } = renderCited([CITED]);
+      await screen.findByTestId("passage-box");
+      const area = container.querySelector<HTMLElement>(".canvasArea")!;
+      // the page's left margin + the passage's x - the 4px marker gap - a 16px margin
+      await waitFor(() => expect(area.scrollLeft).toBe(40 + 50 * 1 - 4 - 16));
+    } finally {
+      clientHeight.mockRestore();
+      clientWidth.mockRestore();
+      offsetTop.mockRestore();
+      offsetLeft.mockRestore();
+    }
+  });
+
+  it("leaves the horizontal scroll alone when the passage is already in view", async () => {
+    const clientHeight = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(600);
+    const clientWidth = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(1000);
+    const offsetTop = vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockReturnValue(40);
+    const offsetLeft = vi.spyOn(HTMLElement.prototype, "offsetLeft", "get").mockReturnValue(40);
+    try {
+      const { container } = renderCited([CITED]);
+      await screen.findByTestId("passage-box");
+      const area = container.querySelector<HTMLElement>(".canvasArea")!;
+      await waitFor(() => expect(area.scrollTop).toBe(40 + 300 * 1 - 600 / 3)); // the reveal has run
+      expect(area.scrollLeft).toBe(0);
+    } finally {
+      clientHeight.mockRestore();
+      clientWidth.mockRestore();
+      offsetTop.mockRestore();
+      offsetLeft.mockRestore();
+    }
+  });
+
   it("does not scroll above the top", async () => {
     const clientHeight = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(1200);
     try {

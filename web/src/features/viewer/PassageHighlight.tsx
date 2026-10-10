@@ -3,7 +3,7 @@ import type { Box } from "./passage";
 
 type Props = { boxes: Box[]; scale: number; text: string }; // boxes in CSS px at zoom 100%, one per line; at least one
 
-const MARKER_GAP = 4; // px between the marker and the passage's left edge
+export const MARKER_GAP = 4; // px between the marker and the passage's left edge
 
 // The cited passage over the canvas (DESIGN.md → Chat, Split view): a fill over each line, a 2px marker beside them, and
 // a "Cited passage" label. The canvas exposes no text, so screen readers get the passage from the hidden paragraph.
