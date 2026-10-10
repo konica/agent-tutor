@@ -9,14 +9,13 @@
     2. Asks you to type the account id (skipped with -Force and in -DryRun).
     3. Removes what Kubernetes created outside CloudFormation (the smart-tutor release, TargetGroupBindings, the
        add-ons), so no security-group rules or ENIs block the Edge and Network deletes.
-    4. cdk destroy, one stack at a time: Storage, Edge, Data, Cluster, Config, Budgets (only with -DeleteBudget),
-       Network. Before Network it clears the leaked VPC-CNI ENIs and CloudFront's VPC-origin security group.
+    4. cdk destroy, one stack at a time: Storage, Edge, Data, Cluster, Config, Registry, Budgets (only with
+       -DeleteBudget), Network. Before Network it clears the leaked VPC-CNI ENIs and CloudFront's VPC-origin security group.
     5. Reports what is left (RDS final snapshot, documents bucket, log groups, secrets), deletes it only when you
        pass -DeleteDatabaseSnapshots, -DeleteDocumentsBucket or -DeleteLogGroups (irreversible; each asks for its
        own confirmation unless -Force), and checks that no EKS cluster, ALB or NAT gateway is left.
-    Kept on purpose: SmartTutor-prod-Registry (ECR, shared with on-premise), SmartTutor-prod-GitHubDeploy (the GitHub
-    OIDC provider on-premise imports), CDKToolkit, and SmartTutor-prod-Budgets (the account's only budget, free)
-    unless -DeleteBudget. Safe to run again after a partial failure: it skips what is gone.
+    Kept on purpose: SmartTutor-prod-GitHubDeploy (the GitHub OIDC provider on-premise imports), CDKToolkit, and
+    SmartTutor-prod-Budgets (the account's only budget, free) unless -DeleteBudget. Safe to run again after a partial failure: it skips what is gone.
     Run with -DryRun first: it only reads and prints what it would do.
 
 .EXAMPLE
@@ -50,9 +49,9 @@ $InfraDir = Join-Path $RepoRoot "infra"
 $ClusterName = "smart-tutor-prod"
 $CdkVersion = "2.1145.0"   # same as .github/workflows/deploy-native-cloud.yml
 # In dependency order. Storage goes before Edge because it imports Edge's CloudFront URL for the bucket CORS rule.
-$DeleteStacks = @("Storage", "Edge", "Data", "Cluster", "Config") + @(if ($DeleteBudget) { "Budgets" }) + @("Network") |
+$DeleteStacks = @("Storage", "Edge", "Data", "Cluster", "Config", "Registry") + @(if ($DeleteBudget) { "Budgets" }) + @("Network") |
     ForEach-Object { "SmartTutor-prod-$_" }
-$KeepStacks = @("SmartTutor-prod-Registry", "SmartTutor-prod-GitHubDeploy", "CDKToolkit") +
+$KeepStacks = @("SmartTutor-prod-GitHubDeploy", "CDKToolkit") +
     @(if (-not $DeleteBudget) { "SmartTutor-prod-Budgets" })
 # The stacks create these names; CloudFormation deletes the secrets without a recovery window, but a secret that was
 # scheduled for deletion before (or by hand) blocks a redeploy that recreates the name.
@@ -236,7 +235,7 @@ try {
 
     # --- CloudFormation stacks -----------------------------------------------------------------------------------
     # --exclusively destroys only the stack named. Every native-cloud stack depends on Network, so without it a
-    # destroy of Network would also destroy its dependents, including the Registry (ECR, shared with on-premise).
+    # destroy of Network would also destroy every stack that depends on it.
     # One call per stack keeps the order explicit. Rerunning is safe: it retries DELETE_FAILED stacks.
     $VpcId = $null
     if ("SmartTutor-prod-Network" -in $ToDelete) {

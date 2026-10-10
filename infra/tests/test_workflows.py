@@ -463,3 +463,24 @@ def test_runbooks_name_the_current_workflows_and_environments() -> None:
     on_premise = (RUNBOOKS / "on-premise-deploy.md").read_text(encoding="utf-8")
     for needle in ("deploy-on-premise.yml", "build-images.yml", "rollback.yml", "gh api -X PUT", "on-premise"):
         assert needle in on_premise, needle
+
+
+def test_runbooks_no_longer_call_ecr_shared_and_explain_old_rollbacks() -> None:
+    names = (
+        "on-premise-deploy.md",
+        "pilot-deploy.md",
+        "pilot-environment-overview.md",
+        "pilot-aws-prerequisites.md",
+        "pilot-teardown.md",
+        "pilot-teardown.ps1",
+    )
+    for name in names:
+        text = (RUNBOOKS / name).read_text(encoding="utf-8")
+        assert not re.search(r"shared with (native-cloud|on-premise)|[Ss]hared ECR|ECR is shared", text), name
+    on_premise = (RUNBOOKS / "on-premise-deploy.md").read_text(encoding="utf-8")
+    assert "smart-tutor-on-premise/<service>" in on_premise
+    assert "before #206" in on_premise  # what a rollback to an older commit does
+    assert '"$Registry/smart-tutor/' not in on_premise  # the hand build pushes to on-premise's repositories
+    assert "before #206" in (RUNBOOKS / "pilot-deploy.md").read_text(encoding="utf-8")
+    teardown = (RUNBOOKS / "pilot-teardown.ps1").read_text(encoding="utf-8")
+    assert '"Registry"' in teardown.split("$DeleteStacks")[1].split("$KeepStacks")[0]

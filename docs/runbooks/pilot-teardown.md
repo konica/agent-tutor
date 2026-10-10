@@ -12,15 +12,14 @@ The idle pilot costs about **$270-275 a month**: EKS $73, two `t3.large` nodes $
 
 | | Stacks | Why |
 |---|---|---|
-| Deleted | `Storage`, `Edge`, `Data`, `Cluster`, `Config`, `Network` | They hold all the cost. Storage goes before Edge because it imports Edge's CloudFront URL. |
+| Deleted | `Storage`, `Edge`, `Data`, `Cluster`, `Config`, `Registry`, `Network` | They hold all the cost. Storage goes before Edge because it imports Edge's CloudFront URL. |
 | Kept | `Budgets` | The budget `smart-tutor-prod-monthly` is the account's only budget, and it is free. `-DeleteBudget` deletes it. |
-| Kept | `Registry` | The ECR repositories `smart-tutor/*` are shared with on-premise. |
 | Kept | `GitHubDeploy` | It owns the account's GitHub OIDC provider, which on-premise's deploy role imports. IAM only, free. |
 | Kept | `CDKToolkit` and the GitHub environment `native-cloud` | So the pilot can be redeployed. |
 
 The script also removes what Kubernetes created outside CloudFormation: the `smart-tutor` release and its TargetGroupBindings, then the AWS Load Balancer Controller, External Secrets, and metrics-server. If those stayed, their security-group rules and ENIs would block the Edge and Network deletes. Before Network it deletes unattached VPC-CNI ENIs of the cluster and waits for CloudFront to release its VPC-origin ENIs (up to 45 min), then deletes `CloudFront-VPCOrigins-Service-SG`. All of this is scoped to the pilot's VPC.
 
-It runs one `cdk destroy --exclusively <stack>` per stack. Every native-cloud stack depends on Network, so without `--exclusively` a destroy of Network would also destroy the Registry.
+It runs one `cdk destroy --exclusively <stack>` per stack. Every native-cloud stack depends on Network, so without `--exclusively` a destroy of Network would also destroy every stack that depends on it.
 
 ## 3. Stop auto-deploys first
 
@@ -61,12 +60,12 @@ You can run the script again later with only a switch once you have decided. Sec
 
 ## 7. What is left and what it costs
 
-Under **$2 a month**: ECR images in `Registry`, the bootstrap bucket, the RDS final snapshot (about $2 for 20 GiB), and the documents bucket. The script prints the leftovers at the end of each run.
+Under **$2 a month**: the bootstrap bucket, the RDS final snapshot (about $2 for 20 GiB), and the documents bucket. The script prints the leftovers at the end of each run.
 
 ## 8. Redeploy later
 
 1. Deal with the documents bucket if you kept it. Its name is fixed and it is retained, so creating the Storage stack fails with "already exists". Either bring it into the stack with `cdk import`, or delete it first with `-DeleteDocumentsBucket`. Its CORS rule must name the new CloudFront domain; the Storage stack sets it, so after an import redeploy Storage and check `aws s3api get-bucket-cors`.
-2. Follow [`pilot-deploy.md`](pilot-deploy.md) from step 2. Or run **deploy** by hand with mode `native-cloud`, or set `NATIVE_CLOUD_AUTO_DEPLOY` to `true` and merge; it needs the kept `GitHubDeploy` role, the bootstrap, and the `native-cloud` environment.
+2. The image build deploys `Registry` before it pushes, so a redeploy recreates the repositories (they come back empty). Follow [`pilot-deploy.md`](pilot-deploy.md) from step 2. Or run **deploy** by hand with mode `native-cloud`, or set `NATIVE_CLOUD_AUTO_DEPLOY` to `true` and merge; it needs the kept `GitHubDeploy` role, the bootstrap, and the `native-cloud` environment.
 
 - A fresh deploy starts with an **empty database**. To restore the final snapshot instead, restore it to a new instance with the same identifier, then fix the credentials: the stacks' secrets were deleted, so the new ones don't match the restored database. Set the master password with `aws rds modify-db-instance --db-instance-identifier smart-tutor-prod --master-user-password <the new smart-tutor/rds/master secret> --apply-immediately`, and run `ALTER ROLE ... PASSWORD ...` for the app and keycloak roles with the new `smart-tutor/db/app` and `smart-tutor/db/keycloak` secrets. This is manual and outside these runbooks.
 - `rollback.yml` does not work while the pilot is down: it has no infrastructure to roll back onto.

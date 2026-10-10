@@ -24,7 +24,7 @@ flowchart TB
       CDKR["CDK bootstrap roles<br/>cdk-hnb659fds-*"]
     end
     CFN["CloudFormation<br/>SmartTutor-prod-* stacks"]
-    ECR["ECR<br/>smart-tutor/api, web, keycloak"]
+    ECR["ECR<br/>smart-tutor/api, web, keycloak, agent, mcp, worker"]
     EKS["EKS cluster smart-tutor-prod"]
   end
 
@@ -35,6 +35,8 @@ flowchart TB
   CFN -->|creates and updates| EKS
   EKS -->|pulls images| ECR
 ```
+
+ECR here is native-cloud's own registry; on-premise has its own `smart-tutor-on-premise/*` repositories (#206, ADR 0015).
 
 ### Setup order: AWS first, then GitHub
 
