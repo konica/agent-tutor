@@ -2,6 +2,7 @@
 
 import json
 import re
+import shlex
 import shutil
 import subprocess
 from pathlib import Path
@@ -654,39 +655,125 @@ def test_deploy_script_migrates_before_it_starts_the_new_tag() -> None:
     assert script.index("run --rm migrate") < script.index("up -d --wait --wait-timeout")
 
 
-def test_deploy_script_asserts_the_running_workers_isolation_and_the_inner_services() -> None:
+def test_deploy_script_checks_the_worker_and_the_inner_services_after_starting_them() -> None:
     script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
-    started = script.index("up -d --wait --wait-timeout")
-    check = script[started:]
-    assert "ps -q worker" in check
-    for fragment in ("docker inspect", ".Config.User", "10001:10001", "ReadonlyRootfs", "CapDrop", "no-new-privileges"):
-        assert fragment in check, fragment
-    # A worker that isn't isolated is stopped before the deploy fails, so it parses no more untrusted PDFs.
-    failed = check[check.index("The worker is not isolated") :]
-    assert failed.index('docker stop "$worker"') < failed.index("exit 1")
-    assert "exec -T api python" in check
+    assert script.index("here=") < script.index('source "$here/check-worker.sh"')
+    check = script[script.index("up -d --wait --wait-timeout 900 --remove-orphans") :]
+    assert check.index("check_worker || exit 1") < check.index("exec -T api python")
     assert "http://agent:8080/healthz" in check
     assert "http://mcp:8000/mcp" in check and "401" in check
 
 
-def test_deploy_script_proves_the_workers_egress_block_and_stops_a_leaking_worker() -> None:
-    script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
-    check = script[script.index("up -d --wait --wait-timeout") :]
-    assert 'exec -T worker python - <"$here/check-egress.py"' in check
+CHECK_WORKER = ON_PREMISE_DIR / "check-worker.sh"
+
+
+def _commands(script: str) -> str:
+    return "\n".join(line for line in script.splitlines() if not line.lstrip().startswith("#"))
+
+
+def test_check_worker_is_a_function_the_caller_sources() -> None:
+    script = CHECK_WORKER.read_text(encoding="utf-8")
+    assert not script.startswith("#!")  # sourced, never run on its own
+    assert "check_worker() {" in script
+    # It returns, so the caller exits (`set -e` doesn't apply inside `check_worker || exit 1`).
+    assert "exit" not in _commands(script)
+
+
+def test_check_worker_asserts_the_running_workers_isolation() -> None:
+    check = CHECK_WORKER.read_text(encoding="utf-8")
+    assert "ps -q worker" in check
+    for fragment in ("docker inspect", ".Config.User", "10001:10001", "ReadonlyRootfs", "CapDrop", "no-new-privileges"):
+        assert fragment in check, fragment
+    # A worker that isn't isolated is stopped before the check fails, so it parses no more untrusted PDFs.
+    failed = check[check.index("The worker is not isolated") :]
+    assert failed.index('docker stop "$worker"') < failed.index("return 1")
+    assert check.index("Checking the worker's isolation") < check.index("Checking the worker's egress")
+
+
+def test_check_worker_proves_the_workers_egress_block_and_stops_a_leaking_worker() -> None:
+    check = CHECK_WORKER.read_text(encoding="utf-8")
+    assert '"${compose[@]}" exec -T worker python - <"$here/check-egress.py" || status=$?' in check
     egress = check[check.index("Checking the worker's egress") :]
     egress = egress[: egress.index("esac")]
-    # Exit 2 (AWS or Postgres unreachable) only fails the deploy; any other status stops the worker first.
+    # Exit 2 (AWS or Postgres unreachable) only fails the check; any other status stops the worker first.
     unreachable = egress[egress.index("2)") : egress.index(";;", egress.index("2)"))]
-    assert "exit 1" in unreachable and "docker stop" not in unreachable
+    assert "return 1" in unreachable and "docker stop" not in unreachable
+    assert "The worker cannot reach a destination it needs (see above)" in unreachable
     leaked = egress[egress.index("*)") :]
-    assert leaked.index('docker stop "$worker"') < leaked.index("exit 1")
+    assert leaked.index('docker stop "$worker"') < leaked.index("return 1")
     assert "Stopped the worker: the egress check found a leak or could not run (see above)" in leaked
+
+
+GOOD_ISOLATION = '10001:10001|true|["ALL"]|["no-new-privileges:true"]'
+FAKE_DOCKER = """
+here=$(mktemp -d)
+trap 'rm -rf "$here"' EXIT
+: >"$here/check-egress.py"
+fake_compose() {
+  case "$*" in
+    'ps -q worker') printf '%s\\n' "$WORKER" ;;
+    'exec -T worker python -') echo 'egress check ran'; return "$EGRESS_STATUS" ;;
+    *) echo "unexpected compose $*" >&2; return 99 ;;
+  esac
+}
+docker() {
+  case $1 in
+    inspect) printf '%s\\n' "$ISOLATION" ;;
+    stop) echo "docker stop $2" >&2 ;;
+    *) echo "unexpected docker $*" >&2; return 99 ;;
+  esac
+}
+compose=(fake_compose)
+"""
+
+
+def _run_check_worker(worker: str, isolation: str, egress_status: int) -> subprocess.CompletedProcess[bytes]:
+    """Sources check-worker.sh under `set -euo pipefail`, as the callers do, with fake `docker` and compose."""
+    program = "\n".join(
+        [
+            "set -euo pipefail",
+            f"WORKER={shlex.quote(worker)} ISOLATION={shlex.quote(isolation)} EGRESS_STATUS={egress_status}",
+            FAKE_DOCKER,
+            CHECK_WORKER.read_text(encoding="utf-8"),
+            "check_worker || exit 1",
+            "echo 'the caller goes on'",
+        ]
+    )
+    # On stdin: on Windows, `bash` may be WSL's, which can't open a Windows path.
+    return subprocess.run(["bash"], input=program.encode(), capture_output=True, check=False)
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")
+@pytest.mark.parametrize(
+    ("worker", "isolation", "egress_status", "code", "stopped", "message"),
+    [
+        ("abc123", GOOD_ISOLATION, 0, 0, False, ""),
+        ("abc123", GOOD_ISOLATION, 2, 1, False, "The worker cannot reach a destination it needs"),
+        ("abc123", GOOD_ISOLATION, 1, 1, True, "the egress check found a leak or could not run"),
+        ("abc123", GOOD_ISOLATION, 137, 1, True, "the egress check found a leak or could not run"),
+        ("abc123", "0:0|false|null|null", 0, 1, True, "The worker is not isolated: runs as '0:0'"),
+        ("", GOOD_ISOLATION, 0, 1, False, "The worker container is not running"),
+    ],
+    ids=["passes", "unreachable", "leak", "crash", "not-isolated", "not-running"],
+)
+def test_check_worker_fails_the_caller_and_stops_a_worker_that_may_leak(
+    worker: str, isolation: str, egress_status: int, code: int, stopped: bool, message: str
+) -> None:
+    run = _run_check_worker(worker, isolation, egress_status)
+    out, err = run.stdout.decode(), run.stderr.decode()
+    assert run.returncode == code, err
+    assert ("the caller goes on" in out) == (code == 0)
+    assert ("docker stop abc123" in err) == stopped
+    assert message in err
+    assert "unexpected" not in err
+    assert ("egress check ran" in out) == (worker != "" and isolation == GOOD_ISOLATION)
 
 
 ENSURE_HEALTHY = ON_PREMISE_DIR / "ensure-healthy.sh"
 SCRIPTS = [
     DEPLOY_SCRIPT,
     ENSURE_HEALTHY,
+    CHECK_WORKER,
     *(ON_PREMISE_DIR / name for name in ("backup.sh", "restore.sh", "report-failure.sh")),
 ]
 VM_FILES = [*SCRIPTS, ON_PREMISE_DIR / "check-egress.py"]
@@ -833,8 +920,16 @@ def test_ensure_healthy_starts_what_is_down_and_waits_for_health() -> None:
     assert "set -euo pipefail" in script
     assert "up -d --wait --wait-timeout" in script
     # It brings back what the last deploy ran: no pull, no migration.
-    commands = "\n".join(line for line in script.splitlines() if not line.lstrip().startswith("#"))
+    commands = _commands(script)
     assert " pull" not in commands and "migrate" not in commands
+
+
+def test_ensure_healthy_re_proves_the_workers_isolation_and_egress() -> None:
+    # Otherwise the patch window would restart a worker that a deploy stopped, and report it healthy.
+    script = ENSURE_HEALTHY.read_text(encoding="utf-8")
+    assert script.index("here=") < script.index('source "$here/check-worker.sh"')
+    started = script.index("up -d --wait --wait-timeout")
+    assert started < script.index("check_worker || exit 1") < script.index("Every service is healthy")
 
 
 # --- backups (#151) ------------------------------------------------------------------------------------------------

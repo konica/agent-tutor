@@ -1,4 +1,5 @@
-"""Proves the on-premise worker's egress block (#153). deploy.sh runs it inside the worker after every deploy:
+"""Proves the on-premise worker's egress block (#153). check-worker.sh runs it inside the worker after every deploy and
+every patch window:
 
     docker compose exec -T worker python - <check-egress.py
 
