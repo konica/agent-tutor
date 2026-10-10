@@ -443,7 +443,7 @@ def compose() -> dict[str, Any]:
     return yaml.safe_load((ON_PREMISE_DIR / "compose.yaml").read_text(encoding="utf-8"))
 
 
-LONG_RUNNING = {"postgres", "keycloak", "api", "web", "caddy", "agent", "mcp", "worker"}
+LONG_RUNNING = {"postgres", "keycloak", "api", "web", "caddy", "agent", "mcp", "worker", "egress-proxy"}
 
 
 def test_compose_runs_the_production_services_and_no_local_emulators(compose: dict[str, Any]) -> None:
@@ -551,6 +551,64 @@ def test_worker_runs_isolated_as_non_root_on_a_read_only_root(compose: dict[str,
     assert worker["pids_limit"] == 256  # room for one extraction child process per PDF
     assert worker["stop_grace_period"] == "60s"
     assert "smart_tutor.apps.worker" in " ".join(worker["healthcheck"]["test"])
+
+
+def _squid_conf(compose: dict[str, Any]) -> list[str]:
+    conf = compose["services"]["egress-proxy"]["environment"]["SQUID_CONF"]
+    return [line.strip() for line in conf.splitlines() if line.strip() and not line.strip().startswith("#")]
+
+
+def test_worker_reaches_only_postgres_and_the_egress_proxy(compose: dict[str, Any]) -> None:
+    assert compose["networks"]["worker"] == {"internal": True}  # no route out of the VM, no external DNS
+    assert compose["services"]["worker"]["networks"] == ["worker"]
+    on_worker_network = {n for n, s in compose["services"].items() if "worker" in s.get("networks", [])}
+    assert on_worker_network == {"worker", "postgres", "egress-proxy"}
+    # Every other service keeps the default network only.
+    assert compose["services"]["postgres"]["networks"] == ["default", "worker"]
+    assert compose["services"]["egress-proxy"]["networks"] == ["default", "worker"]
+    for name, service in compose["services"].items():
+        if name not in on_worker_network:
+            assert "networks" not in service, name
+    env = compose["services"]["worker"]["environment"]
+    assert env["HTTPS_PROXY"] == env["HTTP_PROXY"] == "http://egress-proxy:3128"
+    assert compose["services"]["worker"]["depends_on"]["egress-proxy"] == {"condition": "service_healthy"}
+
+
+def test_egress_proxy_allows_only_the_workers_aws_endpoints_and_imds(compose: dict[str, Any]) -> None:
+    lines = _squid_conf(compose)
+    acls = {line.split()[1]: line.split()[2:] for line in lines if line.startswith("acl ")}
+    assert acls["aws"] == [
+        "dstdomain",
+        "-n",  # no reverse lookup: an IP literal never matches a name
+        "${DOCUMENTS_BUCKET:?}.s3.amazonaws.com",
+        "${DOCUMENTS_BUCKET:?}.s3.${AWS_REGION:?}.amazonaws.com",
+        "sqs.${AWS_REGION:?}.amazonaws.com",
+        "ssm.${AWS_REGION:?}.amazonaws.com",
+        "bedrock-runtime.${AWS_REGION:?}.amazonaws.com",
+    ]
+    assert acls["imds"] == ["dstdomain", "-n", "169.254.169.254"]
+    assert acls["tls"] == ["port", "443"] and acls["http"] == ["port", "80"]
+    rules = [line for line in lines if line.startswith("http_access ")]
+    assert rules == [
+        "http_access allow CONNECT aws tls",
+        "http_access allow !CONNECT imds http",
+        "http_access deny all",
+    ]
+    assert "forwarded_for delete" in lines  # IMDSv2 refuses a token request with X-Forwarded-For
+    assert "via off" in lines
+    assert "cache deny all" in lines
+
+
+def test_egress_proxy_runs_unprivileged_on_a_read_only_root(compose: dict[str, Any]) -> None:
+    proxy = compose["services"]["egress-proxy"]
+    assert proxy["image"] == "ubuntu/squid:6.6-24.04_edge"
+    assert proxy["user"] == "proxy"
+    assert proxy["read_only"] is True
+    assert proxy["cap_drop"] == ["ALL"]
+    assert proxy["security_opt"] == ["no-new-privileges:true"]
+    assert "ports" not in proxy
+    # The config is an environment variable, so a new bucket or region recreates the container.
+    assert "SQUID_CONF" in " ".join(proxy["entrypoint"])
 
 
 def test_agent_and_mcp_run_on_a_read_only_root_without_capabilities(compose: dict[str, Any]) -> None:

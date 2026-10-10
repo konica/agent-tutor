@@ -3,13 +3,20 @@
 #   docker compose -f /opt/smart-tutor/on-premise/compose.yaml --env-file /etc/smart-tutor/smart-tutor.env ps
 # Our images come from ECR by commit tag. Caddy is the only service with public ports. Data lives on the data volume
 # (/data). The worker, agent, and MCP server (#149) run as the image's non-root user on a read-only root filesystem,
-# like the Helm charts; deploy.sh checks the running worker's isolation after every deploy.
+# like the Helm charts. The worker reaches only Postgres and, through the egress proxy, its AWS endpoints (#153);
+# deploy.sh checks the running worker's isolation and egress after every deploy.
 
 name: smart-tutor
 
 x-logging: &logging
   driver: json-file
   options: {max-size: 10m, max-file: "5"}
+
+networks:
+  # The worker parses untrusted PDFs (PRD §9.10). On this network it reaches Postgres and the egress proxy only:
+  # an internal network has no route out of the VM and no external DNS.
+  worker:
+    internal: true
 
 services:
   postgres:
@@ -21,6 +28,7 @@ services:
       # Read only by deploy.sh's role bootstrap (psql \getenv), so the passwords never appear on a command line.
       APP_DB_PASSWORD: ${APP_DB_PASSWORD:?}
       KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
+    networks: [default, worker]
     volumes:
       - /data/postgres:/var/lib/postgresql/data
     healthcheck:
@@ -196,6 +204,57 @@ services:
       postgres: {condition: service_healthy}
       keycloak: {condition: service_started}
 
+  # The worker's only way out (#153): CONNECT to its AWS endpoints, plain HTTP to the instance metadata service (the
+  # instance profile's credentials); everything else gets 403. The config is an environment variable rather than a
+  # file so a changed bucket or region recreates the container (Compose can't inject a config into a read-only one).
+  egress-proxy:
+    image: ubuntu/squid:6.6-24.04_edge
+    restart: unless-stopped
+    logging: *logging
+    entrypoint: [bash, -c, 'printf "%s" "$$SQUID_CONF" > /tmp/squid.conf && exec squid -N -f /tmp/squid.conf']
+    environment:
+      SQUID_CONF: |
+        http_port 3128
+        # Exact names, no reverse lookups (-n): not bare s3.*, whose path-style requests could name any bucket.
+        acl aws dstdomain -n ${DOCUMENTS_BUCKET:?}.s3.amazonaws.com ${DOCUMENTS_BUCKET:?}.s3.${AWS_REGION:?}.amazonaws.com sqs.${AWS_REGION:?}.amazonaws.com ssm.${AWS_REGION:?}.amazonaws.com bedrock-runtime.${AWS_REGION:?}.amazonaws.com
+        acl imds dstdomain -n 169.254.169.254
+        acl tls port 443
+        acl http port 80
+        acl CONNECT method CONNECT
+        http_access allow CONNECT aws tls
+        http_access allow !CONNECT imds http
+        http_access deny all
+        # IMDSv2 refuses a token request that carries X-Forwarded-For.
+        forwarded_for delete
+        via off
+        httpd_suppress_version_string on
+        cache deny all
+        connect_timeout 10 seconds
+        pinger_enable off
+        acl healthcheck src 127.0.0.1/32 ::1
+        access_log stdio:/dev/stdout !healthcheck
+        cache_log stdio:/dev/stderr
+        pid_filename none
+        logfile_rotate 0
+        shutdown_lifetime 1 seconds
+    user: proxy
+    read_only: true
+    tmpfs: [/tmp:size=1m]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    networks: [default, worker]
+    healthcheck:
+      # A request Squid refuses (403) without a DNS lookup: it answers, and the healthcheck ACL keeps it out of the log.
+      test:
+        - CMD
+        - bash
+        - -c
+        - "exec 3<>/dev/tcp/127.0.0.1/3128 && printf 'GET http://healthcheck/ HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '^HTTP/1.1 ' <&3"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
   # The ingestion worker: polls the ingest queue, extracts and embeds each uploaded PDF. It parses untrusted files, so
   # it runs with the least it needs: the image's uid 10001, a read-only root, no capabilities, and bounded CPU, memory,
   # and processes. Each PDF is extracted in a child process (SMART_TUTOR_EXTRACTION_TIMEOUT_SECONDS), which pids_limit
@@ -214,7 +273,13 @@ services:
       SMART_TUTOR_MAX_UPLOAD_MB_PARAM: ${SSM_PATH:?}/max-upload-mb
       SMART_TUTOR_MAX_PAGES_PARAM: ${SSM_PATH:?}/max-pages
       SMART_TUTOR_EXTRACTION_TIMEOUT_SECONDS: "300"
+      # Its only way out (egress-proxy); botocore also fetches the instance profile's credentials through it.
+      HTTP_PROXY: http://egress-proxy:3128
+      HTTPS_PROXY: http://egress-proxy:3128
+      AWS_METADATA_SERVICE_TIMEOUT: "2"  # one more hop to IMDS than the default 1 s assumes
+      AWS_METADATA_SERVICE_NUM_ATTEMPTS: "3"
       HOME: /tmp  # botocore looks for ~/.aws; the root filesystem is read-only
+    networks: [worker]
     user: "10001:10001"
     read_only: true
     tmpfs: [/tmp:size=64m]
@@ -237,6 +302,7 @@ services:
       start_period: 30s
     depends_on:
       postgres: {condition: service_healthy}
+      egress-proxy: {condition: service_healthy}
 
   web:
     image: ${REGISTRY:?}/smart-tutor/web:${IMAGE_TAG:?}
