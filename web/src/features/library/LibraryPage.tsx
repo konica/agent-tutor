@@ -160,14 +160,14 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
   const allReadyNow = finished && counts.allReady && !archivedView;
   // Once none waits, the Library shows every document, not an emptied "needs subjects" filter.
   useEffect(() => {
-    if (finished && counts.allReady) {
+    if (finished && counts.waiting?.length === 0) {
       setFilters((f) => {
         if (f.state !== "awaiting_subjects") return f;
         const { state: _state, ...rest } = f;
         return rest;
       });
     }
-  }, [finished, counts.allReady]);
+  }, [finished, counts.waiting]);
 
   function clearFilters() {
     setFilters({});
@@ -186,7 +186,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
     if (!p) return;
     const done = p.saved + (saved ? 1 : 0);
     if (p.index < p.queue.length - 1) {
-      if (saved) setStatus(`Saved. Document ${p.index + 2} of ${p.queue.length}.`);
+      setStatus(`${saved ? "Saved. " : ""}Document ${p.index + 2} of ${p.queue.length}.`);
       setPicking({ ...p, index: p.index + 1, saved: done });
       return;
     }

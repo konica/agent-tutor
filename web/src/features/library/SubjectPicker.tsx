@@ -252,7 +252,7 @@ export function SubjectPicker({ document, load = defaultLoad, save = defaultSave
               <span className={styles.step}>
                 {step.index + 1} of {step.total}
               </span>
-              <Button variant="quiet" onClick={onSkip}>
+              <Button variant="quiet" onClick={onSkip} disabled={saving}>
                 Skip
               </Button>
             </>

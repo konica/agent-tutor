@@ -1331,8 +1331,8 @@ describe("needs subjects", () => {
   describe("all ready", () => {
     const suggestion = { document_id: "x", title: "x", summary: null, suggestions: [{ subject_id: "s1", name: "AI Agents", origin: "yours" as const }] };
 
-    function fixture(waitingIds: string[]) {
-      const docs = [...waitingIds.map(waiting), { ...ready }];
+    function fixture(waitingIds: string[], extra: DocumentResponse[] = []) {
+      const docs = [...waitingIds.map(waiting), { ...ready }, ...extra];
       const load = vi.fn(async (f: DocumentFilters) => (f.archived ? [] : docs.filter((d) => !f.state || d.state === f.state).map((d) => ({ ...d }))));
       const saveSubjects = vi.fn(async (id: string) => {
         const doc = docs.find((d) => d.document_id === id)!;
@@ -1359,7 +1359,7 @@ describe("needs subjects", () => {
       expect(await screen.findByText("/chat")).toBeVisible();
     });
 
-    it("no ready banner while a document still waits or processes", async () => {
+    it("no ready banner while a document still waits", async () => {
       render(<LibraryPage {...fixture(["a", "b"])} />);
       await userEvent.click(await screen.findByRole("button", { name: "Choose subjects for a.pdf" }));
       await userEvent.click(await screen.findByRole("button", { name: "Save and next" }));
@@ -1367,6 +1367,25 @@ describe("needs subjects", () => {
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
       expect(await screen.findByRole("button", { name: "1 needs subjects" })).toBeVisible();
       expect(screen.queryByText("Your documents are ready.")).toBeNull();
+    });
+
+    it("clears the State filter when none waits but another document processes", async () => {
+      const busy = { ...processing, document_id: "p1", title: "p1.pdf" };
+      render(<LibraryPage {...fixture(["a", "b"], [busy])} />);
+      await userEvent.click(await screen.findByRole("button", { name: "2 need subjects" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Choose subjects for a.pdf" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Save and next" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Save" }));
+      await waitFor(() => expect(screen.getByLabelText("State")).toHaveValue(""));
+      expect(await screen.findByText("p1.pdf")).toBeVisible();
+      expect(screen.queryByText("Your documents are ready.")).toBeNull();
+    });
+
+    it("announces the next step after a Skip", async () => {
+      render(<LibraryPage {...fixture(["a", "b", "c"])} />);
+      await userEvent.click(await screen.findByRole("button", { name: "Choose subjects for a.pdf" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Skip" }));
+      await waitFor(() => expect(screen.getAllByRole("status").some((el) => el.tagName === "P" && el.textContent === "Document 2 of 3.")).toBe(true));
     });
 
     it("no ready banner on load", async () => {

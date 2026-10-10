@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import type { DocumentFilters, DocumentResponse } from "../api/documents";
 
@@ -28,5 +28,5 @@ export function useNeedsSubjectsState(load: (filters: DocumentFilters) => Promis
     };
   }, [key]);
   const report = useCallback((n: number) => setCount(n), []);
-  return { count, report };
+  return useMemo(() => ({ count, report }), [count, report]);
 }

@@ -42,33 +42,33 @@ export function SideNav({ collapsed, onToggle, recent = [], badges }: Props) {
               const badge = badges?.[path];
               const named = badge ? `${label}, ${badge.label}` : label;
               return (
-              <li key={path}>
-                <NavLink
-                  className={styles.link}
-                  to={path}
-                  aria-label={badge || collapsed ? named : undefined}
-                  data-tip={collapsed ? named : undefined}
-                >
-                  <Icon className={styles.icon} strokeWidth={1.5} aria-hidden="true" />
-                  {!collapsed && <span className={styles.text}>{label}</span>}
-                  {badge && (
-                    <span className={styles.badge} aria-hidden="true">
-                      {badge.count}
-                    </span>
+                <li key={path}>
+                  <NavLink
+                    className={styles.link}
+                    to={path}
+                    aria-label={badge || collapsed ? named : undefined}
+                    data-tip={collapsed ? named : undefined}
+                  >
+                    <Icon className={styles.icon} strokeWidth={1.5} aria-hidden="true" />
+                    {!collapsed && <span className={styles.text}>{label}</span>}
+                    {badge && (
+                      <span className={styles.badge} aria-hidden="true">
+                        {badge.count}
+                      </span>
+                    )}
+                  </NavLink>
+                  {path === "/conversations" && !collapsed && recent.length > 0 && (
+                    <ul className={styles.sub} aria-label="Recent conversations">
+                      {recent.slice(0, 3).map((c) => (
+                        <li key={c.id}>
+                          <NavLink to={c.path} title={c.title}>
+                            {c.title}
+                          </NavLink>
+                        </li>
+                      ))}
+                    </ul>
                   )}
-                </NavLink>
-                {path === "/conversations" && !collapsed && recent.length > 0 && (
-                  <ul className={styles.sub} aria-label="Recent conversations">
-                    {recent.slice(0, 3).map((c) => (
-                      <li key={c.id}>
-                        <NavLink to={c.path} title={c.title}>
-                          {c.title}
-                        </NavLink>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </li>
+                </li>
               );
             })}
           </ul>

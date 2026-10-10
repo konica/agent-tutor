@@ -139,6 +139,13 @@ describe("SubjectPicker", () => {
       expect(props.onSkip).toHaveBeenCalledTimes(1);
     });
 
+    it("disables Skip while a save is pending", async () => {
+      const save = vi.fn(() => new Promise<DocumentResponse>(() => {}));
+      setup({ step: { index: 0, total: 3 }, onSkip: vi.fn(), save });
+      await userEvent.click(await screen.findByRole("button", { name: "Save and next" }));
+      expect(screen.getByRole("button", { name: "Skip" })).toBeDisabled();
+    });
+
     it("stays on the document when a save fails in a step-through", async () => {
       const props = setup({ step: { index: 0, total: 3 }, onSkip: vi.fn(), save: vi.fn(async () => { throw new Error(""); }) });
       await userEvent.click(await screen.findByRole("button", { name: "Save and next" }));
