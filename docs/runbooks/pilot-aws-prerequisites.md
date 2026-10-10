@@ -137,7 +137,7 @@ gh api -X DELETE repos/konica/agent-tutor/environments/pilot
 
 Until then, a native-cloud deploy fails at sign-in.
 
-**Shared ECR repositories.** On a fresh account the ECR repositories (`smart-tutor/<service>`) come from native-cloud's `SmartTutor-prod-Registry` stack. Images are built before any `cdk deploy`, so that stack must exist before the first deploy of either mode: deploy it from your laptop with `npx aws-cdk@latest deploy SmartTutor-prod-Registry -c smart-tutor:mode=native-cloud`.
+**Shared ECR repositories.** On a fresh account the ECR repositories (`smart-tutor/<service>`) come from native-cloud's `SmartTutor-prod-Registry` stack. Images are built before any `cdk deploy`, so that stack must exist before the first deploy of either mode: deploy it from your laptop with `npx aws-cdk@latest deploy --exclusively SmartTutor-prod-Registry -c smart-tutor:mode=native-cloud`. `--exclusively` matters: without it CDK also deploys the Network stack first (a VPC with a NAT gateway, which costs money).
 
 ### Check
 

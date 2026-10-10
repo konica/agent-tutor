@@ -35,7 +35,7 @@ The product owner and the DevOps lead asked whether to adopt [SOPS](https://gith
 
 ## Consequences
 
-- No new key, tool, or workflow. Rotating a secret is still "change it in Secrets Manager, redeploy". On-premise, the redeploy resets database role passwords and recreates the services that read them (`docs/runbooks/on-premise-deploy.md` §5).
+- No new key, tool, or workflow. Rotating a secret is still "change it in Secrets Manager, redeploy". On-premise, the redeploy resets database role passwords and recreates the services that read them (`docs/runbooks/on-premise-deploy.md` §6).
 - The #166 incidents stay in the GitGuardian dashboard (the flagged commit remains on the PR branch) until someone with dashboard access marks them as false positives.
 - The committed local-development credentials are not secrets, but a scanner may flag them when a PR touches those lines. They are triaged as above.
 - **Revisit SOPS** if secrets must be authored by people and versioned with the code, for example in a GitOps setup with Argo CD or Flux, or on a deployment target without Secrets Manager.

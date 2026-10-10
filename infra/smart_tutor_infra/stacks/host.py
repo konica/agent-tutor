@@ -76,7 +76,7 @@ PATCH_SCHEDULE = "cron(0 4 ? * SUN *)"
 ENSURE_HEALTHY = "/opt/smart-tutor/on-premise/ensure-healthy.sh"
 ENSURE_HEALTHY_COMMAND = (
     f"[ -f {ENSURE_HEALTHY} ] || {{ echo 'ensure-healthy.sh is missing: redeploy the current tag"
-    f" (docs/runbooks/on-premise-deploy.md §3)' >&2; exit 1; }}; bash {ENSURE_HEALTHY}"
+    f" (docs/runbooks/on-premise-deploy.md §4)' >&2; exit 1; }}; bash {ENSURE_HEALTHY}"
 )
 # Data Lifecycle Manager snapshots the volumes with this tag. Times are UTC; the app's time zone is Asia/Ho_Chi_Minh
 # (UTC+7), so the snapshot is at 02:00 and the dump (deploy/on-premise/systemd/smart-tutor-backup.timer) at 03:00.
