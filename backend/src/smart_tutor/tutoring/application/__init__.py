@@ -2,7 +2,7 @@
 
 from smart_tutor.tutoring.application.answer import (
     LIMITED_DECLINE,
-    NO_CHUNKS_ANSWER,
+    NO_DOCUMENTS_DECLINE,
     answer_messages,
     cited_chunks,
     covers,
@@ -27,7 +27,7 @@ from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
 __all__ = [
     "DELETED_DOCUMENT",
     "LIMITED_DECLINE",
-    "NO_CHUNKS_ANSWER",
+    "NO_DOCUMENTS_DECLINE",
     "AnsweredTurn",
     "CitationView",
     "ConversationService",

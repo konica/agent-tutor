@@ -1,13 +1,15 @@
 """Agent HTTP server (internal ClusterIP): POST /ask streams one answer as SSE (PRD §9.2, ADR 0007).
 
 Events, each ``event: <name>\\ndata: <json>\\n\\n``: ``delta`` {"text"} in order, then ``sources``
-{"document_ids"} once (the distinct documents of the chunks given to the model, in rank order; left out when none
-were, as in the fixed no-chunks reply; meant for the API, which records them and never forwards the event), then
-``citations`` once ({"citations": [{"n", "chunk_id", "document_id", "document_title", "page"}]}, ``n`` being the
-answer's ``[n]`` marker), then ``done``; or ``error`` {"code": "unauthenticated" | "unavailable", "message"}, which
-ends the stream and may come first. A request with ``document_ids`` searches only those documents; when none
-of the chunks found scores at least ``answer_floor``, the turn is ``decline`` {"code": "limited", "message"} then
-``done``, with no ``delta``, ``sources``, or ``citations``.
+{"document_ids"} once (the distinct documents of the chunks given to the model, in rank order; meant for the API,
+which records them and never forwards the event), then ``citations`` once ({"citations": [{"n", "chunk_id",
+"document_id", "document_title", "page"}]}, ``n`` being the answer's ``[n]`` marker), then ``done``; or ``error``
+{"code": "unauthenticated" | "unavailable", "message"}, which ends the stream and may come first.
+
+A turn the model doesn't answer is ``decline`` {"code", "message"} then ``done``, with no ``delta``, ``sources``, or
+``citations``: ``no_documents`` when the learner has nothing readable (no ready, non-archived document; US-3), or,
+for a request with ``document_ids`` (only those documents are searched), ``limited`` when none of the chunks found
+scores at least ``answer_floor`` (US-4c).
 """
 
 import json
@@ -30,7 +32,7 @@ from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.ports.token_verifier import TokenVerifier
 from smart_tutor.tutoring.adapters.mcp_retriever import McpRetriever
-from smart_tutor.tutoring.application import LIMITED_DECLINE, RetrievedChunk
+from smart_tutor.tutoring.application import LIMITED_DECLINE, NO_DOCUMENTS_DECLINE, RetrievedChunk
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +41,7 @@ UNAVAILABLE = "The tutor couldn't answer right now. Try again in a moment."
 # Proxies must pass each event on as it comes, and nothing may cache the answer.
 SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 STREAM_MODES: list[Literal["messages", "updates"]] = ["messages", "updates"]
+DECLINE_MESSAGES = {"limited": LIMITED_DECLINE, "no_documents": NO_DOCUMENTS_DECLINE}
 
 
 class AskRequest(BaseModel):
@@ -53,7 +56,6 @@ def sse(event: str, data: dict[str, Any]) -> str:
 
 async def answer_events(graph: AskGraph, body: AskRequest, token: str) -> AsyncIterator[str]:
     state: AskState = {"question": body.question, "document_ids": body.document_ids}
-    streamed = False
     chunks: list[RetrievedChunk] = []  # what search found; the answer node gives the model exactly these
     try:
         async for part in graph.astream(
@@ -62,19 +64,15 @@ async def answer_events(graph: AskGraph, body: AskRequest, token: str) -> AsyncI
             if part["type"] == "messages":
                 chunk, meta = part["data"]
                 if meta.get("langgraph_node") == "answer" and chunk.text:
-                    streamed = True
                     yield sse("delta", {"text": chunk.text})
             elif part["type"] == "updates" and "search" in part["data"]:
                 chunks = part["data"]["search"].get("chunks", [])
             elif part["type"] == "updates" and "answer" in part["data"]:
                 update = part["data"]["answer"]
-                if update.get("declined"):
-                    yield sse("decline", {"code": "limited", "message": LIMITED_DECLINE})
+                if (code := update.get("decline")) is not None:
+                    yield sse("decline", {"code": code, "message": DECLINE_MESSAGES[code]})
                     continue
-                if not streamed:  # the fixed no-chunks answer never went through the model
-                    yield sse("delta", {"text": update["answer"]})
-                if chunks:  # non-empty exactly when the answer node gave them to the model
-                    yield sse("sources", {"document_ids": list(dict.fromkeys(c.document_id for c in chunks))})
+                yield sse("sources", {"document_ids": list(dict.fromkeys(c.document_id for c in chunks))})
                 citations = [
                     {
                         "n": c.n,

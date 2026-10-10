@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Any
 
 from langchain_core.callbacks import BaseCallbackHandler
@@ -6,7 +7,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from fakes import FakeRetriever, fake_chat_model
 from smart_tutor.apps.agent.graph import build_graph
 from smart_tutor.apps.agent.state import AgentContext
-from smart_tutor.tutoring.application import NO_CHUNKS_ANSWER, Retriever
+from smart_tutor.tutoring.application import Retriever
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 
 CHUNKS = [
@@ -27,15 +28,49 @@ async def test_searches_all_documents_with_the_context_token_then_answers_with_c
     out = await graph.ainvoke(INPUT, context=AgentContext(access_token="t-ada"))
     assert tokens == ["t-ada"]  # one retriever, for the search node
     assert retriever.calls == [("What is attention?", 5, None)]
+    assert "decline" not in out
     assert out["answer"] == "It weighs tokens [1]."
     assert [c.chunk_id for c in out["citations"]] == ["c1"]
 
 
-async def test_no_chunks_gives_the_fixed_answer_without_calling_the_model() -> None:
-    model = fake_chat_model()  # no scripted reply: a call would fail
-    graph = build_graph(lambda token: FakeRetriever([]), model)
+class ListedUnreadable(FakeRetriever):
+    """Finds its chunks library-wide only: the listed documents can't be read (archived, deleted, or another's)."""
+
+    async def search(self, query: str, k: int = 5, document_ids: Sequence[str] | None = None) -> list[RetrievedChunk]:
+        found = await super().search(query, k, document_ids)
+        return [] if document_ids is not None else found
+
+
+async def test_an_empty_readable_set_asks_for_an_upload_without_calling_the_model() -> None:
+    retriever = FakeRetriever([])
+    graph = build_graph(lambda token: retriever, fake_chat_model())  # no scripted reply: a call would fail
     out = await graph.ainvoke(INPUT, context=AgentContext(access_token="t"))
-    assert out["answer"] == NO_CHUNKS_ANSWER and out["citations"] == []
+    assert out["decline"] == "no_documents" and out["answer"] == "" and out["citations"] == []
+    assert retriever.calls == [("What is attention?", 5, None)]  # library-wide: no second search
+
+
+async def test_a_limited_search_with_nothing_readable_anywhere_asks_for_an_upload() -> None:
+    retriever = FakeRetriever([])
+    graph = build_graph(lambda token: retriever, fake_chat_model())
+    out = await graph.ainvoke({**INPUT, "document_ids": ["d1"]}, context=AgentContext(access_token="t"))
+    assert out["decline"] == "no_documents"
+    assert retriever.calls == [("What is attention?", 5, ["d1"]), ("What is attention?", 1, None)]
+
+
+async def test_a_limited_search_with_unreadable_listed_documents_but_an_active_library_is_limited() -> None:
+    retriever = ListedUnreadable(CHUNKS)
+    graph = build_graph(lambda token: retriever, fake_chat_model())
+    out = await graph.ainvoke({**INPUT, "document_ids": ["d1"]}, context=AgentContext(access_token="t"))
+    assert out["decline"] == "limited"
+    assert retriever.calls == [("What is attention?", 5, ["d1"]), ("What is attention?", 1, None)]
+
+
+async def test_a_limited_search_that_finds_chunks_searches_once() -> None:
+    retriever = FakeRetriever(CHUNKS)
+    graph = build_graph(lambda token: retriever, fake_chat_model(AIMessage("It weighs tokens [1].")))
+    out = await graph.ainvoke({**INPUT, "document_ids": ["d1"]}, context=AgentContext(access_token="t"))
+    assert "decline" not in out and out["answer"] == "It weighs tokens [1]."
+    assert retriever.calls == [("What is attention?", 5, ["d1"])]
 
 
 class _SeenMessages(BaseCallbackHandler):

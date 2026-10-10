@@ -8,7 +8,7 @@ from typing import Protocol
 from langchain_core.language_models import BaseChatModel
 
 from smart_tutor.apps.agent.state import AskState
-from smart_tutor.tutoring.application import NO_CHUNKS_ANSWER, answer_messages, cited_chunks, covers
+from smart_tutor.tutoring.application import answer_messages, cited_chunks, covers
 
 
 class AnswerNode(Protocol):
@@ -17,11 +17,11 @@ class AnswerNode(Protocol):
 
 def answer_node(model: BaseChatModel, answer_floor: float) -> AnswerNode:
     async def answer(state: AskState) -> AskState:
+        if state.get("no_documents"):
+            return {"answer": "", "citations": [], "decline": "no_documents"}
         chunks = state.get("chunks", [])
         if state.get("document_ids") is not None and not covers(chunks, answer_floor):
-            return {"answer": "", "citations": [], "declined": True}  # the model is never called
-        if not chunks:
-            return {"answer": NO_CHUNKS_ANSWER, "citations": []}
+            return {"answer": "", "citations": [], "decline": "limited"}
         reply = await model.ainvoke(answer_messages(state["question"], chunks))
         text = reply.text
         return {"answer": text, "citations": [c.citation(n) for n, c in cited_chunks(text, chunks)]}

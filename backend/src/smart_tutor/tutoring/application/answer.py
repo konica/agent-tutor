@@ -8,7 +8,8 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 
-NO_CHUNKS_ANSWER = "I couldn't find anything about that in your documents."
+# The US-3 request to upload a document: the learner has no ready, non-archived document (PRD §9.2 step 1).
+NO_DOCUMENTS_DECLINE = "None of your documents can be used right now: they are all archived or deleted."
 LIMITED_DECLINE = "These documents don't cover this."
 
 _SYSTEM = """You are Smart Tutor. You answer a learner's question using only chunks of their own documents.
