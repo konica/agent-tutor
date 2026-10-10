@@ -861,6 +861,107 @@ describe("ChatPage", () => {
       expect(pane("ReAct")).toBeInTheDocument();
       expect(within(panel()!).getByRole("button", { name: "ReAct" })).toHaveAttribute("aria-current", "true");
     });
+
+    describe("Sources chips", () => {
+      const cited = (c3Page: number | null = 1) =>
+        events(
+          { type: "thread", thread_id: "t1" },
+          { type: "delta", text: "It weighs tokens [1][2][3]." },
+          {
+            type: "citations",
+            citations: [
+              { n: 1, chunk_id: "c1", document_id: "d1", document_title: "ReAct", page: 2 },
+              { n: 2, chunk_id: "c2", document_id: "d1", document_title: "ReAct", page: 3 },
+              { n: 3, chunk_id: "c3", document_id: "d2", document_title: "PPO", page: c3Page },
+            ],
+          },
+          { type: "done" },
+        );
+      const chip = (name: RegExp) => screen.findByRole("button", { name });
+      const reactP2 = () => chip(/^ReAct, p\. 2\. (Open|Shown)/);
+      const reactP3 = () => chip(/^ReAct, p\. 3\. (Open|Shown)/);
+
+      async function cite(props: ComponentProps<typeof ChatPage> = {}) {
+        const viewerDeps = fakeViewerDeps();
+        await answer({ ask: vi.fn().mockImplementation(() => cited()), viewerDeps, ...props });
+        return viewerDeps;
+      }
+
+      it("opens the document beside the conversation at its page", async () => {
+        const deps = await cite();
+        const first = await chip(/ReAct, p\. 2\. Open beside the conversation/);
+        await userEvent.click(first);
+        expect(await screen.findByText("p. 2 / 3", {}, { timeout: 3000 })).toBeInTheDocument();
+        expect(pane("ReAct")).toBeInTheDocument();
+        expect(deps.loadChunk).toHaveBeenCalledWith("c1");
+        expect(first).toHaveAccessibleName(/Shown beside the conversation$/);
+        expect(first).toHaveAttribute("aria-current", "true");
+      });
+
+      it("swaps the document in place when a chip of another document is clicked", async () => {
+        await cite();
+        const react = await reactP2();
+        await userEvent.click(react);
+        await screen.findByText("p. 2 / 3", {}, { timeout: 3000 });
+        const ppo = await chip(/^PPO, p\. 1\./);
+        await userEvent.click(ppo);
+        expect(await screen.findByRole("region", { name: "PPO" })).toBeInTheDocument();
+        expect(pane("ReAct")).not.toBeInTheDocument();
+        expect(react).not.toHaveAttribute("aria-current");
+        expect(ppo).toHaveAttribute("aria-current", "true");
+      });
+
+      it("keeps the PDF loaded when a second chip of the same document is clicked", async () => {
+        const deps = await cite();
+        await userEvent.click(await reactP2());
+        await screen.findByText("p. 2 / 3", {}, { timeout: 3000 });
+        deps.loadChunk.mockImplementation(async (id: string) => ({ chunkId: id, documentId: "d1", page: 3, startIndex: 0, text: "More." }));
+        await userEvent.click(await reactP3());
+        expect(await screen.findByText("p. 3 / 3", {}, { timeout: 3000 })).toBeInTheDocument();
+        expect(deps.loadPdfDoc).toHaveBeenCalledTimes(1);
+      });
+
+      it("returns focus to the chip when the pane closes", async () => {
+        await cite();
+        const react = await reactP2();
+        await userEvent.click(react);
+        await screen.findByText("p. 2 / 3", {}, { timeout: 3000 });
+        fireEvent.keyDown(within(pane("ReAct")!).getByRole("heading", { level: 2, name: "ReAct" }), { key: "Escape" });
+        expect(pane("ReAct")).not.toBeInTheDocument();
+        await waitFor(() => expect(react).toHaveFocus());
+
+        await userEvent.click(react);
+        await screen.findByText("p. 2 / 3", {}, { timeout: 3000 });
+        await userEvent.click(within(pane("ReAct")!).getByRole("button", { name: "Close" }));
+        await waitFor(() => expect(react).toHaveFocus());
+      });
+
+      it("shows a deleted document's chip as text, not a button", async () => {
+        await cite({ loadUsed: async () => [used("d1", "ReAct"), { ...used("d2", "PPO"), deleted: true }] });
+        await chip(/^ReAct, p\. 2\./);
+        const sources = within(screen.getByRole("list", { name: "Sources" }));
+        expect(sources.queryByRole("button", { name: /PPO/ })).not.toBeInTheDocument();
+        expect(sources.getByText(/Deleted document/)).toBeInTheDocument();
+      });
+
+      it("opens the document at page 1 for a citation without a page", async () => {
+        const deps = await cite({ ask: vi.fn().mockImplementation(() => cited(null)) });
+        await userEvent.click(await chip(/^PPO, page unavailable\. Open/));
+        expect(await screen.findByText("p. 1 / 3", {}, { timeout: 3000 })).toBeInTheDocument();
+        expect(deps.loadChunk).not.toHaveBeenCalled();
+      });
+
+      it("clears the chip highlight when a panel row is opened", async () => {
+        await cite();
+        await userEvent.click(await reactP2());
+        await screen.findByText("p. 2 / 3", {}, { timeout: 3000 });
+        await userEvent.click(screen.getByRole("button", { name: "Show panel" }));
+        await userEvent.click(await row("ReAct"));
+        await waitFor(() => expect(pane("ReAct")).toBeInTheDocument());
+        const sources = within(screen.getByRole("list", { name: "Sources" }));
+        for (const c of sources.getAllByRole("button")) expect(c).not.toHaveAttribute("aria-current");
+      });
+    });
   });
 
   describe("title", () => {

@@ -1,7 +1,7 @@
 """PostgreSQL library: one connection and transaction per unit of work."""
 
 import uuid
-from collections.abc import Collection
+from collections.abc import Collection, Mapping
 from types import TracebackType
 from typing import Any, Self
 
@@ -9,7 +9,7 @@ from sqlalchemy import ColumnElement, Connection, Engine, Select, delete, exists
 from sqlalchemy.dialects.postgresql import insert
 
 from smart_tutor.knowledge.adapters.sql_tables import chunks, contents, document_subjects, documents, uploads
-from smart_tutor.knowledge.domain.chunk import Chunk
+from smart_tutor.knowledge.domain.chunk import Chunk, ChunkPassage, StoredChunk
 from smart_tutor.knowledge.domain.content import Content, ContentState
 from smart_tutor.knowledge.domain.document import NO_FILTER, Document, DocumentFilter, DocumentState
 from smart_tutor.knowledge.domain.search import ChunkHit
@@ -350,10 +350,43 @@ class _Chunks(ChunkRepository):
                         "page": c.page,
                         "text": c.text,
                         "embedding": c.embedding,
+                        "start_index": c.start_index,
                     }
                     for c in new_chunks
                 ],
             )
+
+    def contents_missing_start_index(self) -> list[ContentId]:
+        rows = self._conn.execute(
+            select(chunks.c.content_id).where(chunks.c.start_index.is_(None)).distinct().order_by(chunks.c.content_id)
+        )
+        return [ContentId(str(r.content_id)) for r in rows]
+
+    def list_for_content(self, content_id: ContentId) -> list[StoredChunk]:
+        rows = self._conn.execute(
+            select(chunks.c.chunk_id, chunks.c.seq, chunks.c.page, chunks.c.text, chunks.c.start_index)
+            .where(chunks.c.content_id == content_id)
+            .order_by(chunks.c.seq)
+        )
+        return [StoredChunk(str(r.chunk_id), r.seq, r.page, r.text, r.start_index) for r in rows]
+
+    def set_start_indexes(self, offsets: Mapping[str, int]) -> None:
+        for chunk_id, start in offsets.items():
+            self._conn.execute(update(chunks).where(chunks.c.chunk_id == chunk_id).values(start_index=start))
+
+    def get_readable(self, user_id: UserId, chunk_id: str) -> ChunkPassage | None:
+        try:
+            uuid.UUID(chunk_id)
+        except ValueError:
+            return None
+        row = self._conn.execute(
+            select(chunks.c.chunk_id, chunks.c.page, chunks.c.start_index, chunks.c.text, documents.c.document_id)
+            .join(documents, documents.c.content_id == chunks.c.content_id)
+            .where(chunks.c.chunk_id == chunk_id, readable_by(user_id))
+        ).first()
+        if row is None:
+            return None
+        return ChunkPassage(str(row.chunk_id), DocumentId(str(row.document_id)), row.page, row.start_index, row.text)
 
     def search(
         self, user_id: UserId, embedding: list[float], k: int, document_ids: Collection[DocumentId] | None = None

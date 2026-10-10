@@ -3,12 +3,15 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { DocumentPane } from "./DocumentPane";
-import { fakeViewerDeps } from "./testFakes";
+import type { Passage } from "./DocumentViewer";
+import { fakePdf, fakeViewerDeps } from "./testFakes";
 
-function renderPane(documentId = "d1") {
+function renderPane(documentId = "d1", passage?: Passage) {
   const onClose = vi.fn();
   const viewerDeps = fakeViewerDeps();
-  const view = render(<DocumentPane documentId={documentId} onClose={onClose} viewerDeps={viewerDeps} />);
+  // Every page holds the text fakeViewerDeps' loadChunk returns.
+  viewerDeps.loadPdfDoc.mockImplementation(async () => fakePdf(3, [{ str: "Cited text here.", hasEOL: true, x: 50, y: 300, width: 200, height: 12 }]));
+  const view = render(<DocumentPane documentId={documentId} onClose={onClose} viewerDeps={viewerDeps} passage={passage} />);
   return { ...view, onClose, viewerDeps };
 }
 
@@ -79,5 +82,45 @@ describe("DocumentPane", () => {
     expect(screen.getByText("p. 3 / 3")).toBeInTheDocument();
     // The pane kept its PDF: only the dialog loaded a second copy.
     expect(viewerDeps.loadPdfDoc).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows the cited passage highlighted", async () => {
+    const { viewerDeps } = renderPane("d1", { chunkId: "c1", page: 2 });
+    expect(await screen.findByText("p. 2 / 3")).toBeInTheDocument();
+    expect(await screen.findByTestId("passage-box")).toBeInTheDocument();
+    expect(viewerDeps.loadChunk).toHaveBeenCalledWith("c1");
+  });
+
+  it("shows the same highlight in the dialog", async () => {
+    const { viewerDeps } = renderPane("d1", { chunkId: "c1", page: 2 });
+    await screen.findByTestId("passage-box");
+    await userEvent.click(screen.getByRole("button", { name: "Open in dialog" }));
+    const dialog = await screen.findByRole("dialog", { name: "ReAct" });
+    expect(await within(dialog).findByText("p. 2 / 3")).toBeInTheDocument();
+    expect(await within(dialog).findByTestId("passage-box")).toBeInTheDocument();
+    expect(within(dialog).getByText("Cited passage")).toBeInTheDocument();
+    expect(viewerDeps.recordMiss).not.toHaveBeenCalled();
+  });
+
+  it("opens the dialog at the pane's page even when the learner left the passage's page", async () => {
+    renderPane("d1", { chunkId: "c1", page: 2 });
+    await screen.findByTestId("passage-box");
+    await userEvent.click(screen.getByRole("button", { name: "Next page" }));
+    await userEvent.click(screen.getByRole("button", { name: "Open in dialog" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText("p. 3 / 3")).toBeInTheDocument();
+    expect(within(dialog).queryByTestId("passage-box")).not.toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Previous page" }));
+    expect(await within(dialog).findByTestId("passage-box")).toBeInTheDocument();
+  });
+
+  it("counts a miss once, in the pane, not again in the dialog", async () => {
+    const viewerDeps = fakeViewerDeps(); // its PDF pages have no text, so the passage isn't found
+    render(<DocumentPane documentId="d1" onClose={vi.fn()} viewerDeps={viewerDeps} passage={{ chunkId: "c1", page: 2 }} />);
+    expect(await screen.findByRole("note")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Open in dialog" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByRole("note")).toBeInTheDocument();
+    expect(viewerDeps.recordMiss).toHaveBeenCalledTimes(1);
   });
 });

@@ -78,4 +78,5 @@ chunks = Table(
     Column("page", Integer),
     Column("text", Text),
     Column("embedding", Vector(EMBEDDING_DIM)),
+    Column("start_index", Integer),
 )

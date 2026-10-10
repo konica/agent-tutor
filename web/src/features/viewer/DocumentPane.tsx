@@ -1,15 +1,18 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 
-import { DocumentViewer } from "./DocumentViewer";
+import { DocumentViewer, type Passage } from "./DocumentViewer";
 import styles from "./DocumentPane.module.css";
 import { ViewerDialog, type ViewerDeps } from "./ViewerDialog";
 
-type Props = { documentId: string; onClose: () => void; viewerDeps?: ViewerDeps };
+type Props = { documentId: string; onClose: () => void; viewerDeps?: ViewerDeps; passage?: Passage };
+
+// The pane already counted a passage it couldn't highlight; the dialog showing the same passage doesn't count it again.
+const countedByPane = () => {};
 
 // The document beside the conversation (DESIGN.md → Chat, Split view): a labelled region, not a modal. Focus goes to
-// the title on open and on every swap; Escape closes it. "Open in dialog" shows the same page in the overlay; closing
-// the overlay brings the pane to the overlay's last page and focus back to the button.
-export function DocumentPane({ documentId, onClose, viewerDeps }: Props) {
+// the title on open and on every swap; Escape closes it. "Open in dialog" shows the same page and highlight in the
+// overlay; closing the overlay brings the pane to the overlay's last page and focus back to the button.
+export function DocumentPane({ documentId, onClose, viewerDeps, passage }: Props) {
   const titleId = useId();
   const titleRef = useRef<HTMLHeadingElement>(null);
   const openInDialogRef = useRef<HTMLButtonElement>(null);
@@ -38,6 +41,7 @@ export function DocumentPane({ documentId, onClose, viewerDeps }: Props) {
         documentId={documentId}
         mode="pane"
         jumpTo={jumpTo}
+        passage={passage}
         titleRef={titleRef}
         titleId={titleId}
         onClose={onClose}
@@ -49,10 +53,11 @@ export function DocumentPane({ documentId, onClose, viewerDeps }: Props) {
         <ViewerDialog
           documentId={documentId}
           initialPage={dialogPage}
+          passage={passage}
           closeLabel="Back to side by side"
           onClose={closeDialog}
           returnFocusTo={openInDialogRef}
-          viewerDeps={viewerDeps}
+          viewerDeps={{ ...viewerDeps, recordMiss: countedByPane }}
         />
       )}
     </section>

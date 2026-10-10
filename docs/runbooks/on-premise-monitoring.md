@@ -132,6 +132,26 @@ aws ssm describe-instance-patch-states --instance-ids $InstanceId `
 
 To move the window, change `PATCH_SCHEDULE` in `host.py` (a cron expression in the app time zone) and deploy the stacks. To pause patching, disable the window in the console (**Maintenance Windows → Edit → Enabled**), and enable it again afterwards.
 
+## Citation highlight misses
+
+**What it counts.** Each time the document viewer opens a cited page and shows "Couldn't highlight the passage on this page." The count is one number per UTC day in the table `highlight_misses`: no user, chunk, document, or text (PRD §9.4, §10.1). It sends no email.
+
+**How to read it.** Open a shell (`on-premise-deploy.md` §6), define `dc` as there, and run:
+
+```bash
+dc exec postgres psql -U postgres -d smart_tutor -c "SELECT day, misses FROM highlight_misses ORDER BY day DESC LIMIT 30;"
+```
+
+A day with no row had no misses. A few a day is normal: a passage that spans a page break, or a PDF whose text differs from what the worker extracted.
+
+**What to do when it climbs.** Check recent uploads' chunks for a null `start_index` (the worker sets it at ingestion and backfills it at startup; a chunk it can't locate stays null):
+
+```bash
+dc exec postgres psql -U postgres -d smart_tutor -c "SELECT count(*) FILTER (WHERE start_index IS NULL) AS missing, count(*) AS total FROM chunks;"
+```
+
+If the nulls are recent, the ingestion's chunking changed or the worker failed to backfill: read `dc logs worker` (it runs the backfill at startup and logs each chunk it can't place). If `start_index` is set and the count still climbs, compare the viewer's matcher with the seed-corpus test in `web/src/features/viewer/passage.seed.test.ts` and add the failing PDF to it.
+
 ## Bring the services back
 
 `ensure-healthy.sh` is safe to run at any time. It changes nothing that is running and healthy, except that it stops a worker that fails its isolation or egress check:

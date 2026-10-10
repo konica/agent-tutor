@@ -1,9 +1,16 @@
 // The only file that imports pdf.js. Everything else depends on these types, so tests can fake the loader.
-import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
+import { getDocument, GlobalWorkerOptions, Util } from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
-// width/height are at scale 1, in CSS px.
-export type PdfPage = { width: number; height: number; render(canvas: HTMLCanvasElement, scale: number): Promise<void> };
+import type { TextItem } from "./passage";
+
+// width/height are at scale 1, in CSS px. textItems: the page's text layer in CSS px at scale 1, origin top-left.
+export type PdfPage = {
+  width: number;
+  height: number;
+  render(canvas: HTMLCanvasElement, scale: number): Promise<void>;
+  textItems(): Promise<TextItem[]>;
+};
 export type PdfDoc = { numPages: number; page(n: number): Promise<PdfPage>; destroy(): void };
 export type PdfLoader = (url: string) => Promise<PdfDoc>;
 
@@ -37,6 +44,17 @@ export const loadPdf: PdfLoader = async (url) => {
           canvas.style.width = `${viewport.width / ratio}px`;
           canvas.style.height = `${viewport.height / ratio}px`;
           await p.render({ canvas, viewport }).promise;
+        },
+        // An item's matrix composed with the viewport's: (e, f) is its baseline start in CSS px and |(c, d)| its font
+        // height, so the box's top is the baseline minus that height.
+        textItems: async () => {
+          const content = await p.getTextContent();
+          return content.items.flatMap((it) => {
+            if (!("str" in it)) return [];
+            const [, , c, d, e, f] = Util.transform(base.transform, it.transform) as number[];
+            const height = Math.hypot(c!, d!);
+            return [{ str: it.str, hasEOL: it.hasEOL, x: e!, y: f! - height, width: it.width * CSS_PER_PT, height }];
+          });
         },
       };
     },
