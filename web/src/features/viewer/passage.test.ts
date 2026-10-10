@@ -12,6 +12,21 @@ describe("matchKey", () => {
     expect(key).toBe("afib");
     expect(map).toEqual([0, 2, 2, 4]);
   });
+  it("composes a base letter with its combining marks, as NFKC of the whole page does", () => {
+    const { key, map } = matchKey("ae\u0301 b");
+    expect(key).toBe("a\u00e9b");
+    expect(map).toEqual([0, 1, 4]);
+  });
+  it("folds characters outside the BMP (math letters) without splitting their surrogate pairs", () => {
+    const { key, map } = matchKey("\u{1D431} = 1");
+    expect(key).toBe("x=1");
+    expect(map).toEqual([0, 3, 5]);
+  });
+  it("keeps one map entry per key code unit for characters NFKC leaves outside the BMP", () => {
+    const { key, map } = matchKey("a \u{1F600}b");
+    expect(key).toBe("a\u{1F600}b");
+    expect(map).toEqual([0, 2, 2, 4]);
+  });
 });
 
 describe("findPassage", () => {
@@ -37,6 +52,17 @@ describe("findPassage", () => {
     const span = findPassage(page, `${head} ${tail}`, null);
     expect(span?.start).toEqual({ item: 0, offset: 0 });
     expect(span?.end.offset).toBe(page[0]!.str.length);
+  });
+  it("finds a chunk whose letters pdf.js gives decomposed or as math alphanumerics", () => {
+    const page = [item("the cafe\u0301 where \u{1D431} is set", true)];
+    const span = findPassage(page, "caf\u00e9 where x is", null);
+    expect(span).toEqual({ start: { item: 0, offset: 4 }, end: { item: 0, offset: 21 } });
+  });
+  it("ends the span after the whole last character, not inside its surrogate pair or before its marks", () => {
+    const math = [item("let \u{1D431}", true)];
+    expect(findPassage(math, "let x", null)?.end).toEqual({ item: 0, offset: 6 });
+    const accent = [item("cafe\u0301", true)];
+    expect(findPassage(accent, "caf\u00e9", null)?.end).toEqual({ item: 0, offset: 5 });
   });
   it("returns null when the chunk isn't on the page", () => {
     expect(findPassage(items, "Nothing like this appears on the page at all.", 0)).toBeNull();

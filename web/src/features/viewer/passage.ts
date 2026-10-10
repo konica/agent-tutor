@@ -10,16 +10,22 @@ export type Box = { x: number; y: number; width: number; height: number };
 
 const EDGE = 40; // key characters compared at each end when the whole chunk isn't found
 const SPAN_SLACK = 0.3; // a head-to-tail match may be 30% shorter or longer than the chunk
+// One character group: a code point with its combining marks (or stray marks). Sticky, for lastUnitOf.
+const CHARACTER = /\P{M}\p{M}*|\p{M}+/uy;
 
 // `map[i]` is the index in `source` of `key[i]`.
 export function matchKey(source: string): { key: string; map: number[] } {
-  // 1. NFKC per source character, remembering where each output character came from.
+  // 1. NFKC per base character with its combining marks (by code point, so surrogate pairs stay whole), remembering
+  // where each output character came from: the group's first index. Normalizing whole groups composes "e" + U+0301
+  // and folds math letters such as U+1D431 as NFKC of the whole page text does. Output is kept per UTF-16 code unit,
+  // like the key's indexOf, so `map` stays aligned with `key` for characters NFKC leaves outside the BMP.
   const chars: string[] = [];
   const from: number[] = [];
-  for (let i = 0; i < source.length; i++) {
-    for (const c of source[i]!.normalize("NFKC")) {
-      chars.push(c);
-      from.push(i);
+  for (const group of source.matchAll(new RegExp(CHARACTER.source, "gu"))) {
+    const normalized = group[0].normalize("NFKC");
+    for (let k = 0; k < normalized.length; k++) {
+      chars.push(normalized[k]!);
+      from.push(group.index);
     }
   }
   // 2. Join words hyphenated across lines (lowercase on both sides), as clean_page_text does; 3. drop whitespace and
@@ -91,8 +97,14 @@ export function findPassage(items: Pick<TextItem, "str" | "hasEOL">[], text: str
   }
   if (start === undefined || end === undefined) return null;
   const first = owner[page.map[start]!]!;
-  const last = owner[page.map[end - 1]!]!;
+  const last = owner[lastUnitOf(source, page.map[end - 1]!)]!;
   return { start: first, end: { item: last.item, offset: last.offset + 1 } };
+}
+
+// The last code unit of the character group (code point plus combining marks) starting at `index`.
+function lastUnitOf(source: string, index: number): number {
+  CHARACTER.lastIndex = index;
+  return index + (CHARACTER.exec(source)?.[0].length ?? 1) - 1;
 }
 
 // One box per text line: the items' pieces inside the span, merged when their vertical centers are within half a line
