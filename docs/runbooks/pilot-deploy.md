@@ -249,7 +249,7 @@ The agent receives the app database secret but doesn't use it yet, so restarting
 
 ## 10. Tear down
 
-Use the script in [`pilot-teardown.md`](pilot-teardown.md) (#177). It uninstalls the release and add-ons, destroys the stacks one at a time with `--exclusively` (a plain destroy of `Network` would also delete its dependents, the `Registry` among them), and deletes the `Registry` too, and keeps the final RDS snapshot and the documents bucket unless you pass a switch.
+Use the script in [`pilot-teardown.md`](pilot-teardown.md) (#177). It uninstalls the release and add-ons, destroys the stacks one at a time with `--exclusively`, because a plain destroy of `Network` would also delete its dependents, the `Registry` among them. It deletes the `Registry` too. It keeps the final RDS snapshot and the documents bucket unless you pass a switch.
 
 ## 11. Costs
 
@@ -264,6 +264,8 @@ About **$250–300 a month** while idle, including RDS (`db.t3.micro` with 20 Gi
 **Watch it.** `gh run list --workflow deploy.yml --limit 5`, then `gh run watch`. The run summary names the deployed SHA and address. A red step is the failure; the release stays as Helm left it (`helm -n smart-tutor history smart-tutor`).
 
 **Optional approval.** **Settings → Environments → native-cloud → Required reviewers** makes each deploy wait for an approval.
+
+**Image build overlapping a deploy.** The image build's CDK step (the registry and deploy-role stacks) runs outside the `deploy-native-cloud` queue, so a build that overlaps a running native-cloud deploy can fail. Re-run the workflow once the deploy has finished.
 
 **Smoke test by hand.**
 

@@ -8,7 +8,7 @@ Commands are for **PowerShell 7** (`pwsh`). Run them from the repository root wi
 
 | Piece | Where |
 |---|---|
-| CDK stacks `SmartTutor-OnPremise-prod-*` | `infra/` with `-c smart-tutor:mode=on-premise` (the default mode): Storage, Config, Budgets, GitHubDeploy, and **Host** (`infra/smart_tutor_infra/stacks/host.py`) |
+| CDK stacks `SmartTutor-OnPremise-prod-*` | `infra/` with `-c smart-tutor:mode=on-premise` (the default mode): Storage, Config, Budgets, GitHubDeploy, Registry, and **Host** (`infra/smart_tutor_infra/stacks/host.py`) |
 | Images | ECR `smart-tutor-on-premise/<service>:<commit SHA>`, on-premise's own `SmartTutor-OnPremise-prod-Registry` stack (#206) |
 | Files on the VM | `deploy/` is uploaded as a CDK asset; the deploy unpacks it to `/opt/smart-tutor` and runs `/opt/smart-tutor/on-premise/deploy.sh` |
 | Settings and secrets | SSM `/smart-tutor-on-premise/*` and Secrets Manager `smart-tutor-on-premise/*`. On the VM, `deploy.sh` renders them into `/etc/smart-tutor/smart-tutor.env` (root only, mode 600) |
@@ -98,7 +98,7 @@ aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$Instanc
 
 **Commits from before #206.** Until #206 on-premise used native-cloud's repositories `smart-tutor/*`, so a commit merged before it has no images in `smart-tutor-on-premise/*`. A rollback to it stops at "Check the images exist" with an error that points to this runbook; it never pulls from native-cloud's repositories. To go back to such a commit anyway, build its images by hand (section 4, "Build images by hand", with that commit checked out), then run the rollback. Remember that a rollback keeps the deploy files of the last `cdk deploy`.
 
-**Image build overlapping a deploy.** The image build's CDK step (the registry and deploy-role stacks) runs outside the `deploy-on-premise` queue. A build that overlaps a still-running on-premise deploy can fail, because CloudFormation reports the stack busy or the older deploy rolls the deploy role back. Re-run the workflow once the deploy has finished. Don't merge #206 itself while an on-premise deploy is running.
+**Image build overlapping a deploy.** The image build's CDK step (the registry and deploy-role stacks) runs outside the `deploy-on-premise` queue. A build that overlaps a still-running on-premise deploy can fail, because CloudFormation reports the stack busy or the older deploy rolls the deploy role back. Re-run the workflow once the deploy has finished. Don't merge a change to the `GitHubDeploy` or `Registry` stacks while an on-premise deploy is running.
 
 **When it fails.** The step "Deploy the images on the VM (SSM Run Command)" prints `deploy.sh`'s output; the Troubleshooting table applies. If the log says "is not Online in SSM after 10 minutes", the instance is still booting or was replaced: read `/var/log/cloud-init-output.log` through Session Manager.
 

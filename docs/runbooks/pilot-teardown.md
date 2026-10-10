@@ -12,7 +12,7 @@ The idle pilot costs about **$270-275 a month**: EKS $73, two `t3.large` nodes $
 
 | | Stacks | Why |
 |---|---|---|
-| Deleted | `Storage`, `Edge`, `Data`, `Cluster`, `Config`, `Registry`, `Network` | They hold all the cost. Storage goes before Edge because it imports Edge's CloudFront URL. |
+| Deleted | `Storage`, `Edge`, `Data`, `Cluster`, `Config`, `Registry`, `Network` | They hold the cost; the `Registry` holds only images, which the next build recreates. Storage goes before Edge because it imports Edge's CloudFront URL. |
 | Kept | `Budgets` | The budget `smart-tutor-prod-monthly` is the account's only budget, and it is free. `-DeleteBudget` deletes it. |
 | Kept | `GitHubDeploy` | It owns the account's GitHub OIDC provider, which on-premise's deploy role imports. IAM only, free. |
 | Kept | `CDKToolkit` and the GitHub environment `native-cloud` | So the pilot can be redeployed. |

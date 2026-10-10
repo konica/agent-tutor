@@ -775,7 +775,7 @@ M4 Production launch (R1)
 
 ## Appendix A — AWS setup checklist
 
-Both deployment modes use the same account, region, models, and CI role (ADR 0012). Items marked *(on-premise)* or *(native-cloud)* apply to that mode only.
+Both deployment modes use the same account, region, and models (ADR 0012), but each has its own deploy role (ADR 0015). Items marked *(on-premise)* or *(native-cloud)* apply to that mode only.
 
 **Manual, one-time:**
 1. Region us-east-1.
@@ -791,6 +791,6 @@ Both deployment modes use the same account, region, models, and CI role (ADR 001
 - VPC with one public subnet, no NAT, and an S3 gateway endpoint.
 - Host stack: EC2 t3.large with an Elastic IP, a 50 GB encrypted gp3 data volume, a security group allowing 80/443 only, a status-check recovery alarm, and daily EBS snapshots kept 7 days.
 - The instance role: SSM Run Command and Session Manager, ECR pull from on-premise's repositories only, the S3, SQS, SSM, and Bedrock permissions that the native-cloud API, worker, agent, and MCP roles have (below), as one role, and writes of the nightly `pg_dump` to S3.
-- S3 (CORS for presigned POST and GET from the host's domain, `smart-tutor.duckdns.org` (#154), or `https://*.sslip.io` when no domain is set), SQS + DLQ, Secrets Manager, and SSM parameters of its own; budgets; the uptime check on `/api/healthz`.
+- S3 (CORS for presigned POST and GET from the host's domain, `smart-tutor.duckdns.org` (#154), or `https://*.sslip.io` when no domain is set), SQS + DLQ, Secrets Manager, SSM parameters of its own, and ECR repositories `smart-tutor-on-premise/<service>`; budgets; the uptime check on `/api/healthz`.
 
 **Created by CDK, native-cloud (opt-in):** VPC, EKS and node group, RDS, S3 (versioning; `ObjectCreated` notifications for `uploads/` to SQS; lifecycle: `uploads/` expire after 1 day; CORS for presigned POST and the viewer's presigned GET from the web origin, exposing `Accept-Ranges`, `Content-Range`, and `Content-Length` so the viewer can load byte ranges), SQS + DLQ (the ingest queue has a 15-minute visibility timeout, and a message moves to the DLQ after 5 receives), ECR, Secrets Manager, SSM parameters, internal ALB and CloudFront distribution (VPC origin), budgets, IAM roles with Pod Identity (API: presign `uploads/*`, presigned GET on `contents/*.pdf` (document viewer, US-4b), delete (every version) on `contents/*` (US-10c), `ssm:GetParameter` on `/smart-tutor/*`, `sqs:SendMessage` on the ingest queue (Retry), Bedrock invoke on the embedding model (embeds new subject names); worker: `ssm:GetParameter` on `/smart-tutor/*`, read `uploads/*` and `contents/*`, write `contents/*`, delete `uploads/*`, `s3:ListBucket` on the bucket (so a missing key reads as not found, not access denied), receive, delete, and extend (change visibility of) messages on the ingest queue and read its attributes, Bedrock invoke on the embedding and agent models (chunks, summaries, subject names, first-pages description); agent: `ssm:GetParameter` on `/smart-tutor/*` (`detect-threshold`, `detect-margin`, `multi-margin`, read at startup), Bedrock invoke on the inference profile and underlying model ARNs in every destination region).

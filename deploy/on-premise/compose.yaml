@@ -1,10 +1,11 @@
 # On-premise mode (#148, ADR 0012): Smart Tutor on one VM. deploy.sh runs it with the env file it renders from SSM and
 # Secrets Manager (/etc/smart-tutor/smart-tutor.env, root only); runbook: docs/runbooks/on-premise-deploy.md.
 #   docker compose -f /opt/smart-tutor/on-premise/compose.yaml --env-file /etc/smart-tutor/smart-tutor.env ps
-# Our images come from on-premise's ECR repositories (`smart-tutor-on-premise/<service>`) by commit tag. Caddy is the only service with public ports. Data lives on the data volume
-# (/data). The worker, agent, and MCP server (#149) run as the image's non-root user on a read-only root filesystem,
-# like the Helm charts. The worker reaches only Postgres and, through the egress proxy, its AWS endpoints (#153);
-# deploy.sh checks the running worker's isolation and egress after every deploy.
+# Our images come from on-premise's ECR repositories (`smart-tutor-on-premise/<service>`) by commit tag. Caddy is the
+# only service with public ports. Data lives on the data volume (/data). The worker, agent, and MCP server (#149) run
+# as the image's non-root user on a read-only root filesystem, like the Helm charts. The worker reaches only Postgres
+# and, through the egress proxy, its AWS endpoints (#153); deploy.sh checks the running worker's isolation and egress
+# after every deploy.
 
 name: smart-tutor
 

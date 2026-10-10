@@ -22,8 +22,8 @@ class GitHubDeployStack(cdk.Stack):
 
     It can assume the CDK bootstrap roles (so CloudFormation, not the role, changes infrastructure), push app images
     to its mode's ECR repositories (`<repository prefix>/*`, #206), read its mode's stack outputs, and, with `eks`,
-    describe the EKS cluster. With `deploy_document` (on-premise, #150), it runs that one SSM document on the mode's instances and reads
-    the result.
+    describe the EKS cluster. With `deploy_document` (on-premise, #150), it runs that one SSM document on the mode's
+    instances and reads the result.
     """
 
     def __init__(
