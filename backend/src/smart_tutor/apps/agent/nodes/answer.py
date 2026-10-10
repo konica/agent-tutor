@@ -1,6 +1,7 @@
-"""Answer step (PRD §9.2 step 5): stream the model's answer over quoted chunks; no chunks → fixed reply.
+"""Answer step (PRD §9.2): stream the model's answer over quoted chunks.
 
-A search limited to given documents that doesn't cover the question ends in a decline instead (US-4c).
+Nothing readable ends in the upload request (US-3), and a search limited to given documents that doesn't cover the
+question in a decline (US-4c); the model is called for neither.
 """
 
 from typing import Protocol
