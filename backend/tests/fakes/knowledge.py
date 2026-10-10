@@ -8,7 +8,7 @@ from dataclasses import replace
 from types import TracebackType
 from typing import Self
 
-from smart_tutor.knowledge.domain.chunk import Chunk, StoredChunk
+from smart_tutor.knowledge.domain.chunk import Chunk, ChunkPassage, StoredChunk
 from smart_tutor.knowledge.domain.content import Content
 from smart_tutor.knowledge.domain.document import NO_FILTER, Document, DocumentFilter, DocumentState
 from smart_tutor.knowledge.domain.search import ChunkHit
@@ -228,6 +228,15 @@ class _Chunks(ChunkRepository):
                 else c
                 for c in chunks
             ]
+
+    def get_readable(self, user_id: UserId, chunk_id: str) -> ChunkPassage | None:
+        for d in self._s.documents.values():
+            if d.content_id is None or not d.can_be_read_by(user_id):
+                continue
+            for c in self._s.chunks.get(d.content_id, []):
+                if fake_chunk_id(c.content_id, c.seq) == chunk_id:
+                    return ChunkPassage(chunk_id, d.document_id, c.page, c.start_index, c.text)
+        return None
 
     def search(
         self, user_id: UserId, embedding: list[float], k: int, document_ids: Collection[DocumentId] | None = None

@@ -17,8 +17,10 @@ from smart_tutor.knowledge.application.upload_service import (
     UploadStatus,
 )
 from smart_tutor.knowledge.application.viewer_service import VIEWER_LINK_SECONDS, DocumentFile, ViewerService
+from smart_tutor.knowledge.domain.chunk import ChunkPassage
 from smart_tutor.knowledge.domain.content import ContentState
 from smart_tutor.knowledge.domain.errors import (
+    ChunkNotFoundError,
     DocumentNotFoundError,
     DocumentStateError,
     InvalidFileNameError,
@@ -41,6 +43,8 @@ __all__ = [
     "ArchiveService",
     "BackfillResult",
     "ChunkHit",
+    "ChunkNotFoundError",
+    "ChunkPassage",
     "ContentState",
     "DeleteService",
     "Described",

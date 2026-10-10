@@ -5,7 +5,7 @@ from collections.abc import Collection, Mapping
 from types import TracebackType
 from typing import Self
 
-from smart_tutor.knowledge.domain.chunk import Chunk, StoredChunk
+from smart_tutor.knowledge.domain.chunk import Chunk, ChunkPassage, StoredChunk
 from smart_tutor.knowledge.domain.content import Content
 from smart_tutor.knowledge.domain.document import NO_FILTER, Document, DocumentFilter
 from smart_tutor.knowledge.domain.search import ChunkHit
@@ -137,6 +137,11 @@ class ChunkRepository(ABC):
     @abstractmethod
     def set_start_indexes(self, offsets: Mapping[str, int]) -> None:
         """Set `start_index` by chunk id (an id that no longer exists updates nothing)."""
+
+    @abstractmethod
+    def get_readable(self, user_id: UserId, chunk_id: str) -> ChunkPassage | None:
+        """`can_read` in SQL: the chunk through a document the caller can read (archived included, any state);
+        None for another learner's, an unknown, or a malformed id."""
 
     @abstractmethod
     def search(

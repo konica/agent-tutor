@@ -9,7 +9,7 @@ from sqlalchemy import ColumnElement, Connection, Engine, Select, delete, exists
 from sqlalchemy.dialects.postgresql import insert
 
 from smart_tutor.knowledge.adapters.sql_tables import chunks, contents, document_subjects, documents, uploads
-from smart_tutor.knowledge.domain.chunk import Chunk, StoredChunk
+from smart_tutor.knowledge.domain.chunk import Chunk, ChunkPassage, StoredChunk
 from smart_tutor.knowledge.domain.content import Content, ContentState
 from smart_tutor.knowledge.domain.document import NO_FILTER, Document, DocumentFilter, DocumentState
 from smart_tutor.knowledge.domain.search import ChunkHit
@@ -373,6 +373,20 @@ class _Chunks(ChunkRepository):
     def set_start_indexes(self, offsets: Mapping[str, int]) -> None:
         for chunk_id, start in offsets.items():
             self._conn.execute(update(chunks).where(chunks.c.chunk_id == chunk_id).values(start_index=start))
+
+    def get_readable(self, user_id: UserId, chunk_id: str) -> ChunkPassage | None:
+        try:
+            uuid.UUID(chunk_id)
+        except ValueError:
+            return None
+        row = self._conn.execute(
+            select(chunks.c.chunk_id, chunks.c.page, chunks.c.start_index, chunks.c.text, documents.c.document_id)
+            .join(documents, documents.c.content_id == chunks.c.content_id)
+            .where(chunks.c.chunk_id == chunk_id, readable_by(user_id))
+        ).first()
+        if row is None:
+            return None
+        return ChunkPassage(str(row.chunk_id), DocumentId(str(row.document_id)), row.page, row.start_index, row.text)
 
     def search(
         self, user_id: UserId, embedding: list[float], k: int, document_ids: Collection[DocumentId] | None = None
