@@ -669,12 +669,26 @@ def test_deploy_script_asserts_the_running_workers_isolation_and_the_inner_servi
     assert "http://mcp:8000/mcp" in check and "401" in check
 
 
+def test_deploy_script_proves_the_workers_egress_block_and_stops_a_leaking_worker() -> None:
+    script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
+    check = script[script.index("up -d --wait --wait-timeout") :]
+    assert 'exec -T worker python - <"$here/check-egress.py"' in check
+    egress = check[check.index("Checking the worker's egress") :]
+    egress = egress[: egress.index("esac")]
+    # Exit 2 (AWS or Postgres unreachable) only fails the deploy; any other status stops the worker first.
+    unreachable = egress[egress.index("2)") : egress.index(";;", egress.index("2)"))]
+    assert "exit 1" in unreachable and "docker stop" not in unreachable
+    leaked = egress[egress.index("*)") :]
+    assert leaked.index('docker stop "$worker"') < leaked.index("exit 1")
+
+
 ENSURE_HEALTHY = ON_PREMISE_DIR / "ensure-healthy.sh"
 SCRIPTS = [
     DEPLOY_SCRIPT,
     ENSURE_HEALTHY,
     *(ON_PREMISE_DIR / name for name in ("backup.sh", "restore.sh", "report-failure.sh")),
 ]
+VM_FILES = [*SCRIPTS, ON_PREMISE_DIR / "check-egress.py"]
 SYSTEMD_DIR = ON_PREMISE_DIR / "systemd"
 
 
@@ -686,7 +700,7 @@ def test_scripts_parse(script: Path) -> None:
 
 
 def test_files_the_vm_runs_keep_lf_line_endings() -> None:
-    for path in (*SCRIPTS, ON_PREMISE_DIR / "compose.yaml", ON_PREMISE_DIR / "Caddyfile", *SYSTEMD_DIR.iterdir()):
+    for path in (*VM_FILES, ON_PREMISE_DIR / "compose.yaml", ON_PREMISE_DIR / "Caddyfile", *SYSTEMD_DIR.iterdir()):
         assert b"\r\n" not in path.read_bytes(), path
 
 

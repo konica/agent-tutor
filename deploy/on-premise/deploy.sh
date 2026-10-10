@@ -7,7 +7,8 @@
 # 2. Pulls the images, starts Postgres, and creates or updates the app and Keycloak roles and databases.
 # 3. Migrates, then starts every service and waits until all are healthy. Compose recreates only the services whose
 #    image or settings changed, so the same tag again changes nothing. Fails unless the running worker is isolated
-#    (non-root, read-only root, no capabilities; a worker that isn't is stopped) and the agent and MCP server answer.
+#    (non-root, read-only root, no capabilities) and egress-limited (check-egress.py), and the agent and MCP server
+#    answer. A worker that fails either check is stopped.
 #    Installs and enables the scheduled jobs' systemd units (the nightly backup, #151).
 # 4. Creates the test learner if it is missing.
 #
@@ -112,6 +113,21 @@ if ((${#problems[@]})); then
   echo "Stopped the worker" >&2
   exit 1
 fi
+
+# The worker reaches only Postgres and, through egress-proxy, its AWS endpoints (#153). Prove it from inside: a leak
+# stops the worker like a failed isolation check; an unreachable AWS endpoint or database only fails the deploy.
+echo "Checking the worker's egress"
+status=0
+"${compose[@]}" exec -T worker python - <"$here/check-egress.py" || status=$?
+case $status in
+  0) ;;
+  2) echo "The worker cannot reach a destination it needs (see above)" >&2; exit 1 ;;
+  *)
+    docker stop "$worker" >/dev/null
+    echo "Stopped the worker: its egress is not limited (see above)" >&2
+    exit 1
+    ;;
+esac
 
 # The agent and MCP server have no public route; check them from inside the API container, as the API reaches them.
 echo "Checking the agent and the MCP server"
