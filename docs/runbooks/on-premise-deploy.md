@@ -62,28 +62,33 @@ aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$Instanc
 
 **What runs.** On every push to `main`, `deploy.yml` runs the CI checks, then `build-images.yml` (it builds the six images and pushes them, unless all six are already there), then `deploy-on-premise.yml` in the GitHub environment `on-premise`. That workflow checks the images exist, runs `cdk deploy --all -c smart-tutor:mode=on-premise` (uploading `deploy/` as the bundle), reads the Host outputs, and waits until the VM is `Online` in SSM (a deploy that replaces the instance gives it a new id). It then runs the SSM document with the commit SHA and prints its output, and runs `deploy/pilot/smoke_test.py` against `PublicUrl`. The run fails if any step fails, including the smoke test. One on-premise deploy runs at a time (concurrency group `deploy-on-premise`): a later merge waits. GitHub keeps only the newest waiting run per group, so a waiting run can be replaced by a newer one. Native-cloud doesn't deploy unless chosen (see "Native-cloud is optional" in `pilot-deploy.md`).
 
-**One-time setup** (an admin, once):
+**One-time setup** (an admin, once). Do these in order, and do step 1 before you merge #150.
 
-1. Deploy the on-premise GitHubDeploy stack from your laptop, so the role can run the deploy document (`ssm:SendCommand` on `smart-tutor-on-premise-deploy` only, plus reading the command's status):
-
-   ```powershell
-   Push-Location infra
-   npx aws-cdk@latest deploy SmartTutor-OnPremise-prod-GitHubDeploy --require-approval broadening -c smart-tutor:mode=on-premise
-   $RoleArn = aws cloudformation describe-stacks --stack-name SmartTutor-OnPremise-prod-GitHubDeploy --query "Stacks[0].Outputs[?OutputKey=='DeployRoleArn'].OutputValue" --output text
-   Pop-Location
-   ```
-
-2. Create the GitHub environment `on-premise`, limited to `main`, with its variables:
+1. Create the GitHub environment `on-premise`, limited to `main`. The role `smart-tutor-on-premise-github-deploy` already trusts this environment. If the environment doesn't exist, GitHub creates it the first time any workflow names it, and it has no branch policy, so a workflow on another branch could assume the role.
 
    ```powershell
    $Repo = "konica/agent-tutor"
    gh api -X PUT "repos/$Repo/environments/on-premise" -F "deployment_branch_policy[protected_branches]=false" -F "deployment_branch_policy[custom_branch_policies]=true" | Out-Null
    gh api -X POST "repos/$Repo/environments/on-premise/deployment-branch-policies" -f name=main -f type=branch | Out-Null
+   ```
+
+   The role trusts only jobs in this environment (subject `...:environment:on-premise`), and the environment accepts only `main`, so a pull request can't deploy.
+
+2. Set the two variables. Read the role ARN from the existing stack output; this deploys nothing:
+
+   ```powershell
+   $RoleArn = aws cloudformation describe-stacks --stack-name SmartTutor-OnPremise-prod-GitHubDeploy --query "Stacks[0].Outputs[?OutputKey=='DeployRoleArn'].OutputValue" --output text
    gh variable set AWS_ROLE_ARN --env on-premise --repo $Repo --body $RoleArn
    gh variable set AWS_REGION --env on-premise --repo $Repo --body us-east-1
    ```
 
-   The role trusts only jobs in this environment (subject `...:environment:on-premise`), and the environment accepts only `main`, so a pull request can't deploy.
+3. Optional: deploy the GitHubDeploy stack from your laptop, so the role can run the deploy document (`ssm:SendCommand` on `smart-tutor-on-premise-deploy` only, plus reading the command's status). If you skip it, the first merge's `cdk deploy --all` adds these permissions before the SSM step runs.
+
+   ```powershell
+   Push-Location infra
+   npx aws-cdk@latest deploy SmartTutor-OnPremise-prod-GitHubDeploy --require-approval broadening -c smart-tutor:mode=on-premise
+   Pop-Location
+   ```
 
 **Deploy again by hand.** Actions, **deploy**, *Run workflow* from `main`, mode `on-premise`. It runs the same checks, images, and deploy for the head of `main`.
 

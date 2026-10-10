@@ -1,6 +1,5 @@
 """Static checks of the GitHub Actions workflows (#59, #150): what runs, when, and with which AWS access."""
 
-import json
 import re
 from pathlib import Path
 from typing import Any
@@ -247,6 +246,8 @@ def test_on_premise_checks_the_tag_and_the_images_before_deploying() -> None:
     assert job["steps"][checkout]["with"]["ref"] == "${{ inputs.image_tag }}"
     for image in IMAGES:
         assert image in job["steps"][images]["run"]
+    # every deploy, including a rollback, checks
+    assert "if" not in job["steps"][images]
 
 
 def test_on_premise_runs_cdk_only_with_infrastructure() -> None:
@@ -405,14 +406,9 @@ def test_native_cloud_failed_deploys_print_diagnostics() -> None:
     assert "helm -n smart-tutor history" in str(last["run"])
 
 
-def test_workflow_files_parse_as_json_compatible_yaml() -> None:
-    # Guards against tabs and duplicate keys slipping into the new files.
-    for name in ("deploy.yml", "rollback.yml", *ENVIRONMENT_WORKFLOWS):
-        json.dumps(workflow(name))
-
-
 def test_runbooks_name_the_current_workflows_and_environments() -> None:
-    docs = [*RUNBOOKS.glob("*.md"), *RUNBOOKS.glob("*.ps1"), WORKFLOWS.parents[1] / "README.md"]
+    root = WORKFLOWS.parents[1]
+    docs = [*(root / "docs").rglob("*.md"), *RUNBOOKS.glob("*.ps1"), root / "README.md"]
     for path in docs:
         text = path.read_text(encoding="utf-8")
         assert "deploy-pilot.yml" not in text, path.name

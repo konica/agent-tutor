@@ -1,6 +1,6 @@
 # Builds the six app images for one commit and pushes them to the shared ECR repositories, tagged with the full commit
-# SHA (#150). Called by deploy.yml before either mode deploys. Skips the build when all six are already in ECR, so a
-# re-run or a second mode never pushes the same tag twice. Signs in with the deploy role of the environment it is given.
+# SHA (#150). Called by deploy.yml before either mode deploys. Skips the build when all six images are already in ECR;
+# otherwise it rebuilds and pushes all six. Signs in with the deploy role of the environment it is given.
 name: build-images
 
 on:
