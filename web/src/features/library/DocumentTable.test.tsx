@@ -201,6 +201,24 @@ describe("DocumentTable open details", () => {
     expect(onOpen).toHaveBeenLastCalledWith(expect.objectContaining({ document_id: "d2" }));
   });
 
+  it("opens the viewer from a ready or choose-subjects title, and details from the others", async () => {
+    const onOpen = vi.fn();
+    const onView = vi.fn();
+    const rows = [
+      doc,
+      { ...doc, document_id: "d2", title: "Waiting", state: "awaiting_subjects" as const },
+      { ...doc, document_id: "d3", title: "Old", archived: true },
+      { ...doc, document_id: "d4", title: "Broken", state: "failed" as const },
+      { ...doc, document_id: "d5", title: "Busy", state: "processing" as const },
+    ];
+    render(<DocumentTable documents={rows} {...props} onOpen={onOpen} onView={onView} onRestore={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "Toolformer" }));
+    await userEvent.click(screen.getByRole("button", { name: "Waiting" }));
+    expect(onView.mock.calls.map(([d]) => d.document_id)).toEqual(["d1", "d2"]);
+    for (const name of ["Old", "Broken", "Busy"]) await userEvent.click(screen.getByRole("button", { name }));
+    expect(onOpen.mock.calls.map(([d]) => d.document_id)).toEqual(["d3", "d4", "d5"]);
+  });
+
   it("lists Details, Edit title, Archive in the More menu; Edit title opens in edit mode", async () => {
     const onOpen = vi.fn();
     render(<DocumentTable documents={[doc]} {...props} onOpen={onOpen} onArchive={vi.fn()} />);
