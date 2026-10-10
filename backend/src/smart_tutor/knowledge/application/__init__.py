@@ -15,6 +15,7 @@ from smart_tutor.knowledge.application.upload_service import (
     UploadService,
     UploadStatus,
 )
+from smart_tutor.knowledge.application.viewer_service import VIEWER_LINK_SECONDS, DocumentFile, ViewerService
 from smart_tutor.knowledge.domain.content import ContentState
 from smart_tutor.knowledge.domain.errors import (
     DocumentNotFoundError,
@@ -35,6 +36,7 @@ from smart_tutor.knowledge.ports.pdf_extractor import PdfExtractor, TooManyPages
 __all__ = [
     "FIRST_PAGES",
     "PDF_CONTENT_TYPE",
+    "VIEWER_LINK_SECONDS",
     "ArchiveService",
     "ChunkHit",
     "ContentState",
@@ -42,6 +44,7 @@ __all__ = [
     "Described",
     "DocumentDescriber",
     "DocumentDetails",
+    "DocumentFile",
     "DocumentNotFoundError",
     "DocumentService",
     "DocumentStateError",
@@ -67,6 +70,7 @@ __all__ = [
     "UploadOutcome",
     "UploadService",
     "UploadStatus",
+    "ViewerService",
     "load_file_limits",
     "load_max_attempts",
     "retried_content",

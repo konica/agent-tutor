@@ -15,6 +15,11 @@
 /* One explicit row, so the panel and the conversation each get the body's height and scroll on their own. */
 .body { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); min-height: 0; }
 .withPanel { grid-template-columns: var(--chat-panel-w) minmax(0, 1fr); }
+/* Split view: the conversation keeps at least --chat-min-w (about 40%), the document pane takes the rest. */
+.withViewer { grid-template-columns: minmax(var(--chat-min-w), 2fr) minmax(0, 3fr); }
+.withPanel.withViewer { grid-template-columns: var(--chat-panel-w) minmax(var(--chat-min-w), 2fr) minmax(0, 3fr); }
+/* The pane draws no border of its own: this is the divider between the conversation and the document. */
+.viewer { min-width: 0; min-height: 0; border-left: 1px solid var(--border); }
 
 /* The conversation pane: the messages scroll, the composer row stays at the bottom. */
 .conversation { display: flex; flex-direction: column; min-width: 0; min-height: 0; }

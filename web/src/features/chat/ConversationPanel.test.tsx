@@ -71,10 +71,22 @@ describe("ConversationPanel", () => {
     expect(rows[0]).toHaveAttribute("title", "ReAct\nYao, Zhao · 2023");
     expect(within(documentsSection()).getByText("3")).toBeInTheDocument();
     expect(screen.queryByText("Documents used to answer will appear here.")).not.toBeInTheDocument();
-    // Opening a document from a row comes with #123: a row's only button removes it.
-    expect(within(rows[0]!).getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual([
+    // A row has two sibling buttons, never nested: one opens the document (#123), the other removes it.
+    const buttons = within(rows[0]!).getAllByRole("button");
+    expect(buttons.map((b) => b.getAttribute("aria-label") ?? b.textContent)).toEqual([
+      "ReAct",
       "Remove ReAct from this conversation",
     ]);
+    expect(buttons[0]!.querySelector("button")).toBeNull();
+    expect(buttons[1]!.closest("[data-document-id]")).toBeNull();
+  });
+
+  it("removes a deleted document's row, which still opens nothing", () => {
+    renderPanel({ threadId: "t1", onOpen: vi.fn(), onRemoveDocument: vi.fn(), documents: [used("PPO", { deleted: true })] });
+    expect(within(documentsSection()).getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual([
+      "Remove PPO from this conversation",
+    ]);
+    expect(documentsSection().querySelector("[data-document-id]")).toBeNull();
   });
 
   it("offers Add documents once the conversation exists", async () => {
@@ -198,6 +210,27 @@ describe("ConversationPanel", () => {
       />,
     );
     expect(screen.queryByText("Deleted documents can't be opened.")).not.toBeInTheDocument();
+  });
+
+  it("opens a document from its row: one button per row named by its title, archived too", async () => {
+    const onOpen = vi.fn();
+    renderPanel({ answered: true, onOpen, documents: [used("ReAct"), used("RAG", { archived: true })] });
+    const react = within(documentsSection()).getByRole("button", { name: "ReAct" });
+    await userEvent.click(react);
+    expect(onOpen).toHaveBeenCalledWith("ReAct", react);
+    expect(within(documentsSection()).getByRole("button", { name: /^RAG/ })).toBeInTheDocument();
+  });
+
+  it("does not make a deleted document's row a button", () => {
+    renderPanel({ answered: true, onOpen: vi.fn(), documents: [used("PPO", { deleted: true })] });
+    expect(within(documentsSection()).getByText("PPO")).toBeInTheDocument();
+    expect(within(documentsSection()).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("marks the open document's row as current", () => {
+    renderPanel({ answered: true, openId: "RAG", documents: [used("ReAct"), used("RAG")] });
+    expect(within(documentsSection()).getByRole("button", { name: "RAG" })).toHaveAttribute("aria-current", "true");
+    expect(within(documentsSection()).getByRole("button", { name: "ReAct" })).not.toHaveAttribute("aria-current");
   });
 
   it("offers a disabled Summarize lesson after the first answer", () => {

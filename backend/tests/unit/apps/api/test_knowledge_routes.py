@@ -430,6 +430,27 @@ def test_archive_moves_a_document_to_the_archived_list(client: TestClient) -> No
     assert listed_ids(client, {"archived": "false"}) == set()
 
 
+def test_the_file_link_of_a_processing_document_is_409(client: TestClient) -> None:
+    started = client.post("/uploads", json={"file_name": "paper.pdf"}, headers=AUTH).json()
+    r = client.get(f"/documents/{started['document_id']}/file", headers=AUTH)
+    assert r.status_code == 409
+    assert r.json()["detail"] == "This document can't be opened until it has been processed"
+
+
+def test_the_file_link_of_an_archived_document_opens(client: TestClient) -> None:
+    doc = ready_document(client)
+    client.post(f"/documents/{doc}/archive", headers=AUTH)
+    r = client.get(f"/documents/{doc}/file", headers=AUTH)
+    assert r.status_code == 200
+    assert (r.json()["document"]["document_id"], r.json()["document"]["archived"]) == (doc, True)
+    assert r.json()["url"].startswith("https://s3.test/contents/ada/")
+
+
+def test_the_file_link_of_an_unknown_document_is_404(client: TestClient) -> None:
+    r = client.get("/documents/00000000-0000-4000-8000-0000000000aa/file", headers=AUTH)
+    assert (r.status_code, r.json()["detail"]) == (404, "Document not found")
+
+
 def test_archive_twice_is_harmless(client: TestClient) -> None:
     doc = ready_document(client)
     assert client.post(f"/documents/{doc}/archive", headers=AUTH).status_code == 200

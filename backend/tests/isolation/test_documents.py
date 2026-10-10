@@ -77,6 +77,22 @@ def test_b_never_sees_the_subjects_of_a_document() -> None:
     assert client.get("/documents", headers=B).json() == []
 
 
+def test_b_cannot_get_a_documents_file_link() -> None:
+    client, objects, ingestion = setup()
+    stored = client.post("/uploads", json={"file_name": "a1.pdf"}, headers=A).json()
+    objects.objects[stored["fields"]["key"]] = b"%PDF-1.7 " + ("A sentence about attention mechanisms. " * 5).encode()
+    ingestion.ingest_upload(stored["fields"]["key"])
+    doc = stored["document_id"]
+
+    assert client.get(f"/documents/{doc}/file", headers=B).status_code == 404
+    assert objects.presigned_gets == []  # B's request signed nothing
+    mine = client.get(f"/documents/{doc}/file", headers=A)
+    assert mine.status_code == 200 and mine.json()["expires_in"] == 300
+    [(key, _)] = objects.presigned_gets
+    assert key.startswith("contents/learner-a/")
+    assert mine.json()["document"]["document_id"] == doc
+
+
 def test_b_cannot_read_a_suggestions_or_set_a_subjects() -> None:
     client, objects, ingestion = setup()
     stored = client.post("/uploads", json={"file_name": "a1.pdf"}, headers=A).json()

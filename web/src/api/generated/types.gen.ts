@@ -121,6 +121,21 @@ export type DocumentDetailsResponse = {
 };
 
 /**
+ * DocumentFileResponse
+ */
+export type DocumentFileResponse = {
+    document: DocumentResponse;
+    /**
+     * Expires In
+     */
+    expires_in: number;
+    /**
+     * Url
+     */
+    url: string;
+};
+
+/**
  * DocumentResponse
  */
 export type DocumentResponse = {
@@ -644,6 +659,44 @@ export type ArchiveDocumentResponses = {
 };
 
 export type ArchiveDocumentResponse = ArchiveDocumentResponses[keyof ArchiveDocumentResponses];
+
+export type GetDocumentFileData = {
+    body?: never;
+    path: {
+        /**
+         * Document Id
+         */
+        document_id: string;
+    };
+    query?: never;
+    url: '/documents/{document_id}/file';
+};
+
+export type GetDocumentFileErrors = {
+    /**
+     * Not the caller's document.
+     */
+    404: unknown;
+    /**
+     * Still processing or failed.
+     */
+    409: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetDocumentFileError = GetDocumentFileErrors[keyof GetDocumentFileErrors];
+
+export type GetDocumentFileResponses = {
+    /**
+     * Successful Response
+     */
+    200: DocumentFileResponse;
+};
+
+export type GetDocumentFileResponse = GetDocumentFileResponses[keyof GetDocumentFileResponses];
 
 export type RestoreDocumentData = {
     body?: never;

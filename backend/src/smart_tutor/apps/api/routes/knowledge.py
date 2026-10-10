@@ -1,6 +1,7 @@
 """Library routes (knowledge module): start an upload, report what became of it (US-11), list the caller's
 documents, check a file hash against them, retry a failed one, suggest and save its subjects, archive and restore a
-document, show a document's details and set its display title, delete one for good."""
+document, show a document's details and set its display title, delete one for good, and link to its PDF
+for the viewer."""
 
 from datetime import date, datetime
 from typing import Annotated, Literal
@@ -18,6 +19,7 @@ from smart_tutor.apps.api.deps import (
     SubjectChoice,
     Subjects,
     Uploads,
+    Viewer,
 )
 from smart_tutor.knowledge.application import (
     DocumentDetails,
@@ -351,3 +353,30 @@ def delete_document(document_id: UUID, principal: CurrentPrincipal, deletion: De
         raise HTTPException(404, "Document not found") from None
     except DocumentStateError as e:
         raise HTTPException(409, str(e)) from None
+
+
+class DocumentFileResponse(BaseModel):
+    url: str  # presigned GET for the PDF, valid `expires_in` seconds
+    expires_in: int
+    document: DocumentResponse
+
+
+@router.get(
+    "/documents/{document_id}/file",
+    operation_id="get_document_file",
+    responses={404: {"description": "Not the caller's document."}, 409: {"description": "Still processing or failed."}},
+)
+def get_document_file(
+    document_id: UUID, principal: CurrentPrincipal, viewer: Viewer, subjects: Subjects
+) -> DocumentFileResponse:
+    """A 5-minute link to the PDF for the document viewer (PRD §8 US-4b, §9.3 step 5); archived documents open too."""
+    try:
+        found = viewer.file(principal.user_id, DocumentId(str(document_id)))
+    except DocumentNotFoundError:
+        raise HTTPException(404, "Document not found") from None
+    except DocumentStateError as e:
+        raise HTTPException(409, str(e)) from None
+    names = subjects.names_for(principal.user_id, set(found.view.subject_ids))
+    return DocumentFileResponse(
+        url=found.url, expires_in=found.expires_in, document=_document_response(found.view, names)
+    )

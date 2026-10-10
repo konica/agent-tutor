@@ -25,3 +25,9 @@
   border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; color: var(--text-2);
 }
 .iconButton:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
+/* aria-disabled keeps a control focusable while it can't act (it has no click); it looks disabled and has no hover.
+   Last in the file so it wins over the hover rules of the same specificity. */
+.button[aria-disabled="true"], .button[aria-disabled="true"]:hover {
+  background: var(--surface-2); color: var(--text-3); border-color: var(--border); filter: none;
+}
+.iconButton[aria-disabled="true"], .iconButton[aria-disabled="true"]:hover { background: transparent; color: var(--text-3); }
