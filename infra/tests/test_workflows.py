@@ -103,6 +103,11 @@ def test_deploy_needs_the_checks() -> None:
     assert jobs["deploy"]["with"] == {"image_tag": "${{ github.sha }}", "build": True}
 
 
+def test_auto_deploy_can_be_switched_off_for_a_teardown() -> None:
+    deploy = workflow("deploy.yml")["jobs"]["deploy"]
+    assert deploy["if"] == "vars.NATIVE_CLOUD_AUTO_DEPLOY != 'false'"
+
+
 def test_merge_builds_pushes_and_deploys_in_order() -> None:
     text = steps_text(deploy_job())
     order = [
