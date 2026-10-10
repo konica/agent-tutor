@@ -1,6 +1,7 @@
 import { useId, useRef, type RefObject } from "react";
 import { createPortal } from "react-dom";
 
+import type { DocumentResponse } from "../../api/documents";
 import { useModal } from "../../components/Dialog/useModal";
 import { DocumentViewer, type DocumentViewerProps, type Passage } from "./DocumentViewer";
 import styles from "./ViewerDialog.module.css";
@@ -16,11 +17,12 @@ type Props = {
   onClose: (page: number) => void; // with the page the learner was on
   returnFocusTo?: RefObject<HTMLElement | null>;
   viewerDeps?: ViewerDeps;
+  onRestored?: (document: DocumentResponse) => void; // the Library re-lists when the learner restores here
 };
 
 // The viewer as an overlay of --viewer-w (DESIGN.md → Chat, Split view): a modal with the details strip. Focus starts on
 // the title, Tab stays in, Escape closes it alone. Portalled to <body> so no ancestor's layout can clip or contain it.
-export function ViewerDialog({ documentId, initialPage, passage, closeLabel, onClose, returnFocusTo, viewerDeps }: Props) {
+export function ViewerDialog({ documentId, initialPage, passage, closeLabel, onClose, returnFocusTo, viewerDeps, onRestored }: Props) {
   const titleId = useId();
   const page = useRef(initialPage ?? passage?.page ?? 1);
   const close = () => onClose(page.current);
@@ -41,6 +43,7 @@ export function ViewerDialog({ documentId, initialPage, passage, closeLabel, onC
           closeLabel={closeLabel}
           onClose={close}
           onPageChange={(p) => (page.current = p)}
+          onRestored={onRestored}
           showDetails
           {...viewerDeps}
         />

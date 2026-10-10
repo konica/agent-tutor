@@ -29,6 +29,7 @@ type Props = {
   onOpenInDialog?: (page: number) => void; // pane only; shows the Open in dialog button when set
   openInDialogRef?: Ref<HTMLButtonElement>;
   onPageChange?: (page: number) => void;
+  onRestored?: (document: DocumentResponse) => void; // the Library re-lists (the row leaves the Archived tab)
   showDetails?: boolean; // dialog: the details strip
   loadFile?: (id: string) => Promise<DocumentFile>; // tests
   loadPdfDoc?: PdfLoader; // tests
@@ -63,6 +64,7 @@ function Viewer({
   onOpenInDialog,
   openInDialogRef,
   onPageChange,
+  onRestored,
   showDetails = false,
   loadFile,
   loadPdfDoc = defaultLoadPdf,
@@ -208,6 +210,7 @@ function Viewer({
         focusTitle.current = true;
         setKnownDocument(updated);
         setDocument(updated);
+        onRestored?.(updated);
       },
       () => {
         setRestoring(false);
