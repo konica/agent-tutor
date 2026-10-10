@@ -33,10 +33,8 @@ def _user_data(t: Template) -> str:
 
 
 def _statements(t: Template) -> dict[str, dict[str, Any]]:
-    statements = [
-        s for p in t.find_resources("AWS::IAM::Policy").values() for s in p["Properties"]["PolicyDocument"]["Statement"]
-    ]
-    return {s.get("Sid", json.dumps(s["Action"])): s for s in statements}
+    """The named statements by Sid; guards over every statement use `_all_statements`."""
+    return {s["Sid"]: s for s in _all_statements(t) if "Sid" in s}
 
 
 # --- network -------------------------------------------------------------------------------------------------------
@@ -162,27 +160,36 @@ def test_instance_role_pulls_images_reads_its_own_settings_and_secrets_and_is_ma
     assert statements["EcrLogin"]["Resource"] == "*"
     pull = json.dumps(statements["EcrPullAppImages"]["Resource"])
     assert all(f"repository/smart-tutor/{s}" in pull for s in ("api", "web", "keycloak", "agent", "mcp", "worker"))
-    assert "ecr:PutImage" not in json.dumps(statements)
+    assert "ecr:PutImage" not in json.dumps(_all_statements(t))
     assert "parameter/smart-tutor-on-premise/*" in json.dumps(statements["ReadSettings"]["Resource"])
     assert "secret:smart-tutor-on-premise/*" in json.dumps(statements["ReadSecrets"]["Resource"])
     # Nothing of native-cloud's.
-    assert "parameter/smart-tutor/" not in json.dumps(statements)
-    assert "secret:smart-tutor/" not in json.dumps(statements)
+    every = _all_statements(t)
+    assert "parameter/smart-tutor/" not in json.dumps(every)
+    assert "secret:smart-tutor/" not in json.dumps(every)
     # Only the ECR login and metrics, which have no resource, may use "*".
-    assert [sid for sid, s in statements.items() if s["Resource"] == "*"] == ["EcrLogin", "PublishJobMetrics"]
+    assert sorted(s.get("Sid", "<unnamed>") for s in every if s["Resource"] == "*") == ["EcrLogin", "PublishJobMetrics"]
 
 
-def test_instance_role_writes_only_the_backups_prefix_of_the_on_premise_bucket(t: Template) -> None:
+def test_instance_role_writes_the_on_premise_bucket_only_where_a_service_or_the_backup_does(t: Template) -> None:
     statements = _statements(t)
-    writes = {
-        sid: s
-        for sid, s in statements.items()
-        if any(a.startswith("s3:") and not a.startswith(("s3:Get", "s3:List")) for a in _actions(s))
-    }
-    assert set(writes) == {"WriteDatabaseBackups"}
-    assert sorted(_actions(writes["WriteDatabaseBackups"])) == ["s3:AbortMultipartUpload", "s3:PutObject"]
-    resource = json.dumps(writes["WriteDatabaseBackups"]["Resource"])
-    assert "smart-tutor-on-premise-documents-" in resource and resource.endswith('/backups/*"]]}')
+    writes = sorted(
+        (action, resource)
+        for action, resource in _grants(t)
+        if action.startswith("s3:") and not action.startswith(("s3:Get", "s3:List"))
+    )
+    assert all(ON_PREMISE_BUCKET in resource for _, resource in writes)
+    assert [(action, resource.rsplit("/", 1)[0].rsplit('"', 1)[1]) for action, resource in writes] == [
+        ("s3:AbortMultipartUpload", "/backups"),
+        ("s3:DeleteObject", "/uploads"),
+        ("s3:DeleteObjectVersion", "/contents"),
+        ("s3:PutObject", "/backups"),
+        ("s3:PutObject", "/contents"),
+        ("s3:PutObject", "/uploads"),
+    ]
+    assert sorted(_actions(statements["WriteDatabaseBackups"])) == ["s3:AbortMultipartUpload", "s3:PutObject"]
+    resource = json.dumps(statements["WriteDatabaseBackups"]["Resource"])
+    assert ON_PREMISE_BUCKET in resource and resource.endswith('/backups/*"]]}')
     # Restore reads the dumps back; listing is limited to the prefix too.
     assert json.dumps(statements["ReadDatabaseBackups"]["Resource"]).endswith('/backups/*"]]}')
     assert statements["ListDatabaseBackups"]["Condition"] == {"StringLike": {"s3:prefix": ["backups/*"]}}
@@ -199,6 +206,72 @@ def _actions(statement: dict[str, Any]) -> list[str]:
     return [actions] if isinstance(actions, str) else actions
 
 
+def _all_statements(t: Template) -> list[dict[str, Any]]:
+    return [
+        s for p in t.find_resources("AWS::IAM::Policy").values() for s in p["Properties"]["PolicyDocument"]["Statement"]
+    ]
+
+
+def _grants(t: Template) -> list[tuple[str, str]]:
+    """Every (action, resource) pair the instance role allows; a resource is its JSON text."""
+    pairs: list[tuple[str, str]] = []
+    for statement in _all_statements(t):
+        resources = statement["Resource"]
+        for resource in resources if isinstance(resources, list) else [resources]:
+            pairs.extend((action, json.dumps(resource)) for action in _actions(statement))
+    return pairs
+
+
+def _granted(t: Template, action: str, *fragments: str) -> bool:
+    return any(a == action and all(f in r for f in fragments) for a, r in _grants(t))
+
+
+ON_PREMISE_BUCKET = "smart-tutor-on-premise-documents-"
+
+
+def test_instance_role_has_the_api_and_worker_bucket_permissions(t: Template) -> None:
+    # One role runs every service (#149), so it holds what native-cloud gives the API and the worker separately.
+    for action, prefix in (
+        ("s3:PutObject", "/uploads/*"),  # the browser's presigned POST
+        ("s3:PutObject", "/contents/*"),
+        ("s3:GetObject", "/uploads/*"),
+        ("s3:GetObject", "/contents/*"),  # also the document viewer's presigned GET (#123)
+        ("s3:DeleteObject", "/uploads/*"),
+        ("s3:DeleteObjectVersion", "/contents/*"),
+    ):
+        assert _granted(t, action, ON_PREMISE_BUCKET, f'{prefix}"'), (action, prefix)
+    (list_versions,) = (s for s in _all_statements(t) if "s3:ListBucketVersions" in _actions(s))
+    assert ON_PREMISE_BUCKET in json.dumps(list_versions["Resource"])
+    assert list_versions["Condition"] == {"StringLike": {"s3:prefix": ["contents/*"]}}
+
+
+def test_instance_role_sends_and_consumes_the_on_premise_ingest_queue(t: Template) -> None:
+    for action in (
+        "sqs:SendMessage",
+        "sqs:ReceiveMessage",
+        "sqs:DeleteMessage",
+        "sqs:ChangeMessageVisibility",
+        "sqs:GetQueueAttributes",
+    ):
+        assert _granted(t, action, "arn:aws:sqs:us-east-1:", ':smart-tutor-on-premise-ingest"'), action
+
+
+def test_instance_role_invokes_the_agent_and_embedding_models(t: Template) -> None:
+    for action in ("bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"):
+        assert _granted(t, action, ":inference-profile/us.amazon.nova-2-lite-v1:0")
+        for region in ("us-east-1", "us-east-2", "us-west-2"):
+            assert _granted(t, action, f"arn:aws:bedrock:{region}::foundation-model/amazon.nova-2-lite-v1:0")
+        assert _granted(
+            t, action, "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-2-multimodal-embeddings-v1:0"
+        )
+
+
+def test_instance_role_names_no_native_cloud_resource(t: Template) -> None:
+    rendered = json.dumps(_all_statements(t))
+    assert "smart-tutor-documents-" not in rendered
+    assert ":smart-tutor-ingest" not in rendered
+
+
 # --- backups -------------------------------------------------------------------------------------------------------
 
 
@@ -206,6 +279,7 @@ def test_data_volume_is_snapshotted_daily_and_snapshots_are_kept_7_days(t: Templ
     (policy,) = t.find_resources("AWS::DLM::LifecyclePolicy").values()
     props = policy["Properties"]
     assert props["State"] == "ENABLED"
+    assert re.fullmatch(r"[0-9A-Za-z _-]{0,500}", props["Description"])  # DLM rejects anything else at deploy time
     details = props["PolicyDetails"]
     assert details["ResourceTypes"] == ["VOLUME"]
     assert details["TargetTags"] == [{"Key": "smart-tutor:snapshots", "Value": "smart-tutor-on-premise-prod"}]
@@ -350,7 +424,14 @@ def test_no_secret_reaches_the_outputs_or_the_template(t: Template) -> None:
     assert "resolve:secretsmanager" not in rendered
     assert '"SecretString"' not in rendered  # every secret value is generated by Secrets Manager
     outputs = t.to_json()["Outputs"]
-    assert set(outputs) == {"InstanceId", "PublicIp", "PublicUrl", "DataVolumeId", "DeployDocumentName"}
+    # Besides CDK's export of the Elastic IP, which StorageStack's CORS imports.
+    assert {o for o in outputs if not o.startswith("ExportsOutput")} == {
+        "InstanceId",
+        "PublicIp",
+        "PublicUrl",
+        "DataVolumeId",
+        "DeployDocumentName",
+    }
     assert "Secret" not in json.dumps(outputs)
 
 
@@ -362,7 +443,7 @@ def compose() -> dict[str, Any]:
     return yaml.safe_load((ON_PREMISE_DIR / "compose.yaml").read_text(encoding="utf-8"))
 
 
-LONG_RUNNING = {"postgres", "keycloak", "api", "web", "caddy"}
+LONG_RUNNING = {"postgres", "keycloak", "api", "web", "caddy", "agent", "mcp", "worker"}
 
 
 def test_compose_runs_the_production_services_and_no_local_emulators(compose: dict[str, Any]) -> None:
@@ -388,7 +469,8 @@ def test_only_caddy_publishes_ports_80_and_443(compose: dict[str, Any]) -> None:
 
 
 def test_app_images_come_from_ecr_by_commit_tag(compose: dict[str, Any]) -> None:
-    for name, repo in (("keycloak", "keycloak"), ("api", "api"), ("migrate", "api"), ("web", "web")):
+    images = {"keycloak": "keycloak", "api": "api", "migrate": "api", "web": "web", "agent": "agent", "mcp": "mcp"}
+    for name, repo in {**images, "worker": "worker"}.items():
         assert compose["services"][name]["image"] == f"${{REGISTRY:?}}/smart-tutor/{repo}:${{IMAGE_TAG:?}}"
 
 
@@ -414,6 +496,71 @@ def test_api_reads_the_on_premise_ssm_path(compose: dict[str, Any]) -> None:
     assert params and all(v.startswith("${SSM_PATH:?}/") for v in params.values())
     assert env["SMART_TUTOR_KEYCLOAK_ISSUER"] == "https://${DOMAIN:?}/auth/realms/smart-tutor"
     assert env["SMART_TUTOR_ROOT_PATH"] == "/api"
+
+
+def test_agent_mcp_and_worker_read_the_on_premise_ssm_path(compose: dict[str, Any]) -> None:
+    for name in ("agent", "mcp", "worker"):
+        env = compose["services"][name]["environment"]
+        params = {k: v for k, v in env.items() if k.endswith("_PARAM")}
+        assert all(v.startswith("${SSM_PATH:?}/") for v in params.values()), name
+        assert env["SMART_TUTOR_AWS_REGION"] == "${AWS_REGION:?}", name
+        assert env["HOME"] == "/tmp", name
+    worker = compose["services"]["worker"]["environment"]
+    assert worker["SMART_TUTOR_MAX_UPLOAD_MB_PARAM"] == "${SSM_PATH:?}/max-upload-mb"
+    assert worker["SMART_TUTOR_MAX_PAGES_PARAM"] == "${SSM_PATH:?}/max-pages"
+
+
+def test_worker_reads_the_on_premise_bucket_queue_and_database(compose: dict[str, Any]) -> None:
+    env = compose["services"]["worker"]["environment"]
+    assert env["SMART_TUTOR_DOCUMENTS_BUCKET"] == "${DOCUMENTS_BUCKET:?}"
+    assert env["SMART_TUTOR_INGEST_QUEUE_URL"] == "${INGEST_QUEUE_URL:?}"
+    assert env["SMART_TUTOR_DATABASE_URL"] == "${APP_DATABASE_URL:?}"
+    assert env["SMART_TUTOR_EXTRACTION_TIMEOUT_SECONDS"] == "300"
+
+
+def test_agent_and_mcp_reach_keycloak_and_each_other_inside_the_network(compose: dict[str, Any]) -> None:
+    agent = compose["services"]["agent"]["environment"]
+    mcp = compose["services"]["mcp"]["environment"]
+    for env in (agent, mcp):
+        assert env["SMART_TUTOR_KEYCLOAK_ISSUER"] == "https://${DOMAIN:?}/auth/realms/smart-tutor"
+        assert env["SMART_TUTOR_KEYCLOAK_INTERNAL_URL"] == "http://keycloak:8080/auth/realms/smart-tutor"
+        assert env["SMART_TUTOR_MCP_URL"] == "http://mcp:8000/mcp"
+    assert (agent["SMART_TUTOR_KEYCLOAK_CLIENT_ID"], agent["SMART_TUTOR_KEYCLOAK_CLIENT_SECRET"]) == (
+        "smart-tutor-api",
+        "${API_CLIENT_SECRET:?}",
+    )
+    assert (mcp["SMART_TUTOR_KEYCLOAK_CLIENT_ID"], mcp["SMART_TUTOR_KEYCLOAK_CLIENT_SECRET"]) == (
+        "rag-mcp",
+        "${MCP_CLIENT_SECRET:?}",
+    )
+    assert mcp["SMART_TUTOR_KEYCLOAK_AUDIENCE"] == "rag-mcp"
+    assert mcp["SMART_TUTOR_MCP_PORT"] == "8000"
+    assert compose["services"]["api"]["depends_on"]["agent"] == {"condition": "service_started"}
+    assert compose["services"]["agent"]["depends_on"]["mcp"] == {"condition": "service_started"}
+
+
+def test_worker_runs_isolated_as_non_root_on_a_read_only_root(compose: dict[str, Any]) -> None:
+    worker = compose["services"]["worker"]
+    assert worker["user"] == "10001:10001"
+    assert worker["read_only"] is True
+    assert worker["tmpfs"] == ["/tmp:size=64m"]
+    assert worker["cap_drop"] == ["ALL"]
+    assert worker["security_opt"] == ["no-new-privileges:true"]
+    assert worker["cpus"] == 1.0
+    assert worker["mem_limit"] == "1536m"
+    assert worker["pids_limit"] == 256  # room for one extraction child process per PDF
+    assert worker["stop_grace_period"] == "60s"
+    assert "smart_tutor.apps.worker" in " ".join(worker["healthcheck"]["test"])
+
+
+def test_agent_and_mcp_run_on_a_read_only_root_without_capabilities(compose: dict[str, Any]) -> None:
+    for name in ("agent", "mcp"):
+        service = compose["services"][name]
+        assert service["read_only"] is True, name
+        assert service["tmpfs"] == ["/tmp:size=64m"], name
+        assert service["cap_drop"] == ["ALL"], name
+        assert service["security_opt"] == ["no-new-privileges:true"], name
+        assert service["mem_limit"] == "512m", name
 
 
 def test_caddy_routes_one_origin_by_path() -> None:
@@ -447,6 +594,21 @@ def test_no_credential_shaped_url_is_in_the_repository() -> None:
 def test_deploy_script_migrates_before_it_starts_the_new_tag() -> None:
     script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
     assert script.index("run --rm migrate") < script.index("up -d --wait --wait-timeout")
+
+
+def test_deploy_script_asserts_the_running_workers_isolation_and_the_inner_services() -> None:
+    script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
+    started = script.index("up -d --wait --wait-timeout")
+    check = script[started:]
+    assert "ps -q worker" in check
+    for fragment in ("docker inspect", ".Config.User", "10001:10001", "ReadonlyRootfs", "CapDrop", "no-new-privileges"):
+        assert fragment in check, fragment
+    # A worker that isn't isolated is stopped before the deploy fails, so it parses no more untrusted PDFs.
+    failed = check[check.index("The worker is not isolated") :]
+    assert failed.index('docker stop "$worker"') < failed.index("exit 1")
+    assert "exec -T api python" in check
+    assert "http://agent:8080/healthz" in check
+    assert "http://mcp:8000/mcp" in check and "401" in check
 
 
 ENSURE_HEALTHY = ON_PREMISE_DIR / "ensure-healthy.sh"
