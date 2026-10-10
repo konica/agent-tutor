@@ -77,7 +77,7 @@ PATCH_SCHEDULE = "cron(0 4 ? * SUN *)"
 ENSURE_HEALTHY = "/opt/smart-tutor/on-premise/ensure-healthy.sh"
 ENSURE_HEALTHY_COMMAND = (
     f"[ -f {ENSURE_HEALTHY} ] || {{ echo 'ensure-healthy.sh is missing: redeploy the current tag"
-    f" (docs/runbooks/on-premise-deploy.md §3)' >&2; exit 1; }}; bash {ENSURE_HEALTHY}"
+    f" (docs/runbooks/on-premise-deploy.md §4)' >&2; exit 1; }}; bash {ENSURE_HEALTHY}"
 )
 # Data Lifecycle Manager snapshots the volumes with this tag. Times are UTC; the app's time zone is Asia/Ho_Chi_Minh
 # (UTC+7), so the snapshot is at 02:00 and the dump (deploy/on-premise/systemd/smart-tutor-backup.timer) at 03:00.
@@ -323,7 +323,7 @@ class HostStack(cdk.Stack):
         document = ssm.CfnDocument(
             self,
             "DeployDocument",
-            name=f"{names.data_prefix}-deploy",
+            name=names.deploy_document,
             document_type="Command",
             update_method="NewVersion",  # a named document is otherwise replaced, which CloudFormation refuses
             content={
@@ -487,9 +487,13 @@ def _user_data(volume_id: str, region: str, data_snapshot_id: str | None) -> ec2
 
 
 def _deploy_commands(names: ModeNames, region: str) -> list[str]:
-    """The SSM document's script: fetch the bundle this stack uploaded, then run deploy.sh with the tag."""
+    """The SSM document's script: wait for first boot, fetch the bundle this stack uploaded, run deploy.sh with the tag."""
     return [
         "set -euo pipefail",
+        # A replaced instance is Online in SSM before its user data has installed Docker, unzip, and Compose. Waiting
+        # is instant on an instance that has finished booting. A non-zero status only warns, because newer cloud-init
+        # exits 2 for mere warnings; a real failure still stops at the next command.
+        "cloud-init status --wait > /dev/null || echo 'Warning: first boot (cloud-init) reported an error; see /var/log/cloud-init-output.log' >&2",
         f"export AWS_REGION={region} AWS_DEFAULT_REGION={region}",
         f"bundle=$(aws ssm get-parameter --name {names.ssm_path}/host/bundle --query Parameter.Value --output text)",
         "rm -rf /opt/smart-tutor.new /tmp/smart-tutor-bundle.zip",

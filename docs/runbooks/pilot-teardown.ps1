@@ -4,8 +4,8 @@
     See pilot-teardown.md.
 
 .DESCRIPTION
-    1. Preflight: checks the tools, the caller and the repository variable NATIVE_CLOUD_AUTO_DEPLOY (it must be
-       `false`, or the next merge to main redeploys the pilot), and lists the stacks it will delete and keep.
+    1. Preflight: checks the tools, the caller and the repository variable NATIVE_CLOUD_AUTO_DEPLOY (it must not be
+       `true`, or the next merge to main redeploys the pilot), and lists the stacks it will delete and keep.
     2. Asks you to type the account id (skipped with -Force and in -DryRun).
     3. Removes what Kubernetes created outside CloudFormation (the smart-tutor release, TargetGroupBindings, the
        add-ons), so no security-group rules or ENIs block the Edge and Network deletes.
@@ -20,7 +20,7 @@
     Run with -DryRun first: it only reads and prints what it would do.
 
 .EXAMPLE
-    gh variable set NATIVE_CLOUD_AUTO_DEPLOY --body false --repo konica/agent-tutor
+    gh variable delete NATIVE_CLOUD_AUTO_DEPLOY --repo konica/agent-tutor   # or set it to false
     ./docs/runbooks/pilot-teardown.ps1 -AwsProfile default -DryRun
     ./docs/runbooks/pilot-teardown.ps1 -AwsProfile default
     ./docs/runbooks/pilot-teardown.ps1 -AwsProfile default -DeleteLogGroups -DeleteDatabaseSnapshots -DeleteDocumentsBucket
@@ -48,7 +48,7 @@ $PSNativeCommandUseErrorActionPreference = $false   # we check $LASTEXITCODE our
 $RepoRoot = (Resolve-Path "$PSScriptRoot/../..").Path
 $InfraDir = Join-Path $RepoRoot "infra"
 $ClusterName = "smart-tutor-prod"
-$CdkVersion = "2.1145.0"   # same as .github/workflows/deploy-pilot.yml
+$CdkVersion = "2.1145.0"   # same as .github/workflows/deploy-native-cloud.yml
 # In dependency order. Storage goes before Edge because it imports Edge's CloudFront URL for the bucket CORS rule.
 $DeleteStacks = @("Storage", "Edge", "Data", "Cluster", "Config") + @(if ($DeleteBudget) { "Budgets" }) + @("Network") |
     ForEach-Object { "SmartTutor-prod-$_" }
@@ -146,15 +146,15 @@ try {
             "will say Unauthorized, and the Kubernetes cleanup will fail.")
     }
 
-    # deploy.yml deploys the pilot on every merge to main. Until the variable is `false`, a merge after the teardown
-    # would rebuild everything. The script never sets it: that is a repository setting, so you do it.
+    # Since #150 deploy.yml deploys native-cloud on a merge only while NATIVE_CLOUD_AUTO_DEPLOY is `true`. The script
+    # never changes it: that is a repository setting, so you do it.
     $AutoDeploy = gh variable get NATIVE_CLOUD_AUTO_DEPLOY --repo $Repo 2>$null
-    if ($AutoDeploy -ne "false") {
-        $SetCommand = "gh variable set NATIVE_CLOUD_AUTO_DEPLOY --body false --repo $Repo"
+    if ($AutoDeploy -eq "true") {
+        $SetCommand = "gh variable delete NATIVE_CLOUD_AUTO_DEPLOY --repo $Repo"
         if ($DryRun) {
-            Write-Warning "NATIVE_CLOUD_AUTO_DEPLOY is not 'false'; a real run would stop. Run first: $SetCommand"
+            Write-Warning "NATIVE_CLOUD_AUTO_DEPLOY is 'true'; a real run would stop. Run first: $SetCommand"
         } else {
-            throw "NATIVE_CLOUD_AUTO_DEPLOY is not 'false', so the next merge to main would redeploy the pilot. Run: $SetCommand"
+            throw "NATIVE_CLOUD_AUTO_DEPLOY is 'true', so the next merge to main would redeploy the pilot. Run: $SetCommand"
         }
     }
 

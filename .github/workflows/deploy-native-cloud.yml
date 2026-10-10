@@ -1,6 +1,8 @@
-# Deploys the pilot (PRD §9.12, #59). Called by deploy.yml (every push to main, after the checks) and rollback.yml.
-# Signs in to AWS with the GitHub OIDC deploy role (#55), which trusts only jobs in the `pilot` environment.
-name: deploy-pilot
+# Deploys native-cloud mode (PRD §9.12, #59): cdk deploy, the cluster add-ons, and the Helm release. Opt-in since #150:
+# deploy.yml calls it when started by hand with mode native-cloud, or on a push when the repository variable
+# NATIVE_CLOUD_AUTO_DEPLOY is `true`; rollback.yml calls it with infrastructure false. deploy.yml builds the images first.
+# Signs in with the native-cloud deploy role (#55), which trusts only jobs in the `native-cloud` environment.
+name: deploy-native-cloud
 
 on:
   workflow_call:
@@ -9,18 +11,18 @@ on:
         description: Commit SHA whose images to deploy
         type: string
         required: true
-      build:
-        description: Deploy the infrastructure and build the images (false for a rollback)
+      infrastructure:
+        description: Deploy the infrastructure with CDK first (false for a rollback)
         type: boolean
         required: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: pilot
+    environment: native-cloud
     # One deployment at a time; a queued one waits instead of cancelling the running release.
     concurrency:
-      group: deploy-pilot
+      group: deploy-native-cloud
       cancel-in-progress: false
     timeout-minutes: 60
     env:
@@ -29,23 +31,22 @@ jobs:
       JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION: "1"
     steps:
       # Reject a malformed tag before checking out or signing in.
-      - name: Check the rollback tag
-        if: ${{ !inputs.build }}
+      - name: Check the image tag
         run: |
           [[ "$IMAGE_TAG" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::image_tag must be a full 40-character commit SHA"; exit 1; }
 
-      # A rollback checks out the old commit, so the chart matches its images.
+      # The chart and smoke test come from the deployed commit, so they match its images.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ inputs.image_tag }}
 
       # Setup actions run before the AWS credentials exist in the environment.
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        if: inputs.build
+        if: inputs.infrastructure
         with:
           node-version: 22
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
-        if: inputs.build
+        if: inputs.infrastructure
       - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
         with:
           version: v4.2.1
@@ -55,8 +56,15 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
+      - name: Check the images exist
+        run: |
+          for repo in api web keycloak agent mcp worker; do
+            aws ecr describe-images --repository-name "smart-tutor/$repo" --image-ids imageTag="$IMAGE_TAG" > /dev/null \
+              || { echo "::error::smart-tutor/$repo:$IMAGE_TAG is not in ECR (it keeps the last 30 images)"; exit 1; }
+          done
+
       - name: Deploy the infrastructure (CDK)
-        if: inputs.build
+        if: inputs.infrastructure
         working-directory: infra
         run: |
           uv sync --frozen
@@ -85,30 +93,6 @@ jobs:
             echo "DOCUMENTS_BUCKET=$documents_bucket"
             echo "INGEST_QUEUE_URL=$ingest_queue_url"
           } >> "$GITHUB_ENV"
-
-      - name: Check the images to roll back to exist
-        if: ${{ !inputs.build }}
-        run: |
-          for repo in api web keycloak agent mcp worker; do
-            aws ecr describe-images --repository-name "smart-tutor/$repo" --image-ids imageTag="$IMAGE_TAG" > /dev/null \
-              || { echo "::error::smart-tutor/$repo:$IMAGE_TAG is not in ECR (it keeps the last 30 images)"; exit 1; }
-          done
-
-      - name: Build the images
-        if: inputs.build
-        run: |
-          aws ecr get-login-password | docker login --username AWS --password-stdin "$REGISTRY"
-          docker build --target api -t "$REGISTRY/smart-tutor/api:$IMAGE_TAG" backend
-          docker build --build-arg VITE_API_URL=/api --build-arg VITE_KEYCLOAK_URL=/auth -t "$REGISTRY/smart-tutor/web:$IMAGE_TAG" web
-          docker build -t "$REGISTRY/smart-tutor/keycloak:$IMAGE_TAG" deploy/keycloak
-          docker build --target agent -t "$REGISTRY/smart-tutor/agent:$IMAGE_TAG" backend
-          docker build --target mcp -t "$REGISTRY/smart-tutor/mcp:$IMAGE_TAG" backend
-          docker build --target worker -t "$REGISTRY/smart-tutor/worker:$IMAGE_TAG" backend
-
-      - name: Push the images
-        if: inputs.build
-        run: |
-          for repo in api web keycloak agent mcp worker; do docker push "$REGISTRY/smart-tutor/$repo:$IMAGE_TAG"; done
 
       - name: Connect to the cluster
         run: aws eks update-kubeconfig --name smart-tutor-prod --region "$AWS_REGION"

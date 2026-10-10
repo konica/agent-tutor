@@ -13,7 +13,7 @@ $InstanceId = Get-Output InstanceId
 $Url = Get-Output PublicUrl
 ```
 
-**After deploying the Host stack with these changes, redeploy the current tag** (`on-premise-deploy.md` §3). `cdk deploy` uploads the bundle, but only a deploy copies it to the VM, and the patching window's health check needs `ensure-healthy.sh` from it. Until then, the window fails with "ensure-healthy.sh is missing".
+**After deploying the Host stack with these changes, redeploy the current tag** (`on-premise-deploy.md` §4). `cdk deploy` uploads the bundle, but only a deploy copies it to the VM, and the patching window's health check needs `ensure-healthy.sh` from it. Until then, the window fails with "ensure-healthy.sh is missing".
 
 ## Who gets the emails
 
@@ -76,10 +76,10 @@ An **instance** status check failure (the VM's own OS, such as memory exhaustion
    python deploy/pilot/smoke_test.py $Url
    ```
 
-2. Check that a deploy isn't running or failed: in the Systems Manager console, **Run Command → Command history**, look for `smart-tutor-on-premise-deploy`. A failed deploy stops before or during `docker compose up`, so redeploy the last good tag (`on-premise-deploy.md` §3).
+2. Check that a deploy isn't running or failed: in the Systems Manager console, **Run Command → Command history**, look for `smart-tutor-on-premise-deploy`. A failed deploy stops before or during `docker compose up`, so redeploy the last good tag (`on-premise-deploy.md` §4).
 3. Check the instance (the `describe-instance-status` command above). If it is stopped, start it. If its **instance** status check failed, reboot it: `aws ec2 reboot-instances --instance-ids $InstanceId`.
 4. If the instance is running, [bring the services back](#bring-the-services-back) and read the logs of the unhealthy service.
-5. If the services are healthy but the check still fails, check DNS: `Resolve-DnsName smart-tutor.duckdns.org` must return the Elastic IP. If it does not, run a deploy (it points the name at the instance) or update the address on duckdns.org (`on-premise-deploy.md` section 8).
+5. If the services are healthy but the check still fails, check DNS: `Resolve-DnsName smart-tutor.duckdns.org` must return the Elastic IP. If it does not, run a deploy (it points the name at the instance) or update the address on duckdns.org (`on-premise-deploy.md` section 9).
 
 ### Patching failed
 
@@ -136,7 +136,7 @@ To move the window, change `PATCH_SCHEDULE` in `host.py` (a cron expression in t
 
 **What it counts.** Each time the document viewer opens a cited page and shows "Couldn't highlight the passage on this page." The count is one number per UTC day in the table `highlight_misses`: no user, chunk, document, or text (PRD §9.4, §10.1). It sends no email.
 
-**How to read it.** Open a shell (`on-premise-deploy.md` §6), define `dc` as there, and run:
+**How to read it.** Open a shell (`on-premise-deploy.md` §7), define `dc` as there, and run:
 
 ```bash
 dc exec postgres psql -U postgres -d smart_tutor -c "SELECT day, misses FROM highlight_misses ORDER BY day DESC LIMIT 30;"
@@ -163,7 +163,7 @@ aws ssm wait command-executed --command-id $Command --instance-id $InstanceId
 aws ssm get-command-invocation --command-id $Command --instance-id $InstanceId --query "{Status: Status, Output: StandardOutputContent, Errors: StandardErrorContent}"
 ```
 
-The output lists each service's status. If one stays unhealthy, open a shell (`on-premise-deploy.md` §6) and read its logs with `dc logs --tail 200 <service>`. Common causes: `/data` not mounted (the data volume), the disk full (`df -h / /data`; `docker image prune -af` frees old images), or Keycloak slow to start after a reboot. If a deploy left the services broken, redeploy the last good tag.
+The output lists each service's status. If one stays unhealthy, open a shell (`on-premise-deploy.md` §7) and read its logs with `dc logs --tail 200 <service>`. Common causes: `/data` not mounted (the data volume), the disk full (`df -h / /data`; `docker image prune -af` frees old images), or Keycloak slow to start after a reboot. If a deploy left the services broken, redeploy the last good tag.
 
 ## Test the alarms
 

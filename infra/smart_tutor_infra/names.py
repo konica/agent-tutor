@@ -40,6 +40,11 @@ class ModeNames:
     def deploy_role(self) -> str:
         return f"{self.data_prefix}-github-deploy"
 
+    @property
+    def deploy_document(self) -> str:
+        """The SSM Command document that deploys one image tag on the on-premise host (HostStack)."""
+        return f"{self.data_prefix}-deploy"
+
     def documents_bucket(self, account: str) -> str:
         return f"{self.data_prefix}-documents-{account}"
 

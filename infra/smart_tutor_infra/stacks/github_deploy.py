@@ -21,7 +21,8 @@ class GitHubDeployStack(cdk.Stack):
 
     It can assume the CDK bootstrap roles (so CloudFormation, not the role, changes infrastructure), push app images
     to the shared `smart-tutor/*` ECR repositories, read its mode's stack outputs, and, with `eks`, describe the EKS
-    cluster.
+    cluster. With `deploy_document` (on-premise, #150), it runs that one SSM document on the mode's instances and reads
+    the result.
     """
 
     def __init__(
@@ -34,6 +35,7 @@ class GitHubDeployStack(cdk.Stack):
         github_environment: str,
         existing_provider_arn: str | None = None,
         eks: bool = False,
+        deploy_document: str | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -94,6 +96,28 @@ class GitHubDeployStack(cdk.Stack):
                     )
                 ]
                 if eks
+                else []
+            ),
+            *(
+                [
+                    # SendCommand is authorized on both the document and the target instance. Only the deploy
+                    # document is allowed, so the role can't run arbitrary shell commands on any instance.
+                    iam.PolicyStatement(
+                        sid="RunDeployDocument",
+                        actions=["ssm:SendCommand"],
+                        resources=[
+                            f"arn:aws:ssm:{region}:{account}:document/{deploy_document}",
+                            f"arn:aws:ec2:{region}:{account}:instance/*",
+                        ],
+                    ),
+                    # Neither action supports resource-level permissions.
+                    iam.PolicyStatement(
+                        sid="ReadDeployStatus",
+                        actions=["ssm:DescribeInstanceInformation", "ssm:GetCommandInvocation"],
+                        resources=["*"],
+                    ),
+                ]
+                if deploy_document
                 else []
             ),
             iam.PolicyStatement(

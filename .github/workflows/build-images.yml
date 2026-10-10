@@ -1,0 +1,69 @@
+# Builds the six app images for one commit and pushes them to the shared ECR repositories, tagged with the full commit
+# SHA (#150). Called by deploy.yml before either mode deploys. Skips the build when all six images are already in ECR;
+# otherwise it rebuilds and pushes all six. Signs in with the deploy role of the environment it is given.
+name: build-images
+
+on:
+  workflow_call:
+    inputs:
+      image_tag:
+        description: Full commit SHA to build and tag the images with
+        type: string
+        required: true
+      environment:
+        description: GitHub environment whose deploy role pushes the images (on-premise or native-cloud)
+        type: string
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    timeout-minutes: 30
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      IMAGE_TAG: ${{ inputs.image_tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ inputs.image_tag }}
+
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # ECR is shared by both modes (native-cloud's Registry stack): the account's registry in the region.
+      - name: Check which images exist
+        id: existing
+        run: |
+          account=$(aws sts get-caller-identity --query Account --output text)
+          echo "REGISTRY=$account.dkr.ecr.$AWS_REGION.amazonaws.com" >> "$GITHUB_ENV"
+          all=true
+          for repo in api web keycloak agent mcp worker; do
+            if aws ecr describe-images --repository-name "smart-tutor/$repo" --image-ids imageTag="$IMAGE_TAG" > /dev/null 2>&1; then
+              echo "smart-tutor/$repo:$IMAGE_TAG is already in ECR"
+            else
+              all=false
+            fi
+          done
+          echo "all=$all" >> "$GITHUB_OUTPUT"
+
+      - name: Sign in to ECR
+        if: steps.existing.outputs.all != 'true'
+        run: aws ecr get-login-password | docker login --username AWS --password-stdin "$REGISTRY"
+
+      - name: Build the images
+        if: steps.existing.outputs.all != 'true'
+        run: |
+          docker build --target api -t "$REGISTRY/smart-tutor/api:$IMAGE_TAG" backend
+          docker build --build-arg VITE_API_URL=/api --build-arg VITE_KEYCLOAK_URL=/auth -t "$REGISTRY/smart-tutor/web:$IMAGE_TAG" web
+          docker build -t "$REGISTRY/smart-tutor/keycloak:$IMAGE_TAG" deploy/keycloak
+          docker build --target agent -t "$REGISTRY/smart-tutor/agent:$IMAGE_TAG" backend
+          docker build --target mcp -t "$REGISTRY/smart-tutor/mcp:$IMAGE_TAG" backend
+          docker build --target worker -t "$REGISTRY/smart-tutor/worker:$IMAGE_TAG" backend
+
+      - name: Push the images
+        if: steps.existing.outputs.all != 'true'
+        run: |
+          for repo in api web keycloak agent mcp worker; do docker push "$REGISTRY/smart-tutor/$repo:$IMAGE_TAG"; done

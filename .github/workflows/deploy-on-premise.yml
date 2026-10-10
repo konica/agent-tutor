@@ -1,0 +1,129 @@
+# Deploys on-premise mode (PRD §9.12, ADR 0012, #150): cdk deploy, then SSM Run Command runs deploy.sh with the tag on
+# the VM, then the smoke test. Called by deploy.yml (every push to main, after the checks and the images) and
+# rollback.yml. Signs in with the on-premise deploy role, which trusts only jobs in the `on-premise` environment.
+# Runbook: docs/runbooks/on-premise-deploy.md.
+name: deploy-on-premise
+
+on:
+  workflow_call:
+    inputs:
+      image_tag:
+        description: Commit SHA whose images to deploy
+        type: string
+        required: true
+      infrastructure:
+        description: Run cdk deploy first (false for a rollback, which keeps the deploy files already on the VM)
+        type: boolean
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: on-premise
+    # One deployment at a time; a queued one waits instead of cancelling the running one.
+    concurrency:
+      group: deploy-on-premise
+      cancel-in-progress: false
+    # The deploy role's session lasts 1 hour.
+    timeout-minutes: 60
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      IMAGE_TAG: ${{ inputs.image_tag }}
+      JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION: "1"
+    steps:
+      # Reject a malformed tag before checking out or signing in.
+      - name: Check the image tag
+        run: |
+          [[ "$IMAGE_TAG" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::image_tag must be a full 40-character commit SHA"; exit 1; }
+
+      # The smoke test (and, with infrastructure, the CDK app and deploy files) come from the deployed commit.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ inputs.image_tag }}
+
+      # Setup actions run before the AWS credentials exist in the environment.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        if: inputs.infrastructure
+        with:
+          node-version: 22
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        if: inputs.infrastructure
+
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Check the images exist
+        run: |
+          for repo in api web keycloak agent mcp worker; do
+            aws ecr describe-images --repository-name "smart-tutor/$repo" --image-ids imageTag="$IMAGE_TAG" > /dev/null \
+              || { echo "::error::smart-tutor/$repo:$IMAGE_TAG is not in ECR (it keeps the last 30 images)"; exit 1; }
+          done
+
+      # Uploads deploy/ as the bundle the SSM document unpacks. A new Amazon Linux image replaces the instance here.
+      - name: Deploy the infrastructure (CDK)
+        if: inputs.infrastructure
+        working-directory: infra
+        run: |
+          uv sync --frozen
+          npx --yes aws-cdk@2.1145.0 deploy --all --require-approval never -c smart-tutor:mode=on-premise
+
+      - name: Read the stack outputs
+        run: |
+          output() {
+            aws cloudformation describe-stacks --stack-name SmartTutor-OnPremise-prod-Host \
+              --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text
+          }
+          instance_id=$(output InstanceId)
+          [[ -n "$instance_id" && "$instance_id" != None ]] || { echo "::error::SmartTutor-OnPremise-prod-Host has no InstanceId output"; exit 1; }
+          public_url=$(output PublicUrl)
+          [[ -n "$public_url" && "$public_url" != None ]] || { echo "::error::SmartTutor-OnPremise-prod-Host has no PublicUrl output"; exit 1; }
+          deploy_document=$(output DeployDocumentName)
+          [[ -n "$deploy_document" && "$deploy_document" != None ]] || { echo "::error::SmartTutor-OnPremise-prod-Host has no DeployDocumentName output"; exit 1; }
+          {
+            echo "INSTANCE_ID=$instance_id"
+            echo "PUBLIC_URL=$public_url"
+            echo "DEPLOY_DOCUMENT=$deploy_document"
+          } >> "$GITHUB_ENV"
+
+      # A replaced instance registers with SSM within a few minutes of starting; the deploy document then waits for its
+      # first boot (Docker, Compose) to finish.
+      - name: Wait until the VM is online in SSM
+        run: |
+          status=None
+          for _ in $(seq 60); do
+            status=$(aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+              --query "InstanceInformationList[0].PingStatus" --output text)
+            [[ "$status" == Online ]] && exit 0
+            sleep 10
+          done
+          echo "::error::$INSTANCE_ID is not Online in SSM after 10 minutes (last status: $status)"
+          exit 1
+
+      # deploy.sh prints no secret, so its output is safe to show here. The document allows 30 minutes.
+      - name: Deploy the images on the VM (SSM Run Command)
+        run: |
+          command_id=$(aws ssm send-command --document-name "$DEPLOY_DOCUMENT" --instance-ids "$INSTANCE_ID" \
+            --parameters "ImageTag=$IMAGE_TAG" --comment "Deploy $IMAGE_TAG (run $GITHUB_RUN_ID)" \
+            --query Command.CommandId --output text)
+          echo "SSM command $command_id on $INSTANCE_ID"
+          status=Pending
+          for _ in $(seq 200); do
+            sleep 10
+            # Right after send-command the invocation may not exist yet.
+            status=$(aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE_ID" \
+              --query Status --output text 2> /dev/null || echo Pending)
+            case "$status" in Pending|InProgress|Delayed) ;; *) break ;; esac
+          done
+          invocation() {
+            aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE_ID" --query "$1" --output text
+          }
+          invocation StandardOutputContent
+          invocation StandardErrorContent >&2
+          [[ "$status" == Success ]] || { echo "::error::The deploy on the VM ended with status $status (output above)"; exit 1; }
+
+      - name: Smoke test the public address
+        run: |
+          python3 deploy/pilot/smoke_test.py "$PUBLIC_URL"
+          echo "Deployed \`$IMAGE_TAG\` to $PUBLIC_URL" >> "$GITHUB_STEP_SUMMARY"

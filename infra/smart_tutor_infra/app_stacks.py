@@ -15,7 +15,7 @@ from smart_tutor_infra.stacks.network import NetworkStack
 from smart_tutor_infra.stacks.registry import RegistryStack
 from smart_tutor_infra.stacks.storage import StorageStack
 
-# The GitHub environment whose jobs may assume the on-premise deploy role (#150).
+# The GitHub environment whose jobs may assume the on-premise deploy role (deploy-on-premise.yml, #150).
 ON_PREMISE_GITHUB_ENVIRONMENT = "on-premise"
 
 
@@ -48,6 +48,7 @@ def _on_premise(app: cdk.App, env: cdk.Environment, names: ModeNames) -> list[cd
         names=names,
         subject_prefix=app.node.get_context("smart-tutor:github-oidc-subject-prefix"),
         github_environment=ON_PREMISE_GITHUB_ENVIRONMENT,
+        deploy_document=names.deploy_document,
         # The account's one GitHub provider already exists (native-cloud's GitHubDeploy created it).
         existing_provider_arn=app.node.try_get_context("smart-tutor:github-oidc-provider-arn")
         or f"arn:aws:iam::{cdk.Aws.ACCOUNT_ID}:oidc-provider/{GITHUB_OIDC_HOST}",

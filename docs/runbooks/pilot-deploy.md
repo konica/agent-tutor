@@ -1,6 +1,8 @@
-# Pilot deploy (#56, #57, #58, #59, #139)
+# Pilot deploy (#56, #57, #58, #59, #139, #150)
 
-Deploys the pilot's infrastructure and the `web`, `keycloak`, `api`, `agent`, `mcp-server`, and `worker` charts, so the CloudFront address serves the app shell, Keycloak at `/auth` on RDS, and the API at `/api`. The pilot now runs upload, processing, and chat: a learner uploads a PDF and asks a question about it (PRD §9.12, ADRs 0009 and 0010). It needs an account admin. Do [`pilot-aws-prerequisites.md`](pilot-aws-prerequisites.md) (#55) first. The big picture is in [`pilot-environment-overview.md`](pilot-environment-overview.md). After the first deploy, every merge to `main` deploys automatically (section 12); this runbook stays the manual path and the reference for what the workflow does.
+**Optional mode.** On-premise is the default and deploys on every merge (`on-premise-deploy.md`). Native-cloud deploys only when chosen (#150).
+
+Deploys the pilot's infrastructure and the `web`, `keycloak`, `api`, `agent`, `mcp-server`, and `worker` charts, so the CloudFront address serves the app shell, Keycloak at `/auth` on RDS, and the API at `/api`. The pilot now runs upload, processing, and chat: a learner uploads a PDF and asks a question about it (PRD §9.12, ADRs 0009 and 0010). It needs an account admin. Do [`pilot-aws-prerequisites.md`](pilot-aws-prerequisites.md) (#55) first. The big picture is in [`pilot-environment-overview.md`](pilot-environment-overview.md). Since #150 native-cloud deploys only when chosen (section 12); this runbook stays the manual path and the reference for what the workflow does.
 
 To stop paying for the pilot, see [`pilot-teardown.md`](pilot-teardown.md) (#177).
 
@@ -232,7 +234,7 @@ aws sqs get-queue-attributes --queue-url $Dlq --attribute-names ApproximateNumbe
 
 ## 9. Update after a change
 
-Merging to `main` does all of this (section 12). By hand: deploy infrastructure changes with CDK first (`npx aws-cdk@latest deploy --all` from `infra/`), then rebuild and push the images with a new tag and run the `helm upgrade` from step 6 again (with `--timeout 15m`). The order matters: the API pods read their SSM parameters at startup through a Pod Identity association that the CDK stacks create. The upgrade runs the `db-bootstrap` and `migrate` hooks first. Only `db-bootstrap` resets database passwords, so a password rotated in Secrets Manager reaches the database there; `migrate` only applies the schema. Since #139, five deployments read a database secret: `keycloak` (`keycloak-db`, database `keycloak`) and `api`, `agent`, `mcp-server`, `worker` (`api-db`, `agent-db`, `mcp-db`, `worker-db`, all copies of `smart-tutor/db/app`). Running pods keep the old password (the environment is read at start, and External Secrets refreshes these secrets only hourly), so after rotating, run the `helm upgrade`, then force the syncs and restart all five:
+The native-cloud deploy workflow does all of this (section 12). By hand: deploy infrastructure changes with CDK first (`npx aws-cdk@latest deploy --all` from `infra/`), then rebuild and push the images with a new tag and run the `helm upgrade` from step 6 again (with `--timeout 15m`). The order matters: the API pods read their SSM parameters at startup through a Pod Identity association that the CDK stacks create. The upgrade runs the `db-bootstrap` and `migrate` hooks first. Only `db-bootstrap` resets database passwords, so a password rotated in Secrets Manager reaches the database there; `migrate` only applies the schema. Since #139, five deployments read a database secret: `keycloak` (`keycloak-db`, database `keycloak`) and `api`, `agent`, `mcp-server`, `worker` (`api-db`, `agent-db`, `mcp-db`, `worker-db`, all copies of `smart-tutor/db/app`). Running pods keep the old password (the environment is read at start, and External Secrets refreshes these secrets only hourly), so after rotating, run the `helm upgrade`, then force the syncs and restart all five:
 
 ```powershell
 foreach ($Secret in "keycloak-db", "api-db", "agent-db", "mcp-db", "worker-db") {
@@ -253,15 +255,15 @@ Use the script in [`pilot-teardown.md`](pilot-teardown.md) (#177). It uninstalls
 
 About **$250–300 a month** while idle, including RDS (`db.t3.micro` with 20 GiB, about $15 a month). During the testing phase the budget is **$20 a month** (`smart-tutor:budget-monthly-usd` in `infra/cdk.json`), with alerts. That is below the idle cost, so expect the 80% alert email within the first days the environment runs. Raise the value and run `npx aws-cdk@latest deploy SmartTutor-prod-Budgets -c smart-tutor:mode=native-cloud` from `infra/` when the pilot starts.
 
-## 12. Deploy on merge and roll back (#59)
+## 12. Native-cloud is optional: deploy and roll back (#59, #150)
 
-**What runs.** `.github/workflows/deploy.yml` runs on every push to `main`: the CI checks (`ci.yml`), then `deploy-pilot.yml` in the `pilot` environment. That job runs `cdk deploy --all`, builds and pushes the six images (`web`, `keycloak`, `api`, `agent`, `mcp`, `worker`) tagged with the full commit SHA, installs the add-ons, runs `helm upgrade --install smart-tutor` with the Storage outputs, checks the in-cluster services (the agent answers `/healthz`, the MCP server refuses a call without a token), and runs `deploy/pilot/smoke_test.py` against the CloudFront address. One deployment runs at a time; a second merge waits.
+**What runs.** Native-cloud deploys when someone runs **deploy** by hand (Actions, **deploy**, *Run workflow*) with mode `native-cloud`, or on every push to `main` while the repository variable `NATIVE_CLOUD_AUTO_DEPLOY` is `true` (unset is off). `.github/workflows/deploy.yml` runs the CI checks (`ci.yml`), then `build-images.yml`, which builds the six images (`web`, `keycloak`, `api`, `agent`, `mcp`, `worker`) tagged with the full commit SHA (skipped when they already exist). Then `deploy-native-cloud.yml` runs in the GitHub environment `native-cloud`: `cdk deploy --all`, the add-ons, `helm upgrade --install smart-tutor` with the Storage outputs, the in-cluster check (the agent answers `/healthz`, the MCP server refuses a call without a token), and `deploy/pilot/smoke_test.py` against the CloudFront address. One native-cloud deployment runs at a time (concurrency group `deploy-native-cloud`); a second one waits. To turn on deploy on merge: `gh variable set NATIVE_CLOUD_AUTO_DEPLOY --body true --repo konica/agent-tutor`. The images job runs in the `on-premise` environment on a push, so a push with `NATIVE_CLOUD_AUTO_DEPLOY=true` needs the `on-premise` environment set up too; a manual run with mode `native-cloud` builds with the native-cloud role.
 
 **Concurrency.** GitHub keeps only one *pending* run per group. If several merges land while a deploy runs, only the newest waits and the ones in between are cancelled (latest wins). A queued rollback can likewise be replaced by a newer merge's deploy.
 
 **Watch it.** `gh run list --workflow deploy.yml --limit 5`, then `gh run watch`. The run summary names the deployed SHA and address. A red step is the failure; the release stays as Helm left it (`helm -n smart-tutor history smart-tutor`).
 
-**Optional approval.** **Settings → Environments → pilot → Required reviewers** makes each deploy wait for an approval.
+**Optional approval.** **Settings → Environments → native-cloud → Required reviewers** makes each deploy wait for an approval.
 
 **Smoke test by hand.**
 
@@ -285,7 +287,7 @@ helm -n smart-tutor uninstall smart-tutor
 **Roll back.**
 
 ```powershell
-gh workflow run rollback.yml --ref main -f image_tag=<full SHA of an earlier successful deploy>
+gh workflow run rollback.yml --ref main -f mode=native-cloud -f image_tag=<full SHA of an earlier successful deploy>
 ```
 
 Find the SHA with `gh run list --workflow deploy.yml --status success --limit 10 --json headSha,displayTitle,createdAt`. The workflow checks the images are still in ECR (the last 30 per repository), checks out that commit's chart, and runs the add-ons, `helm upgrade`, and the smoke test, without CDK or a build. It doesn't undo infrastructure changes.

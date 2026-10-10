@@ -1,9 +1,19 @@
-# Every push to main: the CI checks, then the pilot deploy (PRD §9.12, #59). Runbook: docs/runbooks/pilot-deploy.md.
+# Every push to main: the CI checks, the images, then the on-premise deploy (PRD §9.12, ADR 0012, #150).
+# Native-cloud is opt-in: run this workflow by hand with mode native-cloud, or set the repository variable
+# NATIVE_CLOUD_AUTO_DEPLOY to `true` to deploy it on every push as well (unset or anything else keeps it off).
+# Runbooks: docs/runbooks/on-premise-deploy.md, docs/runbooks/pilot-deploy.md (native-cloud).
 name: deploy
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Deployment mode to deploy this commit to
+        type: choice
+        options: [on-premise, native-cloud]
+        default: on-premise
 
 jobs:
   checks:
@@ -11,15 +21,35 @@ jobs:
       contents: read
     uses: ./.github/workflows/ci.yml
 
-  deploy:
-    # Set the repository variable NATIVE_CLOUD_AUTO_DEPLOY to `false` while the pilot is torn down
-    # (docs/runbooks/pilot-teardown.md), or the next merge rebuilds it. Unset keeps deploying (#150 makes it opt-in).
-    if: vars.NATIVE_CLOUD_AUTO_DEPLOY != 'false'
+  images:
     needs: checks
     permissions:
       contents: read
-      id-token: write  # OIDC sign-in to AWS, used only inside the `pilot` environment
-    uses: ./.github/workflows/deploy-pilot.yml
+      id-token: write  # OIDC sign-in to AWS, used only inside the deploy environment
+    uses: ./.github/workflows/build-images.yml
     with:
       image_tag: ${{ github.sha }}
-      build: true
+      # A push builds with the on-premise role; a manual run with the role of the mode it deploys.
+      environment: ${{ inputs.mode || 'on-premise' }}
+
+  on-premise:
+    needs: images
+    if: github.event_name == 'push' || inputs.mode == 'on-premise'
+    permissions:
+      contents: read
+      id-token: write  # OIDC sign-in to AWS, used only inside the `on-premise` environment
+    uses: ./.github/workflows/deploy-on-premise.yml
+    with:
+      image_tag: ${{ github.sha }}
+      infrastructure: true
+
+  native-cloud:
+    needs: images
+    if: (github.event_name == 'push' && vars.NATIVE_CLOUD_AUTO_DEPLOY == 'true') || inputs.mode == 'native-cloud'
+    permissions:
+      contents: read
+      id-token: write  # OIDC sign-in to AWS, used only inside the `native-cloud` environment
+    uses: ./.github/workflows/deploy-native-cloud.yml
+    with:
+      image_tag: ${{ github.sha }}
+      infrastructure: true

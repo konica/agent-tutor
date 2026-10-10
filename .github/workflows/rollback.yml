@@ -1,21 +1,38 @@
-# Redeploys an earlier commit's images and chart, without CDK or a build (#59). Runbook: docs/runbooks/pilot-deploy.md.
-# The `pilot` environment only accepts runs from main: start it from main with the SHA to go back to.
+# Redeploys an earlier commit's images, without CDK or a build (#59, #150). Runbooks: docs/runbooks/on-premise-deploy.md
+# (on-premise keeps the deploy files of the last cdk deploy), docs/runbooks/pilot-deploy.md (native-cloud).
+# The deploy environments only accept runs from main: start it from main with the SHA to go back to.
 name: rollback
 
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: Deployment mode to roll back
+        type: choice
+        options: [on-premise, native-cloud]
+        default: on-premise
       image_tag:
         description: Full commit SHA of an earlier deploy (its images must still be in ECR)
         type: string
         required: true
 
 jobs:
-  rollback:
+  on-premise:
+    if: inputs.mode == 'on-premise'
     permissions:
       contents: read
-      id-token: write  # OIDC sign-in to AWS, used only inside the `pilot` environment
-    uses: ./.github/workflows/deploy-pilot.yml
+      id-token: write  # OIDC sign-in to AWS, used only inside the `on-premise` environment
+    uses: ./.github/workflows/deploy-on-premise.yml
     with:
       image_tag: ${{ inputs.image_tag }}
-      build: false
+      infrastructure: false
+
+  native-cloud:
+    if: inputs.mode == 'native-cloud'
+    permissions:
+      contents: read
+      id-token: write  # OIDC sign-in to AWS, used only inside the `native-cloud` environment
+    uses: ./.github/workflows/deploy-native-cloud.yml
+    with:
+      image_tag: ${{ inputs.image_tag }}
+      infrastructure: false
