@@ -130,7 +130,7 @@ class HostStack(cdk.Stack):
             description="Smart Tutor on-premise host: HTTP and HTTPS only",
             allow_all_outbound=True,  # ECR, Let's Encrypt, Bedrock, SSM, Secrets Manager
         )
-        security_group.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(80), "Let's Encrypt challenge, redirect")
+        security_group.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(80), "ACME HTTP-01 challenge, HTTPS redirect")
         security_group.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(443), "HTTPS")
 
         volume = ec2.Volume(
