@@ -1,7 +1,8 @@
-import { AlertCircle, Archive, Filter, Info, Upload } from "lucide-react";
+import { AlertCircle, Archive, Filter, Info, MessageSquare, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router";
 
+import { useNeedsSubjects } from "../../app/needsSubjects";
 import { SessionExpiredError } from "../../auth/authClient";
 import { archiveDocument, deleteDocument, DocumentGoneError, DocumentProcessingError, findInLibrary, loadDocumentDetails, loadDocuments, loadSubjectSuggestions, loadUploadLimits, loadUploadRateLimit, loadUploadStatus, megabytes, rejectionReason, restoreDocument, RetriesUsedUpError, retryProcessing, saveDocumentTitle, saveSubjects as saveChosenSubjects, UploadLimitError, uploadPdf, type DocumentDetails, type DocumentFilters, type DocumentResponse, type SubjectSuggestions, type UploadEvents, type UploadLimits, type UploadRateLimit, type UploadStatus } from "../../api/documents";
 import type { SubjectResponse } from "../../api/generated/types.gen";
@@ -44,6 +45,7 @@ type Props = {
 };
 
 type View = "active" | "archived";
+type Picking = { queue: PickerDocument[]; index: number; saved: number }; // the documents to step through, where the picker is, and how many were saved
 
 const ARCHIVED_NOTICE = "Archived documents aren't used for answers, but citations to them in past conversations still work. Restore a document to change its subjects.";
 
@@ -84,6 +86,12 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
   const archivedView = view === "archived";
   const { documents, applied, unavailable, refresh } = useDocuments(load, pollMs, archivedView ? { ...filters, archived: true } : filters);
   const counts = useLibraryCounts(load);
+  const { report } = useNeedsSubjects();
+  const waitingCount = counts.waiting?.length ?? 0;
+  // The chip and the nav badge count the whole active library, whatever the filters show.
+  useEffect(() => {
+    if (counts.waiting) report(counts.waiting.length);
+  }, [counts.waiting, report]);
   // Until the selected tab's list arrives, the other tab's rows are not shown under it.
   const list = documents !== null && Boolean(applied.archived) === archivedView ? documents : null;
   // The empty states follow the filters the list was loaded with, so clearing never flashes the upload card before the full list arrives.
@@ -111,7 +119,8 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
   const [alreadyIn, setAlreadyIn] = useState<{ name: string; documentId: string }[]>([]);
   const seen = useRef<Map<string, DocumentResponse["state"]> | null>(null);
   const justSaved = useRef(new Set<string>()); // saved here, so the poll must not announce "is ready." over "Subjects saved."
-  const [picking, setPicking] = useState<PickerDocument | null>(null);
+  const [finished, setFinished] = useState(false); // a subjects save happened in this visit, so "all ready" is news
+  const [picking, setPicking] = useState<Picking | null>(null);
   const pickerFromDetails = useRef<string | null>(null); // the details panel to reopen when the picker closes
   const statusRegion = useRef<HTMLParagraphElement>(null);
   const wasPicking = useRef(false);
@@ -155,23 +164,58 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
     (title ?? statusRegion.current)?.focus();
   }, [details]);
 
+  const allReadyNow = finished && counts.allReady && !archivedView;
+  // Once none waits, the Library shows every document, not an emptied "needs subjects" filter.
+  useEffect(() => {
+    if (finished && counts.waiting?.length === 0) {
+      setFilters((f) => {
+        if (f.state !== "awaiting_subjects") return f;
+        const { state: _state, ...rest } = f;
+        return rest;
+      });
+    }
+  }, [finished, counts.waiting]);
+
   function clearFilters() {
     setFilters({});
     subjectSelect.current?.focus(); // the Clear button disappears
   }
 
-  async function onSaved(doc: DocumentResponse, changed: boolean) {
+  // The queue is the clicked document, then every other waiting one in list order. The counts hold the whole active library; the visible list stands in until they load.
+  // Changing a ready document's subjects (US-10) opens the picker for that document alone.
+  function choose(doc: DocumentResponse) {
+    const others = doc.state === "awaiting_subjects" ? (counts.waiting ?? list ?? []).filter((d) => d.state === "awaiting_subjects" && !d.archived && d.document_id !== doc.document_id) : [];
+    setPicking({ queue: [doc, ...others], index: 0, saved: 0 });
+  }
+
+  // Reads `picking` from render, not an updater: setStatus must not run twice under StrictMode.
+  function advance(saved: boolean) {
+    const p = picking;
+    if (!p) return;
+    const done = p.saved + (saved ? 1 : 0);
+    if (p.index < p.queue.length - 1) {
+      setStatus(`${saved ? "Saved. " : ""}Document ${p.index + 2} of ${p.queue.length}.`);
+      setPicking({ ...p, index: p.index + 1, saved: done });
+      return;
+    }
+    if (done) setStatus(`Subjects saved for ${done} ${done === 1 ? "document" : "documents"}. They're ready to use.`);
+    closePicker();
+  }
+
+  // `changed`: a ready document's subjects were changed, which isn't news that the library is ready. `announce` is false in a step-through, where advance() words the status.
+  async function onSaved(doc: DocumentResponse, changed: boolean, announce: boolean) {
     justSaved.current.add(doc.document_id);
     seen.current?.set(doc.document_id, "ready");
-    setStatus(changed ? `Subjects saved. ${doc.title} now uses ${doc.subjects.map((s) => s.name).join(", ")}.` : `Subjects saved. ${doc.title} is ready to use.`);
-    await Promise.all([refresh(), refreshSubjects()]);
+    if (!changed) setFinished(true);
+    if (announce) setStatus(changed ? `Subjects saved. ${doc.title} now uses ${doc.subjects.map((s) => s.name).join(", ")}.` : `Subjects saved. ${doc.title} is ready to use.`);
+    await Promise.all([refresh(), counts.refresh(), refreshSubjects()]); // the document no longer waits, so the counts change
   }
 
   // From details, the picker replaces the panel (both are modal) and gives it back when it closes.
   function changeFromDetails(doc: DocumentDetails) {
     pickerFromDetails.current = doc.document_id;
     setDetails(null);
-    setPicking(doc);
+    setPicking({ queue: [doc], index: 0, saved: 0 });
   }
 
   function closePicker() {
@@ -187,6 +231,8 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
     const before = seen.current;
     seen.current = new Map(documents.map((d) => [d.document_id, d.state]));
     if (!before) return; // the first load is not a change
+    // A poll that sees a state change moves the counts (a document may now wait for subjects).
+    if (documents.some((d) => before.has(d.document_id) && before.get(d.document_id) !== d.state)) void counts.refresh();
     const changes = documents
       .filter((d) => !d.archived && before.has(d.document_id) && before.get(d.document_id) !== d.state && !justSaved.current.has(d.document_id))
       .map(announceChange)
@@ -638,6 +684,13 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
           Can't load your library. Retrying…
         </p>
       )}
+      {allReadyNow && (
+        <div role="status" className={styles.ready}>
+          <Banner variant="success" inline title="Your documents are ready." action={<Button variant="primary" size="sm" icon={MessageSquare} onClick={() => navigate("/chat")}>Ask a question</Button>}>
+            Ask anything about them; answers cite the document and page.
+          </Banner>
+        </div>
+      )}
       {showToolbar && (
         <div className={styles.toolbar}>
           <Tabs
@@ -649,7 +702,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
             value={view}
             onChange={changeView}
           />
-          <LibraryFilters ref={subjectSelect} filters={filters} onChange={setFilters} subjects={subjects} count={list ? list.length : null} needsSubjects={list ? list.filter((d) => d.state === "awaiting_subjects").length : 0} onClear={clearFilters} showState={!archivedView} />
+          <LibraryFilters ref={subjectSelect} filters={filters} onChange={setFilters} subjects={subjects} count={list ? list.length : null} needsSubjects={waitingCount} onClear={clearFilters} showState={!archivedView} />
         </div>
       )}
       {showToolbar && archivedView && (
@@ -708,7 +761,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
           documents={list}
           onRetry={(d) => void onRetry(d)}
           retrying={retrying}
-          onChooseSubjects={setPicking}
+          onChooseSubjects={choose}
           uploading={uploading}
           onArchive={(d) => void changeArchived(d, true)}
           onRestore={(d) => void changeArchived(d, false)}
@@ -718,7 +771,25 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
           busy={busy}
         />
       )}
-      {picking && <SubjectPicker document={picking} load={loadSuggestions} save={saveSubjects} onClose={closePicker} onSaved={(doc) => void onSaved(doc, picking.state === "ready")} />}
+      {picking && (() => {
+        const doc = picking.queue[picking.index]!;
+        const multi = picking.queue.length > 1;
+        return (
+          <SubjectPicker
+            key={doc.document_id} // a fresh picker for each document
+            document={doc}
+            step={multi ? { index: picking.index, total: picking.queue.length } : undefined}
+            onSkip={() => advance(false)}
+            load={loadSuggestions}
+            save={saveSubjects}
+            onClose={closePicker}
+            onSaved={(d) => {
+              void onSaved(d, doc.state === "ready", !multi);
+              if (multi) advance(true);
+            }}
+          />
+        );
+      })()}
       {details && (
         <DocumentDetailsPanel
           key={details.id}

@@ -13,11 +13,12 @@ function renderNav({
   collapsed = false,
   onToggle = vi.fn(),
   recent = [],
-}: { path?: string; collapsed?: boolean; onToggle?: () => void; recent?: RecentConversation[] } = {}) {
+  badges,
+}: { path?: string; collapsed?: boolean; onToggle?: () => void; recent?: RecentConversation[]; badges?: Record<string, { count: number; label: string }> } = {}) {
   render(
     <SessionContext.Provider value={{ name: "Ada Lovelace", signOut: vi.fn() }}>
       <MemoryRouter initialEntries={[path]}>
-        <SideNav collapsed={collapsed} onToggle={onToggle} recent={recent} />
+        <SideNav collapsed={collapsed} onToggle={onToggle} recent={recent} badges={badges} />
       </MemoryRouter>
     </SessionContext.Provider>,
   );
@@ -49,6 +50,23 @@ describe("SideNav", () => {
     expect(chat).toHaveAttribute("data-tip", "Chat");
     await userEvent.click(screen.getByRole("button", { name: "Expand navigation" }));
     expect(onToggle).toHaveBeenCalled();
+  });
+
+  it("shows a badge on Library with its label", () => {
+    renderNav({ badges: { "/library": { count: 3, label: "3 need subjects" } } });
+    expect(screen.getByRole("link", { name: "Library, 3 need subjects" })).toHaveTextContent("3");
+  });
+
+  it("keeps the badge label in the rail's accessible name and tooltip", () => {
+    renderNav({ collapsed: true, badges: { "/library": { count: 3, label: "3 need subjects" } } });
+    const link = screen.getByRole("link", { name: "Library, 3 need subjects" });
+    expect(link).toHaveAttribute("aria-label", "Library, 3 need subjects");
+    expect(link).toHaveAttribute("data-tip", "Library, 3 need subjects");
+  });
+
+  it("names Library plainly without badges", () => {
+    renderNav();
+    expect(screen.getByRole("link", { name: "Library" })).not.toHaveAttribute("aria-label");
   });
 
   it("puts the collapse toggle at the top, after the brand and before the items", () => {

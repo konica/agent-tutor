@@ -14,6 +14,12 @@
 .link:hover { background: var(--surface-2); color: var(--text); }
 .link[aria-current="page"] { background: var(--accent-soft); color: var(--accent-text); font-weight: 650; }
 .icon { width: 16px; height: 16px; flex: none; }
+/* The Library badge counts documents waiting for subjects (brief v0.10). */
+.badge {
+  margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--r-pill);
+  background: var(--attn-soft); color: var(--attn); font-size: var(--fs-12); font-weight: 650; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums;
+}
+.collapsed .badge { position: absolute; top: 0; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; font-size: var(--fs-12); line-height: 16px; margin: 0; }
 .text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hr { border: 0; height: 1px; margin: var(--sp-2); background: var(--border); }
 .sub { list-style: none; margin: 0 0 var(--sp-1); padding: 0 0 0 34px; display: grid; }

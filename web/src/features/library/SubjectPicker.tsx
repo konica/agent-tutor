@@ -25,6 +25,8 @@ type Props = {
   search?: (query: string) => Promise<SubjectMatch[]>;
   onClose: () => void;
   onSaved: (document: DocumentResponse) => void;
+  step?: { index: number; total: number }; // 0-based place in a step-through of waiting documents
+  onSkip?: () => void;
 };
 
 const defaultLoad = (id: string) => loadSubjectSuggestions(id);
@@ -40,7 +42,7 @@ type Option = { kind: "match"; match: SubjectMatch } | { kind: "create" };
 // The learner picks 1-3 subjects for a document (PRD §8 US-2b): from three ranked suggestions (the first is
 // pre-selected) or by typing a name, with type-ahead over the shared catalog. Typed chips follow the suggestions.
 // For a ready document it changes them (US-10): its current subjects start selected, after the suggestions when not among them.
-export function SubjectPicker({ document, load = defaultLoad, save = defaultSave, search = defaultSearch, onClose, onSaved }: Props) {
+export function SubjectPicker({ document, load = defaultLoad, save = defaultSave, search = defaultSearch, onClose, onSaved, step, onSkip }: Props) {
   const changing = document.state === "ready";
   const [loaded, setLoaded] = useState<SubjectSuggestions | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -205,6 +207,10 @@ export function SubjectPicker({ document, load = defaultLoad, save = defaultSave
     try {
       const updated = await save(document.document_id, choice);
       if (!alive.current) return;
+      if (step) {
+        onSaved(updated); // the parent moves on to the next document or closes, so no saved screen
+        return;
+      }
       setSavedDoc(updated);
       onSaved(updated);
     } catch (error) {
@@ -214,7 +220,8 @@ export function SubjectPicker({ document, load = defaultLoad, save = defaultSave
     setSaving(false);
   }
 
-  const kicker = changing ? "Ready document" : "Processing finished";
+  const last = !step || step.index === step.total - 1;
+  const kicker = step ? `Document ${step.index + 1} of ${step.total}` : changing ? "Ready document" : "Processing finished";
   const title = changing ? "Change subjects" : "Choose subjects";
 
   if (savedDoc) {
@@ -255,14 +262,25 @@ export function SubjectPicker({ document, load = defaultLoad, save = defaultSave
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Cancel</Button>
+          {step ? (
+            <>
+              <span className={styles.step}>
+                {step.index + 1} of {step.total}
+              </span>
+              <Button variant="quiet" onClick={onSkip} disabled={saving}>
+                Skip
+              </Button>
+            </>
+          ) : (
+            <Button onClick={onClose}>Cancel</Button>
+          )}
           <Button
             variant="primary"
             disabled={!loaded || saving || toSave.length === 0 || tooLong || overMax}
             aria-describedby={saveDescribedBy || undefined}
             onClick={() => void onSave()}
           >
-            Save
+            {last ? "Save" : "Save and next"}
           </Button>
           <span id="picker-save-hint" className="visually-hidden">
             Choose at least one subject to save.

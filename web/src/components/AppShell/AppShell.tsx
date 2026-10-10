@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useMatches, useNavigationType } from "react-router";
 
+import { loadDocuments as defaultLoadDocuments } from "../../api/documents";
 import { NAV } from "../../app/nav";
+import { NeedsSubjectsContext, needsSubjectsLabel, useNeedsSubjectsState } from "../../app/needsSubjects";
 import { SideNav } from "../SideNav/SideNav";
 import { useNavCollapsed } from "../SideNav/useNavCollapsed";
 import styles from "./AppShell.module.css";
@@ -11,7 +13,7 @@ type Handle = { wide?: boolean; bleed?: boolean } | undefined;
 
 // A route opts into the wider column with `handle: { wide: true }` (the Library table needs it), or into
 // `handle: { bleed: true }` to fill the whole main area and lay out its own panes (the chat).
-export function AppShell() {
+export function AppShell({ loadDocuments = defaultLoadDocuments }: { loadDocuments?: typeof defaultLoadDocuments }) {
   const [collapsed, toggle] = useNavCollapsed();
   // A page can force the rail for a while (the chat's split view). The learner can still open the nav: that ends the
   // forcing without touching their saved choice.
@@ -30,6 +32,7 @@ export function AppShell() {
   const navigationType = useNavigationType();
   const main = useRef<HTMLElement>(null);
   const settledPath = useRef<string | null>(null);
+  const needs = useNeedsSubjectsState(loadDocuments, pathname);
 
   useEffect(() => {
     const label = NAV.find((item) => item.path === pathname)?.label;
@@ -43,15 +46,22 @@ export function AppShell() {
 
   return (
     <NavRailContext.Provider value={setForced}>
-      <div className={railed ? `${styles.app} ${styles.collapsed}` : styles.app}>
-        {/* recent is filled when the conversations list exists (US-5) */}
-        <SideNav collapsed={railed} onToggle={onToggle} recent={[]} />
-        <main ref={main} className={styles.main} id="main-content" tabIndex={-1}>
-          <div className={bleed ? styles.bleed : wide ? `${styles.page} ${styles.wide}` : styles.page}>
-            <Outlet />
-          </div>
-        </main>
-      </div>
+      <NeedsSubjectsContext.Provider value={needs}>
+        <div className={railed ? `${styles.app} ${styles.collapsed}` : styles.app}>
+          {/* recent is filled when the conversations list exists (US-5) */}
+          <SideNav
+            collapsed={railed}
+            onToggle={onToggle}
+            recent={[]}
+            badges={needs.count ? { "/library": { count: needs.count, label: needsSubjectsLabel(needs.count) } } : undefined}
+          />
+          <main ref={main} className={styles.main} id="main-content" tabIndex={-1}>
+            <div className={bleed ? styles.bleed : wide ? `${styles.page} ${styles.wide}` : styles.page}>
+              <Outlet />
+            </div>
+          </main>
+        </div>
+      </NeedsSubjectsContext.Provider>
     </NavRailContext.Provider>
   );
 }
