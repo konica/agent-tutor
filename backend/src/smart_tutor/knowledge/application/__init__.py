@@ -44,7 +44,6 @@ from smart_tutor.knowledge.ports.pdf_extractor import (
 __all__ = [
     "FIRST_PAGES",
     "MAX_QUERY_CHARS",
-    "MAX_QUERY_CHARS",
     "PDF_CONTENT_TYPE",
     "VIEWER_LINK_SECONDS",
     "ArchiveService",

@@ -269,7 +269,7 @@ def test_an_unknown_body_field_is_still_refused() -> None:
     assert c.post("/ask", json={**BODY, "turn_id": "x"}, headers=AUTH).status_code == 422
 
 
-def test_history_in_the_request_reaches_the_search_and_the_model() -> None:
+def test_history_in_the_request_reaches_the_search() -> None:
     retriever = FakeRetriever([CHUNK])
     c, _ = client(retriever)
     body = {

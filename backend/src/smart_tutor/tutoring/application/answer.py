@@ -24,7 +24,8 @@ like [1]. If the chunks don't answer the question, say so briefly instead of gue
 
 _MARKER = re.compile(r"\[(\d+(?:\s*[-\u2013,]\s*\d+)*)\]")  # [1], [1, 2], [1-3], and [1-3] with an en dash
 _RANGE = re.compile(r"\s*[-\u2013]\s*")
-_OLD_MARKER = re.compile(r"\s*,?\s*" + _MARKER.pattern)  # an earlier answer's markers point at chunks no longer given
+# An earlier answer's markers point at chunks no longer given; `x[0]` (no space before) is kept.
+_OLD_MARKER = re.compile(r"(?:\s*,)?\s+" + _MARKER.pattern + r"|^" + _MARKER.pattern)
 
 
 def covers(chunks: Sequence[RetrievedChunk], floor: float) -> bool:
@@ -51,7 +52,8 @@ def answer_messages(
     )
     earlier: list[BaseMessage] = []
     for turn in history:
-        earlier += [HumanMessage(turn.question), AIMessage(_OLD_MARKER.sub("", turn.answer))]
+        text = _OLD_MARKER.sub("", turn.answer).strip()
+        earlier += [HumanMessage(turn.question), AIMessage(text or "(no answer)")]
     return [SystemMessage(_SYSTEM), *earlier, HumanMessage(f"{blocks}\n\nQuestion: {question}")]
 
 

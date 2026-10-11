@@ -115,6 +115,19 @@ def test_history_messages_hold_no_chunk_text_and_no_old_citation_markers() -> No
     assert all("<chunk" not in m.text for m in messages[1:-1])
 
 
+def test_old_markers_are_stripped_only_after_whitespace_or_at_the_start() -> None:
+    def earlier(answer: str) -> object:
+        return answer_messages("Q", [HISTORY_CHUNK], [HistoryTurn("q", answer)])[2].content
+
+    assert earlier("Attention [1] weighs tokens [2, 3].") == "Attention weighs tokens."
+    assert earlier("Use x[0] and a[1] in Python.") == "Use x[0] and a[1] in Python."
+    assert earlier("[1] Start.") == "Start."
+
+
+def test_an_empty_earlier_answer_gets_a_stand_in() -> None:
+    assert answer_messages("Q", [HISTORY_CHUNK], [HistoryTurn("q", "")])[2].content == "(no answer)"
+
+
 def test_without_history_the_prompt_is_unchanged() -> None:
     assert answer_messages("Q", [HISTORY_CHUNK]) == answer_messages("Q", [HISTORY_CHUNK], [])
     assert len(answer_messages("Q", [HISTORY_CHUNK])) == 2

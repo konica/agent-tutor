@@ -35,7 +35,7 @@ from smart_tutor.shared.adapters.auth.bearer import BearerToken, CurrentPrincipa
 from smart_tutor.shared.adapters.auth.keycloak_introspection import keycloak_verifier
 from smart_tutor.shared.adapters.model_factory import ChatRole, ModelFactory
 from smart_tutor.shared.adapters.tracing import LearnerHasher, run_metadata, start_tracing
-from smart_tutor.shared.config import Settings
+from smart_tutor.shared.config import MAX_HISTORY_ANSWER_CHARS, MAX_HISTORY_TURNS, Settings
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.ports.token_verifier import TokenVerifier
 from smart_tutor.tutoring.adapters.mcp_retriever import McpRetriever
@@ -53,7 +53,7 @@ STREAM_MODES: list[Literal["messages", "updates"]] = ["messages", "updates"]
 class HistoryTurnBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     question: str = Field(min_length=1, max_length=4000)
-    answer: str = Field(max_length=8000)  # the API cuts answers well below this (history_answer_chars)
+    answer: str = Field(max_length=MAX_HISTORY_ANSWER_CHARS)  # the API cuts answers to history_answer_chars
 
 
 class AskRequest(BaseModel):
@@ -65,7 +65,7 @@ class AskRequest(BaseModel):
     thread_id: uuid.UUID | None = None
     run_id: uuid.UUID | None = None
     # Set by the API for a question in an existing conversation (ADR 0015): its last turns, oldest first.
-    history: list[HistoryTurnBody] = Field(default_factory=list, max_length=20)
+    history: list[HistoryTurnBody] = Field(default_factory=list, max_length=MAX_HISTORY_TURNS)
 
 
 def sse(event: str, data: dict[str, Any]) -> str:

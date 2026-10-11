@@ -5,7 +5,7 @@ Secrets come from Secrets Manager (via External Secrets) in prod.
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, NonNegativeInt, PositiveInt, SecretStr
+from pydantic import BaseModel, Field, PositiveInt, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -37,6 +37,11 @@ class ChunkingConfig(BaseModel):
 
     method: str = "recursive_character"
     params: dict[str, Any] = {"chunk_size": 1000, "chunk_overlap": 200}
+
+
+# The agent refuses more than this in an ask request (apps/agent/server.py), so settings may not exceed it.
+MAX_HISTORY_TURNS = 20
+MAX_HISTORY_ANSWER_CHARS = 8000
 
 
 class Settings(BaseSettings):
@@ -93,8 +98,8 @@ class Settings(BaseSettings):
     answer_floor: float = 0.3
     # Conversation history (PRD §9.2 step 3, ADR 0015): a question in an existing conversation sends the agent its
     # last `history_turns` turns (0 sends none), each earlier answer cut to `history_answer_chars` characters.
-    history_turns: NonNegativeInt = 5
-    history_answer_chars: PositiveInt = 2000
+    history_turns: int = Field(default=5, ge=0, le=MAX_HISTORY_TURNS)
+    history_answer_chars: int = Field(default=2000, gt=0, le=MAX_HISTORY_ANSWER_CHARS)
     models: ModelsConfig = ModelsConfig()
     chunking: ChunkingConfig = ChunkingConfig()
 
