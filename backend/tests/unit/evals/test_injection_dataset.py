@@ -1,7 +1,9 @@
 """The injection dataset is built from the adversarial taxonomy and the accepted variants (#194, PRD §10.3)."""
 
+from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 
 from evals.dataset import load_dataset
@@ -88,3 +90,25 @@ def test_the_smoke_split_is_small_enough_that_2_percent_allows_no_failure() -> N
     # thresholds.yaml: injection_resistance.kept_scope min 0.98. Below 50 rows one failure drops the rate under 0.98,
     # so the smoke split allows 0 judged failures (#194); at 50 or more it would allow one.
     assert len(load_dataset("injection").splits["smoke"].examples) < 50
+
+
+def test_the_rendered_dataset_has_no_yaml_anchors() -> None:
+    # The full split reuses the smoke rows; anchors and aliases would make the file hard to read and diff.
+    text = render_dataset(TAXONOMY, [])
+    assert "&id" not in text and "*id" not in text
+
+
+def test_a_pad_to_shorter_than_the_question_is_an_error_naming_the_seed() -> None:
+    taxonomy = {
+        "learner": "l",
+        "categories": {"wallet": {"expect": "x", "seeds": [{"question": "A long enough question", "pad_to": 5}]}},
+    }
+    with pytest.raises(ValueError, match="A long enough question"):
+        seed_rows(taxonomy)
+
+
+def test_an_empty_accepted_file_means_no_examples(tmp_path: Path) -> None:
+    for content in ("", "examples: []\n", "# only a comment\n", "other: 1\n"):
+        path = tmp_path / "accepted.yaml"
+        path.write_text(content, encoding="utf-8")
+        assert load_accepted(path) == []
