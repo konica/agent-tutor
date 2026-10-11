@@ -53,28 +53,18 @@ journalctl -u smart-tutor-backup -n 20           # ends with "Backed up smart_tu
 
 Use this when the volume or the database on it is damaged and a snapshot from before the damage is good enough. You lose the data written since that snapshot. A new volume is created from the snapshot, and the instance is replaced so its first boot attaches it, as in `on-premise-deploy.md` §7 "Replace the instance".
 
-1. **Pick the snapshot** (see "Check the backups"). Note its id, `snap-…`.
-2. **Set it in `infra/cdk.json`:** `"smart-tutor:on-premise-data-snapshot-id": "snap-…"`. Commit it to `main` through a PR, because every deploy reads `cdk.json`. **Leave it set afterwards.** Changing it again replaces the volume again, and clearing it replaces the restored volume with a **blank** one. CloudFormation snapshots the volume it replaces, so even that mistake can be undone the same way.
-3. **Deploy the Host stack.** The deploy on merge does this. To do it by hand:
+1. **Pick the snapshot** (see "Check the backups"). Note its id, `snap-…`. If it is one of the policy's daily snapshots, the policy deletes it after 7 days; that is fine once the volume exists, but copy it (EC2 → Snapshots → Copy) if you may need to restore from it again later.
+2. **Set it in `infra/cdk.json`** through a PR: `"smart-tutor:on-premise-data-snapshot-id": "snap-…"`. **Never pass it with `-c` to a `cdk deploy` by hand:** the next merge deploys `cdk.json` and replaces the restored volume with a blank one (the drill lost a restored volume this way; its final snapshot kept the data). Preview the change from `infra/` with `npx aws-cdk@2.1145.0 diff SmartTutor-OnPremise-prod-Host --exclusively -c smart-tutor:mode=on-premise`: it creates `DataVolumeFrom<snapshot id>` and a new `Instance`, and destroys the old volume and instance. **Leave it set afterwards.** Changing it again restores another snapshot, and clearing it replaces the volume with a **blank** one. CloudFormation snapshots every volume it deletes, so even that mistake can be undone the same way.
+3. **Merge the PR.** The deploy on merge (`on-premise-deploy.md` §3) does the rest. CloudFormation creates the volume from the snapshot as a new resource (an in-place update is something EC2 refuses), starts a new instance that attaches it, and moves the Elastic IP. It then terminates the old instance and deletes the old volume after a final snapshot of it. The workflow waits for the new VM, deploys the merged commit's images (migrations only move forward, so a snapshot from an older schema is migrated up), and runs the smoke test. The final snapshot has no description and isn't managed by the policy: delete it by hand once the restore is checked.
+4. **Check:** a learner signs in and their library and threads are as they were at the snapshot time. Caddy keeps its certificate (it is on the volume).
 
-   ```powershell
-   Push-Location infra
-   npx aws-cdk@latest diff SmartTutor-OnPremise-prod-Host -c smart-tutor:mode=on-premise   # Volume and Instance: replace
-   npx aws-cdk@latest deploy SmartTutor-OnPremise-prod-Host -c smart-tutor:mode=on-premise
-   Pop-Location
-   ```
-
-   CloudFormation creates the volume from the snapshot and starts a new instance that attaches it, then moves the Elastic IP. It terminates the old instance and deletes the old volume after taking a final snapshot of it. That final snapshot isn't managed by the policy: delete it by hand once the restore is checked.
-4. **Deploy an image tag** (`on-premise-deploy.md` §4, with the new `$InstanceId`). Use the tag that is running now: migrations only move forward, so a snapshot from an older schema is migrated up.
-5. **Check:** a learner signs in and their library and threads are as they were at the snapshot time. Caddy keeps its certificate (it is on the volume).
-
-A volume restored from a snapshot loads its blocks from S3 the first time each is read, so the first minutes are slow.
+A volume restored from a snapshot loads its blocks from S3 the first time each is read, so the first minutes are slow. If a `cdk deploy` of the Host stack fails and its rollback fails too (`UPDATE_ROLLBACK_FAILED`), every later deploy fails until you recover it: see Troubleshooting.
 
 ## Restore from a `pg_dump` onto a fresh VM
 
 Use this when the volume and its snapshots are gone (the Host stack was destroyed, the account lost them), or to recover a single bad night's change from up to 30 days back. You lose the data written since that dump.
 
-1. **A running VM with an empty database.** If the Host stack is gone, deploy the stacks and a tag (`on-premise-deploy.md` §2 and §4, with `smart-tutor:on-premise-data-snapshot-id` empty). The deploy creates the roles and databases, and the restore needs them.
+1. **A running VM with an empty database.** If the Host stack is gone, deploy the stacks and a tag (`on-premise-deploy.md` §2 and §4, with `smart-tutor:on-premise-data-snapshot-id` empty). If the stack is there but its volume is lost or not to be trusted, set the snapshot id to `""` in `infra/cdk.json` through a PR (or to `"snap-…"` → `""` if it held one): the merge gives a blank volume and a new VM, deploys, and passes the smoke test with an empty database. The deploy creates the roles and databases, and the restore needs them. A blank volume has no certificate, so Caddy requests one; Let's Encrypt issues at most 5 for the same name a week.
 2. **Pick the dump** (`aws s3 ls "s3://$Bucket/backups/postgres/"`). The timestamp is the folder name, for example `2026-10-09T200312Z`.
 3. **Restore it** in a Session Manager shell:
 
@@ -90,20 +80,33 @@ Documents follow the database, not the bucket. Documents uploaded after the back
 
 ## Restore drill
 
-The PRD asks for one drill before the pilot starts, while the database holds only test data. The drill restores the newest dump onto the running VM (step 3 onwards above), which replaces today's changes:
+The PRD asks for one drill before the pilot starts, while the database holds only test data. A drill runs both paths: a snapshot onto a new volume, and a dump onto a fresh VM. Each replaces the data written since its backup.
 
-1. Sign in as the test learner and make changes you can recognize: create a learner account in the admin console, and once uploads work (#149), upload a document and start a thread.
-2. `systemctl start smart-tutor-backup`, and note the timestamp it prints.
-3. Undo the changes: delete the account, the document, and the thread.
-4. Run `restore.sh` with that timestamp, then deploy the same tag.
-5. The account signs in again, and the document and thread are back. The document opens at a citation.
-6. Optionally, run the snapshot path the same way with today's snapshot.
+1. **Make data you can recognize.** As the test learner, upload a document and ask about it, and keep both: `deploy/pilot/smoke_test.py --end-to-end` deletes its document, so upload through the app. Create a second account in the admin console.
+2. **Fingerprint the data** on the VM, so a restore can be compared with it exactly:
+
+   ```bash
+   dc exec -T postgres psql -U postgres -d smart_tutor -At -c "select format('select %L, count(*) from public.%I', table_name, table_name) from information_schema.tables where table_schema='public' and table_type='BASE TABLE' order by 1" \
+     | while read -r q; do dc exec -T postgres psql -U postgres -d smart_tutor -At -c "$q" < /dev/null; done
+   dc exec -T postgres psql -U postgres -d smart_tutor -At -c "select md5(string_agg(thread_id::text, ',' order by thread_id)) from threads"
+   dc exec -T postgres psql -U postgres -d smart_tutor -At -c "select md5(string_agg(document_id::text, ',' order by document_id)) from documents"
+   dc exec -T postgres psql -U postgres -d keycloak -At -c "select count(*), md5(string_agg(u.username, ',' order by u.username)) from user_entity u join realm r on r.id = u.realm_id where r.name <> 'master'"
+   ```
+
+   (`< /dev/null` matters: without it `dc exec` reads the rest of the loop's input.) It prints row counts and hashes, never a learner's data.
+3. **Back up:** `systemctl start smart-tutor-backup` (note the timestamp it prints), then snapshot the data volume (EC2 → Volumes → the `DataVolumeId` output → Create snapshot).
+4. **Snapshot path:** "Restore from a snapshot" with that snapshot. Fingerprint again: it must equal step 2.
+5. **Dump path:** "Restore from a `pg_dump` onto a fresh VM" with that dump, starting from a blank volume. Fingerprint again: it must equal step 2.
+6. After each path, the second account is listed in the admin console, the document opens from the Library, its thread is listed, and the end-to-end smoke test passes (`on-premise-deploy.md` §5).
 
 Record each drill:
 
 | Date | Path | Backup | Result | By |
 |---|---|---|---|---|
-| | | | | |
+| 2026-10-11 | Snapshot, `cdk deploy -c …snapshot-id` by hand | `snap-0463b98fe3c21b1d3` | **Failed.** CloudFormation updated `SnapshotId` in place, which EC2 refuses; the rollback failed the same way and left the Host stack in `UPDATE_ROLLBACK_FAILED` (recovered as in Troubleshooting; the volume was never changed). Fixed in #155's PR: a restored volume is a new resource | Claude Code for the product owner |
+| 2026-10-11 | Snapshot, by hand, after the fix | `snap-0463b98fe3c21b1d3` | Volume and instance replaced in 2.5 min (CloudFormation 08:18:46–08:21:16 UTC). **Not checked:** a merge (#229) deployed `cdk.json` 17 minutes later and replaced the restored volume with a blank one; its final snapshot `snap-046c10c4b56e7790d` kept the data. Hence step 2 of "Restore from a snapshot" | Claude Code for the product owner |
+| 2026-10-11 | Dump onto a fresh VM (the blank volume above) | `2026-10-11T025404Z` | **Passed.** `restore.sh` 42 s, the redeploy of the same tag about 2 min, so the product was down about 3 minutes. The fingerprint equals the backup's (11 tables, 2 Keycloak accounts, thread and document ids). The document opens, its thread is listed, and the end-to-end smoke test passed. Caddy got a new certificate | Claude Code for the product owner |
+| 2026-10-11 | Snapshot through a `cdk.json` PR | `snap-0a78e35899360960f` | Pending: recorded after #155's PR is merged and deployed | |
 
 ## Scheduled jobs on the VM (timer pattern)
 
@@ -157,4 +160,5 @@ Keep in mind:
 | `No space left on device` | The dumps are written to `/data/backups` before the upload. Check `df -h /data` and grow the volume. |
 | The timer isn't listed | No deploy has run since #151, or the env file is missing. Run a deploy. |
 | `restore.sh` fails in `pg_restore` | A database may be half restored. Fix the cause (the error is above it) and run it again: it drops and recreates each database. The services stay stopped until a deploy. |
+| The Host stack is `UPDATE_ROLLBACK_FAILED`, and every deploy fails | An update and its rollback both failed on one resource, for example the data volume before #155 (EC2 refuses to change a volume's snapshot in place). Check that the resource itself is unchanged (for the volume: `aws ec2 describe-volumes --volume-ids <DataVolumeId>` shows it still attached to the instance), then skip it in the rollback: `aws cloudformation continue-update-rollback --stack-name SmartTutor-OnPremise-prod-Host --resources-to-skip <logical id>` and `aws cloudformation wait stack-rollback-complete --stack-name SmartTutor-OnPremise-prod-Host`. Re-run the failed deploy (Actions → deploy). |
 | No alert email although the alarm is in ALARM | The subscription is unconfirmed: SNS → Topics → `…-alerts` → Subscriptions. Request the confirmation again there. |
