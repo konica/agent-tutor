@@ -319,7 +319,7 @@ Deletes every on-premise stack, in this order:
 |---|---|---|
 | Deleted | `Host`: the VM, the Elastic IP, the VPC, the data volume (after a final snapshot), the snapshot policy, the alarms and alert topic, the uptime check, the patching window, the deploy document, and the database and test-learner secrets | |
 | Deleted | `Registry`: the repositories `smart-tutor-on-premise/*` and their images | The next build recreates them, empty. |
-| Deleted | `Config`: the SSM parameters under `/smart-tutor-on-premise/` and the Keycloak secrets | |
+| Deleted | `Config`: the SSM parameters under `/smart-tutor-on-premise/`, the Keycloak secrets, and the LangSmith learner-hash key `smart-tutor-on-premise/langsmith/learner-hash-key` | |
 | Deleted | `Storage`: the queues `smart-tutor-on-premise-ingest` and `smart-tutor-on-premise-ingest-dlq` | The bucket stays (below). |
 | Deleted | `Budgets`: the budget `smart-tutor-on-premise-prod-monthly` | |
 | Deleted | `GitHubDeploy`: the role `smart-tutor-on-premise-github-deploy` | The role only imports the GitHub OIDC provider, so the provider stays. |
@@ -327,6 +327,7 @@ Deletes every on-premise stack, in this order:
 | Kept | The final data-volume snapshot and the daily snapshots (up to 7) | The database, Keycloak's users, and Caddy's certificates. Data Lifecycle Manager leaves its snapshots behind when its policy is deleted. |
 | Kept | The DuckDNS name `smart-tutor.duckdns.org` | In the DuckDNS account, pointed at `127.0.0.1` by step 4. The next deploy points it at the new Elastic IP. |
 | Kept | The secret `smart-tutor-on-premise/duckdns/token` | Created by hand, not by a stack (section 9). |
+| Kept | The secret `smart-tutor-on-premise/langsmith/api-key` | Created by hand, not by a stack (section 10). |
 | Kept | The account's GitHub OIDC provider and the CDK bootstrap (`CDKToolkit`) | Native-cloud created the provider and still uses it; both modes deploy with the bootstrap. |
 | Kept | The GitHub environment `on-premise` and its variables | So on-premise can be redeployed. |
 
@@ -337,6 +338,7 @@ $VolumeId = "<the DataVolumeId from step 2>"
 aws ec2 describe-snapshots --owner-ids self --filters "Name=volume-id,Values=$VolumeId" --query "Snapshots[].SnapshotId" --output text
 aws ec2 delete-snapshot --snapshot-id <snapshot id>   # once per snapshot
 aws secretsmanager delete-secret --secret-id smart-tutor-on-premise/duckdns/token --force-delete-without-recovery
+aws secretsmanager delete-secret --secret-id smart-tutor-on-premise/langsmith/api-key --force-delete-without-recovery
 ```
 
 The bucket is versioned: in the S3 console, **Empty** it (all versions), then **Delete** it. `aws s3 rm --recursive` would leave the old versions behind.
