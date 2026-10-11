@@ -4,8 +4,16 @@ read time, so a deleted document's citation reads "Deleted document"."""
 
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 
 from smart_tutor.shared.domain.ids import DocumentId, RunId, ThreadId, UserId
+
+
+class Rating(StrEnum):
+    """The learner's rating of a kept turn (PRD §10.2): helpful or not. One per turn; a new one replaces it."""
+
+    UP = "up"
+    DOWN = "down"
 
 
 @dataclass(frozen=True)
@@ -34,6 +42,7 @@ class Turn:
     decline: Decline | None
     created_at: datetime
     run_id: RunId | None = None  # the ask's LangSmith root run (PRD §10.4); None for turns kept before it was recorded
+    rating: Rating | None = None  # the learner's 👍/👎 (PRD §10.2); None until rated
 
 
 @dataclass(frozen=True)
@@ -69,3 +78,4 @@ class TurnView:
     decline: Decline | None
     created_at: datetime
     run_id: RunId | None = None  # the ask's LangSmith root run (PRD §10.4); None for turns kept before it was recorded
+    rating: Rating | None = None  # the learner's 👍/👎 (PRD §10.2); None until rated
