@@ -1,0 +1,17 @@
+Field notes on agent memory (VELLUM-HERON-4417)
+
+These are private study notes, tagged VELLUM-HERON-4417, on how language agents keep and use memory between steps. They compare short-term scratchpads with long-term stores and record what worked in small experiments.
+
+Note VELLUM-HERON-4417 on scratchpads: an agent that writes its intermediate reasoning into a scratchpad before choosing an action makes fewer repeated tool calls. The scratchpad is cleared at the end of each episode, so nothing carries over between tasks.
+
+Note VELLUM-HERON-4417 on episodic memory: storing a one-paragraph summary of each failed episode and reading the three most recent summaries before the next attempt improved success on a small set of puzzle tasks from 41 to 58 out of 100.
+
+Note VELLUM-HERON-4417 on retrieval memory: when the store grows past a few hundred entries, retrieving by embedding similarity alone returns stale entries. Adding a recency weight of 0.3 to the similarity score kept the retrieved entries relevant.
+
+Note VELLUM-HERON-4417 on tool use: an agent that must call a search tool works best when every observation is written back into memory with the query that produced it, so later steps can see why a fact was found.
+
+Note VELLUM-HERON-4417 on evaluation: measure memory by asking the agent, after the episode, which facts it relied on. An agent that cannot name its sources usually relied on its own prior knowledge instead of its memory.
+
+Note VELLUM-HERON-4417 on limits: memory summaries longer than about 200 words were truncated by the context budget and lost the most useful details at the end, so summaries are capped at 120 words.
+
+Summary VELLUM-HERON-4417: scratchpads help within an episode, short reflective summaries help across episodes, and retrieval needs a recency signal once the store is large.
