@@ -1,8 +1,10 @@
 """Hand-written eval datasets: loaded from datasets/, pushed to LangSmith once per version (PRD §10.3 item 6)."""
 
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
+from langsmith.utils import LangSmithError, LangSmithNotFoundError
 
 from evals.corpus import load_manifest
 from evals.dataset import Dataset, DatasetError, Example, Split, load_dataset, versioned_examples
@@ -77,3 +79,13 @@ def test_a_new_version_replaces_the_split_and_the_old_tag_keeps_its_examples() -
     assert _pairs(versioned_examples(client, v2, v2.splits["smoke"])) == _pairs([Q2])
     old = client.list_examples(dataset_name="smart-tutor-ask", splits=["smoke"], as_of="smoke-v1")
     assert _pairs(list(old)) == _pairs([Q1, Q2])
+
+
+def test_the_fake_refuses_to_tag_a_guessed_version_and_to_list_an_unknown_tag() -> None:
+    client = FakeLangSmith()
+    versioned_examples(client, _dataset(Q1), _dataset(Q1).splits["smoke"])
+    guessed = client.datasets["smart-tutor-ask"].tags["smoke-v1"] + timedelta(microseconds=1)
+    with pytest.raises(LangSmithError):
+        client.update_dataset_tag(dataset_name="smart-tutor-ask", as_of=guessed, tag="x")
+    with pytest.raises(LangSmithNotFoundError):
+        client.list_examples(dataset_name="smart-tutor-ask", as_of="nope")

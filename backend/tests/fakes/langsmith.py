@@ -10,7 +10,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from langsmith.evaluation import EvaluationResult
-from langsmith.utils import LangSmithNotFoundError
+from langsmith.schemas import DatasetVersion
+from langsmith.utils import LangSmithError, LangSmithNotFoundError
 
 START = datetime(2026, 10, 11, tzinfo=UTC)
 
@@ -76,15 +77,29 @@ class FakeLangSmith:
     def create_dataset(self, dataset_name: str, *, description: str | None = None) -> None:
         self.datasets[dataset_name] = _Dataset()
 
-    def read_dataset_version(self, *, dataset_name: str, tag: str) -> dict[str, Any]:
-        if tag not in self.datasets[dataset_name].tags:
-            raise LangSmithNotFoundError(f"no version tagged {tag}")
-        return {"tags": [tag], "as_of": self.datasets[dataset_name].tags[tag]}
+    def read_dataset_version(
+        self, *, dataset_name: str, as_of: datetime | None = None, tag: str | None = None
+    ) -> DatasetVersion:
+        if (as_of is None) == (tag is None):
+            raise ValueError("Exactly one of as_of and tag must be specified.")
+        dataset = self.datasets[dataset_name]
+        if tag is not None:
+            if tag not in dataset.tags:
+                raise LangSmithNotFoundError(f"no version tagged {tag}")
+            return DatasetVersion(tags=[tag], as_of=dataset.tags[tag])
+        assert as_of is not None
+        found = [at for at, _ in dataset.versions if at <= as_of]
+        if not found:
+            raise LangSmithNotFoundError(f"no version at or before {as_of}")
+        at = max(found)
+        return DatasetVersion(tags=[t for t, when in dataset.tags.items() if when == at], as_of=at)
 
     def list_examples(
         self, *, dataset_name: str, splits: Sequence[str] | None = None, as_of: str | datetime | None = None
     ) -> Iterator[FakeExample]:
         dataset = self.datasets[dataset_name]
+        if isinstance(as_of, str) and as_of not in dataset.tags:
+            raise LangSmithNotFoundError(f"no version tagged {as_of}")
         when = dataset.tags[as_of] if isinstance(as_of, str) else as_of
         return iter([e for e in dataset.at(when) if splits is None or e.split in splits])
 
@@ -103,7 +118,10 @@ class FakeLangSmith:
         dataset.versions.append((now, dataset.at(None) + new))
 
     def update_dataset_tag(self, *, dataset_name: str, as_of: datetime, tag: str) -> None:
-        self.datasets[dataset_name].tags[tag] = as_of
+        dataset = self.datasets[dataset_name]
+        if as_of not in [at for at, _ in dataset.versions]:
+            raise LangSmithError(f"{as_of} is not an exact version of {dataset_name}")
+        dataset.tags[tag] = as_of
 
     async def aevaluate(
         self,

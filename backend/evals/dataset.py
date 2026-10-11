@@ -88,7 +88,9 @@ def _push(client: langsmith.Client, dataset: Dataset, split: Split) -> None:
         dataset_name=dataset.name,
         examples=[{"inputs": e.inputs, "outputs": e.outputs, "split": split.name} for e in split.examples],
     )
-    # Tag the version that holds the new examples: the latest change among them (the server's clock, not ours).
+    # Tag the version that holds the new examples. Tagging needs an exact version time, so ask LangSmith for the
+    # version at the latest change among them (the server's clock, not ours) instead of tagging that guess.
     pushed = list(client.list_examples(dataset_name=dataset.name, splits=[split.name]))
     latest = max(e.modified_at or e.created_at for e in pushed)
-    client.update_dataset_tag(dataset_name=dataset.name, as_of=latest, tag=split.version)
+    version = client.read_dataset_version(dataset_name=dataset.name, as_of=latest)
+    client.update_dataset_tag(dataset_name=dataset.name, as_of=version.as_of, tag=split.version)
