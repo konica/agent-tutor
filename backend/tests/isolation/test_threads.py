@@ -321,6 +321,38 @@ def test_each_learner_lists_only_their_own_threads() -> None:
     assert a_list[0]["thread_id"] != b_list[0]["thread_id"]
 
 
+def test_filtering_by_a_shared_subject_lists_only_the_callers_threads() -> None:
+    """Two learners whose conversations used documents of the same shared subject each filter to only their own."""
+    library, threads = InMemoryLibrary(), InMemoryThreads()
+    same_text = "Attention weighs tokens."
+    documents = {
+        "token-a": ingest_ready(library, "learner-a", same_text, subject_ids=[SHARED]),
+        "token-b": ingest_ready(library, "learner-b", same_text, subject_ids=[SHARED]),
+    }
+
+    def own_document_answer(request: httpx.Request) -> httpx.Response:
+        document = documents[request.headers["authorization"].removeprefix("Bearer ")]
+        body = (
+            b'event: delta\ndata: {"text": "Hi"}\n\n'
+            + f'event: sources\ndata: {{"document_ids": ["{document}"]}}\n\n'.encode()
+            + b"event: done\ndata: {}\n\n"
+        )
+        return httpx.Response(200, content=body, headers={"content-type": "text/event-stream"})
+
+    catalog = InMemorySubjects({SHARED: "Shared"})
+    services = api_services(library, threads=threads, catalog=catalog, agent=fake_agent(own_document_answer))
+    client = TestClient(create_app(Settings(), verifier=learners(), services=services))
+    assert client.post("/threads", json={"question": "What is attention?"}, headers=A).status_code == 200
+    assert client.post("/threads", json={"question": "What is attention?"}, headers=B).status_code == 200
+    owned = {t.user_id: t.thread_id for t in threads.threads.values()}
+
+    a_list = client.get("/threads", params={"subject_id": SHARED, "q": "attention"}, headers=A).json()
+    b_list = client.get("/threads", params={"subject_id": SHARED}, headers=B).json()
+
+    assert [t["thread_id"] for t in a_list] == [owned["learner-a"]]
+    assert [t["thread_id"] for t in b_list] == [owned["learner-b"]]
+
+
 def test_asking_in_another_learners_thread_loads_none_of_its_turns() -> None:
     library, threads = InMemoryLibrary(), InMemoryThreads()
     ingest_ready(library, "learner-a", "Attention weighs tokens.")

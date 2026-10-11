@@ -2018,8 +2018,76 @@
     },
     "/threads": {
       "get": {
-        "description": "The learner's active conversations, newest last activity first (PRD US-13): title, subjects of the documents\nused (deleted ones excluded), number of documents, last activity.",
+        "description": "The learner's active conversations, newest last activity first (PRD US-13): title, subjects of the documents\nused (deleted ones excluded), number of documents, last activity.\n\n`subject_id` repeats; a conversation matches when any of its listed documents that still exist has any of them.\n`active_from` and `active_to` are inclusive calendar days of last activity in the app time zone (D27). `q` is a\ncase-insensitive part of the title; answers are not searched (Q63). The filters combine; blank `q` is ignored.",
         "operationId": "list_threads",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "subject_id",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "maxItems": 100,
+              "title": "Subject Id",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "active_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Active From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "active_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Active To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -2034,6 +2102,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "security": [
