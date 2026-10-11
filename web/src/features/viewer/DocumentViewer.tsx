@@ -10,6 +10,7 @@ import { PassageHighlight } from "./PassageHighlight";
 import type { PdfDoc, PdfLoader } from "./pdf";
 import { useChunk, usePassageHighlight, usePassageReveal, type Highlight } from "./useChunk";
 import { useDocumentFile } from "./useDocumentFile";
+import { usePageFlip, type FlipDirection } from "./usePageFlip";
 import { ViewerToolbar, ZOOM_STEPS } from "./ViewerToolbar";
 
 /** A cited passage to show (PRD US-4b). Each new object means "jump to it", even for the same chunk. */
@@ -82,6 +83,8 @@ function Viewer({
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const renderChain = useRef<Promise<void>>(Promise.resolve());
+  // Where a page reached by flipping opens: its top going down, its bottom going up, so reading continues (#212).
+  const landAt = useRef<FlipDirection | null>(null);
 
   // The document stays known while Retry fetches a new link, so the title doesn't flicker back to "Document".
   const [document, setKnownDocument] = useState<DocumentResponse | null>(null);
@@ -131,7 +134,14 @@ function Viewer({
       if (!live) return;
       const pdfPage = await doc.page(page);
       if (!live || !canvasRef.current) return;
-      await pdfPage.render(canvasRef.current, zoom / 100);
+      const drawn = pdfPage.render(canvasRef.current, zoom / 100);
+      // A flipped-to page lands once the canvas has its size, which render sets before it draws.
+      const area = canvasAreaRef.current;
+      if (landAt.current !== null && area) {
+        area.scrollTop = landAt.current > 0 ? 0 : Math.max(0, area.scrollHeight - area.clientHeight);
+        landAt.current = null;
+      }
+      await drawn;
       if (live) setRendered(true);
     });
     renderChain.current = run.catch(() => {});
@@ -175,6 +185,14 @@ function Viewer({
     setMoved(true);
     onPageChange?.(clamped);
   };
+
+  const flip = (dir: FlipDirection) => {
+    if (numPages === null || page + dir < 1 || page + dir > numPages) return false;
+    landAt.current = dir;
+    goTo(page + dir);
+    return true;
+  };
+  usePageFlip(canvasAreaRef, flip);
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key === "PageDown") {
