@@ -14,6 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from fakes import (
+    FakeAnswerFeedback,
     FakeTokenVerifier,
     FixedClock,
     InMemoryLibrary,
@@ -26,10 +27,10 @@ from fakes import (
 from smart_tutor.apps.api.main import create_app
 from smart_tutor.knowledge.application import DocumentService
 from smart_tutor.shared.config import Settings
-from smart_tutor.shared.domain.ids import DocumentId, SubjectId, ThreadId, UserId
+from smart_tutor.shared.domain.ids import DocumentId, RunId, SubjectId, ThreadId, UserId
 from smart_tutor.shared.domain.principal import Principal
 from smart_tutor.subjects.application import SubjectNames
-from smart_tutor.tutoring.application import AnsweredTurn, ConversationService, Thread, Turn
+from smart_tutor.tutoring.application import AnsweredTurn, ConversationService, Rating, Thread, Turn
 from smart_tutor.tutoring.domain.thread import ThreadStatus
 
 AUTH = {"Authorization": "Bearer t-ada"}
@@ -59,14 +60,14 @@ def sse_no_documents(request: httpx.Request) -> httpx.Response:
 
 
 def setup(
-    handler: Handler = sse_ok, ready_document: bool = True
+    handler: Handler = sse_ok, ready_document: bool = True, feedback: FakeAnswerFeedback | None = None
 ) -> tuple[TestClient, InMemoryThreads, FakeTokenVerifier]:
     verifier = FakeTokenVerifier()
     verifier.add("t-ada", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
     library, threads = InMemoryLibrary(), InMemoryThreads()
     if ready_document:
         ingest_ready(library, "ada", "Attention weighs tokens.")
-    services = api_services(library, threads=threads, agent=fake_agent(handler))
+    services = api_services(library, threads=threads, agent=fake_agent(handler), feedback=feedback)
     return TestClient(create_app(Settings(), verifier=verifier, services=services)), threads, verifier
 
 
@@ -90,9 +91,10 @@ def test_starts_a_thread_and_relays_the_agents_answer_after_a_thread_event() -> 
     assert thread.user_id == "ada"
     first, rest = response.text.split("\n\n", 1)
     assert first.startswith("event: thread\n")
-    assert json.loads(first.split("data: ", 1)[1]) == {"thread_id": thread.thread_id}
-    assert rest == AGENT_ANSWER.decode()  # the agent's events follow, byte-identical
     [request] = seen
+    run_id = json.loads(request.content)["run_id"]
+    assert json.loads(first.split("data: ", 1)[1]) == {"thread_id": thread.thread_id, "run_id": run_id}
+    assert rest == AGENT_ANSWER.decode()  # the agent's events follow, byte-identical
     assert request.url == "http://agent.test/ask"
     assert request.headers["authorization"] == "Bearer t-ada"  # the same token, forwarded (ADR 0007)
     assert json.loads(request.content)["question"] == "What is attention?"
@@ -183,7 +185,9 @@ def test_without_ready_documents_the_agents_upload_request_is_streamed_and_kept(
 
     assert response.status_code == 200 and len(seen) == 1
     [thread] = threads.threads.values()
-    assert response.text == f'event: thread\ndata: {{"thread_id": "{thread.thread_id}"}}\n\n' + NO_DOCUMENTS.decode()
+    run_id = json.loads(seen[0].content)["run_id"]
+    thread_event = f'event: thread\ndata: {{"thread_id": "{thread.thread_id}", "run_id": "{run_id}"}}\n\n'
+    assert response.text == thread_event + NO_DOCUMENTS.decode()
     [turn] = threads.turns(ThreadId(thread.thread_id), UserId("ada"))
     assert turn.answer == "" and turn.decline is not None and turn.decline.code == "no_documents"
 
@@ -679,9 +683,12 @@ def test_a_question_in_a_limited_thread_sends_its_listed_documents_to_the_agent(
     assert response.status_code == 200
     first, rest = response.text.split("\n\n", 1)
     assert first.startswith("event: thread\n")
-    assert json.loads(first.split("data: ", 1)[1]) == {"thread_id": thread_id}
-    assert rest == AGENT_ANSWER.decode()
     [request] = seen
+    assert json.loads(first.split("data: ", 1)[1]) == {
+        "thread_id": thread_id,
+        "run_id": json.loads(request.content)["run_id"],
+    }
+    assert rest == AGENT_ANSWER.decode()
     assert json.loads(request.content)["document_ids"] == [doc]
 
 
@@ -881,7 +888,7 @@ def test_a_done_answer_is_kept_as_a_turn_with_its_citations() -> None:
             "deleted": False,
         }
     ]
-    assert set(turn) == {"question", "answer", "citations", "decline", "created_at", "run_id"}
+    assert set(turn) == {"question", "answer", "citations", "decline", "created_at", "run_id", "rating"}
 
 
 def test_a_decline_is_kept_as_a_turn() -> None:
@@ -1028,6 +1035,93 @@ def test_a_turn_kept_without_a_run_id_lists_none() -> None:
     threads.turn_rows[:] = [dataclasses.replace(t, run_id=None) for t in threads.turn_rows]
     [older] = client.get(f"/threads/{thread.thread_id}/turns", headers=AUTH).json()
     assert older["run_id"] is None
+
+
+def rating_url(thread_id: str, run_id: str) -> str:
+    return f"/threads/{thread_id}/turns/{run_id}/rating"
+
+
+def answered(
+    handler: Handler = sse_ok, feedback: FakeAnswerFeedback | None = None, ready_document: bool = True
+) -> tuple[TestClient, str, str]:
+    """A client with one asked question: its thread id and the ask's run id (as the agent saw it)."""
+    seen: list[httpx.Request] = []
+    client, threads, _ = setup(recording(seen, handler), ready_document=ready_document, feedback=feedback)
+    client.post("/threads", json=QUESTION, headers=AUTH)
+    [thread] = threads.threads.values()
+    return client, thread.thread_id, json.loads(seen[0].content)["run_id"]
+
+
+def test_the_thread_event_carries_the_asks_run_id() -> None:
+    seen: list[httpx.Request] = []
+    client, threads, _ = setup(recording(seen))
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    data = json.loads(response.text.split("\n\n", 1)[0].split("data: ", 1)[1])
+    [thread] = threads.threads.values()
+    [turn] = client.get(f"/threads/{thread.thread_id}/turns", headers=AUTH).json()
+    assert set(data) == {"thread_id", "run_id"}
+    assert data["run_id"] == json.loads(seen[0].content)["run_id"] == turn["run_id"]
+
+
+def test_a_learner_rates_a_turn_and_sees_the_rating_with_the_turn() -> None:
+    feedback = FakeAnswerFeedback()
+    client, thread_id, run_id = answered(feedback=feedback)
+
+    up = client.put(rating_url(thread_id, run_id), json={"rating": "up"}, headers=AUTH)
+    [turn] = client.get(f"/threads/{thread_id}/turns", headers=AUTH).json()
+    assert up.status_code == 200 and up.json() == {"rating": "up"} and turn["rating"] == "up"
+
+    down = client.put(rating_url(thread_id, run_id), json={"rating": "down"}, headers=AUTH)
+    [turn] = client.get(f"/threads/{thread_id}/turns", headers=AUTH).json()
+    assert down.status_code == 200 and turn["rating"] == "down"
+    assert feedback.sent == [(RunId(run_id), Rating.UP), (RunId(run_id), Rating.DOWN)]
+
+
+def test_an_unrated_turn_lists_a_null_rating() -> None:
+    client, thread_id, _ = answered()
+    [turn] = client.get(f"/threads/{thread_id}/turns", headers=AUTH).json()
+    assert turn["rating"] is None
+
+
+def test_a_decline_can_be_rated() -> None:
+    feedback = FakeAnswerFeedback()
+    client, thread_id, run_id = answered(sse_no_documents, feedback=feedback, ready_document=False)
+
+    response = client.put(rating_url(thread_id, run_id), json={"rating": "down"}, headers=AUTH)
+
+    assert response.status_code == 200 and feedback.sent == [(RunId(run_id), Rating.DOWN)]
+
+
+def test_rating_an_unknown_run_is_404() -> None:
+    feedback = FakeAnswerFeedback()
+    client, thread_id, _ = answered(feedback=feedback)
+
+    response = client.put(rating_url(thread_id, str(uuid.uuid4())), json={"rating": "up"}, headers=AUTH)
+
+    assert response.status_code == 404 and feedback.sent == []
+
+
+@pytest.mark.parametrize(
+    "body", [{"rating": "meh"}, {"rating": "up", "user_id": "x"}, {}], ids=["value", "extra", "none"]
+)
+def test_a_rating_must_be_up_or_down(body: dict[str, str]) -> None:
+    feedback = FakeAnswerFeedback()
+    client, thread_id, run_id = answered(feedback=feedback)
+
+    response = client.put(rating_url(thread_id, run_id), json=body, headers=AUTH)
+
+    assert response.status_code == 422 and feedback.sent == []
+
+
+def test_a_feedback_outage_still_saves_the_rating() -> None:
+    client, thread_id, run_id = answered(feedback=FakeAnswerFeedback(error=ConnectionError()))
+
+    response = client.put(rating_url(thread_id, run_id), json={"rating": "up"}, headers=AUTH)
+
+    [turn] = client.get(f"/threads/{thread_id}/turns", headers=AUTH).json()
+    assert response.status_code == 200 and turn["rating"] == "up"
 
 
 IR = SubjectId("00000000-0000-4000-8000-0000000000a1")

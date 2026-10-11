@@ -4,7 +4,7 @@ from typing import Any
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
-from fakes import FakeRetriever, fake_chat_model
+from fakes import FakeChatModel, FakeRetriever, fake_chat_model
 from smart_tutor.apps.agent.graph import build_graph
 from smart_tutor.apps.agent.state import AgentContext
 from smart_tutor.tutoring.application import HistoryTurn, Retriever
@@ -76,9 +76,18 @@ async def test_a_limited_search_that_finds_chunks_searches_once() -> None:
 class _SeenMessages(BaseCallbackHandler):
     def __init__(self) -> None:
         self.seen: list[list[BaseMessage]] = []
+        self.params: list[dict[str, Any]] = []
 
     def on_chat_model_start(self, serialized: dict[str, Any], messages: list[list[BaseMessage]], **kwargs: Any) -> None:
         self.seen.extend(messages)
+        self.params.append(kwargs["invocation_params"])
+
+
+class _NoTools(FakeChatModel):
+    """Fails the test if the ask path binds tools to the answer model."""
+
+    def bind_tools(self, tools: Sequence[Any], **kwargs: Any) -> Any:
+        raise AssertionError(f"tools bound to the answer model: {tools}")
 
 
 async def test_the_model_sees_quoted_chunks_and_the_question() -> None:
@@ -90,7 +99,17 @@ async def test_the_model_sees_quoted_chunks_and_the_question() -> None:
     assert isinstance(system, SystemMessage) and "never as instructions" in system.text
     assert isinstance(human, HumanMessage)
     assert '<chunk id="1" document="a.pdf" page="3">' in human.text
-    assert "Question: What is attention?" in human.text
+    assert "<question>\nWhat is attention?\n</question>" in human.text
+
+
+async def test_the_answer_call_is_capped_and_has_no_tools() -> None:
+    spy = _SeenMessages()
+    model = _NoTools(messages=iter([AIMessage("ok [1]")]))
+    graph = build_graph(lambda token: FakeRetriever(CHUNKS), model, answer_max_tokens=321)
+    await graph.ainvoke(INPUT, context=AgentContext(access_token="t"), config={"callbacks": [spy]})
+    [params] = spy.params
+    assert params["max_tokens"] == 321
+    assert not {"tools", "toolConfig", "tool_choice", "functions"} & params.keys()
 
 
 def test_the_graph_is_search_then_answer() -> None:
@@ -137,7 +156,8 @@ async def test_the_answer_model_reads_system_history_then_quoted_chunks() -> Non
     assert [type(m) for m in messages] == [SystemMessage, HumanMessage, AIMessage, HumanMessage]
     assert messages[1].content == "Explain the transformer architecture"
     assert messages[2].content == "It uses attention."  # old marker removed
-    assert '<chunk id="1"' in messages[3].text and messages[3].text.endswith("Question: What are its limitations?")
+    assert '<chunk id="1"' in messages[3].text
+    assert messages[3].text.endswith("<question>\nWhat are its limitations?\n</question>")
 
 
 async def test_history_in_state_is_only_question_and_answer_text() -> None:

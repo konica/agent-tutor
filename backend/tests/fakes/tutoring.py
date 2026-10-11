@@ -6,11 +6,12 @@ from collections.abc import Sequence
 from dataclasses import replace
 from datetime import datetime
 
-from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
+from smart_tutor.shared.domain.ids import DocumentId, RunId, ThreadId, UserId
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
-from smart_tutor.tutoring.domain.turn import Turn
+from smart_tutor.tutoring.domain.turn import Rating, Turn
+from smart_tutor.tutoring.ports.answer_feedback import AnswerFeedback
 from smart_tutor.tutoring.ports.retriever import Retriever
 from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
 
@@ -85,6 +86,26 @@ class InMemoryThreads(ThreadRepository):
 
     def last_turns(self, thread_id: ThreadId, user_id: UserId, limit: int) -> list[Turn]:
         return self.turns(thread_id, user_id)[-limit:] if limit > 0 else []
+
+    def set_rating(self, thread_id: ThreadId, user_id: UserId, run_id: RunId, rating: Rating) -> bool:
+        for i, t in enumerate(self.turn_rows):
+            if t.thread_id == thread_id and t.user_id == user_id and t.run_id == run_id:
+                self.turn_rows[i] = dataclasses.replace(t, rating=rating)
+                return True
+        return False
+
+
+class FakeAnswerFeedback(AnswerFeedback):
+    """Records each rating sent; raises `error` from send when given one."""
+
+    def __init__(self, error: Exception | None = None) -> None:
+        self.sent: list[tuple[RunId, Rating]] = []
+        self._error = error
+
+    def send(self, run_id: RunId, rating: Rating) -> None:
+        if self._error is not None:
+            raise self._error
+        self.sent.append((run_id, rating))
 
 
 class FakeRetriever(Retriever):

@@ -4,10 +4,10 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from datetime import datetime
 
-from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
+from smart_tutor.shared.domain.ids import DocumentId, RunId, ThreadId, UserId
 from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
-from smart_tutor.tutoring.domain.turn import Turn
+from smart_tutor.tutoring.domain.turn import Rating, Turn
 
 
 class ThreadRepository(ABC):
@@ -80,3 +80,8 @@ class ThreadRepository(ABC):
     @abstractmethod
     def turns(self, thread_id: ThreadId, user_id: UserId) -> list[Turn]:
         """The thread's kept turns, oldest first; empty unless the thread is this learner's (scoped by owner)."""
+
+    @abstractmethod
+    def set_rating(self, thread_id: ThreadId, user_id: UserId, run_id: RunId, rating: Rating) -> bool:
+        """Store the rating on that turn of the learner's thread (committed). False when the learner's thread has no
+        turn with this run id."""

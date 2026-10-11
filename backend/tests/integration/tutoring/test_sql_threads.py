@@ -12,7 +12,7 @@ from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import DocumentId, RunId, ThreadId, UserId
 from smart_tutor.tutoring.adapters.sql_threads import SqlThreadRepository, thread_documents, thread_turns
 from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
-from smart_tutor.tutoring.domain.turn import Decline, Turn, TurnCitation
+from smart_tutor.tutoring.domain.turn import Decline, Rating, Turn, TurnCitation
 
 pytestmark = pytest.mark.integration
 
@@ -190,6 +190,7 @@ def test_a_turn_row_holds_no_title_or_text_beyond_what_the_learner_saw(engine: E
         "decline_message",
         "created_at",
         "run_id",
+        "rating",
     }
     with engine.connect() as conn:
         [citations] = conn.execute(
@@ -212,6 +213,25 @@ def test_a_turn_keeps_its_run_id_and_one_without_reads_none(engine: Engine) -> N
     repo.add_turn(without, [])
 
     assert [t.run_id for t in repo.turns(thread.thread_id, owner)] == [run, None]
+
+
+def test_a_turns_rating_is_set_and_replaced_for_its_owner_only(engine: Engine) -> None:
+    repo = SqlThreadRepository(engine)
+    owner = UserId(f"ada-{uuid.uuid4()}")
+    thread = Thread.start(ThreadId(str(uuid.uuid4())), owner, datetime.now(UTC))
+    repo.add(thread)
+    run = RunId(str(uuid.uuid4()))
+    repo.add_turn(Turn(thread.thread_id, owner, "Q", "A.", (), None, datetime.now(UTC), run_id=run), [])
+
+    assert repo.turns(thread.thread_id, owner)[0].rating is None
+    assert repo.set_rating(thread.thread_id, owner, run, Rating.UP) is True
+    assert repo.turns(thread.thread_id, owner)[0].rating is Rating.UP
+    assert repo.set_rating(thread.thread_id, owner, run, Rating.DOWN) is True
+    assert repo.turns(thread.thread_id, owner)[0].rating is Rating.DOWN
+
+    assert repo.set_rating(thread.thread_id, UserId("bob"), run, Rating.UP) is False
+    assert repo.turns(thread.thread_id, owner)[0].rating is Rating.DOWN
+    assert repo.set_rating(thread.thread_id, owner, RunId(str(uuid.uuid4())), Rating.UP) is False
 
 
 def test_list_owned_is_the_owners_threads_newest_activity_first(engine: Engine) -> None:

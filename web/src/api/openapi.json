@@ -496,6 +496,24 @@
         "title": "QuestionRequest",
         "type": "object"
       },
+      "RateTurnRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "rating": {
+            "enum": [
+              "up",
+              "down"
+            ],
+            "title": "Rating",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rating"
+        ],
+        "title": "RateTurnRequest",
+        "type": "object"
+      },
       "SetTitleRequest": {
         "additionalProperties": false,
         "properties": {
@@ -891,6 +909,23 @@
         "title": "TurnDeclineResponse",
         "type": "object"
       },
+      "TurnRatingResponse": {
+        "properties": {
+          "rating": {
+            "enum": [
+              "up",
+              "down"
+            ],
+            "title": "Rating",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rating"
+        ],
+        "title": "TurnRatingResponse",
+        "type": "object"
+      },
       "TurnResponse": {
         "properties": {
           "answer": {
@@ -923,6 +958,22 @@
             "title": "Question",
             "type": "string"
           },
+          "rating": {
+            "anyOf": [
+              {
+                "enum": [
+                  "up",
+                  "down"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The learner's rating (PRD \u00a710.2); null until rated.",
+            "title": "Rating"
+          },
           "run_id": {
             "anyOf": [
               {
@@ -942,7 +993,8 @@
           "citations",
           "decline",
           "created_at",
-          "run_id"
+          "run_id",
+          "rating"
         ],
         "title": "TurnResponse",
         "type": "object"
@@ -2441,6 +2493,78 @@
           }
         ],
         "summary": "List Thread Turns",
+        "tags": [
+          "tutoring"
+        ]
+      }
+    },
+    "/threads/{thread_id}/turns/{run_id}/rating": {
+      "put": {
+        "description": "Rate an answer or decline of the learner's conversation helpful (\"up\") or not (\"down\"); a new rating replaces\nthe last (PRD \u00a710.2). Saved with the turn and sent to LangSmith as feedback on its run; an outage there doesn't fail\nthe rating.",
+        "operationId": "rate_turn",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "thread_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Thread Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RateTurnRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnRatingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not the caller's conversation, or no such answer in it."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rate Turn",
         "tags": [
           "tutoring"
         ]

@@ -1,0 +1,6 @@
+.rating { display: inline-flex; align-items: center; gap: var(--sp-1); margin-left: auto; }
+/* The :hover form is as specific as IconButton's hover rule, so a pressed button keeps its fill under the pointer. */
+.rating button[aria-pressed="true"],
+.rating button[aria-pressed="true"]:hover:not(:disabled) { color: var(--accent-text); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+/* Its own line under the Sources / rating row, so it never moves the buttons or wraps the chips. */
+.note { flex: 0 0 100%; font-size: var(--fs-12); color: var(--text-2); }

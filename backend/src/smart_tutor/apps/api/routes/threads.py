@@ -7,7 +7,8 @@ thread; the learner adds documents to that list and removes them (US-4c). The le
 read its search scope. A learner with no ready, non-archived document still gets a stream: the agent's request
 to upload a document (a "no_documents" decline), kept as a turn like any decline (US-3, US-10). Each ask gets a run
 id that names its trace and is kept with the turn. The learner lists their active conversations, newest activity
-first (US-13)."""
+first (US-13). The learner rates a kept answer or decline 👍/👎 (PRD §10.2); the rating is saved with the turn and sent
+to LangSmith on its run."""
 
 import json
 import logging
@@ -36,11 +37,13 @@ from smart_tutor.tutoring.application import (
     HistoryTurn,
     InvalidTitleError,
     NoListedDocumentsError,
+    Rating,
     SearchScope,
     Thread,
     ThreadArchivedError,
     ThreadNotFoundError,
     TurnCitation,
+    TurnNotFoundError,
     TurnView,
 )
 
@@ -335,7 +338,7 @@ async def ask_in_new_thread(
             logger.exception("starting a thread failed")
             return None
         thread_id = ThreadId(thread.thread_id)
-        return _sse("thread", {"thread_id": thread.thread_id})
+        return _sse("thread", {"thread_id": thread.thread_id, "run_id": run_id})
 
     recorder = _recorder(conversations, principal.user_id, body.question, lambda: thread_id, run_id)
     return _stream(answer, start, recorder)
@@ -374,7 +377,7 @@ async def ask_in_thread(
     answer = await _open(agent, token, body.question, listed, tid, run_id, history)
 
     async def start() -> bytes | None:
-        return _sse("thread", {"thread_id": tid})
+        return _sse("thread", {"thread_id": tid, "run_id": run_id})
 
     return _stream(answer, start, _recorder(conversations, principal.user_id, body.question, lambda: tid, run_id))
 
@@ -575,6 +578,7 @@ class TurnResponse(BaseModel):
             "The ask's LangSmith run id, for attaching a rating (#227); null for turns kept before it was recorded."
         )
     )
+    rating: Literal["up", "down"] | None = Field(description="The learner's rating (PRD §10.2); null until rated.")
 
 
 def _turn_response(t: TurnView) -> TurnResponse:
@@ -596,6 +600,7 @@ def _turn_response(t: TurnView) -> TurnResponse:
         decline=TurnDeclineResponse(code=t.decline.code, message=t.decline.message) if t.decline else None,
         created_at=t.created_at,
         run_id=t.run_id,
+        rating=t.rating.value if t.rating else None,
     )
 
 
@@ -614,3 +619,34 @@ def list_thread_turns(
     except ThreadNotFoundError as e:
         raise HTTPException(404, str(e)) from None
     return [_turn_response(t) for t in turns]
+
+
+class RateTurnRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    rating: Literal["up", "down"]
+
+
+class TurnRatingResponse(BaseModel):
+    rating: Literal["up", "down"]
+
+
+@router.put(
+    "/threads/{thread_id}/turns/{run_id}/rating",
+    operation_id="rate_turn",
+    responses={404: {"description": "Not the caller's conversation, or no such answer in it."}},
+)
+def rate_turn(
+    thread_id: uuid.UUID,
+    run_id: uuid.UUID,
+    body: RateTurnRequest,
+    principal: CurrentPrincipal,
+    conversations: Conversations,
+) -> TurnRatingResponse:
+    """Rate an answer or decline of the learner's conversation helpful ("up") or not ("down"); a new rating replaces
+    the last (PRD §10.2). Saved with the turn and sent to LangSmith as feedback on its run; an outage there doesn't fail
+    the rating."""
+    try:
+        conversations.rate_turn(ThreadId(str(thread_id)), principal.user_id, RunId(str(run_id)), Rating(body.rating))
+    except (ThreadNotFoundError, TurnNotFoundError) as e:
+        raise HTTPException(404, str(e)) from None
+    return TurnRatingResponse(rating=body.rating)
