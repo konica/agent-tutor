@@ -1243,6 +1243,7 @@ describe("ChatPage", () => {
       citations: [{ n: 1, chunk_id: "c1", document_id: "d1", document_title: "a.pdf", page: 3, archived: false, deleted: false }],
       decline: null,
       created_at: "2026-10-10T09:00:00Z",
+      run_id: null,
       ...over,
     });
     const cited = (over: Partial<TurnResponse["citations"][number]>) => turn({ citations: [{ ...turn().citations[0]!, ...over }] });

@@ -4,7 +4,8 @@ only the thread's listed ones once the learner limits its search scope (US-4c). 
 answer is kept as a turn when it is done, with the documents it drew on, and the turns and documents are listed per
 thread; the learner adds documents to that list and removes them (US-4c). The learner can rename a thread and set or
 read its search scope. A learner with no ready, non-archived document still gets a stream: the agent's request
-to upload a document (a "no_documents" decline), kept as a turn like any decline (US-3, US-10)."""
+to upload a document (a "no_documents" decline), kept as a turn like any decline (US-3, US-10). Each ask gets a run
+id that names its trace and is kept with the turn."""
 
 import json
 import logging
@@ -23,7 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_vali
 from smart_tutor.apps.api.agent_client import AgentAnswer, AgentUnavailableError
 from smart_tutor.apps.api.deps import Agent, BearerToken, Conversations, CurrentPrincipal
 from smart_tutor.shared.domain.errors import UnauthenticatedError
-from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
+from smart_tutor.shared.domain.ids import DocumentId, RunId, ThreadId, UserId
 from smart_tutor.tutoring.application import (
     AnsweredTurn,
     Decline,
@@ -249,9 +250,16 @@ async def _relay(answer: AgentAnswer, start: StartThread, record: RecordAnswer) 
         await answer.aclose()
 
 
-async def _open(agent: Agent, token: str, question: str, document_ids: Sequence[str] | None) -> AgentAnswer:
+async def _open(
+    agent: Agent,
+    token: str,
+    question: str,
+    document_ids: Sequence[str] | None,
+    thread_id: ThreadId,
+    run_id: RunId,
+) -> AgentAnswer:
     try:
-        return await agent.open_answer(token, question, document_ids)
+        return await agent.open_answer(token, question, document_ids, thread_id=thread_id, run_id=run_id)
     except UnauthenticatedError:
         raise HTTPException(401, "Not authenticated", headers={"WWW-Authenticate": "Bearer"}) from None
     except AgentUnavailableError:
@@ -259,7 +267,11 @@ async def _open(agent: Agent, token: str, question: str, document_ids: Sequence[
 
 
 def _recorder(
-    conversations: Conversations, user_id: UserId, question: str, thread_id: Callable[[], ThreadId | None]
+    conversations: Conversations,
+    user_id: UserId,
+    question: str,
+    thread_id: Callable[[], ThreadId | None],
+    run_id: RunId,
 ) -> RecordAnswer:
     """Keeps an answer as a turn of the thread `thread_id()` gives (None: none started, so nothing to keep)."""
 
@@ -267,7 +279,7 @@ def _recorder(
         tid = thread_id()
         if tid is None:
             return
-        turn = AnsweredTurn(question, seen.answer, seen.citations, seen.decline, seen.document_ids)
+        turn = AnsweredTurn(question, seen.answer, seen.citations, seen.decline, seen.document_ids, run_id)
         try:
             await run_in_threadpool(conversations.record_turn, tid, user_id, turn)
         except Exception as e:
@@ -296,14 +308,18 @@ async def ask_in_new_thread(
             await run_in_threadpool(conversations.require_readable, principal.user_id, document_id)
         except DocumentNotAvailableError as e:
             raise HTTPException(404, str(e)) from None
-    answer = await _open(agent, token, body.question, None)
+    new_id = ThreadId(str(uuid.uuid4()))
+    run_id = RunId(str(uuid.uuid4()))
+    answer = await _open(agent, token, body.question, None, new_id, run_id)
 
     thread_id: ThreadId | None = None
 
     async def start() -> bytes | None:
         nonlocal thread_id
         try:
-            thread = await run_in_threadpool(conversations.start_thread, principal.user_id, body.question, document_id)
+            thread = await run_in_threadpool(
+                conversations.start_thread, principal.user_id, body.question, document_id, thread_id=new_id
+            )
         except DocumentNotAvailableError as e:
             logger.warning("the thread was refused: %s", e)
             return None
@@ -314,7 +330,8 @@ async def ask_in_new_thread(
         thread_id = ThreadId(thread.thread_id)
         return _sse("thread", {"thread_id": thread.thread_id})
 
-    return _stream(answer, start, _recorder(conversations, principal.user_id, body.question, lambda: thread_id))
+    recorder = _recorder(conversations, principal.user_id, body.question, lambda: thread_id, run_id)
+    return _stream(answer, start, recorder)
 
 
 @router.post(
@@ -341,12 +358,13 @@ async def ask_in_thread(
         raise HTTPException(404, str(e)) from None
     except ThreadArchivedError as e:
         raise HTTPException(409, str(e)) from None
-    answer = await _open(agent, token, body.question, listed)
+    run_id = RunId(str(uuid.uuid4()))
+    answer = await _open(agent, token, body.question, listed, tid, run_id)
 
     async def start() -> bytes | None:
         return _sse("thread", {"thread_id": tid})
 
-    return _stream(answer, start, _recorder(conversations, principal.user_id, body.question, lambda: tid))
+    return _stream(answer, start, _recorder(conversations, principal.user_id, body.question, lambda: tid, run_id))
 
 
 class UpdateThreadRequest(BaseModel):
@@ -512,6 +530,11 @@ class TurnResponse(BaseModel):
     citations: list[TurnCitationResponse]
     decline: TurnDeclineResponse | None
     created_at: datetime
+    run_id: str | None = Field(
+        description=(
+            "The ask's LangSmith run id, for attaching a rating (#227); null for turns kept before it was recorded."
+        )
+    )
 
 
 def _turn_response(t: TurnView) -> TurnResponse:
@@ -532,6 +555,7 @@ def _turn_response(t: TurnView) -> TurnResponse:
         ],
         decline=TurnDeclineResponse(code=t.decline.code, message=t.decline.message) if t.decline else None,
         created_at=t.created_at,
+        run_id=t.run_id,
     )
 
 

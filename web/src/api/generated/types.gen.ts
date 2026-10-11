@@ -514,6 +514,12 @@ export type TurnResponse = {
      * Question
      */
     question: string;
+    /**
+     * Run Id
+     *
+     * The ask's LangSmith run id, for attaching a rating (#227); null for turns kept before it was recorded.
+     */
+    run_id: string | null;
 };
 
 /**

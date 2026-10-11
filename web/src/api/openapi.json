@@ -878,6 +878,18 @@
           "question": {
             "title": "Question",
             "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ask's LangSmith run id, for attaching a rating (#227); null for turns kept before it was recorded.",
+            "title": "Run Id"
           }
         },
         "required": [
@@ -885,7 +897,8 @@
           "answer",
           "citations",
           "decline",
-          "created_at"
+          "created_at",
+          "run_id"
         ],
         "title": "TurnResponse",
         "type": "object"
