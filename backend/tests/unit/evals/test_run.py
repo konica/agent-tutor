@@ -1,5 +1,6 @@
 """The runner: one LangSmith experiment per dataset with the split, then the gate decides the exit code."""
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -156,3 +157,44 @@ def test_a_missing_langsmith_key_exits_1_with_a_hint(capsys: pytest.CaptureFixtu
     code = main(["--split", "smoke"], client=NoKey(), suites=_suites(0.9), load=lambda key: ASK)
     assert code == 1
     assert "LANGSMITH_API_KEY" in capsys.readouterr().err
+
+
+def test_a_summary_file_gets_the_markdown_table(tmp_path: Path) -> None:
+    summary = tmp_path / "summary.md"
+    summary.write_text("earlier step\n", encoding="utf-8")
+    code = main(
+        ["--split", "smoke", "--summary", str(summary)],
+        client=FakeLangSmith(),
+        suites=_suites(0.5),
+        load=lambda key: ASK,
+    )
+    text = summary.read_text(encoding="utf-8")
+    assert code == 1
+    assert text.startswith("earlier step\n")  # appended, never overwritten
+    assert "### Smoke evals: FAIL" in text
+    assert "(https://smith.example/smart-tutor-ask-smoke-1)" in text
+
+
+def test_a_run_that_stops_early_says_why_in_the_summary(tmp_path: Path) -> None:
+    class NoKey(FakeLangSmith):
+        def has_dataset(self, *, dataset_name: str) -> bool:
+            raise LangSmithError("Authentication failed")
+
+    summary = tmp_path / "summary.md"
+    code = main(
+        ["--split", "smoke", "--summary", str(summary)], client=NoKey(), suites=_suites(0.9), load=lambda key: ASK
+    )
+    assert code == 1
+    assert "LANGSMITH_API_KEY" in summary.read_text(encoding="utf-8")
+
+
+def test_a_run_where_nothing_ran_says_so_in_the_summary(tmp_path: Path) -> None:
+    summary = tmp_path / "summary.md"
+    code = main(
+        ["--split", "full", "--summary", str(summary)],
+        client=FakeLangSmith(),
+        suites=_suites(0.9),
+        load=lambda key: ASK,
+    )
+    assert code == 1
+    assert "Nothing ran" in summary.read_text(encoding="utf-8")
