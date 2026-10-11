@@ -16,8 +16,8 @@ const gap = (el: HTMLElement) => el.scrollHeight - el.clientHeight - el.scrollTo
  * it follows new content; scrolling up stops the follow and `away` turns on, scrolling back near the bottom resumes it.
  * `content` lists what makes the pane grow; after each change the pane sticks to the bottom if following. While the
  * learner reads earlier turns the hook never moves the pane: the browser's scroll anchoring keeps it in place when the
- * layout reflows (the split view opening or closing). Scrolling down to where the bottom was when the gesture began also
- * resumes it: a smooth wheel scroll lands there while a streaming answer keeps growing.
+ * layout reflows (the split view opening or closing). Scrolling down to where the bottom was when that downward scroll
+ * began also resumes it: a smooth wheel scroll lands there while a streaming answer keeps growing.
  */
 export function useChatScroll(content: readonly unknown[]) {
   const [element, setElement] = useState<HTMLElement | null>(null);
@@ -26,7 +26,8 @@ export function useChatScroll(content: readonly unknown[]) {
   // On the way down after toLatest(): keep scrolling smoothly until the bottom is reached.
   const catchingUp = useRef(false);
   const lastTop = useRef(0);
-  // Where the bottom was when the current scroll gesture began.
+  // Where the bottom was when the current downward scroll began, and the direction of the last move.
+  const movingDown = useRef(false);
   const lastScrollAt = useRef(0);
   const gestureBottom = useRef(0);
 
@@ -49,7 +50,13 @@ export function useChatScroll(content: readonly unknown[]) {
     const onScroll = () => {
       const top = element.scrollTop;
       const now = Date.now();
-      if (now - lastScrollAt.current > GESTURE_GAP_MS) gestureBottom.current = element.scrollHeight - element.clientHeight;
+      const wasDown = movingDown.current;
+      if (top > lastTop.current) movingDown.current = true;
+      else if (top < lastTop.current) movingDown.current = false;
+      // A downward scroll is measured from the bottom as it was when it began: a new gesture or a turn from up to down.
+      if (now - lastScrollAt.current > GESTURE_GAP_MS || (movingDown.current && !wasDown)) {
+        gestureBottom.current = element.scrollHeight - element.clientHeight;
+      }
       lastScrollAt.current = now;
       if (gap(element) <= NEAR_BOTTOM_PX || (top > lastTop.current && gestureBottom.current - top <= NEAR_BOTTOM_PX)) {
         following.current = true;

@@ -197,6 +197,23 @@ describe("useChatScroll", () => {
     expect(pane().scrollTop).toBe(1800);
   });
 
+  it("scrolling up then straight back down a little doesn't resume following", () => {
+    let now = 1_000_000;
+    vi.spyOn(Date, "now").mockImplementation(() => (now += 16)); // a stream: events never pause for a new gesture
+    const g = geometry();
+    const { rerender } = render(<Harness items={["a"]} />);
+    scrollTo(1400); // the chain begins with the bottom at 1400
+    g.content = 2400;
+    rerender(<Harness items={["a", "b"]} />);
+    scrollTo(1800); // the follow's own scroll
+    scrollTo(1350); // up: stops following
+    scrollTo(1400); // a little down, 400px above the bottom now
+    expect(jump()).toBeInTheDocument();
+    g.content = 2800;
+    rerender(<Harness items={["a", "b", "c"]} />);
+    expect(pane().scrollTop).toBe(1400);
+  });
+
   it("a new scroll gesture measures from the bottom as it is now", () => {
     const { g, rerender } = wheelBackDown(GESTURE_GAP_MS + 1);
     expect(jump()).toBeInTheDocument();
