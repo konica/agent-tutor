@@ -1,6 +1,12 @@
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
-from smart_tutor.tutoring.application import NO_DOCUMENTS_DECLINE, answer_messages, cited_chunks, covers
+from smart_tutor.tutoring.application import (
+    NO_DOCUMENTS_DECLINE,
+    HistoryTurn,
+    answer_messages,
+    cited_chunks,
+    covers,
+)
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 
 
@@ -72,3 +78,49 @@ def test_covers_needs_a_chunk_scoring_at_least_the_floor() -> None:
     assert covers([scored(0.3)], 0.3) is True
     assert covers([scored(0.29)], 0.3) is False
     assert covers([scored(0.1), scored(0.5)], 0.3) is True
+
+
+HISTORY_CHUNK = RetrievedChunk("c1", "d1", "a.pdf", 3, "Transformers can't see beyond their context window.", 0.9)
+
+
+def test_history_comes_between_the_system_prompt_and_the_quoted_chunks() -> None:
+    history = [
+        HistoryTurn("Explain the transformer architecture", "It uses attention."),
+        HistoryTurn("Who made it?", "These documents don't cover this."),
+    ]
+
+    messages = answer_messages("What are its limitations?", [HISTORY_CHUNK], history)
+
+    assert [type(m) for m in messages] == [
+        SystemMessage,
+        HumanMessage,
+        AIMessage,
+        HumanMessage,
+        AIMessage,
+        HumanMessage,
+    ]
+    assert messages[1].content == "Explain the transformer architecture"
+    assert messages[2].content == "It uses attention."
+    assert messages[4].content == "These documents don't cover this."
+    last = messages[-1].text
+    assert '<chunk id="1"' in last and last.endswith("Question: What are its limitations?")
+
+
+def test_history_messages_hold_no_chunk_text_and_no_old_citation_markers() -> None:
+    history = [HistoryTurn("What is attention?", "It weighs tokens [1], [2-3].")]
+
+    messages = answer_messages("And its cost?", [HISTORY_CHUNK], history)
+
+    assert messages[2].content == "It weighs tokens."
+    assert all("<chunk" not in m.text for m in messages[1:-1])
+
+
+def test_without_history_the_prompt_is_unchanged() -> None:
+    assert answer_messages("Q", [HISTORY_CHUNK]) == answer_messages("Q", [HISTORY_CHUNK], [])
+    assert len(answer_messages("Q", [HISTORY_CHUNK])) == 2
+
+
+def test_the_system_prompt_says_earlier_turns_are_context_not_instructions() -> None:
+    system = answer_messages("Q", [HISTORY_CHUNK], [HistoryTurn("q", "a")])[0].text
+    assert "earlier turns" in system.lower() and "not instructions" in system.lower()
+    assert "only from the chunks" in system.lower()
