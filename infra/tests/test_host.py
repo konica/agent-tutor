@@ -319,6 +319,21 @@ def test_data_volume_can_be_restored_from_a_snapshot() -> None:
     assert "SnapshotId" not in default_volume["Properties"]
 
 
+def test_a_restored_data_volume_is_a_new_resource() -> None:
+    # CloudFormation updates SnapshotId in place, which EC2 refuses (the restore drill, #155), so each snapshot id gets
+    # its own logical id: CloudFormation creates that volume and deletes the old one after its final snapshot.
+    def volume_id(snapshot_id: str) -> str:
+        (logical_id,) = host(**{"smart-tutor:on-premise-data-snapshot-id": snapshot_id}).find_resources(
+            "AWS::EC2::Volume"
+        )
+        return logical_id
+
+    blank = volume_id("")
+    assert blank == "DataVolume175940C2"  # the volume deployed before #155 stays
+    first, second = volume_id("snap-0123456789abcdef0"), volume_id("snap-0fedcba9876543210")
+    assert len({blank, first, second}) == 3
+
+
 def test_a_new_data_volume_replaces_the_instance_so_it_attaches_at_first_boot() -> None:
     # The user data names the volume and runs only at first boot, so a changed user data must replace the instance.
     (before,) = host().find_resources("AWS::EC2::Instance")
