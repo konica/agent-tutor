@@ -147,6 +147,7 @@ services:
     logging: *logging
     environment:
       SMART_TUTOR_ENVIRONMENT: prod
+      SMART_TUTOR_DEPLOYMENT: on-premise
       SMART_TUTOR_AWS_REGION: ${AWS_REGION:?}
       AWS_REGION: ${AWS_REGION:?}
       SMART_TUTOR_KEYCLOAK_ISSUER: https://${DOMAIN:?}/auth/realms/smart-tutor
@@ -269,6 +270,7 @@ services:
     logging: *logging
     environment:
       SMART_TUTOR_ENVIRONMENT: prod
+      SMART_TUTOR_DEPLOYMENT: on-premise
       SMART_TUTOR_AWS_REGION: ${AWS_REGION:?}
       AWS_REGION: ${AWS_REGION:?}
       SMART_TUTOR_DOCUMENTS_BUCKET: ${DOCUMENTS_BUCKET:?}
