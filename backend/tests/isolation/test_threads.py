@@ -26,7 +26,7 @@ from smart_tutor.knowledge.application import UploadService
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import DocumentId, SubjectId, ThreadId, UserId
 from smart_tutor.shared.domain.principal import Principal
-from smart_tutor.tutoring.application import Rating
+from smart_tutor.tutoring.application import Rating, Turn
 
 A = {"Authorization": "Bearer token-a"}
 B = {"Authorization": "Bearer token-b"}
@@ -319,6 +319,38 @@ def test_each_learner_lists_only_their_own_threads() -> None:
         assert row["thread_id"] == owned[owner]
         assert row["subjects"] == [{"subject_id": SHARED, "name": "Shared"}] and row["documents"] == 1
     assert a_list[0]["thread_id"] != b_list[0]["thread_id"]
+
+
+def test_asking_in_another_learners_thread_loads_none_of_its_turns() -> None:
+    library, threads = InMemoryLibrary(), InMemoryThreads()
+    ingest_ready(library, "learner-a", "Attention weighs tokens.")
+    ingest_ready(library, "learner-b", "Gradient descent follows the slope.")
+    seen: list[httpx.Request] = []
+
+    def agent_called(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return answers(request)
+
+    services = api_services(library, threads=threads, agent=fake_agent(agent_called))
+    client = TestClient(create_app(Settings(), verifier=learners(), services=services))
+    assert client.post("/threads", json={"question": "A's private question"}, headers=A).status_code == 200
+    [thread] = threads.threads.values()
+    loaded: list[tuple[str, str]] = []
+    original = threads.last_turns
+
+    def spy(thread_id: ThreadId, user_id: UserId, limit: int) -> list[Turn]:
+        loaded.append((thread_id, user_id))
+        return original(thread_id, user_id, limit)
+
+    threads.last_turns = spy  # type: ignore[method-assign]
+    seen.clear()
+
+    response = client.post(f"/threads/{thread.thread_id}/questions", json={"question": "Hi"}, headers=B)
+
+    assert response.status_code == 404
+    assert seen == []  # the agent never got A's turns
+    assert loaded == []  # and they were never read
+    assert threads.last_turns(ThreadId(thread.thread_id), UserId("learner-b"), 5) == []
 
 
 def test_only_the_owner_rates_a_turn() -> None:

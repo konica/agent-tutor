@@ -19,6 +19,7 @@ from smart_tutor.apps.agent.state import AgentContext
 from smart_tutor.apps.agent.tracing import AskRun, AskTracing
 from smart_tutor.shared.adapters.tracing import LearnerHasher
 from smart_tutor.shared.domain.ids import UserId
+from smart_tutor.tutoring.application import HistoryTurn
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 
 TOKEN = "eyJhbGciOi.token-under-test.signature-xyz"
@@ -51,6 +52,12 @@ async def test_positive_control_a_token_in_the_question_is_caught() -> None:
     traces, out = await traced_run({**INPUT, "question": f"What is attention? {TOKEN}"})
     assert TOKEN in traces
     assert TOKEN in out
+
+
+async def test_history_reaches_traces_without_the_token() -> None:
+    traces, out = await traced_run({**INPUT, "history": [HistoryTurn("Explain attention", "It weighs tokens.")]})
+    assert "Explain attention" in traces
+    assert TOKEN not in traces and TOKEN not in out
 
 
 def test_the_context_repr_hides_the_token() -> None:

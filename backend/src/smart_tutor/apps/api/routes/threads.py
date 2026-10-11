@@ -1,6 +1,7 @@
 """Thread routes (tutoring module): ask the first question of a new thread, optionally started from one of the
 learner's documents, or a later one in an existing thread; an answer draws on all of the learner's ready documents, or
-only the thread's listed ones once the learner limits its search scope (US-4c). Answered as SSE (PRD §9.2); the
+only the thread's listed ones once the learner limits its search scope (US-4c); a question in an existing thread is
+sent with its last turns (ADR 0015). Answered as SSE (PRD §9.2); the
 answer is kept as a turn when it is done, with the documents it drew on, and the turns and documents are listed per
 thread; the learner adds documents to that list and removes them (US-4c). The learner can rename a thread and set or
 read its search scope. A learner with no ready, non-archived document still gets a stream: the agent's request
@@ -33,6 +34,7 @@ from smart_tutor.tutoring.application import (
     Decline,
     DocumentNotAvailableError,
     DocumentUsed,
+    HistoryTurn,
     InvalidTitleError,
     NoListedDocumentsError,
     Rating,
@@ -262,9 +264,12 @@ async def _open(
     document_ids: Sequence[str] | None,
     thread_id: ThreadId,
     run_id: RunId,
+    history: Sequence[HistoryTurn] = (),
 ) -> AgentAnswer:
     try:
-        return await agent.open_answer(token, question, document_ids, thread_id=thread_id, run_id=run_id)
+        return await agent.open_answer(
+            token, question, document_ids, thread_id=thread_id, run_id=run_id, history=history
+        )
     except UnauthenticatedError:
         raise HTTPException(401, "Not authenticated", headers={"WWW-Authenticate": "Bearer"}) from None
     except AgentUnavailableError:
@@ -361,12 +366,15 @@ async def ask_in_thread(
         listed = await run_in_threadpool(conversations.search_documents, tid, principal.user_id)
         # The question moves the conversation to the top of the list, once it is accepted and before the agent runs.
         await run_in_threadpool(conversations.note_question, tid, principal.user_id)
+        # The agent also gets the conversation's last turns (PRD §9.2 step 3), read through owner-scoped SQL after
+        # the ownership check (ADR 0015).
+        history = await run_in_threadpool(conversations.history, tid, principal.user_id)
     except ThreadNotFoundError as e:
         raise HTTPException(404, str(e)) from None
     except ThreadArchivedError as e:
         raise HTTPException(409, str(e)) from None
     run_id = RunId(str(uuid.uuid4()))
-    answer = await _open(agent, token, body.question, listed, tid, run_id)
+    answer = await _open(agent, token, body.question, listed, tid, run_id, history)
 
     async def start() -> bytes | None:
         return _sse("thread", {"thread_id": tid, "run_id": run_id})

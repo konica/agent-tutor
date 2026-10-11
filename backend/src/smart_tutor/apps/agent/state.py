@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Literal, TypedDict
 
 from smart_tutor.shared.domain.citation import Citation
-from smart_tutor.tutoring.application import LIMITED_DECLINE, NO_DOCUMENTS_DECLINE, RetrievedChunk
+from smart_tutor.tutoring.application import LIMITED_DECLINE, NO_DOCUMENTS_DECLINE, HistoryTurn, RetrievedChunk
 
 
 @dataclass
@@ -21,6 +21,7 @@ DECLINE_MESSAGES: dict[DeclineCode, str] = {"limited": LIMITED_DECLINE, "no_docu
 class AskState(TypedDict, total=False):
     question: str
     document_ids: list[str] | None
+    history: list[HistoryTurn]  # earlier turns, oldest first (question and answer text only; ADR 0015)
     chunks: list[RetrievedChunk]
     no_documents: bool  # the readable set is empty: the learner has no ready, non-archived document
     answer: str

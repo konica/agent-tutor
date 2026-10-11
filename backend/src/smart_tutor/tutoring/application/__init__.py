@@ -8,6 +8,7 @@ from smart_tutor.tutoring.application.answer import (
     covers,
 )
 from smart_tutor.tutoring.application.conversation_service import ConversationService
+from smart_tutor.tutoring.application.follow_up import search_query
 from smart_tutor.tutoring.domain.document_used import DELETED_DOCUMENT, DocumentUsed
 from smart_tutor.tutoring.domain.errors import (
     DocumentNotAvailableError,
@@ -25,6 +26,7 @@ from smart_tutor.tutoring.domain.turn import (
     AnsweredTurn,
     CitationView,
     Decline,
+    HistoryTurn,
     Rating,
     Turn,
     TurnCitation,
@@ -45,6 +47,7 @@ __all__ = [
     "Decline",
     "DocumentNotAvailableError",
     "DocumentUsed",
+    "HistoryTurn",
     "InvalidTitleError",
     "NoAnswerFeedback",
     "NoListedDocumentsError",
@@ -65,4 +68,5 @@ __all__ = [
     "answer_messages",
     "cited_chunks",
     "covers",
+    "search_query",
 ]

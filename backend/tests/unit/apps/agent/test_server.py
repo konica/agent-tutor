@@ -267,3 +267,30 @@ def test_without_ids_the_run_gets_a_fresh_id_and_no_thread() -> None:
 def test_an_unknown_body_field_is_still_refused() -> None:
     c, _ = traced_client()
     assert c.post("/ask", json={**BODY, "turn_id": "x"}, headers=AUTH).status_code == 422
+
+
+def test_history_in_the_request_reaches_the_search() -> None:
+    retriever = FakeRetriever([CHUNK])
+    c, _ = client(retriever)
+    body = {
+        "question": "What are its limitations?",
+        "history": [{"question": "Explain the transformer architecture", "answer": "It uses attention."}],
+    }
+    response = c.post("/ask", json=body, headers=AUTH)
+    assert response.status_code == 200
+    assert retriever.calls[0][0] == "Explain the transformer architecture\nWhat are its limitations?"
+
+
+@pytest.mark.parametrize(
+    "history",
+    [
+        [{"question": "q", "answer": "a"}] * 21,
+        [{"question": "", "answer": "a"}],
+        [{"question": "q", "answer": "a" * 8001}],
+        [{"question": "q", "answer": "a", "user_id": "ada"}],
+    ],
+)
+def test_oversized_or_malformed_history_is_refused(history: list[dict[str, str]]) -> None:
+    c, _ = client(FakeRetriever([CHUNK]))
+    response = c.post("/ask", json={"question": "Q", "history": history}, headers=AUTH)
+    assert response.status_code == 422
