@@ -133,6 +133,7 @@ def owned(mode: str) -> Owned:
     names = {
         f"{n.stack_prefix}-",
         f"{n.ssm_path}/",
+        f"parameter{n.ssm_path}/",  # also in ARN form, where the lookbehind blocks the bare path
         f"secret:{n.secret_prefix}/",
         f"repository/{n.repository_prefix}/",
         n.deploy_role,
@@ -264,6 +265,11 @@ SHARED_REFERENCES = {
         _parameter(
             {"Fn::ImportValue": "SmartTutor-prod-Edge:ExportsOutputFnGetAttDistribution830FAC52DomainNameBEB09E30"}
         ),
+    ),
+    "on-premise reads a sub-path of native-cloud's SSM path": (
+        ON_PREMISE,
+        "SmartTutor-OnPremise-prod-Host",
+        _allow("arn:aws:ssm:us-east-1:*:parameter/smart-tutor/agent/*"),
     ),
     "native-cloud reads on-premise's secrets": (
         NATIVE_CLOUD,
