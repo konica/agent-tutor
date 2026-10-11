@@ -415,9 +415,11 @@ These come from the code as it is today. None of them lets one learner read anot
 | The documents bucket `smart-tutor-documents-<account id>`, with all learners' PDFs. It is versioned and set to "retain". | The cluster, network, load balancer, and CloudFront distribution |
 | A final snapshot of the database (RDS), which holds documents' metadata, conversations, and Keycloak accounts | The database server itself (only its final snapshot is kept) |
 | The one-time setup: CDK bootstrap, the GitHub deploy role, and the `native-cloud` environment (they cost nothing; the teardown command lists stacks by name and never uses `--all`) | The six ECR repositories and every image in them, so rollback starts fresh after a redeploy |
-| | The ingest queue and dead-letter queue, with any messages in them |
+| The budget `smart-tutor-prod-monthly`, which is free (`-DeleteBudget` deletes it) | The ingest queue and dead-letter queue, with any messages in them |
 | | All secrets, deleted at once with no recovery window. A redeploy generates new ones. |
-| | The settings in SSM Parameter Store and the budget alarm (so no cost emails arrive while paused; snapshots and the bucket still cost a little) |
+| | The settings in SSM Parameter Store (snapshots and the bucket still cost a little) |
+
+On-premise mode is torn down separately and leaves native-cloud running: see `docs/runbooks/on-premise-deploy.md` section 8.
 
 After a teardown, a fresh deploy starts with an empty database. Restoring the snapshot is a manual step. A redeploy also fails while the retained bucket exists outside the stack: the bucket must be imported into the stack or deleted first.
 

@@ -164,7 +164,7 @@ def test_deployments_of_one_mode_queue_and_never_cancel() -> None:
 # --- deploy.yml: what a push and a manual run deploy ---------------------------------------------------------
 
 
-# On-premise deploys on every push unless the variable is exactly `false` (while it is torn down, #207).
+# On-premise deploys on every push unless the variable is `false`, in any case (while it is torn down, #207).
 ON_PREMISE_IF = (
     "(github.event_name == 'push' && vars.ON_PREMISE_AUTO_DEPLOY != 'false') || inputs.mode == 'on-premise'"
 )
