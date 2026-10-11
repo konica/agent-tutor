@@ -35,6 +35,17 @@ class Thread:
         """A new thread with its first question asked now; its title starts as that question (§9.4)."""
         return cls(thread_id, user_id, now, title=title, last_learner_message_at=now)
 
+    @property
+    def last_activity(self) -> datetime:
+        """The learner's last question in it, or when it started (US-13)."""
+        return self.last_learner_message_at or self.created_at
+
+    def ask(self, now: datetime) -> None:
+        """The learner asks in it now; an archived thread is read-only."""
+        if self.status is ThreadStatus.ARCHIVED:
+            raise ThreadArchivedError("An archived conversation is read-only. Restore it first.")
+        self.last_learner_message_at = now
+
     def is_owned_by(self, user_id: UserId) -> bool:
         return self.user_id == user_id
 

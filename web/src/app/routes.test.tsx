@@ -153,6 +153,12 @@ describe("app shell routes", () => {
     expect(nav().getByRole("link", { name: "Chat" })).toHaveAttribute("aria-current", "page");
   });
 
+  it("renders the Conversations page, not the placeholder", () => {
+    renderAt("/conversations");
+    expect(screen.getByRole("heading", { level: 1, name: "Conversations" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New conversation" })).toBeInTheDocument();
+  });
+
   it("shows the needs-subjects badge on Library from any page", async () => {
     vi.mocked(loadDocuments).mockImplementation(async (filters) => (filters?.state === "awaiting_subjects" ? [{ state: "awaiting_subjects" } as DocumentResponse] : []));
     try {
