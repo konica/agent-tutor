@@ -66,7 +66,7 @@ known-first-party = ["smart_tutor", "fakes"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-m 'not integration and not bedrock' --import-mode=importlib"
-pythonpath = ["tests"]  # so tests can `import fakes`
+pythonpath = ["tests", "."]  # so tests can `import fakes` and `import evals`
 markers = [
     "integration: needs the Docker Compose stack (make up)",
     "bedrock: real Bedrock calls in us-east-1 with your AWS credentials (make bedrock-check)",

@@ -1,4 +1,6 @@
 import json
+from collections.abc import Iterator
+from contextlib import AbstractContextManager, contextmanager
 from typing import Any
 
 import pytest
@@ -10,6 +12,7 @@ from fakes import (
     TEST_LIMITS,
     TEST_UPLOAD_LIMITS,
     FakeObjectStore,
+    FakeRunTracing,
     FixedClock,
     InMemoryLibrary,
     fake_embeddings,
@@ -320,3 +323,51 @@ def test_a_corrupt_pdf_fails_as_unreadable_and_stores_no_chunks() -> None:
     document_id, content_id = w.upload(make_pdf(["Hello"])[:40])
 
     _assert_failed_without_output(w, document_id, content_id, UNREADABLE_PDF)
+
+
+class ActiveRunTracing(FakeRunTracing):
+    """Also says whether a run is open right now."""
+
+    active = False
+
+    def run(self, name: str, user_id: UserId, metadata: Any) -> AbstractContextManager[None]:
+        super().run(name, user_id, metadata)
+        return self._open()
+
+    @contextmanager
+    def _open(self) -> Iterator[None]:
+        self.active = True
+        try:
+            yield
+        finally:
+            self.active = False
+
+
+def test_processing_a_content_runs_inside_one_ingest_run_for_its_owner() -> None:
+    tracing, seen = ActiveRunTracing(), []
+
+    class Watching(Embeddings):
+        def embed_documents(self, texts: list[str]) -> list[list[float]]:
+            seen.append(tracing.active)
+            return fake_embeddings(8).embed_documents(texts)
+
+        def embed_query(self, text: str) -> list[float]:
+            return fake_embeddings(8).embed_query(text)
+
+    w = World(fake_tools(embeddings=Watching(), tracing=tracing))
+    _, content_id = w.upload(pdf(SENTENCE))
+
+    assert tracing.runs == [("ingest", UserId("ada"), {"content_id": content_id})]
+    assert seen and all(seen)
+    assert not tracing.active
+
+
+def test_a_content_no_longer_processing_opens_no_run() -> None:
+    tracing = FakeRunTracing()
+    w = World(fake_tools(tracing=tracing))
+    _, content_id = w.upload(pdf(SENTENCE))
+    tracing.runs.clear()
+
+    assert w.ingestion.process_content(ContentId(content_id)) is None
+    assert w.ingestion.process_content(ContentId("missing")) is None
+    assert tracing.runs == []

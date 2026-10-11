@@ -1,7 +1,9 @@
 import dataclasses
 import json
 import logging
-from collections.abc import Sequence
+import uuid
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from typing import Any
 
 import pytest
@@ -11,6 +13,7 @@ from langchain_core.messages import AIMessage
 from fakes import FakeRetriever, FakeTokenVerifier, fake_chat_model
 from smart_tutor.apps.agent.graph import build_graph
 from smart_tutor.apps.agent.server import create_app
+from smart_tutor.apps.agent.tracing import AskRun, AskTrace, AskTracing
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.domain.ids import UserId
@@ -207,3 +210,60 @@ def test_more_than_200_document_ids_are_refused() -> None:
     c, _ = client(FakeRetriever([CHUNK]))
     ids = [f"d{i}" for i in range(201)]
     assert c.post("/ask", json={"question": "q", "document_ids": ids}, headers=AUTH).status_code == 422
+
+
+def test_startup_refuses_tracing_without_a_learner_hash_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("smart_tutor.shared.adapters.tracing.ls_utils.tracing_is_enabled", lambda *a: True)
+    with (
+        pytest.raises(RuntimeError, match="SMART_TUTOR_LEARNER_HASH_KEY"),
+        TestClient(create_app(Settings(keycloak_client_secret="s", learner_hash_key=""))),
+    ):
+        pass
+
+
+class _RecordingTracing(AskTracing):
+    def __init__(self) -> None:
+        super().__init__({}, None)
+        self.runs: list[AskRun] = []
+
+    @contextmanager
+    def trace(self, run: AskRun) -> Iterator[AskTrace]:
+        self.runs.append(run)
+
+        class _Noop:
+            def finish(self, answer: str, decline: str | None, chunks: int) -> None:
+                pass
+
+            def fail(self, code: str) -> None:
+                pass
+
+        yield _Noop()  # type: ignore[misc]
+
+
+def traced_client() -> tuple[TestClient, _RecordingTracing]:
+    verifier = FakeTokenVerifier()
+    verifier.add("t-ada", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
+    graph = build_graph(lambda token: FakeRetriever([CHUNK]), fake_chat_model(AIMessage("It weighs tokens [1].")))
+    tracing = _RecordingTracing()
+    return TestClient(create_app(Settings(), verifier=verifier, graph=graph, tracing=tracing)), tracing
+
+
+def test_the_run_and_thread_ids_reach_the_trace_with_the_principal() -> None:
+    c, tracing = traced_client()
+    run_id, thread_id = uuid.uuid4(), uuid.uuid4()
+    body = {**BODY, "run_id": str(run_id), "thread_id": str(thread_id)}
+    assert c.post("/ask", json=body, headers=AUTH).status_code == 200
+    assert tracing.runs == [AskRun(run_id, str(thread_id), UserId("ada"), BODY["question"], None)]
+
+
+def test_without_ids_the_run_gets_a_fresh_id_and_no_thread() -> None:
+    c, tracing = traced_client()
+    c.post("/ask", json=BODY, headers=AUTH)
+    c.post("/ask", json=BODY, headers=AUTH)
+    first, second = tracing.runs
+    assert first.thread_id is None and first.run_id != second.run_id
+
+
+def test_an_unknown_body_field_is_still_refused() -> None:
+    c, _ = traced_client()
+    assert c.post("/ask", json={**BODY, "turn_id": "x"}, headers=AUTH).status_code == 422

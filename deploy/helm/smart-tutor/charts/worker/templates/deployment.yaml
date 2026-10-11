@@ -32,6 +32,8 @@ spec:
           env:
             - name: SMART_TUTOR_ENVIRONMENT
               value: prod
+            - name: SMART_TUTOR_DEPLOYMENT
+              value: native-cloud
             - name: SMART_TUTOR_AWS_REGION
               value: {{ .Values.awsRegion | quote }}
             - name: SMART_TUTOR_DOCUMENTS_BUCKET
