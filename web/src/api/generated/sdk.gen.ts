@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddThreadDocumentsData, AddThreadDocumentsErrors, AddThreadDocumentsResponses, ArchiveDocumentData, ArchiveDocumentErrors, ArchiveDocumentResponses, AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponse, AskInNewThreadResponses, AskInThreadData, AskInThreadErrors, AskInThreadResponse, AskInThreadResponses, CheckDuplicateData, CheckDuplicateErrors, CheckDuplicateResponses, ChooseSubjectsData, ChooseSubjectsErrors, ChooseSubjectsResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, GetChunkData, GetChunkErrors, GetChunkResponses, GetDocumentData, GetDocumentErrors, GetDocumentFileData, GetDocumentFileErrors, GetDocumentFileResponses, GetDocumentResponses, GetMeData, GetMeResponses, GetSubjectSuggestionsData, GetSubjectSuggestionsErrors, GetSubjectSuggestionsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUploadData, GetUploadErrors, GetUploadLimitsData, GetUploadLimitsResponses, GetUploadRateLimitData, GetUploadRateLimitResponses, GetUploadResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListMySubjectsData, ListMySubjectsResponses, ListThreadDocumentsData, ListThreadDocumentsErrors, ListThreadDocumentsResponses, ListThreadTurnsData, ListThreadTurnsErrors, ListThreadTurnsResponses, RecordHighlightMissData, RecordHighlightMissResponses, RemoveThreadDocumentData, RemoveThreadDocumentErrors, RemoveThreadDocumentResponses, RestoreDocumentData, RestoreDocumentErrors, RestoreDocumentResponses, RetryDocumentData, RetryDocumentErrors, RetryDocumentResponses, SearchSubjectsData, SearchSubjectsErrors, SearchSubjectsResponses, SetDocumentTitleData, SetDocumentTitleErrors, SetDocumentTitleResponses, StartUploadData, StartUploadErrors, StartUploadResponses, UpdateThreadData, UpdateThreadErrors, UpdateThreadResponses } from './types.gen';
+import type { AddThreadDocumentsData, AddThreadDocumentsErrors, AddThreadDocumentsResponses, ArchiveDocumentData, ArchiveDocumentErrors, ArchiveDocumentResponses, AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponse, AskInNewThreadResponses, AskInThreadData, AskInThreadErrors, AskInThreadResponse, AskInThreadResponses, CheckDuplicateData, CheckDuplicateErrors, CheckDuplicateResponses, ChooseSubjectsData, ChooseSubjectsErrors, ChooseSubjectsResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, GetChunkData, GetChunkErrors, GetChunkResponses, GetDocumentData, GetDocumentErrors, GetDocumentFileData, GetDocumentFileErrors, GetDocumentFileResponses, GetDocumentResponses, GetMeData, GetMeResponses, GetSubjectSuggestionsData, GetSubjectSuggestionsErrors, GetSubjectSuggestionsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUploadData, GetUploadErrors, GetUploadLimitsData, GetUploadLimitsResponses, GetUploadRateLimitData, GetUploadRateLimitResponses, GetUploadResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListMySubjectsData, ListMySubjectsResponses, ListThreadDocumentsData, ListThreadDocumentsErrors, ListThreadDocumentsResponses, ListThreadsData, ListThreadsResponses, ListThreadTurnsData, ListThreadTurnsErrors, ListThreadTurnsResponses, RecordHighlightMissData, RecordHighlightMissResponses, RemoveThreadDocumentData, RemoveThreadDocumentErrors, RemoveThreadDocumentResponses, RestoreDocumentData, RestoreDocumentErrors, RestoreDocumentResponses, RetryDocumentData, RetryDocumentErrors, RetryDocumentResponses, SearchSubjectsData, SearchSubjectsErrors, SearchSubjectsResponses, SetDocumentTitleData, SetDocumentTitleErrors, SetDocumentTitleResponses, StartUploadData, StartUploadErrors, StartUploadResponses, UpdateThreadData, UpdateThreadErrors, UpdateThreadResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -201,6 +201,18 @@ export const listMySubjects = <ThrowOnError extends boolean = false>(options?: O
 export const searchSubjects = <ThrowOnError extends boolean = false>(options: Options<SearchSubjectsData, ThrowOnError>): RequestResult<SearchSubjectsResponses, SearchSubjectsErrors, ThrowOnError> => (options.client ?? client).get<SearchSubjectsResponses, SearchSubjectsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/subjects/search',
+    ...options
+});
+
+/**
+ * List Threads
+ *
+ * The learner's active conversations, newest last activity first (PRD US-13): title, subjects of the documents
+ * used (deleted ones excluded), number of documents, last activity.
+ */
+export const listThreads = <ThrowOnError extends boolean = false>(options?: Options<ListThreadsData, ThrowOnError>): RequestResult<ListThreadsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListThreadsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/threads',
     ...options
 });
 

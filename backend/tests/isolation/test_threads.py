@@ -1,6 +1,7 @@
 """US-12: each learner's POST /threads starts a thread owned by that learner; no one else can get it, its
 documents used (GET /threads/{id}/documents), its turns (GET /threads/{id}/turns), or rename it (PATCH
-/threads/{id}). A thread starts from a document only if it is the learner's own ready, active one."""
+/threads/{id}); GET /threads lists only the caller's own threads. A thread starts from a document only if it is the
+learner's own ready, active one."""
 
 import httpx
 from fastapi.testclient import TestClient
@@ -10,6 +11,7 @@ from fakes import (
     FakeTokenVerifier,
     FixedClock,
     InMemoryLibrary,
+    InMemorySubjects,
     InMemoryThreads,
     api_services,
     fake_agent,
@@ -245,3 +247,38 @@ def test_only_the_owner_reads_a_threads_turns() -> None:
     assert [t["question"] for t in mine.json()] == ["What is attention?"]
     assert theirs.status_code == 404 and theirs.json() == {"detail": "Conversation not found"}
     assert threads.turns(ThreadId(thread.thread_id), UserId("learner-b")) == []
+
+
+def test_each_learner_lists_only_their_own_threads() -> None:
+    """Two learners sharing a subject and the same uploaded file each list only their own threads."""
+    library, threads = InMemoryLibrary(), InMemoryThreads()
+    same_text = "Attention weighs tokens."
+    documents = {
+        "token-a": ingest_ready(library, "learner-a", same_text, subject_ids=[SHARED]),
+        "token-b": ingest_ready(library, "learner-b", same_text, subject_ids=[SHARED]),
+    }
+
+    def own_document_answer(request: httpx.Request) -> httpx.Response:
+        # The agent receives the caller's own token; its `sources` names that learner's document.
+        document = documents[request.headers["authorization"].removeprefix("Bearer ")]
+        body = (
+            b'event: delta\ndata: {"text": "Hi"}\n\n'
+            + f'event: sources\ndata: {{"document_ids": ["{document}"]}}\n\n'.encode()
+            + b"event: done\ndata: {}\n\n"
+        )
+        return httpx.Response(200, content=body, headers={"content-type": "text/event-stream"})
+
+    catalog = InMemorySubjects({SHARED: "Shared"})
+    services = api_services(library, threads=threads, catalog=catalog, agent=fake_agent(own_document_answer))
+    client = TestClient(create_app(Settings(), verifier=learners(), services=services))
+    assert client.post("/threads", json={"question": "What is attention?"}, headers=A).status_code == 200
+    assert client.post("/threads", json={"question": "What is attention?"}, headers=B).status_code == 200
+    owned = {t.user_id: t.thread_id for t in threads.threads.values()}
+
+    a_list, b_list = client.get("/threads", headers=A).json(), client.get("/threads", headers=B).json()
+
+    for listed, owner in ((a_list, "learner-a"), (b_list, "learner-b")):
+        [row] = listed
+        assert row["thread_id"] == owned[owner]
+        assert row["subjects"] == [{"subject_id": SHARED, "name": "Shared"}] and row["documents"] == 1
+    assert a_list[0]["thread_id"] != b_list[0]["thread_id"]

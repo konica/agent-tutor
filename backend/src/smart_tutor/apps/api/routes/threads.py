@@ -3,7 +3,7 @@ learner's documents, or a later one in an existing thread; an answer draws on al
 only the thread's listed ones once the learner limits its search scope (US-4c). Answered as SSE (PRD §9.2); the
 answer is kept as a turn when it is done, with the documents it drew on, and the turns and documents are listed per
 thread; the learner adds documents to that list and removes them (US-4c). The learner can rename a thread and set or
-read its search scope."""
+read its search scope. The learner lists their active conversations, newest activity first (US-13)."""
 
 import json
 import logging
@@ -20,7 +20,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from smart_tutor.apps.api.agent_client import AgentAnswer, AgentUnavailableError
-from smart_tutor.apps.api.deps import Agent, BearerToken, Conversations, CurrentPrincipal
+from smart_tutor.apps.api.deps import Agent, BearerToken, Conversations, CurrentPrincipal, Subjects
+from smart_tutor.apps.api.routes.knowledge import SubjectResponse
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.tutoring.application import (
@@ -340,6 +341,8 @@ async def ask_in_thread(
         # Ownership first, so another learner's thread is a 404 whatever their library holds.
         listed = await run_in_threadpool(conversations.search_documents, tid, principal.user_id)
         await run_in_threadpool(conversations.require_documents, principal.user_id)
+        # The question moves the conversation to the top of the list, once it is accepted and before the agent runs.
+        await run_in_threadpool(conversations.note_question, tid, principal.user_id)
     except ThreadNotFoundError as e:
         raise HTTPException(404, str(e)) from None
     except (NoDocumentsError, ThreadArchivedError) as e:
@@ -373,6 +376,34 @@ class ThreadResponse(BaseModel):
 
 def _thread_response(thread: Thread) -> ThreadResponse:
     return ThreadResponse(thread_id=thread.thread_id, title=thread.title, search_scope=thread.search_scope.value)
+
+
+class ThreadSummaryResponse(BaseModel):
+    thread_id: str
+    title: str | None
+    subjects: list[SubjectResponse]  # of its documents used that still exist, by the learner's names (D11)
+    documents: int
+    last_activity: datetime
+
+
+@router.get("/threads", operation_id="list_threads")
+def list_threads(
+    principal: CurrentPrincipal, conversations: Conversations, subjects: Subjects
+) -> list[ThreadSummaryResponse]:
+    """The learner's active conversations, newest last activity first (PRD US-13): title, subjects of the documents
+    used (deleted ones excluded), number of documents, last activity."""
+    summaries = conversations.list_threads(principal.user_id)
+    names = subjects.names_for(principal.user_id, {s for t in summaries for s in t.subject_ids})
+    return [
+        ThreadSummaryResponse(
+            thread_id=t.thread_id,
+            title=t.title,
+            subjects=[SubjectResponse(subject_id=s, name=names[s]) for s in t.subject_ids if s in names],
+            documents=t.documents,
+            last_activity=t.last_activity,
+        )
+        for t in summaries
+    ]
 
 
 @router.get(
