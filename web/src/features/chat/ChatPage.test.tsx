@@ -1299,7 +1299,7 @@ describe("ChatPage", () => {
     });
     const cited = (over: Partial<TurnResponse["citations"][number]>) => turn({ citations: [{ ...turn().citations[0]!, ...over }] });
     const conversation = (turns: TurnResponse[], over: Partial<ThreadResponse> = {}) =>
-      vi.fn(async () => ({ thread: { thread_id: "t1", title: "Attention basics", search_scope: "library" as const, ...over }, turns }));
+      vi.fn(async () => ({ thread: { thread_id: "t1", title: "Attention basics", search_scope: "library" as const, status: "active" as const, ...over }, turns }));
     const usedDoc: ThreadDocumentResponse = { document_id: "d1", title: "a.pdf", authors: [], year: null, archived: false, deleted: false, added_by: "answer", used: true };
     const panel = () => screen.queryByRole("complementary", { name: "Conversation" });
     const location = () => screen.getByTestId("location").textContent;
@@ -1663,7 +1663,7 @@ describe("ChatPage", () => {
         ...over,
       });
       const turns = [turn({ rating: "down" }), turn({ question: "Old?", run_id: null })];
-      const loadConversation = vi.fn(async () => ({ thread: { thread_id: "t1", title: "T", search_scope: "library" as const }, turns }));
+      const loadConversation = vi.fn(async () => ({ thread: { thread_id: "t1", title: "T", search_scope: "library" as const, status: "active" as const }, turns }));
       renderChat({ loadConversation }, "/chat/t1");
 
       expect(await screen.findByRole("button", { name: "Not helpful" })).toHaveAttribute("aria-pressed", "true");
@@ -1675,7 +1675,7 @@ describe("ChatPage", () => {
       const rate = vi.fn(() => new Promise<"up" | "down">((resolve) => (release = resolve)));
       const saved: TurnResponse = { question: "Q1?", answer: "A1.", citations: [], decline: null, created_at: "2026-10-10T09:00:00Z", run_id: "r1", rating: null };
       const loadConversation = vi.fn(async (id: string) => ({
-        thread: { thread_id: id, title: id, search_scope: "library" as const },
+        thread: { thread_id: id, title: id, search_scope: "library" as const, status: "active" as const },
         turns: [{ ...saved, question: id === "t1" ? "Q1?" : "Q2?" }],
       }));
       render(
@@ -1698,7 +1698,7 @@ describe("ChatPage", () => {
 
     it("announces the outcome in the page's one status region, not in a region per turn", async () => {
       const turn = (run_id: string, rating: "up" | null): TurnResponse => ({ question: "Q?", answer: "A.", citations: [], decline: null, created_at: "2026-10-10T09:00:00Z", run_id, rating });
-      const loadConversation = vi.fn(async () => ({ thread: { thread_id: "t1", title: "T", search_scope: "library" as const }, turns: [turn("r1", "up"), turn("r2", null)] }));
+      const loadConversation = vi.fn(async () => ({ thread: { thread_id: "t1", title: "T", search_scope: "library" as const, status: "active" as const }, turns: [turn("r1", "up"), turn("r2", null)] }));
       renderChat({ loadConversation, rate: async (_t, _r, rating) => rating }, "/chat/t1");
 
       const helpfuls = await screen.findAllByRole("button", { name: "Helpful" });

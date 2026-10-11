@@ -773,6 +773,14 @@
             "title": "Search Scope",
             "type": "string"
           },
+          "status": {
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
           "thread_id": {
             "title": "Thread Id",
             "type": "string"
@@ -792,7 +800,8 @@
         "required": [
           "thread_id",
           "title",
-          "search_scope"
+          "search_scope",
+          "status"
         ],
         "title": "ThreadResponse",
         "type": "object"
@@ -2018,8 +2027,20 @@
     },
     "/threads": {
       "get": {
-        "description": "The learner's active conversations, newest last activity first (PRD US-13): title, subjects of the documents\nused (deleted ones excluded), number of documents, last activity.",
+        "description": "The learner's active conversations, or with `archived=true` the archived ones, newest last activity first\n(PRD US-13): title, subjects of the documents used (deleted ones excluded), number of documents, last activity.",
         "operationId": "list_threads",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Archived",
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -2034,6 +2055,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "security": [
@@ -2202,6 +2233,58 @@
         ]
       }
     },
+    "/threads/{thread_id}/archive": {
+      "post": {
+        "description": "Archive the learner's conversation (PRD US-13): it leaves the active list and becomes read-only; its history,\ndocuments used, and title stay. Archiving an archived one changes nothing.",
+        "operationId": "archive_thread",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "thread_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Thread Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not the caller's conversation."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Archive Thread",
+        "tags": [
+          "tutoring"
+        ]
+      }
+    },
     "/threads/{thread_id}/documents": {
       "get": {
         "description": "The conversation's documents: those its answers drew on and those the learner added (PRD US-4b, US-4c).",
@@ -2300,6 +2383,9 @@
           "404": {
             "description": "Not the caller's conversation, or a document that isn't their ready one."
           },
+          "409": {
+            "description": "The conversation is archived."
+          },
           "422": {
             "content": {
               "application/json": {
@@ -2354,6 +2440,9 @@
           },
           "404": {
             "description": "Not the caller's conversation."
+          },
+          "409": {
+            "description": "The conversation is archived."
           },
           "422": {
             "content": {
@@ -2437,6 +2526,58 @@
           }
         ],
         "summary": "Ask In Thread",
+        "tags": [
+          "tutoring"
+        ]
+      }
+    },
+    "/threads/{thread_id}/restore": {
+      "post": {
+        "description": "Restore the learner's archived conversation: active again; restoring an active one changes nothing.",
+        "operationId": "restore_thread",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "thread_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Thread Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not the caller's conversation."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Restore Thread",
         "tags": [
           "tutoring"
         ]

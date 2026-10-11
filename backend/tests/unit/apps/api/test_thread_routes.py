@@ -604,6 +604,7 @@ def test_rename_trims_and_saves_the_title() -> None:
         "thread_id": thread.thread_id,
         "title": "Attention basics",
         "search_scope": "library",
+        "status": "active",
     }
     assert threads.threads[thread.thread_id].title == "Attention basics"
 
@@ -1281,3 +1282,49 @@ def test_the_history_holds_no_token_user_id_or_chunk_text() -> None:
     assert "t-ada" not in dumped  # no token
     assert "ada" not in dumped  # no user id
     assert "c1" not in dumped  # no chunk id or citation
+
+
+def test_archive_and_restore_return_the_thread_and_change_only_its_status() -> None:
+    client, threads, thread = started_thread()
+
+    response = client.post(f"/threads/{thread.thread_id}/archive", headers=AUTH)
+    assert response.status_code == 200
+    assert response.json() == {
+        "thread_id": thread.thread_id,
+        "title": "What is attention?",
+        "search_scope": "library",
+        "status": "archived",
+    }
+    assert client.post(f"/threads/{thread.thread_id}/archive", headers=AUTH).json()["status"] == "archived"
+    assert client.get("/threads", headers=AUTH).json() == []
+    assert [t["thread_id"] for t in client.get("/threads?archived=true", headers=AUTH).json()] == [thread.thread_id]
+    assert client.get(f"/threads/{thread.thread_id}", headers=AUTH).json()["status"] == "archived"
+
+    response = client.post(f"/threads/{thread.thread_id}/restore", headers=AUTH)
+    assert response.status_code == 200 and response.json()["status"] == "active"
+    assert [t["thread_id"] for t in client.get("/threads", headers=AUTH).json()] == [thread.thread_id]
+    assert client.get("/threads?archived=true", headers=AUTH).json() == []
+
+
+@pytest.mark.parametrize("action", ["archive", "restore"])
+def test_archiving_or_restoring_an_unknown_thread_is_404(action: str) -> None:
+    client, _, _ = setup()
+    response = client.post(f"/threads/{uuid.uuid4()}/{action}", headers=AUTH)
+    assert response.status_code == 404 and response.json() == {"detail": "Conversation not found"}
+
+
+def test_an_archived_thread_cant_add_or_remove_documents() -> None:
+    client, _, threads, ids = ask_with(lambda ids: DELTA + NO_CITATIONS + DONE)
+    client.post("/threads", json=QUESTION, headers=AUTH)
+    [thread] = threads.threads.values()
+    listed, other = ids
+    url = f"/threads/{thread.thread_id}/documents"
+    assert client.post(url, json={"document_ids": [listed]}, headers=AUTH).status_code == 200
+    threads.threads[thread.thread_id].status = ThreadStatus.ARCHIVED
+
+    added = client.post(url, json={"document_ids": [other]}, headers=AUTH)
+    assert added.status_code == 409
+    assert added.json() == {"detail": "An archived conversation can't be changed. Restore it first."}
+    removed = client.delete(f"{url}/{listed}", headers=AUTH)
+    assert removed.status_code == 409
+    assert [d["document_id"] for d in client.get(url, headers=AUTH).json()] == [listed]
