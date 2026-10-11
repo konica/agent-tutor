@@ -4,7 +4,7 @@ every patch window:
     docker compose exec -T worker python - <check-egress.py
 
 The worker must not reach the internet, directly, by DNS, or through the proxy (CONNECT to another host or port, or
-plain HTTP), while S3, SQS, SSM, Bedrock, and Postgres work. The AWS calls are read-only and use the instance profile, whose credentials come through the proxy too.
+plain HTTP), while S3, SQS, SSM, Bedrock, LangSmith, and Postgres work. The AWS calls are read-only and use the instance profile, whose credentials come through the proxy too.
 Exit 0: as expected. Exit 2: blocked, but a needed destination is unreachable. Exit 1, or a crash: treat as a leak.
 """
 
@@ -16,6 +16,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+LANGSMITH_HOST = "api.smith.langchain.com"
 ARBITRARY_HOST = "example.com"
 ARBITRARY_IP = "1.1.1.1"
 TIMEOUT = 10
@@ -79,6 +80,8 @@ def leaks() -> list[str]:
         problems.append(f"the proxy answered {status} to GET {url}, not 403")
     tunnels = [(host, 443) for host in (ARBITRARY_HOST, ARBITRARY_IP, f"other-{os.getpid()}.s3.amazonaws.com")]
     tunnels.append((sqs_host, 80))  # an allowed host, but only on 443
+    tunnels.append(("smith.langchain.com", 443))  # another name of the same service
+    tunnels.append((LANGSMITH_HOST, 80))  # the allowed name, but only on 443
     for host, port in tunnels:
         status = _tunnel_status(host, port)
         if status != 403:
@@ -86,11 +89,9 @@ def leaks() -> list[str]:
     return problems
 
 
-def unreachable() -> list[str]:
-    """Destinations the worker needs that don't answer."""
+def _aws_problems(region: str) -> list[str]:
     import boto3  # in the worker image; imported here so the tests run without it
 
-    region = os.environ["AWS_REGION"]
     calls = {
         "S3": lambda: boto3.client("s3", region_name=region).head_bucket(
             Bucket=os.environ["SMART_TUTOR_DOCUMENTS_BUCKET"]
@@ -108,6 +109,13 @@ def unreachable() -> list[str]:
             call()
         except Exception as error:  # every failure is reported, none is fatal here
             problems.append(f"{name}: {type(error).__name__}: {error}")
+    return problems
+
+
+def unreachable() -> list[str]:
+    """Destinations the worker needs that don't answer."""
+    region = os.environ["AWS_REGION"]
+    problems = _aws_problems(region)
     # Bedrock: any HTTP answer proves the route; an invocation would cost money.
     try:
         urllib.request.urlopen(f"https://bedrock-runtime.{region}.amazonaws.com/", timeout=TIMEOUT)
@@ -115,6 +123,13 @@ def unreachable() -> list[str]:
         pass
     except OSError as error:
         problems.append(f"Bedrock: {error}")
+    # LangSmith (the ingest traces): any HTTP answer proves the route.
+    try:
+        urllib.request.urlopen(f"https://{LANGSMITH_HOST}/info", timeout=TIMEOUT)
+    except urllib.error.HTTPError:
+        pass
+    except OSError as error:
+        problems.append(f"LangSmith: {error}")
     if not _connects("postgres", 5432):
         problems.append("Postgres: postgres:5432 refused or timed out")
     return problems
@@ -130,7 +145,7 @@ def main() -> int:
         return 1
     if missing:
         return 2
-    print("The worker reaches S3, SQS, SSM, Bedrock, and Postgres, and nothing else")
+    print("The worker reaches S3, SQS, SSM, Bedrock, LangSmith, and Postgres, and nothing else")
     return 0
 
 
