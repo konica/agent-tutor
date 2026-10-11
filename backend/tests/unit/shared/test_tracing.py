@@ -1,17 +1,24 @@
 """Keyed learner hash and LangSmith run tracing (PRD §10.4): the learner appears only as an HMAC of their user id."""
 
 import json
+from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import Any
 
 import langsmith
 import pytest
 from langchain_core.messages import AIMessage
+from langsmith import run_trees
+from langsmith import utils as ls_utils
 
 from fakes import RecordingClient, fake_chat_model
 from smart_tutor.shared.adapters.tracing import (
     LangSmithRunTracing,
     LearnerHasher,
     learner_hasher,
+    never_raising,
     run_metadata,
+    start_tracing,
 )
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
@@ -73,3 +80,95 @@ def test_a_run_and_its_model_calls_trace_into_the_given_project_with_the_learner
     children = [p for p in created if p.get("parent_run_id") is not None]
     assert children and all(p["session_name"] == "proj-ingestion" for p in children)
     assert "user-123" not in json.dumps(recorder.payloads, default=str)
+
+
+@contextmanager
+def _broken(on: str) -> Iterator[str]:
+    if on == "enter":
+        raise ConnectionError("cannot start")
+    yield "traced"
+    if on == "exit":
+        raise ConnectionError("cannot end")
+
+
+def test_a_trace_that_cannot_start_runs_the_work_untraced() -> None:
+    with never_raising(_broken("enter"), "untraced") as value:
+        ran = value
+    assert ran == "untraced"
+
+
+def test_a_trace_that_cannot_end_leaves_the_work_done() -> None:
+    with never_raising(_broken("exit"), "untraced") as value:
+        ran = value
+    assert ran == "traced"
+
+
+def test_the_works_own_error_still_propagates() -> None:
+    with pytest.raises(KeyError), never_raising(_broken("none"), "untraced"):
+        raise KeyError("work failed")
+
+
+class _FailingClient(RecordingClient):
+    def create_run(self, *args: Any, **kwargs: Any) -> None:
+        raise ConnectionError("LangSmith is down")
+
+    def update_run(self, *args: Any, **kwargs: Any) -> None:
+        raise ConnectionError("LangSmith is down")
+
+
+def test_a_failing_langsmith_never_fails_the_work_of_a_run() -> None:
+    client = _FailingClient()
+    tracing = LangSmithRunTracing(LearnerHasher("k"), "proj-ingestion", {}, client=client)
+    model = fake_chat_model(AIMessage("A summary."))
+    with langsmith.tracing_context(enabled=True, client=client), tracing.run("ingest", UserId("u"), {}):
+        assert model.invoke("Describe these pages.").content == "A summary."
+
+
+class _UpdateFailsClient(RecordingClient):
+    def update_run(self, *args: Any, **kwargs: Any) -> None:
+        raise ConnectionError("LangSmith is down")
+
+
+def test_a_trace_that_cannot_end_leaves_no_context_for_the_next_run() -> None:
+    """LangSmith skips restoring its context when ending fails; a long-lived worker would carry the run's metadata."""
+    failing, recording = _UpdateFailsClient(), RecordingClient()
+    hasher = LearnerHasher("k")
+    first = LangSmithRunTracing(hasher, "p", {}, client=failing).run("ingest", UserId("a"), {"content_id": "c-1"})
+    with langsmith.tracing_context(enabled=True, client=failing):
+        with first:
+            pass
+        assert not langsmith.get_tracing_context()["metadata"]
+        assert langsmith.get_tracing_context()["parent"] is None
+    second = LangSmithRunTracing(hasher, "p", {}, client=recording).run("ingest", UserId("b"), {"content_id": "c-2"})
+    with langsmith.tracing_context(enabled=True, client=recording), second:
+        pass
+    created = next(p for p in recording.payloads if p["op"] == "create")
+    assert created["extra"]["metadata"]["content_id"] == "c-2"
+    assert created["extra"]["metadata"]["learner_hash"] == hasher(UserId("b"))
+
+
+@pytest.fixture
+def fresh_langsmith_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """LangSmith caches its env vars and default client; start and end each test without them."""
+    monkeypatch.setattr(run_trees, "_CLIENT", None)
+    ls_utils.get_env_var.cache_clear()
+    yield
+    ls_utils.get_env_var.cache_clear()
+
+
+@pytest.mark.usefixtures("fresh_langsmith_settings")
+def test_a_sampling_rate_outside_zero_to_one_refuses_to_start(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LANGSMITH_TRACING_SAMPLING_RATE", "2")
+    monkeypatch.setenv("LANGSMITH_API_KEY", "test-not-a-key")
+    with langsmith.tracing_context(enabled=True), pytest.raises(ls_utils.LangSmithUserError, match="SAMPLING_RATE"):
+        start_tracing(Settings(learner_hash_key="k"))
+
+
+@pytest.mark.usefixtures("fresh_langsmith_settings")
+def test_start_tracing_gives_the_hasher_and_builds_no_client_while_tracing_is_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("LANGSMITH_TRACING_SAMPLING_RATE", "2")  # not read while tracing is off
+    with langsmith.tracing_context(enabled=False):
+        hasher = start_tracing(Settings(learner_hash_key="k"))
+    assert hasher is not None and run_trees._CLIENT is None

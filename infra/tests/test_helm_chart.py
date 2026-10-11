@@ -273,3 +273,40 @@ def test_aws_render_refuses_a_missing_bucket_or_queue(missing: str) -> None:
     with pytest.raises(subprocess.CalledProcessError) as e:
         render(*PROD, *args)
     assert missing in e.value.stderr
+
+
+def service_env(docs: list[dict], name: str) -> dict[str, dict]:
+    container = find(docs, "Deployment", name)["spec"]["template"]["spec"]["containers"][0]
+    return {e["name"]: e for e in container["env"]}
+
+
+@pytest.mark.parametrize("service", ["agent", "worker"])
+def test_agent_and_worker_trace_into_the_native_cloud_project_with_keys_from_secrets_manager(service: str) -> None:
+    docs = render(*PROD, *DEPLOY, "--set-string", "global.langsmith.samplingRate=0.5")
+    env = service_env(docs, service)
+    assert env["LANGSMITH_TRACING"]["value"] == "true"
+    assert env["LANGSMITH_PROJECT"]["value"] == "smart-tutor-native-cloud"
+    assert env["LANGSMITH_TRACING_SAMPLING_RATE"]["value"] == "0.5"
+    secret = f"{service}-langsmith"
+    assert env["LANGSMITH_API_KEY"]["valueFrom"] == {"secretKeyRef": {"name": secret, "key": "api-key"}}
+    assert env["SMART_TUTOR_LEARNER_HASH_KEY"]["valueFrom"] == {
+        "secretKeyRef": {"name": secret, "key": "learner-hash-key"}
+    }
+    external = find(docs, "ExternalSecret", secret)
+    refs = {d["secretKey"]: d["remoteRef"]["key"] for d in external["spec"]["data"]}
+    assert refs == {
+        "api-key": "smart-tutor/langsmith/api-key",
+        "learner-hash-key": "smart-tutor/langsmith/learner-hash-key",
+    }
+
+
+def test_the_sampling_rate_defaults_to_every_run() -> None:
+    assert service_env(render(*PROD, *DEPLOY), "agent")["LANGSMITH_TRACING_SAMPLING_RATE"]["value"] == "1"
+
+
+@pytest.mark.parametrize("service", ["agent", "worker"])
+def test_without_a_project_nothing_traces(service: str) -> None:
+    docs = render(*PROD, *DEPLOY, "--set", "global.langsmith.project=")
+    env = service_env(docs, service)
+    assert not [k for k in env if k.startswith("LANGSMITH_") or k == "SMART_TUTOR_LEARNER_HASH_KEY"]
+    assert not [d for d in docs if d["kind"] == "ExternalSecret" and d["metadata"]["name"] == f"{service}-langsmith"]

@@ -617,6 +617,7 @@ def test_egress_proxy_allows_only_the_workers_aws_endpoints_and_imds(compose: di
     rules = [line for line in lines if line.startswith("http_access ")]
     assert rules == [
         "http_access allow CONNECT aws tls",
+        "http_access allow CONNECT langsmith tls",
         "http_access allow !CONNECT imds http",
         "http_access deny all",
     ]
@@ -1056,3 +1057,43 @@ def test_deploy_installs_and_enables_every_timer() -> None:
     assert "systemctl daemon-reload" in script
     assert 'for timer in "$here"/systemd/*.timer' in script
     assert script.index("up -d --wait --wait-timeout") < script.index("systemctl daemon-reload")
+
+
+LANGSMITH_HOST = "api.smith.langchain.com"
+
+
+@pytest.mark.parametrize("service", ["agent", "worker"])
+def test_agent_and_worker_trace_into_the_on_premise_project(compose: dict[str, Any], service: str) -> None:
+    env = compose["services"][service]["environment"]
+    assert env["LANGSMITH_TRACING"] == "${LANGSMITH_TRACING:?}"
+    assert env["LANGSMITH_API_KEY"] == "${LANGSMITH_API_KEY}"  # empty while tracing is off
+    assert env["LANGSMITH_PROJECT"] == "smart-tutor-on-premise"  # the worker adds -ingestion
+    assert env["LANGSMITH_TRACING_SAMPLING_RATE"] == "${TRACE_SAMPLING_RATE:?}"
+    assert env["SMART_TUTOR_LEARNER_HASH_KEY"] == "${LEARNER_HASH_KEY:?}"
+
+
+@pytest.mark.parametrize("service", ["api", "mcp"])
+def test_services_that_make_no_model_calls_of_their_own_do_not_trace(compose: dict[str, Any], service: str) -> None:
+    assert not [k for k in compose["services"][service]["environment"] if k.startswith("LANGSMITH_")]
+
+
+def test_egress_proxy_allows_langsmith_by_exact_name_on_443_only(compose: dict[str, Any]) -> None:
+    lines = _squid_conf(compose)
+    acls = {line.split()[1]: line.split()[2:] for line in lines if line.startswith("acl ")}
+    assert acls["langsmith"] == ["dstdomain", "-n", LANGSMITH_HOST]
+    allows = [line for line in lines if line.startswith("http_access allow")]
+    assert allows == ["http_access allow CONNECT aws tls", "http_access allow CONNECT langsmith tls",
+                      "http_access allow !CONNECT imds http"]
+
+
+def test_deploy_script_renders_the_tracing_settings_and_turns_tracing_off_without_the_api_key() -> None:
+    script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
+    assert "learner_hash_key=$(secret langsmith/learner-hash-key)" in script
+    assert "trace_sampling_rate=$(param trace-sampling-rate)" in script
+    tracing = script[script.index("langsmith_api_key="):script.index("umask 077")]
+    assert "secret langsmith/api-key 2>/dev/null" in tracing
+    assert "langsmith_tracing=false" in tracing and "langsmith_tracing=true" in tracing
+    assert "$prefix/langsmith/api-key" in tracing and ">&2" in tracing  # the warning names the secret
+    for line in ("LANGSMITH_TRACING=$langsmith_tracing", "LANGSMITH_API_KEY=$langsmith_api_key",
+                 "TRACE_SAMPLING_RATE=$trace_sampling_rate", "LEARNER_HASH_KEY=$learner_hash_key"):
+        assert line in script

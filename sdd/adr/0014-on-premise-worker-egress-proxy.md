@@ -30,3 +30,7 @@ The worker talks to S3, SQS, SSM, Bedrock, the instance metadata service (for it
 - Squid sees only the host name in CONNECT; a compromised worker controls what goes inside the tunnel. It can still send data out through the allowed AWS APIs: by signing requests with credentials of its own (for example, SendMessage to another account's queue on the SQS endpoint), to resources that allow anonymous access, or by naming another bucket inside a tunnel opened to our bucket's host (S3 front ends serve every bucket, and the S3 gateway endpoint has the default full-access policy). This is the same residual as native-cloud's NetworkPolicy. What the proxy closes is every other host: arbitrary internet hosts, any server on EC2, and DNS.
 - Follow-up hardening would close that residual: an S3 gateway endpoint policy limited to our account (free), and interface endpoints with policies for SQS, SSM, and Bedrock (about $7 a month each).
 - Native-cloud is unchanged.
+
+## Amendment (#229)
+
+The worker also traces its processing to LangSmith, so the proxy allows `CONNECT api.smith.langchain.com:443` by exact name. `check-egress.py` checks that LangSmith answers and that other LangSmith names and ports stay refused.
