@@ -54,8 +54,8 @@ class Settings(BaseSettings):
     # This service's confidential client for token introspection: smart-tutor-api (API, agent) or rag-mcp (MCP).
     keycloak_client_id: str = "smart-tutor-api"
     keycloak_client_secret: SecretStr = SecretStr("")
-    # HMAC key for the learner hash in traces (PRD §10.4). A secret: from Secrets Manager when deployed (#229); required
-    # only while LangSmith tracing is on.
+    # HMAC key for the learner hash in traces (PRD §10.4). A secret: <mode prefix>/langsmith/learner-hash-key in Secrets
+    # Manager when deployed; required only while LangSmith tracing is on.
     learner_hash_key: SecretStr = SecretStr("")
     cors_origins: list[str] = ["http://localhost:10453"]
     # Path prefix the API is served under: /api behind CloudFront (ADR 0009). Routes match with and without it.

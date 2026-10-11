@@ -35,8 +35,8 @@ from smart_tutor.shared.adapters.postgres.engine import create_db_engine
 from smart_tutor.shared.adapters.tracing import (
     LangSmithRunTracing,
     ingestion_project,
-    learner_hasher,
     run_metadata,
+    start_tracing,
 )
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.ports.message_queue import MessageQueue
@@ -76,7 +76,7 @@ def run_once(queue: MessageQueue, ingestion: IngestionService) -> int:
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     settings = Settings()
-    tracing = LangSmithRunTracing(learner_hasher(settings), ingestion_project(), run_metadata(settings))
+    tracing = LangSmithRunTracing(start_tracing(settings), ingestion_project(), run_metadata(settings))
     engine = create_db_engine(settings.database_url)
 
     def library() -> SqlLibraryUnitOfWork:

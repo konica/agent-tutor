@@ -4,7 +4,7 @@
 # Our images come from on-premise's ECR repositories (`smart-tutor-on-premise/<service>`) by commit tag. Caddy is the
 # only service with public ports. Data lives on the data volume (/data). The worker, agent, and MCP server (#149) run
 # as the image's non-root user on a read-only root filesystem, like the Helm charts. The worker reaches only Postgres
-# and, through the egress proxy, its AWS endpoints (#153); deploy.sh checks the running worker's isolation and egress
+# and, through the egress proxy, its AWS endpoints and LangSmith (#153, #229); deploy.sh checks the running worker's isolation and egress
 # after every deploy.
 
 name: smart-tutor
@@ -149,6 +149,12 @@ services:
     environment:
       SMART_TUTOR_ENVIRONMENT: prod
       SMART_TUTOR_DEPLOYMENT: on-premise
+      # Traces (PRD §10.4, #229): tracing is off until the LangSmith API key's secret exists (deploy.sh).
+      LANGSMITH_TRACING: ${LANGSMITH_TRACING:?}
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY}
+      LANGSMITH_PROJECT: smart-tutor-on-premise
+      LANGSMITH_TRACING_SAMPLING_RATE: ${TRACE_SAMPLING_RATE:?}
+      SMART_TUTOR_LEARNER_HASH_KEY: ${LEARNER_HASH_KEY:?}
       SMART_TUTOR_AWS_REGION: ${AWS_REGION:?}
       AWS_REGION: ${AWS_REGION:?}
       SMART_TUTOR_KEYCLOAK_ISSUER: https://${DOMAIN:?}/auth/realms/smart-tutor
@@ -208,7 +214,7 @@ services:
       postgres: {condition: service_healthy}
       keycloak: {condition: service_started}
 
-  # The worker's only way out (#153): CONNECT to its AWS endpoints, plain HTTP to the instance metadata service (the
+  # The worker's only way out (#153): CONNECT to its AWS endpoints and LangSmith's API, plain HTTP to the instance metadata service (the
   # instance profile's credentials); everything else gets 403. The config is an environment variable rather than a
   # file so a changed bucket or region recreates the container (Compose can't inject a config into a read-only one).
   egress-proxy:
@@ -222,11 +228,14 @@ services:
         http_port 3128
         # Exact names, no reverse lookups (-n): not bare s3.*, whose path-style requests could name any bucket.
         acl aws dstdomain -n ${DOCUMENTS_BUCKET:?}.s3.amazonaws.com ${DOCUMENTS_BUCKET:?}.s3.${AWS_REGION:?}.amazonaws.com sqs.${AWS_REGION:?}.amazonaws.com ssm.${AWS_REGION:?}.amazonaws.com bedrock-runtime.${AWS_REGION:?}.amazonaws.com
+        # The worker's ingest traces (#229).
+        acl langsmith dstdomain -n api.smith.langchain.com
         acl imds dstdomain -n 169.254.169.254
         acl tls port 443
         acl http port 80
         acl CONNECT method CONNECT
         http_access allow CONNECT aws tls
+        http_access allow CONNECT langsmith tls
         http_access allow !CONNECT imds http
         http_access deny all
         # IMDSv2 refuses a token request that carries X-Forwarded-For.
@@ -272,6 +281,12 @@ services:
     environment:
       SMART_TUTOR_ENVIRONMENT: prod
       SMART_TUTOR_DEPLOYMENT: on-premise
+      # Traces (PRD §10.4, #229): tracing is off until the LangSmith API key's secret exists (deploy.sh).
+      LANGSMITH_TRACING: ${LANGSMITH_TRACING:?}
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY}
+      LANGSMITH_PROJECT: smart-tutor-on-premise  # its ingest traces go to smart-tutor-on-premise-ingestion
+      LANGSMITH_TRACING_SAMPLING_RATE: ${TRACE_SAMPLING_RATE:?}
+      SMART_TUTOR_LEARNER_HASH_KEY: ${LEARNER_HASH_KEY:?}
       SMART_TUTOR_AWS_REGION: ${AWS_REGION:?}
       AWS_REGION: ${AWS_REGION:?}
       SMART_TUTOR_DOCUMENTS_BUCKET: ${DOCUMENTS_BUCKET:?}

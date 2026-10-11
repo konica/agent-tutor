@@ -105,3 +105,24 @@ async def test_a_failed_ask_ends_the_run_with_the_error_code() -> None:
     assert got[-1].startswith("event: error") and "unavailable" in got[-1]
     updates = [p for p in payloads if p["op"] == "update" and str(p.get("run_id")) == str(RUN_ID)]
     assert updates[-1]["error"] == "unavailable"
+
+
+class FailingClient(RecordingClient):
+    """A LangSmith client whose every send fails, as when LangSmith is down or rejects the key."""
+
+    def create_run(self, *args: Any, **kwargs: Any) -> None:
+        raise ConnectionError("LangSmith is down")
+
+    def update_run(self, *args: Any, **kwargs: Any) -> None:
+        raise ConnectionError("LangSmith is down")
+
+
+async def test_a_failing_langsmith_never_fails_the_ask() -> None:
+    client = FailingClient()
+    tracing = AskTracing(META, LearnerHasher("k"), client=client)
+    graph = build_graph(lambda token: FakeRetriever(CHUNKS), fake_chat_model(AIMessage("It weighs tokens [1].")))
+    run = AskRun(RUN_ID, None, USER, "What is attention?", None)
+    with langsmith.tracing_context(enabled=True, client=client):
+        got = [e async for e in answer_events(graph, AskRequest(question="What is attention?"), "tok", run, tracing)]
+    assert any(e.startswith("event: delta") for e in got)
+    assert got[-1].startswith("event: done")
