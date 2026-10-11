@@ -1,5 +1,6 @@
 # Every push to main: the CI checks, then per deployed mode its images (built into that mode's own repositories, #206)
-# and its deploy. On-premise deploys on every push (PRD §9.12, ADR 0012, #150).
+# and its deploy. On-premise deploys on every push (PRD §9.12, ADR 0012, #150) unless the repository variable
+# ON_PREMISE_AUTO_DEPLOY is `false`, which an operator sets while on-premise is torn down (#207).
 # Native-cloud is opt-in: run this workflow by hand with mode native-cloud, or set the repository variable
 # NATIVE_CLOUD_AUTO_DEPLOY to `true` to deploy it on every push as well (unset or anything else keeps it off).
 # Runbooks: docs/runbooks/on-premise-deploy.md, docs/runbooks/pilot-deploy.md (native-cloud).
@@ -26,7 +27,7 @@ jobs:
   # builds twice.
   images-on-premise:
     needs: checks
-    if: github.event_name == 'push' || inputs.mode == 'on-premise'
+    if: (github.event_name == 'push' && vars.ON_PREMISE_AUTO_DEPLOY != 'false') || inputs.mode == 'on-premise'
     permissions:
       contents: read
       id-token: write  # OIDC sign-in to AWS, used only inside the `on-premise` environment
@@ -48,7 +49,7 @@ jobs:
 
   on-premise:
     needs: images-on-premise
-    if: github.event_name == 'push' || inputs.mode == 'on-premise'
+    if: (github.event_name == 'push' && vars.ON_PREMISE_AUTO_DEPLOY != 'false') || inputs.mode == 'on-premise'
     permissions:
       contents: read
       id-token: write  # OIDC sign-in to AWS, used only inside the `on-premise` environment

@@ -1,6 +1,6 @@
 # Pilot deploy (#56, #57, #58, #59, #139, #150)
 
-**Optional mode.** On-premise is the default and deploys on every merge (`on-premise-deploy.md`). Native-cloud deploys only when chosen (#150).
+**Optional mode.** On-premise is the default and deploys on every merge unless `ON_PREMISE_AUTO_DEPLOY` is `false` (`on-premise-deploy.md`). Native-cloud deploys only when chosen (#150).
 
 Deploys the pilot's infrastructure and the `web`, `keycloak`, `api`, `agent`, `mcp-server`, and `worker` charts, so the CloudFront address serves the app shell, Keycloak at `/auth` on RDS, and the API at `/api`. The pilot now runs upload, processing, and chat: a learner uploads a PDF and asks a question about it (PRD §9.12, ADRs 0009 and 0010). It needs an account admin. Do [`pilot-aws-prerequisites.md`](pilot-aws-prerequisites.md) (#55) first. The big picture is in [`pilot-environment-overview.md`](pilot-environment-overview.md). Since #150 native-cloud deploys only when chosen (section 12); this runbook stays the manual path and the reference for what the workflow does.
 

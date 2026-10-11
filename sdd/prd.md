@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Draft v2.40 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; conversations over all of a learner's documents; per-learner contents; on-premise deployment by default; research map in Release 2) |
+| **Status** | Draft v2.41 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; conversations over all of a learner's documents; per-learner contents; on-premise deployment by default; research map in Release 2) |
+| **Changes from v2.40** | Tearing down one deployment mode leaves the other running (#207, ADR 0016). On-premise deploys on every merge unless the repository variable `ON_PREMISE_AUTO_DEPLOY` is `false`, which an operator sets while on-premise is torn down, so merges neither redeploy it nor fail. The on-premise runbook tears down the whole mode; native-cloud's teardown deletes its Registry and keeps only `GitHubDeploy` (the account's GitHub OIDC provider) and the bootstrap. An infra test fails if either mode's stacks create, import, or grant access to the other's resources. |
 | **Changes from v2.39** | Each deployment mode has its own image registry (#206; ADR 0016): on-premise pushes to and pulls from `smart-tutor-on-premise/<service>`, native-cloud keeps `smart-tutor/<service>`, and each mode's deploy role pushes only to its own. The modes share no stack except the account's CDK bootstrap and the GitHub OIDC provider. Appendix A. No product behavior changes. |
 | **Changes from v2.38** | List conversations (#188, US-13): `GET /threads` (operation `list_threads`) returns the owner's active threads, newest last activity first, each with `title`, `subjects` (of its listed documents that still exist, archived included, by the learner's names; D11, Q63 L1), `documents` (the number listed), and `last_activity` (`last_learner_message_at`, else `created_at`). A question in an existing thread now sets `last_learner_message_at`. The web's Conversations page lists them (at most two subject chips, then "+N"; empty state "No conversations yet" with "Start a conversation"), and the side nav shows the three most recent. Archived tab, filters, search, and the note indicator come in their own slices. |
 | **Changes from v2.37** | Open a document from the Library (#209, US-3, US-10): a ready or *choose subjects* row's title opens the document viewer as an overlay at page 1 (Details stays in the row's More menu; archived, processing, and failed rows' titles open details). Document details offers **Open** for ready, *choose subjects*, and archived documents; it replaces the panel, and closing the viewer returns to details. An archived document opens read-only with "Archived" and Restore; restoring there moves the row out of Archived and keeps the viewer open. Web only. |
@@ -521,7 +522,7 @@ Smart Tutor has two **deployment modes**, and the product behaves the same in bo
 | Public entry and TLS | Caddy (path routing, automatic Let's Encrypt) at an Elastic IP with a DuckDNS subdomain (fallback `<eip>.sslip.io`) | The CloudFront domain, through a VPC origin to an internal ALB (ADR 0009) |
 | Network | Its own VPC: one public subnet, no NAT, S3 gateway endpoint; inbound 80/443 only; no SSH | VPC in 2 AZs with a NAT gateway |
 | Managed AWS services | S3, SQS + DLQ, SSM, Secrets Manager, ECR (each mode its own repositories), Bedrock | The same, plus EKS, RDS, CloudFront, and the ALB |
-| Deployed | On every merge to `main` | By `workflow_dispatch`, or on every merge when `NATIVE_CLOUD_AUTO_DEPLOY=true` |
+| Deployed | On every merge to `main`, unless `ON_PREMISE_AUTO_DEPLOY=false` (while it is torn down) | By `workflow_dispatch`, or on every merge when `NATIVE_CLOUD_AUTO_DEPLOY=true` |
 
 Bedrock AgentCore Runtime for the agent and MCP server was considered and rejected. It would be a second platform next to the other services and add a hop per turn, and its microVM isolation and scale-to-zero matter little for an agent that runs no code (cost at pilot scale is similar). The worker gets stricter isolation because it parses untrusted files.
 
@@ -539,7 +540,7 @@ Bedrock AgentCore Runtime for the agent and MCP server was considered and reject
 
 **Delivery:**
 
-- **On-premise**, on every merge to `main`: tests and the smoke evaluation split → images to on-premise's ECR repositories → `cdk deploy` → SSM Run Command on the VM (pull images, migrate, `docker compose up -d`) → smoke test. Brief downtime during a deploy is acceptable.
+- **On-premise**, on every merge to `main` unless `ON_PREMISE_AUTO_DEPLOY=false`: tests and the smoke evaluation split → images to on-premise's ECR repositories → `cdk deploy` → SSM Run Command on the VM (pull images, migrate, `docker compose up -d`) → smoke test. Brief downtime during a deploy is acceptable.
 - **Native-cloud** (`cdk deploy` → `helm upgrade`) runs by `workflow_dispatch`, or on every merge when `NATIVE_CLOUD_AUTO_DEPLOY=true`. CI still runs `cdk synth` and `helm lint` for native-cloud on every change, so it doesn't rot.
 - The running EKS pilot stays, deployed only by hand, until on-premise passes its smoke test; then the product owner decides what happens to it.
 - Releases are gated on the full evaluation split.

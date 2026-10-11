@@ -164,7 +164,10 @@ def test_deployments_of_one_mode_queue_and_never_cancel() -> None:
 # --- deploy.yml: what a push and a manual run deploy ---------------------------------------------------------
 
 
-ON_PREMISE_IF = "github.event_name == 'push' || inputs.mode == 'on-premise'"
+# On-premise deploys on every push unless the variable is exactly `false` (while it is torn down, #207).
+ON_PREMISE_IF = (
+    "(github.event_name == 'push' && vars.ON_PREMISE_AUTO_DEPLOY != 'false') || inputs.mode == 'on-premise'"
+)
 NATIVE_CLOUD_IF = (
     "(github.event_name == 'push' && vars.NATIVE_CLOUD_AUTO_DEPLOY == 'true') || inputs.mode == 'native-cloud'"
 )
@@ -517,3 +520,9 @@ def test_native_cloud_teardown_runbook_leaves_on_premise_alone() -> None:
     assert "with the reason" in text  # the dry run explains each kept stack
     leftovers = text.split("## 7.")[1].split("## 8.")[0]
     assert "ECR" not in leftovers and "image" not in leftovers.lower()
+
+
+def test_the_on_premise_auto_deploy_switch_is_documented() -> None:
+    for path in (RUNBOOKS / "on-premise-deploy.md", WORKFLOWS.parents[1] / "sdd/prd.md"):
+        assert "ON_PREMISE_AUTO_DEPLOY" in path.read_text(encoding="utf-8"), path.name
+    assert "ON_PREMISE_AUTO_DEPLOY" in (WORKFLOWS / "deploy.yml").read_text(encoding="utf-8").split("name: deploy")[0]
