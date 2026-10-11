@@ -23,7 +23,6 @@ from smart_tutor.knowledge.application import (
     SearchService,
     UploadService,
 )
-from smart_tutor.knowledge.domain.document import DocumentState
 from smart_tutor.shared.domain.ids import DocumentId, SubjectId, UserId
 from smart_tutor.subjects.application import GENERAL_SUBJECT_ID
 
@@ -167,26 +166,6 @@ def test_an_unlinked_or_duplicate_failed_document_never_matches() -> None:
     assert service.find_in_library(UserId("carol"), SHA) is None
 
 
-def test_has_ready_documents_ignores_archived_and_unfinished_documents() -> None:
-    library = InMemoryLibrary()
-    docs = DocumentService(library.unit_of_work, max_attempts=3)
-    ada = UserId("ada")
-    UploadService(
-        library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ
-    ).start_upload(ada, "p.pdf")
-    choosing = ingest_ready(library, "ada", "Awaiting subjects.")
-    library.state.documents[choosing].state = DocumentState.AWAITING_SUBJECTS
-    archived = ingest_ready(library, "ada", "Archived.")
-    library.state.documents[archived].archived = True
-    ingest_ready(library, "bob", "Bob's ready document.")  # another learner's never counts
-
-    assert docs.has_ready_documents(ada) is False
-
-    ingest_ready(library, "ada", "Ready and not archived.")
-    assert docs.has_ready_documents(ada) is True
-    assert docs.has_ready_documents(UserId("carol")) is False
-
-
 def test_the_list_holds_active_documents_by_default_and_archived_ones_on_request() -> None:
     library = InMemoryLibrary()
     active = ingest_ready(library, "ada", "active")
@@ -198,7 +177,7 @@ def test_the_list_holds_active_documents_by_default_and_archived_ones_on_request
     assert [d.document_id for d in docs.list_documents(UserId("ada"), archived=True)] == [archived]
 
 
-def test_archived_documents_leave_my_subjects_ready_check_and_duplicate_check() -> None:
+def test_archived_documents_leave_my_subjects_and_the_duplicate_check() -> None:
     library = InMemoryLibrary()
     doc = ingest_ready(library, "ada", "only", [ART])
     library.state.documents[doc].archived = True
@@ -206,7 +185,6 @@ def test_archived_documents_leave_my_subjects_ready_check_and_duplicate_check() 
     sha = hashlib.sha256(b"only").hexdigest()
 
     assert docs.learner_subjects(UserId("ada")) == frozenset()
-    assert docs.has_ready_documents(UserId("ada")) is False
     assert docs.find_in_library(UserId("ada"), sha) is None
 
 
