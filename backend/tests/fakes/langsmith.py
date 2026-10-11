@@ -40,6 +40,37 @@ class _Dataset:
         return found
 
 
+@dataclass(frozen=True)
+class FakeRun:
+    id: uuid.UUID
+    name: str
+    inputs: dict[str, Any]
+    outputs: dict[str, Any] | None
+    run_type: str
+    project_name: str
+    start_time: datetime
+    extra: dict[str, Any] | None
+
+
+@dataclass(frozen=True)
+class FakeFeedback:
+    id: uuid.UUID
+    run_id: uuid.UUID
+    key: str
+    score: float | None
+    modified_at: datetime
+
+
+@dataclass
+class FakeQueue:
+    id: uuid.UUID
+    name: str
+    description: str | None
+    rubric_instructions: str | None
+    rubric_items: list[dict[str, Any]]
+    run_ids: list[uuid.UUID] = field(default_factory=list)
+
+
 @dataclass
 class Experiment:
     prefix: str
@@ -67,6 +98,11 @@ class FakeLangSmith:
         self.datasets: dict[str, _Dataset] = {}
         self.experiments: list[Experiment] = []
         self.created = 0  # create_examples calls
+        self.runs: dict[uuid.UUID, FakeRun] = {}
+        self.feedback: list[FakeFeedback] = []
+        self.feedback_configs: dict[str, dict[str, Any]] = {}
+        self.queues: dict[uuid.UUID, FakeQueue] = {}
+        self.flushed = 0
         self._clock = itertools.count(1)
 
     def _now(self) -> datetime:
@@ -131,6 +167,69 @@ class FakeLangSmith:
         if as_of not in [at for at, _ in dataset.versions]:
             raise LangSmithError(f"{as_of} is not an exact version of {dataset_name}")
         dataset.tags[tag] = as_of
+
+    def create_run(self, name: str, inputs: dict[str, Any], run_type: str, *, project_name: str, **kwargs: Any) -> None:
+        run_id = kwargs["id"]
+        self.runs[run_id] = FakeRun(
+            run_id,
+            name,
+            dict(inputs),
+            kwargs.get("outputs"),
+            run_type,
+            project_name,
+            kwargs.get("start_time") or self._now(),
+            kwargs.get("extra"),
+        )
+
+    def flush(self) -> None:
+        self.flushed += 1
+
+    def list_runs(self, *, project_name: str, is_root: bool | None = None) -> Iterator[FakeRun]:
+        runs = [r for r in self.runs.values() if r.project_name == project_name]
+        if not runs:
+            raise LangSmithNotFoundError(f"Project {project_name} not found")
+        return iter(runs)
+
+    def create_feedback(self, run_id: uuid.UUID, key: str, *, score: float | None = None) -> None:
+        self.feedback.append(FakeFeedback(uuid.uuid4(), run_id, key, score, self._now()))
+
+    def list_feedback(
+        self, *, run_ids: Sequence[uuid.UUID], feedback_key: Sequence[str] | None = None
+    ) -> Iterator[FakeFeedback]:
+        if len(run_ids) > 100:  # keep callers batching: real query strings have a length limit
+            raise LangSmithError("too many run ids")
+        return iter(f for f in self.feedback if f.run_id in run_ids and (feedback_key is None or f.key in feedback_key))
+
+    def list_feedback_configs(self, *, feedback_key: Sequence[str]) -> Iterator[dict[str, Any]]:
+        return iter({"feedback_key": k, **self.feedback_configs[k]} for k in feedback_key if k in self.feedback_configs)
+
+    def create_feedback_config(self, feedback_key: str, *, feedback_config: dict[str, Any]) -> None:
+        if feedback_key in self.feedback_configs:
+            raise LangSmithError(f"{feedback_key} exists")
+        self.feedback_configs[feedback_key] = dict(feedback_config)
+
+    def list_annotation_queues(self, *, name: str) -> Iterator[FakeQueue]:
+        return iter(q for q in self.queues.values() if q.name == name)
+
+    def create_annotation_queue(
+        self,
+        *,
+        name: str,
+        description: str | None = None,
+        rubric_instructions: str | None = None,
+        rubric_items: list[dict[str, Any]] | None = None,
+    ) -> FakeQueue:
+        for item in rubric_items or []:
+            if item["feedback_key"] not in self.feedback_configs:  # as LangSmith: the config must exist first
+                raise LangSmithError(f"no feedback config {item['feedback_key']}")
+        queue = FakeQueue(uuid.uuid4(), name, description, rubric_instructions, list(rubric_items or []))
+        self.queues[queue.id] = queue
+        return queue
+
+    def add_runs_to_annotation_queue(self, queue_id: uuid.UUID, *, run_ids: Sequence[uuid.UUID]) -> None:
+        if unknown := [r for r in run_ids if r not in self.runs]:
+            raise LangSmithNotFoundError(f"runs not found: {unknown}")
+        self.queues[queue_id].run_ids.extend(run_ids)
 
     async def aevaluate(
         self,
