@@ -73,6 +73,7 @@ def build_services(settings: Settings) -> ApiServices:
         feedback=answer_feedback(),
         history_turns=settings.history_turns,
         history_answer_chars=settings.history_answer_chars,
+        time_zone=time_zone,
     )
     return ApiServices(
         uploads=UploadService(
