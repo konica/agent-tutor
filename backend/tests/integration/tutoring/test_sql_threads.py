@@ -298,3 +298,25 @@ def test_last_turns_are_the_newest_n_oldest_first_for_the_owner_only(engine: Eng
     assert [t.question for t in repo.last_turns(thread.thread_id, owner, 5)] == ["Q3", "Q4", "Q5", "Q6", "Q7"]
     assert repo.last_turns(thread.thread_id, owner, 0) == []
     assert repo.last_turns(thread.thread_id, UserId("bob"), 5) == []
+
+
+def test_set_status_archives_and_the_lists_follow(engine: Engine) -> None:
+    repo = SqlThreadRepository(engine)
+    ada, bob = UserId(f"ada-{uuid.uuid4()}"), UserId(f"bob-{uuid.uuid4()}")
+    now = datetime.now(UTC)
+    active = Thread.start(ThreadId(str(uuid.uuid4())), ada, now, title="Active")
+    archived = Thread.start(ThreadId(str(uuid.uuid4())), ada, now, title="Archived")
+    other = Thread.start(ThreadId(str(uuid.uuid4())), bob, now, title="Bob's")
+    for t in (active, archived, other):
+        repo.add(t)
+
+    repo.set_status(ThreadId(archived.thread_id), ThreadStatus.ARCHIVED)
+    repo.set_status(ThreadId(other.thread_id), ThreadStatus.ARCHIVED)
+
+    assert [t.thread_id for t in repo.list_owned(ada, ThreadStatus.ACTIVE)] == [active.thread_id]
+    assert [t.thread_id for t in repo.list_owned(ada, ThreadStatus.ARCHIVED)] == [archived.thread_id]
+    got = repo.get_owned(ThreadId(archived.thread_id), ada)
+    assert got is not None and got.status is ThreadStatus.ARCHIVED and got.title == "Archived"
+
+    repo.set_status(ThreadId(archived.thread_id), ThreadStatus.ACTIVE)
+    assert repo.list_owned(ada, ThreadStatus.ARCHIVED) == []

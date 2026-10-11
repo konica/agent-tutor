@@ -8,6 +8,7 @@ from smart_tutor.shared.domain.ids import ThreadId, UserId
 from smart_tutor.tutoring.domain.errors import InvalidTitleError, NoListedDocumentsError, ThreadArchivedError
 
 MAX_TITLE = 120
+CHANGE_ARCHIVED = "An archived conversation can't be changed. Restore it first."
 
 
 class ThreadStatus(StrEnum):
@@ -42,17 +43,28 @@ class Thread:
 
     def ask(self, now: datetime) -> None:
         """The learner asks in it now; an archived thread is read-only."""
-        if self.status is ThreadStatus.ARCHIVED:
-            raise ThreadArchivedError("An archived conversation is read-only. Restore it first.")
+        self.require_active("An archived conversation is read-only. Restore it first.")
         self.last_learner_message_at = now
+
+    def archive(self) -> None:
+        """The learner archives it (US-13): read-only until restored; history, documents used, and title stay."""
+        self.status = ThreadStatus.ARCHIVED
+
+    def restore(self) -> None:
+        """The learner restores it: it can be asked in, renamed, and changed again."""
+        self.status = ThreadStatus.ACTIVE
+
+    def require_active(self, message: str) -> None:
+        """An archived thread is read-only (US-13)."""
+        if self.status is ThreadStatus.ARCHIVED:
+            raise ThreadArchivedError(message)
 
     def is_owned_by(self, user_id: UserId) -> bool:
         return self.user_id == user_id
 
     def rename(self, title: str) -> str:
         """The learner's title, trimmed, 1-120 characters (US-13); returns it. An archived thread can't be renamed."""
-        if self.status is ThreadStatus.ARCHIVED:
-            raise ThreadArchivedError("An archived conversation can't be renamed. Restore it first.")
+        self.require_active("An archived conversation can't be renamed. Restore it first.")
         trimmed = title.strip()
         if not trimmed:
             raise InvalidTitleError("Enter a title")
@@ -64,8 +76,7 @@ class Thread:
     def limit_search(self, scope: SearchScope, listed: int) -> None:
         """Search all ready documents or only the listed ones (US-4c); limiting needs a listed document. An archived
         thread can't be changed."""
-        if self.status is ThreadStatus.ARCHIVED:
-            raise ThreadArchivedError("An archived conversation can't be changed. Restore it first.")
+        self.require_active(CHANGE_ARCHIVED)
         if scope is SearchScope.LISTED and listed == 0:
             raise NoListedDocumentsError("Add documents to limit the search.")
         self.search_scope = scope

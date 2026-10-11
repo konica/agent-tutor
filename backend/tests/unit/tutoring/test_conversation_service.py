@@ -737,3 +737,65 @@ def test_an_unrated_turn_reads_none() -> None:
     svc, _, thread_id, _ = _rated_setup(FakeAnswerFeedback())
 
     assert svc.turns(thread_id, LEARNER)[0].rating is None
+
+
+def test_archive_and_restore_keep_history_documents_and_title() -> None:
+    library, threads, clock = InMemoryLibrary(), InMemoryThreads(), FixedClock()
+    doc = ingest_ready(library, "ada", "Attention is all you need.")
+    conversations = service(library, threads, clock)
+    thread = conversations.start_thread(UserId("ada"), "What is attention?", doc)
+    tid = ThreadId(thread.thread_id)
+    conversations.record_turn(
+        tid, UserId("ada"), AnsweredTurn("What is attention?", "It weighs tokens.", document_ids=(doc,))
+    )
+
+    archived = conversations.archive_thread(tid, UserId("ada"))
+
+    assert archived.status is ThreadStatus.ARCHIVED and archived.title == "What is attention?"
+    assert threads.threads[tid].status is ThreadStatus.ARCHIVED
+    assert [t.answer for t in conversations.turns(tid, UserId("ada"))] == ["It weighs tokens."]
+    assert [d.document_id for d in conversations.documents_used(tid, UserId("ada"))] == [doc]
+    assert conversations.archive_thread(tid, UserId("ada")).status is ThreadStatus.ARCHIVED  # idempotent
+
+    restored = conversations.restore_thread(tid, UserId("ada"))
+    assert restored.status is ThreadStatus.ACTIVE and threads.threads[tid].status is ThreadStatus.ACTIVE
+    assert conversations.restore_thread(tid, UserId("ada")).status is ThreadStatus.ACTIVE  # idempotent
+
+
+@pytest.mark.parametrize("action", ["archive_thread", "restore_thread"])
+def test_archive_and_restore_another_learners_thread_is_not_found(action: str) -> None:
+    library, threads, clock = InMemoryLibrary(), InMemoryThreads(), FixedClock()
+    conversations = service(library, threads, clock)
+    thread = conversations.start_thread(UserId("ada"), "Q")
+
+    with pytest.raises(ThreadNotFoundError, match="Conversation not found"):
+        getattr(conversations, action)(ThreadId(thread.thread_id), UserId("bob"))
+    assert threads.threads[thread.thread_id].status is ThreadStatus.ACTIVE
+
+
+def test_the_list_shows_active_or_archived_threads() -> None:
+    library, threads, clock = InMemoryLibrary(), InMemoryThreads(), FixedClock()
+    conversations = service(library, threads, clock)
+    kept = conversations.start_thread(UserId("ada"), "Kept")
+    clock.current += timedelta(minutes=1)
+    gone = conversations.start_thread(UserId("ada"), "Archived")
+    conversations.archive_thread(ThreadId(gone.thread_id), UserId("ada"))
+
+    assert [t.thread_id for t in conversations.list_threads(UserId("ada"))] == [kept.thread_id]
+    assert [t.thread_id for t in conversations.list_threads(UserId("ada"), archived=True)] == [gone.thread_id]
+
+
+def test_an_archived_thread_can_neither_add_nor_remove_documents() -> None:
+    library, threads, clock = InMemoryLibrary(), InMemoryThreads(), FixedClock()
+    listed = ingest_ready(library, "ada", "Attention is all you need.")
+    other = ingest_ready(library, "ada", "Gradient descent.")
+    conversations = service(library, threads, clock)
+    thread = conversations.start_thread(UserId("ada"), "Q", listed)
+    tid = ThreadId(thread.thread_id)
+    conversations.archive_thread(tid, UserId("ada"))
+
+    with pytest.raises(ThreadArchivedError, match="An archived conversation can't be changed. Restore it first."):
+        conversations.add_documents(tid, UserId("ada"), [other])
+    with pytest.raises(ThreadArchivedError):
+        conversations.remove_document(tid, UserId("ada"), listed)
+    assert [r.document_id for r in threads.documents_used(tid)] == [listed]

@@ -14,7 +14,7 @@ from smart_tutor.tutoring.domain.errors import (
     ThreadNotFoundError,
     TurnNotFoundError,
 )
-from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
+from smart_tutor.tutoring.domain.thread import CHANGE_ARCHIVED, SearchScope, Thread, ThreadStatus
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
 from smart_tutor.tutoring.domain.thread_summary import ThreadSummary
 from smart_tutor.tutoring.domain.turn import (
@@ -99,10 +99,26 @@ class ConversationService:
             self._threads.set_search_scope(thread_id, search_scope)
         return thread
 
-    def list_threads(self, user_id: UserId) -> list[ThreadSummary]:
-        """The learner's active conversations, newest last activity first (US-13). A row's subjects are those of its
-        listed documents that still exist, archived included, read now (D11); a deleted document adds none."""
-        threads = self._threads.list_owned(user_id, ThreadStatus.ACTIVE)
+    def archive_thread(self, thread_id: ThreadId, user_id: UserId) -> Thread:
+        """The learner archives the conversation (US-13): it leaves the active list and is read-only; its history,
+        documents used, and title stay. Archiving an archived one changes nothing."""
+        thread = self._get(thread_id, user_id)
+        thread.archive()
+        self._threads.set_status(thread_id, thread.status)
+        return thread
+
+    def restore_thread(self, thread_id: ThreadId, user_id: UserId) -> Thread:
+        """The learner restores the conversation: active again; restoring an active one changes nothing."""
+        thread = self._get(thread_id, user_id)
+        thread.restore()
+        self._threads.set_status(thread_id, thread.status)
+        return thread
+
+    def list_threads(self, user_id: UserId, *, archived: bool = False) -> list[ThreadSummary]:
+        """The learner's active conversations, or archived ones, newest last activity first (US-13). A row's
+        subjects are those of its listed documents that still exist, archived included, read now (D11); a deleted
+        document adds none."""
+        threads = self._threads.list_owned(user_id, ThreadStatus.ARCHIVED if archived else ThreadStatus.ACTIVE)
         rows = self._threads.documents_used_by_thread([ThreadId(t.thread_id) for t in threads])
         views = self._documents.documents_by_id(
             user_id, list(dict.fromkeys(r.document_id for listed in rows.values() for r in listed))
@@ -193,8 +209,8 @@ class ConversationService:
         self, thread_id: ThreadId, user_id: UserId, document_ids: Sequence[DocumentId]
     ) -> list[DocumentUsed]:
         """The learner adds documents to the list (US-4c): each must be their ready, non-archived document
-        (`can_read`), or nothing is added."""
-        self._owned(thread_id, user_id)
+        (`can_read`), or nothing is added. An archived conversation can't be changed."""
+        self._get(thread_id, user_id).require_active(CHANGE_ARCHIVED)
         ids = list(dict.fromkeys(document_ids))
         views = self._documents.documents_by_id(user_id, ids)
         if any((v := views.get(i)) is None or v.state != "ready" or v.archived for i in ids):
@@ -205,6 +221,7 @@ class ConversationService:
     def remove_document(self, thread_id: ThreadId, user_id: UserId, document_id: DocumentId) -> None:
         """Take a document off the list; the document and old citations to it are unchanged (US-4c)."""
         thread = self._get(thread_id, user_id)
+        thread.require_active(CHANGE_ARCHIVED)
         self._threads.remove_document(thread_id, document_id)
         # A limited thread never has an empty list: the last removal turns the limit off.
         if thread.search_scope is SearchScope.LISTED and not self._threads.documents_used(thread_id):
