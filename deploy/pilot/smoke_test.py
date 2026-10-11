@@ -59,6 +59,19 @@ TRACE_METADATA = (
     "decline",
     "chunks",
 )
+QUERY_SELECT = [
+    "id",
+    "name",
+    "run_type",
+    "inputs",
+    "outputs",
+    "extra",
+    "events",
+    "error",
+    "tags",
+    "parent_run_id",
+    "trace_id",
+]
 DEFAULT_LANGSMITH_ENDPOINT = "https://api.smith.langchain.com"
 
 
@@ -614,12 +627,15 @@ def check_trace(
         raise SmokeTestError(f"trace: no LangSmith project {project}")
 
     root: dict[str, object] = {}
+    seen = False  # the run exists in LangSmith, finished or not
+    last_other: int | None = None  # the last answer that was not 200, 404, 401, 403
     try:
         while True:
             r = _langsmith(s, "GET", endpoint, f"/runs/{run_id}", api_key)
             if refused(r):
                 raise SmokeTestError("trace: LangSmith refused the API key")
             if r.status == 200:
+                seen = True
                 found = _json(r, "trace")
                 if isinstance(found, dict):
                     extra = found.get("extra")
@@ -631,13 +647,20 @@ def check_trace(
                     ):
                         root = found
                         break
+            elif r.status != 404:
+                last_other = r.status
             s.wait("the ask's trace")
     except SmokeTestError as e:
         if "the deadline passed" not in str(e):
             raise
+        last = f"; last answer {last_other}" if last_other else ""
+        if seen:
+            raise SmokeTestError(
+                f"trace: run {run_id} reached LangSmith but never finished with its metadata{last}"
+            ) from None
         raise SmokeTestError(
             f"trace: run {run_id} never reached LangSmith "
-            "(is tracing on, and the sampling rate trace-sampling-rate 1?)"
+            f"(is tracing on, and the sampling rate trace-sampling-rate 1?){last}"
         ) from None
 
     if root.get("name") != "ask":
@@ -654,8 +677,15 @@ def check_trace(
     if metadata["thread_id"] != run.thread_id:
         raise SmokeTestError("trace: the ask run belongs to another thread")
 
+    # The server returns some fields only when selected (as the LangSmith SDK always does),
+    # so ask for the ones a secret could hide in; otherwise the scan could pass over trimmed runs.
     r = _langsmith(
-        s, "POST", endpoint, "/runs/query", api_key, {"trace": run_id, "limit": 100}
+        s,
+        "POST",
+        endpoint,
+        "/runs/query",
+        api_key,
+        {"trace": run_id, "limit": 100, "select": QUERY_SELECT},
     )
     if refused(r):
         raise SmokeTestError("trace: LangSmith refused the API key")
@@ -665,7 +695,7 @@ def check_trace(
         )
     queried = _json(r, "trace")
     runs = queried.get("runs", []) if isinstance(queried, dict) else []
-    blob = json.dumps(runs)
+    blob = json.dumps([root, *runs])
     if s.token and s.token in blob:
         raise SmokeTestError("trace: the trace holds the learner's access token")
     if username and username in blob:

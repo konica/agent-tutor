@@ -241,6 +241,7 @@ class FakePilot:
         self.trace_run_id = "99999999-8888-4777-8666-555555555555"
         self.trace_runs: list[dict] | None = None  # default: built in _langsmith
         self.trace_after_polls = 1  # the root run appears on the 2nd poll
+        self.trace_poll_status = 404  # what the polls before that answer
         # What happened
         self.trace_polls = 0
         self.langsmith_keys: list[str | None] = []
@@ -299,11 +300,14 @@ class FakePilot:
         if method == "GET" and path == f"/ls/runs/{self.trace_run_id}":
             self.trace_polls += 1
             if self.trace_polls <= self.trace_after_polls:
-                return self._json(404, {"detail": "not found"})
+                return self._json(self.trace_poll_status, {"detail": "not yet"})
             runs = self.trace_runs if self.trace_runs is not None else [self._ask_run()]
             return self._json(200, runs[0])
         if method == "POST" and path == "/ls/runs/query":
-            assert json.loads(body)["trace"] == self.trace_run_id
+            query = json.loads(body)
+            assert query["trace"] == self.trace_run_id
+            if not {"inputs", "outputs", "extra"} <= set(query.get("select", [])):
+                return self._json(400, {"detail": "select inputs, outputs and extra"})
             runs = self.trace_runs if self.trace_runs is not None else [self._ask_run()]
             return self._json(200, {"runs": runs, "cursors": {"next": None}})
         return 404, {}, b""
@@ -702,6 +706,29 @@ def test_trace_that_never_arrives_fails_naming_the_run_and_sampling(
     out = output_without_secrets(capsys)
     assert pilot.trace_run_id in out and "sampling rate" in out
     assert pilot.deleted == [DOC]  # cleanup still ran
+
+
+def test_trace_that_exists_but_never_finishes_fails_saying_so(
+    pilot, monkeypatch, capsys
+) -> None:
+    unfinished = pilot._ask_run()
+    unfinished["end_time"] = None
+    pilot.trace_runs = [unfinished]
+    pilot.trace_after_polls = 0
+    assert run_with_trace(pilot, monkeypatch) == 1
+    out = output_without_secrets(capsys)
+    assert "reached LangSmith but never finished" in out
+    assert "never reached LangSmith" not in out
+
+
+def test_trace_polls_answering_errors_name_the_last_status(
+    pilot, monkeypatch, capsys
+) -> None:
+    pilot.trace_after_polls = 10**6
+    pilot.trace_poll_status = 503
+    assert run_with_trace(pilot, monkeypatch) == 1
+    out = output_without_secrets(capsys)
+    assert "never reached LangSmith" in out and "last answer 503" in out
 
 
 def test_trace_project_needs_the_api_key_and_end_to_end(
