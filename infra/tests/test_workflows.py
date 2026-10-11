@@ -675,4 +675,12 @@ def test_ci_compose_override_passes_the_oidc_session_not_a_profile() -> None:
     for service in ("api", "agent", "mcp", "worker"):
         env = override["services"][service]["environment"]
         assert {"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "LANGSMITH_API_KEY"} <= set(env), service
-    assert "AWS_PROFILE" in step(evals_job(), "Prepare .env")["run"]  # removed, so botocore uses the session
+    assert "grep -v '^AWS_PROFILE='" in step(evals_job(), "Prepare .env")["run"]  # removed, so botocore uses the session
+
+
+def test_smoke_evals_logs_cover_cancelled_runs_and_every_service() -> None:
+    logs = step(evals_job(), "Service logs")
+    # a 60-minute timeout cancels the job, which is when the logs matter most
+    assert "cancelled()" in logs["if"] and "steps.access.outputs.run == 'true'" in logs["if"]
+    log_line = next(line for line in logs["run"].splitlines() if " logs " in line)
+    assert log_line.rstrip().endswith("logs --no-color --tail 200")  # no service list: migrate, keycloak, localstack too

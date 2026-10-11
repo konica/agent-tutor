@@ -82,7 +82,7 @@ jobs:
 
       - name: Build the app images
         if: steps.access.outputs.run == 'true'
-        run: docker compose -f compose.yaml -f compose.ci.yaml --profile app build
+        run: docker compose -f compose.yaml -f compose.ci.yaml --profile app build migrate api agent mcp worker
 
       - name: Sign in to AWS (Bedrock only)
         if: steps.access.outputs.run == 'true'
@@ -96,19 +96,24 @@ jobs:
         env:
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
         run: |
-          docker compose -f compose.yaml -f compose.ci.yaml --profile app up -d
+          docker compose -f compose.yaml -f compose.ci.yaml --profile app up -d api worker mcp
           wait_for() {
             for _ in $(seq 90); do curl -fs -o /dev/null "$1" && return 0; sleep 2; done
             echo "::error::$1 didn't answer within 3 minutes"; return 1
           }
           wait_for http://localhost:10450/healthz
           wait_for http://localhost:10401/realms/smart-tutor
-          wait_for http://localhost:10451/healthz
+          # The ask graph runs on the runner (evals/targets.py); only MCP must be up. It has no health route and answers 4xx.
+          for _ in $(seq 90); do
+            [[ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:10452/mcp)" != 000 ]] && exit 0
+            sleep 2
+          done
+          echo "::error::http://localhost:10452/mcp didn't answer within 3 minutes"; exit 1
 
       - name: Load the eval learners' libraries
         if: steps.access.outputs.run == 'true'
         working-directory: backend
-        run: uv run --extra eval python -m evals.learners
+        run: uv run --extra eval python -m evals.learners --timeout 600
 
       - name: Run the smoke split
         if: steps.access.outputs.run == 'true'
@@ -118,5 +123,7 @@ jobs:
         run: uv run --env-file ../.env --extra eval python -m evals.run --split smoke --summary "$GITHUB_STEP_SUMMARY"
 
       - name: Service logs
-        if: failure() && steps.access.outputs.run == 'true'
-        run: docker compose -f compose.yaml -f compose.ci.yaml --profile app logs --no-color --tail 200 api worker agent mcp
+        if: (failure() || cancelled()) && steps.access.outputs.run == 'true'
+        run: |
+          docker compose -f compose.yaml -f compose.ci.yaml --profile app ps -a
+          docker compose -f compose.yaml -f compose.ci.yaml --profile app logs --no-color --tail 200
