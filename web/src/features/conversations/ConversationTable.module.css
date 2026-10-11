@@ -1,0 +1,37 @@
+.table {
+  width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
+}
+/* Widths sit on the th cells (plain %, as in the Library). The Conversation column takes the rest. */
+.table th.colSubjects { width: 34%; }
+.table th.colDocuments { width: 96px; }
+.table th.colActivity { width: 144px; }
+.table th {
+  position: sticky; top: 0; z-index: 1; height: 28px; text-align: left; padding: 0 var(--sp-3);
+  background: var(--surface-2); color: var(--text-2);
+  font-size: var(--fs-12); font-weight: 600; letter-spacing: 0; text-transform: none;
+  border-bottom: 1px solid var(--border);
+}
+.table td { height: 40px; padding: 0 var(--sp-3); vertical-align: middle; border-bottom: 1px solid var(--border); }
+.table tbody tr:last-child td { border-bottom: 0; }
+.row { cursor: pointer; }
+.table tbody tr:hover td { background: var(--surface-2); }
+.right { text-align: right; }
+.title {
+  display: block; min-width: 0; font-size: var(--fs-14); font-weight: 600; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.title:hover { text-decoration: underline; }
+.subjects { display: flex; align-items: center; gap: var(--sp-1); min-width: 0; white-space: nowrap; overflow: hidden; }
+.more {
+  flex: none; display: inline-flex; align-items: center; height: 20px; padding: 0 var(--sp-2); border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); font-size: var(--fs-12);
+}
+.muted { color: var(--text-2); font-size: var(--fs-13); }
+.number { font-size: var(--fs-13); font-variant-numeric: tabular-nums; }
+.date { font-size: var(--fs-12); color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* No overflow clipping on the table, so the sticky header works and focus rings show; corners are rounded per cell. */
+.table thead th:first-child { border-top-left-radius: calc(var(--r-md) - 1px); }
+.table thead th:last-child { border-top-right-radius: calc(var(--r-md) - 1px); }
+.table tbody tr:last-child td:first-child { border-bottom-left-radius: calc(var(--r-md) - 1px); }
+.table tbody tr:last-child td:last-child { border-bottom-right-radius: calc(var(--r-md) - 1px); }
