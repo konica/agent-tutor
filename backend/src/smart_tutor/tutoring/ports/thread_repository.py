@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
-from smart_tutor.tutoring.domain.thread import SearchScope, Thread
+from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
 from smart_tutor.tutoring.domain.turn import Turn
 
@@ -18,6 +18,19 @@ class ThreadRepository(ABC):
     @abstractmethod
     def get_owned(self, thread_id: ThreadId, user_id: UserId) -> Thread | None:
         """The thread if it exists and belongs to this learner; None otherwise."""
+
+    @abstractmethod
+    def list_owned(self, user_id: UserId, status: ThreadStatus) -> list[Thread]:
+        """The learner's threads in this status, newest last activity first (then newest started; scoped by owner)."""
+
+    @abstractmethod
+    def documents_used_by_thread(self, thread_ids: Sequence[ThreadId]) -> dict[ThreadId, list[ThreadDocument]]:
+        """Each thread's document list as `documents_used` orders it; a thread with none may be absent.
+        (Callers pass ids of the learner's own threads.)"""
+
+    @abstractmethod
+    def set_last_learner_message_at(self, thread_id: ThreadId, at: datetime) -> None:
+        """Store when the learner last asked in the thread (committed). (Callers check ownership first.)"""
 
     @abstractmethod
     def set_title(self, thread_id: ThreadId, title: str) -> None:

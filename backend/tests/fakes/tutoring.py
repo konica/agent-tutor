@@ -8,7 +8,7 @@ from datetime import datetime
 
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
-from smart_tutor.tutoring.domain.thread import SearchScope, Thread
+from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
 from smart_tutor.tutoring.domain.turn import Turn
 from smart_tutor.tutoring.ports.retriever import Retriever
@@ -27,6 +27,18 @@ class InMemoryThreads(ThreadRepository):
     def get_owned(self, thread_id: ThreadId, user_id: UserId) -> Thread | None:
         found = self.threads.get(thread_id)
         return copy.deepcopy(found) if found and found.is_owned_by(user_id) else None
+
+    def list_owned(self, user_id: UserId, status: ThreadStatus) -> list[Thread]:
+        mine = [copy.deepcopy(t) for t in self.threads.values() if t.user_id == user_id and t.status is status]
+        mine.sort(key=lambda t: t.thread_id)
+        mine.sort(key=lambda t: (t.last_activity, t.created_at), reverse=True)
+        return mine
+
+    def documents_used_by_thread(self, thread_ids: Sequence[ThreadId]) -> dict[ThreadId, list[ThreadDocument]]:
+        return {tid: list(self.documents_used_rows[tid]) for tid in thread_ids if self.documents_used_rows.get(tid)}
+
+    def set_last_learner_message_at(self, thread_id: ThreadId, at: datetime) -> None:
+        self.threads[thread_id].last_learner_message_at = at
 
     def set_title(self, thread_id: ThreadId, title: str) -> None:
         self.threads[thread_id].title = title

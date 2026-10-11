@@ -1,6 +1,7 @@
 """ConversationService: a thread answers from all the learner's ready documents (PRD §8 US-3)."""
 
 from dataclasses import replace
+from datetime import timedelta
 
 import pytest
 
@@ -15,7 +16,7 @@ from fakes import (
     ingest_ready,
 )
 from smart_tutor.knowledge.application import DocumentService, UploadService
-from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
+from smart_tutor.shared.domain.ids import DocumentId, SubjectId, ThreadId, UserId
 from smart_tutor.tutoring.application import (
     DELETED_DOCUMENT,
     AnsweredTurn,
@@ -476,3 +477,85 @@ def test_turns_of_another_learners_thread_are_not_found() -> None:
 
     with pytest.raises(ThreadNotFoundError):
         svc.turns(t, OTHER)
+
+
+S1, S2, S3 = (SubjectId(f"00000000-0000-4000-8000-00000000000{i}") for i in (1, 2, 3))
+
+
+def test_lists_the_learners_active_threads_newest_activity_first() -> None:
+    library, threads, clock = InMemoryLibrary(), InMemoryThreads(), FixedClock()
+    ingest_ready(library, "ada", "Attention is all you need.")
+    svc = service(library, threads, clock)
+    first = svc.start_thread(UserId("ada"), "First?")
+    clock.current += timedelta(minutes=1)
+    second = svc.start_thread(UserId("ada"), "Second?")
+    clock.current += timedelta(minutes=1)
+    svc.note_question(ThreadId(first.thread_id), UserId("ada"))  # first is now the newest
+
+    listed = svc.list_threads(UserId("ada"))
+
+    assert [(s.thread_id, s.title) for s in listed] == [(first.thread_id, "First?"), (second.thread_id, "Second?")]
+    assert listed[0].last_activity == clock.now()
+
+
+def test_lists_no_archived_and_no_one_elses_threads() -> None:
+    library, threads, clock = InMemoryLibrary(), InMemoryThreads(), FixedClock()
+    ingest_ready(library, "ada", "Attention is all you need.")
+    ingest_ready(library, "bob", "Attention is all you need.")
+    svc = service(library, threads, clock)
+    kept = svc.start_thread(UserId("ada"), "Mine?")
+    archived = svc.start_thread(UserId("ada"), "Old?")
+    threads.threads[archived.thread_id].status = ThreadStatus.ARCHIVED
+    svc.start_thread(UserId("bob"), "Theirs?")
+
+    assert [s.thread_id for s in svc.list_threads(UserId("ada"))] == [kept.thread_id]
+
+
+def test_deleted_documents_subjects_dont_count_archived_ones_do() -> None:
+    library, threads, clock = InMemoryLibrary(), InMemoryThreads(), FixedClock()
+    d1 = ingest_ready(library, "ada", "Live paper.", subject_ids=[S1])
+    d2 = ingest_ready(library, "ada", "Archived paper.", subject_ids=[S2])
+    d3 = ingest_ready(library, "ada", "Deleted paper.", subject_ids=[S3])
+    svc = service(library, threads, clock)
+    thread = svc.start_thread(UserId("ada"), "Q?")
+    svc.record_turn(ThreadId(thread.thread_id), UserId("ada"), answered(d1, d2, d3))
+    library.state.documents[d2].archived = True
+    del library.state.documents[d3]
+
+    [row] = svc.list_threads(UserId("ada"))
+
+    assert row.subject_ids == (S1, S2) and row.documents == 3
+
+
+def test_a_subject_shared_by_two_documents_appears_once() -> None:
+    library, threads, clock = InMemoryLibrary(), InMemoryThreads(), FixedClock()
+    d1 = ingest_ready(library, "ada", "First paper.", subject_ids=[S1, S2])
+    d2 = ingest_ready(library, "ada", "Second paper.", subject_ids=[S2, S3])
+    svc = service(library, threads, clock)
+    thread = svc.start_thread(UserId("ada"), "Q?")
+    svc.record_turn(ThreadId(thread.thread_id), UserId("ada"), answered(d1, d2))
+
+    [row] = svc.list_threads(UserId("ada"))
+
+    assert row.subject_ids == (S1, S2, S3) and row.documents == 2
+
+
+def test_a_thread_with_no_documents_lists_none() -> None:
+    library, threads, clock = InMemoryLibrary(), InMemoryThreads(), FixedClock()
+    ingest_ready(library, "ada", "Attention is all you need.")
+    svc = service(library, threads, clock)
+    svc.start_thread(UserId("ada"), "Hi?")
+    [row] = svc.list_threads(UserId("ada"))
+    assert row.subject_ids == () and row.documents == 0
+
+
+def test_noting_a_question_needs_the_owners_active_thread() -> None:
+    library, threads, clock = InMemoryLibrary(), InMemoryThreads(), FixedClock()
+    ingest_ready(library, "ada", "Attention is all you need.")
+    svc = service(library, threads, clock)
+    thread = svc.start_thread(UserId("ada"), "Hi?")
+    with pytest.raises(ThreadNotFoundError):
+        svc.note_question(ThreadId(thread.thread_id), UserId("bob"))
+    threads.threads[thread.thread_id].status = ThreadStatus.ARCHIVED
+    with pytest.raises(ThreadArchivedError):
+        svc.note_question(ThreadId(thread.thread_id), UserId("ada"))
