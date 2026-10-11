@@ -1,5 +1,5 @@
 import { FileText } from "lucide-react";
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 
 import { formatCitation, type ChatCitation } from "../../api/chat";
 import styles from "./Answer.module.css";
@@ -17,10 +17,12 @@ type Props = {
   shownChunkId: string | null;
   /** Opens the citation's document beside the conversation; focus goes back to `from` when it closes. */
   onOpenCitation: (citation: ChatCitation, from: HTMLElement) => void;
+  /** Helpful / Not helpful, at the end of the Sources line; the page places it itself when there is no line. */
+  rating?: ReactNode;
 };
 
 // A turn's answer and its Sources line (DESIGN.md → Chat). A declined turn has neither.
-export function Answer({ text, citations, showCitations, deletedIds, shownChunkId, onOpenCitation }: Props) {
+export function Answer({ text, citations, showCitations, deletedIds, shownChunkId, onOpenCitation, rating }: Props) {
   const listId = useId();
   // Markers link once the answer's citations have arrived (they follow its last words) and while citations are shown.
   const linked = showCitations && citations.length > 0;
@@ -104,6 +106,7 @@ export function Answer({ text, citations, showCitations, deletedIds, shownChunkI
               );
             })}
           </ul>
+          {rating}
         </div>
       )}
     </>

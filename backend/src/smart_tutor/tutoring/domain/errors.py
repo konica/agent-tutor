@@ -25,3 +25,7 @@ class ThreadArchivedError(DomainError):
 
 class NoListedDocumentsError(DomainError):
     """A search can only be limited to documents when the conversation lists at least one (PRD §8 US-4c)."""
+
+
+class TurnNotFoundError(DomainError):
+    """The answer doesn't exist in the learner's conversation (PRD §10.2)."""

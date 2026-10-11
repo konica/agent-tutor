@@ -274,6 +274,16 @@ export type QuestionRequest = {
 };
 
 /**
+ * RateTurnRequest
+ */
+export type RateTurnRequest = {
+    /**
+     * Rating
+     */
+    rating: 'up' | 'down';
+};
+
+/**
  * SetTitleRequest
  */
 export type SetTitleRequest = {
@@ -520,6 +530,16 @@ export type TurnDeclineResponse = {
 };
 
 /**
+ * TurnRatingResponse
+ */
+export type TurnRatingResponse = {
+    /**
+     * Rating
+     */
+    rating: 'up' | 'down';
+};
+
+/**
  * TurnResponse
  */
 export type TurnResponse = {
@@ -540,6 +560,12 @@ export type TurnResponse = {
      * Question
      */
     question: string;
+    /**
+     * Rating
+     *
+     * The learner's rating (PRD §10.2); null until rated.
+     */
+    rating: 'up' | 'down' | null;
     /**
      * Run Id
      *
@@ -1425,6 +1451,44 @@ export type ListThreadTurnsResponses = {
 };
 
 export type ListThreadTurnsResponse = ListThreadTurnsResponses[keyof ListThreadTurnsResponses];
+
+export type RateTurnData = {
+    body: RateTurnRequest;
+    path: {
+        /**
+         * Thread Id
+         */
+        thread_id: string;
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/threads/{thread_id}/turns/{run_id}/rating';
+};
+
+export type RateTurnErrors = {
+    /**
+     * Not the caller's conversation, or no such answer in it.
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RateTurnError = RateTurnErrors[keyof RateTurnErrors];
+
+export type RateTurnResponses = {
+    /**
+     * Successful Response
+     */
+    200: TurnRatingResponse;
+};
+
+export type RateTurnResponse = RateTurnResponses[keyof RateTurnResponses];
 
 export type StartUploadData = {
     body: StartUploadRequest;
