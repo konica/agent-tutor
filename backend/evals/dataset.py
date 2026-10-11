@@ -21,6 +21,7 @@ from langsmith.utils import LangSmithNotFoundError
 
 DATASETS = Path(__file__).parent / "datasets"
 SPLITS = ("smoke", "full")
+SPLIT_KEY = "dataset_split"  # the example metadata key where LangSmith keeps an example's splits
 
 
 class DatasetError(Exception):
@@ -90,6 +91,20 @@ def version_to_run(client: langsmith.Client, dataset: Dataset, split: str) -> st
 
 def examples_at(client: langsmith.Client, dataset: Dataset, split: str, version: str) -> list[LangSmithExample]:
     return list(client.list_examples(dataset_name=dataset.name, splits=[split], as_of=version))
+
+
+def newest_examples(client: langsmith.Client, dataset: Dataset, split: str) -> list[Example]:
+    """The examples of the split's newest version, with their metadata; none when it has never been published."""
+    if not client.has_dataset(dataset_name=dataset.name):
+        return []
+    newest = newest_version(client, dataset.name, split)
+    if newest is None:
+        return []
+    return [
+        # LangSmith returns an example's splits in its metadata; publishing names the split on its own
+        Example(dict(e.inputs), dict(e.outputs or {}), {k: v for k, v in (e.metadata or {}).items() if k != SPLIT_KEY})
+        for e in examples_at(client, dataset, split, newest)
+    ]
 
 
 def _canonical(examples: Iterable[Example]) -> list[str]:

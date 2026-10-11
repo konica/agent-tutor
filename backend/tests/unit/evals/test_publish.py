@@ -1,12 +1,13 @@
 """Publishing (PRD §10.3 item 6): hand-written plus accepted examples become the next smoke and full versions."""
 
+import uuid
 from collections import Counter
 
 import pytest
 from langsmith.utils import LangSmithError
 
 from evals.dataset import Dataset, Example, examples_at
-from evals.publish import TYPES, main, split_examples
+from evals.publish import TYPES, main, oldest_first, split_examples
 from evals.review import ACCEPTED, Candidate, submit
 from fakes.langsmith import FakeLangSmith
 
@@ -38,13 +39,80 @@ def test_an_accepted_item_equal_to_a_hand_written_one_is_not_added_twice() -> No
     assert split_examples(ASK, [duplicate])["full"] == list(HAND)
 
 
-def _accept(client: FakeLangSmith, *questions: str) -> None:
+def _submit(client: FakeLangSmith, *questions: str) -> list[uuid.UUID]:
     candidates = [
         Candidate({"question": q}, {"covered": True}, "factual", ({"chunk": "react-2022:1", "text": "t"},))
         for q in questions
     ]
-    for run_id in submit(client, ASK, candidates, {}):
+    return submit(client, ASK, candidates, {})
+
+
+def _accept(client: FakeLangSmith, *questions: str) -> list[uuid.UUID]:
+    ids = _submit(client, *questions)
+    for run_id in ids:
         client.create_feedback(run_id, ACCEPTED, score=1)
+    return ids
+
+
+def _expire(client: FakeLangSmith, run_id: uuid.UUID) -> None:
+    """The candidates project's trace retention deletes a run and its feedback."""
+    del client.runs[run_id]
+    client.feedback = [f for f in client.feedback if f.run_id != run_id]
+
+
+def _publish(client: FakeLangSmith) -> None:
+    assert main([], client=client, load=lambda key: ASK, keys=["ask"]) == 0
+
+
+def _questions(client: FakeLangSmith, split: str, version: str) -> list[str]:
+    return [e.inputs["question"] for e in examples_at(client, ASK, split, version)]
+
+
+def test_an_accepted_example_stays_after_its_candidate_run_expires(capsys: pytest.CaptureFixture[str]) -> None:
+    client = FakeLangSmith()
+    [old] = _accept(client, "old")
+    _publish(client)
+    capsys.readouterr()
+    _expire(client, old)
+    _publish(client)
+    assert capsys.readouterr().out.count("unchanged") == 2  # no smaller version
+    _accept(client, "new")
+    _publish(client)
+    assert sorted(_questions(client, "full", "full-v2")) == ["hand", "new", "old"]
+    assert sorted(_questions(client, "smoke", "smoke-v2")) == ["hand", "new", "old"]
+    [carried] = [e for e in examples_at(client, ASK, "full", "full-v2") if e.inputs["question"] == "old"]
+    assert carried.metadata is not None and carried.metadata["candidate_run"] == str(old)
+
+
+def test_a_carried_example_a_reviewer_rejects_later_is_dropped() -> None:
+    client = FakeLangSmith()
+    changed, _ = _accept(client, "changed", "kept")
+    _publish(client)
+    client.create_feedback(changed, ACCEPTED, score=0)
+    _publish(client)
+    assert sorted(_questions(client, "full", "full-v2")) == ["hand", "kept"]
+    assert sorted(_questions(client, "smoke", "smoke-v2")) == ["hand", "kept"]
+
+
+def test_a_later_publish_adds_new_acceptances_and_keeps_smoke_oldest_first() -> None:
+    client = FakeLangSmith()
+    older, newer = _submit(client, "older", "newer")
+    client.create_feedback(newer, ACCEPTED, score=1)
+    _publish(client)
+    client.create_feedback(older, ACCEPTED, score=1)  # accepted after a newer candidate was published
+    _publish(client)
+    assert _questions(client, "full", "full-v2") == ["hand", "older", "newer"]
+    assert _questions(client, "smoke", "smoke-v2") == ["hand", "older", "newer"]
+
+
+def test_generated_examples_are_ordered_by_when_they_were_generated() -> None:
+    def made(question: str, at: str | None, run: str) -> Example:
+        metadata = {"candidate_run": run} | ({"generated_at": at} if at else {})
+        return Example({"question": question}, {"covered": True}, metadata)
+
+    examples = [made("b", "2026-10-02T00:00:00.000000+00:00", "1"), made("a", None, "9"), made("c", "2026-10-01", "2")]
+    examples += [made("d", "2026-10-02T00:00:00.000000+00:00", "0")]
+    assert [e.inputs["question"] for e in oldest_first(examples)] == ["a", "c", "d", "b"]
 
 
 def test_publish_makes_the_next_versions_and_prints_them(capsys: pytest.CaptureFixture[str]) -> None:

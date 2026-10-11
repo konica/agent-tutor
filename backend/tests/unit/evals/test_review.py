@@ -1,11 +1,13 @@
 """The human review gate (PRD §10.3 item 6): candidates go to an annotation queue as runs, and only the ones a
 reviewer accepted come back as examples."""
 
+from dataclasses import replace
+
 import pytest
 from langsmith.utils import LangSmithNotFoundError
 
 from evals.dataset import Dataset, Example
-from evals.review import ACCEPTED, Candidate, accepted, candidates_name, ensure_queue, submit
+from evals.review import ACCEPTED, Candidate, Reviewed, candidates_name, ensure_queue, reviewed, submit
 from fakes.langsmith import FakeLangSmith
 
 ASK = Dataset("ask", "smart-tutor-ask", "", (Example({"question": "hand"}, {"covered": True}),))
@@ -100,12 +102,29 @@ def test_only_items_whose_latest_feedback_accepts_them_are_accepted() -> None:
     client.create_feedback(changed, ACCEPTED, score=1)
     client.create_feedback(changed, ACCEPTED, score=0)  # the reviewer changed their mind
     client.create_feedback(unscored, "note", score=1)  # another key doesn't count
-    [example] = accepted(client, ASK)
+    review = reviewed(client, ASK)
+    [example] = review.accepted
     assert example == Example(
         {"question": "kept", "learner": "learner@example.com", "documents": None},
         {"covered": True, "sources": ["react-2022"], "chunks": ["react-2022:4"]},
-        {"type": "factual", "candidate_run": str(kept)},
+        {
+            "type": "factual",
+            "candidate_run": str(kept),
+            "generated_at": client.runs[kept].start_time.isoformat(timespec="microseconds"),
+        },
     )
+    # a run that still exists and isn't accepted withdraws its example from later versions
+    assert review.withdrawn == {str(rejected), str(unscored), str(changed)}
+
+
+def test_a_naive_run_start_time_is_read_as_utc() -> None:
+    client = FakeLangSmith()
+    [run_id] = submit(client, ASK, [candidate("kept")], {})
+    client.create_feedback(run_id, ACCEPTED, score=1)
+    aware = client.runs[run_id].start_time
+    client.runs[run_id] = replace(client.runs[run_id], start_time=aware.replace(tzinfo=None))
+    [example] = reviewed(client, ASK).accepted
+    assert example.metadata["generated_at"] == aware.isoformat(timespec="microseconds")
 
 
 def test_accepted_examples_come_oldest_first_across_many_feedback_batches() -> None:
@@ -113,8 +132,16 @@ def test_accepted_examples_come_oldest_first_across_many_feedback_batches() -> N
     ids = submit(client, ASK, [candidate(f"q{i}") for i in range(130)], {})
     for run_id in reversed(ids):
         client.create_feedback(run_id, ACCEPTED, score=1)
-    assert [e.inputs["question"] for e in accepted(client, ASK)] == [f"q{i}" for i in range(130)]
+    assert [e.inputs["question"] for e in reviewed(client, ASK).accepted] == [f"q{i}" for i in range(130)]
+
+
+def test_an_expired_run_is_neither_accepted_nor_withdrawn() -> None:
+    client = FakeLangSmith()
+    [run_id] = submit(client, ASK, [candidate("old")], {})
+    client.create_feedback(run_id, ACCEPTED, score=1)
+    del client.runs[run_id]  # the project's trace retention deleted it
+    assert reviewed(client, ASK) == Reviewed([], set())
 
 
 def test_no_candidates_project_means_nothing_accepted() -> None:
-    assert accepted(FakeLangSmith(), ASK) == []
+    assert reviewed(FakeLangSmith(), ASK) == Reviewed([], set())

@@ -13,6 +13,7 @@ from evals.dataset import (
     Example,
     examples_at,
     load_dataset,
+    newest_examples,
     newest_version,
     publish_split,
     version_to_run,
@@ -104,7 +105,20 @@ def test_example_metadata_is_published() -> None:
     client = FakeLangSmith()
     typed = Example(Q3.inputs, Q3.outputs, {"type": "unanswerable"})
     publish_split(client, ASK, "full", [typed])
-    assert [e.metadata for e in examples_at(client, ASK, "full", "full-v1")] == [{"type": "unanswerable"}]
+    assert [e.metadata for e in examples_at(client, ASK, "full", "full-v1")] == [
+        {"type": "unanswerable", "dataset_split": ["full"]}
+    ]
+
+
+def test_the_newest_examples_of_a_split_come_back_with_their_own_metadata() -> None:
+    client = FakeLangSmith()
+    assert newest_examples(client, ASK, "full") == []  # no dataset yet
+    typed = Example(Q3.inputs, Q3.outputs, {"type": "unanswerable", "candidate_run": "r1"})
+    publish_split(client, ASK, "smoke", [Q1])
+    assert newest_examples(client, ASK, "full") == []  # no full version yet
+    publish_split(client, ASK, "full", [Q1])
+    publish_split(client, ASK, "full", [Q1, typed])
+    assert sorted(newest_examples(client, ASK, "full"), key=lambda e: e.inputs["question"]) == [Q1, typed]
 
 
 def test_the_runner_uses_the_newest_version_unless_one_is_pinned() -> None:

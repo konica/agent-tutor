@@ -2,7 +2,8 @@
 
 Generated candidates become runs in the dataset's candidates project (`<dataset>-candidates`) and are added to the
 annotation queue of the same name. The queue's rubric asks the reviewer for `accepted`: 1 to accept, 0 to reject. Only
-candidates whose latest `accepted` feedback is 1 come back as examples, for evals.publish to add to the next versions.
+candidates whose latest `accepted` feedback is 1 come back as examples, for evals.publish to add to the next versions;
+the other runs that still exist come back as withdrawn, so publishing drops an example a reviewer no longer accepts.
 """
 
 import time
@@ -125,12 +126,25 @@ def submit(
     return ids
 
 
-def accepted(client: langsmith.Client, dataset: Dataset) -> list[Example]:
-    """The candidates whose latest `accepted` feedback is 1, as examples, oldest candidate first."""
+@dataclass(frozen=True)
+class Reviewed:
+    accepted: list[Example]  # candidates whose latest `accepted` feedback is 1, oldest first
+    withdrawn: set[str]  # ids of the other candidate runs that still exist: none of them may stay published
+
+
+def _generated_at(start: datetime) -> str:
+    """A run's start time as UTC ISO 8601 (LangSmith may return it without a zone), sortable as text."""
+    utc = start.replace(tzinfo=UTC) if start.tzinfo is None else start.astimezone(UTC)
+    return utc.isoformat(timespec="microseconds")
+
+
+def reviewed(client: langsmith.Client, dataset: Dataset) -> Reviewed:
+    """The review state of the candidate runs that still exist (runs expire with the project's trace retention)."""
     try:
-        runs = sorted(client.list_runs(project_name=candidates_name(dataset), is_root=True), key=lambda r: r.start_time)
+        runs = list(client.list_runs(project_name=candidates_name(dataset), is_root=True))
     except LangSmithNotFoundError:
-        return []  # nothing generated yet
+        return Reviewed([], set())  # nothing generated yet
+    runs.sort(key=lambda r: _generated_at(r.start_time))
     latest: dict[uuid.UUID, Any] = {}
     for start in range(0, len(runs), FEEDBACK_BATCH):
         batch = [r.id for r in runs[start : start + FEEDBACK_BATCH]]
@@ -138,12 +152,13 @@ def accepted(client: langsmith.Client, dataset: Dataset) -> list[Example]:
             seen = latest.get(feedback.run_id)
             if seen is None or feedback.modified_at > seen.modified_at:
                 latest[feedback.run_id] = feedback
-    return [
+    accepted = [run for run in runs if run.id in latest and latest[run.id].score == 1]
+    examples = [
         Example(
             dict(run.inputs),
             dict(run.outputs["expected"]),
-            {"type": run.outputs["type"], "candidate_run": str(run.id)},
+            {"type": run.outputs["type"], "candidate_run": str(run.id), "generated_at": _generated_at(run.start_time)},
         )
-        for run in runs
-        if run.id in latest and latest[run.id].score == 1
+        for run in accepted
     ]
+    return Reviewed(examples, {str(run.id) for run in runs} - {str(run.id) for run in accepted})

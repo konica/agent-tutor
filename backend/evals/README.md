@@ -78,13 +78,13 @@ The runner then uses the pinned tag for that split (and stops if LangSmith doesn
 
    Each candidate is a run in the `smart-tutor-ask-candidates` project, added to the annotation queue of the same name. Its outputs show the expected behavior, the source chunk ids, and the passages (`evidence`). The ask target asks only the last question of a `drift` example until the graph takes history (#210, #214).
 
-2. **Review** in LangSmith → Annotation Queues → `smart-tutor-ask-candidates`. For each item, score **accepted**: 1 when the question is clear, a learner could ask it, and the passages support the expected behavior (for an answer, they answer it); 0 otherwise. Don't edit items: reject them, and generate more. Your latest score counts. Review a batch before the candidates project's trace retention deletes its runs.
+2. **Review** in LangSmith → Annotation Queues → `smart-tutor-ask-candidates`. For each item, score **accepted**: 1 when the question is clear, a learner could ask it, and the passages support the expected behavior (for an answer, they answer it); 0 otherwise. Don't edit items: reject them, and generate more. Your latest score counts. Review a batch before its runs expire with the candidates project's trace retention: unreviewed candidates are lost with them. A published example stays in later versions after its run expires. To withdraw one, score it 0 while its run still exists; after that, leave a note on the example in the dataset.
 
 3. **Publish** the accepted items:
 
        make evals-publish      # or: cd backend && uv run --env-file ../.env --extra eval python -m evals.publish [--dataset ask] [--dry-run]
 
-   `full` gets the hand-written examples plus every accepted item; `smoke` the hand-written examples plus accepted items taken in turn from each type, oldest first, up to 30. It prints each split's new tag (or "unchanged") with its examples by type, and names the types smoke has no accepted item of yet. `--dry-run` prints the splits without publishing.
+   `full` gets the hand-written examples plus every accepted item (the newest `full` version's generated examples, less any you have since scored 0, plus the newly accepted); `smoke` the hand-written examples plus accepted items taken in turn from each type, oldest first, until it holds 30 items in all, hand-written included. It prints each split's new tag (or "unchanged") with its examples by type, and names the types smoke has no accepted item of yet. `--dry-run` prints the splits without publishing.
 
 ## Add a suite
 

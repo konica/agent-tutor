@@ -2,23 +2,34 @@
 
 Usage: uv run --env-file ../.env --extra eval python -m evals.publish [--dataset ask] [--dry-run]
 
-`full` holds the dataset file's hand-written examples and every candidate a reviewer accepted in the annotation queue;
-`smoke` holds the hand-written examples and accepted candidates taken in turn from each question type, oldest first,
-up to SMOKE_SIZE items. A split whose examples changed gets the next `<split>-vN` tag; an unchanged one gets none.
+`full` holds the dataset file's hand-written examples and every candidate a reviewer accepted in the annotation queue:
+the newest `full` version's generated examples carry over (their candidate runs expire, the examples don't), less any
+a reviewer has since rejected, plus the newly accepted. `smoke` holds the hand-written examples and accepted candidates
+taken in turn from each question type, oldest generated first, up to SMOKE_SIZE items in all. A split whose examples
+changed gets the next `<split>-vN` tag; an unchanged one gets none.
 """
 
 import argparse
 import json
 import sys
 from collections import Counter, defaultdict
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from typing import Any
 
 import langsmith
 from langsmith.utils import LangSmithError
 
-from evals.dataset import DATASETS, SPLITS, Dataset, DatasetError, Example, load_dataset, publish_split
-from evals.review import accepted
+from evals.dataset import (
+    DATASETS,
+    SPLITS,
+    Dataset,
+    DatasetError,
+    Example,
+    load_dataset,
+    newest_examples,
+    publish_split,
+)
+from evals.review import reviewed
 
 SMOKE_SIZE = 30
 # Question types of generated ask examples (PRD §10.3 items 1-2), in the order smoke takes them.
@@ -51,6 +62,27 @@ def split_examples(
     return {"smoke": smoke, "full": [*dataset.examples, *new]}
 
 
+def oldest_first(examples: Iterable[Example]) -> list[Example]:
+    """Generated examples in the order they were generated (those published without `generated_at` first)."""
+    return sorted(examples, key=lambda e: (str(e.metadata.get("generated_at") or ""), str(e.metadata["candidate_run"])))
+
+
+def generated_examples(client: langsmith.Client, dataset: Dataset) -> list[Example]:
+    """The generated examples of the next versions, oldest first.
+
+    The newest `full` version's generated examples are the base, so an example outlives its candidate run (runs expire
+    with the candidates project's trace retention): it leaves only when its run still exists and is no longer
+    accepted. Newly accepted candidates join it."""
+    review = reviewed(client, dataset)
+    examples = {
+        str(e.metadata["candidate_run"]): e
+        for e in newest_examples(client, dataset, "full")
+        if "candidate_run" in e.metadata and str(e.metadata["candidate_run"]) not in review.withdrawn
+    }
+    examples.update((str(e.metadata["candidate_run"]), e) for e in review.accepted)
+    return oldest_first(examples.values())
+
+
 def _summary(examples: Sequence[Example]) -> str:
     counts = Counter(str(e.metadata.get("type", "hand-written")) for e in examples)
     return ", ".join(f"{n} {kind}" for kind, n in sorted(counts.items()))
@@ -72,7 +104,7 @@ def main(
     try:
         for key in keys:
             dataset = load(key)
-            splits = split_examples(dataset, accepted(client, dataset))
+            splits = split_examples(dataset, generated_examples(client, dataset))
             for split in SPLITS:
                 examples = splits[split]
                 if args.dry_run:

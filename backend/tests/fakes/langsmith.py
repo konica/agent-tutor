@@ -157,10 +157,21 @@ class FakeLangSmith:
                 dataset.versions.append((self._now(), tuple(e for e in current if e.id not in example_ids)))
 
     def create_examples(self, *, dataset_name: str, examples: Sequence[dict[str, Any]]) -> None:
+        if any("dataset_split" in (e.get("metadata") or {}) for e in examples):
+            raise LangSmithUserError("dataset_split is LangSmith's: pass split")  # it would fight the split given
         self.created += 1
         dataset, now = self.datasets[dataset_name], self._now()
         new = tuple(
-            FakeExample(uuid.uuid4(), dict(e["inputs"]), e.get("outputs"), e["split"], now, now, e.get("metadata"))
+            # as LangSmith: an example's metadata reads back with its split in it
+            FakeExample(
+                uuid.uuid4(),
+                dict(e["inputs"]),
+                e.get("outputs"),
+                e["split"],
+                now,
+                now,
+                {**(e.get("metadata") or {}), "dataset_split": [e["split"]]},
+            )
             for e in examples
         )
         dataset.versions.append((now, dataset.at(None) + new))
