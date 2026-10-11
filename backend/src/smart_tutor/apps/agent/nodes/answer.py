@@ -16,14 +16,16 @@ class AnswerNode(Protocol):
     async def __call__(self, state: AskState) -> AskState: ...
 
 
-def answer_node(model: BaseChatModel, answer_floor: float) -> AnswerNode:
+def answer_node(model: BaseChatModel, answer_floor: float, max_tokens: int) -> AnswerNode:
+    capped = model.bind(max_tokens=max_tokens)  # no tools: the answer is plain text (US-6)
+
     async def answer(state: AskState) -> AskState:
         if state.get("no_documents"):
             return {"answer": "", "citations": [], "decline": "no_documents"}
         chunks = state.get("chunks", [])
         if state.get("document_ids") is not None and not covers(chunks, answer_floor):
             return {"answer": "", "citations": [], "decline": "limited"}
-        reply = await model.ainvoke(answer_messages(state["question"], chunks))
+        reply = await capped.ainvoke(answer_messages(state["question"], chunks))
         text = reply.text
         return {"answer": text, "citations": [c.citation(n) for n, c in cited_chunks(text, chunks)]}
 

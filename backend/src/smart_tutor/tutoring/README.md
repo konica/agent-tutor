@@ -8,7 +8,7 @@
 
 **May use (application layer only):** `knowledge` (`DocumentService.documents_by_id`, to resolve the documents used and citations), `subjects`, `accounts`, `insights` (log declines). Everyone may use `shared`.
 
-**Rules:** Never reads chunk tables: retrieval goes through the `Retriever` port (MCP client adapter). A thread has no subjects and answers from all of the learner's ready documents. Document text is passed to the model as quoted data. Never imports `learning`.
+**Rules:** Never reads chunk tables: retrieval goes through the `Retriever` port (MCP client adapter). A thread has no subjects and answers from all of the learner's ready documents. Document text and the learner's question are passed to the model as quoted data. Never imports `learning`.
 
 Layout: `domain/` → `ports/` ← `application/`, `adapters/`. Other modules import only `tutoring.application`.
 See `sdd/specs/2026-10-02-project-structure-design.md`.

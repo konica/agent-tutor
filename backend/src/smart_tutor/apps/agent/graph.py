@@ -14,11 +14,16 @@ from smart_tutor.tutoring.application import Retriever
 AskGraph = CompiledStateGraph[AskState, AgentContext, AskState, AskState]
 
 
-def build_graph(retriever_for: Callable[[str], Retriever], model: BaseChatModel, answer_floor: float = 0.3) -> AskGraph:
+def build_graph(
+    retriever_for: Callable[[str], Retriever],
+    model: BaseChatModel,
+    answer_floor: float = 0.3,
+    answer_max_tokens: int = 1500,
+) -> AskGraph:
     return (
         StateGraph(AskState, context_schema=AgentContext)
         .add_node("search", search_node(retriever_for))
-        .add_node("answer", answer_node(model, answer_floor))
+        .add_node("answer", answer_node(model, answer_floor, answer_max_tokens))
         .add_edge(START, "search")
         .add_edge("search", "answer")
         .add_edge("answer", END)
