@@ -4,7 +4,8 @@ from collections.abc import Sequence
 from typing import Any
 
 import pytest
-from langchain_core.messages import AIMessage
+from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.messages import AIMessage, BaseMessage
 
 from evals.corpus import SeedDocument
 from evals.learners import LoadError
@@ -36,6 +37,9 @@ class FakeLearners:
     def document_id(self, username: str, seed_id: str) -> str:
         return self.ids[seed_id]
 
+    def library(self, username: str) -> list[str]:
+        return sorted(self.ids.values())
+
 
 def _target(
     retriever: Retriever, reply: str | None = "ReAct interleaves reasoning and acting [1].", **kw: Any
@@ -60,6 +64,40 @@ async def test_an_answer_comes_with_its_citations_and_the_search_calls() -> None
     assert out["trajectory"] == [
         {"tool": "search", "query": "What is ReAct?", "k": 5, "document_ids": None, "found": ["d1", "d2"]}
     ]
+
+
+async def test_outputs_name_the_learners_own_documents() -> None:
+    learners = FakeLearners(ids={"react-2022": "d1", "cot-2022": "d2"})
+    out = await _target(FakeRetriever(CHUNKS), learners=learners)(ASK)
+    assert out["library"] == ["d1", "d2"]
+
+
+class _Seen(BaseCallbackHandler):
+    def __init__(self) -> None:
+        self.messages: list[list[BaseMessage]] = []
+        self.params: list[dict[str, Any]] = []
+
+    def on_chat_model_start(self, serialized: dict[str, Any], messages: list[list[BaseMessage]], **kwargs: Any) -> None:
+        self.messages.extend(messages)
+        self.params.append(kwargs["invocation_params"])
+
+
+async def test_history_reaches_the_answer_model_as_earlier_turns() -> None:
+    seen, model = _Seen(), fake_chat_model(AIMessage("It interleaves them [1]."))
+    model.callbacks = [seen]
+    target = AskTarget(FakeLearners(), lambda token: FakeRetriever(CHUNKS), model, 0.3)
+    history = [{"question": "What is ReAct?", "answer": "A prompting method [1]."}]
+    await target({**ASK, "question": "How does it work?", "history": history})
+    [sent] = seen.messages
+    assert any("What is ReAct?" in str(m.content) for m in sent[:-1])
+
+
+async def test_the_answer_is_capped_at_the_configured_tokens() -> None:
+    seen, model = _Seen(), fake_chat_model(AIMessage("Short [1]."))
+    model.callbacks = [seen]
+    target = AskTarget(FakeLearners(), lambda token: FakeRetriever(CHUNKS), model, 0.3, answer_max_tokens=77)
+    await target(ASK)
+    assert seen.params[0]["max_tokens"] == 77
 
 
 async def test_a_limited_example_searches_the_learners_own_copies_of_its_seed_documents() -> None:
@@ -149,6 +187,12 @@ def test_a_complete_library_passes_the_check() -> None:
 
 def _seed(seed_id: str, sha: str) -> SeedDocument:
     return SeedDocument(seed_id, "https://arxiv.org/pdf/y", sha, ("LLM agents",), "y.pdf")
+
+
+def test_eval_learners_library_resolves_every_held_seed() -> None:
+    seeds = {"a": _seed("a", "sha-a"), "b": _seed("b", "sha-b")}
+    learners = EvalLearners({"l@x": StubTutor({"sha-a": "d-a", "sha-b": "d-b"})}, seeds, {"l@x": ["a", "b"]})
+    assert learners.library("l@x") == ["d-a", "d-b"]
 
 
 def test_signing_in_again_gives_a_fresh_token() -> None:
