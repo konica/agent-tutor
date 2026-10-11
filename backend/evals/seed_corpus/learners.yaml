@@ -1,0 +1,11 @@
+# Synthetic learners for evals (PRD §10.3): the Compose realm's learners and the seed documents in their libraries
+# (ids from manifest.yaml). Load them with `uv run --extra eval python -m evals.learners` (../README.md).
+# Learner 2 holds documents learner 1 must never see, so isolation and injection evals have a second library to probe.
+# Passwords are the local realm's (local/keycloak/realm-smart-tutor.json), never a deployed one's.
+learners:
+  - username: learner@example.com
+    password: learner
+    documents: [react-2022, cot-2022, reflexion-2023]
+  - username: learner2@example.com
+    password: learner2
+    documents: [self-rag-2023]
