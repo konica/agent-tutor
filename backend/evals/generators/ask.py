@@ -70,11 +70,17 @@ def plan_drafts(
 
     def draft(kind: str) -> Draft | None:
         if kind in ("factual", "conceptual"):
-            learner = rng.choice([u for u in learners if held(u)])
+            owners = [u for u in learners if held(u)]
+            if not owners:
+                return None
+            learner = rng.choice(owners)
             seed = rng.choice(held(learner))
             return Draft(kind, learner, None, pick(seed), (), True, (seed,))
         if kind == "multi_chunk":
-            learner = rng.choice([u for u in learners if any(len(good[s]) >= 2 for s in held(u))])
+            owners = [u for u in learners if any(len(good[s]) >= 2 for s in held(u))]
+            if not owners:
+                return None
+            learner = rng.choice(owners)
             seed = rng.choice([s for s in held(learner) if len(good[s]) >= 2])
             return Draft(kind, learner, None, pick(seed, 2), (), True, (seed,))
         if kind == "multi_document":
@@ -85,11 +91,17 @@ def plan_drafts(
             a, b = sorted(rng.sample(held(learner), 2))
             return Draft(kind, learner, None, pick(a) + pick(b), (), True, (a, b))
         if kind == "unanswerable":
-            learner = rng.choice([u for u in learners if set(seeds) - set(held(u))])
+            owners = [u for u in learners if set(seeds) - set(held(u))]
+            if not owners:
+                return None
+            learner = rng.choice(owners)
             seed = rng.choice(sorted(set(seeds) - set(held(learner))))
             return Draft(kind, learner, None, pick(seed), (), False, ())
         # drift: limited to one held document; the last turn is written from another document
-        learner = rng.choice([u for u in learners if held(u) and len(seeds) >= 2])
+        owners = [u for u in learners if held(u) and len(seeds) >= 2]
+        if not owners:
+            return None
+        learner = rng.choice(owners)
         limit = rng.choice(held(learner))
         other = rng.choice([s for s in seeds if s != limit])
         return Draft(kind, learner, (limit,), pick(other), pick(limit), False, ())
@@ -145,7 +157,10 @@ def question_writer(model: BaseChatModel) -> Write:
     template = PROMPT.read_text(encoding="utf-8")
 
     async def write(kind: str, passages: Sequence[SeedChunk]) -> str | None:
-        quoted = "\n\n".join(f'<passage id="{p.id}">\n{p.text}\n</passage>' for p in passages)
+        # Passage text is untrusted: it must not be able to close its own tag.
+        quoted = "\n\n".join(
+            f'<passage id="{p.id}">\n{p.text.replace("</passage>", "&lt;/passage&gt;")}\n</passage>' for p in passages
+        )
         reply = await structured.ainvoke(
             [SystemMessage(template.format(instruction=INSTRUCTIONS[kind])), HumanMessage(quoted)]
         )
