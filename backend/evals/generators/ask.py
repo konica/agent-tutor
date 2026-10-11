@@ -9,6 +9,7 @@ declined otherwise; every candidate keeps the seed chunk ids it was written from
 import asyncio
 import logging
 import random
+import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,6 +27,7 @@ LOG = logging.getLogger(__name__)
 PROMPT = Path(__file__).parent / "prompts" / "ask_question.md"
 MIN_CHARS = 400
 MIN_LETTERS = 0.6  # share of letters and spaces: reference lists and tables fall below it
+CLOSING_TAG = re.compile(r"</\s*passage\s*>", re.IGNORECASE)  # every spelling a model may read as closing a passage
 INSTRUCTIONS = {
     "factual": "Ask for one specific fact the passage states (a number, a name, a result, a setting).",
     "conceptual": "Ask the learner's 'how' or 'why' question about the main idea of the passage.",
@@ -167,7 +169,7 @@ def question_writer(model: BaseChatModel) -> Write:
     async def write(kind: str, passages: Sequence[SeedChunk]) -> str | None:
         # Passage text is untrusted: it must not be able to close its own tag.
         quoted = "\n\n".join(
-            f'<passage id="{p.id}">\n{p.text.replace("</passage>", "&lt;/passage&gt;")}\n</passage>' for p in passages
+            f'<passage id="{p.id}">\n{CLOSING_TAG.sub("&lt;/passage&gt;", p.text)}\n</passage>' for p in passages
         )
         reply = await structured.ainvoke(
             [SystemMessage(template.format(instruction=INSTRUCTIONS[kind])), HumanMessage(quoted)]

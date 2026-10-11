@@ -65,7 +65,7 @@ def main(
 ) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--dataset", action="append", help="a datasets/<key>.yaml key (default: every dataset)")
-    parser.add_argument("--dry-run", action="store_true", help="print each split's examples; publish nothing")
+    parser.add_argument("--dry-run", action="store_true", help="print each split's summary; publish nothing")
     args = parser.parse_args(argv)
     keys = args.dataset or keys or sorted(p.stem for p in DATASETS.glob("*.yaml"))
     client = client or langsmith.Client()

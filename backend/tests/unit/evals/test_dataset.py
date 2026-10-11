@@ -1,8 +1,10 @@
 """Eval datasets: hand-written examples in datasets/, split versions made only by publishing (PRD §10.3 item 6)."""
 
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
+from langsmith.utils import LangSmithError, LangSmithNotFoundError
 
 from evals.corpus import load_manifest
 from evals.dataset import (
@@ -127,6 +129,17 @@ def test_a_pin_to_a_missing_version_stops_the_run() -> None:
     pinned = Dataset("ask", "smart-tutor-ask", "", ASK.examples, {"smoke": "smoke-v7"})
     with pytest.raises(DatasetError, match="smoke-v7"):
         version_to_run(client, pinned, "smoke")
+
+
+def test_the_fake_refuses_what_langsmith_refuses() -> None:
+    # publish_split's tagging relies on these: a tag needs an exact version time, and an unknown tag is not found
+    client = FakeLangSmith()
+    publish_split(client, ASK, "smoke", [Q1])
+    as_of = client.datasets["smart-tutor-ask"].tags["smoke-v1"]
+    with pytest.raises(LangSmithError, match="not an exact version"):
+        client.update_dataset_tag(dataset_name="smart-tutor-ask", as_of=as_of + timedelta(microseconds=1), tag="x")
+    with pytest.raises(LangSmithNotFoundError):
+        list(client.list_examples(dataset_name="smart-tutor-ask", splits=["smoke"], as_of="smoke-v2"))
 
 
 def test_tags_of_other_shapes_are_not_versions() -> None:
