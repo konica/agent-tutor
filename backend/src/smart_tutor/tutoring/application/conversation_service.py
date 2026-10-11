@@ -9,7 +9,6 @@ from smart_tutor.shared.ports.clock import Clock
 from smart_tutor.tutoring.domain.document_used import DELETED_DOCUMENT, DocumentUsed
 from smart_tutor.tutoring.domain.errors import (
     DocumentNotAvailableError,
-    NoDocumentsError,
     ThreadArchivedError,
     ThreadNotFoundError,
 )
@@ -25,11 +24,6 @@ class ConversationService:
         self._documents = documents
         self._clock = clock
 
-    def require_documents(self, user_id: UserId) -> None:
-        """No ready, non-archived document → "Upload a document first"."""
-        if not self._documents.has_ready_documents(user_id):
-            raise NoDocumentsError("Upload a document first")
-
     def require_readable(self, user_id: UserId, document_id: DocumentId) -> None:
         """The document is the learner's ready, non-archived one (`can_read`), else "Document not found"."""
         view = self._documents.documents_by_id(user_id, [document_id]).get(document_id)
@@ -40,8 +34,8 @@ class ConversationService:
         self, user_id: UserId, question: str | None = None, document_id: DocumentId | None = None
     ) -> Thread:
         """A new thread owned by the learner, persisted; its title starts as the first question. Started from a
-        document (US-4c), it lists that document as added by the learner; answers still search all documents."""
-        self.require_documents(user_id)
+        document (US-4c), it lists that document as added by the learner; answers still search all documents. A
+        learner without ready documents gets a thread too: its turn is the agent's request to upload one (US-3)."""
         if document_id is not None:
             self.require_readable(user_id, document_id)
         now = self._clock.now()

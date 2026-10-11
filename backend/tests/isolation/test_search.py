@@ -84,3 +84,13 @@ async def test_document_ids_only_narrow_the_callers_own_search() -> None:
     result = await search_as(library, verifier, "token-a", query=A_TEXT, document_ids=[a_doc, b_doc], k=5)
     chunks = result.structured_content["chunks"]
     assert chunks and {c["document_id"] for c in chunks} == {a_doc}
+
+
+async def test_an_archived_only_learner_gets_an_empty_readable_set_while_another_has_documents() -> None:
+    library, verifier, a_doc = world()
+    library.state.documents[a_doc].archived = True  # type: ignore[index]
+
+    for arguments in ({"query": A_TEXT}, {"query": B_TEXT}, {"query": A_TEXT, "document_ids": [a_doc]}):
+        result = await search_as(library, verifier, "token-a", **arguments)
+        assert not result.is_error
+        assert result.structured_content["chunks"] == []

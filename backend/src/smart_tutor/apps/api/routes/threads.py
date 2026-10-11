@@ -3,7 +3,8 @@ learner's documents, or a later one in an existing thread; an answer draws on al
 only the thread's listed ones once the learner limits its search scope (US-4c). Answered as SSE (PRD §9.2); the
 answer is kept as a turn when it is done, with the documents it drew on, and the turns and documents are listed per
 thread; the learner adds documents to that list and removes them (US-4c). The learner can rename a thread and set or
-read its search scope."""
+read its search scope. A learner with no ready, non-archived document still gets a stream: the agent's request
+to upload a document (a "no_documents" decline), kept as a turn like any decline (US-3, US-10)."""
 
 import json
 import logging
@@ -29,7 +30,6 @@ from smart_tutor.tutoring.application import (
     DocumentNotAvailableError,
     DocumentUsed,
     InvalidTitleError,
-    NoDocumentsError,
     NoListedDocumentsError,
     SearchScope,
     Thread,
@@ -47,16 +47,18 @@ UNAVAILABLE = "The tutor is unavailable. Try again in a moment."
 SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 SSE_RESPONSE: dict[int | str, dict[str, object]] = {
     200: {
-        "description": "Server-sent events: thread, then delta*, citations, done (or error).",
+        "description": (
+            "Server-sent events: thread, then delta*, citations, done; or decline then done "
+            "(no_documents: nothing readable, upload first; limited: the listed documents don't cover it); or error."
+        ),
         "content": {"text/event-stream": {"schema": {"type": "string"}}},
     },
     404: {"description": "A document that isn't the caller's ready one."},
-    409: {"description": "The learner has no ready documents."},
 }
 ASK_IN_THREAD_RESPONSE: dict[int | str, dict[str, object]] = {
     **SSE_RESPONSE,
     404: {"description": "Not the caller's conversation."},
-    409: {"description": "The conversation is archived, or the learner has no ready documents."},
+    409: {"description": "The conversation is archived."},
 }
 
 
@@ -288,10 +290,6 @@ async def ask_in_new_thread(
     conversations: Conversations,
     agent: Agent,
 ) -> StreamingResponse:
-    try:
-        await run_in_threadpool(conversations.require_documents, principal.user_id)
-    except NoDocumentsError as e:
-        raise HTTPException(409, str(e)) from None
     document_id = DocumentId(str(body.document_id)) if body.document_id else None
     if document_id is not None:
         try:
@@ -306,7 +304,7 @@ async def ask_in_new_thread(
         nonlocal thread_id
         try:
             thread = await run_in_threadpool(conversations.start_thread, principal.user_id, body.question, document_id)
-        except (NoDocumentsError, DocumentNotAvailableError) as e:
+        except DocumentNotAvailableError as e:
             logger.warning("the thread was refused: %s", e)
             return None
         except Exception:
@@ -339,10 +337,9 @@ async def ask_in_thread(
     try:
         # Ownership first, so another learner's thread is a 404 whatever their library holds.
         listed = await run_in_threadpool(conversations.search_documents, tid, principal.user_id)
-        await run_in_threadpool(conversations.require_documents, principal.user_id)
     except ThreadNotFoundError as e:
         raise HTTPException(404, str(e)) from None
-    except (NoDocumentsError, ThreadArchivedError) as e:
+    except ThreadArchivedError as e:
         raise HTTPException(409, str(e)) from None
     answer = await _open(agent, token, body.question, listed)
 

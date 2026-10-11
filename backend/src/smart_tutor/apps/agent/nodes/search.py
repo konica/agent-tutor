@@ -1,4 +1,4 @@
-"""Search step (PRD §9.2 step 2): all the learner's ready documents, or only the conversation's listed ones
+"""Search step (PRD §9.2 step 1): all the learner's ready documents, or only the conversation's listed ones
 (US-4c), k = 5, token from runtime context."""
 
 from collections.abc import Callable
@@ -19,7 +19,11 @@ class SearchNode(Protocol):
 def search_node(retriever_for: Callable[[str], Retriever]) -> SearchNode:
     async def search(state: AskState, *, runtime: Runtime[AgentContext]) -> AskState:
         retriever = retriever_for(runtime.context.access_token)
-        chunks = await retriever.search(state["question"], K, state.get("document_ids"))
-        return {"chunks": chunks}
+        question, document_ids = state["question"], state.get("document_ids")
+        chunks = await retriever.search(question, K, document_ids)
+        # An empty readable set gets the upload request. A limited search that found nothing only says its listed
+        # documents can't be read, so one library-wide chunk tells whether anything else can.
+        no_documents = not chunks and (document_ids is None or not await retriever.search(question, 1, None))
+        return {"chunks": chunks, "no_documents": no_documents}
 
     return search
