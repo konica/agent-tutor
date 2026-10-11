@@ -5,6 +5,16 @@
   font-size: var(--fs-16); line-height: var(--lh-read);
   white-space: pre-wrap; overflow-wrap: anywhere;
 }
+/* An inline citation marker: a link to its source in the answer's text. Inline in a sentence, so the 24px target
+   minimum doesn't apply (WCAG 2.5.8 inline exception). */
+.marker {
+  padding: 0; border: 0; border-radius: var(--r-sm); background: none;
+  color: var(--accent-text); font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+}
+.marker:hover { text-decoration-thickness: 2px; }
+.marker:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* Its passage is open beside the conversation, as for its chip (--accent-soft marks the selected item). */
+.marker[aria-current="true"] { background: var(--accent-soft); }
 
 /* One line of source chips under the answer (DESIGN.md → Chat). Each opens its document beside the conversation. */
 .sources { display: flex; align-items: flex-start; flex-wrap: wrap; gap: var(--sp-2); font-size: var(--fs-12); color: var(--text-2); }

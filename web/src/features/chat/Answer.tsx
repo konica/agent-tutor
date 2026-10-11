@@ -3,6 +3,7 @@ import { useId } from "react";
 
 import { formatCitation, type ChatCitation } from "../../api/chat";
 import styles from "./Answer.module.css";
+import { splitMarkers, type Piece } from "./citationMarkers";
 
 type Props = {
   /** The answer as the model wrote it: always rendered as text. */
@@ -21,9 +22,42 @@ type Props = {
 // A turn's answer and its Sources line (DESIGN.md → Chat). A declined turn has neither.
 export function Answer({ text, citations, showCitations, deletedIds, shownChunkId, onOpenCitation }: Props) {
   const listId = useId();
+  // Markers link once the answer's citations have arrived (they follow its last words) and while citations are shown.
+  const linked = showCitations && citations.length > 0;
+  const byNumber = new Map(citations.map((c) => [c.n, c]));
+
+  // A marker number with a source in this answer opens it, as its Sources chip does; any other piece stays text.
+  function piece(p: Piece, index: number) {
+    const c = p.n === undefined ? undefined : byNumber.get(p.n);
+    if (!c) return p.text;
+    if (c.deleted || deletedIds.has(c.document_id)) {
+      return (
+        <span key={index} title="Deleted document">
+          {p.text}
+        </span>
+      );
+    }
+    const name = `Source ${c.n}: ${formatCitation(c)}${c.archived ? ", archived" : ""}`;
+    return (
+      <button
+        key={index}
+        type="button"
+        className={styles.marker}
+        title={name}
+        aria-label={name}
+        aria-current={shownChunkId === c.chunk_id ? "true" : undefined}
+        data-chunk-id={c.chunk_id}
+        onClick={(event) => onOpenCitation(c, event.currentTarget)}
+      >
+        {p.text}
+      </button>
+    );
+  }
+
   return (
     <>
-      {text && <p className={styles.answer}>{text}</p>}
+      {/* Text nodes only: the model's words are never read as HTML. */}
+      {text && <p className={styles.answer}>{linked ? splitMarkers(text).map(piece) : text}</p>}
       {showCitations && citations.length > 0 && (
         <div className={styles.sources}>
           <span className={styles.sourcesLabel} id={listId}>

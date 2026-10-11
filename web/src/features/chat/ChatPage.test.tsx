@@ -66,6 +66,8 @@ function renderChat(props: ComponentProps<typeof ChatPage> = {}, entry = "/chat"
 }
 const question = () => screen.findByRole("textbox", { name: /question/i });
 const askButton = () => screen.getByRole("button", { name: /ask/i });
+// An answer's paragraph by its whole text: once its citations arrive, its [n] markers are buttons inside it.
+const answerText = (text: string) => (_: string, element: Element | null) => element?.tagName === "P" && element.textContent === text;
 
 beforeEach(() => localStorage.clear());
 afterEach(() => vi.restoreAllMocks());
@@ -91,7 +93,7 @@ describe("ChatPage", () => {
     await userEvent.type(await question(), "What is attention?");
     await userEvent.click(askButton());
     expect(ask).toHaveBeenCalledWith("What is attention?", undefined);
-    expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
+    expect(await screen.findByText(answerText("It weighs tokens [1]."))).toBeInTheDocument();
     // The question is the header title and also the learner's bubble in the conversation.
     expect(screen.getByRole("heading", { level: 1 })).toContainElement(screen.getByRole("button", { name: "What is attention?. Edit title" }));
     expect(screen.getByText("You asked:").parentElement).toHaveTextContent("You asked: What is attention?");
@@ -409,7 +411,7 @@ describe("ChatPage", () => {
       renderChat({ ask, loadUsed });
       await userEvent.type(await question(), "What is attention?");
       await userEvent.click(askButton());
-      expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
+      expect(await screen.findByText(answerText("It weighs tokens [1]."))).toBeInTheDocument();
       expect(await within(panel()!).findByText("Couldn't load the documents used.")).toBeInTheDocument();
       expect(within(panel()!).queryByText("Documents used to answer will appear here.")).not.toBeInTheDocument();
 
@@ -608,7 +610,7 @@ describe("ChatPage", () => {
         await waitFor(() => expect(askIn).toHaveBeenCalledWith("t1", "And RAG?"));
         expect(ask).toHaveBeenCalledTimes(1);
         // The answer is a second turn under the first.
-        await waitFor(() => expect(screen.getAllByText("It weighs tokens [1].")).toHaveLength(2));
+        await waitFor(() => expect(screen.getAllByText(answerText("It weighs tokens [1]."))).toHaveLength(2));
         // The same conversation: its title and its documents stay.
         expect(screen.getByRole("button", { name: "What is attention?. Edit title" })).toBeInTheDocument();
         expect(within(panel()!).getByText("a.pdf")).toBeInTheDocument();
@@ -705,7 +707,7 @@ describe("ChatPage", () => {
         expect(askIn).toHaveBeenCalledTimes(2);
         expect(ask).toHaveBeenCalledTimes(1);
         // The answer is a new turn under the decline, which keeps its message but no longer offers its way out.
-        await waitFor(() => expect(screen.getAllByText("It weighs tokens [1].")).toHaveLength(2));
+        await waitFor(() => expect(screen.getAllByText(answerText("It weighs tokens [1]."))).toHaveLength(2));
         expect(screen.getByText("These documents don't cover this.")).toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "Search all my documents" })).not.toBeInTheDocument();
         expect(scopeSwitch()).toHaveAttribute("aria-checked", "false");
@@ -765,7 +767,7 @@ describe("ChatPage", () => {
       expect(await screen.findByRole("list", { name: "Sources" })).toBeInTheDocument();
       await userEvent.click(screen.getByRole("switch", { name: "Show citations" }));
       expect(screen.queryByRole("list", { name: "Sources" })).not.toBeInTheDocument();
-      expect(screen.getByText("It weighs tokens [1].")).toBeInTheDocument();
+      expect(screen.getByText(answerText("It weighs tokens [1]."))).toBeInTheDocument();
     });
   });
 
@@ -807,7 +809,7 @@ describe("ChatPage", () => {
       expect(pane("ReAct")).toBeInTheDocument();
       expect(within(pane("ReAct")!).getByRole("heading", { level: 2, name: "ReAct" })).toHaveFocus();
       expect(panel()).not.toBeInTheDocument();
-      expect(screen.getByText("It weighs tokens [1].")).toBeInTheDocument();
+      expect(screen.getByText(answerText("It weighs tokens [1]."))).toBeInTheDocument();
     });
 
     it("swaps the document in place when another row is opened", async () => {
@@ -983,6 +985,96 @@ describe("ChatPage", () => {
         await waitFor(() => expect(pane("ReAct")).toBeInTheDocument());
         const sources = within(screen.getByRole("list", { name: "Sources" }));
         for (const c of sources.getAllByRole("button")) expect(c).not.toHaveAttribute("aria-current");
+      });
+    });
+
+    describe("citation markers", () => {
+      const cited = (text = "It weighs tokens [1] and keys [2], see [3].") =>
+        events(
+          { type: "thread", thread_id: "t1" },
+          { type: "delta", text },
+          {
+            type: "citations",
+            citations: [
+              { n: 1, chunk_id: "c1", document_id: "d1", document_title: "ReAct", page: 2 },
+              { n: 2, chunk_id: "c2", document_id: "d1", document_title: "ReAct", page: 3 },
+              { n: 3, chunk_id: "c3", document_id: "d2", document_title: "PPO", page: 1 },
+            ],
+          },
+          { type: "done" },
+        );
+      const marker = (n: number) => screen.findByRole("button", { name: new RegExp(`^Source ${n}: `) });
+      const close = () => fireEvent.keyDown(within(pane("ReAct")!).getByRole("heading", { level: 2, name: "ReAct" }), { key: "Escape" });
+
+      async function cite(text?: string) {
+        const viewerDeps = fakeViewerDeps();
+        await answer({ ask: vi.fn().mockImplementation(() => cited(text)), viewerDeps });
+        return viewerDeps;
+      }
+
+      it("opens the document beside the conversation at the cited passage and marks its chip shown", async () => {
+        const deps = await cite();
+        const first = await marker(1);
+        expect(first).toHaveAccessibleName("Source 1: ReAct, p. 2");
+        await userEvent.click(first);
+        expect(await screen.findByText("p. 2 / 3", {}, { timeout: 3000 })).toBeInTheDocument();
+        expect(pane("ReAct")).toBeInTheDocument();
+        expect(deps.loadChunk).toHaveBeenCalledWith("c1");
+        expect(first).toHaveAttribute("aria-current", "true");
+        const chip = within(screen.getByRole("list", { name: "Sources" })).getByRole("button", { name: /^ReAct, p\. 2\./ });
+        expect(chip).toHaveAccessibleName(/Shown beside the conversation$/);
+        expect(chip).toHaveAttribute("aria-current", "true");
+      });
+
+      it("swaps the document in place when another marker is clicked", async () => {
+        await cite();
+        const react = await marker(1);
+        await userEvent.click(react);
+        await screen.findByText("p. 2 / 3", {}, { timeout: 3000 });
+        const ppo = await marker(3);
+        await userEvent.click(ppo);
+        expect(await screen.findByRole("region", { name: "PPO" })).toBeInTheDocument();
+        expect(pane("ReAct")).not.toBeInTheDocument();
+        expect(react).not.toHaveAttribute("aria-current");
+        expect(ppo).toHaveAttribute("aria-current", "true");
+      });
+
+      it("returns focus to the marker that opened it, on Escape and on Close", async () => {
+        await cite("Twice [1] and again [1].");
+        const [, second] = await screen.findAllByRole("button", { name: /^Source 1: / });
+        await userEvent.click(second!);
+        await screen.findByText("p. 2 / 3", {}, { timeout: 3000 });
+        close();
+        expect(pane("ReAct")).not.toBeInTheDocument();
+        await waitFor(() => expect(second).toHaveFocus());
+
+        await userEvent.click(second!);
+        await screen.findByText("p. 2 / 3", {}, { timeout: 3000 });
+        await userEvent.click(within(pane("ReAct")!).getByRole("button", { name: "Close" }));
+        await waitFor(() => expect(second).toHaveFocus());
+      });
+
+      it("keeps markers as text while the answer streams, linking them once the citations arrive", async () => {
+        const live = controlledStream();
+        renderChat({ ask: vi.fn(() => live.stream()), viewerDeps: fakeViewerDeps() });
+        await userEvent.type(await question(), "How does ReAct work?");
+        await userEvent.click(askButton());
+        live.push({ type: "thread", thread_id: "t1" });
+        live.push({ type: "delta", text: "It weighs tokens [1]." });
+        expect(await screen.findByText(answerText("It weighs tokens [1]."))).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /^Source 1: / })).not.toBeInTheDocument();
+        live.push({ type: "citations", citations: [{ n: 1, chunk_id: "c1", document_id: "d1", document_title: "ReAct", page: 2 }] });
+        expect(await marker(1)).toBeInTheDocument();
+        live.push({ type: "done" });
+        live.push(null);
+      });
+
+      it("keeps markers as text with Show citations off", async () => {
+        await cite();
+        await marker(1);
+        await userEvent.click(screen.getByRole("switch", { name: "Show citations" }));
+        expect(screen.queryByRole("button", { name: /^Source \d: / })).not.toBeInTheDocument();
+        expect(screen.getByText(answerText("It weighs tokens [1] and keys [2], see [3]."))).toBeInTheDocument();
       });
     });
   });
@@ -1313,7 +1405,7 @@ describe("ChatPage", () => {
       expect(await screen.findByRole("button", { name: "Attention basics. Edit title" })).toBeInTheDocument();
       expect(loadConversation).toHaveBeenCalledWith("t1");
       expect(asked()).toEqual(["You asked: What is attention?", "You asked: And in RAG?"]);
-      expect(screen.getByText("It weighs tokens [1].")).toBeInTheDocument();
+      expect(screen.getByText(answerText("It weighs tokens [1]."))).toBeInTheDocument();
       expect(screen.getByText("These documents don't cover this.")).toBeInTheDocument();
       const sources = screen.getAllByRole("list", { name: "Sources" });
       expect(sources).toHaveLength(1);
@@ -1355,6 +1447,44 @@ describe("ChatPage", () => {
       expect(screen.getByRole("region", { name: "ReAct" })).toBeInTheDocument();
     });
 
+    it("a history answer's marker opens its passage", async () => {
+      const deps = fakeViewerDeps();
+      renderChat({ loadConversation: conversation([cited({ document_title: "ReAct", page: 2 })]), viewerDeps: deps }, "/chat/t1");
+      const marker = await screen.findByRole("button", { name: "Source 1: ReAct, p. 2" });
+      await userEvent.click(marker);
+      expect(await screen.findByText("p. 2 / 3", {}, { timeout: 3000 })).toBeInTheDocument();
+      expect(deps.loadChunk).toHaveBeenCalledWith("c1");
+      expect(marker).toHaveAttribute("aria-current", "true");
+    });
+
+    it("marks only the clicked turn's marker when two turns cite the same passage", async () => {
+      const both = conversation([cited({ document_title: "ReAct", page: 2 }), cited({ document_title: "ReAct", page: 2 })]);
+      renderChat({ loadConversation: both, viewerDeps: fakeViewerDeps() }, "/chat/t1");
+      await screen.findAllByRole("button", { name: "Source 1: ReAct, p. 2" });
+      const [first, second] = screen.getAllByRole("button", { name: "Source 1: ReAct, p. 2" });
+      await userEvent.click(second!);
+      expect(await screen.findByText("p. 2 / 3", {}, { timeout: 3000 })).toBeInTheDocument();
+      expect(second).toHaveAttribute("aria-current", "true");
+      expect(first).not.toHaveAttribute("aria-current");
+    });
+
+    it("a deleted document's history marker is text with Deleted document", async () => {
+      renderChat({ loadConversation: conversation([cited({ document_title: "Deleted document", deleted: true })]) }, "/chat/t1");
+      await screen.findByRole("list", { name: "Sources" });
+      expect(screen.queryByRole("button", { name: /^Source 1: / })).not.toBeInTheDocument();
+      const answer = screen.getByText(answerText("It weighs tokens [1]."));
+      expect(within(answer).getByTitle("Deleted document")).toHaveTextContent("[1]");
+    });
+
+    it("an archived document's history marker still opens it", async () => {
+      renderChat(
+        { loadConversation: conversation([cited({ document_title: "ReAct", page: 2, archived: true })]), viewerDeps: fakeViewerDeps() },
+        "/chat/t1",
+      );
+      await userEvent.click(await screen.findByRole("button", { name: "Source 1: ReAct, p. 2, archived" }));
+      expect(await screen.findByRole("region", { name: "ReAct" })).toBeInTheDocument();
+    });
+
     it("an unknown conversation shows Conversation not found with a way back to Chat", async () => {
       const loadConversation = vi.fn(async () => {
         throw new ConversationNotFoundError();
@@ -1384,7 +1514,7 @@ describe("ChatPage", () => {
 
     it("titles a conversation without a title Conversation", async () => {
       renderChat({ loadConversation: conversation([turn()], { title: null }) }, "/chat/t1");
-      expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
+      expect(await screen.findByText(answerText("It weighs tokens [1]."))).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Conversation. Edit title" })).toBeInTheDocument();
     });
 
@@ -1408,7 +1538,7 @@ describe("ChatPage", () => {
           <Back />
         </MemoryRouter>,
       );
-      expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
+      expect(await screen.findByText(answerText("It weighs tokens [1]."))).toBeInTheDocument();
       await userEvent.type(await question(), "Next?");
       await userEvent.click(askButton());
       expect(await screen.findByText("The tutor is unavailable. Try again in a moment.")).toBeInTheDocument();
@@ -1418,7 +1548,7 @@ describe("ChatPage", () => {
       expect(screen.queryByRole("heading", { name: "Ask about your documents" })).not.toBeInTheDocument();
       await userEvent.click(screen.getByRole("button", { name: "Go back" }));
       await waitFor(() => expect(location()).toBe("/chat/t1"));
-      expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
+      expect(await screen.findByText(answerText("It weighs tokens [1]."))).toBeInTheDocument();
       expect(loadConversation).toHaveBeenCalledTimes(2);
     });
 
@@ -1442,12 +1572,12 @@ describe("ChatPage", () => {
       const ask = vi.fn(() => events({ type: "thread", thread_id: "t2" }, { type: "delta", text: "Next answer." }, { type: "done" }));
       const askIn = vi.fn();
       renderChat({ loadConversation: conversation([turn()]), ask, askIn }, "/chat/t1");
-      expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
+      expect(await screen.findByText(answerText("It weighs tokens [1]."))).toBeInTheDocument();
       await userEvent.type(await question(), "Next?");
       await userEvent.click(askButton());
       expect(await screen.findByText("Next answer.")).toBeInTheDocument();
       await waitFor(() => expect(location()).toBe("/chat/t2"));
-      expect(screen.queryByText("It weighs tokens [1].")).not.toBeInTheDocument();
+      expect(screen.queryByText(answerText("It weighs tokens [1]."))).not.toBeInTheDocument();
       expect(asked()).toEqual(["You asked: Next?"]);
       expect(ask).toHaveBeenCalledWith("Next?", undefined);
       expect(askIn).not.toHaveBeenCalled();
@@ -1461,17 +1591,17 @@ describe("ChatPage", () => {
       await userEvent.click(askButton());
       expect(await screen.findByText("More.")).toBeInTheDocument();
       expect(asked()).toEqual(["You asked: What is attention?", "You asked: More?"]);
-      expect(screen.getByText("It weighs tokens [1].")).toBeInTheDocument();
+      expect(screen.getByText(answerText("It weighs tokens [1]."))).toBeInTheDocument();
       expect(location()).toBe("/chat/t1");
       expect(askIn).toHaveBeenCalledWith("t1", "More?");
     });
 
     it("the Chat link starts a new conversation", async () => {
       renderChat({ loadConversation: conversation([turn()]) }, "/chat/t1");
-      expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
+      expect(await screen.findByText(answerText("It weighs tokens [1]."))).toBeInTheDocument();
       await userEvent.click(screen.getByRole("link", { name: "Chat" }));
       expect(await screen.findByRole("heading", { name: "Ask about your documents" })).toBeInTheDocument();
-      expect(screen.queryByText("It weighs tokens [1].")).not.toBeInTheDocument();
+      expect(screen.queryByText(answerText("It weighs tokens [1]."))).not.toBeInTheDocument();
       expect(screen.getByRole("heading", { level: 1, name: "New conversation" })).toBeInTheDocument();
     });
 
@@ -1492,7 +1622,7 @@ describe("ChatPage", () => {
 
     it("a reopened conversation shows its history even with no ready documents", async () => {
       renderChat({ loadConversation: conversation([turn()]), loadDocs: async () => [] }, "/chat/t1");
-      expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
+      expect(await screen.findByText(answerText("It weighs tokens [1]."))).toBeInTheDocument();
       expect(screen.queryByRole("heading", { name: "Upload a document first" })).not.toBeInTheDocument();
       expect(screen.getByRole("textbox", { name: /question/i })).toBeEnabled();
     });
@@ -1503,14 +1633,14 @@ describe("ChatPage", () => {
         events({ type: "thread", thread_id: "t1" }, { type: "decline", code: "no_documents", message: NO_DOCUMENTS }, { type: "done" }),
       );
       renderChat({ loadConversation: conversation([turn()]), loadDocs: async () => [], ask, askIn }, "/chat/t1");
-      await screen.findByText("It weighs tokens [1].");
+      await screen.findByText(answerText("It weighs tokens [1]."));
       await userEvent.type(await question(), "What does the clipping range control?");
       await userEvent.click(askButton());
       expect(await screen.findByText(NO_DOCUMENTS)).toBeInTheDocument();
       expect(askIn).toHaveBeenCalledWith("t1", "What does the clipping range control?");
       expect(ask).not.toHaveBeenCalled();
       expect(asked()).toEqual(["You asked: What is attention?", "You asked: What does the clipping range control?"]);
-      expect(screen.getByText("It weighs tokens [1].")).toBeInTheDocument();
+      expect(screen.getByText(answerText("It weighs tokens [1]."))).toBeInTheDocument();
       expect(location()).toBe("/chat/t1");
       expect(screen.getByRole("link", { name: "Upload" })).toHaveAttribute("href", "/library");
     });
@@ -1526,7 +1656,7 @@ describe("ChatPage", () => {
         ),
       );
       renderChat({ loadConversation: conversation([turn()]), loadDocs: async () => [], ask, askIn }, "/chat/t1");
-      await screen.findByText("It weighs tokens [1].");
+      await screen.findByText(answerText("It weighs tokens [1]."));
       await userEvent.type(await question(), "First?");
       await userEvent.click(askButton());
       expect(await screen.findByText("Found one.")).toBeInTheDocument();
