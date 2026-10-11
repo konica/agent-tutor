@@ -55,6 +55,13 @@ def test_a_dataset_without_examples_or_with_an_unknown_pinned_split_is_refused(t
         load_dataset("y", tmp_path)
 
 
+@pytest.mark.parametrize("tag", ["full-v1", "smoke-latest", "smoke-v"])
+def test_a_pin_must_name_a_version_of_its_own_split(tmp_path: Path, tag: str) -> None:
+    (tmp_path / "w.yaml").write_text(f"name: w\npins: {{smoke: {tag}}}\nexamples: [{{inputs: {{q: a}}}}]\n", "utf-8")
+    with pytest.raises(DatasetError, match=f"smoke: {tag}"):
+        load_dataset("w", tmp_path)
+
+
 def test_pins_are_read_from_the_file(tmp_path: Path) -> None:
     (tmp_path / "z.yaml").write_text("name: z\npins: {full: full-v3}\nexamples: [{inputs: {q: a}}]\n", encoding="utf-8")
     assert load_dataset("z", tmp_path).pins == {"full": "full-v3"}

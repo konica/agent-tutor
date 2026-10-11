@@ -52,6 +52,9 @@ def load_dataset(key: str, folder: Path = DATASETS) -> Dataset:
     pins = {str(split): str(tag) for split, tag in (raw.get("pins") or {}).items()}
     if unknown := set(pins) - set(SPLITS):
         raise DatasetError(f"{path.name}: pins name unknown splits {sorted(unknown)} (splits: {', '.join(SPLITS)})")
+    for split, tag in pins.items():
+        if _number(tag, split) is None:
+            raise DatasetError(f"{path.name}: pin {split}: {tag} is not a {split}-v<N> version")
     return Dataset(key, raw["name"], raw.get("description", ""), examples, pins)
 
 
