@@ -124,6 +124,29 @@ def test_a_failing_langsmith_never_fails_the_work_of_a_run() -> None:
         assert model.invoke("Describe these pages.").content == "A summary."
 
 
+class _UpdateFailsClient(RecordingClient):
+    def update_run(self, *args: Any, **kwargs: Any) -> None:
+        raise ConnectionError("LangSmith is down")
+
+
+def test_a_trace_that_cannot_end_leaves_no_context_for_the_next_run() -> None:
+    """LangSmith skips restoring its context when ending fails; a long-lived worker would carry the run's metadata."""
+    failing, recording = _UpdateFailsClient(), RecordingClient()
+    hasher = LearnerHasher("k")
+    first = LangSmithRunTracing(hasher, "p", {}, client=failing).run("ingest", UserId("a"), {"content_id": "c-1"})
+    with langsmith.tracing_context(enabled=True, client=failing):
+        with first:
+            pass
+        assert not langsmith.get_tracing_context()["metadata"]
+        assert langsmith.get_tracing_context()["parent"] is None
+    second = LangSmithRunTracing(hasher, "p", {}, client=recording).run("ingest", UserId("b"), {"content_id": "c-2"})
+    with langsmith.tracing_context(enabled=True, client=recording), second:
+        pass
+    created = next(p for p in recording.payloads if p["op"] == "create")
+    assert created["extra"]["metadata"]["content_id"] == "c-2"
+    assert created["extra"]["metadata"]["learner_hash"] == hasher(UserId("b"))
+
+
 @pytest.fixture
 def fresh_langsmith_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """LangSmith caches its env vars and default client; start and end each test without them."""

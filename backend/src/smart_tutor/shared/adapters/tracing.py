@@ -8,7 +8,7 @@ from collections.abc import Iterator, Mapping
 from contextlib import AbstractContextManager, contextmanager
 
 import langsmith
-from langsmith import run_trees
+from langsmith import run_helpers, run_trees
 from langsmith import utils as ls_utils
 
 from smart_tutor.shared.config import Settings
@@ -24,24 +24,31 @@ logger = logging.getLogger(__name__)
 def never_raising[T](cm: AbstractContextManager[T], fallback: T) -> Iterator[T]:
     """Runs the block inside `cm`, a trace, but a trace that can't start or end is logged and skipped: tracing never
     fails the work it traces (#229). The block's own errors still propagate."""
+    # When ending fails, LangSmith never restores the context it set (metadata, tags, parent run), and a long-lived
+    # worker would carry this run's values into every later trace. `tracing_context` can't restore a snapshot fully,
+    # so use what the trace's own teardown uses.
+    before = run_helpers.get_tracing_context()
+
+    def end(exc_type: type[BaseException] | None, error: BaseException | None) -> None:
+        try:
+            cm.__exit__(exc_type, error, error.__traceback__ if error else None)
+        except Exception:
+            logger.warning("tracing could not end", exc_info=True)
+            run_helpers._set_tracing_context(before)
+
     try:
         value = cm.__enter__()
     except Exception:
         logger.warning("tracing could not start; running untraced", exc_info=True)
+        run_helpers._set_tracing_context(before)
         yield fallback
         return
     try:
         yield value
     except BaseException as error:
-        try:
-            cm.__exit__(type(error), error, error.__traceback__)
-        except Exception:
-            logger.warning("tracing could not end", exc_info=True)
+        end(type(error), error)
         raise
-    try:
-        cm.__exit__(None, None, None)
-    except Exception:
-        logger.warning("tracing could not end", exc_info=True)
+    end(None, None)
 
 
 class LearnerHasher:
