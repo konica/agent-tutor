@@ -1,6 +1,9 @@
 """The human review gate (PRD §10.3 item 6): candidates go to an annotation queue as runs, and only the ones a
 reviewer accepted come back as examples."""
 
+import pytest
+from langsmith.utils import LangSmithNotFoundError
+
 from evals.dataset import Dataset, Example
 from evals.review import ACCEPTED, Candidate, accepted, candidates_name, ensure_queue, submit
 from fakes.langsmith import FakeLangSmith
@@ -43,6 +46,48 @@ def test_submitted_candidates_are_runs_in_the_queue_with_their_evidence() -> Non
         "evidence": [{"chunk": "react-2022:4", "text": "ReAct interleaves reasoning and acting."}],
     }
     assert run.extra == {"metadata": {"dataset": "smart-tutor-ask", "type": "unanswerable", "batch": "b1"}}
+
+
+def test_runs_are_queued_by_their_full_key_in_the_candidates_project() -> None:
+    client = FakeLangSmith()
+    ids = submit(client, ASK, [candidate("a"), candidate("b")], {})
+    project = client.read_project(project_name="smart-tutor-ask-candidates")
+    [keys] = client.queue_adds
+    assert keys == [
+        {"run_id": run_id, "session_id": project.id, "start_time": client.runs[run_id].start_time} for run_id in ids
+    ]
+    assert project.description and "smart-tutor-ask" in project.description
+
+
+def test_an_existing_candidates_project_is_reused() -> None:
+    client = FakeLangSmith()
+    first = submit(client, ASK, [candidate("a")], {})
+    second = submit(client, ASK, [candidate("b")], {})
+    assert len(client.projects) == 1
+    assert next(iter(client.queues.values())).run_ids == [*first, *second]
+
+
+def test_runs_not_yet_ingested_are_queued_after_retries() -> None:
+    client, sleeps = FakeLangSmith(), []
+    client.ingestion_lag = 2
+    ids = submit(client, ASK, [candidate("a")], {}, sleep=sleeps.append)
+    assert next(iter(client.queues.values())).run_ids == ids
+    assert sleeps == [2, 4]
+
+
+def test_many_candidates_are_queued_in_batches_of_at_most_100() -> None:
+    client = FakeLangSmith()
+    ids = submit(client, ASK, [candidate(f"q{i}") for i in range(130)], {})
+    assert [len(keys) for keys in client.queue_adds] == [100, 30]
+    assert next(iter(client.queues.values())).run_ids == ids
+
+
+def test_runs_still_missing_after_about_two_minutes_raise() -> None:
+    client, sleeps = FakeLangSmith(), []
+    client.ingestion_lag = 1000
+    with pytest.raises(LangSmithNotFoundError):
+        submit(client, ASK, [candidate("a")], {}, sleep=sleeps.append)
+    assert sleeps[:3] == [2, 4, 8] and max(sleeps) <= 15 and 100 <= sum(sleeps) <= 150
 
 
 def test_only_items_whose_latest_feedback_accepts_them_are_accepted() -> None:

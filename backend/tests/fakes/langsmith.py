@@ -11,7 +11,7 @@ from typing import Any
 
 from langsmith.evaluation import EvaluationResult
 from langsmith.schemas import DatasetVersion
-from langsmith.utils import LangSmithError, LangSmithNotFoundError
+from langsmith.utils import LangSmithError, LangSmithNotFoundError, LangSmithUserError
 
 START = datetime(2026, 10, 11, tzinfo=UTC)
 
@@ -61,6 +61,13 @@ class FakeFeedback:
     modified_at: datetime
 
 
+@dataclass(frozen=True)
+class FakeProject:
+    id: uuid.UUID
+    name: str
+    description: str | None
+
+
 @dataclass
 class FakeQueue:
     id: uuid.UUID
@@ -102,6 +109,9 @@ class FakeLangSmith:
         self.feedback: list[FakeFeedback] = []
         self.feedback_configs: dict[str, dict[str, Any]] = {}
         self.queues: dict[uuid.UUID, FakeQueue] = {}
+        self.projects: dict[str, FakeProject] = {}
+        self.queue_adds: list[list[dict[str, Any]]] = []  # the runs of each successful add to a queue
+        self.ingestion_lag = 0  # queue adds that fail with "not found" before new runs become visible
         self.flushed = 0
         self._clock = itertools.count(1)
 
@@ -168,7 +178,23 @@ class FakeLangSmith:
             raise LangSmithError(f"{as_of} is not an exact version of {dataset_name}")
         dataset.tags[tag] = as_of
 
+    def has_project(self, project_name: str) -> bool:
+        return project_name in self.projects
+
+    def create_project(self, project_name: str, *, description: str | None = None) -> FakeProject:
+        if project_name in self.projects:
+            raise LangSmithError(f"project {project_name} exists")
+        project = self.projects[project_name] = FakeProject(uuid.uuid4(), project_name, description)
+        return project
+
+    def read_project(self, *, project_name: str) -> FakeProject:
+        if project_name not in self.projects:
+            raise LangSmithNotFoundError(f"Project {project_name} not found")
+        return self.projects[project_name]
+
     def create_run(self, name: str, inputs: dict[str, Any], run_type: str, *, project_name: str, **kwargs: Any) -> None:
+        if project_name not in self.projects:  # as LangSmith: tracing to a new project creates it
+            self.projects[project_name] = FakeProject(uuid.uuid4(), project_name, None)
         run_id = kwargs["id"]
         self.runs[run_id] = FakeRun(
             run_id,
@@ -185,10 +211,8 @@ class FakeLangSmith:
         self.flushed += 1
 
     def list_runs(self, *, project_name: str, is_root: bool | None = None) -> Iterator[FakeRun]:
-        runs = [r for r in self.runs.values() if r.project_name == project_name]
-        if not runs:
-            raise LangSmithNotFoundError(f"Project {project_name} not found")
-        return iter(runs)
+        self.read_project(project_name=project_name)
+        return iter([r for r in self.runs.values() if r.project_name == project_name])
 
     def create_feedback(self, run_id: uuid.UUID, key: str, *, score: float | None = None) -> None:
         self.feedback.append(FakeFeedback(uuid.uuid4(), run_id, key, score, self._now()))
@@ -226,10 +250,29 @@ class FakeLangSmith:
         self.queues[queue.id] = queue
         return queue
 
-    def add_runs_to_annotation_queue(self, queue_id: uuid.UUID, *, run_ids: Sequence[uuid.UUID]) -> None:
-        if unknown := [r for r in run_ids if r not in self.runs]:
-            raise LangSmithNotFoundError(f"runs not found: {unknown}")
-        self.queues[queue_id].run_ids.extend(run_ids)
+    def add_runs_to_annotation_queue(
+        self,
+        queue_id: uuid.UUID,
+        *,
+        runs: Sequence[dict[str, Any]] | None = None,
+        run_ids: Sequence[uuid.UUID] | None = None,
+    ) -> None:
+        if run_ids is not None or runs is None:  # deprecated in SDK 0.14, and unusable on SmithDB workspaces
+            raise LangSmithUserError("pass runs (RunKeys), not run_ids")
+        if len(runs) > 100:  # as LangSmith: at most 100 runs per add
+            raise LangSmithError("at most 100 runs per add")
+        if self.ingestion_lag:  # runs sent moments ago aren't ingested yet
+            self.ingestion_lag -= 1
+            raise LangSmithNotFoundError(f"404 Not Found for /annotation-queues/{queue_id}/runs/by-key")
+        for key in runs:
+            run = self.runs.get(uuid.UUID(str(key["run_id"])))
+            if run is None or (str(key["session_id"]), key["start_time"]) != (
+                str(self.projects[run.project_name].id),
+                run.start_time,
+            ):
+                raise LangSmithNotFoundError(f"no run with key {key}")
+        self.queue_adds.append(list(runs))
+        self.queues[queue_id].run_ids.extend(uuid.UUID(str(key["run_id"])) for key in runs)
 
     async def aevaluate(
         self,
