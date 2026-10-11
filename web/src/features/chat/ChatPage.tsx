@@ -640,10 +640,10 @@ export function ChatPage({
   }
 
   // The button goes once the pane is at the bottom, so focus moves on: to the question box, or while it is disabled
-  // during an answer, to the messages.
+  // during an answer, to the newest turn (so the next Tab continues from there, not from the first turn).
   function jumpToLatest() {
     scroll.toLatest();
-    if (answering) scroll.element?.focus();
+    if (answering) scroll.element?.querySelector<HTMLElement>("[data-newest-turn]")?.focus({ preventScroll: true });
     else input.current?.focus();
   }
 
@@ -804,7 +804,7 @@ export function ChatPage({
 
         {/* The messages scroll; the composer row stays pinned under them (DESIGN.md → Chat). */}
         <div className={styles.conversation}>
-          <div ref={scroll.ref} className={styles.messages} role="region" aria-label="Messages" tabIndex={-1}>
+          <div ref={scroll.ref} className={styles.messages} role="region" aria-label="Messages">
             <div className={styles.column}>
               {pendingStart && (
                 <p className={styles.notice}>
@@ -834,7 +834,7 @@ export function ChatPage({
                 const hasSources = t.decline === null && showCitations && t.citations.length > 0;
                 return (
                   // Turns are only ever added at the end or all replaced, so the index is a stable key.
-                  <div key={index} className={styles.turn}>
+                  <div key={index} className={styles.turn} {...(last ? { "data-newest-turn": "", tabIndex: -1 } : {})}>
                     <p className={styles.question}>
                       <span className="visually-hidden">You asked: </span>
                       {t.question}

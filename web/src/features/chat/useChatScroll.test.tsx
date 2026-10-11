@@ -71,6 +71,16 @@ describe("useChatScroll", () => {
     expect(pane().scrollTop).toBe(500);
   });
 
+  it("stops following on a small upward scroll inside the near-bottom zone", () => {
+    const g = geometry();
+    const { rerender } = render(<Harness items={["a"]} />);
+    scrollTo(1380); // 20px up from the bottom (1400)
+    expect(jump()).toBeInTheDocument();
+    g.content = 2400;
+    rerender(<Harness items={["a", "b"]} />);
+    expect(pane().scrollTop).toBe(1380);
+  });
+
   it("scrolling down short of the bottom keeps the pane still", () => {
     const g = geometry();
     const { rerender } = render(<Harness items={["a"]} />);

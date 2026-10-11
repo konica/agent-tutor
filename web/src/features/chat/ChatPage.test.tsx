@@ -1651,20 +1651,29 @@ describe("ChatPage", () => {
         expect(await question()).toHaveFocus();
       });
 
-      it("while answering, Jump to latest moves focus to the messages", async () => {
+      it("while answering, Jump to latest moves focus to the newest turn, so Tab continues from there", async () => {
         const g = geometry(600);
         const control = controlledStream();
-        renderChat({ ask: vi.fn(() => control.stream()) });
+        renderChat({ loadConversation: conversation([cited({ document_title: "ReAct", page: 2 })], { search_scope: "listed" }), loadUsed: async () => [usedDoc], askIn: vi.fn(() => control.stream()) }, "/chat/t1");
+        const oldChip = await screen.findByRole("button", { name: /^ReAct, p\. 2/ });
+        const firstTurn = messages().querySelector("div.turn") as HTMLElement; // the first turn's wrapper
+        expect(firstTurn.contains(oldChip)).toBe(true);
         await userEvent.type(await question(), "What is attention?{Enter}");
         control.push({ type: "thread", thread_id: "t1", run_id: "r1" });
         g.content = 2000;
         control.push({ type: "delta", text: "It weighs" });
-        await screen.findByText("It weighs");
+        const answer = await screen.findByText("It weighs");
         scrollPane(100);
         await userEvent.click(jump()!);
-        expect(messages()).toHaveFocus();
+        const newest = answer.closest("[data-newest-turn]") as HTMLElement;
+        expect(newest).toHaveFocus();
+        expect(newest).not.toHaveAttribute("aria-live");
         control.push({ type: "done" });
         control.push(null);
+        await screen.findByRole("button", { name: /ask/i });
+        await userEvent.tab();
+        expect(firstTurn.contains(document.activeElement)).toBe(false);
+        expect(newest.contains(document.activeElement) || document.activeElement === (await question())).toBe(true);
       });
 
       it("only the newest turn's answer is a live region", async () => {
@@ -1677,6 +1686,7 @@ describe("ChatPage", () => {
       });
 
       it("opening and closing a document leaves the messages where they were", async () => {
+        // jsdom doesn't lay out, so this guards only against code that scrolls the pane; the real check is in a browser.
         geometry();
         renderChat(
           { loadConversation: conversation([cited({ document_title: "ReAct", page: 2 }), ...many(4)]), viewerDeps: fakeViewerDeps() },
@@ -1687,6 +1697,30 @@ describe("ChatPage", () => {
         await userEvent.click(chip);
         await userEvent.click(await screen.findByRole("button", { name: "Close" }));
         expect(messages().scrollTop).toBe(300);
+      });
+
+      it("switching conversations while scrolled away lands the next one on its newest turn", async () => {
+        const g = geometry();
+        const loadConversation = vi.fn(async (id: string) => ({
+          thread: { thread_id: id, title: id, search_scope: "library" as const },
+          turns: id === "t1" ? many(5) : Array.from({ length: 4 }, (_, i) => turn({ question: `Other ${i + 1}?`, answer: `Other answer ${i + 1}.` })),
+        }));
+        render(
+          <MemoryRouter initialEntries={["/chat/t1"]}>
+            <Routes>
+              <Route path="/chat/:threadId?" element={<ChatPage loadDocs={async () => [doc("ready")]} loadUsed={async () => []} loadConversation={loadConversation} />} />
+            </Routes>
+            <Link to="/chat/t2">Other</Link>
+          </MemoryRouter>,
+        );
+        await screen.findByText("Answer 5.");
+        scrollPane(200);
+        expect(jump()).toBeInTheDocument();
+        g.content = 3000;
+        await userEvent.click(screen.getByRole("link", { name: "Other" }));
+        expect(await screen.findByText("Other answer 4.")).toBeInTheDocument();
+        expect(jump()).toBeNull();
+        expect(messages().scrollTop).toBe(3000 - 600);
       });
     });
   });

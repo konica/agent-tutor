@@ -25,7 +25,7 @@
 .conversation { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 /* Compact page padding, the same as AppShell's .page (DESIGN.md → Density). */
 .messages { flex: 1; min-height: 0; overflow-y: auto; padding: var(--sp-3) var(--sp-4) var(--sp-6); }
-/* Focused only by Jump to latest during an answer; the ring sits inside the pane so it isn't clipped. */
+/* Chrome makes a scroller without focusable children keyboard-focusable; the ring sits inside the pane so it isn't clipped. */
 .messages:focus-visible { outline-offset: -2px; }
 .column { max-width: var(--chat-w); margin: 0 auto; }
 /* Loading, failed, and no-documents states: one padded pane, no panel or composer. */
@@ -54,6 +54,8 @@
 
 /* Stacked turns: each question and its answer, set apart from the turn before. */
 .turn + .turn { margin-top: var(--sp-6); }
+/* Focused by Jump to latest during an answer, so the next Tab continues from the newest turn. */
+.turn:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; border-radius: var(--r-md); }
 
 .answerRegion { display: grid; gap: var(--sp-3); }
 /* The tutor's words: plain prose on the page, never smaller than --fs-16 (DESIGN.md → Density). */

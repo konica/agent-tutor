@@ -58,7 +58,11 @@ export function useChatScroll(content: readonly unknown[]) {
         gestureBottom.current = element.scrollHeight - element.clientHeight;
       }
       lastScrollAt.current = now;
-      if (gap(element) <= NEAR_BOTTOM_PX || (top > lastTop.current && gestureBottom.current - top <= NEAR_BOTTOM_PX)) {
+      // Any upward scroll stops the follow, even inside the near-bottom zone. A clamp from shrinking content leaves no gap.
+      if (top < lastTop.current && gap(element) > 0) {
+        following.current = false;
+        catchingUp.current = false;
+      } else if (gap(element) <= NEAR_BOTTOM_PX || (top > lastTop.current && gestureBottom.current - top <= NEAR_BOTTOM_PX)) {
         following.current = true;
         catchingUp.current = false;
       } else if (top < lastTop.current) {
