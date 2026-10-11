@@ -145,6 +145,28 @@ describe("ConversationsPage", () => {
       expect(await screen.findByText("Couldn't archive First. Try again.")).toBeInTheDocument();
     });
 
+    it("a failed archive leaves focus on the row's menu button", async () => {
+      const archive = vi.fn().mockRejectedValue(new Error("x"));
+      render(page({ list: [thread("a", "First")] }, { archive }));
+      await chooseAction("First", "Archive");
+      await screen.findByText("Couldn't archive First. Try again.");
+      expect(screen.getByRole("status")).not.toHaveFocus();
+    });
+
+    it("a failed restore says so", async () => {
+      const restore = vi.fn().mockRejectedValue(new Error("x"));
+      render(page({ list: [] }, { restore, loadArchived: vi.fn().mockResolvedValue([thread("c", "Old")]) }));
+      await userEvent.click(await screen.findByRole("tab", { name: /^Archived\s*1$/ }));
+      await chooseAction("Old", "Restore");
+      expect(await screen.findByText("Couldn't restore Old. Try again.")).toBeInTheDocument();
+    });
+
+    it("an empty Active list still invites a conversation when the archived load fails", async () => {
+      render(page({ list: [] }, { loadArchived: vi.fn().mockRejectedValue(new Error("x")) }));
+      expect(await screen.findByRole("heading", { name: "No conversations yet" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Start a conversation" })).toBeInTheDocument();
+    });
+
     it("an expired session says nothing", async () => {
       const archive = vi.fn().mockRejectedValue(new SessionExpiredError());
       const loadArchived = vi.fn().mockResolvedValue([]);

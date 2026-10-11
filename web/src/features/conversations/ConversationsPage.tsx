@@ -30,6 +30,7 @@ export function ConversationsPage({ loadArchived = defaultLoadArchived, archive 
   const navigate = useNavigate();
   const [view, setView] = useState<View>("active");
   const [archived, setArchived] = useState<ThreadSummaryResponse[] | null>(null);
+  const [archivedFailed, setArchivedFailed] = useState(false);
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
   const [status, setStatus] = useState("");
   const statusRegion = useRef<HTMLParagraphElement>(null);
@@ -44,9 +45,11 @@ export function ConversationsPage({ loadArchived = defaultLoadArchived, archive 
     const call = ++latest.current;
     try {
       const items = await loadRef.current();
-      if (call === latest.current) setArchived(items);
+      if (call !== latest.current) return;
+      setArchived(items);
+      setArchivedFailed(false);
     } catch {
-      // a 401 is handled by the API client
+      if (call === latest.current) setArchivedFailed(true); // a 401 is handled by the API client; a failure keeps the last list
     }
   }, []);
   useEffect(() => {
@@ -58,9 +61,11 @@ export function ConversationsPage({ loadArchived = defaultLoadArchived, archive 
 
   async function change(t: ThreadSummaryResponse, archiving: boolean) {
     const title = conversationTitle(t);
+    let moved = false; // the row left this list, and its menu with it
     setBusy((s) => new Set(s).add(t.thread_id));
     try {
       await (archiving ? archive : restore)(t.thread_id);
+      moved = true;
       setStatus(archiving ? `${title} archived. Find it under Archived.` : `${title} restored.`);
     } catch (error) {
       // A 401 is left to the session screen.
@@ -73,15 +78,17 @@ export function ConversationsPage({ loadArchived = defaultLoadArchived, archive 
       next.delete(t.thread_id);
       return next;
     });
-    statusRegion.current?.focus(); // the row left this list, and its menu with it
+    // On failure the row keeps focus, unless the disabled menu button dropped it.
+    if (moved || document.activeElement === document.body) statusRegion.current?.focus();
   }
 
   const start = () => navigate("/chat");
   const description = NAV.find((item) => item.path === "/conversations")?.description;
   const archivedView = view === "archived";
   const shown = archivedView ? archived : list;
-  const bothEmpty = list?.length === 0 && archived?.length === 0;
-  const waiting = list?.length === 0 && archived === null; // an empty Active tab says nothing until Archived is known
+  // Without the archived list (its load failed), an empty Active list still gets the plain "No conversations yet".
+  const bothEmpty = list?.length === 0 && (archived?.length === 0 || (archived === null && archivedFailed));
+  const waiting = list?.length === 0 && archived === null && !archivedFailed; // an empty Active tab says nothing until Archived is known
   return (
     <>
       <PageHeader
