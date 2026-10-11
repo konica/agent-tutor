@@ -1,6 +1,6 @@
 # On-premise deploy (#148, #149, #150, #153, #154)
 
-Deploys on-premise mode (ADR 0012, PRD §9.12): one EC2 VM runs Smart Tutor with Docker Compose, and Caddy serves it over HTTPS at `https://smart-tutor.duckdns.org` (a DuckDNS name pointed at the Elastic IP, section 9) with a Let's Encrypt certificate. Every merge to `main` deploys on-premise automatically (section 3). This runbook also covers the one-time setup, the first deploy, and a deploy by hand. It brings up Postgres, Keycloak, the API, the web app, Caddy, the agent, the MCP server, and the worker, so a learner can sign in, upload a PDF, and ask about it (#149). Backups and restore: `on-premise-backups.md` (#151). Alarms and weekly patching: `on-premise-monitoring.md` (#152); after the first deploy, every alert recipient confirms the subscription email.
+Deploys on-premise mode (ADR 0012, PRD §9.12): one EC2 VM runs Smart Tutor with Docker Compose, and Caddy serves it over HTTPS at `https://smart-tutor.duckdns.org` (a DuckDNS name pointed at the Elastic IP, section 9) with a Let's Encrypt certificate. Every merge to `main` deploys on-premise automatically, unless `ON_PREMISE_AUTO_DEPLOY` is `false` (section 3). This runbook also covers the one-time setup, the first deploy, and a deploy by hand. It brings up Postgres, Keycloak, the API, the web app, Caddy, the agent, the MCP server, and the worker, so a learner can sign in, upload a PDF, and ask about it (#149). Backups and restore: `on-premise-backups.md` (#151). Alarms and weekly patching: `on-premise-monitoring.md` (#152); after the first deploy, every alert recipient confirms the subscription email.
 
 Commands are for **PowerShell 7** (`pwsh`). Run them from the repository root with your admin profile. No command here prints a secret. Don't paste the values you read in step 5 anywhere.
 
@@ -62,7 +62,7 @@ aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$Instanc
 
 ## 3. Deploy on merge (#150)
 
-**What runs.** On every push to `main`, `deploy.yml` runs the CI checks, then `build-images.yml` (it builds the six images and pushes them, unless all six are already there), then `deploy-on-premise.yml` in the GitHub environment `on-premise`. That workflow checks the images exist, runs `cdk deploy --all -c smart-tutor:mode=on-premise` (uploading `deploy/` as the bundle), reads the Host outputs, and waits until the VM is `Online` in SSM (a deploy that replaces the instance gives it a new id). It then runs the SSM document with the commit SHA and prints its output, and runs `deploy/pilot/smoke_test.py` against `PublicUrl`. The run fails if any step fails, including the smoke test. One on-premise deploy runs at a time (concurrency group `deploy-on-premise`): a later merge waits. GitHub keeps only the newest waiting run per group, so a waiting run can be replaced by a newer one. Native-cloud doesn't deploy unless chosen (see "Native-cloud is optional" in `pilot-deploy.md`).
+**What runs.** On every push to `main`, `deploy.yml` runs the CI checks, then `build-images.yml` (it builds the six images and pushes them, unless all six are already there), then `deploy-on-premise.yml` in the GitHub environment `on-premise`. That workflow checks the images exist, runs `cdk deploy --all -c smart-tutor:mode=on-premise` (uploading `deploy/` as the bundle), reads the Host outputs, and waits until the VM is `Online` in SSM (a deploy that replaces the instance gives it a new id). It then runs the SSM document with the commit SHA and prints its output, and runs `deploy/pilot/smoke_test.py` against `PublicUrl`. The run fails if any step fails, including the smoke test. One on-premise deploy runs at a time (concurrency group `deploy-on-premise`): a later merge waits. GitHub keeps only the newest waiting run per group, so a waiting run can be replaced by a newer one. Native-cloud doesn't deploy unless chosen (see "Native-cloud is optional" in `pilot-deploy.md`). **Stop deploys on merge** by setting the repository variable `ON_PREMISE_AUTO_DEPLOY` to `false` (in any case), for example while on-premise is torn down (section 8): `gh variable set ON_PREMISE_AUTO_DEPLOY --body false --repo konica/agent-tutor`. Unset or any other value deploys on every merge; `gh variable delete ON_PREMISE_AUTO_DEPLOY --repo konica/agent-tutor` turns it back on. A run by hand (`gh workflow run deploy.yml -f mode=on-premise`) deploys either way.
 
 **One-time setup** (an admin, once). Do these in order, and do step 1 before you merge #150.
 
@@ -265,13 +265,88 @@ The data volume keeps a snapshot if the stack is deleted (`DeletionPolicy: Snaps
 
 ## 8. Tear down
 
+Tear down the Host alone to stop paying for the VM and keep the rest, or the whole mode. Either way native-cloud keeps running: the modes share no stack (ADR 0016), and with `-c smart-tutor:mode=on-premise` the CDK app contains only `SmartTutor-OnPremise-prod-*` stacks.
+
+### Tear down the Host
+
 ```powershell
 Push-Location infra
 npx aws-cdk@latest destroy SmartTutor-OnPremise-prod-Host -c smart-tutor:mode=on-premise
 Pop-Location
 ```
 
-This deletes the VM, the Elastic IP, and the VPC. The data volume is deleted after a final snapshot. Note the `DataVolumeId` output before you destroy, and delete that volume's snapshot by hand when the data must go (EC2 → Snapshots, filter by volume id). The Storage stack keeps the documents bucket, as in native-cloud. No other stack references the Host (Storage's CORS names the configured domain or `*.sslip.io`, not the Elastic IP), so the Host can be destroyed on its own. The DuckDNS token's secret isn't part of any stack, so it stays. When the Host is deployed again, its first deploy points the name at the new Elastic IP.
+This deletes the VM, the Elastic IP, and the VPC. The data volume is deleted after a final snapshot. Note the `DataVolumeId` output before you destroy, and delete that volume's snapshot by hand when the data must go (EC2 → Snapshots, filter by volume id). The Storage stack keeps the documents bucket, as in native-cloud. No other stack references the Host (Storage's CORS names the configured domain or `*.sslip.io`, not the Elastic IP), so the Host can be destroyed on its own. The DuckDNS token's secret isn't part of any stack, so it stays. The name keeps pointing at the released Elastic IP, so point it away as in step 4 of the whole-mode steps. When the Host is deployed again, its first deploy points the name at the new Elastic IP.
+
+### Tear down the whole mode
+
+Deletes every on-premise stack, in this order:
+
+1. **Stop deploys on merge** (section 3). Otherwise the next merge's image build deploys the deploy role and the registry again, or fails once the role is gone. Wait until no deploy run is in progress:
+
+   ```powershell
+   gh variable set ON_PREMISE_AUTO_DEPLOY --body false --repo konica/agent-tutor
+   gh variable get ON_PREMISE_AUTO_DEPLOY --repo konica/agent-tutor   # must print false
+   gh run list --workflow deploy.yml --limit 5
+   ```
+
+   A typo in the value leaves deploys on, so check that the second command prints `false`.
+
+2. **Save what you need to keep.** Note the data volume id, because its snapshots outlive the stack. Read the DuckDNS token (step 4 needs it, and the secret is deleted later). If you may restore the data later, also save the Keycloak admin password from `smart-tutor-on-premise/keycloak/admin`: the teardown deletes it, and the restored Keycloak keeps the old one.
+
+   ```powershell
+   aws cloudformation describe-stacks --stack-name SmartTutor-OnPremise-prod-Host `
+       --query "Stacks[0].Outputs[?OutputKey=='DataVolumeId'].OutputValue" --output text
+   aws secretsmanager get-secret-value --secret-id smart-tutor-on-premise/duckdns/token --query SecretString --output text
+   aws secretsmanager get-secret-value --secret-id smart-tutor-on-premise/keycloak/admin --query SecretString --output text
+   ```
+
+3. **Destroy the stacks** (about 10 min; it asks you to confirm):
+
+   ```powershell
+   Push-Location infra
+   npx aws-cdk@latest destroy "SmartTutor-OnPremise-prod-*" -c smart-tutor:mode=on-premise
+   Pop-Location
+   ```
+
+4. **Point the name away.** `smart-tutor.duckdns.org` still points at the Elastic IP, which AWS can hand to another customer once it is released. That customer could get a certificate for the name. Set the address to `127.0.0.1` on duckdns.org (sign in as section 9 describes) or with the update URL, using the token from step 2:
+
+   ```powershell
+   Invoke-RestMethod "https://www.duckdns.org/update?domains=smart-tutor&token=<the token>&ip=127.0.0.1"   # prints OK
+   ```
+
+| | What | Notes |
+|---|---|---|
+| Deleted | `Host`: the VM, the Elastic IP, the VPC, the data volume (after a final snapshot), the snapshot policy, the alarms and alert topic, the uptime check, the patching window, the deploy document, and the database and test-learner secrets | |
+| Deleted | `Registry`: the repositories `smart-tutor-on-premise/*` and their images | The next build recreates them, empty. |
+| Deleted | `Config`: the SSM parameters under `/smart-tutor-on-premise/` and the Keycloak secrets | |
+| Deleted | `Storage`: the queues `smart-tutor-on-premise-ingest` and `smart-tutor-on-premise-ingest-dlq` | The bucket stays (below). |
+| Deleted | `Budgets`: the budget `smart-tutor-on-premise-prod-monthly` | |
+| Deleted | `GitHubDeploy`: the role `smart-tutor-on-premise-github-deploy` | The role only imports the GitHub OIDC provider, so the provider stays. |
+| Kept | The documents bucket `smart-tutor-on-premise-documents-<account>` | Learner PDFs, and the nightly dumps under `backups/`, which still expire after 30 days. The stack retains it. |
+| Kept | The final data-volume snapshot and the daily snapshots (up to 7) | The database, Keycloak's users, and Caddy's certificates. Data Lifecycle Manager leaves its snapshots behind when its policy is deleted. |
+| Kept | The DuckDNS name `smart-tutor.duckdns.org` | In the DuckDNS account, pointed at `127.0.0.1` by step 4. The next deploy points it at the new Elastic IP. |
+| Kept | The secret `smart-tutor-on-premise/duckdns/token` | Created by hand, not by a stack (section 9). |
+| Kept | The account's GitHub OIDC provider and the CDK bootstrap (`CDKToolkit`) | Native-cloud created the provider and still uses it; both modes deploy with the bootstrap. |
+| Kept | The GitHub environment `on-premise` and its variables | So on-premise can be redeployed. |
+
+What is left costs a few dollars a month: snapshots about $0.05 per GB-month (incremental, at most the 50 GB volume) and the bucket about $0.023 per GB-month. Each is the only copy of learner data, so delete it by hand only when the data must go:
+
+```powershell
+$VolumeId = "<the DataVolumeId from step 2>"
+aws ec2 describe-snapshots --owner-ids self --filters "Name=volume-id,Values=$VolumeId" --query "Snapshots[].SnapshotId" --output text
+aws ec2 delete-snapshot --snapshot-id <snapshot id>   # once per snapshot
+aws secretsmanager delete-secret --secret-id smart-tutor-on-premise/duckdns/token --force-delete-without-recovery
+```
+
+The bucket is versioned: in the S3 console, **Empty** it (all versions), then **Delete** it. `aws s3 rm --recursive` would leave the old versions behind.
+
+**Redeploy later.** Deploy the stacks from a laptop (section 2), because GitHub can't create the role it signs in with. Deal with the kept bucket first: its name is fixed, so creating `Storage` fails with "already exists" until you bring the bucket into the stack with `cdk import` or delete it. To keep the data, set `smart-tutor:on-premise-data-snapshot-id` to the final snapshot before deploying (`on-premise-backups.md`, "Restore from a snapshot"); the first deploy resets the passwords of the `smart_tutor` and `keycloak` roles only. A redeploy without a restore starts with an empty database and just works. Keeping the data is manual and outside this runbook, because the teardown deleted every secret and the restored volume still holds the old ones. After the first deploy on the restored volume:
+
+- Set the secrets of the Keycloak clients `smart-tutor-api` and `rag-mcp` (realm `smart-tutor`) to the new `smart-tutor-on-premise/keycloak/api-client` and `smart-tutor-on-premise/keycloak/mcp-client` values. The realm already exists, so Keycloak doesn't import it again. Until then, sign-in and the smoke test fail.
+- Sign in to the Keycloak console with the old admin password saved in step 2. The bootstrap admin keeps it. It is lost if you didn't save it.
+- Run `ALTER ROLE postgres PASSWORD '<the new smart-tutor-on-premise/db/postgres value>'` in the database. Until then, the nightly dump fails.
+
+Then turn deploys on merge back on (`gh variable delete ON_PREMISE_AUTO_DEPLOY --repo konica/agent-tutor`), and merge or deploy a tag by hand (section 4).
 
 ## 9. DuckDNS name (#154)
 
