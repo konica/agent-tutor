@@ -24,6 +24,7 @@ class FakeExample:
     split: str
     created_at: datetime
     modified_at: datetime
+    metadata: dict[str, Any] | None = None
 
 
 @dataclass
@@ -113,9 +114,17 @@ class FakeLangSmith:
         self.created += 1
         dataset, now = self.datasets[dataset_name], self._now()
         new = tuple(
-            FakeExample(uuid.uuid4(), dict(e["inputs"]), e.get("outputs"), e["split"], now, now) for e in examples
+            FakeExample(uuid.uuid4(), dict(e["inputs"]), e.get("outputs"), e["split"], now, now, e.get("metadata"))
+            for e in examples
         )
         dataset.versions.append((now, dataset.at(None) + new))
+
+    def list_dataset_versions(self, *, dataset_name: str) -> Iterator[DatasetVersion]:
+        dataset = self.datasets[dataset_name]
+        return iter(
+            DatasetVersion(tags=[t for t, when in dataset.tags.items() if when == at] or None, as_of=at)
+            for at, _ in reversed(dataset.versions)
+        )
 
     def update_dataset_tag(self, *, dataset_name: str, as_of: datetime, tag: str) -> None:
         dataset = self.datasets[dataset_name]

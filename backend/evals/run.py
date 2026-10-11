@@ -2,7 +2,8 @@
 
 Usage: uv run --env-file ../.env --extra eval python -m evals.run --split smoke|full [--release release_1]
 
-Every suite in evaluators/ whose dataset has the split runs; suites on one dataset share one experiment. The gate
+Every suite in evaluators/ whose dataset has a published version of the split runs, on its newest version unless the
+dataset file pins one; suites on one dataset share one experiment. The gate
 prints each of the release's metrics as pass, fail, or not run, with the experiments' links, and the run exits 1 when
 a metric fails or when nothing ran. Needs the local stack with the eval learners loaded (make evals-learners), your
 AWS profile (agent and judge models), and LANGSMITH_API_KEY.
@@ -18,7 +19,7 @@ from typing import Any
 import langsmith
 from langsmith.utils import LangSmithError
 
-from evals.dataset import Dataset, DatasetError, load_dataset, versioned_examples
+from evals.dataset import Dataset, DatasetError, examples_at, load_dataset, version_to_run
 from evals.gate import check, load_thresholds, passed, ran, render
 from evals.learners import LoadError
 from evals.suite import DatasetSuites, Suite, by_dataset, discover
@@ -50,15 +51,16 @@ async def run_split(
     links: dict[str, str] = {}
     for group in groups:
         dataset = load(group.dataset)
-        if split not in dataset.splits:
-            continue  # its metrics stay "not run"
-        version = dataset.splits[split]
+        version = version_to_run(client, dataset, split)
+        if version is None:  # its metrics stay "not run"
+            print(f"{dataset.name} has no {split} version yet: publish one (make evals-publish)", file=sys.stderr)
+            continue
         results = await client.aevaluate(
             _coroutine_function(group.target()),
-            data=versioned_examples(client, dataset, version),
+            data=examples_at(client, dataset, split, version),
             evaluators=list(group.evaluators),
             experiment_prefix=f"{dataset.name}-{split}",
-            metadata={**(metadata or {}), "split": split, "dataset_version": version.version},
+            metadata={**(metadata or {}), "split": split, "dataset_version": version},
             max_concurrency=MAX_CONCURRENCY,
         )
         rows = [{r.key: r.score for r in row["evaluation_results"]["results"]} async for row in results]
@@ -66,7 +68,7 @@ async def run_split(
         # gate would average only the survivors.
         for key in {key for row in rows for key in row}:
             scores[key].extend(row.get(key) for row in rows)
-        links[f"{dataset.name} ({split} {version.version})"] = (
+        links[f"{dataset.name} ({split} {version})"] = (
             await results.get_comparison_url() or results.url or results.experiment_name
         )
     return dict(scores), links
