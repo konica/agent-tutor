@@ -88,7 +88,7 @@ type Problem = { message: string };
 // Loading the conversation a URL names; "none" once it is shown, or at /chat.
 type Opened = { status: "none" | "loading" | "not-found" | "failed" };
 
-// `chunkId`, `turn`, and `passage` are set only when a Sources chip opened the document; a panel row's open leaves
+// `chunkId`, `turn`, and `passage` are set only when a Sources chip or an answer's marker opened the document; a panel row's open leaves
 // them out. `turn` tells apart the same passage cited in two turns.
 type Viewer = { documentId: string; chunkId?: string; turn?: number; passage?: Passage };
 
@@ -286,7 +286,7 @@ export function ChatPage({
     const id = from?.dataset.documentId;
     const rows = Array.from(document.querySelectorAll<HTMLElement>(`#${PANEL_ID} [data-document-id]`));
     const live = from?.isConnected ? from : rows.find((row) => row.dataset.documentId === id);
-    // Sources chips stay mounted while the pane is open, so they take focus back directly. The toggle is the fallback
+    // Sources chips and answer markers stay mounted while the pane is open, so they take focus back directly. The toggle is the fallback
     // for a row that is no longer shown.
     (live ?? toggleRef.current)?.focus();
   }, [viewer]);
@@ -297,8 +297,8 @@ export function ChatPage({
     setViewer({ documentId });
   }
 
-  // A Sources chip opens its document at the cited passage. `passage` is a new object on every click, so clicking the
-  // same chip again jumps back to it; a citation without a page opens the document at page 1.
+  // A Sources chip or an answer's marker opens its document at the cited passage. `passage` is a new object on every click, so clicking the
+  // it again jumps back to it; a citation without a page opens the document at page 1.
   function openCitation(c: ChatCitation, turnIndex: number, from: HTMLElement) {
     opener.current = from;
     setViewer({

@@ -27,8 +27,9 @@ export function Answer({ text, citations, showCitations, deletedIds, shownChunkI
   const byNumber = new Map(citations.map((c) => [c.n, c]));
 
   // A marker number with a source in this answer opens it, as its Sources chip does; any other piece stays text.
+  // The pieces render even while markers stay text, so toggling citations keeps the live answer's text nodes.
   function piece(p: Piece, index: number) {
-    const c = p.n === undefined ? undefined : byNumber.get(p.n);
+    const c = !linked || p.n === undefined ? undefined : byNumber.get(p.n);
     if (!c) return p.text;
     if (c.deleted || deletedIds.has(c.document_id)) {
       return (
@@ -57,7 +58,7 @@ export function Answer({ text, citations, showCitations, deletedIds, shownChunkI
   return (
     <>
       {/* Text nodes only: the model's words are never read as HTML. */}
-      {text && <p className={styles.answer}>{linked ? splitMarkers(text).map(piece) : text}</p>}
+      {text && <p className={styles.answer}>{splitMarkers(text).map(piece)}</p>}
       {showCitations && citations.length > 0 && (
         <div className={styles.sources}>
           <span className={styles.sourcesLabel} id={listId}>

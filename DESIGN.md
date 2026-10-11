@@ -111,7 +111,7 @@ The chat header is one 40px row with only the panel toggle (a sidebar icon; tool
 
 ## Accessibility
 
-WCAG 2.2 AA: pointer targets of at least 24px, AA contrast in both themes, everything reachable and operable by keyboard, visible `:focus-visible` outlines, labelled controls. Announce processing-state changes and upload results through one polite live region; announce a streamed answer once when it completes, never word by word. The drop zone always has a keyboard "Upload" button beside it.
+WCAG 2.2 AA: pointer targets of at least 24px (links inside a sentence, such as an answer's citation markers, excepted), AA contrast in both themes, everything reachable and operable by keyboard, visible `:focus-visible` outlines, labelled controls. Announce processing-state changes and upload results through one polite live region; announce a streamed answer once when it completes, never word by word. The drop zone always has a keyboard "Upload" button beside it.
 
 ## Copy
 
