@@ -9,18 +9,23 @@ learner's own duplicate check skips the rest), chooses each document's labeled s
 ready. Exits 1 when a document fails or the time runs out. Running it again uploads nothing.
 """
 
+import argparse
 import base64
 import hashlib
 import html
 import re
 import secrets
-from collections.abc import Collection
+import sys
+import time
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import httpx
 import yaml
+
+from evals.corpus import DOWNLOADS, CorpusError, SeedDocument, download, load_manifest
 
 LEARNERS = Path(__file__).parent / "seed_corpus" / "learners.yaml"
 API = "http://localhost:10450"
@@ -151,3 +156,151 @@ class Tutor:
         if stored.status_code not in (200, 201, 204):
             raise LoadError(f"{file_name}: the storage POST gave {stored.status_code}: {stored.text[:200]}")
         return str(started["upload_id"])
+
+
+@dataclass
+class _Pending:
+    """A seed document on its way into the learner's library."""
+
+    seed: SeedDocument
+    upload_id: str | None = None
+    document_id: str | None = None
+    found: bool = False  # already in the library before this run
+    retried: bool = False
+    state: str = "uploading"
+
+
+def _advance(tutor: Tutor, p: _Pending) -> bool:
+    """One look at a pending document: True once it is ready; LoadError when it can't become ready."""
+    if p.document_id is None:
+        status = tutor.call("GET", f"/uploads/{p.upload_id}")
+        if status["document_id"] is None:
+            return False  # the worker hasn't hashed the file yet
+        p.document_id = status["document_id"]  # a server-side duplicate points at the learner's own copy
+    path = f"/documents/{p.document_id}"
+    doc = tutor.call("GET", path)
+    p.state = doc["state"]
+    if p.state == "processing":
+        return False
+    if p.state == "failed":
+        if p.found and doc["can_retry"] and not p.retried:  # left failed by an earlier run: one more attempt
+            tutor.call("POST", f"{path}/retry", ok=204)
+            p.retried = True
+            return False
+        raise LoadError(f"failed: {doc['failure_reason']}")
+    if doc["archived"]:
+        tutor.call("POST", f"{path}/restore")
+    if p.state == "awaiting_subjects":
+        chosen = tutor.call("PUT", f"{path}/subjects", {"subject_ids": [], "new_names": list(p.seed.subjects)})
+        if chosen["state"] != "ready":
+            raise LoadError(f"is {chosen['state']} after choosing its subjects")
+    return True
+
+
+def load_library(
+    tutor: Tutor,
+    seeds: Sequence[SeedDocument],
+    paths: Mapping[str, Path],
+    *,
+    timeout: float,
+    interval: float,
+    log: Callable[[str], None] = print,
+) -> list[str]:
+    """Bring the learner's library to hold every seed document, ready with its labeled subjects. A document already
+    there is not uploaded again; a ready one keeps the subjects it has. The problems; empty when all are ready."""
+    deadline = time.monotonic() + timeout
+    pending: list[_Pending] = []
+    problems: list[str] = []
+    for seed in seeds:
+        try:
+            found = tutor.call("POST", "/documents/duplicate-check", {"sha256": seed.sha256})["document_id"]
+            if found:
+                pending.append(_Pending(seed, document_id=found, found=True))
+                log(f"{tutor.username} {seed.id}: already in the library")
+            else:
+                pending.append(_Pending(seed, upload_id=tutor.upload(seed.file_name, paths[seed.id].read_bytes())))
+                log(f"{tutor.username} {seed.id}: uploaded")
+        except LoadError as e:
+            problems.append(f"{seed.id}: {e}")
+    while pending:
+        for p in list(pending):
+            try:
+                done = _advance(tutor, p)
+            except LoadError as e:
+                problems.append(f"{p.seed.id}: {e}")
+                pending.remove(p)
+                continue
+            if done:
+                log(f"{tutor.username} {p.seed.id}: ready")
+                pending.remove(p)
+        if pending and time.monotonic() >= deadline:
+            problems += [f"{p.seed.id}: timed out after {timeout:g}s while {p.state}" for p in pending]
+            break
+        if pending:
+            time.sleep(interval)
+    return problems
+
+
+def load_all(
+    learners: Sequence[Learner],
+    seeds: Mapping[str, SeedDocument],
+    paths: Mapping[str, Path],
+    *,
+    connect: Callable[[], httpx.Client],
+    api: str,
+    issuer: str,
+    app: str,
+    timeout: float,
+    interval: float,
+    log: Callable[[str], None] = print,
+) -> list[str]:
+    """Load every learner's library, each in their own client (Keycloak's session cookie must not carry over)."""
+    problems: list[str] = []
+    for learner in learners:
+        with connect() as http:
+            tutor = Tutor(http, learner.username, learner.password, api=api, issuer=issuer, app=app)
+            try:
+                found = load_library(
+                    tutor, [seeds[d] for d in learner.documents], paths, timeout=timeout, interval=interval, log=log
+                )
+            except (LoadError, httpx.HTTPError) as e:
+                found = [f"can't load the library: {e}"]
+        problems += [f"{learner.username} {p}" for p in found]
+    return problems
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--api", default=API)
+    parser.add_argument("--issuer", default=ISSUER)
+    parser.add_argument("--app", default=APP, help="smart-tutor-web's redirect URI")
+    parser.add_argument("--downloads", type=Path, default=DOWNLOADS)
+    parser.add_argument("--timeout", type=float, default=900, help="seconds per learner until every document is ready")
+    parser.add_argument("--interval", type=float, default=3, help="seconds between status checks")
+    args = parser.parse_args(argv)
+    seeds = load_manifest()
+    learners = load_learners(LEARNERS, seeds)
+    wanted = sorted({seeds[d] for learner in learners for d in learner.documents}, key=lambda s: s.id)
+    try:
+        paths = download(wanted, args.downloads)
+    except (CorpusError, httpx.HTTPError) as e:
+        print(f"Can't download the seed corpus: {e}", file=sys.stderr)
+        return 1
+    problems = load_all(
+        learners,
+        seeds,
+        paths,
+        connect=lambda: httpx.Client(timeout=60),
+        api=args.api.rstrip("/"),
+        issuer=args.issuer.rstrip("/"),
+        app=args.app,
+        timeout=args.timeout,
+        interval=args.interval,
+    )
+    for problem in problems:
+        print(problem, file=sys.stderr)
+    return 1 if problems else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
