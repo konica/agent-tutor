@@ -135,12 +135,14 @@ class HostStack(cdk.Stack):
         security_group.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(80), "ACME HTTP-01 challenge, HTTPS redirect")
         security_group.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(443), "HTTPS")
 
+        # CloudFormation updates SnapshotId in place, which EC2 refuses, so a volume restored from a snapshot is a new
+        # resource: CloudFormation creates it, and deletes the old volume after its final snapshot (#155).
         volume = ec2.Volume(
             self,
-            "DataVolume",
+            f"DataVolumeFrom{data_snapshot_id}" if data_snapshot_id else "DataVolume",
             availability_zone=subnet.availability_zone,
             size=cdk.Size.gibibytes(DATA_VOLUME_GIB),
-            snapshot_id=data_snapshot_id,  # a changed id replaces the volume; the old one is kept as a snapshot
+            snapshot_id=data_snapshot_id,
             volume_type=ec2.EbsDeviceVolumeType.GP3,
             encrypted=True,
             removal_policy=cdk.RemovalPolicy.SNAPSHOT,
@@ -449,8 +451,8 @@ def _user_data(volume_id: str, region: str, data_snapshot_id: str | None) -> ec2
     """First boot: attach and mount the data volume, then install Docker and Compose. Holds no secret."""
     user_data = ec2.UserData.for_linux()
     user_data.add_commands(
-        # The volume id is a reference whose text doesn't change when the volume is replaced, so name the snapshot: a
-        # restored volume changes the user data, which replaces the instance (user_data_causes_replacement).
+        # A restored volume is a new resource, so its reference, and with it the user data, changes; that replaces the
+        # instance (user_data_causes_replacement). The snapshot is named for whoever reads the user data.
         f"# Data volume from snapshot: {data_snapshot_id or 'none'}",
         "set -euo pipefail",
         f"volume_id={volume_id}",

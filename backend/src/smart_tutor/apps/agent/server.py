@@ -135,7 +135,10 @@ def create_app(
         if graph is None:
             model = ModelFactory(settings).chat(ChatRole.AGENT)
             app.state.graph = build_graph(
-                lambda token: McpRetriever(settings.mcp_url, token), model, settings.answer_floor
+                lambda token: McpRetriever(settings.mcp_url, token),
+                model,
+                settings.answer_floor,
+                settings.answer_max_tokens,
             )
         async with httpx.AsyncClient(timeout=5) as http:
             app.state.verifier = keycloak_verifier(settings, http)

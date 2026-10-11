@@ -9,6 +9,6 @@
     "smart-tutor:budget-alert-emails": ["dtrungthao@gmail.com"],
     "smart-tutor:on-premise-instance-type": "t3.large",
     "smart-tutor:on-premise-domain": "smart-tutor.duckdns.org",
-    "smart-tutor:on-premise-data-snapshot-id": ""
+    "smart-tutor:on-premise-data-snapshot-id": "snap-0a78e35899360960f"
   }
 }
