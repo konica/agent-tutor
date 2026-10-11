@@ -1590,6 +1590,22 @@ describe("ChatPage", () => {
       expect(notHelpful()).toHaveAttribute("aria-pressed", "false");
     });
 
+    it("groups each answer's buttons and keeps them and the note out of the answer's live region", async () => {
+      const rate = vi.fn(async (_threadId: string, _runId: string, rating: "up" | "down") => rating);
+      renderChat({ ask: vi.fn(answered), rate });
+      await askQuestion();
+      await userEvent.click(await screen.findByRole("button", { name: "Helpful" }));
+
+      const group = screen.getByRole("group", { name: "Rate this answer" });
+      expect(group).toContainElement(helpful());
+      expect(group).toContainElement(notHelpful());
+      // The nearest live region decides: the page announces the note once, through its own status.
+      // The same text is also in the page's status (the one announcement); the note is the other match.
+      const [note] = (await screen.findAllByText("Thanks — glad it helped.")).filter((el) => el.getAttribute("role") !== "status");
+      expect(group.closest("[aria-live]")).toHaveAttribute("aria-live", "off");
+      expect(note.closest("[aria-live]")).toHaveAttribute("aria-live", "off");
+    });
+
     it("shows the buttons under an answer without citations", async () => {
       const rate = vi.fn(async (_threadId: string, _runId: string, rating: "up" | "down") => rating);
       renderChat({ ask: vi.fn(() => events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "delta", text: "Yes." }, { type: "done" })), rate });

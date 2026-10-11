@@ -14,7 +14,7 @@ const FAILED = "Your rating couldn't be saved. Try again.";
 // Helpful / Not helpful for one answer (DESIGN.md → Chat). Renders the buttons and, as a sibling that takes a line of its
 // own in the flex row it sits in, a visible note. The clicked button shows pressed at once and goes back to the saved
 // rating if saving fails. A pressed button doesn't un-press: clicking it saves nothing. `onAnnounce` gets the outcome
-// for the page's one polite live region; the note itself is not one.
+// for the page's one polite live region; the note itself is not one (aria-live="off" keeps it out of the answer's polite region it sits inside).
 export function AnswerRating({
   rating,
   onRate,
@@ -58,11 +58,11 @@ export function AnswerRating({
 
   return (
     <>
-      <span className={styles.rating}>
+      <span className={styles.rating} role="group" aria-label="Rate this answer" aria-live="off">
         <IconButton label="Helpful" icon={ThumbsUp} aria-pressed={shown === "up"} onClick={() => void rate("up")} />
         <IconButton label="Not helpful" icon={ThumbsDown} aria-pressed={shown === "down"} onClick={() => void rate("down")} />
       </span>
-      {note && <span className={styles.note}>{note}</span>}
+      {note && <span className={styles.note} aria-live="off">{note}</span>}
     </>
   );
 }
