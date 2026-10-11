@@ -20,7 +20,7 @@ from fakes.pdfs import make_pdf
 from fakes.processing import FakePdfExtractor, PageChunker, fake_tools
 from fakes.queue import FakeQueue
 from fakes.subjects import InMemorySubjects
-from fakes.tracing import FakeRunTracing, RecordingClient
+from fakes.tracing import FakeRunTracing, FeedbackClient, InlineExecutor, RecordingClient
 from fakes.tutoring import FakeAnswerFeedback, FakeRetriever, InMemoryThreads
 
 __all__ = [
@@ -34,6 +34,8 @@ __all__ = [
     "FakeRetriever",
     "FakeRunTracing",
     "RecordingClient",
+    "FeedbackClient",
+    "InlineExecutor",
     "fake_chat_model",
     "fake_embeddings",
     "FakeTokenVerifier",
