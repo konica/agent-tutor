@@ -205,6 +205,7 @@ export function ChatPage({
   const [starting, setStarting] = useState<DocumentResponse | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const alive = useRef(true);
+  const rateRequests = useRef<Record<string, number>>({});
   const busy = useRef(false);
   const sourcesId = useId();
   // Counts the conversations shown (a new thread, or one a URL opens), so a late reply or stream event of an earlier
@@ -621,11 +622,13 @@ export function ChatPage({
   }
 
   // Saves the learner's rating of one turn and shows what the server kept. A failure rejects to the buttons, which say so.
+  // Only the newest request for a turn may update it: replies can arrive out of order.
   async function rateTurn(runId: string, rating: Rating) {
     if (threadId === null) return;
     const forTurn = turn.current;
+    const request = (rateRequests.current[runId] = (rateRequests.current[runId] ?? 0) + 1);
     const saved = await rate(threadId, runId, rating);
-    if (alive.current && turn.current === forTurn) setTurns((list) => list.map((e) => (e.runId === runId ? { ...e, rating: saved } : e)));
+    if (alive.current && turn.current === forTurn && rateRequests.current[runId] === request) setTurns((list) => list.map((e) => (e.runId === runId ? { ...e, rating: saved } : e)));
   }
 
   function onSubmit(event: FormEvent) {
@@ -811,7 +814,7 @@ export function ChatPage({
                 const listId = `${sourcesId}-${index}`;
                 // A turn that didn't end with done wasn't saved, so it can't be rated.
                 const runId = t.kept ? t.runId : null;
-                const rating = runId !== null && threadId !== null ? <AnswerRating rating={t.rating} onRate={(r) => rateTurn(runId, r)} /> : null;
+                const rating = runId !== null && threadId !== null ? <AnswerRating rating={t.rating} onRate={(r) => rateTurn(runId, r)} onAnnounce={setAnnouncement} /> : null;
                 const hasSources = t.decline === null && showCitations && t.citations.length > 0;
                 return (
                   // Turns are only ever added at the end or all replaced, so the index is a stable key.

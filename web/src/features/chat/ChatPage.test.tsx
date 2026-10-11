@@ -1662,15 +1662,49 @@ describe("ChatPage", () => {
         thread: { thread_id: id, title: id, search_scope: "library" as const },
         turns: [{ ...saved, question: id === "t1" ? "Q1?" : "Q2?" }],
       }));
-      renderChat({ loadConversation, rate }, "/chat/t1");
+      render(
+        <MemoryRouter initialEntries={["/chat/t1"]}>
+          <Routes>
+            <Route path="/chat/:threadId?" element={<ChatPage loadDocs={async () => [doc("ready")]} loadUsed={async () => []} loadConversation={loadConversation} rate={rate} />} />
+          </Routes>
+          <Link to="/chat/t2">Other</Link>
+        </MemoryRouter>,
+      );
       await userEvent.click(await screen.findByRole("button", { name: "Helpful" }));
 
-      await userEvent.click(screen.getByRole("link", { name: "Chat" }));
-      expect(await screen.findByRole("heading", { name: "Ask about your documents" })).toBeInTheDocument();
-      act(() => release("up"));
+      await userEvent.click(screen.getByRole("link", { name: "Other" }));
+      expect(await screen.findByText("Q2?", { selector: "p" })).toBeInTheDocument();
+      await act(async () => release("up"));
 
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      expect(screen.queryByRole("button", { name: "Helpful" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Helpful" })).toHaveAttribute("aria-pressed", "false");
+      expect(screen.queryByText("Thanks — glad it helped.")).not.toBeInTheDocument();
+    });
+
+    it("announces the outcome in the page's one status region, not in a region per turn", async () => {
+      const turn = (run_id: string, rating: "up" | null): TurnResponse => ({ question: "Q?", answer: "A.", citations: [], decline: null, created_at: "2026-10-10T09:00:00Z", run_id, rating });
+      const loadConversation = vi.fn(async () => ({ thread: { thread_id: "t1", title: "T", search_scope: "library" as const }, turns: [turn("r1", "up"), turn("r2", null)] }));
+      renderChat({ loadConversation, rate: async (_t, _r, rating) => rating }, "/chat/t1");
+
+      const helpfuls = await screen.findAllByRole("button", { name: "Helpful" });
+      expect(screen.getAllByRole("status")).toHaveLength(1);
+      await userEvent.click(helpfuls[1]!);
+
+      await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Thanks — glad it helped."));
+    });
+
+    it("keeps the newer rating when an older reply arrives last", async () => {
+      const replies: ((rating: "up" | "down") => void)[] = [];
+      const rate = vi.fn(() => new Promise<"up" | "down">((resolve) => replies.push(resolve)));
+      renderChat({ ask: vi.fn(answered), rate });
+      await askQuestion();
+      await userEvent.click(await screen.findByRole("button", { name: "Helpful" }));
+      await userEvent.click(notHelpful());
+
+      await act(async () => replies[1]!("down"));
+      await act(async () => replies[0]!("up"));
+
+      expect(notHelpful()).toHaveAttribute("aria-pressed", "true");
+      expect(helpful()).toHaveAttribute("aria-pressed", "false");
     });
   });
 });
