@@ -1,6 +1,9 @@
-# Builds the six app images for one commit and pushes them to the shared ECR repositories, tagged with the full commit
-# SHA (#150). Called by deploy.yml before either mode deploys. Skips the build when all six images are already in ECR;
-# otherwise it rebuilds and pushes all six. Signs in with the deploy role of the environment it is given.
+# Builds the six app images for one commit and pushes them to the ECR repositories of one deployment mode, tagged with
+# the full commit SHA (#150, #206): on-premise `smart-tutor-on-premise/<service>`, native-cloud `smart-tutor/<service>`.
+# Called by deploy.yml once per mode it deploys, with that mode's deploy role (which may push only to its own
+# repositories). Skips the build when all six images are already there; otherwise it first deploys the mode's
+# GitHubDeploy and Registry stacks, so the repositories and the role's push permission exist before the push (the
+# first merge after #206 needed both; later runs find nothing to change), then rebuilds and pushes all six.
 name: build-images
 
 on:
@@ -11,7 +14,7 @@ on:
         type: string
         required: true
       environment:
-        description: GitHub environment whose deploy role pushes the images (on-premise or native-cloud)
+        description: Deployment mode (and GitHub environment) whose repositories get the images (on-premise or native-cloud)
         type: string
         required: true
 
@@ -23,31 +26,61 @@ jobs:
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
       IMAGE_TAG: ${{ inputs.image_tag }}
+      MODE: ${{ inputs.environment }}
+      JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION: "1"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ inputs.image_tag }}
+
+      # Setup actions run before the AWS credentials exist in the environment.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
 
       - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      # ECR is shared by both modes (native-cloud's Registry stack): the account's registry in the region.
+      # The same names as ModeNames (infra/smart_tutor_infra/names.py); test_workflows.py keeps them in step.
+      - name: Name the mode's stacks and repositories
+        run: |
+          case "$MODE" in
+            on-premise) stack_prefix=SmartTutor-OnPremise-prod repository_prefix=smart-tutor-on-premise ;;
+            native-cloud) stack_prefix=SmartTutor-prod repository_prefix=smart-tutor ;;
+            *) echo "::error::Unknown deployment mode $MODE (on-premise or native-cloud)"; exit 1 ;;
+          esac
+          account=$(aws sts get-caller-identity --query Account --output text)
+          {
+            echo "STACK_PREFIX=$stack_prefix"
+            echo "REPOSITORY_PREFIX=$repository_prefix"
+            echo "REGISTRY=$account.dkr.ecr.$AWS_REGION.amazonaws.com"
+          } >> "$GITHUB_ENV"
+
+      # A repository that doesn't exist yet counts as missing images.
       - name: Check which images exist
         id: existing
         run: |
-          account=$(aws sts get-caller-identity --query Account --output text)
-          echo "REGISTRY=$account.dkr.ecr.$AWS_REGION.amazonaws.com" >> "$GITHUB_ENV"
           all=true
           for repo in api web keycloak agent mcp worker; do
-            if aws ecr describe-images --repository-name "smart-tutor/$repo" --image-ids imageTag="$IMAGE_TAG" > /dev/null 2>&1; then
-              echo "smart-tutor/$repo:$IMAGE_TAG is already in ECR"
+            if aws ecr describe-images --repository-name "$REPOSITORY_PREFIX/$repo" --image-ids imageTag="$IMAGE_TAG" > /dev/null 2>&1; then
+              echo "$REPOSITORY_PREFIX/$repo:$IMAGE_TAG is already in ECR"
             else
               all=false
             fi
           done
           echo "all=$all" >> "$GITHUB_OUTPUT"
+
+      # --exclusively: only these two stacks, not Network (native-cloud) or the rest of the mode; deploy.yml's deploy
+      # job runs the full cdk deploy afterwards.
+      - name: Deploy the deploy role and the registry (CDK)
+        if: steps.existing.outputs.all != 'true'
+        working-directory: infra
+        run: |
+          uv sync --frozen
+          npx --yes aws-cdk@2.1145.0 deploy --exclusively "$STACK_PREFIX-GitHubDeploy" "$STACK_PREFIX-Registry" --require-approval never -c smart-tutor:mode="$MODE"
 
       - name: Sign in to ECR
         if: steps.existing.outputs.all != 'true'
@@ -56,14 +89,14 @@ jobs:
       - name: Build the images
         if: steps.existing.outputs.all != 'true'
         run: |
-          docker build --target api -t "$REGISTRY/smart-tutor/api:$IMAGE_TAG" backend
-          docker build --build-arg VITE_API_URL=/api --build-arg VITE_KEYCLOAK_URL=/auth -t "$REGISTRY/smart-tutor/web:$IMAGE_TAG" web
-          docker build -t "$REGISTRY/smart-tutor/keycloak:$IMAGE_TAG" deploy/keycloak
-          docker build --target agent -t "$REGISTRY/smart-tutor/agent:$IMAGE_TAG" backend
-          docker build --target mcp -t "$REGISTRY/smart-tutor/mcp:$IMAGE_TAG" backend
-          docker build --target worker -t "$REGISTRY/smart-tutor/worker:$IMAGE_TAG" backend
+          docker build --target api -t "$REGISTRY/$REPOSITORY_PREFIX/api:$IMAGE_TAG" backend
+          docker build --build-arg VITE_API_URL=/api --build-arg VITE_KEYCLOAK_URL=/auth -t "$REGISTRY/$REPOSITORY_PREFIX/web:$IMAGE_TAG" web
+          docker build -t "$REGISTRY/$REPOSITORY_PREFIX/keycloak:$IMAGE_TAG" deploy/keycloak
+          docker build --target agent -t "$REGISTRY/$REPOSITORY_PREFIX/agent:$IMAGE_TAG" backend
+          docker build --target mcp -t "$REGISTRY/$REPOSITORY_PREFIX/mcp:$IMAGE_TAG" backend
+          docker build --target worker -t "$REGISTRY/$REPOSITORY_PREFIX/worker:$IMAGE_TAG" backend
 
       - name: Push the images
         if: steps.existing.outputs.all != 'true'
         run: |
-          for repo in api web keycloak agent mcp worker; do docker push "$REGISTRY/smart-tutor/$repo:$IMAGE_TAG"; done
+          for repo in api web keycloak agent mcp worker; do docker push "$REGISTRY/$REPOSITORY_PREFIX/$repo:$IMAGE_TAG"; done

@@ -175,7 +175,7 @@ infra/
 │                               # host (on-premise VPC, VM, Elastic IP, data volume, deploy document; #148;
 │                               # snapshot policy, backup and snapshot alarms, alerts topic; #151)
 ├── smart_tutor_infra/names.py  # per-mode names; context smart-tutor:mode picks on-premise (default: storage, config,
-│                               # budgets, github_deploy, host; ECR shared) or native-cloud (all but host)
+│                               # budgets, github_deploy, registry, host) or native-cloud (all but host)
 └── tests/                      # CDK assertion tests
 
 deploy/

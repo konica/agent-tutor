@@ -1,4 +1,5 @@
-"""ECR repositories `smart-tutor/<service>` (#56). The deploy role may push only to these names."""
+"""ECR repositories `<repository prefix>/<service>` of one deployment mode (#56, #206): `smart-tutor/<service>` for
+native-cloud, `smart-tutor-on-premise/<service>` for on-premise. Each mode's deploy role may push only to its own."""
 
 from collections.abc import Sequence
 from typing import Any
@@ -7,12 +8,20 @@ import aws_cdk as cdk
 from aws_cdk import aws_ecr as ecr
 from constructs import Construct
 
+from smart_tutor_infra.names import ModeNames
+
 SERVICES = ("api", "web", "keycloak", "agent", "mcp", "worker")
 
 
 class RegistryStack(cdk.Stack):
     def __init__(
-        self, scope: Construct, construct_id: str, *, services: Sequence[str] = SERVICES, **kwargs: Any
+        self,
+        scope: Construct,
+        construct_id: str,
+        *,
+        names: ModeNames,
+        services: Sequence[str] = SERVICES,
+        **kwargs: Any,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
         # Images are rebuilt from git, so a teardown deletes them; a kept repository would block the next deploy.
@@ -20,7 +29,7 @@ class RegistryStack(cdk.Stack):
             service: ecr.Repository(
                 self,
                 f"{service.capitalize()}Repository",
-                repository_name=f"smart-tutor/{service}",
+                repository_name=names.repository(service),
                 image_scan_on_push=True,
                 lifecycle_rules=[ecr.LifecycleRule(max_image_count=30)],
                 removal_policy=cdk.RemovalPolicy.DESTROY,

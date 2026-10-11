@@ -39,7 +39,9 @@ def _budgets(app: cdk.App, env: cdk.Environment, names: ModeNames) -> BudgetsSta
 
 
 def _on_premise(app: cdk.App, env: cdk.Environment, names: ModeNames) -> list[cdk.Stack]:
-    """Storage, Config, Budgets, and GitHubDeploy of its own, and the Host; ECR is native-cloud's, shared."""
+    """Storage, Config, Budgets, GitHubDeploy, and Registry of its own, and the Host; it shares no stack with
+    native-cloud (ADR 0016). The Host names its repositories through ModeNames, so it never references the Registry
+    stack."""
     prefix = names.stack_prefix
     deploy = GitHubDeployStack(
         app,
@@ -69,6 +71,7 @@ def _on_premise(app: cdk.App, env: cdk.Environment, names: ModeNames) -> list[cd
         ConfigStack(app, f"{prefix}-Config", env=env, names=names),
         _budgets(app, env, names),
         deploy,
+        RegistryStack(app, f"{prefix}-Registry", env=env, names=names),
         HostStack(
             app,
             f"{prefix}-Host",
@@ -132,7 +135,7 @@ def _native_cloud(app: cdk.App, env: cdk.Environment, names: ModeNames) -> list[
         # The bucket's CORS allows only the CloudFront address, so Storage deploys after Edge.
         StorageStack(app, f"{prefix}-Storage", env=env, names=names, web_origin=edge.public_url),
         cluster,
-        RegistryStack(app, f"{prefix}-Registry", env=env),
+        RegistryStack(app, f"{prefix}-Registry", env=env, names=names),
         ConfigStack(app, f"{prefix}-Config", env=env, names=names),
         _budgets(app, env, names),
     ]

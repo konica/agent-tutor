@@ -82,6 +82,8 @@ def test_deploy_role_gets_only_the_deployment_permissions() -> None:
     assert [s["Sid"] for s in statements if s["Resource"] == "*"] == ["EcrLogin"]
     actions = [a for s in statements for a in ([s["Action"]] if isinstance(s["Action"], str) else s["Action"])]
     assert not [a for a in actions if a.startswith(("iam:", "cloudformation:Create", "cloudformation:Update"))]
+    push = next(s for s in statements if s["Sid"] == "EcrPushAppImages")
+    assert ":repository/smart-tutor/*" in json.dumps(push["Resource"])
 
 
 def test_an_existing_oidc_provider_is_imported_instead_of_created() -> None:
@@ -115,6 +117,9 @@ def test_registry_has_one_repository_per_service_and_empties_them_on_delete() ->
     assert names == [f"smart-tutor/{s}" for s in ["agent", "api", "keycloak", "mcp", "web", "worker"]]
     t.has_resource_properties("AWS::ECR::Repository", {"ImageScanningConfiguration": {"ScanOnPush": True}})
     assert all(r["Properties"]["EmptyOnDelete"] is True for r in repos.values())  # teardown works with images inside
+    for repo in repos.values():
+        assert repo["DeletionPolicy"] == "Delete"
+        assert '"countNumber":30' in repo["Properties"]["LifecyclePolicy"]["LifecyclePolicyText"]
     t.has_output("RegistryUri", {})
 
 

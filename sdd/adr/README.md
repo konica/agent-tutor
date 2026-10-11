@@ -32,3 +32,4 @@ Product decisions are recorded in `sdd/prd.md` (§6, §13); ADRs cover architect
 | [0013](0013-secrets-stay-in-aws-secrets-manager.md) | Secrets stay in AWS Secrets Manager (no SOPS for now); no credential-shaped strings in the repository; GitGuardian findings are triaged, not silenced (proposed) |
 | [0014](0014-on-premise-worker-egress-proxy.md) | On-premise worker egress: an internal Compose network whose only way out is an allowlisting Squid proxy (narrows 0012's egress gap: no internet) |
 | [0015](0015-conversation-history-in-tutoring-table.md) | Conversation history in a tutoring-owned `thread_turns` table, written by the API; no LangGraph checkpointer |
+| [0016](0016-deployment-modes-share-no-stack.md) | Deployment modes share no stack: each has its own ECR repositories; only the CDK bootstrap and the GitHub OIDC provider (native-cloud's GitHubDeploy owns it) are shared (supersedes 0012's "ECR is shared") |

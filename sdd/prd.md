@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Draft v2.39 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; conversations over all of a learner's documents; per-learner contents; on-premise deployment by default; research map in Release 2) |
+| **Status** | Draft v2.40 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; conversations over all of a learner's documents; per-learner contents; on-premise deployment by default; research map in Release 2) |
+| **Changes from v2.39** | Each deployment mode has its own image registry (#206; ADR 0016): on-premise pushes to and pulls from `smart-tutor-on-premise/<service>`, native-cloud keeps `smart-tutor/<service>`, and each mode's deploy role pushes only to its own. The modes share no stack except the account's CDK bootstrap and the GitHub OIDC provider. Appendix A. No product behavior changes. |
 | **Changes from v2.38** | List conversations (#188, US-13): `GET /threads` (operation `list_threads`) returns the owner's active threads, newest last activity first, each with `title`, `subjects` (of its listed documents that still exist, archived included, by the learner's names; D11, Q63 L1), `documents` (the number listed), and `last_activity` (`last_learner_message_at`, else `created_at`). A question in an existing thread now sets `last_learner_message_at`. The web's Conversations page lists them (at most two subject chips, then "+N"; empty state "No conversations yet" with "Start a conversation"), and the side nav shows the three most recent. Archived tab, filters, search, and the note indicator come in their own slices. |
 | **Changes from v2.37** | Open a document from the Library (#209, US-3, US-10): a ready or *choose subjects* row's title opens the document viewer as an overlay at page 1 (Details stays in the row's More menu; archived, processing, and failed rows' titles open details). Document details offers **Open** for ready, *choose subjects*, and archived documents; it replaces the panel, and closing the viewer returns to details. An archived document opens read-only with "Archived" and Restore; restoring there moves the row out of Archived and keeps the viewer open. Web only. |
 | **Changes from v2.36** | No active documents left (#111, US-3, US-10): `POST /threads` and `POST /threads/{id}/questions` no longer answer `409` when the learner has no ready, non-archived document. The agent's search finds an empty readable set (a limited conversation that finds nothing checks the whole library with one more search, k = 1, so it gets the upload request only when nothing at all is readable) and streams `decline` {"code": "no_documents", "message"} then `done` without calling the model; the turn is kept like any decline, so the conversation's history shows it. In a conversation opened at its URL, a learner with no active documents asks in that conversation rather than a new one, so the request sits under the history, with **Upload** (to the Library). The fixed "I couldn't find anything about that in your documents." answer is removed. Old citations to an archived document still open and are marked "Archived". |
@@ -519,7 +520,7 @@ Smart Tutor has two **deployment modes**, and the product behaves the same in bo
 | PostgreSQL + pgvector | A container on the VM | RDS |
 | Public entry and TLS | Caddy (path routing, automatic Let's Encrypt) at an Elastic IP with a DuckDNS subdomain (fallback `<eip>.sslip.io`) | The CloudFront domain, through a VPC origin to an internal ALB (ADR 0009) |
 | Network | Its own VPC: one public subnet, no NAT, S3 gateway endpoint; inbound 80/443 only; no SSH | VPC in 2 AZs with a NAT gateway |
-| Managed AWS services | S3, SQS + DLQ, SSM, Secrets Manager, ECR (shared by both modes), Bedrock | The same, plus EKS, RDS, CloudFront, and the ALB |
+| Managed AWS services | S3, SQS + DLQ, SSM, Secrets Manager, ECR (each mode its own repositories), Bedrock | The same, plus EKS, RDS, CloudFront, and the ALB |
 | Deployed | On every merge to `main` | By `workflow_dispatch`, or on every merge when `NATIVE_CLOUD_AUTO_DEPLOY=true` |
 
 Bedrock AgentCore Runtime for the agent and MCP server was considered and rejected. It would be a second platform next to the other services and add a hop per turn, and its microVM isolation and scale-to-zero matter little for an agent that runs no code (cost at pilot scale is similar). The worker gets stricter isolation because it parses untrusted files.
@@ -528,7 +529,7 @@ Bedrock AgentCore Runtime for the agent and MCP server was considered and reject
 
 **Local (Docker Compose):** PostgreSQL + pgvector; Keycloak with realm import; LocalStack with the documents bucket (versioning; `ObjectCreated` notifications for `uploads/` to SQS + DLQ; CORS for the web origin), SSM parameters; Mailpit (catches Keycloak's verification emails). Bedrock and LangSmith are real (developer AWS profile, separate LangSmith project).
 
-**AWS (us-east-1):** one AWS CDK (Python) app takes `-c smart-tutor:mode=on-premise|native-cloud`, with `on-premise` as the default. Each mode has its own bucket, queue, and SSM parameters; ECR is shared.
+**AWS (us-east-1):** one AWS CDK (Python) app takes `-c smart-tutor:mode=on-premise|native-cloud`, with `on-premise` as the default. Each mode has its own bucket, queue, and SSM parameters, and ECR repositories (on-premise `smart-tutor-on-premise/<service>`, native-cloud `smart-tutor/<service>`). The modes share no stack except the account's CDK bootstrap and the GitHub OIDC provider (ADR 0016).
 
 - **On-premise mode (default):** CDK creates the VPC, the **Host** stack (the EC2 instance with its Elastic IP, data volume, IAM role, status-check recovery alarm, and snapshot policy), S3 (versioning; `uploads/` event notifications; lifecycle: `uploads/` expires after 1 day, `backups/` after 30 days), SQS + DLQ, ECR, IAM, Secrets Manager, SSM, and budgets. Docker Compose on the VM runs all services, PostgreSQL + pgvector, and Caddy. Caddy routes by path (`/` to web, `/api/*` to the API, `/auth/*` to Keycloak) and gets a Let's Encrypt certificate for the DuckDNS address.
   - Backups: daily EBS snapshots kept 7 days and a nightly `pg_dump` to S3 (`backups/`, the only prefix the instance role may write), with a restore runbook and one restore drill (`docs/runbooks/on-premise-backups.md`). A failed snapshot or dump emails the alert addresses.
@@ -538,7 +539,7 @@ Bedrock AgentCore Runtime for the agent and MCP server was considered and reject
 
 **Delivery:**
 
-- **On-premise**, on every merge to `main`: tests and the smoke evaluation split → images to ECR → `cdk deploy` → SSM Run Command on the VM (pull images, migrate, `docker compose up -d`) → smoke test. Brief downtime during a deploy is acceptable.
+- **On-premise**, on every merge to `main`: tests and the smoke evaluation split → images to on-premise's ECR repositories → `cdk deploy` → SSM Run Command on the VM (pull images, migrate, `docker compose up -d`) → smoke test. Brief downtime during a deploy is acceptable.
 - **Native-cloud** (`cdk deploy` → `helm upgrade`) runs by `workflow_dispatch`, or on every merge when `NATIVE_CLOUD_AUTO_DEPLOY=true`. CI still runs `cdk synth` and `helm lint` for native-cloud on every change, so it doesn't rot.
 - The running EKS pilot stays, deployed only by hand, until on-premise passes its smoke test; then the product owner decides what happens to it.
 - Releases are gated on the full evaluation split.
@@ -780,7 +781,7 @@ M4 Production launch (R1)
 
 ## Appendix A — AWS setup checklist
 
-Both deployment modes use the same account, region, models, and CI role (ADR 0012). Items marked *(on-premise)* or *(native-cloud)* apply to that mode only.
+Both deployment modes use the same account, region, and models (ADR 0012), but each has its own deploy role (ADR 0016). Items marked *(on-premise)* or *(native-cloud)* apply to that mode only.
 
 **Manual, one-time:**
 1. Region us-east-1.
@@ -795,7 +796,7 @@ Both deployment modes use the same account, region, models, and CI role (ADR 001
 
 - VPC with one public subnet, no NAT, and an S3 gateway endpoint.
 - Host stack: EC2 t3.large with an Elastic IP, a 50 GB encrypted gp3 data volume, a security group allowing 80/443 only, a status-check recovery alarm, and daily EBS snapshots kept 7 days.
-- The instance role: SSM Run Command and Session Manager, ECR pull, the S3, SQS, SSM, and Bedrock permissions that the native-cloud API, worker, agent, and MCP roles have (below), as one role, and writes of the nightly `pg_dump` to S3.
-- S3 (CORS for presigned POST and GET from the host's domain, `smart-tutor.duckdns.org` (#154), or `https://*.sslip.io` when no domain is set), SQS + DLQ, Secrets Manager, and SSM parameters of its own; budgets; the uptime check on `/api/healthz`.
+- The instance role: SSM Run Command and Session Manager, ECR pull from on-premise's repositories only, the S3, SQS, SSM, and Bedrock permissions that the native-cloud API, worker, agent, and MCP roles have (below), as one role, and writes of the nightly `pg_dump` to S3.
+- S3 (CORS for presigned POST and GET from the host's domain, `smart-tutor.duckdns.org` (#154), or `https://*.sslip.io` when no domain is set), SQS + DLQ, Secrets Manager, SSM parameters of its own, and ECR repositories `smart-tutor-on-premise/<service>`; budgets; the uptime check on `/api/healthz`.
 
 **Created by CDK, native-cloud (opt-in):** VPC, EKS and node group, RDS, S3 (versioning; `ObjectCreated` notifications for `uploads/` to SQS; lifecycle: `uploads/` expire after 1 day; CORS for presigned POST and the viewer's presigned GET from the web origin, exposing `Accept-Ranges`, `Content-Range`, and `Content-Length` so the viewer can load byte ranges), SQS + DLQ (the ingest queue has a 15-minute visibility timeout, and a message moves to the DLQ after 5 receives), ECR, Secrets Manager, SSM parameters, internal ALB and CloudFront distribution (VPC origin), budgets, IAM roles with Pod Identity (API: presign `uploads/*`, presigned GET on `contents/*.pdf` (document viewer, US-4b), delete (every version) on `contents/*` (US-10c), `ssm:GetParameter` on `/smart-tutor/*`, `sqs:SendMessage` on the ingest queue (Retry), Bedrock invoke on the embedding model (embeds new subject names); worker: `ssm:GetParameter` on `/smart-tutor/*`, read `uploads/*` and `contents/*`, write `contents/*`, delete `uploads/*`, `s3:ListBucket` on the bucket (so a missing key reads as not found, not access denied), receive, delete, and extend (change visibility of) messages on the ingest queue and read its attributes, Bedrock invoke on the embedding and agent models (chunks, summaries, subject names, first-pages description); agent: `ssm:GetParameter` on `/smart-tutor/*` (`detect-threshold`, `detect-margin`, `multi-margin`, read at startup), Bedrock invoke on the inference profile and underlying model ARNs in every destination region).

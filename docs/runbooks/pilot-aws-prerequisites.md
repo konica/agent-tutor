@@ -18,7 +18,7 @@ The deploy role's permissions use these names, so #56–#59 must use them too. I
 | Admin CLI profile (your laptop) | Any profile with admin rights (pilot account: `default`); pass it with `-AwsProfile` |
 | GitHub Actions deploy role | `smart-tutor-github-deploy` |
 | GitHub environment | `native-cloud` (deploys from `main` only) |
-| ECR repositories | `smart-tutor/<service>` (`api`, `web`, `keycloak`; later `agent`, `mcp`, `worker`) |
+| ECR repositories | Per mode: native-cloud `smart-tutor/<service>`, on-premise `smart-tutor-on-premise/<service>` (`api`, `web`, `keycloak`, `agent`, `mcp`, `worker`) |
 | EKS cluster | `smart-tutor-prod` |
 | CloudFormation stacks | `SmartTutor-prod-*` (already set in `infra/smart_tutor_infra/app_stacks.py`) |
 
@@ -114,7 +114,7 @@ The role trusts **only jobs in the `native-cloud` environment** (`StringEquals` 
 |---|---|---|
 | `sts:AssumeRole` | `cdk-hnb659fds-*-<ACCOUNT_ID>-us-east-1` | `cdk deploy` works through the CDK bootstrap roles, so the deploy role never gets CloudFormation or IAM rights directly |
 | `ecr:GetAuthorizationToken` | `*` | `docker login` to ECR (this action has no resource) |
-| ECR push and pull actions | `smart-tutor/*` repositories | push app images |
+| ECR push and pull actions | its own mode's repositories: `smart-tutor/*` (native-cloud) or `smart-tutor-on-premise/*` (on-premise) | push app images |
 | `eks:DescribeCluster` | `smart-tutor-*` clusters | `aws eks update-kubeconfig`. Kubernetes permissions come from an **EKS access entry**, which #56 creates in CDK for this role. |
 | `cloudformation:DescribeStacks` | `SmartTutor-prod-*` stacks | the #59 smoke test reads the CloudFront address from the stack outputs |
 
@@ -137,7 +137,7 @@ gh api -X DELETE repos/konica/agent-tutor/environments/pilot
 
 Until then, a native-cloud deploy fails at sign-in.
 
-**Shared ECR repositories.** On a fresh account the ECR repositories (`smart-tutor/<service>`) come from native-cloud's `SmartTutor-prod-Registry` stack. Images are built before any `cdk deploy`, so that stack must exist before the first deploy of either mode: deploy it from your laptop with `npx aws-cdk@latest deploy --exclusively SmartTutor-prod-Registry -c smart-tutor:mode=native-cloud`. `--exclusively` matters: without it CDK also deploys the Network stack first (a VPC with a NAT gateway, which costs money).
+**ECR repositories.** Each mode has its own (`SmartTutor-prod-Registry`, `SmartTutor-OnPremise-prod-Registry`; ADR 0016). The image build deploys its mode's Registry and GitHubDeploy stacks before its first push, so neither needs deploying by hand. The only resource the modes share is the account's GitHub OIDC provider: AWS allows one per URL, so native-cloud's `GitHubDeploy` creates it and on-premise's imports it. Deploy native-cloud's `GitHubDeploy` first on a fresh account (section 3b above).
 
 ### Check
 

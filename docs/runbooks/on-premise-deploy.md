@@ -8,8 +8,8 @@ Commands are for **PowerShell 7** (`pwsh`). Run them from the repository root wi
 
 | Piece | Where |
 |---|---|
-| CDK stacks `SmartTutor-OnPremise-prod-*` | `infra/` with `-c smart-tutor:mode=on-premise` (the default mode): Storage, Config, Budgets, GitHubDeploy, and **Host** (`infra/smart_tutor_infra/stacks/host.py`) |
-| Images | ECR `smart-tutor/<service>:<commit SHA>`, shared with native-cloud (its Registry stack owns the repositories) |
+| CDK stacks `SmartTutor-OnPremise-prod-*` | `infra/` with `-c smart-tutor:mode=on-premise` (the default mode): Storage, Config, Budgets, GitHubDeploy, Registry, and **Host** (`infra/smart_tutor_infra/stacks/host.py`) |
+| Images | ECR `smart-tutor-on-premise/<service>:<commit SHA>`, on-premise's own `SmartTutor-OnPremise-prod-Registry` stack (#206) |
 | Files on the VM | `deploy/` is uploaded as a CDK asset; the deploy unpacks it to `/opt/smart-tutor` and runs `/opt/smart-tutor/on-premise/deploy.sh` |
 | Settings and secrets | SSM `/smart-tutor-on-premise/*` and Secrets Manager `smart-tutor-on-premise/*`. On the VM, `deploy.sh` renders them into `/etc/smart-tutor/smart-tutor.env` (root only, mode 600) |
 | AWS from the containers | The agent, MCP server, worker, and API use the instance profile (IMDSv2, hop limit 2): Bedrock, the on-premise bucket and ingest queue, and SSM `/smart-tutor-on-premise/*`. One role holds what native-cloud gives each service separately. The worker reaches them only through `egress-proxy` (an allowlist; ADR 0014) |
@@ -21,7 +21,7 @@ The Host stack creates a VPC with one public subnet, no NAT, and an S3 gateway e
 ## 1. Before you start
 
 - CDK is bootstrapped in the account (`pilot-aws-prerequisites.md` §2), and the GitHub OIDC provider exists (native-cloud's `SmartTutor-prod-GitHubDeploy` created it; the on-premise deploy role reuses it).
-- The ECR repositories exist (`SmartTutor-prod-Registry`; see `pilot-aws-prerequisites.md`) and hold images for the commit you want. `deploy.yml` builds and pushes them for every merge to `main` (`build-images.yml`), tagged with the full commit SHA. On-premise needs `api`, `web`, `keycloak`, `agent`, `mcp`, and `worker`. A commit merged while no images were built (before #150, while `NATIVE_CLOUD_AUTO_DEPLOY=false`) has none: build them by hand (section 4, "Build images by hand").
+- The ECR repositories come from `SmartTutor-OnPremise-prod-Registry`. `build-images.yml` deploys that stack (and the deploy role) before its first push, so nothing is deployed by hand for them. The repositories hold images for the commit you want: `deploy.yml` builds and pushes them for every merge to `main`, tagged with the full commit SHA. On-premise needs `api`, `web`, `keycloak`, `agent`, `mcp`, and `worker`. A commit merged while no images were built (before #150, while `NATIVE_CLOUD_AUTO_DEPLOY=false`) has none, and neither has a commit merged before #206 (its images are only in native-cloud's `smart-tutor/*`): build them by hand (section 4, "Build images by hand").
 - The DuckDNS token is stored (section 9). Without it a deploy still works but can't point the name at a new Elastic IP.
 - Tools: Node 22+, uv, AWS CLI v2, and the [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) to open a shell on the VM.
 - Set up the shell for real AWS (the same as `pilot-deploy.md` §1):
@@ -96,6 +96,10 @@ aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$Instanc
 
 **Roll back.** Actions, **rollback** (`rollback.yml`), *Run workflow* from `main`, mode `on-premise`, `image_tag` = the full SHA to go back to. It skips CDK and the build; the VM keeps the deploy files of the last `cdk deploy`. Migrations don't run backwards (see section 6, "To roll back").
 
+**Commits from before #206.** Until #206 on-premise used native-cloud's repositories `smart-tutor/*`, so a commit merged before it has no images in `smart-tutor-on-premise/*`. A rollback to it stops at "Check the images exist" with an error that points to this runbook; it never pulls from native-cloud's repositories. To go back to such a commit anyway, build its images by hand (section 4, "Build images by hand", with that commit checked out), then run the rollback. Remember that a rollback keeps the deploy files of the last `cdk deploy`.
+
+**Image build overlapping a deploy.** The image build's CDK step (the registry and deploy-role stacks) runs outside the `deploy-on-premise` queue. A build that overlaps a still-running on-premise deploy can fail, because CloudFormation reports the stack busy or the older deploy rolls the deploy role back. Re-run the workflow once the deploy has finished. Don't merge a change to the `GitHubDeploy` or `Registry` stacks while an on-premise deploy is running.
+
 **When it fails.** The step "Deploy the images on the VM (SSM Run Command)" prints `deploy.sh`'s output; the Troubleshooting table applies. If the log says "is not Online in SSM after 10 minutes", the instance is still booting or was replaced: read `/var/log/cloud-init-output.log` through Session Manager.
 
 **Every merge can replace the VM.** The AMI is the latest Amazon Linux 2023, read at each `cdk deploy`. After Amazon publishes a new image, the next merge replaces the instance (section 7, "Replace the instance"). The deploy waits for the VM to be `Online`, and the deploy document first waits for the VM's first boot to finish (`cloud-init status --wait`), so it doesn't run before Docker is installed. The data survives; expect a few more minutes of downtime.
@@ -109,7 +113,7 @@ Pick the commit whose images to run. It must be a full 40-character SHA with ima
 ```powershell
 $Tag = git rev-parse origin/main
 foreach ($Repo in "api", "web", "keycloak", "agent", "mcp", "worker") {
-    aws ecr describe-images --repository-name "smart-tutor/$Repo" --image-ids imageTag=$Tag --query "imageDetails[0].imageTags[0]" --output text
+    aws ecr describe-images --repository-name "smart-tutor-on-premise/$Repo" --image-ids imageTag=$Tag --query "imageDetails[0].imageTags[0]" --output text
 }
 ```
 
@@ -137,20 +141,21 @@ The output lists each service's status and ends with `Deployed <tag> to https://
 
 ### Build images by hand
 
-Use this for a commit that has no images in ECR. The commands match `build-images.yml`:
+Use this for a commit that has no images in ECR. The commands match `build-images.yml`. The repositories must exist: if `SmartTutor-OnPremise-prod-Registry` isn't deployed yet, run `npx aws-cdk@2.1145.0 deploy --exclusively SmartTutor-OnPremise-prod-Registry -c smart-tutor:mode=on-premise` from `infra/` first.
 
 ```powershell
 git switch --detach $Tag
 $Registry = "$(aws sts get-caller-identity --query Account --output text).dkr.ecr.$env:AWS_REGION.amazonaws.com"
 aws ecr get-login-password | docker login --username AWS --password-stdin $Registry
+$Prefix = "smart-tutor-on-premise"
 $P = "--platform", "linux/amd64"    # the VM is x86_64
-docker build @P --target api    -t "$Registry/smart-tutor/api:$Tag" backend
-docker build @P --build-arg VITE_API_URL=/api --build-arg VITE_KEYCLOAK_URL=/auth -t "$Registry/smart-tutor/web:$Tag" web
-docker build @P -t "$Registry/smart-tutor/keycloak:$Tag" deploy/keycloak
-docker build @P --target agent  -t "$Registry/smart-tutor/agent:$Tag" backend
-docker build @P --target mcp    -t "$Registry/smart-tutor/mcp:$Tag" backend
-docker build @P --target worker -t "$Registry/smart-tutor/worker:$Tag" backend
-foreach ($Repo in "api", "web", "keycloak", "agent", "mcp", "worker") { docker push "$Registry/smart-tutor/${Repo}:$Tag" }
+docker build @P --target api    -t "$Registry/$Prefix/api:$Tag" backend
+docker build @P --build-arg VITE_API_URL=/api --build-arg VITE_KEYCLOAK_URL=/auth -t "$Registry/$Prefix/web:$Tag" web
+docker build @P -t "$Registry/$Prefix/keycloak:$Tag" deploy/keycloak
+docker build @P --target agent  -t "$Registry/$Prefix/agent:$Tag" backend
+docker build @P --target mcp    -t "$Registry/$Prefix/mcp:$Tag" backend
+docker build @P --target worker -t "$Registry/$Prefix/worker:$Tag" backend
+foreach ($Repo in "api", "web", "keycloak", "agent", "mcp", "worker") { docker push "$Registry/$Prefix/${Repo}:$Tag" }
 git switch -
 ```
 

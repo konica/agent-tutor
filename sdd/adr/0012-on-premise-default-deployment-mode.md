@@ -1,6 +1,6 @@
 # 0012. On-premise is the default deployment mode; native-cloud is opt-in
 
-- Status: accepted
+- Status: accepted; "ECR is shared" superseded by 0016 (the modes share no stack)
 - Date: 2026-10-09
 - Supersedes: the parts of 0009 and 0010 listed under "What still holds from 0009 and 0010", which now apply only to native-cloud mode
 
@@ -17,7 +17,7 @@ The product behaves the same in both modes.
 
 ## Decision
 
-- **One CDK app, two modes.** It takes `-c smart-tutor:mode=on-premise|native-cloud` and defaults to `on-premise`. Each mode has its own bucket, queue, and SSM parameters, so the modes never share data. ECR is shared. On-premise adds a **Host** stack.
+- **One CDK app, two modes.** It takes `-c smart-tutor:mode=on-premise|native-cloud` and defaults to `on-premise`. Each mode has its own bucket, queue, and SSM parameters, so the modes never share data. ECR was shared until ADR 0016 gave each mode its own repositories. On-premise adds a **Host** stack.
 - **Host:** one **t3.large** EC2 instance (Amazon Linux 2023) with a 50 GB encrypted gp3 data volume. If it runs short, it grows to t3.xlarge, or a second data VM is added.
 - **Runtime:** **Docker Compose** runs web, API, agent, MCP server, worker, Keycloak, **PostgreSQL + pgvector**, and **Caddy**. Scheduled jobs are systemd timers that call `docker compose run`.
 - **Edge:** Caddy routes by path (`/` to web, `/api/*` to the API, `/auth/*` to Keycloak) and gets its certificate from Let's Encrypt automatically. The address is an Elastic IP with a **DuckDNS** subdomain, falling back to `<eip>.sslip.io`. There is no CloudFront distribution and no ALB.
