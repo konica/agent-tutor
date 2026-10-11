@@ -15,7 +15,11 @@ on:
       - backend/src/smart_tutor/shared/config.py
       - backend/src/smart_tutor/shared/adapters/model_factory.py
       - backend/src/smart_tutor/shared/adapters/bedrock/**
+      - backend/src/smart_tutor/knowledge/application/search_service.py
+      - backend/src/smart_tutor/knowledge/adapters/sql_library.py
+      - backend/src/smart_tutor/knowledge/adapters/chunking.py
       - backend/evals/**
+      - .env.example
       - compose.yaml
       - compose.ci.yaml
       - .github/workflows/evals-smoke.yml
