@@ -15,15 +15,32 @@ from smart_tutor.tutoring.domain.errors import (
 from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
 from smart_tutor.tutoring.domain.thread_summary import ThreadSummary
-from smart_tutor.tutoring.domain.turn import AnsweredTurn, CitationView, Turn, TurnCitation, TurnView
+from smart_tutor.tutoring.domain.turn import AnsweredTurn, CitationView, HistoryTurn, Turn, TurnCitation, TurnView
 from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
 
 
 class ConversationService:
-    def __init__(self, threads: ThreadRepository, documents: DocumentService, clock: Clock) -> None:
+    def __init__(
+        self,
+        threads: ThreadRepository,
+        documents: DocumentService,
+        clock: Clock,
+        *,
+        history_turns: int = 5,
+        history_answer_chars: int = 2000,
+    ) -> None:
         self._threads = threads
         self._documents = documents
         self._clock = clock
+        self._history_turns = history_turns
+        self._history_answer_chars = history_answer_chars
+
+    def history(self, thread_id: ThreadId, user_id: UserId) -> list[HistoryTurn]:
+        """What a new question in the thread sends the agent (PRD §9.2 step 3, ADR 0015): its last `history_turns`
+        turns, oldest first, read through owner-scoped SQL, each answer cut to `history_answer_chars`."""
+        self._owned(thread_id, user_id)
+        kept = self._threads.last_turns(thread_id, user_id, self._history_turns)
+        return [t.as_history(self._history_answer_chars) for t in kept]
 
     def require_readable(self, user_id: UserId, document_id: DocumentId) -> None:
         """The document is the learner's ready, non-archived one (`can_read`), else "Document not found"."""

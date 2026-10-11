@@ -65,7 +65,13 @@ def build_services(settings: Settings) -> ApiServices:
     names = SubjectNames(subject_repo)
     time_zone = ZoneInfo(params.get(settings.app_time_zone_param))
     documents = DocumentService(library, max_attempts, time_zone=time_zone)
-    conversations = ConversationService(SqlThreadRepository(engine), documents, SystemClock())
+    conversations = ConversationService(
+        SqlThreadRepository(engine),
+        documents,
+        SystemClock(),
+        history_turns=settings.history_turns,
+        history_answer_chars=settings.history_answer_chars,
+    )
     return ApiServices(
         uploads=UploadService(
             library,

@@ -248,6 +248,18 @@ class SqlThreadRepository(ThreadRepository):
             )
             _add_documents_used(conn, turn.thread_id, document_ids, turn.created_at)
 
+    def last_turns(self, thread_id: ThreadId, user_id: UserId, limit: int) -> list[Turn]:
+        if limit <= 0:
+            return []
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                select(thread_turns)
+                .where(thread_turns.c.thread_id == thread_id, thread_turns.c.user_id == user_id)
+                .order_by(thread_turns.c.turn_id.desc())
+                .limit(limit)
+            ).all()
+        return [_turn(r) for r in reversed(rows)]
+
     def turns(self, thread_id: ThreadId, user_id: UserId) -> list[Turn]:
         with self._engine.connect() as conn:
             rows = conn.execute(

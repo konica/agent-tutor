@@ -73,5 +73,10 @@ class ThreadRepository(ABC):
         `add_documents_used` does, in one transaction (committed when this returns). (Callers check ownership first.)"""
 
     @abstractmethod
+    def last_turns(self, thread_id: ThreadId, user_id: UserId, limit: int) -> list[Turn]:
+        """The thread's newest `limit` kept turns, oldest first; empty unless the thread is this learner's (scoped by
+        owner)."""
+
+    @abstractmethod
     def turns(self, thread_id: ThreadId, user_id: UserId) -> list[Turn]:
         """The thread's kept turns, oldest first; empty unless the thread is this learner's (scoped by owner)."""

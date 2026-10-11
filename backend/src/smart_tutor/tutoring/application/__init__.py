@@ -20,7 +20,15 @@ from smart_tutor.tutoring.domain.errors import (
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 from smart_tutor.tutoring.domain.thread import SearchScope, Thread
 from smart_tutor.tutoring.domain.thread_summary import ThreadSummary
-from smart_tutor.tutoring.domain.turn import AnsweredTurn, CitationView, Decline, Turn, TurnCitation, TurnView
+from smart_tutor.tutoring.domain.turn import (
+    AnsweredTurn,
+    CitationView,
+    Decline,
+    HistoryTurn,
+    Turn,
+    TurnCitation,
+    TurnView,
+)
 from smart_tutor.tutoring.ports.retriever import Retriever
 from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
 
@@ -34,6 +42,7 @@ __all__ = [
     "Decline",
     "DocumentNotAvailableError",
     "DocumentUsed",
+    "HistoryTurn",
     "InvalidTitleError",
     "NoListedDocumentsError",
     "RetrievalError",

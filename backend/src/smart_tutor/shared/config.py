@@ -5,7 +5,7 @@ Secrets come from Secrets Manager (via External Secrets) in prod.
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, PositiveInt, SecretStr
+from pydantic import BaseModel, NonNegativeInt, PositiveInt, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -91,6 +91,10 @@ class Settings(BaseSettings):
     # Relevance gate for a conversation limited to its documents (US-4c): a best cosine score below it declines.
     # A starting value; US-5 tunes it on the decline dataset and moves it to SSM answer-floor.
     answer_floor: float = 0.3
+    # Conversation history (PRD §9.2 step 3, ADR 0015): a question in an existing conversation sends the agent its
+    # last `history_turns` turns (0 sends none), each earlier answer cut to `history_answer_chars` characters.
+    history_turns: NonNegativeInt = 5
+    history_answer_chars: PositiveInt = 2000
     models: ModelsConfig = ModelsConfig()
     chunking: ChunkingConfig = ChunkingConfig()
 

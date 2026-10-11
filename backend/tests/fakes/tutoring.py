@@ -83,6 +83,9 @@ class InMemoryThreads(ThreadRepository):
     def turns(self, thread_id: ThreadId, user_id: UserId) -> list[Turn]:
         return [t for t in self.turn_rows if t.thread_id == thread_id and t.user_id == user_id]
 
+    def last_turns(self, thread_id: ThreadId, user_id: UserId, limit: int) -> list[Turn]:
+        return self.turns(thread_id, user_id)[-limit:] if limit > 0 else []
+
 
 class FakeRetriever(Retriever):
     def __init__(self, chunks: list[RetrievedChunk] | None = None, error: Exception | None = None) -> None:

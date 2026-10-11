@@ -26,6 +26,7 @@ from smart_tutor.tutoring.application import (
     Decline,
     DocumentNotAvailableError,
     DocumentUsed,
+    HistoryTurn,
     InvalidTitleError,
     NoListedDocumentsError,
     SearchScope,
@@ -589,3 +590,55 @@ def test_noting_a_question_needs_the_owners_active_thread() -> None:
     threads.threads[thread.thread_id].status = ThreadStatus.ARCHIVED
     with pytest.raises(ThreadArchivedError):
         svc.note_question(ThreadId(thread.thread_id), UserId("ada"))
+
+
+def _history_service(**limits: int) -> tuple[ConversationService, ThreadId]:
+    conversations = ConversationService(
+        InMemoryThreads(), DocumentService(InMemoryLibrary().unit_of_work, max_attempts=3), FixedClock(), **limits
+    )
+    return conversations, ThreadId(conversations.start_thread(UserId("ada"), "Q1").thread_id)
+
+
+def _kept(conversations: ConversationService, thread_id: ThreadId, n: int) -> None:
+    for i in range(1, n + 1):
+        conversations.record_turn(thread_id, UserId("ada"), AnsweredTurn(f"Q{i}", f"A{i}"))
+
+
+def test_history_is_the_last_turns_oldest_first() -> None:
+    conversations, tid = _history_service(history_turns=5)
+    _kept(conversations, tid, 7)
+
+    assert conversations.history(tid, UserId("ada")) == [HistoryTurn(f"Q{i}", f"A{i}") for i in range(3, 8)]
+
+
+def test_a_declined_turn_is_its_question_and_the_decline_message() -> None:
+    conversations, tid = _history_service()
+    decline = Decline("limited", "These documents don't cover this.")
+    conversations.record_turn(tid, UserId("ada"), AnsweredTurn("Explain transformers", decline=decline))
+
+    assert conversations.history(tid, UserId("ada")) == [
+        HistoryTurn("Explain transformers", "These documents don't cover this.")
+    ]
+
+
+def test_a_long_earlier_answer_is_cut() -> None:
+    conversations, tid = _history_service(history_answer_chars=10)
+    conversations.record_turn(tid, UserId("ada"), AnsweredTurn("Q", "x" * 50))
+
+    [turn] = conversations.history(tid, UserId("ada"))
+    assert len(turn.answer) <= 10 and turn.answer.endswith("…") and turn.answer.startswith("x")
+
+
+def test_a_zero_cap_sends_no_history() -> None:
+    conversations, tid = _history_service(history_turns=0)
+    _kept(conversations, tid, 2)
+
+    assert conversations.history(tid, UserId("ada")) == []
+
+
+def test_another_learners_thread_has_no_history() -> None:
+    conversations, tid = _history_service()
+    _kept(conversations, tid, 1)
+
+    with pytest.raises(ThreadNotFoundError):
+        conversations.history(tid, UserId("bob"))
