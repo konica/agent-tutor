@@ -28,3 +28,13 @@ def test_turns_are_kept_oldest_first_for_the_owner_only() -> None:
     assert threads.turns(t, ADA) == [first, second]
     assert threads.turns(t, BOB) == []
     assert [row.document_id for row in threads.documents_used(t)] == [D1]
+
+
+def test_last_turns_are_the_newest_n_oldest_first_for_the_owner_only() -> None:
+    threads, t = started()
+    for i in range(1, 5):
+        threads.add_turn(Turn(t, ADA, f"Q{i}", f"A{i}", (), None, T0), [])
+
+    assert [x.question for x in threads.last_turns(t, ADA, 2)] == ["Q3", "Q4"]
+    assert threads.last_turns(t, ADA, 0) == []
+    assert threads.last_turns(t, BOB, 5) == []

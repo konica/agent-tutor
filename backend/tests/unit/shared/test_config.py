@@ -18,6 +18,21 @@ def test_introspection_url_uses_the_internal_url_when_set() -> None:
     )
 
 
+def test_history_defaults() -> None:
+    s = Settings()
+    assert s.history_turns == 5
+    assert s.history_answer_chars == 2000
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [{"history_turns": 21}, {"history_turns": -1}, {"history_answer_chars": 8001}, {"history_answer_chars": 0}],
+)
+def test_history_settings_beyond_what_the_agent_accepts_stop_startup(overrides: dict[str, int]) -> None:
+    with pytest.raises(ValidationError):
+        Settings(**overrides)  # type: ignore[arg-type]
+
+
 def test_client_secret_is_not_printed() -> None:
     s = Settings(keycloak_client_secret="local-api-secret")
     assert "local-api-secret" not in repr(s)
