@@ -6,6 +6,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { DocumentGoneError, DocumentProcessingError, RetriesUsedUpError, UploadLimitError, type DocumentFilters, type DocumentResponse, type UploadEvents, type UploadRateLimit, type UploadStatus } from "../../api/documents";
 import { SessionExpiredError } from "../../auth/authClient";
 import { NeedsSubjectsContext } from "../../app/needsSubjects";
+import { fakeFile, fakeViewerDeps } from "../viewer/testFakes";
 import { LibraryPage } from "./LibraryPage";
 
 // The page navigates (Chat on a row), so every render sits in a router.
@@ -1164,10 +1165,10 @@ describe("LibraryPage document details", () => {
     subjects: [], attempt: null, max_attempts: 3, can_retry: false,
   });
 
-  function setup() {
+  function setup(over: Partial<DocumentResponse> = {}) {
     let title = "Toolformer";
-    const load = vi.fn(async (f: DocumentFilters) => (f.archived ? [] : [{ ...row, title }]));
-    const loadDetails = vi.fn(async (_id: string) => full(title));
+    const load = vi.fn(async (f: DocumentFilters) => (f.archived ? [] : [{ ...row, ...over, title }]));
+    const loadDetails = vi.fn(async (_id: string) => ({ ...full(title), ...over }));
     const saveTitle = vi.fn(async (_id: string, next: string | null) => {
       title = next ?? "Toolformer";
       return full(title);
@@ -1177,8 +1178,13 @@ describe("LibraryPage document details", () => {
     return { load, loadDetails, saveTitle, archive };
   }
 
-  it("opens a dialog from the row title and returns focus to it on close", async () => {
-    setup();
+  async function openDetails() {
+    await userEvent.click(await screen.findByRole("button", { name: "More actions for Toolformer" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Details" }));
+  }
+
+  it("opens a dialog from a failed row's title and returns focus to it on close", async () => {
+    setup({ state: "failed", failure_reason: "Unreadable" }); // ready titles open the viewer
     const opener = await screen.findByRole("button", { name: "Toolformer" });
     await userEvent.click(opener);
     expect(await screen.findByRole("dialog", { name: "Toolformer" })).toBeVisible();
@@ -1206,7 +1212,7 @@ describe("LibraryPage document details", () => {
 
   it("re-lists after a title change", async () => {
     const { load } = setup();
-    await userEvent.click(await screen.findByRole("button", { name: "Toolformer" }));
+    await openDetails();
     await userEvent.click(await screen.findByRole("button", { name: "Edit title" }));
     const field = screen.getByRole("textbox", { name: "Display title" });
     await userEvent.clear(field);
@@ -1220,7 +1226,7 @@ describe("LibraryPage document details", () => {
 
   it("re-lists after archiving from the panel", async () => {
     const { load, archive } = setup();
-    await userEvent.click(await screen.findByRole("button", { name: "Toolformer" }));
+    await openDetails();
     const before = load.mock.calls.length;
     await userEvent.click(await screen.findByRole("button", { name: "Archive" }));
     expect(archive).toHaveBeenCalledWith("d1");
@@ -1414,6 +1420,11 @@ describe("LibraryPage change subjects", () => {
   const details = (doc: DocumentResponse) => ({ ...doc, extracted_title: "Toolformer", title_overridden: false, doi: null, file_name: "toolformer.pdf", pages: 10, summary: null });
   const pageStatus = () => screen.getAllByRole("status").find((el) => el.tagName === "P" && el.closest("[role=dialog]") === null)!;
 
+  async function openDetails() {
+    await userEvent.click(await screen.findByRole("button", { name: "More actions for Toolformer" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Details" }));
+  }
+
   function setup() {
     let current = ready;
     const load = vi.fn(async (f: DocumentFilters) => (f.archived ? [] : [current]));
@@ -1459,7 +1470,7 @@ describe("LibraryPage change subjects", () => {
 
   it("opens the picker from details prefilled, and goes back to details when it closes", async () => {
     setup();
-    await userEvent.click(await screen.findByRole("button", { name: "Toolformer" }));
+    await openDetails();
     await userEvent.click(await screen.findByRole("button", { name: "Change subjects" }));
     expect(screen.queryByRole("dialog", { name: "Toolformer" })).toBeNull();
     expect(screen.getByRole("dialog", { name: "Change subjects" })).toBeVisible();
@@ -1471,7 +1482,7 @@ describe("LibraryPage change subjects", () => {
 
   it("shows details with the new subjects after saving from them", async () => {
     setup();
-    await userEvent.click(await screen.findByRole("button", { name: "Toolformer" }));
+    await openDetails();
     await userEvent.click(await screen.findByRole("button", { name: "Change subjects" }));
     await userEvent.click(await screen.findByRole("button", { name: /AI Agents/ }));
     await userEvent.click(screen.getByRole("button", { name: /LLMs/ }));
@@ -1585,5 +1596,96 @@ describe("LibraryPage upload limits", () => {
       });
     }
     expect(loadRateLimit.mock.calls.length).toBeLessThanOrEqual(6);
+  });
+});
+
+describe("LibraryPage document viewer", () => {
+  const ready: DocumentResponse = { ...processing, document_id: "d1", title: "ReAct", state: "ready" };
+  const old: DocumentResponse = { ...processing, document_id: "d7", title: "GPT-3", state: "awaiting_subjects", archived: true };
+  const detailsOf = (doc: DocumentResponse) => ({ ...doc, extracted_title: doc.title, title_overridden: false, doi: null, file_name: "x.pdf", pages: 3, summary: null });
+
+  function library(active: DocumentResponse[], archived: DocumentResponse[]) {
+    const lists = { active: [...active], archived: [...archived] };
+    const load = vi.fn(async (f: DocumentFilters) => (f.archived ? lists.archived : lists.active));
+    const find = (id: string) => [...lists.active, ...lists.archived].find((d) => d.document_id === id)!;
+    const restore = vi.fn(async (id: string) => {
+      const doc = { ...find(id), archived: false };
+      lists.archived = lists.archived.filter((d) => d.document_id !== id);
+      lists.active = [doc, ...lists.active];
+      return doc;
+    });
+    const loadDetails = vi.fn(async (id: string) => detailsOf(find(id)));
+    const { restore: _unused, ...fakes } = fakeViewerDeps(); // the Library's own restore must reach the viewer
+    const deps = { ...fakes, loadFile: vi.fn(async (id: string) => fakeFile({ ...find(id) }, `url-${id}`)) };
+    return { load, restore, loadDetails, deps };
+  }
+  const page = (l: ReturnType<typeof library>) =>
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={l.load} upload={vi.fn()} restore={l.restore} loadDetails={l.loadDetails} viewerDeps={l.deps} />);
+  const tab = (name: "Active" | "Archived") => screen.getByRole("tab", { name: new RegExp(`^${name}`) });
+
+  it("opens a ready row's title in the overlay at page 1 and returns focus to the title", async () => {
+    const l = library([ready], []);
+    page(l);
+    const title = await screen.findByRole("button", { name: "ReAct" });
+    await userEvent.click(title);
+    const viewer = await screen.findByRole("dialog", { name: "ReAct" });
+    expect(await within(viewer).findByText("p. 1 / 3")).toBeVisible();
+    expect(screen.queryByText("Document details")).toBeNull();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(title).toHaveFocus();
+  });
+
+  it("opens from details, replacing the panel, and goes back to details with Open focused", async () => {
+    const l = library([ready], []);
+    page(l);
+    await userEvent.click(await screen.findByRole("button", { name: "More actions for ReAct" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Details" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Open" }));
+    expect(await screen.findByText("p. 1 / 3")).toBeVisible();
+    expect(screen.queryByText("Document details")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(await screen.findByText("Document details")).toBeVisible();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Open" })).toHaveFocus());
+  });
+
+  it("restores an archived document in the viewer: read-only first, then the row leaves Archived and the viewer stays", async () => {
+    const l = library([], [old]);
+    page(l);
+    await waitFor(() => expect(tab("Archived")).toHaveTextContent("1"));
+    await userEvent.click(tab("Archived"));
+    await userEvent.click(await screen.findByRole("button", { name: "GPT-3" })); // an archived title opens details
+    await userEvent.click(await screen.findByRole("button", { name: "Open" }));
+    expect(await screen.findByText("Archived · read-only")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Restore" }));
+    expect(l.restore).toHaveBeenCalledExactlyOnceWith("d7");
+    await waitFor(() => expect(screen.queryByText("Archived · read-only")).toBeNull());
+    expect(screen.getByRole("dialog", { name: "GPT-3" })).toBeVisible();
+    await waitFor(() => expect(tab("Archived")).toHaveTextContent("0"));
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(await screen.findByText("Document details")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Archive" })).toBeVisible(); // details reloaded as active
+    await waitFor(() => expect(screen.getByRole("button", { name: "Open" })).toHaveFocus());
+  });
+
+  it("shows the error card with Retry in the overlay", async () => {
+    const l = library([ready], []);
+    l.deps.loadFile.mockRejectedValueOnce(new Error("offline"));
+    page(l);
+    await userEvent.click(await screen.findByRole("button", { name: "ReAct" }));
+    expect(await screen.findByText("We couldn't open this document.")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("p. 1 / 3")).toBeVisible();
+  });
+
+  it("ignores a page drop while the viewer is open", async () => {
+    const l = library([ready], []);
+    const upload = vi.fn();
+    render(<LibraryPage loadSubjects={noSubjects} check={notInLibrary} loadLimits={limits} load={l.load} upload={upload} loadDetails={l.loadDetails} viewerDeps={l.deps} />);
+    await userEvent.click(await screen.findByRole("button", { name: "ReAct" }));
+    await screen.findByText("p. 1 / 3");
+    const file = new File(["%PDF"], "a.pdf", { type: "application/pdf" });
+    fireEvent.drop(document.body, { dataTransfer: { types: ["Files"], files: [file] } });
+    expect(upload).not.toHaveBeenCalled();
   });
 });
