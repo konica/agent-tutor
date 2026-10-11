@@ -4,6 +4,7 @@
 Usage:
   python3 deploy/pilot/smoke_test.py <url> [--deadline-seconds 600] [--interval-seconds 15]
   SMOKE_TEST_USERNAME=... SMOKE_TEST_PASSWORD=... python3 deploy/pilot/smoke_test.py <url> --end-to-end
+  LANGSMITH_API_KEY=... SMOKE_TEST_USERNAME=... SMOKE_TEST_PASSWORD=... python3 deploy/pilot/smoke_test.py <url> --end-to-end --trace-project smart-tutor-on-premise
 
 <url> is the public address, e.g. https://<id>.cloudfront.net or the on-premise https://<host>.
 
@@ -16,6 +17,10 @@ passphrase, and require a cited answer from that document. It deletes the docume
 the thread is kept, as every thread is. The same deadline covers the whole run. Use a dedicated test learner: the
 document's subject may add one subject, "Smoke testing", to the shared catalog. Credentials come from the
 environment and are never printed.
+
+--trace-project then reads the ask's run id from the conversation's turns and waits for its trace in that LangSmith
+project (#229): named `ask`, with the run metadata of PRD §10.4, and holding neither the access token nor the
+username. LANGSMITH_ENDPOINT defaults to https://api.smith.langchain.com. The key is never printed.
 
 Exit 0 when everything passes, 1 otherwise. Standard library only.
 """
@@ -44,6 +49,17 @@ CLIENT_ID = "smart-tutor-web"
 QUESTION = "What is the Smart Tutor smoke test passphrase?"
 NEW_SUBJECT = "Smoke testing"  # one fixed name, so the shared catalog gains at most one subject from smoke tests
 ANSWER_TIMEOUT = 120  # the agent may think for a while before its first event
+TRACE_METADATA = (
+    "deployment",
+    "chat_model",
+    "embedding_model",
+    "thread_id",
+    "learner_hash",
+    "limited",
+    "decline",
+    "chunks",
+)
+DEFAULT_LANGSMITH_ENDPOINT = "https://api.smith.langchain.com"
 
 
 @dataclass(frozen=True)
@@ -379,6 +395,7 @@ class _Run:
 
     run_id: str
     document_id: str | None = None
+    thread_id: str | None = None
 
 
 def upload(s: _Session, run: _Run) -> str:
@@ -514,6 +531,8 @@ def ask(s: _Session, run: _Run) -> None:
         cited: set[str] = set()
         for event, data in _sse_events(iter(r.readline, b"")):
             seen.add(event)
+            if event == "thread" and isinstance(data, dict):
+                run.thread_id = str(data.get("thread_id"))
             if event == "error":
                 detail = data if isinstance(data, dict) else {}
                 raise SmokeTestError(
@@ -536,6 +555,124 @@ def ask(s: _Session, run: _Run) -> None:
         )
 
 
+def _langsmith(
+    s: _Session,
+    method: str,
+    endpoint: str,
+    path: str,
+    api_key: str,
+    body: object | None = None,
+) -> Response:
+    """A LangSmith REST call: the API key only, never the learner's bearer token."""
+    return s.request(
+        method,
+        endpoint.rstrip("/") + path,
+        data=json.dumps(body).encode() if body is not None else None,
+        headers={"x-api-key": api_key, "Content-Type": "application/json"},
+    )
+
+
+def check_trace(
+    s: _Session,
+    run: _Run,
+    project: str,
+    endpoint: str,
+    api_key: str,
+    username: str,
+) -> str:
+    """Wait for the ask's trace in the LangSmith project; require its name, metadata, and no leaked secrets."""
+    r = s.api("GET", f"/api/threads/{run.thread_id}/turns")
+    if r.status != 200:
+        raise SmokeTestError(
+            f"trace: GET the thread's turns gave {r.status}, expected 200"
+        )
+    turns = _json(r, "trace")
+    last = turns[-1] if isinstance(turns, list) and turns else None
+    run_id = last.get("run_id") if isinstance(last, dict) else None
+    if not isinstance(run_id, str) or not run_id:
+        raise SmokeTestError("trace: the turn has no run id")
+
+    def refused(r: Response) -> bool:
+        return r.status in (401, 403)
+
+    quoted = urllib.parse.quote(project, safe="")
+    r = _langsmith(s, "GET", endpoint, f"/sessions?name={quoted}", api_key)
+    if refused(r):
+        raise SmokeTestError("trace: LangSmith refused the API key")
+    if r.status != 200:
+        raise SmokeTestError(f"trace: LangSmith projects gave {r.status}, expected 200")
+    sessions = _json(r, "trace")
+    project_id = next(
+        (
+            x.get("id")
+            for x in (sessions if isinstance(sessions, list) else [])
+            if isinstance(x, dict) and x.get("name") == project
+        ),
+        None,
+    )
+    if not project_id:
+        raise SmokeTestError(f"trace: no LangSmith project {project}")
+
+    root: dict[str, object] = {}
+    try:
+        while True:
+            r = _langsmith(s, "GET", endpoint, f"/runs/{run_id}", api_key)
+            if refused(r):
+                raise SmokeTestError("trace: LangSmith refused the API key")
+            if r.status == 200:
+                found = _json(r, "trace")
+                if isinstance(found, dict):
+                    extra = found.get("extra")
+                    meta = extra.get("metadata") if isinstance(extra, dict) else None
+                    if (
+                        found.get("end_time")
+                        and isinstance(meta, dict)
+                        and "decline" in meta
+                    ):
+                        root = found
+                        break
+            s.wait("the ask's trace")
+    except SmokeTestError as e:
+        if "the deadline passed" not in str(e):
+            raise
+        raise SmokeTestError(
+            f"trace: run {run_id} never reached LangSmith "
+            "(is tracing on, and the sampling rate trace-sampling-rate 1?)"
+        ) from None
+
+    if root.get("name") != "ask":
+        raise SmokeTestError(
+            f"trace: run {run_id} is named {root.get('name')!r}, expected 'ask'"
+        )
+    if root.get("session_id") != project_id:
+        raise SmokeTestError(f"trace: run {run_id} is not in the project {project}")
+    extra = root.get("extra")
+    metadata = extra.get("metadata", {}) if isinstance(extra, dict) else {}
+    missing = [k for k in TRACE_METADATA if k not in metadata]
+    if missing:
+        raise SmokeTestError(f"trace: the ask run lacks metadata {', '.join(missing)}")
+    if metadata["thread_id"] != run.thread_id:
+        raise SmokeTestError("trace: the ask run belongs to another thread")
+
+    r = _langsmith(
+        s, "POST", endpoint, "/runs/query", api_key, {"trace": run_id, "limit": 100}
+    )
+    if refused(r):
+        raise SmokeTestError("trace: LangSmith refused the API key")
+    if r.status != 200:
+        raise SmokeTestError(
+            f"trace: LangSmith run query gave {r.status}, expected 200"
+        )
+    queried = _json(r, "trace")
+    runs = queried.get("runs", []) if isinstance(queried, dict) else []
+    blob = json.dumps(runs)
+    if s.token and s.token in blob:
+        raise SmokeTestError("trace: the trace holds the learner's access token")
+    if username and username in blob:
+        raise SmokeTestError("trace: the trace names the learner (username found)")
+    return f"ask trace {run_id} is in {project}"
+
+
 def clean_up(s: _Session, run: _Run) -> str | None:
     """Delete the run's document; a failure message, or None. Threads are kept, so the thread stays."""
     if run.document_id is None or s.token is None:
@@ -554,7 +691,12 @@ def clean_up(s: _Session, run: _Run) -> str | None:
 
 
 def run_end_to_end(
-    base: str, deadline: float, interval: float, username: str, password: str
+    base: str,
+    deadline: float,
+    interval: float,
+    username: str,
+    password: str,
+    trace: tuple[str, str, str] | None = None,
 ) -> int:
     s = _Session(base, deadline, interval)
     run = _Run(secrets.token_hex(4))
@@ -568,6 +710,8 @@ def run_end_to_end(
         print("document ready")
         ask(s, run)
         print("cited answer received")
+        if trace:
+            print(check_trace(s, run, *trace, username))
     except SmokeTestError as e:
         failure = str(e)
     except (http.client.HTTPException, OSError, KeyError, TypeError, ValueError) as e:
@@ -594,7 +738,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="also sign in as SMOKE_TEST_USERNAME, upload a PDF, and require a cited answer",
     )
+    parser.add_argument(
+        "--trace-project",
+        help="also require the ask's trace in this LangSmith project (needs LANGSMITH_API_KEY)",
+    )
     args = parser.parse_args(argv)
+
+    trace: tuple[str, str, str] | None = None
+    if args.trace_project:
+        if not args.end_to_end:
+            print("--trace-project needs --end-to-end")
+            return 1
+        langsmith_key = os.environ.get("LANGSMITH_API_KEY", "")
+        if not langsmith_key:
+            print("--trace-project needs LANGSMITH_API_KEY in the environment")
+            return 1
+        endpoint = os.environ.get("LANGSMITH_ENDPOINT", DEFAULT_LANGSMITH_ENDPOINT)
+        trace = (args.trace_project, endpoint, langsmith_key)
 
     username = os.environ.get("SMOKE_TEST_USERNAME", "")
     password = os.environ.get("SMOKE_TEST_PASSWORD", "")
@@ -619,6 +779,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     args.interval_seconds,
                     username,
                     password,
+                    trace,
                 )
             return 0
         if time.monotonic() + args.interval_seconds > deadline:

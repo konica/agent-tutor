@@ -211,6 +211,8 @@ UPLOAD = "33333333-3333-3333-3333-333333333333"
 SUBJECT = "44444444-4444-4444-4444-444444444444"
 THREAD = "55555555-5555-5555-5555-555555555555"
 REALM = "/auth/realms/smart-tutor"
+LANGSMITH_KEY = "lsv2-test-not-a-key"
+QUESTION_TEXT = "What is the Smart Tutor smoke test passphrase?"
 
 
 def _sse(event: str, data: object) -> bytes:
@@ -236,7 +238,12 @@ class FakePilot:
         self.cited_document = DOC
         self.stream: list[bytes] | None = None
         self.delete_status = 204
+        self.trace_run_id = "99999999-8888-4777-8666-555555555555"
+        self.trace_runs: list[dict] | None = None  # default: built in _langsmith
+        self.trace_after_polls = 1  # the root run appears on the 2nd poll
         # What happened
+        self.trace_polls = 0
+        self.langsmith_keys: list[str | None] = []
         self.state = "processing"
         self.document_polls = 0
         self.auth_request: dict[str, str] = {}
@@ -258,6 +265,48 @@ class FakePilot:
             "state": self.state,
             "failure_reason": self.failure_reason if self.state == "failed" else None,
         }
+
+    def _ask_run(self) -> dict[str, object]:
+        return {
+            "id": self.trace_run_id,
+            "trace_id": self.trace_run_id,
+            "name": "ask",
+            "session_id": "proj-1",
+            "end_time": "2026-10-11T00:00:05Z",
+            "inputs": {"question": "What is the passphrase?"},
+            "extra": {
+                "metadata": {
+                    "deployment": "on-premise",
+                    "chat_model": "m",
+                    "embedding_model": "e",
+                    "thread_id": THREAD,
+                    "learner_hash": "ab" * 32,
+                    "limited": False,
+                    "decline": "none",
+                    "chunks": 2,
+                }
+            },
+        }
+
+    def _langsmith(
+        self, method: str, path: str, headers: dict[str, str], body: bytes
+    ) -> Route:
+        self.langsmith_keys.append(headers.get("x-api-key"))
+        if headers.get("x-api-key") != LANGSMITH_KEY:
+            return self._json(401, {"detail": "bad key"})
+        if method == "GET" and path == "/ls/sessions":
+            return self._json(200, [{"id": "proj-1", "name": "smart-tutor-on-premise"}])
+        if method == "GET" and path == f"/ls/runs/{self.trace_run_id}":
+            self.trace_polls += 1
+            if self.trace_polls <= self.trace_after_polls:
+                return self._json(404, {"detail": "not found"})
+            runs = self.trace_runs if self.trace_runs is not None else [self._ask_run()]
+            return self._json(200, runs[0])
+        if method == "POST" and path == "/ls/runs/query":
+            assert json.loads(body)["trace"] == self.trace_run_id
+            runs = self.trace_runs if self.trace_runs is not None else [self._ask_run()]
+            return self._json(200, {"runs": runs, "cursors": {"next": None}})
+        return 404, {}, b""
 
     def _login_form(self, message: str = "") -> Route:
         action = (
@@ -330,6 +379,8 @@ class FakePilot:
                 name = part.get_param("name", header="content-disposition")
                 self.s3_parts.append((str(name), part.get_payload(decode=True)))
             return 204, {}, b""
+        if path.startswith("/ls/"):
+            return self._langsmith(method, path, headers, body)
         if path.startswith("/api/"):
             if headers.get("authorization") != f"Bearer {TOKEN}":
                 self.api_without_token.append(path)
@@ -401,6 +452,16 @@ class FakePilot:
                 _sse("done", {}),
             ]
             return 200, {"Content-Type": "text/event-stream"}, b"".join(events)
+        if method == "GET" and path == f"/api/threads/{THREAD}/turns":
+            turn = {
+                "question": QUESTION_TEXT,
+                "answer": "The passphrase is in your document [1].",
+                "citations": [],
+                "decline": None,
+                "created_at": "2026-10-11T00:00:00Z",
+                "run_id": self.trace_run_id,
+            }
+            return self._json(200, [turn])
         if method == "DELETE" and path == f"/api/documents/{DOC}":
             if self.delete_status == 204:
                 self.deleted.append(DOC)
@@ -565,3 +626,90 @@ def test_smoke_pdf_has_enough_text_per_page_to_not_read_as_scanned() -> None:
     assert len("".join(text.split())) >= 50
     pdf = smoke.make_pdf([text])
     assert pdf.startswith(b"%PDF-1.4") and pdf.rstrip().endswith(b"%%EOF")
+
+
+# --- The ask's trace in LangSmith (#229) ---------------------------------------------------------------------------
+
+
+def run_with_trace(pilot: FakePilot, monkeypatch) -> int:
+    monkeypatch.setenv("LANGSMITH_API_KEY", LANGSMITH_KEY)
+    monkeypatch.setenv("LANGSMITH_ENDPOINT", f"{pilot.base}/ls")
+    return smoke.main(
+        [
+            pilot.base,
+            "--end-to-end",
+            "--trace-project",
+            "smart-tutor-on-premise",
+            "--deadline-seconds",
+            "10",
+            "--interval-seconds",
+            "0.05",
+        ]
+    )
+
+
+def test_trace_check_finds_the_ask_trace_with_its_metadata(
+    pilot, monkeypatch, capsys
+) -> None:
+    assert run_with_trace(pilot, monkeypatch) == 0
+    out = output_without_secrets(capsys)
+    assert LANGSMITH_KEY not in out
+    assert f"ask trace {pilot.trace_run_id} is in smart-tutor-on-premise" in out
+    assert pilot.trace_polls >= 2  # it waited for the trace to arrive
+
+
+def test_trace_with_the_token_fails(pilot, monkeypatch, capsys) -> None:
+    leaked = pilot._ask_run()
+    leaked["inputs"] = {"question": "q", "token": TOKEN}
+    pilot.trace_runs = [leaked]
+    assert run_with_trace(pilot, monkeypatch) == 1
+    out = capsys.readouterr().out
+    assert "the trace holds the learner's access token" in out
+    assert TOKEN not in out
+
+
+def test_trace_with_the_username_fails(pilot, monkeypatch, capsys) -> None:
+    leaked = pilot._ask_run()
+    leaked["extra"]["metadata"]["user"] = USERNAME  # type: ignore[index]
+    pilot.trace_runs = [leaked]
+    assert run_with_trace(pilot, monkeypatch) == 1
+    assert "the trace names the learner" in output_without_secrets(capsys)
+
+
+def test_trace_missing_metadata_fails_naming_the_keys(
+    pilot, monkeypatch, capsys
+) -> None:
+    run = pilot._ask_run()
+    del run["extra"]["metadata"]["learner_hash"]  # type: ignore[index]
+    pilot.trace_runs = [run]
+    assert run_with_trace(pilot, monkeypatch) == 1
+    assert "learner_hash" in output_without_secrets(capsys)
+
+
+def test_trace_in_another_project_fails(pilot, monkeypatch, capsys) -> None:
+    run = pilot._ask_run()
+    run["session_id"] = "proj-other"
+    pilot.trace_runs = [run]
+    assert run_with_trace(pilot, monkeypatch) == 1
+    assert "not in the project smart-tutor-on-premise" in output_without_secrets(capsys)
+
+
+def test_trace_that_never_arrives_fails_naming_the_run_and_sampling(
+    pilot, monkeypatch, capsys
+) -> None:
+    pilot.trace_after_polls = 10**6
+    assert run_with_trace(pilot, monkeypatch) == 1
+    out = output_without_secrets(capsys)
+    assert pilot.trace_run_id in out and "sampling rate" in out
+    assert pilot.deleted == [DOC]  # cleanup still ran
+
+
+def test_trace_project_needs_the_api_key_and_end_to_end(
+    pilot, monkeypatch, capsys
+) -> None:
+    monkeypatch.delenv("LANGSMITH_API_KEY", raising=False)
+    assert smoke.main([pilot.base, "--end-to-end", "--trace-project", "p"]) == 1
+    assert "LANGSMITH_API_KEY" in capsys.readouterr().out
+    monkeypatch.setenv("LANGSMITH_API_KEY", LANGSMITH_KEY)
+    assert smoke.main([pilot.base, "--trace-project", "p"]) == 1
+    assert "--trace-project needs --end-to-end" in capsys.readouterr().out
