@@ -3,7 +3,9 @@ import type { Client } from "./generated/client";
 import { client } from "./generated/client.gen";
 import {
   addThreadDocuments as addThreadDocumentsSdk,
+  getThread,
   listThreadDocuments,
+  listThreadTurns,
   removeThreadDocument as removeThreadDocumentSdk,
   updateThread,
 } from "./generated/sdk.gen";
@@ -15,14 +17,26 @@ import type {
   AskInThreadErrors,
   AskInThreadResponses,
   ThreadDocumentResponse,
+  ThreadResponse,
+  TurnResponse,
 } from "./generated/types.gen";
 import { failure, sessionOver } from "./documents";
 import { parseSse } from "./sse";
 
-export type { ThreadDocumentResponse };
+export type { ThreadDocumentResponse, ThreadResponse, TurnResponse };
+export type Conversation = { thread: ThreadResponse; turns: TurnResponse[] };
 
-/** `n` is the number of the answer's inline [n] marker that points at this citation. */
-export type ChatCitation = { n: number; chunk_id: string; document_id: string; document_title: string; page: number | null };
+/** `n` is the number of the answer's inline [n] marker that points at this citation. `archived` and `deleted` come
+ * only with a conversation's history; a live answer's citation has neither. */
+export type ChatCitation = {
+  n: number;
+  chunk_id: string;
+  document_id: string;
+  document_title: string;
+  page: number | null;
+  archived?: boolean;
+  deleted?: boolean;
+};
 
 export type ChatEvent =
   | { type: "thread"; thread_id: string }
@@ -40,6 +54,14 @@ export class NoDocumentsError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "NoDocumentsError";
+  }
+}
+
+/** 404 (unknown, or another learner's) or 422 (not a conversation id) from a conversation's URL. */
+export class ConversationNotFoundError extends Error {
+  constructor() {
+    super("Conversation not found");
+    this.name = "ConversationNotFoundError";
   }
 }
 
@@ -128,6 +150,24 @@ export async function loadDocumentsUsed(threadId: string, apiClient: Client = cl
   if (sessionOver(error, response)) throw new SessionExpiredError();
   if (!data) throw new Error(`GET /threads/${threadId}/documents failed (${response?.status ?? "no response"})`);
   return data;
+}
+
+// A conversation at its URL: its title and scope, and its turns oldest first (owner only).
+export async function loadConversation(threadId: string, apiClient: Client = client): Promise<Conversation> {
+  const path = { thread_id: threadId };
+  const [thread, turns] = await Promise.all([
+    getThread({ client: apiClient, path, throwOnError: false }),
+    listThreadTurns({ client: apiClient, path, throwOnError: false }),
+  ]);
+  for (const { error, response } of [thread, turns]) {
+    if (sessionOver(error, response)) throw new SessionExpiredError();
+    if (response?.status === 404 || response?.status === 422) throw new ConversationNotFoundError();
+  }
+  if (!thread.data || !turns.data) {
+    const status = (thread.data ? turns : thread).response?.status ?? "no response";
+    throw new Error(`GET /threads/${threadId} failed (${status})`);
+  }
+  return { thread: thread.data, turns: turns.data };
 }
 
 // Adds the learner's ready documents to the conversation's list and returns the full list. All or nothing: a document

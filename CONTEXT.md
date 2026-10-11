@@ -46,6 +46,9 @@ The subjects of a learner's ready, non-archived documents. They organize and fil
 One conversation. Has no subjects; answers from all of the learner's ready, non-archived documents and keeps its **documents used**.
 _Avoid_: Chat, session, conversation (in code; "conversation" is fine in UI copy)
 
+**Turn**:
+One question and its answer (or decline) in a thread, kept when the answer ends with `done`. A thread's turns, oldest first, are its history; a reopened conversation shows them.
+
 **Documents used**:
 The documents whose chunks were given to the model for a conversation's answered turns, in order of first use. A deleted one stays listed as "Deleted" and can't be opened.
 

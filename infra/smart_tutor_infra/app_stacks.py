@@ -40,7 +40,7 @@ def _budgets(app: cdk.App, env: cdk.Environment, names: ModeNames) -> BudgetsSta
 
 def _on_premise(app: cdk.App, env: cdk.Environment, names: ModeNames) -> list[cdk.Stack]:
     """Storage, Config, Budgets, GitHubDeploy, and Registry of its own, and the Host; it shares no stack with
-    native-cloud (ADR 0015). The Host names its repositories through ModeNames, so it never references the Registry
+    native-cloud (ADR 0016). The Host names its repositories through ModeNames, so it never references the Registry
     stack."""
     prefix = names.stack_prefix
     deploy = GitHubDeployStack(

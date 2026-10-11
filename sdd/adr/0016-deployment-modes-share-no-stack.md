@@ -1,4 +1,4 @@
-# 0015. Deployment modes share no stack
+# 0016. Deployment modes share no stack
 
 - Status: accepted
 - Date: 2026-10-11

@@ -1,9 +1,10 @@
-"""POST /threads: start a thread, forward the same token to the agent, relay its SSE stream, record the documents
-used on `done`; GET /threads/{id}/documents lists them."""
+"""POST /threads: start a thread, forward the same token to the agent, relay its SSE stream, keep the answer as a turn
+and record the documents used on `done`; GET /threads/{id}/documents lists the documents and GET /threads/{id}/turns
+the turns."""
 
 import json
 import uuid
-from collections.abc import AsyncIterator, Callable, Sequence
+from collections.abc import AsyncIterator, Callable
 from typing import Any
 
 import httpx
@@ -24,7 +25,7 @@ from smart_tutor.knowledge.application import DocumentService
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.shared.domain.principal import Principal
-from smart_tutor.tutoring.application import ConversationService, Thread
+from smart_tutor.tutoring.application import AnsweredTurn, ConversationService, Thread
 from smart_tutor.tutoring.domain.thread import ThreadStatus
 
 AUTH = {"Authorization": "Bearer t-ada"}
@@ -422,7 +423,7 @@ def test_a_stream_closed_before_done_records_nothing(tail: bytes) -> None:
     assert documents_of(client, threads) == []
 
 
-def test_a_decline_records_nothing() -> None:
+def test_an_answer_without_sources_records_no_documents() -> None:
     client, _, threads, _ = ask_with(lambda ids: DELTA + NO_CITATIONS + DONE)
 
     response = client.post("/threads", json=QUESTION, headers=AUTH)
@@ -431,9 +432,24 @@ def test_a_decline_records_nothing() -> None:
     assert documents_of(client, threads) == []
 
 
+def test_a_sources_id_that_isnt_a_uuid_is_dropped_and_the_turn_kept(caplog: pytest.LogCaptureFixture) -> None:
+    client, _, threads, ids = ask_with(
+        lambda ids: DELTA + sources("not-a-uuid", "{" + ids[0].upper() + "}") + NO_CITATIONS + DONE
+    )
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    assert response.text.endswith(DONE.decode())
+    assert len(turns_of(client, threads)) == 1
+    [used] = documents_of(client, threads)
+    assert used["document_id"] == ids[0] and used["deleted"] is False
+    assert "the agent's sources were partly malformed" in caplog.text
+
+
 class _FailingRecord(ConversationService):
-    def record_answer(self, thread_id: ThreadId, user_id: UserId, document_ids: Sequence[DocumentId]) -> None:
-        raise RuntimeError("database down")
+    def record_turn(self, thread_id: ThreadId, user_id: UserId, turn: AnsweredTurn) -> None:
+        # Like a database error, whose message carries the bound parameters.
+        raise RuntimeError(f"database down: {turn.question}")
 
 
 def test_a_failed_record_still_ends_with_done(caplog: pytest.LogCaptureFixture) -> None:
@@ -442,7 +458,9 @@ def test_a_failed_record_still_ends_with_done(caplog: pytest.LogCaptureFixture) 
     response = client.post("/threads", json=QUESTION, headers=AUTH)
 
     assert response.status_code == 200 and response.text.endswith(DONE.decode())
-    assert "recording the documents used failed" in caplog.text
+    assert "keeping the turn failed (RuntimeError)" in caplog.text
+    assert QUESTION["question"] not in caplog.text and "Traceback" not in caplog.text
+    assert turns_of(client, threads) == []
     assert documents_of(client, threads) == []
 
 
@@ -687,7 +705,7 @@ def test_a_question_in_a_thread_records_its_documents() -> None:
     assert [d["document_id"] for d in documents_of(client, threads)] == [ids[1]]
 
 
-def test_a_limited_decline_is_relayed_and_records_nothing() -> None:
+def test_a_limited_decline_is_relayed_and_records_no_documents() -> None:
     decline = b'event: decline\ndata: {"code": "limited", "message": "Not in these documents."}\n\n'
     seen: list[httpx.Request] = []
     client, threads, thread_id, _ = limited_thread(seen, event_stream(decline + DONE))
@@ -801,3 +819,149 @@ def test_openapi_declares_the_starting_document_and_its_404() -> None:
     operation = spec["paths"]["/threads"]["post"]
     assert "404" in operation["responses"]
     assert "document_id" in spec["components"]["schemas"]["AskRequest"]["properties"]
+
+
+def cite(n: int, document_id: str, chunk_id: str = "c1", page: int | None = 3, title: str = "a.pdf") -> dict[str, Any]:
+    return {"n": n, "chunk_id": chunk_id, "document_id": document_id, "document_title": title, "page": page}
+
+
+def citations_event(*items: object) -> bytes:
+    return f"event: citations\ndata: {json.dumps({'citations': list(items)})}\n\n".encode()
+
+
+def turns_of(client: TestClient, threads: InMemoryThreads) -> list[dict[str, Any]]:
+    [thread] = threads.threads.values()
+    response = client.get(f"/threads/{thread.thread_id}/turns", headers=AUTH)
+    assert response.status_code == 200
+    body: list[dict[str, Any]] = response.json()
+    return body
+
+
+def test_a_done_answer_is_kept_as_a_turn_with_its_citations() -> None:
+    two_deltas = b'event: delta\ndata: {"text": "It weighs "}\n\nevent: delta\ndata: {"text": "tokens [1]."}\n\n'
+    client, library, threads, ids = ask_with(
+        lambda ids: two_deltas + sources(ids[0]) + citations_event(cite(1, ids[0])) + DONE
+    )
+
+    client.post("/threads", json=QUESTION, headers=AUTH)
+
+    [turn] = turns_of(client, threads)
+    title = library.state.documents[ids[0]].file_name
+    assert turn["question"] == "What is attention?" and turn["answer"] == "It weighs tokens [1]."
+    assert turn["decline"] is None
+    assert turn["citations"] == [
+        {
+            "n": 1,
+            "chunk_id": "c1",
+            "document_id": ids[0],
+            "document_title": title,
+            "page": 3,
+            "archived": False,
+            "deleted": False,
+        }
+    ]
+    assert set(turn) == {"question", "answer", "citations", "decline", "created_at"}
+
+
+def test_a_decline_is_kept_as_a_turn() -> None:
+    decline = b'event: decline\ndata: {"code": "limited", "message": "These documents don\'t cover this."}\n\n'
+    client, _, threads, _ = ask_with(lambda ids: decline + DONE)
+
+    client.post("/threads", json=QUESTION, headers=AUTH)
+
+    [turn] = turns_of(client, threads)
+    assert turn["answer"] == "" and turn["citations"] == []
+    assert turn["decline"] == {"code": "limited", "message": "These documents don't cover this."}
+
+
+@pytest.mark.parametrize(
+    "tail", [AGENT_ERROR, b"", b'event: citations\ndata: {"cit'], ids=["error", "clean-end", "inside-an-event"]
+)
+def test_an_answer_that_doesnt_end_with_done_keeps_no_turn(tail: bytes) -> None:
+    client, _, threads, _ = ask_with(lambda ids: DELTA + sources(*ids) + tail)
+
+    client.post("/threads", json=QUESTION, headers=AUTH)
+
+    assert turns_of(client, threads) == []
+
+
+def test_a_malformed_citation_is_skipped_and_the_turn_is_kept(caplog: pytest.LogCaptureFixture) -> None:
+    bad = [
+        {"n": 2, "chunk_id": "c2", "document_title": "x", "page": 1},  # no document_id
+        cite(3, "not-a-uuid"),
+        {**cite(4, str(uuid.uuid4())), "n": "4"},
+        {**cite(5, str(uuid.uuid4())), "page": "5"},
+    ]
+    client, _, threads, ids = ask_with(lambda ids: DELTA + citations_event(cite(1, ids[0]), *bad) + DONE)
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    assert response.text.endswith(DONE.decode())
+    [turn] = turns_of(client, threads)
+    assert [c["n"] for c in turn["citations"]] == [1]
+    assert "the agent's citations were partly malformed" in caplog.text
+
+
+@pytest.mark.parametrize("form", ["upper", "braced", "urn", "hex"])
+def test_a_citation_document_id_is_kept_canonical(form: str) -> None:
+    def written(document_id: str) -> str:
+        value = uuid.UUID(document_id)
+        return {"upper": str(value).upper(), "braced": f"{{{value}}}", "urn": value.urn, "hex": value.hex}[form]
+
+    client, _, threads, ids = ask_with(lambda ids: DELTA + citations_event(cite(1, written(ids[0]))) + DONE)
+
+    client.post("/threads", json=QUESTION, headers=AUTH)
+
+    [turn] = turns_of(client, threads)
+    [citation] = turn["citations"]
+    assert citation["document_id"] == ids[0] and citation["deleted"] is False
+
+
+def test_turns_list_oldest_first_and_resolve_archived_and_deleted() -> None:
+    gone = UNKNOWN_DOCUMENT
+    client, library, threads, ids = ask_with(
+        lambda ids: DELTA + citations_event(cite(1, ids[0]), cite(2, gone, "c9", None)) + DONE
+    )
+    client.post("/threads", json=QUESTION, headers=AUTH)
+    [thread] = threads.threads.values()
+    client.post(f"/threads/{thread.thread_id}/questions", json={"question": "And then?"}, headers=AUTH)
+    library.state.documents[ids[0]].archived = True
+
+    first, second = turns_of(client, threads)
+
+    assert [first["question"], second["question"]] == ["What is attention?", "And then?"]
+    archived, deleted = first["citations"]
+    assert archived["archived"] is True and archived["deleted"] is False
+    assert deleted == {
+        "n": 2,
+        "chunk_id": "c9",
+        "document_id": gone,
+        "document_title": "Deleted document",
+        "page": None,
+        "archived": False,
+        "deleted": True,
+    }
+
+
+def test_turns_of_an_unknown_thread_are_404_and_a_malformed_id_is_422() -> None:
+    client, _, _ = setup()
+    assert client.get(f"/threads/{uuid.uuid4()}/turns", headers=AUTH).status_code == 404
+    assert client.get("/threads/not-a-uuid/turns", headers=AUTH).status_code == 422
+
+
+def test_turns_need_a_token() -> None:
+    client, _, _ = setup()
+    assert client.get(f"/threads/{uuid.uuid4()}/turns").status_code == 401
+
+
+def test_openapi_names_the_turns_list() -> None:
+    client, _, _ = setup()
+    op = client.get("/openapi.json").json()["paths"]["/threads/{thread_id}/turns"]["get"]
+    assert op["operationId"] == "list_thread_turns"
+
+
+def test_a_kept_turn_holds_no_token() -> None:
+    client, _, threads, ids = ask_with(lambda ids: DELTA + citations_event(cite(1, ids[0])) + DONE)
+    client.post("/threads", json=QUESTION, headers=AUTH)
+    [turn] = threads.turn_rows
+    assert "t-ada" not in repr(turn) and turn.user_id == "ada"

@@ -18,7 +18,10 @@ from smart_tutor.knowledge.application import DocumentService, UploadService
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.tutoring.application import (
     DELETED_DOCUMENT,
+    AnsweredTurn,
+    CitationView,
     ConversationService,
+    Decline,
     DocumentNotAvailableError,
     DocumentUsed,
     InvalidTitleError,
@@ -27,6 +30,8 @@ from smart_tutor.tutoring.application import (
     SearchScope,
     ThreadArchivedError,
     ThreadNotFoundError,
+    Turn,
+    TurnCitation,
 )
 from smart_tutor.tutoring.domain.thread import ThreadStatus
 
@@ -80,6 +85,10 @@ def test_an_archived_only_learner_cannot_start_a_thread() -> None:
 LEARNER, OTHER = UserId("ada"), UserId("bob")
 
 
+def answered(*document_ids: DocumentId) -> AnsweredTurn:
+    return AnsweredTurn("What is attention?", "It weighs tokens.", document_ids=document_ids)
+
+
 def started(
     library: InMemoryLibrary,
 ) -> tuple[ConversationService, InMemoryThreads, DocumentId, DocumentId, DocumentId]:
@@ -90,23 +99,23 @@ def started(
     return service(library, threads, FixedClock()), threads, a, b, c
 
 
-def test_record_answer_keeps_first_use_order_without_duplicates() -> None:
+def test_record_turn_keeps_first_use_order_without_duplicates() -> None:
     library = InMemoryLibrary()
     svc, _, a, b, c = started(library)
     thread = svc.start_thread(LEARNER)
 
-    svc.record_answer(thread.thread_id, LEARNER, [a, b, a])
-    svc.record_answer(thread.thread_id, LEARNER, [c, b])
+    svc.record_turn(thread.thread_id, LEARNER, answered(a, b, a))
+    svc.record_turn(thread.thread_id, LEARNER, answered(c, b))
 
     assert [d.document_id for d in svc.documents_used(thread.thread_id, LEARNER)] == [a, b, c]
 
 
-def test_record_answer_with_no_documents_adds_nothing() -> None:  # a decline
+def test_record_turn_with_no_documents_adds_nothing() -> None:  # a decline
     library = InMemoryLibrary()
     svc, threads, _, _, _ = started(library)
     thread = svc.start_thread(LEARNER)
 
-    svc.record_answer(thread.thread_id, LEARNER, [])
+    svc.record_turn(thread.thread_id, LEARNER, answered())
 
     assert svc.documents_used(thread.thread_id, LEARNER) == []
     assert threads.documents_used_rows == {}
@@ -119,7 +128,7 @@ def test_documents_used_show_title_authors_year_and_archived() -> None:
     content.title, content.authors, content.year = "Attention Is All You Need", ["Vaswani", "Shazeer"], 2017
     library.state.documents[b].archived = True
     thread = svc.start_thread(LEARNER)
-    svc.record_answer(thread.thread_id, LEARNER, [a, b])
+    svc.record_turn(thread.thread_id, LEARNER, answered(a, b))
 
     first, second = svc.documents_used(thread.thread_id, LEARNER)
 
@@ -133,7 +142,7 @@ def test_a_document_that_no_longer_exists_reads_as_deleted() -> None:
     svc, _, a, _, _ = started(library)
     thread = svc.start_thread(LEARNER)
     gone = DocumentId("gone")
-    svc.record_answer(thread.thread_id, LEARNER, [a, gone])
+    svc.record_turn(thread.thread_id, LEARNER, answered(a, gone))
 
     _, deleted = svc.documents_used(thread.thread_id, LEARNER)
 
@@ -147,7 +156,7 @@ def test_a_deleted_document_keeps_the_title_copied_when_it_was_deleted() -> None
     svc, threads, a, _, _ = started(library)
     thread = svc.start_thread(LEARNER)
     gone = DocumentId("gone")
-    svc.record_answer(thread.thread_id, LEARNER, [gone])
+    svc.record_turn(thread.thread_id, LEARNER, answered(gone))
     row = threads.documents_used_rows[thread.thread_id][0]
     threads.documents_used_rows[thread.thread_id][0] = replace(row, deleted_title="Old paper")
 
@@ -206,7 +215,7 @@ def test_another_learner_can_neither_record_nor_read() -> None:
     with pytest.raises(ThreadNotFoundError, match="Conversation not found"):
         svc.documents_used(thread.thread_id, OTHER)
     with pytest.raises(ThreadNotFoundError):
-        svc.record_answer(thread.thread_id, OTHER, [a])
+        svc.record_turn(thread.thread_id, OTHER, answered(a))
     assert threads.documents_used_rows == {}
 
 
@@ -217,8 +226,10 @@ def test_a_deleted_document_keeps_its_title_in_the_learners_threads_only() -> No
     ingest_ready(library, "bob", "Something else.")
     thread_a = svc.start_thread(LEARNER)
     thread_b = svc.start_thread(other)
-    svc.record_answer(thread_a.thread_id, LEARNER, [doc])
-    svc.record_answer(thread_b.thread_id, other, [doc])  # cannot happen in practice; the update is scoped by owner
+    svc.record_turn(thread_a.thread_id, LEARNER, answered(doc))
+    svc.record_turn(
+        thread_b.thread_id, other, answered(doc)
+    )  # cannot happen in practice; the update is scoped by owner
 
     svc.keep_deleted_title(LEARNER, doc, "Chain-of-Thought Prompting")
     library.state.documents.pop(doc)
@@ -235,7 +246,7 @@ def test_an_answer_saved_after_the_delete_lists_the_document_as_deleted() -> Non
     thread = svc.start_thread(LEARNER)
 
     library.state.documents.pop(doc)
-    svc.record_answer(thread.thread_id, LEARNER, [doc])
+    svc.record_turn(thread.thread_id, LEARNER, answered(doc))
 
     used = svc.documents_used(thread.thread_id, LEARNER)
     assert [(d.title, d.deleted) for d in used] == [(DELETED_DOCUMENT, True)]
@@ -245,12 +256,12 @@ def test_the_learner_adds_ready_documents_listed_as_added_and_unused() -> None:
     library = InMemoryLibrary()
     svc, _, used, added, _ = started(library)
     thread = svc.start_thread(LEARNER)
-    svc.record_answer(thread.thread_id, LEARNER, [used])
+    svc.record_turn(thread.thread_id, LEARNER, answered(used))
 
     listed = svc.add_documents(thread.thread_id, LEARNER, [added, used])
 
     assert [(d.document_id, d.added_by, d.used) for d in listed] == [(used, "answer", True), (added, "learner", False)]
-    svc.record_answer(thread.thread_id, LEARNER, [added])
+    svc.record_turn(thread.thread_id, LEARNER, answered(added))
     assert [(d.document_id, d.added_by, d.used) for d in svc.documents_used(thread.thread_id, LEARNER)] == [
         (used, "answer", True),
         (added, "learner", True),
@@ -294,13 +305,13 @@ def test_removing_a_document_takes_it_off_the_list_until_an_answer_uses_it_again
     library = InMemoryLibrary()
     svc, _, a, b, _ = started(library)
     thread = svc.start_thread(LEARNER)
-    svc.record_answer(thread.thread_id, LEARNER, [a, b])
+    svc.record_turn(thread.thread_id, LEARNER, answered(a, b))
 
     svc.remove_document(thread.thread_id, LEARNER, a)
 
     assert [d.document_id for d in svc.documents_used(thread.thread_id, LEARNER)] == [b]
     assert a in library.state.documents and not library.state.documents[a].archived
-    svc.record_answer(thread.thread_id, LEARNER, [a])
+    svc.record_turn(thread.thread_id, LEARNER, answered(a))
     listed = svc.documents_used(thread.thread_id, LEARNER)
     assert [d.document_id for d in listed] == [b, a]
     assert listed[1].added_by == "answer"
@@ -311,7 +322,7 @@ def test_another_learner_can_neither_add_nor_remove() -> None:
     svc, _, a, b, _ = started(library)
     ingest_ready(library, "bob", "Bob's paper.")
     thread = svc.start_thread(LEARNER)
-    svc.record_answer(thread.thread_id, LEARNER, [a])
+    svc.record_turn(thread.thread_id, LEARNER, answered(a))
 
     with pytest.raises(ThreadNotFoundError, match="Conversation not found"):
         svc.add_documents(thread.thread_id, OTHER, [b])
@@ -389,7 +400,7 @@ def test_a_thread_started_from_a_document_lists_it_as_added_then_marks_it_used()
 
     [row] = svc.documents_used(thread.thread_id, LEARNER)
     assert (row.document_id, row.added_by, row.used) == (doc, "learner", False)
-    svc.record_answer(thread.thread_id, LEARNER, [doc, other])
+    svc.record_turn(thread.thread_id, LEARNER, answered(doc, other))
     assert [(d.document_id, d.added_by, d.used) for d in svc.documents_used(thread.thread_id, LEARNER)] == [
         (doc, "learner", True),
         (other, "answer", True),
@@ -426,3 +437,65 @@ def test_a_thread_starts_only_from_the_learners_ready_active_document(kind: str)
         svc.start_thread(LEARNER, "q", bad)
 
     assert threads.threads == {}
+
+
+def test_record_turn_keeps_the_turn_with_its_time_and_owner() -> None:
+    library, threads, clock = InMemoryLibrary(), InMemoryThreads(), FixedClock()
+    doc = DocumentId(ingest_ready(library, "ada", "Attention weighs tokens."))
+    svc = service(library, threads, clock)
+    thread = svc.start_thread(LEARNER, "What is attention?")
+    citation = TurnCitation(1, doc, "c1", 3)
+    answer = AnsweredTurn("What is attention?", "It weighs [1].", (citation,), document_ids=(doc, doc))
+
+    svc.record_turn(ThreadId(thread.thread_id), LEARNER, answer)
+
+    [kept] = threads.turn_rows
+    expected = Turn(
+        ThreadId(thread.thread_id), LEARNER, "What is attention?", "It weighs [1].", (citation,), None, clock.now()
+    )
+    assert kept == expected
+    assert [row.document_id for row in threads.documents_used(ThreadId(thread.thread_id))] == [doc]
+
+
+def test_record_turn_in_another_learners_thread_is_not_found_and_keeps_nothing() -> None:
+    library, threads, clock = InMemoryLibrary(), InMemoryThreads(), FixedClock()
+    ingest_ready(library, "ada", "Attention weighs tokens.")
+    svc = service(library, threads, clock)
+    thread = svc.start_thread(LEARNER, "Q")
+
+    with pytest.raises(ThreadNotFoundError):
+        svc.record_turn(ThreadId(thread.thread_id), OTHER, AnsweredTurn("Q", "A"))
+    assert threads.turn_rows == []
+
+
+def test_turns_resolve_citations_now_archived_and_deleted() -> None:
+    library, threads, clock = InMemoryLibrary(), InMemoryThreads(), FixedClock()
+    kept_doc = DocumentId(ingest_ready(library, "ada", "Attention weighs tokens."))
+    gone = DocumentId("00000000-0000-4000-8000-000000000999")
+    svc = service(library, threads, clock)
+    t = ThreadId(svc.start_thread(LEARNER, "Q1").thread_id)
+    cited = (TurnCitation(1, kept_doc, "c1", 3), TurnCitation(2, gone, "c9", None))
+    svc.record_turn(t, LEARNER, AnsweredTurn("Q1", "A [1] [2].", cited))
+    svc.record_turn(t, LEARNER, AnsweredTurn("Q2", decline=Decline("limited", "These documents don't cover this.")))
+    library.state.documents[kept_doc].archived = True
+
+    first, second = svc.turns(t, LEARNER)
+
+    title = library.state.documents[kept_doc].file_name  # the display title before extraction
+    assert first.question == "Q1" and first.answer == "A [1] [2]." and first.decline is None
+    assert first.citations == (
+        CitationView(1, kept_doc, "c1", 3, title, archived=True, deleted=False),
+        CitationView(2, gone, "c9", None, DELETED_DOCUMENT, archived=False, deleted=True),
+    )
+    assert second.answer == "" and second.citations == ()
+    assert second.decline == Decline("limited", "These documents don't cover this.")
+
+
+def test_turns_of_another_learners_thread_are_not_found() -> None:
+    library, threads, clock = InMemoryLibrary(), InMemoryThreads(), FixedClock()
+    ingest_ready(library, "ada", "Attention weighs tokens.")
+    svc = service(library, threads, clock)
+    t = ThreadId(svc.start_thread(LEARNER, "Q").thread_id)
+
+    with pytest.raises(ThreadNotFoundError):
+        svc.turns(t, OTHER)

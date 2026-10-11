@@ -137,7 +137,7 @@ gh api -X DELETE repos/konica/agent-tutor/environments/pilot
 
 Until then, a native-cloud deploy fails at sign-in.
 
-**ECR repositories.** Each mode has its own (`SmartTutor-prod-Registry`, `SmartTutor-OnPremise-prod-Registry`; ADR 0015). The image build deploys its mode's Registry and GitHubDeploy stacks before its first push, so neither needs deploying by hand. The only resource the modes share is the account's GitHub OIDC provider: AWS allows one per URL, so native-cloud's `GitHubDeploy` creates it and on-premise's imports it. Deploy native-cloud's `GitHubDeploy` first on a fresh account (section 3b above).
+**ECR repositories.** Each mode has its own (`SmartTutor-prod-Registry`, `SmartTutor-OnPremise-prod-Registry`; ADR 0016). The image build deploys its mode's Registry and GitHubDeploy stacks before its first push, so neither needs deploying by hand. The only resource the modes share is the account's GitHub OIDC provider: AWS allows one per URL, so native-cloud's `GitHubDeploy` creates it and on-premise's imports it. Deploy native-cloud's `GitHubDeploy` first on a fresh account (section 3b above).
 
 ### Check
 

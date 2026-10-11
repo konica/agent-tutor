@@ -36,7 +36,7 @@ flowchart TB
   EKS -->|pulls images| ECR
 ```
 
-ECR here is native-cloud's own registry; on-premise has its own `smart-tutor-on-premise/*` repositories (#206, ADR 0015).
+ECR here is native-cloud's own registry; on-premise has its own `smart-tutor-on-premise/*` repositories (#206, ADR 0016).
 
 ### Setup order: AWS first, then GitHub
 

@@ -3,7 +3,7 @@
 An admin deploys this stack once from a laptop, because GitHub Actions can't create the role it signs in with.
 After that the deploy workflow (#59) updates it like any other stack. Each deployment mode has its own copy (#147):
 its own role, trusted by its own GitHub environment. The account's GitHub OIDC provider is the one resource the modes
-share (ADR 0015): AWS allows one per URL, so native-cloud's copy creates it and on-premise's imports it.
+share (ADR 0016): AWS allows one per URL, so native-cloud's copy creates it and on-premise's imports it.
 """
 
 from typing import Any

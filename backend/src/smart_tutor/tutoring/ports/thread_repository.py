@@ -7,6 +7,7 @@ from datetime import datetime
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.tutoring.domain.thread import SearchScope, Thread
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
+from smart_tutor.tutoring.domain.turn import Turn
 
 
 class ThreadRepository(ABC):
@@ -52,3 +53,12 @@ class ThreadRepository(ABC):
 
         (Callers check ownership first with `get_owned`.)
         """
+
+    @abstractmethod
+    def add_turn(self, turn: Turn, document_ids: Sequence[DocumentId]) -> None:
+        """Keep the turn and add `document_ids` to the thread's documents used at `turn.created_at`, as
+        `add_documents_used` does, in one transaction (committed when this returns). (Callers check ownership first.)"""
+
+    @abstractmethod
+    def turns(self, thread_id: ThreadId, user_id: UserId) -> list[Turn]:
+        """The thread's kept turns, oldest first; empty unless the thread is this learner's (scoped by owner)."""

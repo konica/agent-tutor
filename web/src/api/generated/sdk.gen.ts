@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddThreadDocumentsData, AddThreadDocumentsErrors, AddThreadDocumentsResponses, ArchiveDocumentData, ArchiveDocumentErrors, ArchiveDocumentResponses, AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponse, AskInNewThreadResponses, AskInThreadData, AskInThreadErrors, AskInThreadResponse, AskInThreadResponses, CheckDuplicateData, CheckDuplicateErrors, CheckDuplicateResponses, ChooseSubjectsData, ChooseSubjectsErrors, ChooseSubjectsResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, GetChunkData, GetChunkErrors, GetChunkResponses, GetDocumentData, GetDocumentErrors, GetDocumentFileData, GetDocumentFileErrors, GetDocumentFileResponses, GetDocumentResponses, GetMeData, GetMeResponses, GetSubjectSuggestionsData, GetSubjectSuggestionsErrors, GetSubjectSuggestionsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUploadData, GetUploadErrors, GetUploadLimitsData, GetUploadLimitsResponses, GetUploadRateLimitData, GetUploadRateLimitResponses, GetUploadResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListMySubjectsData, ListMySubjectsResponses, ListThreadDocumentsData, ListThreadDocumentsErrors, ListThreadDocumentsResponses, RecordHighlightMissData, RecordHighlightMissResponses, RemoveThreadDocumentData, RemoveThreadDocumentErrors, RemoveThreadDocumentResponses, RestoreDocumentData, RestoreDocumentErrors, RestoreDocumentResponses, RetryDocumentData, RetryDocumentErrors, RetryDocumentResponses, SearchSubjectsData, SearchSubjectsErrors, SearchSubjectsResponses, SetDocumentTitleData, SetDocumentTitleErrors, SetDocumentTitleResponses, StartUploadData, StartUploadErrors, StartUploadResponses, UpdateThreadData, UpdateThreadErrors, UpdateThreadResponses } from './types.gen';
+import type { AddThreadDocumentsData, AddThreadDocumentsErrors, AddThreadDocumentsResponses, ArchiveDocumentData, ArchiveDocumentErrors, ArchiveDocumentResponses, AskInNewThreadData, AskInNewThreadErrors, AskInNewThreadResponse, AskInNewThreadResponses, AskInThreadData, AskInThreadErrors, AskInThreadResponse, AskInThreadResponses, CheckDuplicateData, CheckDuplicateErrors, CheckDuplicateResponses, ChooseSubjectsData, ChooseSubjectsErrors, ChooseSubjectsResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, GetChunkData, GetChunkErrors, GetChunkResponses, GetDocumentData, GetDocumentErrors, GetDocumentFileData, GetDocumentFileErrors, GetDocumentFileResponses, GetDocumentResponses, GetMeData, GetMeResponses, GetSubjectSuggestionsData, GetSubjectSuggestionsErrors, GetSubjectSuggestionsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUploadData, GetUploadErrors, GetUploadLimitsData, GetUploadLimitsResponses, GetUploadRateLimitData, GetUploadRateLimitResponses, GetUploadResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListMySubjectsData, ListMySubjectsResponses, ListThreadDocumentsData, ListThreadDocumentsErrors, ListThreadDocumentsResponses, ListThreadTurnsData, ListThreadTurnsErrors, ListThreadTurnsResponses, RecordHighlightMissData, RecordHighlightMissResponses, RemoveThreadDocumentData, RemoveThreadDocumentErrors, RemoveThreadDocumentResponses, RestoreDocumentData, RestoreDocumentErrors, RestoreDocumentResponses, RetryDocumentData, RetryDocumentErrors, RetryDocumentResponses, SearchSubjectsData, SearchSubjectsErrors, SearchSubjectsResponses, SetDocumentTitleData, SetDocumentTitleErrors, SetDocumentTitleResponses, StartUploadData, StartUploadErrors, StartUploadResponses, UpdateThreadData, UpdateThreadErrors, UpdateThreadResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -294,6 +294,18 @@ export const askInThread = <ThrowOnError extends boolean = false>(options: Optio
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * List Thread Turns
+ *
+ * The conversation's turns, oldest first: each question with its answer and citations, or its decline (PRD
+ * US-13). Citations resolve now: display title, archived, or "Deleted document".
+ */
+export const listThreadTurns = <ThrowOnError extends boolean = false>(options: Options<ListThreadTurnsData, ThrowOnError>): RequestResult<ListThreadTurnsResponses, ListThreadTurnsErrors, ThrowOnError> => (options.client ?? client).get<ListThreadTurnsResponses, ListThreadTurnsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/threads/{thread_id}/turns',
+    ...options
 });
 
 /**
