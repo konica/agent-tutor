@@ -488,3 +488,32 @@ def test_runbooks_no_longer_call_ecr_shared_and_explain_old_rollbacks() -> None:
         assert not re.search(r"/smart-tutor/(api|web|keycloak|agent|mcp|worker)[:\"]", text), runbook.name
     teardown = (RUNBOOKS / "pilot-teardown.ps1").read_text(encoding="utf-8")
     assert '"Registry"' in teardown.split("$DeleteStacks")[1].split("$KeepStacks")[0]
+
+
+def test_native_cloud_teardown_touches_only_native_cloud_names_and_says_why_it_keeps_stacks() -> None:
+    script = (RUNBOOKS / "pilot-teardown.ps1").read_text(encoding="utf-8")
+    on_premise = mode_names(ON_PREMISE)
+    # The names the script deletes: stacks, secrets, log groups, and the cluster (whose id also names the snapshots).
+    names = script.split("$ClusterName =")[1].split("# The script runs in your PowerShell session")[0]
+    literals = re.findall(r'"([^"]*)"', names)
+    assert "/aws/eks/smart-tutor-prod" in literals and "smart-tutor/rds/master" in literals
+    for literal in literals:
+        assert not re.search(rf"(^|/)({on_premise.stack_prefix}|{on_premise.data_prefix})", literal), literal
+    assert "starts_with(StackName,'SmartTutor-prod-')" in script
+    assert '$Bucket = "smart-tutor-documents-$AccountId"' in script
+    # Each kept stack comes with the reason the dry run prints; GitHubDeploy is kept for the OIDC provider (ADR 0016).
+    keep = script.split("$KeepStacks = [ordered]@{")[1].split("}")[0]
+    assert re.search(r'"SmartTutor-prod-GitHubDeploy"\s*=\s*"[^"]*GitHub OIDC provider[^"]*on-premise', keep)
+    assert re.search(r'"CDKToolkit"\s*=\s*"[^"]+"', keep)
+    assert "SmartTutor-prod-Budgets" not in keep  # kept only without -DeleteBudget
+    assert re.search(r'if \(-not \$DeleteBudget\) \{ \$KeepStacks\["SmartTutor-prod-Budgets"\] = "[^"]+" \}', script)
+    assert "$KeepStacks.GetEnumerator()" in script
+
+
+def test_native_cloud_teardown_runbook_leaves_on_premise_alone() -> None:
+    text = (RUNBOOKS / "pilot-teardown.md").read_text(encoding="utf-8")
+    assert "account's only budget" not in text  # on-premise has a budget of its own
+    assert "`SmartTutor-OnPremise-`" in text and "on-premise-deploy.md" in text
+    assert "with the reason" in text  # the dry run explains each kept stack
+    leftovers = text.split("## 7.")[1].split("## 8.")[0]
+    assert "ECR" not in leftovers and "image" not in leftovers.lower()

@@ -14,8 +14,10 @@
     5. Reports what is left (RDS final snapshot, documents bucket, log groups, secrets), deletes it only when you
        pass -DeleteDatabaseSnapshots, -DeleteDocumentsBucket or -DeleteLogGroups (irreversible; each asks for its
        own confirmation unless -Force), and checks that no EKS cluster, ALB or NAT gateway is left.
-    Kept on purpose: SmartTutor-prod-GitHubDeploy (the GitHub OIDC provider on-premise imports), CDKToolkit, and
-    SmartTutor-prod-Budgets (the account's only budget, free) unless -DeleteBudget. Safe to run again after a partial failure: it skips what is gone.
+    Kept on purpose, and the dry run says why: SmartTutor-prod-GitHubDeploy (it owns the account's GitHub OIDC provider,
+    which on-premise's deploy role imports: the one resource the modes share, ADR 0016), CDKToolkit, and
+    SmartTutor-prod-Budgets (free) unless -DeleteBudget. It deletes nothing of on-premise (SmartTutor-OnPremise-*,
+    smart-tutor-on-premise*), which keeps running. Safe to run again after a partial failure: it skips what is gone.
     Run with -DryRun first: it only reads and prints what it would do.
 
 .EXAMPLE
@@ -51,8 +53,14 @@ $CdkVersion = "2.1145.0"   # same as .github/workflows/deploy-native-cloud.yml
 # In dependency order. Storage goes before Edge because it imports Edge's CloudFront URL for the bucket CORS rule.
 $DeleteStacks = @("Storage", "Edge", "Data", "Cluster", "Config", "Registry") + @(if ($DeleteBudget) { "Budgets" }) + @("Network") |
     ForEach-Object { "SmartTutor-prod-$_" }
-$KeepStacks = @("SmartTutor-prod-GitHubDeploy", "CDKToolkit") +
-    @(if (-not $DeleteBudget) { "SmartTutor-prod-Budgets" })
+# Kept on purpose, with the reason the run prints. GitHubDeploy is the accepted exception to "the modes share no
+# stack" (ADR 0016). Every name this script deletes is native-cloud's; none starts with SmartTutor-OnPremise- or
+# smart-tutor-on-premise (#207).
+$KeepStacks = [ordered]@{
+    "SmartTutor-prod-GitHubDeploy" = "owns the account's GitHub OIDC provider, which on-premise's deploy role imports (ADR 0016)"
+    "CDKToolkit"                   = "the account's CDK bootstrap, which both modes deploy with"
+}
+if (-not $DeleteBudget) { $KeepStacks["SmartTutor-prod-Budgets"] = "the budget smart-tutor-prod-monthly is free; -DeleteBudget deletes it" }
 # The stacks create these names; CloudFormation deletes the secrets without a recovery window, but a secret that was
 # scheduled for deletion before (or by hand) blocks a redeploy that recreates the name.
 $SecretNames = "smart-tutor/keycloak/api-client", "smart-tutor/keycloak/admin", "smart-tutor/keycloak/mcp-client",
@@ -167,7 +175,8 @@ try {
 
     $ToDelete = @($DeleteStacks | Where-Object { $Status.ContainsKey($_) })
     Write-Host "`nWill DELETE: $(if ($ToDelete) { $ToDelete -join ', ' } else { '(none)' })" -ForegroundColor Red
-    Write-Host "Will KEEP:   $($KeepStacks -join ', ')" -ForegroundColor Green
+    Write-Host "Will KEEP:" -ForegroundColor Green
+    foreach ($Keep in $KeepStacks.GetEnumerator()) { Write-Host ("  {0,-34} {1}" -f $Keep.Key, $Keep.Value) -ForegroundColor Green }
     $Switches = @(if ($DeleteDatabaseSnapshots) { "RDS snapshots" }; if ($DeleteDocumentsBucket) { "documents bucket" };
         if ($DeleteLogGroups) { "log groups" })
     Write-Host "Irreversible extras: $(if ($Switches) { $Switches -join ', ' } else { 'none (leftovers are only reported)' })"
@@ -360,7 +369,7 @@ try {
     }
 
     Write-Host ""
-    Write-Host $(if ($DryRun) { "Dry run done. Nothing was changed." } else { "Done. Kept: $($KeepStacks -join ', ')." }) -ForegroundColor Green
+    Write-Host $(if ($DryRun) { "Dry run done. Nothing was changed." } else { "Done. Kept: $($KeepStacks.Keys -join ', ')." }) -ForegroundColor Green
 } finally {
     foreach ($Name in $SavedEnv.Keys) { [Environment]::SetEnvironmentVariable($Name, $SavedEnv[$Name]) }
 }
