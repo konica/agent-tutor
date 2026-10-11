@@ -73,6 +73,12 @@ class Tutor:
         self._api, self._issuer, self._app = api, issuer, app
         self._token: str | None = None
 
+    def _send_secure_cookies_to_localhost(self) -> None:
+        # Keycloak's cookies are Secure; browsers send them to http://localhost, httpx's cookie jar does not.
+        for cookie in self._http.cookies.jar:
+            if cookie.domain in ("localhost", "localhost.local", "127.0.0.1"):
+                cookie.secure = False
+
     def sign_in(self) -> None:
         verifier = secrets.token_urlsafe(48)
         challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
@@ -87,13 +93,15 @@ class Tutor:
             "code_challenge": challenge,
             "code_challenge_method": "S256",
         }
-        r = self._http.get(f"{oidc}/auth", params=params)
+        self._send_secure_cookies_to_localhost()
+        r = self._http.get(f"{oidc}/auth", params=params, follow_redirects=False)
         if not r.is_redirect:  # no SSO session yet: fill in the login form
             action = _login_form_action(r.text)
             if r.status_code != 200 or action is None:
                 raise LoadError(f"{self.username}: Keycloak's login page gave {r.status_code} without a login form")
             form = {"username": self.username, "password": self._password, "credentialId": ""}
-            r = self._http.post(r.url.join(action), data=form)
+            self._send_secure_cookies_to_localhost()
+            r = self._http.post(r.url.join(action), data=form, follow_redirects=False)
         if not r.is_redirect:
             raise LoadError(
                 f"{self.username}: sign-in refused (wrong password in learners.yaml, or a required action?)"

@@ -18,6 +18,8 @@ from evals.learners import API, ISSUER
 
 PASSWORDS = {"learner@example.com": "learner", "learner2@example.com": "learner2"}
 LOGIN_ACTION = "http://localhost:10401/realms/smart-tutor/login-actions/authenticate?session_code=s&amp;tab_id=t"
+# Keycloak's cookies are Secure, which a browser still sends to http://localhost but a plain cookie jar does not.
+SECURE_COOKIE = "Path=/realms/smart-tutor/; Secure; HttpOnly; SameSite=None"
 BUCKET = "http://localhost:10402/smart-tutor-documents"
 
 
@@ -40,6 +42,7 @@ class FakeStack:
         self.uploads_started = 0
         self.sign_ins = 0
         self.retries = 0
+        self.always_unauthorized = False  # the API answers 401 whatever the token
         self.process: Callable[[FakeDocument], None] = lambda d: setattr(d, "state", "awaiting_subjects")
         self._ids = (f"00000000-0000-0000-0000-{n:012d}" for n in itertools.count(1))
         self._codes: dict[str, tuple[str, str]] = {}  # code -> (username, PKCE challenge)
@@ -67,21 +70,30 @@ class FakeStack:
         code = next(self._ids)
         self._codes[code] = (username, auth["code_challenge"])
         location = f"{auth['redirect_uri']}?state={auth['state']}&session_state=x&code={code}"
-        return httpx.Response(302, headers={"Location": location, "Set-Cookie": f"KC_SESSION={username}; Path=/"})
+        return httpx.Response(
+            302, headers={"Location": location, "Set-Cookie": f"KC_SESSION={username}; {SECURE_COOKIE}"}
+        )
+
+    @staticmethod
+    def _cookies(request: httpx.Request) -> dict[str, str]:
+        pairs = (c.strip().partition("=") for c in request.headers.get("cookie", "").split(";") if c.strip())
+        return {name: value for name, _, value in pairs}
 
     def _keycloak(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path
         if path.endswith("/protocol/openid-connect/auth"):
             auth = dict(request.url.params)
             assert auth["client_id"] == "smart-tutor-web" and auth["code_challenge_method"] == "S256"
-            session = request.headers.get("cookie", "")
-            if session.startswith("KC_SESSION="):  # an SSO session: straight back to the app
-                return self._redirect_with_code(session.removeprefix("KC_SESSION="), auth)
+            sso = self._cookies(request).get("KC_SESSION")
+            if sso:  # an SSO session: straight back to the app
+                return self._redirect_with_code(sso, auth)
             self._auth["current"] = auth
             page = f'<html><form id="kc-form-login" action="{LOGIN_ACTION}" method="post"></form></html>'
-            return httpx.Response(200, text=page)
+            return httpx.Response(200, text=page, headers={"Set-Cookie": f"AUTH_SESSION_ID=a1; {SECURE_COOKIE}"})
         if path.endswith("/login-actions/authenticate"):
             assert request.url.params["tab_id"] == "t"  # the action's &amp; was unescaped
+            if "AUTH_SESSION_ID" not in self._cookies(request):  # Keycloak: "Cookie not found"
+                return httpx.Response(400)
             form = {k: v[0] for k, v in parse_qs(request.content.decode()).items()}
             if PASSWORDS.get(form["username"]) != form.get("password"):
                 return httpx.Response(200, text='<form id="kc-form-login" action="x"></form>Invalid password')
@@ -136,7 +148,7 @@ class FakeStack:
 
     def _api(self, request: httpx.Request) -> httpx.Response:
         user = self._tokens.get(request.headers.get("authorization", "").removeprefix("Bearer "))
-        if user is None:
+        if user is None or self.always_unauthorized:
             return httpx.Response(401)
         method, path = request.method, request.url.path
         body = json.loads(request.content) if request.content else None

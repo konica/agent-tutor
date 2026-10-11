@@ -44,6 +44,15 @@ def test_an_expired_token_signs_in_again() -> None:
     assert stack.sign_ins == 2
 
 
+def test_a_second_unauthorized_answer_is_a_load_error() -> None:
+    stack = FakeStack()
+    stack.always_unauthorized = True
+    tutor = Tutor(stack.client(), "learner@example.com", "learner")
+    with pytest.raises(LoadError, match="401"):
+        tutor.call("POST", "/documents/duplicate-check", {"sha256": "0" * 64})
+    assert stack.sign_ins == 2  # the first sign-in, one more after the first 401, then it gives up
+
+
 def test_an_unexpected_status_is_a_load_error() -> None:
     tutor = Tutor(FakeStack().client(), "learner@example.com", "learner")
     with pytest.raises(LoadError, match="404"):
