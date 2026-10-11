@@ -28,3 +28,15 @@ def test_extraction_timeout_must_be_positive(seconds: int) -> None:
     # 0 would fail every PDF at once: the worker would stop the parser before it has started.
     with pytest.raises(ValidationError, match="extraction_timeout_seconds"):
         Settings(extraction_timeout_seconds=seconds)
+
+
+def test_answer_max_tokens_defaults_to_1500_and_reads_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert Settings(_env_file=None).answer_max_tokens == 1500
+    monkeypatch.setenv("SMART_TUTOR_ANSWER_MAX_TOKENS", "800")
+    assert Settings(_env_file=None).answer_max_tokens == 800
+
+
+@pytest.mark.parametrize("tokens", [0, -1])
+def test_answer_max_tokens_must_be_positive(tokens: int) -> None:
+    with pytest.raises(ValidationError, match="answer_max_tokens"):
+        Settings(answer_max_tokens=tokens)
