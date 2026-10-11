@@ -91,6 +91,8 @@ class Settings(BaseSettings):
     # Relevance gate for a conversation limited to its documents (US-4c): a best cosine score below it declines.
     # A starting value; US-5 tunes it on the decline dataset and moves it to SSM answer-floor.
     answer_floor: float = 0.3
+    # Output tokens one answer may use (US-6), so a question can't buy the model's full 64K-token reply.
+    answer_max_tokens: PositiveInt = 1500
     models: ModelsConfig = ModelsConfig()
     chunking: ChunkingConfig = ChunkingConfig()
 
