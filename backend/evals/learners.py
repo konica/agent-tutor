@@ -6,7 +6,8 @@ Needs the Compose stack with the app profile (or the host processes, README "Run
 worker describes and embeds each PDF with Bedrock. Downloads the seed PDFs (evals.corpus), then for each learner in
 seed_corpus/learners.yaml signs in through Keycloak's login form, uploads the documents their library lacks (the
 learner's own duplicate check skips the rest), chooses each document's labeled subjects, and waits until every one is
-ready. Exits 1 when a document fails or the time runs out. Running it again uploads nothing.
+ready. Exits 1 when a document fails or the time runs out. Running it again uploads nothing for documents already
+in the library. For the local stack: Keycloak runs on localhost.
 """
 
 import argparse
@@ -113,7 +114,9 @@ class Tutor:
             )
         back = r.url.join(r.headers["location"])
         if str(back.copy_with(query=None, fragment=None)) != self._app or back.params.get("state") != state:
-            raise LoadError(f"{self.username}: sign-in redirected to {back}, expected {self._app}")
+            where = back.copy_with(query=None, fragment=None)  # the query holds the authorization code
+            error = f" (error: {back.params['error']})" if "error" in back.params else ""
+            raise LoadError(f"{self.username}: sign-in redirected to {where}{error}, expected {self._app}")
         code = back.params.get("code")
         if not code:
             raise LoadError(f"{self.username}: Keycloak refused: {back.params.get('error')}")
@@ -177,6 +180,7 @@ def _advance(tutor: Tutor, p: _Pending) -> bool:
         status = tutor.call("GET", f"/uploads/{p.upload_id}")
         if status["document_id"] is None:
             return False  # the worker hasn't hashed the file yet
+        p.found = p.found or status["outcome"] == "duplicate"  # it existed before this run
         p.document_id = status["document_id"]  # a server-side duplicate points at the learner's own copy
     path = f"/documents/{p.document_id}"
     doc = tutor.call("GET", path)
@@ -279,8 +283,10 @@ def load_all(
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--api", default=API)
-    parser.add_argument("--issuer", default=ISSUER)
+    parser.add_argument("--api", default=API, help="the local stack's API (this command is for the local stack)")
+    parser.add_argument(
+        "--issuer", default=ISSUER, help="Keycloak's realm URL; for the local stack, where Keycloak runs on localhost"
+    )
     parser.add_argument("--app", default=APP, help="smart-tutor-web's redirect URI")
     parser.add_argument("--downloads", type=Path, default=DOWNLOADS)
     parser.add_argument("--timeout", type=float, default=900, help="seconds per learner until every document is ready")
