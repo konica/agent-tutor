@@ -11,7 +11,7 @@ from fakes.models import fake_embeddings
 from fakes.parameters import APP_TZ, TEST_LIMITS, TEST_UPLOAD_LIMITS
 from fakes.queue import FakeQueue
 from fakes.subjects import InMemorySubjects
-from fakes.tutoring import InMemoryThreads
+from fakes.tutoring import FakeAnswerFeedback, InMemoryThreads
 from smart_tutor.apps.api.agent_client import AgentClient
 from smart_tutor.apps.api.services import ApiServices
 from smart_tutor.insights.application import HighlightMissService
@@ -45,10 +45,11 @@ def api_services(
     clock: FixedClock | None = None,
     queue: FakeQueue | None = None,
     names: SubjectNames | None = None,
+    feedback: FakeAnswerFeedback | None = None,
     **overrides: Any,
 ) -> ApiServices:
-    """ApiServices from fakes sharing `library`, `objects`, `threads`, `catalog`, `queue`, `names`; `overrides`
-    replace fields."""
+    """ApiServices from fakes sharing `library`, `objects`, `threads`, `catalog`, `queue`, `names`, `feedback`;
+    `overrides` replace fields."""
     library = library or InMemoryLibrary()
     objects = objects or FakeObjectStore()
     threads = threads or InMemoryThreads()
@@ -57,7 +58,7 @@ def api_services(
     queue = queue or FakeQueue()
     names = names or SubjectNames(catalog)
     documents = DocumentService(library.unit_of_work, max_attempts=3)
-    conversations = ConversationService(threads, documents, clock)
+    conversations = ConversationService(threads, documents, clock, feedback=feedback)
     fields: dict[str, Any] = {
         "uploads": UploadService(
             library.unit_of_work, objects, clock, TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ
