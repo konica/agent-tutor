@@ -1,6 +1,7 @@
 import dataclasses
 import json
 import logging
+from collections.abc import Sequence
 from typing import Any
 
 import pytest
@@ -20,6 +21,7 @@ from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 BODY = {"question": "What is attention?"}
 AUTH = {"Authorization": "Bearer t-ada"}
 CHUNK = RetrievedChunk("c1", "d1", "a.pdf", 3, "Attention weighs tokens.", 0.9)
+NO_DOCUMENTS = "None of your documents can be used right now: they are all archived or deleted."
 
 
 def client(
@@ -96,14 +98,13 @@ def test_citations_carry_the_marker_number_the_answer_uses() -> None:
     )
 
 
-def test_no_chunks_streams_the_fixed_answer() -> None:
-    c, _ = client(FakeRetriever([]))
+def test_an_empty_readable_set_streams_the_upload_request_without_calling_the_model() -> None:
+    verifier = FakeTokenVerifier()
+    verifier.add("t-ada", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
+    graph = build_graph(lambda token: FakeRetriever([]), fake_chat_model(), 0.3)  # no replies: any model call fails
+    c = TestClient(create_app(Settings(), verifier=verifier, graph=graph))
     got = events(c.post("/ask", json=BODY, headers=AUTH).text)
-    assert got == [
-        ("delta", {"text": "I couldn't find anything about that in your documents."}),
-        ("citations", {"citations": []}),
-        ("done", {}),
-    ]  # no `sources`: nothing was given to the model
+    assert got == [("decline", {"code": "no_documents", "message": NO_DOCUMENTS}), ("done", {})]
 
 
 def test_a_token_refused_mid_turn_ends_with_an_unauthenticated_error() -> None:
@@ -163,8 +164,20 @@ def test_document_ids_go_to_the_search_and_a_covered_question_is_answered() -> N
     assert names[-1] == "done" and "delta" in names and "decline" not in names
 
 
-def test_a_limited_search_with_no_chunks_declines() -> None:
+def test_a_limited_search_with_nothing_readable_anywhere_streams_the_upload_request() -> None:
     c, _ = client(FakeRetriever([]))
+    body = c.post("/ask", json={"question": "q", "document_ids": ["d1"]}, headers=AUTH).text
+    assert events(body) == [("decline", {"code": "no_documents", "message": NO_DOCUMENTS}), ("done", {})]
+
+
+class _ListedUnreadable(FakeRetriever):
+    async def search(self, query: str, k: int = 5, document_ids: Sequence[str] | None = None) -> list[RetrievedChunk]:
+        found = await super().search(query, k, document_ids)
+        return [] if document_ids is not None else found
+
+
+def test_a_limited_search_whose_listed_documents_cant_be_read_declines_as_limited() -> None:
+    c, _ = client(_ListedUnreadable([CHUNK]))
     body = c.post("/ask", json={"question": "q", "document_ids": ["d1"]}, headers=AUTH).text
     assert events(body) == [
         ("decline", {"code": "limited", "message": "These documents don't cover this."}),

@@ -10,7 +10,6 @@ import {
   formatCitation,
   loadConversation,
   loadDocumentsUsed,
-  NoDocumentsError,
   removeThreadDocument,
   renameConversation,
   setSearchScope,
@@ -117,19 +116,24 @@ describe("askInNewThread", () => {
     expect(onUnauthorized).toHaveBeenCalled();
   });
 
-  it("rejects with NoDocumentsError carrying the API's message on 409", async () => {
-    const { apiClient } = api(() => json({ detail: "Upload a document first" }, 409));
-    const failure = collect(askInNewThread("q", undefined, apiClient));
-    await expect(failure).rejects.toBeInstanceOf(NoDocumentsError);
-    await expect(failure).rejects.toThrow("Upload a document first");
-  });
-
   it("rejects with AskRefusedError carrying the detail on any other 409", async () => {
     const { apiClient } = api(() => json({ detail: "The tutor can't answer that right now" }, 409));
     const failure = collect(askInNewThread("q", undefined, apiClient));
     await expect(failure).rejects.toBeInstanceOf(AskRefusedError);
     await expect(failure).rejects.toThrow("The tutor can't answer that right now");
-    await expect(failure).rejects.not.toBeInstanceOf(NoDocumentsError);
+  });
+
+  it("reads a no_documents decline", async () => {
+    const { apiClient } = api(() =>
+      eventStream(
+        'event: decline\ndata: {"code": "no_documents", "message": "None of your documents can be used right now: they are all archived or deleted."}\n\n' +
+          "event: done\ndata: {}\n\n",
+      ),
+    );
+    expect(await collect(askInNewThread("q", undefined, apiClient))).toEqual([
+      { type: "decline", code: "no_documents", message: "None of your documents can be used right now: they are all archived or deleted." },
+      { type: "done" },
+    ]);
   });
 
   it("parses the marker number of each citation", async () => {
@@ -152,7 +156,6 @@ describe("askInNewThread", () => {
     const { apiClient } = api(() => json({ detail: "The tutor is unavailable. Try again in a moment." }, 503));
     const failure = collect(askInNewThread("q", undefined, apiClient));
     await expect(failure).rejects.toThrow("503");
-    await expect(failure).rejects.not.toBeInstanceOf(NoDocumentsError);
   });
 });
 
@@ -297,11 +300,9 @@ describe("askInThread", () => {
     await expect(collect(askInThread("t1", "q", apiClient))).rejects.toBeInstanceOf(SessionExpiredError);
   });
 
-  it("rejects with NoDocumentsError or AskRefusedError on 409 by its message", async () => {
-    const none = api(() => json({ detail: "Upload a document first" }, 409));
-    await expect(collect(askInThread("t1", "q", none.apiClient))).rejects.toBeInstanceOf(NoDocumentsError);
-    const refused = api(() => json({ detail: "Add documents to limit the search." }, 409));
-    const failure = collect(askInThread("t1", "q", refused.apiClient));
+  it("rejects with AskRefusedError carrying the detail on 409", async () => {
+    const { apiClient } = api(() => json({ detail: "Add documents to limit the search." }, 409));
+    const failure = collect(askInThread("t1", "q", apiClient));
     await expect(failure).rejects.toBeInstanceOf(AskRefusedError);
     await expect(failure).rejects.toThrow("Add documents to limit the search.");
   });

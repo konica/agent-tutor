@@ -2,6 +2,8 @@
 documents used (GET /threads/{id}/documents), its turns (GET /threads/{id}/turns), or rename it (PATCH
 /threads/{id}). A thread starts from a document only if it is the learner's own ready, active one."""
 
+import json
+
 import httpx
 from fastapi.testclient import TestClient
 
@@ -100,16 +102,49 @@ def test_only_the_owner_renames_a_thread() -> None:
     assert mine.status_code == 200 and threads.threads[thread.thread_id].title == "Attention basics"
 
 
-def test_a_learner_without_documents_starts_no_thread_even_when_another_has_documents_in_their_subject() -> None:
+def test_a_learner_without_documents_asks_with_their_own_token_even_when_another_has_documents() -> None:
     library, threads = InMemoryLibrary(), InMemoryThreads()
     ingest_ready(library, "learner-a", "Attention weighs tokens.", subject_ids=(SHARED,))
-    services = api_services(library, threads=threads, agent=fake_agent(answers))
+    seen: list[httpx.Request] = []
+
+    def record(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return answers(request)
+
+    services = api_services(library, threads=threads, agent=fake_agent(record))
     client = TestClient(create_app(Settings(), verifier=learners(), services=services))
 
     response = client.post("/threads", json={"question": "What is attention?"}, headers=B)
 
-    assert response.status_code == 409
-    assert threads.threads == {}
+    # The agent searches as B (MCP's can_read gives B an empty readable set); the thread is B's, never A's.
+    assert response.status_code == 200
+    assert [r.headers["authorization"] for r in seen] == ["Bearer token-b"]
+    [thread] = threads.threads.values()
+    assert thread.user_id == "learner-b"
+
+
+def test_a_citation_to_another_learners_document_never_resolves() -> None:
+    library, threads = InMemoryLibrary(), InMemoryThreads()
+    ingest_ready(library, "learner-a", "Attention weighs tokens.")
+    b_document = ingest_ready(library, "learner-b", "Gradient descent follows the slope.")
+    citation = {"n": 1, "chunk_id": "c1", "document_id": str(b_document), "document_title": "B's paper", "page": 1}
+    body = (
+        b'event: delta\ndata: {"text": "Hi [1]"}\n\n'
+        + f"event: citations\ndata: {json.dumps({'citations': [citation]})}\n\n".encode()
+        + b"event: done\ndata: {}\n\n"
+    )
+    agent = fake_agent(lambda request: httpx.Response(200, content=body, headers={"content-type": "text/event-stream"}))
+    services = api_services(library, threads=threads, agent=agent)
+    client = TestClient(create_app(Settings(), verifier=learners(), services=services))
+    assert client.post("/threads", json={"question": "What is attention?"}, headers=A).status_code == 200
+    [thread] = threads.threads.values()
+
+    [turn] = client.get(f"/threads/{thread.thread_id}/turns", headers=A).json()
+
+    # Resolved through A's library only: B's document reads as gone, with none of its title or state.
+    assert turn["citations"][0]["document_title"] == "Deleted document"
+    assert turn["citations"][0]["deleted"] is True and turn["citations"][0]["archived"] is False
+    assert library.state.documents[b_document].file_name not in json.dumps(turn)
 
 
 def _client_with_thread() -> tuple[TestClient, InMemoryLibrary, DocumentId, str]:

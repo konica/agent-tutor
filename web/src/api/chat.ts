@@ -38,24 +38,17 @@ export type ChatCitation = {
   deleted?: boolean;
 };
 
+export type DeclineCode = "limited" | "no_documents";
+
 export type ChatEvent =
   | { type: "thread"; thread_id: string }
   | { type: "delta"; text: string }
   | { type: "citations"; citations: ChatCitation[] }
-  | { type: "decline"; code: "limited"; message: string }
+  | { type: "decline"; code: DeclineCode; message: string }
   | { type: "error"; code: "unauthenticated" | "unavailable"; message: string }
   | { type: "done" };
 
-export const NO_DOCUMENTS = "Upload a document first";
 const DOCUMENT_UNUSABLE = "That document can't be used. Start a new conversation.";
-
-/** 409 from POST /threads: the learner has no ready documents yet. */
-export class NoDocumentsError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "NoDocumentsError";
-  }
-}
 
 /** 404 (unknown, or another learner's) or 422 (not a conversation id) from a conversation's URL. */
 export class ConversationNotFoundError extends Error {
@@ -65,7 +58,7 @@ export class ConversationNotFoundError extends Error {
   }
 }
 
-/** Another 409 from POST /threads, or a 404 for a starting document the learner can't use: its message is for the learner. */
+/** A 409 from an ask (e.g. an archived conversation), or a 404 for a starting document the learner can't use: its message is for the learner. */
 export class AskRefusedError extends Error {
   constructor(message: string) {
     super(message);
@@ -89,7 +82,7 @@ function toEvent(event: string, data: string): ChatEvent | null {
     case "citations":
       return { type: "citations", citations: payload().citations as ChatCitation[] };
     case "decline":
-      return { type: "decline", ...(payload() as { code: "limited"; message: string }) };
+      return { type: "decline", ...(payload() as { code: DeclineCode; message: string }) };
     case "error":
       return { type: "error", ...(payload() as { code: "unauthenticated" | "unavailable"; message: string }) };
     case "done":
@@ -133,7 +126,6 @@ async function* stream(
   if (error instanceof SessionExpiredError || response?.status === 401) throw new SessionExpiredError();
   if (response?.status === 409) {
     const message = detail(error);
-    if (message === NO_DOCUMENTS) throw new NoDocumentsError(message);
     if (message !== null) throw new AskRefusedError(message);
   }
   if (response?.status === 404 && notFound !== undefined) throw new AskRefusedError(detail(error) ?? notFound);

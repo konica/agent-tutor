@@ -4,11 +4,14 @@ import type { ComponentProps } from "react";
 import { Link, MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AskRefusedError, ConversationNotFoundError, NoDocumentsError, type ChatEvent } from "../../api/chat";
+import { AskRefusedError, ConversationNotFoundError, type ChatEvent } from "../../api/chat";
 import type { DocumentResponse, ThreadDocumentResponse, ThreadResponse, TurnResponse } from "../../api/generated/types.gen";
 import { SessionExpiredError, sessionExpiry } from "../../auth/authClient";
 import { fakeViewerDeps } from "../viewer/testFakes";
 import { ChatPage } from "./ChatPage";
+
+const NO_DOCUMENTS = "None of your documents can be used right now: they are all archived or deleted.";
+const UPLOAD_HINT = "Upload a document to get an answer. Your earlier answers stay readable.";
 
 async function* events(...list: ChatEvent[]) {
   for (const e of list) yield e;
@@ -291,16 +294,20 @@ describe("ChatPage", () => {
     expect(screen.getByText("1 document is still processing and can't be used yet.")).toBeInTheDocument();
   });
 
-  it("switches to the upload prompt when the ask finds no documents", async () => {
-    const ask = vi.fn(() => {
-      throw new NoDocumentsError("Upload a document first");
-    });
+  it("shows the agent's upload request inline, with Upload, and keeps the composer", async () => {
+    const ask = vi.fn(() =>
+      events({ type: "thread", thread_id: "t1" }, { type: "decline", code: "no_documents", message: NO_DOCUMENTS }, { type: "done" }),
+    );
     renderChat({ ask });
     await userEvent.type(await question(), "What is attention?");
     await userEvent.click(askButton());
-    expect(await screen.findByRole("heading", { name: "Upload a document first" })).toBeInTheDocument();
+    expect(await screen.findByText(NO_DOCUMENTS)).toBeInTheDocument();
+    expect(screen.getByText(UPLOAD_HINT)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Upload" })).toHaveAttribute("href", "/library");
-    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    // Not the limited decline's way out, and no error.
+    expect(screen.queryByRole("button", { name: "Search all my documents" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/couldn't answer/)).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /question/i })).toBeInTheDocument();
   });
 
   it("explains when the documents can't be loaded, instead of a blank page or a false upload prompt", async () => {
@@ -1436,6 +1443,64 @@ describe("ChatPage", () => {
       renderChat({ loadConversation: conversation([turn()]), loadDocs: async () => [] }, "/chat/t1");
       expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
       expect(screen.queryByRole("heading", { name: "Upload a document first" })).not.toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: /question/i })).toBeEnabled();
+    });
+
+    it("with no active documents a question goes to this conversation, under its history", async () => {
+      const ask = vi.fn(() => events());
+      const askIn = vi.fn(() =>
+        events({ type: "thread", thread_id: "t1" }, { type: "decline", code: "no_documents", message: NO_DOCUMENTS }, { type: "done" }),
+      );
+      renderChat({ loadConversation: conversation([turn()]), loadDocs: async () => [], ask, askIn }, "/chat/t1");
+      await screen.findByText("It weighs tokens [1].");
+      await userEvent.type(await question(), "What does the clipping range control?");
+      await userEvent.click(askButton());
+      expect(await screen.findByText(NO_DOCUMENTS)).toBeInTheDocument();
+      expect(askIn).toHaveBeenCalledWith("t1", "What does the clipping range control?");
+      expect(ask).not.toHaveBeenCalled();
+      expect(asked()).toEqual(["You asked: What is attention?", "You asked: What does the clipping range control?"]);
+      expect(screen.getByText("It weighs tokens [1].")).toBeInTheDocument();
+      expect(location()).toBe("/chat/t1");
+      expect(screen.getByRole("link", { name: "Upload" })).toHaveAttribute("href", "/library");
+    });
+
+    it("once an answer arrives the no-documents state is over: the next question starts a new conversation", async () => {
+      const ask = vi.fn(() => events({ type: "thread", thread_id: "t2" }, { type: "delta", text: "Fresh." }, { type: "done" }));
+      const askIn = vi.fn(() =>
+        events(
+          { type: "thread", thread_id: "t1" },
+          { type: "delta", text: "Found one." },
+          { type: "citations", citations: [{ n: 1, chunk_id: "c1", document_id: "d1", document_title: "a.pdf", page: 3 }] },
+          { type: "done" },
+        ),
+      );
+      renderChat({ loadConversation: conversation([turn()]), loadDocs: async () => [], ask, askIn }, "/chat/t1");
+      await screen.findByText("It weighs tokens [1].");
+      await userEvent.type(await question(), "First?");
+      await userEvent.click(askButton());
+      expect(await screen.findByText("Found one.")).toBeInTheDocument();
+      expect(askIn).toHaveBeenCalledTimes(1);
+      await userEvent.type(await question(), "Second?");
+      await userEvent.click(askButton());
+      await waitFor(() => expect(ask).toHaveBeenCalledWith("Second?", undefined));
+      expect(askIn).toHaveBeenCalledTimes(1);
+    });
+
+    it("a decline with an unknown code shows its message and no way out", async () => {
+      const odd = turn({ question: "Q?", answer: "", citations: [], decline: { code: "something_new", message: "Not now." } });
+      renderChat({ loadConversation: conversation([odd]) }, "/chat/t1");
+      expect(await screen.findByText("Not now.")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Search all my documents" })).not.toBeInTheDocument();
+      expect(screen.queryByText(/This conversation only searches/)).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Upload" })).not.toBeInTheDocument();
+    });
+
+    it("a no_documents decline in the history shows its message, with Upload only on the last turn", async () => {
+      const nodocs = turn({ question: "Q?", answer: "", citations: [], decline: { code: "no_documents", message: NO_DOCUMENTS } });
+      renderChat({ loadConversation: conversation([nodocs, turn()]) }, "/chat/t1");
+      expect(await screen.findByText(NO_DOCUMENTS)).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Upload" })).not.toBeInTheDocument();
+      expect(screen.queryByText(UPLOAD_HINT)).not.toBeInTheDocument();
     });
 
     it("the same passage cited in two turns highlights only the clicked chip", async () => {
