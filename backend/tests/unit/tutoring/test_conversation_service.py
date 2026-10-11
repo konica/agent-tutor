@@ -26,7 +26,6 @@ from smart_tutor.tutoring.application import (
     DocumentNotAvailableError,
     DocumentUsed,
     InvalidTitleError,
-    NoDocumentsError,
     NoListedDocumentsError,
     SearchScope,
     ThreadArchivedError,
@@ -51,36 +50,14 @@ def test_starts_a_thread_owned_by_the_learner() -> None:
     assert threads.threads == {thread.thread_id: thread}
 
 
-def test_a_learner_without_documents_cannot_start_a_thread() -> None:
-    library, threads = InMemoryLibrary(), InMemoryThreads()
-    ingest_ready(library, "bob", "Gradient descent.")  # someone else's document doesn't count
-
-    with pytest.raises(NoDocumentsError, match="Upload a document first"):
-        service(library, threads, FixedClock()).require_documents(UserId("ada"))
-    with pytest.raises(NoDocumentsError, match="Upload a document first"):
-        service(library, threads, FixedClock()).start_thread(UserId("ada"))
-    assert threads.threads == {}
-
-
-def test_a_processing_document_is_not_enough_to_start_a_thread() -> None:
-    library, threads = InMemoryLibrary(), InMemoryThreads()
-    UploadService(
-        library.unit_of_work, FakeObjectStore(), FixedClock(), TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ
-    ).start_upload(UserId("ada"), "processing.pdf")
-
-    with pytest.raises(NoDocumentsError, match="Upload a document first"):
-        service(library, threads, FixedClock()).require_documents(UserId("ada"))
-    assert threads.threads == {}
-
-
-def test_an_archived_only_learner_cannot_start_a_thread() -> None:
+def test_a_thread_starts_without_ready_documents_so_the_upload_request_is_kept() -> None:
     library, threads = InMemoryLibrary(), InMemoryThreads()
     document_id = ingest_ready(library, "ada", "Attention is all you need.")
-    library.state.documents[document_id].archived = True
+    library.state.documents[document_id].archived = True  # the agent answers with the upload request (US-3)
 
-    with pytest.raises(NoDocumentsError):
-        service(library, threads, FixedClock()).start_thread(UserId("ada"))
-    assert threads.threads == {}
+    thread = service(library, threads, FixedClock()).start_thread(UserId("ada"), "What is attention?")
+
+    assert threads.threads == {thread.thread_id: thread}
 
 
 LEARNER, OTHER = UserId("ada"), UserId("bob")

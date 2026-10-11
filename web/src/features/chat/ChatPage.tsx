@@ -23,7 +23,6 @@ import {
   formatCitation,
   loadConversation as loadConversationApi,
   loadDocumentsUsed,
-  NoDocumentsError,
   removeThreadDocument,
   renameConversation,
   setSearchScope,
@@ -76,8 +75,9 @@ type Exchange = {
   question: string;
   answer: string;
   citations: ChatCitation[];
-  /** The limited decline's message: the conversation's documents don't cover the question. */
-  declined: string | null;
+  /** A turn the tutor didn't answer: "limited" (the conversation's documents don't cover it) or "no_documents" (nothing
+   * can be read: the request to upload a document). */
+  decline: { code: string; message: string } | null;
 };
 
 // "ended" is a session that expired while loading: the session screen takes over, this page shows nothing.
@@ -135,7 +135,8 @@ function processingHint(count: number) {
 
 // Each unlimited question starts a new thread (and moves to its URL), replacing the turns shown. A conversation limited
 // to its documents (US-4c) is the exception: its questions are asked in the same thread and add a turn under the
-// history. `/chat/<id>` reopens a conversation with its turns (US-13).
+// history. `/chat/<id>` reopens a conversation with its turns (US-13). With no active documents, a question in a
+// conversation stays in it too (US-10).
 export function ChatPage({
   ask = defaultAsk,
   askIn = defaultAskIn,
@@ -322,8 +323,11 @@ export function ChatPage({
     // The ref also stops a second Enter that lands before the disabled state renders.
     if (!canAsk || busy.current) return;
     setQuestion("");
-    // A limited conversation keeps its thread, so the limit applies; otherwise a question starts a new thread.
-    void answer(trimmed, threadId !== null && scope === "listed" ? threadId : null);
+    // A limited conversation keeps its thread, so the limit applies. So does a conversation when the learner has no
+    // active documents: there is nothing to start a new one from, and the upload request goes under its history.
+    // Otherwise a question starts a new thread.
+    const keepThread = threadId !== null && (scope === "listed" || noDocuments);
+    void answer(trimmed, keepThread ? threadId : null);
   }
 
   // Clears the page for another conversation: a new thread, a new one at /chat, or the one a URL opens. Bumping `turn`
@@ -360,7 +364,7 @@ export function ChatPage({
       setThreadId(thread.thread_id);
       setFirstQuestion(thread.title ?? null);
       setScope(thread.search_scope);
-      setTurns(turns.map((t) => ({ question: t.question, answer: t.answer, citations: t.citations, declined: t.decline?.message ?? null })));
+      setTurns(turns.map((t) => ({ question: t.question, answer: t.answer, citations: t.citations, decline: t.decline ?? null })));
       setAnswered(turns.length > 0);
       setOpened({ status: "none" });
       // Its list agrees with the scope: the server turns the limit off for an empty list, as showList does.
@@ -388,7 +392,7 @@ export function ChatPage({
     busy.current = true;
     setAnswering(true);
     setProblem(null);
-    const asked: Exchange = { question: text, answer: "", citations: [], declined: null };
+    const asked: Exchange = { question: text, answer: "", citations: [], decline: null };
     setTurns((list) => [...list, asked]);
     await run(() => (inThread === null ? ask(text, documentId) : askIn(inThread, text)), turn.current, inThread === null);
   }
@@ -418,9 +422,18 @@ export function ChatPage({
             navigate(`/chat/${thread}`);
           }
           setThreadId(thread);
-        } else if (event.type === "delta") updateLast((e) => ({ ...e, answer: e.answer + event.text }));
-        else if (event.type === "citations") updateLast((e) => ({ ...e, citations: event.citations }));
-        else if (event.type === "decline") updateLast((e) => ({ ...e, declined: event.message }));
+        } else if (event.type === "delta") {
+          updateLast((e) => ({ ...e, answer: e.answer + event.text }));
+          // The server found readable documents after all (one was uploaded elsewhere): no longer the empty-library state.
+          setNoDocuments(false);
+        } else if (event.type === "citations") {
+          updateLast((e) => ({ ...e, citations: event.citations }));
+          setNoDocuments(false);
+        }
+        else if (event.type === "decline") {
+          updateLast((e) => ({ ...e, decline: { code: event.code, message: event.message } }));
+          if (event.code === "no_documents") setNoDocuments(true);
+        }
         else if (event.type === "error") {
           // The token stopped working mid-answer: the session screen asks the learner to sign in again.
           if (event.code === "unauthenticated") sessionExpiry.notify();
@@ -442,12 +455,7 @@ export function ChatPage({
       if (!current()) return;
       // A stream that broke after the thread started: the server updated its last activity.
       if (thread) conversations.refresh();
-      // The last ready document was archived since the page loaded. A limited conversation keeps its history and says
-      // so under it; a new conversation (its history already cleared) shows the upload prompt.
-      if (error instanceof NoDocumentsError) {
-        setNoDocuments(true);
-        if (!newThread) setProblem({ message: error.message });
-      } else if (error instanceof AskRefusedError) setProblem({ message: error.message });
+      if (error instanceof AskRefusedError) setProblem({ message: error.message });
       // A SessionExpiredError was already reported by the API client; the session screen replaces this page.
       else if (!(error instanceof SessionExpiredError)) setProblem({ message: GENERIC_FAILURE });
     } finally {
@@ -599,7 +607,8 @@ export function ChatPage({
     }
   }
 
-  // A conversation opened from its URL shows its history even without ready documents.
+  // A conversation opened from its URL shows its history even without ready documents; a question there gets the upload
+  // request under it.
   if (noDocuments && routeThreadId === undefined) {
     return (
       <div className={styles.fallback}>
@@ -781,9 +790,24 @@ export function ChatPage({
                       aria-live={last ? "polite" : undefined}
                       aria-busy={last ? answering : undefined}
                     >
-                      {t.declined != null ? (
+                      {t.decline?.code === "no_documents" ? (
                         <div className={styles.declineCard}>
-                          <p>{t.declined}</p>
+                          <p>{t.decline.message}</p>
+                          {/* The way out is for the latest question only, as for the limited decline. */}
+                          {last && (
+                            <>
+                              <p className={styles.muted}>Upload a document to get an answer. Your earlier answers stay readable.</p>
+                              <div className={styles.declineActions}>
+                                <LinkButton to="/library" icon={Upload}>
+                                  Upload
+                                </LinkButton>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ) : t.decline?.code === "limited" ? (
+                        <div className={styles.declineCard}>
+                          <p>{t.decline.message}</p>
                           {/* The way out is for the latest question only; an earlier decline keeps just its message. */}
                           {last && (
                             <>
@@ -803,10 +827,15 @@ export function ChatPage({
                             </>
                           )}
                         </div>
+                      ) : t.decline != null ? (
+                        // A code this page has no way out for: the message alone.
+                        <div className={styles.declineCard}>
+                          <p>{t.decline.message}</p>
+                        </div>
                       ) : (
                         t.answer && <p className={styles.answer}>{t.answer}</p>
                       )}
-                      {t.declined === null && showCitations && t.citations.length > 0 && (
+                      {t.decline === null && showCitations && t.citations.length > 0 && (
                         <div className={styles.sources}>
                           <span className={styles.sourcesLabel} id={listId}>
                             Sources

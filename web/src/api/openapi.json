@@ -2002,13 +2002,10 @@
                 }
               }
             },
-            "description": "Server-sent events: thread, then delta*, citations, done (or error)."
+            "description": "Server-sent events: thread, then delta*, citations, done; or decline then done (no_documents: nothing readable, upload first; limited: the listed documents don't cover it); or error."
           },
           "404": {
             "description": "A document that isn't the caller's ready one."
-          },
-          "409": {
-            "description": "The learner has no ready documents."
           },
           "422": {
             "content": {
@@ -2350,13 +2347,13 @@
                 }
               }
             },
-            "description": "Server-sent events: thread, then delta*, citations, done (or error)."
+            "description": "Server-sent events: thread, then delta*, citations, done; or decline then done (no_documents: nothing readable, upload first; limited: the listed documents don't cover it); or error."
           },
           "404": {
             "description": "Not the caller's conversation."
           },
           "409": {
-            "description": "The conversation is archived, or the learner has no ready documents."
+            "description": "The conversation is archived."
           },
           "422": {
             "content": {

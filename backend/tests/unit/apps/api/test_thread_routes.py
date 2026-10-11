@@ -28,7 +28,7 @@ from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import DocumentId, SubjectId, ThreadId, UserId
 from smart_tutor.shared.domain.principal import Principal
 from smart_tutor.subjects.application import SubjectNames
-from smart_tutor.tutoring.application import AnsweredTurn, ConversationService, Thread
+from smart_tutor.tutoring.application import AnsweredTurn, ConversationService, Thread, Turn
 from smart_tutor.tutoring.domain.thread import ThreadStatus
 
 AUTH = {"Authorization": "Bearer t-ada"}
@@ -41,11 +41,20 @@ AGENT_ANSWER = (
     b'event: citations\ndata: {"citations": [{"n": 1, "chunk_id": "c1", "document_title": "a.pdf", "page": 3}]}\n\n'
     b"event: done\ndata: {}\n\n"
 )
+NO_DOCUMENTS = (
+    b'event: decline\ndata: {"code": "no_documents", "message": "None of your documents can be used right now: '
+    b'they are all archived or deleted."}\n\n'
+    b"event: done\ndata: {}\n\n"
+)
 Handler = Callable[[httpx.Request], httpx.Response]
 
 
 def sse_ok(request: httpx.Request) -> httpx.Response:
     return httpx.Response(200, content=AGENT_ANSWER, headers={"content-type": "text/event-stream"})
+
+
+def sse_no_documents(request: httpx.Request) -> httpx.Response:
+    return httpx.Response(200, content=NO_DOCUMENTS, headers={"content-type": "text/event-stream"})
 
 
 def setup(
@@ -165,15 +174,17 @@ def test_an_agent_error_status_is_503() -> None:
     assert response.json() == {"detail": UNAVAILABLE}
 
 
-def test_no_ready_documents_is_409_before_any_thread_or_agent_call() -> None:
+def test_without_ready_documents_the_agents_upload_request_is_streamed_and_kept() -> None:
     seen: list[httpx.Request] = []
-    client, threads, _ = setup(recording(seen), ready_document=False)
+    client, threads, _ = setup(recording(seen, sse_no_documents), ready_document=False)
 
     response = client.post("/threads", json=QUESTION, headers=AUTH)
 
-    assert response.status_code == 409
-    assert response.json() == {"detail": "Upload a document first"}
-    assert threads.threads == {} and seen == []
+    assert response.status_code == 200 and len(seen) == 1
+    [thread] = threads.threads.values()
+    assert response.text == f'event: thread\ndata: {{"thread_id": "{thread.thread_id}"}}\n\n' + NO_DOCUMENTS.decode()
+    [turn] = threads.turns(ThreadId(thread.thread_id), UserId("ada"))
+    assert turn.answer == "" and turn.decline is not None and turn.decline.code == "no_documents"
 
 
 def test_an_unknown_body_field_is_422() -> None:
@@ -323,20 +334,19 @@ def test_a_stream_dropped_inside_the_first_event_is_unavailable_and_starts_no_th
     assert response.text == UNAVAILABLE_EVENT and threads.threads == {}
 
 
-def test_an_archived_only_learner_is_409_before_any_agent_call() -> None:
+def test_an_archived_only_learner_gets_the_upload_request_from_the_agent() -> None:
     seen: list[httpx.Request] = []
     verifier = FakeTokenVerifier()
     verifier.add("t-ada", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
     library, threads = InMemoryLibrary(), InMemoryThreads()
     document_id = ingest_ready(library, "ada", "Attention weighs tokens.")
     library.state.documents[document_id].archived = True
-    services = api_services(library, threads=threads, agent=fake_agent(recording(seen)))
+    services = api_services(library, threads=threads, agent=fake_agent(recording(seen, sse_no_documents)))
     client = TestClient(create_app(Settings(), verifier=verifier, services=services))
 
     response = client.post("/threads", json=QUESTION, headers=AUTH)
 
-    assert response.status_code == 409 and response.json() == {"detail": "Upload a document first"}
-    assert threads.threads == {} and seen == []
+    assert response.status_code == 200 and "event: decline" in response.text and len(seen) == 1
 
 
 def test_a_dropped_agent_stream_ends_with_an_unavailable_error_event() -> None:
@@ -732,15 +742,22 @@ def test_a_question_in_an_archived_thread_is_409_before_any_agent_call() -> None
     assert response.status_code == 409 and seen == []
 
 
-def test_a_question_without_ready_documents_is_409_before_any_agent_call() -> None:
+def test_a_question_in_a_thread_without_ready_documents_streams_the_upload_request_under_its_history() -> None:
     seen: list[httpx.Request] = []
-    client, threads, _ = setup(recording(seen), ready_document=False)
+    client, threads, _ = setup(recording(seen, sse_no_documents), ready_document=False)
     thread = Thread.start(ThreadId(str(uuid.uuid4())), UserId("ada"), FixedClock().now(), "T")
     threads.threads[thread.thread_id] = thread
+    earlier = Turn(
+        ThreadId(thread.thread_id), UserId("ada"), "Earlier?", "Earlier answer.", (), None, FixedClock().now()
+    )
+    threads.add_turn(earlier, [])
 
     response = client.post(f"/threads/{thread.thread_id}/questions", json=QUESTION, headers=AUTH)
 
-    assert response.status_code == 409 and seen == []
+    assert response.status_code == 200 and len(seen) == 1 and "event: decline" in response.text
+    turns = threads.turns(ThreadId(thread.thread_id), UserId("ada"))
+    assert [t.question for t in turns] == ["Earlier?", "What is attention?"]
+    assert turns[1].decline is not None and turns[1].decline.code == "no_documents"
 
 
 def test_a_question_in_an_unknown_thread_is_404() -> None:

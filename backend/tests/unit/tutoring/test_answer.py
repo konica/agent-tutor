@@ -1,6 +1,6 @@
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from smart_tutor.tutoring.application import NO_CHUNKS_ANSWER, answer_messages, cited_chunks, covers
+from smart_tutor.tutoring.application import NO_DOCUMENTS_DECLINE, answer_messages, cited_chunks, covers
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 
 
@@ -55,8 +55,8 @@ def test_an_answer_without_valid_markers_cites_every_chunk_with_its_own_number()
     assert cited_chunks("Bad [0] and [7] and [5-3].", chunks) == [(1, chunks[0]), (2, chunks[1])]
 
 
-def test_no_chunks_answer_is_plain() -> None:
-    assert NO_CHUNKS_ANSWER == "I couldn't find anything about that in your documents."
+def test_the_no_documents_decline_says_nothing_can_be_used() -> None:
+    assert NO_DOCUMENTS_DECLINE == "None of your documents can be used right now: they are all archived or deleted."
 
 
 def test_retrieved_chunk_citation() -> None:

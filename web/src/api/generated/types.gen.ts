@@ -1150,10 +1150,6 @@ export type AskInNewThreadErrors = {
      */
     404: unknown;
     /**
-     * The learner has no ready documents.
-     */
-    409: unknown;
-    /**
      * Validation Error
      */
     422: HttpValidationError;
@@ -1163,7 +1159,7 @@ export type AskInNewThreadError = AskInNewThreadErrors[keyof AskInNewThreadError
 
 export type AskInNewThreadResponses = {
     /**
-     * Server-sent events: thread, then delta*, citations, done (or error).
+     * Server-sent events: thread, then delta*, citations, done; or decline then done (no_documents: nothing readable, upload first; limited: the listed documents don't cover it); or error.
      */
     200: string;
 };
@@ -1368,7 +1364,7 @@ export type AskInThreadErrors = {
      */
     404: unknown;
     /**
-     * The conversation is archived, or the learner has no ready documents.
+     * The conversation is archived.
      */
     409: unknown;
     /**
@@ -1381,7 +1377,7 @@ export type AskInThreadError = AskInThreadErrors[keyof AskInThreadErrors];
 
 export type AskInThreadResponses = {
     /**
-     * Server-sent events: thread, then delta*, citations, done (or error).
+     * Server-sent events: thread, then delta*, citations, done; or decline then done (no_documents: nothing readable, upload first; limited: the listed documents don't cover it); or error.
      */
     200: string;
 };

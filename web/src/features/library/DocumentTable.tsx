@@ -46,6 +46,9 @@ function StateCell({ doc, uploading }: { doc: DocumentResponse; uploading: boole
   );
 }
 
+// Ready and choose-subjects documents open in the viewer; processing and failed ones can't (PRD US-4b).
+export const viewable = (doc: Pick<DocumentResponse, "state">) => doc.state === "ready" || doc.state === "awaiting_subjects";
+
 type Props = {
   documents: DocumentResponse[];
   onRetry: (doc: DocumentResponse) => void;
@@ -56,6 +59,7 @@ type Props = {
   onRestore?: (doc: DocumentResponse) => void;
   onChat?: (doc: DocumentResponse) => void; // start a conversation from a ready document
   onOpen?: (doc: DocumentResponse, options?: { editTitle?: boolean }) => void;
+  onView?: (doc: DocumentResponse) => void; // a ready or choose-subjects title opens the document viewer (PRD US-3)
   onDelete?: (doc: DocumentResponse) => void;
   busy?: ReadonlySet<string>; // document ids whose archive or restore is running
 };
@@ -107,7 +111,7 @@ function Actions({ doc, onRetry, retrying, onChooseSubjects, uploading, onArchiv
   );
 }
 
-export function DocumentTable({ documents, onRetry, retrying, onChooseSubjects, uploading = NONE, onArchive, onRestore, onChat, onOpen, onDelete, busy = NONE }: Props) {
+export function DocumentTable({ documents, onRetry, retrying, onChooseSubjects, uploading = NONE, onArchive, onRestore, onChat, onOpen, onView, onDelete, busy = NONE }: Props) {
   return (
     <table className={styles.table}>
       <thead>
@@ -131,7 +135,7 @@ export function DocumentTable({ documents, onRetry, retrying, onChooseSubjects, 
                 <span className={styles.doc}>
                   <FileText className={styles.fileIcon} strokeWidth={1.5} aria-hidden="true" />
                   {onOpen && !uploading.has(doc.document_id) ? (
-                    <button type="button" className={`${styles.title} ${styles.titleButton}`} title={doc.title} onClick={() => onOpen(doc)}>
+                    <button type="button" className={`${styles.title} ${styles.titleButton}`} title={doc.title} aria-label={onView && !doc.archived && viewable(doc) ? `${doc.title}, open in the document viewer` : undefined} onClick={() => (onView && !doc.archived && viewable(doc) ? onView(doc) : onOpen(doc))}>
                       {doc.title}
                     </button>
                   ) : (

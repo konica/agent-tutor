@@ -29,7 +29,7 @@ function details(over: Partial<DocumentDetails> = {}): DocumentDetails {
   };
 }
 
-function setup(first: DocumentDetails = details(), over: Partial<Parameters<typeof DocumentDetailsPanel>[0]> = {}) {
+function renderPanel(first: DocumentDetails = details(), over: Partial<Parameters<typeof DocumentDetailsPanel>[0]> = {}) {
   const props = {
     documentId: "d1",
     load: vi.fn(async (_id: string) => first),
@@ -40,8 +40,11 @@ function setup(first: DocumentDetails = details(), over: Partial<Parameters<type
     onClose: vi.fn(),
     ...over,
   };
-  render(<DocumentDetailsPanel {...props} />);
-  return props;
+  return { props, ...render(<DocumentDetailsPanel {...props} />) };
+}
+
+function setup(first: DocumentDetails = details(), over: Partial<Parameters<typeof DocumentDetailsPanel>[0]> = {}) {
+  return renderPanel(first, over).props;
 }
 
 const field = () => screen.getByRole("textbox", { name: "Display title" });
@@ -331,5 +334,40 @@ describe("DocumentDetailsPanel", () => {
     setup(details({ state: "awaiting_subjects", subjects: [] }), { onChangeSubjects: vi.fn() });
     expect(await screen.findByRole("heading", { name: "ReAct" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Change subjects" })).toBeNull();
+  });
+
+  it("offers Open for ready, choose-subjects, and archived documents, not processing or failed", async () => {
+    for (const [over, shown] of [
+      [{}, true],
+      [{ state: "awaiting_subjects" as const }, true],
+      [{ archived: true }, true],
+      [{ state: "processing" as const }, false],
+      [{ state: "failed" as const }, false],
+    ] as const) {
+      const onOpenDocument = vi.fn();
+      const { unmount } = renderPanel(details(over), { onOpenDocument });
+      await screen.findByRole("heading", { name: "ReAct" });
+      const open = screen.queryByRole("button", { name: "Open" });
+      if (!shown) expect(open).toBeNull();
+      else {
+        await userEvent.click(open!);
+        expect(onOpenDocument).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ document_id: "d1" }));
+      }
+      unmount();
+    }
+  });
+
+  it("makes Restore secondary beside Open for an archived document", async () => {
+    setup(details({ archived: true }), { onOpenDocument: vi.fn() });
+    const restore = await screen.findByRole("button", { name: "Restore" });
+    const open = screen.getByRole("button", { name: "Open" });
+    expect(restore.compareDocumentPosition(open) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // Open last, the main action
+    expect(open.className).toMatch(/primary/);
+    expect(restore.className).not.toMatch(/primary/);
+  });
+
+  it("focuses Open once loaded when asked (the viewer closed back to details)", async () => {
+    setup(details(), { onOpenDocument: vi.fn(), focusOpen: true });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Open" })).toHaveFocus());
   });
 });
