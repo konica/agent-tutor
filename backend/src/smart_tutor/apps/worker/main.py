@@ -3,7 +3,8 @@ IngestionService (PRD §9.5).
 
 One message at a time (plain FIFO, no per-learner fairness). A message is deleted only after it was handled;
 a failure leaves it to come back after the visibility timeout, and the queue's redrive policy moves it to the
-DLQ after 5 receives.
+DLQ after 5 receives. Each content's processing is traced as `ingest` into `<LANGSMITH_PROJECT>-ingestion`, with the
+content id and learner hash.
 """
 
 import logging
@@ -31,6 +32,12 @@ from smart_tutor.shared.adapters.aws.sqs_queue import SqsMessageQueue
 from smart_tutor.shared.adapters.aws.ssm_parameters import SsmParameterStore
 from smart_tutor.shared.adapters.model_factory import ChatRole, ModelFactory
 from smart_tutor.shared.adapters.postgres.engine import create_db_engine
+from smart_tutor.shared.adapters.tracing import (
+    LangSmithRunTracing,
+    ingestion_project,
+    learner_hasher,
+    run_metadata,
+)
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.ports.message_queue import MessageQueue
 from smart_tutor.subjects.adapters.sql_subjects import SqlSubjectRepository
@@ -69,6 +76,7 @@ def run_once(queue: MessageQueue, ingestion: IngestionService) -> int:
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     settings = Settings()
+    tracing = LangSmithRunTracing(learner_hasher(settings), ingestion_project(), run_metadata(settings))
     engine = create_db_engine(settings.database_url)
 
     def library() -> SqlLibraryUnitOfWork:
@@ -86,6 +94,7 @@ def main() -> None:
         embeddings=embeddings,
         embedding_model=embedding.model_id,
         embedding_dim=embedding_dimension(embedding.params),
+        tracing=tracing,
     )
     backfilled = SubjectCatalogService(SqlSubjectRepository(engine), embeddings).embed_missing_names()
     logger.info("embedded %d subject names", backfilled)

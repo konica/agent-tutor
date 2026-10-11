@@ -8,6 +8,7 @@ from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
 
 from fakes.models import describing_chat_model, fake_embeddings
+from fakes.tracing import FakeRunTracing
 from smart_tutor.knowledge.application import DocumentDescriber, ProcessingTools, TooManyPagesError, UnreadablePdfError
 from smart_tutor.knowledge.ports.pdf_extractor import PdfExtractor
 
@@ -43,6 +44,7 @@ def fake_tools(
     chunker: BaseDocumentTransformer | None = None,
     embeddings: Embeddings | None = None,
     chat: BaseChatModel | None = None,
+    tracing: FakeRunTracing | None = None,
 ) -> ProcessingTools:
     return ProcessingTools(
         extractor=extractor or FakePdfExtractor(),
@@ -52,4 +54,5 @@ def fake_tools(
         embeddings=embeddings or fake_embeddings(dim),
         embedding_model="fake-embedding",
         embedding_dim=dim,
+        **({} if tracing is None else {"tracing": tracing}),
     )

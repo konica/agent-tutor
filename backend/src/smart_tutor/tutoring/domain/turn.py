@@ -5,7 +5,7 @@ read time, so a deleted document's citation reads "Deleted document"."""
 from dataclasses import dataclass
 from datetime import datetime
 
-from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
+from smart_tutor.shared.domain.ids import DocumentId, RunId, ThreadId, UserId
 
 
 @dataclass(frozen=True)
@@ -33,6 +33,7 @@ class Turn:
     citations: tuple[TurnCitation, ...]
     decline: Decline | None
     created_at: datetime
+    run_id: RunId | None = None  # the ask's LangSmith root run (PRD §10.4); None for turns kept before it was recorded
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,7 @@ class AnsweredTurn:
     citations: tuple[TurnCitation, ...] = ()
     decline: Decline | None = None
     document_ids: tuple[DocumentId, ...] = ()
+    run_id: RunId | None = None  # the ask's LangSmith root run (PRD §10.4); None for turns kept before it was recorded
 
 
 @dataclass(frozen=True)
@@ -66,3 +68,4 @@ class TurnView:
     citations: tuple[CitationView, ...]
     decline: Decline | None
     created_at: datetime
+    run_id: RunId | None = None  # the ask's LangSmith root run (PRD §10.4); None for turns kept before it was recorded

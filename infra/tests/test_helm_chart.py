@@ -191,6 +191,7 @@ def test_agent_runs_with_the_production_issuer_and_reaches_mcp() -> None:
     assert env["SMART_TUTOR_KEYCLOAK_CLIENT_SECRET"] == {"secretKeyRef": {"name": "agent-keycloak", "key": "client-secret"}}
     assert env["SMART_TUTOR_DATABASE_URL"] == {"secretKeyRef": {"name": "agent-db", "key": "url"}}
     assert env["SMART_TUTOR_MCP_URL"] == "http://mcp-server/mcp"
+    assert env["SMART_TUTOR_DEPLOYMENT"] == "native-cloud"
     assert c["readinessProbe"]["httpGet"]["path"] == "/healthz"
     assert c["securityContext"]["readOnlyRootFilesystem"] is True
 
@@ -241,6 +242,7 @@ def test_worker_polls_the_ingest_queue_for_the_documents_bucket() -> None:
     assert pod["serviceAccountName"] == "worker"
     assert env["SMART_TUTOR_DOCUMENTS_BUCKET"] == "docs-bucket"
     assert env["SMART_TUTOR_INGEST_QUEUE_URL"] == QUEUE
+    assert env["SMART_TUTOR_DEPLOYMENT"] == "native-cloud"
     assert env["SMART_TUTOR_DATABASE_URL"] == {"secretKeyRef": {"name": "worker-db", "key": "url"}}
     assert "ports" not in c and "readinessProbe" not in c  # a queue poller with no HTTP server
     assert c["securityContext"]["readOnlyRootFilesystem"] is True

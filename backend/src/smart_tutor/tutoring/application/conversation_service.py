@@ -32,15 +32,21 @@ class ConversationService:
             raise DocumentNotAvailableError("Document not found")
 
     def start_thread(
-        self, user_id: UserId, question: str | None = None, document_id: DocumentId | None = None
+        self,
+        user_id: UserId,
+        question: str | None = None,
+        document_id: DocumentId | None = None,
+        *,
+        thread_id: ThreadId | None = None,
     ) -> Thread:
         """A new thread owned by the learner, persisted; its title starts as the first question. Started from a
         document (US-4c), it lists that document as added by the learner; answers still search all documents. A
-        learner without ready documents gets a thread too: its turn is the agent's request to upload one (US-3)."""
+        learner without ready documents gets a thread too: its turn is the agent's request to upload one (US-3). The
+        API may give the id, minted before the agent call so the first turn's trace carries it."""
         if document_id is not None:
             self.require_readable(user_id, document_id)
         now = self._clock.now()
-        thread = Thread.start(ThreadId(str(uuid.uuid4())), user_id, now, title=question)
+        thread = Thread.start(thread_id or ThreadId(str(uuid.uuid4())), user_id, now, title=question)
         self._threads.add(thread)
         if document_id is not None:
             self._threads.add_documents(ThreadId(thread.thread_id), [document_id], now)
@@ -104,7 +110,9 @@ class ConversationService:
         """Keep a turn whose answer ended with `done` (US-13) with the documents it drew on (US-4b), together.
         A decline draws on none."""
         self._owned(thread_id, user_id)
-        kept = Turn(thread_id, user_id, turn.question, turn.answer, turn.citations, turn.decline, self._clock.now())
+        kept = Turn(
+            thread_id, user_id, turn.question, turn.answer, turn.citations, turn.decline, self._clock.now(), turn.run_id
+        )
         self._threads.add_turn(kept, list(dict.fromkeys(turn.document_ids)))
 
     def turns(self, thread_id: ThreadId, user_id: UserId) -> list[TurnView]:
@@ -122,6 +130,7 @@ class ConversationService:
                 tuple(_citation(c, views.get(c.document_id)) for c in t.citations),
                 t.decline,
                 t.created_at,
+                t.run_id,
             )
             for t in kept
         ]

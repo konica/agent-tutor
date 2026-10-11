@@ -66,6 +66,10 @@ _Avoid_: Refusal, rejection
 **Decline log**:
 Anonymized record of declined questions, with no user id, kept 90 days.
 
+**Learner hash**:
+A keyed hash (HMAC-SHA256) of a learner's user id, the only way traces name a learner. Stable per learner, different between learners, and changes with the key.
+_Avoid_: User id (in traces), pseudonym
+
 ## Learning
 
 **Lesson Note**:
