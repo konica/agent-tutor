@@ -1,29 +1,41 @@
 """Start a thread (PRD §8 US-3) and manage its documents and search scope (US-4b, US-4c)."""
 
+import logging
 import uuid
 from collections.abc import Sequence
 
 from smart_tutor.knowledge.application import DocumentService, DocumentView
-from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
+from smart_tutor.shared.domain.ids import DocumentId, RunId, ThreadId, UserId
 from smart_tutor.shared.ports.clock import Clock
 from smart_tutor.tutoring.domain.document_used import DELETED_DOCUMENT, DocumentUsed
 from smart_tutor.tutoring.domain.errors import (
     DocumentNotAvailableError,
     ThreadArchivedError,
     ThreadNotFoundError,
+    TurnNotFoundError,
 )
 from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
 from smart_tutor.tutoring.domain.thread_summary import ThreadSummary
-from smart_tutor.tutoring.domain.turn import AnsweredTurn, CitationView, Turn, TurnCitation, TurnView
+from smart_tutor.tutoring.domain.turn import AnsweredTurn, CitationView, Rating, Turn, TurnCitation, TurnView
+from smart_tutor.tutoring.ports.answer_feedback import AnswerFeedback, NoAnswerFeedback
 from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
+
+logger = logging.getLogger(__name__)
 
 
 class ConversationService:
-    def __init__(self, threads: ThreadRepository, documents: DocumentService, clock: Clock) -> None:
+    def __init__(
+        self,
+        threads: ThreadRepository,
+        documents: DocumentService,
+        clock: Clock,
+        feedback: AnswerFeedback | None = None,
+    ) -> None:
         self._threads = threads
         self._documents = documents
         self._clock = clock
+        self._feedback = feedback or NoAnswerFeedback()
 
     def require_readable(self, user_id: UserId, document_id: DocumentId) -> None:
         """The document is the learner's ready, non-archived one (`can_read`), else "Document not found"."""
@@ -131,9 +143,22 @@ class ConversationService:
                 t.decline,
                 t.created_at,
                 t.run_id,
+                t.rating,
             )
             for t in kept
         ]
+
+    def rate_turn(self, thread_id: ThreadId, user_id: UserId, run_id: RunId, rating: Rating) -> None:
+        """The learner rates a kept answer or decline of their conversation (PRD §10.2); a new rating replaces the
+        last. It is saved first; sending it to LangSmith never fails the rating."""
+        self._owned(thread_id, user_id)
+        if not self._threads.set_rating(thread_id, user_id, run_id, rating):
+            raise TurnNotFoundError("Answer not found")
+        try:
+            self._feedback.send(run_id, rating)
+        except Exception as e:
+            # Only the class name and run id: the learner is never named in logs.
+            logger.error("sending the rating of run %s failed (%s)", run_id, type(e).__name__)
 
     def keep_deleted_title(self, user_id: UserId, document_id: DocumentId, title: str) -> None:
         """Called by the document delete before it commits, so documents used keep the title (US-10c)."""

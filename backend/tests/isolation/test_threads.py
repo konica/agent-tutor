@@ -1,7 +1,7 @@
 """US-12: each learner's POST /threads starts a thread owned by that learner; no one else can get it, its
 documents used (GET /threads/{id}/documents), its turns (GET /threads/{id}/turns), or rename it (PATCH
-/threads/{id}); GET /threads lists only the caller's own threads. A thread starts from a document only if it is the
-learner's own ready, active one."""
+/threads/{id}), or rate one of its turns (PUT /threads/{id}/turns/{run_id}/rating); GET /threads lists only the
+caller's own threads. A thread starts from a document only if it is the learner's own ready, active one."""
 
 import json
 
@@ -9,6 +9,7 @@ import httpx
 from fastapi.testclient import TestClient
 
 from fakes import (
+    FakeAnswerFeedback,
     FakeObjectStore,
     FakeTokenVerifier,
     FixedClock,
@@ -25,6 +26,7 @@ from smart_tutor.knowledge.application import UploadService
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import DocumentId, SubjectId, ThreadId, UserId
 from smart_tutor.shared.domain.principal import Principal
+from smart_tutor.tutoring.application import Rating
 
 A = {"Authorization": "Bearer token-a"}
 B = {"Authorization": "Bearer token-b"}
@@ -317,3 +319,26 @@ def test_each_learner_lists_only_their_own_threads() -> None:
         assert row["thread_id"] == owned[owner]
         assert row["subjects"] == [{"subject_id": SHARED, "name": "Shared"}] and row["documents"] == 1
     assert a_list[0]["thread_id"] != b_list[0]["thread_id"]
+
+
+def test_only_the_owner_rates_a_turn() -> None:
+    library, threads, feedback = InMemoryLibrary(), InMemoryThreads(), FakeAnswerFeedback()
+    ingest_ready(library, "learner-a", "Attention weighs tokens.")
+    ingest_ready(library, "learner-b", "Gradient descent follows the slope.")
+    services = api_services(library, threads=threads, agent=fake_agent(answers), feedback=feedback)
+    client = TestClient(create_app(Settings(), verifier=learners(), services=services))
+    assert client.post("/threads", json={"question": "What is attention?"}, headers=A).status_code == 200
+    assert client.post("/threads", json={"question": "What is descent?"}, headers=B).status_code == 200
+    [a_turn] = [t for t in threads.turn_rows if t.user_id == "learner-a"]
+    [b_turn] = [t for t in threads.turn_rows if t.user_id == "learner-b"]
+
+    # B on A's thread and run, and B's own thread with A's run: both 404, nothing changes or is sent.
+    theirs = client.put(f"/threads/{a_turn.thread_id}/turns/{a_turn.run_id}/rating", json={"rating": "down"}, headers=B)
+    mixed = client.put(f"/threads/{b_turn.thread_id}/turns/{a_turn.run_id}/rating", json={"rating": "down"}, headers=B)
+
+    assert theirs.status_code == 404 and mixed.status_code == 404
+    assert "What is attention?" not in theirs.text + mixed.text
+    assert all(t.rating is None for t in threads.turn_rows)
+    assert feedback.sent == []
+    mine = client.put(f"/threads/{a_turn.thread_id}/turns/{a_turn.run_id}/rating", json={"rating": "up"}, headers=A)
+    assert mine.status_code == 200 and feedback.sent == [(a_turn.run_id, Rating.UP)]

@@ -74,7 +74,7 @@ describe("ChatPage", () => {
   it("sends the question and renders the streamed answer with citations", async () => {
     const ask = vi.fn(() =>
       events(
-        { type: "thread", thread_id: "t1" },
+        { type: "thread", thread_id: "t1", run_id: "r1" },
         { type: "delta", text: "It weighs " },
         { type: "delta", text: "tokens [1]." },
         {
@@ -103,7 +103,7 @@ describe("ChatPage", () => {
   it("numbers each citation with the marker the answer uses for it", async () => {
     const ask = vi.fn(() =>
       events(
-        { type: "thread", thread_id: "t1" },
+        { type: "thread", thread_id: "t1", run_id: "r1" },
         { type: "delta", text: "Only the second chunk [2]." },
         { type: "citations", citations: [{ n: 2, chunk_id: "c2", document_id: "d2", document_title: "b.pdf", page: 4 }] },
         { type: "done" },
@@ -123,7 +123,7 @@ describe("ChatPage", () => {
     const title = "ReAct: Synergizing Reasoning and Acting";
     const ask = vi.fn(() =>
       events(
-        { type: "thread", thread_id: "t1" },
+        { type: "thread", thread_id: "t1", run_id: "r1" },
         { type: "delta", text: "Yes [1]." },
         { type: "citations", citations: [{ n: 1, chunk_id: "c1", document_id: "d1", document_title: title, page: 3 }] },
         { type: "done" },
@@ -172,7 +172,7 @@ describe("ChatPage", () => {
     await userEvent.type(await question(), "What is attention?");
     await userEvent.click(askButton());
 
-    control.push({ type: "thread", thread_id: "t1" });
+    control.push({ type: "thread", thread_id: "t1", run_id: "r1" });
     control.push({ type: "delta", text: "It weighs" });
     const answer = await screen.findByText("It weighs");
     const region = answer.closest("[aria-live]")!;
@@ -192,7 +192,7 @@ describe("ChatPage", () => {
   it("shows the message of an unavailable error", async () => {
     const ask = vi.fn(() =>
       events(
-        { type: "thread", thread_id: "t1" },
+        { type: "thread", thread_id: "t1", run_id: "r1" },
         { type: "error", code: "unavailable", message: "The tutor is unavailable. Try again in a moment." },
       ),
     );
@@ -206,7 +206,7 @@ describe("ChatPage", () => {
     const notify = vi.spyOn(sessionExpiry, "notify").mockImplementation(() => {});
     const ask = vi.fn(() =>
       events(
-        { type: "thread", thread_id: "t1" },
+        { type: "thread", thread_id: "t1", run_id: "r1" },
         { type: "error", code: "unauthenticated", message: "Please sign in again." },
       ),
     );
@@ -218,7 +218,7 @@ describe("ChatPage", () => {
 
   it("shows a generic message when the stream ends without done or error, keeping the partial answer", async () => {
     const ask = vi.fn(() =>
-      events({ type: "thread", thread_id: "t1" }, { type: "delta", text: "It weighs" }),
+      events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "delta", text: "It weighs" }),
     );
     renderChat({ ask });
     await userEvent.type(await question(), "What is attention?");
@@ -285,7 +285,7 @@ describe("ChatPage", () => {
   });
 
   it("titles the conversation with the question, with no subject chips, keeping the hint", async () => {
-    const ask = vi.fn(() => events({ type: "thread", thread_id: "t1" }, { type: "done" }));
+    const ask = vi.fn(() => events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "done" }));
     renderChat({ ask, loadDocs: async () => [doc("ready"), doc("processing")] });
     await userEvent.type(await question(), "What is attention?");
     await userEvent.click(askButton());
@@ -297,7 +297,7 @@ describe("ChatPage", () => {
 
   it("shows the agent's upload request inline, with Upload, and keeps the composer", async () => {
     const ask = vi.fn(() =>
-      events({ type: "thread", thread_id: "t1" }, { type: "decline", code: "no_documents", message: NO_DOCUMENTS }, { type: "done" }),
+      events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "decline", code: "no_documents", message: NO_DOCUMENTS }, { type: "done" }),
     );
     renderChat({ ask });
     await userEvent.type(await question(), "What is attention?");
@@ -337,7 +337,7 @@ describe("ChatPage", () => {
     });
     const answered = () =>
       events(
-        { type: "thread", thread_id: "t1" },
+        { type: "thread", thread_id: "t1", run_id: "r1" },
         { type: "delta", text: "It weighs tokens [1]." },
         { type: "citations", citations: [{ n: 1, chunk_id: "c1", document_id: "d1", document_title: "a.pdf", page: 3 }] },
         { type: "done" },
@@ -365,7 +365,7 @@ describe("ChatPage", () => {
     it("shows a deleted document's citation as Deleted document, without its title or page", async () => {
       const ask = vi.fn(() =>
         events(
-          { type: "thread", thread_id: "t1" },
+          { type: "thread", thread_id: "t1", run_id: "r1" },
           { type: "delta", text: "A [1] and B [2]." },
           {
             type: "citations",
@@ -393,7 +393,7 @@ describe("ChatPage", () => {
     it("does not look up documents used when the answer failed", async () => {
       const loadUsed = vi.fn(async () => []);
       const ask = vi.fn(() =>
-        events({ type: "thread", thread_id: "t1" }, { type: "error", code: "unavailable", message: "The tutor is unavailable." }),
+        events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "error", code: "unavailable", message: "The tutor is unavailable." }),
       );
       renderChat({ ask, loadUsed });
       await userEvent.type(await question(), "What is attention?");
@@ -467,7 +467,7 @@ describe("ChatPage", () => {
       expect(within(panel()!).queryByRole("button", { name: "Archive conversation" })).not.toBeInTheDocument();
       await userEvent.type(await question(), "What is attention?");
       await userEvent.click(askButton());
-      control.push({ type: "thread", thread_id: "t1" });
+      control.push({ type: "thread", thread_id: "t1", run_id: "r1" });
       // The thread exists before its answer is done.
       expect(await within(panel()!).findByRole("button", { name: "Archive conversation" })).toBeDisabled();
       control.push({ type: "done" });
@@ -572,7 +572,7 @@ describe("ChatPage", () => {
       const scopeSwitch = () => within(panel()!).getByRole("switch", { name: "Only search these documents" });
       const status = () => screen.getByRole("status");
       const declined = () =>
-        events({ type: "thread", thread_id: "t1" }, { type: "decline", code: "limited", message: "These documents don't cover this." }, { type: "done" });
+        events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "decline", code: "limited", message: "These documents don't cover this." }, { type: "done" });
 
       // Answers a first question (a new thread t1 that used a.pdf), then turns the limit on.
       async function limit(props: ComponentProps<typeof ChatPage> = {}) {
@@ -781,7 +781,7 @@ describe("ChatPage", () => {
       used: true,
     });
     const answered = () =>
-      events({ type: "thread", thread_id: "t1" }, { type: "delta", text: "It weighs tokens [1]." }, { type: "done" });
+      events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "delta", text: "It weighs tokens [1]." }, { type: "done" });
     const panel = () => screen.queryByRole("complementary", { name: "Conversation" });
     const pane = (name: string) => screen.queryByRole("region", { name });
     const row = (name: string) => within(panel()!).findByRole("button", { name });
@@ -888,7 +888,7 @@ describe("ChatPage", () => {
     describe("Sources chips", () => {
       const cited = (c3Page: number | null = 1) =>
         events(
-          { type: "thread", thread_id: "t1" },
+          { type: "thread", thread_id: "t1", run_id: "r1" },
           { type: "delta", text: "It weighs tokens [1][2][3]." },
           {
             type: "citations",
@@ -1001,7 +1001,7 @@ describe("ChatPage", () => {
       );
       return refresh;
     }
-    const started = () => events({ type: "thread", thread_id: "t1" }, { type: "done" });
+    const started = () => events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "done" });
 
     it("is refreshed once an answer ends with done", async () => {
       const refresh = renderInShell({ ask: vi.fn(started) });
@@ -1014,7 +1014,7 @@ describe("ChatPage", () => {
 
     it("is refreshed once when an answer ends with an error after the thread started", async () => {
       const refresh = renderInShell({
-        ask: vi.fn(() => events({ type: "thread", thread_id: "t1" }, { type: "error", code: "unavailable", message: "The tutor is unavailable." })),
+        ask: vi.fn(() => events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "error", code: "unavailable", message: "The tutor is unavailable." })),
       });
       await userEvent.type(await question(), "What is attention?");
       await userEvent.click(askButton());
@@ -1037,7 +1037,7 @@ describe("ChatPage", () => {
   });
 
   describe("title", () => {
-    const started = () => events({ type: "thread", thread_id: "t1" }, { type: "done" });
+    const started = () => events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "done" });
     const titleButton = () => screen.findByRole("button", { name: "What is attention?. Edit title" });
     const field = () => screen.getByRole("textbox", { name: "Conversation title" });
 
@@ -1169,7 +1169,7 @@ describe("ChatPage", () => {
     const notice = () => screen.queryByText((_, el) => el?.tagName === "P" && el.textContent === NOTICE);
     const startChat = (props: ComponentProps<typeof ChatPage> = {}, docs = [library()]) =>
       renderChat({ loadDocs: async () => docs, ...props }, "/chat?document=d1");
-    const answered = () => events({ type: "thread", thread_id: "t1" }, { type: "delta", text: "Yes." }, { type: "done" });
+    const answered = () => events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "delta", text: "Yes." }, { type: "done" });
 
     it("lists the document as Added, says where the conversation started, and focuses the composer", async () => {
       startChat();
@@ -1269,7 +1269,7 @@ describe("ChatPage", () => {
       await userEvent.type(await question(), "q");
       await userEvent.click(askButton());
       expect(screen.getByTestId("location").textContent).toBe("/chat");
-      control.push({ type: "thread", thread_id: "t1" });
+      control.push({ type: "thread", thread_id: "t1", run_id: "r1" });
       control.push({ type: "delta", text: "Partly." });
       expect(await screen.findByText("Partly.")).toBeInTheDocument();
       expect(loadDocs).toHaveBeenCalledTimes(1);
@@ -1294,6 +1294,7 @@ describe("ChatPage", () => {
       decline: null,
       created_at: "2026-10-10T09:00:00Z",
       run_id: null,
+      rating: null,
       ...over,
     });
     const cited = (over: Partial<TurnResponse["citations"][number]>) => turn({ citations: [{ ...turn().citations[0]!, ...over }] });
@@ -1428,7 +1429,7 @@ describe("ChatPage", () => {
       renderChat({ ask: vi.fn(() => control.stream()), loadConversation });
       await userEvent.type(await question(), "What is attention?");
       await userEvent.click(askButton());
-      control.push({ type: "thread", thread_id: "t1" });
+      control.push({ type: "thread", thread_id: "t1", run_id: "r1" });
       await waitFor(() => expect(location()).toBe("/chat/t1"));
       control.push({ type: "delta", text: "It weighs" });
       expect(await screen.findByText("It weighs")).toBeInTheDocument();
@@ -1439,7 +1440,7 @@ describe("ChatPage", () => {
     });
 
     it("an unlimited question in a reopened conversation starts a new conversation at a new URL", async () => {
-      const ask = vi.fn(() => events({ type: "thread", thread_id: "t2" }, { type: "delta", text: "Next answer." }, { type: "done" }));
+      const ask = vi.fn(() => events({ type: "thread", thread_id: "t2", run_id: "r1" }, { type: "delta", text: "Next answer." }, { type: "done" }));
       const askIn = vi.fn();
       renderChat({ loadConversation: conversation([turn()]), ask, askIn }, "/chat/t1");
       expect(await screen.findByText("It weighs tokens [1].")).toBeInTheDocument();
@@ -1454,7 +1455,7 @@ describe("ChatPage", () => {
     });
 
     it("a question in a limited conversation adds a turn under the history", async () => {
-      const askIn = vi.fn(() => events({ type: "thread", thread_id: "t1" }, { type: "delta", text: "More." }, { type: "done" }));
+      const askIn = vi.fn(() => events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "delta", text: "More." }, { type: "done" }));
       renderChat({ loadConversation: conversation([turn()], { search_scope: "listed" }), loadUsed: async () => [usedDoc], askIn }, "/chat/t1");
       expect(await screen.findByText("Searching 1 document")).toBeInTheDocument();
       await userEvent.type(await question(), "More?");
@@ -1480,7 +1481,7 @@ describe("ChatPage", () => {
       renderChat({ ask: vi.fn(() => control.stream()) });
       await userEvent.type(await question(), "What is attention?");
       await userEvent.click(askButton());
-      control.push({ type: "thread", thread_id: "t1" });
+      control.push({ type: "thread", thread_id: "t1", run_id: "r1" });
       await waitFor(() => expect(location()).toBe("/chat/t1"));
       await userEvent.click(screen.getByRole("link", { name: "Chat" }));
       expect(await screen.findByRole("heading", { name: "Ask about your documents" })).toBeInTheDocument();
@@ -1500,7 +1501,7 @@ describe("ChatPage", () => {
     it("with no active documents a question goes to this conversation, under its history", async () => {
       const ask = vi.fn(() => events());
       const askIn = vi.fn(() =>
-        events({ type: "thread", thread_id: "t1" }, { type: "decline", code: "no_documents", message: NO_DOCUMENTS }, { type: "done" }),
+        events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "decline", code: "no_documents", message: NO_DOCUMENTS }, { type: "done" }),
       );
       renderChat({ loadConversation: conversation([turn()]), loadDocs: async () => [], ask, askIn }, "/chat/t1");
       await screen.findByText("It weighs tokens [1].");
@@ -1516,10 +1517,10 @@ describe("ChatPage", () => {
     });
 
     it("once an answer arrives the no-documents state is over: the next question starts a new conversation", async () => {
-      const ask = vi.fn(() => events({ type: "thread", thread_id: "t2" }, { type: "delta", text: "Fresh." }, { type: "done" }));
+      const ask = vi.fn(() => events({ type: "thread", thread_id: "t2", run_id: "r1" }, { type: "delta", text: "Fresh." }, { type: "done" }));
       const askIn = vi.fn(() =>
         events(
-          { type: "thread", thread_id: "t1" },
+          { type: "thread", thread_id: "t1", run_id: "r1" },
           { type: "delta", text: "Found one." },
           { type: "citations", citations: [{ n: 1, chunk_id: "c1", document_id: "d1", document_title: "a.pdf", page: 3 }] },
           { type: "done" },
@@ -1562,6 +1563,164 @@ describe("ChatPage", () => {
       expect(await screen.findByRole("region", { name: "ReAct" }, { timeout: 3000 })).toBeInTheDocument();
       expect(chips[1]).toHaveAttribute("aria-current", "true");
       expect(chips[0]).not.toHaveAttribute("aria-current");
+    });
+  });
+
+  describe("rating an answer", () => {
+    const helpful = () => screen.getByRole("button", { name: "Helpful" });
+    const notHelpful = () => screen.getByRole("button", { name: "Not helpful" });
+    const answered = () =>
+      events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "delta", text: "It weighs tokens [1]." }, { type: "citations", citations: [{ n: 1, chunk_id: "c1", document_id: "d1", document_title: "a.pdf", page: 3 }] }, { type: "done" });
+    async function askQuestion() {
+      await userEvent.type(await question(), "What is attention?");
+      await userEvent.click(askButton());
+    }
+
+    it("shows the buttons at the end of the Sources line once the answer is done, and rates it", async () => {
+      const rate = vi.fn(async (_threadId: string, _runId: string, rating: "up" | "down") => rating);
+      renderChat({ ask: vi.fn(answered), rate });
+      await askQuestion();
+
+      const sources = (await screen.findByText("Sources")).parentElement!;
+      expect(sources).toContainElement(await screen.findByRole("button", { name: "Helpful" }));
+      await userEvent.click(helpful());
+
+      expect(rate).toHaveBeenCalledWith("t1", "r1", "up");
+      await waitFor(() => expect(helpful()).toHaveAttribute("aria-pressed", "true"));
+      expect(notHelpful()).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("groups each answer's buttons and keeps them and the note out of the answer's live region", async () => {
+      const rate = vi.fn(async (_threadId: string, _runId: string, rating: "up" | "down") => rating);
+      renderChat({ ask: vi.fn(answered), rate });
+      await askQuestion();
+      await userEvent.click(await screen.findByRole("button", { name: "Helpful" }));
+
+      const group = screen.getByRole("group", { name: "Rate this answer" });
+      expect(group).toContainElement(helpful());
+      expect(group).toContainElement(notHelpful());
+      // The nearest live region decides: the page announces the note once, through its own status.
+      // The same text is also in the page's status (the one announcement); the note is the other match.
+      const [note] = (await screen.findAllByText("Thanks — glad it helped.")).filter((el) => el.getAttribute("role") !== "status");
+      expect(group.closest("[aria-live]")).toHaveAttribute("aria-live", "off");
+      expect(note.closest("[aria-live]")).toHaveAttribute("aria-live", "off");
+    });
+
+    it("shows the buttons under an answer without citations", async () => {
+      const rate = vi.fn(async (_threadId: string, _runId: string, rating: "up" | "down") => rating);
+      renderChat({ ask: vi.fn(() => events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "delta", text: "Yes." }, { type: "done" })), rate });
+      await askQuestion();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Not helpful" }));
+
+      expect(rate).toHaveBeenCalledWith("t1", "r1", "down");
+      expect(screen.queryByText("Sources")).not.toBeInTheDocument();
+    });
+
+    it("shows the buttons under a declined turn", async () => {
+      const rate = vi.fn(async (_threadId: string, _runId: string, rating: "up" | "down") => rating);
+      const declined = events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "decline", code: "limited", message: "These documents don't cover this." }, { type: "done" });
+      renderChat({ ask: vi.fn(() => declined), rate });
+      await askQuestion();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Helpful" }));
+
+      expect(rate).toHaveBeenCalledWith("t1", "r1", "up");
+    });
+
+    it("shows no buttons while the answer is streaming", async () => {
+      const control = controlledStream();
+      renderChat({ ask: vi.fn(() => control.stream()) });
+      await askQuestion();
+      control.push({ type: "thread", thread_id: "t1", run_id: "r1" });
+      control.push({ type: "delta", text: "It weighs" });
+      expect(await screen.findByText("It weighs")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Helpful" })).not.toBeInTheDocument();
+
+      control.push({ type: "done" });
+      control.push(null);
+      expect(await screen.findByRole("button", { name: "Helpful" })).toBeInTheDocument();
+    });
+
+    it("shows no buttons for a turn whose stream ended with an error", async () => {
+      const failed = events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "delta", text: "It wei" }, { type: "error", code: "unavailable", message: "The tutor is unavailable." });
+      renderChat({ ask: vi.fn(() => failed) });
+      await askQuestion();
+
+      expect(await screen.findByText("The tutor is unavailable.")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Helpful" })).not.toBeInTheDocument();
+    });
+
+    it("shows each saved turn's rating pressed and no buttons for a turn with no run", async () => {
+      const turn = (over: Partial<TurnResponse>): TurnResponse => ({
+        question: "Q?",
+        answer: "A.",
+        citations: [],
+        decline: null,
+        created_at: "2026-10-10T09:00:00Z",
+        run_id: "r1",
+        rating: null,
+        ...over,
+      });
+      const turns = [turn({ rating: "down" }), turn({ question: "Old?", run_id: null })];
+      const loadConversation = vi.fn(async () => ({ thread: { thread_id: "t1", title: "T", search_scope: "library" as const }, turns }));
+      renderChat({ loadConversation }, "/chat/t1");
+
+      expect(await screen.findByRole("button", { name: "Not helpful" })).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getAllByRole("button", { name: "Helpful" })).toHaveLength(1);
+    });
+
+    it("ignores a rating reply that arrives after another conversation was opened", async () => {
+      let release: (rating: "up" | "down") => void = () => {};
+      const rate = vi.fn(() => new Promise<"up" | "down">((resolve) => (release = resolve)));
+      const saved: TurnResponse = { question: "Q1?", answer: "A1.", citations: [], decline: null, created_at: "2026-10-10T09:00:00Z", run_id: "r1", rating: null };
+      const loadConversation = vi.fn(async (id: string) => ({
+        thread: { thread_id: id, title: id, search_scope: "library" as const },
+        turns: [{ ...saved, question: id === "t1" ? "Q1?" : "Q2?" }],
+      }));
+      render(
+        <MemoryRouter initialEntries={["/chat/t1"]}>
+          <Routes>
+            <Route path="/chat/:threadId?" element={<ChatPage loadDocs={async () => [doc("ready")]} loadUsed={async () => []} loadConversation={loadConversation} rate={rate} />} />
+          </Routes>
+          <Link to="/chat/t2">Other</Link>
+        </MemoryRouter>,
+      );
+      await userEvent.click(await screen.findByRole("button", { name: "Helpful" }));
+
+      await userEvent.click(screen.getByRole("link", { name: "Other" }));
+      expect(await screen.findByText("Q2?", { selector: "p" })).toBeInTheDocument();
+      await act(async () => release("up"));
+
+      expect(screen.getByRole("button", { name: "Helpful" })).toHaveAttribute("aria-pressed", "false");
+      expect(screen.queryByText("Thanks — glad it helped.")).not.toBeInTheDocument();
+    });
+
+    it("announces the outcome in the page's one status region, not in a region per turn", async () => {
+      const turn = (run_id: string, rating: "up" | null): TurnResponse => ({ question: "Q?", answer: "A.", citations: [], decline: null, created_at: "2026-10-10T09:00:00Z", run_id, rating });
+      const loadConversation = vi.fn(async () => ({ thread: { thread_id: "t1", title: "T", search_scope: "library" as const }, turns: [turn("r1", "up"), turn("r2", null)] }));
+      renderChat({ loadConversation, rate: async (_t, _r, rating) => rating }, "/chat/t1");
+
+      const helpfuls = await screen.findAllByRole("button", { name: "Helpful" });
+      expect(screen.getAllByRole("status")).toHaveLength(1);
+      await userEvent.click(helpfuls[1]!);
+
+      await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Thanks — glad it helped."));
+    });
+
+    it("keeps the newer rating when an older reply arrives last", async () => {
+      const replies: ((rating: "up" | "down") => void)[] = [];
+      const rate = vi.fn(() => new Promise<"up" | "down">((resolve) => replies.push(resolve)));
+      renderChat({ ask: vi.fn(answered), rate });
+      await askQuestion();
+      await userEvent.click(await screen.findByRole("button", { name: "Helpful" }));
+      await userEvent.click(notHelpful());
+
+      await act(async () => replies[1]!("down"));
+      await act(async () => replies[0]!("up"));
+
+      expect(notHelpful()).toHaveAttribute("aria-pressed", "true");
+      expect(helpful()).toHaveAttribute("aria-pressed", "false");
     });
   });
 });
