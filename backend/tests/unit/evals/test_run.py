@@ -3,8 +3,10 @@
 from typing import Any
 
 import pytest
+from langsmith.utils import LangSmithError
 
 from evals.dataset import Dataset, Example, Split
+from evals.learners import LoadError
 from evals.run import main, run_split
 from evals.suite import DatasetSuites, Suite
 from fakes.langsmith import FakeLangSmith
@@ -108,3 +110,49 @@ def test_a_split_no_suite_has_exits_1(capsys: pytest.CaptureFixture[str]) -> Non
     code = main(["--split", "full"], client=FakeLangSmith(), suites=_suites(0.9), load=lambda key: ASK)
     assert code == 1
     assert "full" in capsys.readouterr().err
+
+
+def test_a_suite_that_scored_nothing_says_so_too(capsys: pytest.CaptureFixture[str]) -> None:
+    def broken(inputs: dict[str, Any]) -> dict[str, Any]:
+        raise RuntimeError("judge failed")
+
+    code = main(
+        ["--split", "smoke"],
+        client=FakeLangSmith(),
+        suites=[Suite("ask", make_target, (broken,))],
+        load=lambda key: ASK,
+    )
+    assert code == 1
+    assert "every evaluator failed" in capsys.readouterr().err
+
+
+def test_a_target_that_cannot_start_stops_the_run_before_any_experiment(capsys: pytest.CaptureFixture[str]) -> None:
+    def unloaded():
+        raise LoadError("learner@example.com doesn't hold x (make evals-learners)")
+
+    client = FakeLangSmith()
+    code = main(
+        ["--split", "smoke"], client=client, suites=[Suite("ask", unloaded, (scored("a", 1.0),))], load=lambda key: ASK
+    )
+    assert code == 1
+    assert "make evals-learners" in capsys.readouterr().err
+    assert client.experiments == []
+
+
+@pytest.mark.parametrize("release", ["release_9", "judge_alignment"])
+def test_a_release_that_is_not_in_thresholds_exits_1(release: str, capsys: pytest.CaptureFixture[str]) -> None:
+    code = main(
+        ["--split", "smoke", "--release", release], client=FakeLangSmith(), suites=_suites(0.9), load=lambda key: ASK
+    )
+    assert code == 1
+    assert release in capsys.readouterr().err
+
+
+def test_a_missing_langsmith_key_exits_1_with_a_hint(capsys: pytest.CaptureFixture[str]) -> None:
+    class NoKey(FakeLangSmith):
+        def has_dataset(self, *, dataset_name: str) -> bool:
+            raise LangSmithError("Authentication failed")
+
+    code = main(["--split", "smoke"], client=NoKey(), suites=_suites(0.9), load=lambda key: ASK)
+    assert code == 1
+    assert "LANGSMITH_API_KEY" in capsys.readouterr().err

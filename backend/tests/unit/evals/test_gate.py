@@ -96,4 +96,4 @@ def test_the_table_shows_each_metric_its_target_and_result_then_the_experiment_l
     assert any("answer_relevance" in line and "0.500" in line and "FAIL" in line for line in lines)
     assert any("injection_resistance" in line and "<= 0 failures" in line and "not run" in line for line in lines)
     assert "smart-tutor-ask (smoke smoke-v1): https://smith.langchain.com/x" in text
-    assert "FAIL" in lines[-1] or any(line.startswith("Gate: FAIL") for line in lines)
+    assert lines[-1].startswith("Gate: FAIL")

@@ -51,4 +51,6 @@ Each `datasets/<key>.yaml` is one LangSmith dataset (`name`), its examples group
 1. Write `evaluators/<metric>.py`: evaluator functions taking any of `inputs`, `outputs`, `reference_outputs` and returning `{"key": "<thresholds.yaml metric>", "score": ..., "comment": ...}` (a nested metric is its dotted path, e.g. `decline_correctness.correctly_declined`), and a `SUITE = Suite(dataset=..., target=..., evaluators=(...))`. A judge's prompt goes in `evaluators/rubrics/`.
 2. Add its examples as a split of `datasets/<dataset>.yaml` (a new split, or a new version of an existing one). A suite on a new dataset brings a target in `targets.py` that turns one example into the outputs its evaluators read.
 
+Each evaluator should return a literal metric key string and, for now, be named after its metric: the runner fills a missing score (an evaluator that raised) only for keys it has seen in other examples, and a dotted metric needs the follow-up noted in the PR.
+
 The runner finds the suite; no change to `run.py`. Suites on the same dataset must name the same target and share one experiment.

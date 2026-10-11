@@ -16,6 +16,7 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 import langsmith
+from langsmith.utils import LangSmithError
 
 from evals.dataset import Dataset, DatasetError, load_dataset, versioned_examples
 from evals.gate import check, load_thresholds, passed, ran, render
@@ -31,6 +32,8 @@ def _coroutine_function(target: Callable[[dict[str, Any]], Any]) -> Callable[[di
     async def call(inputs: dict[str, Any]) -> Any:
         return await target(inputs)
 
+    # LangSmith names the traced target run after the function: not "call" for every dataset
+    call.__name__ = call.__qualname__ = getattr(target, "__name__", type(target).__name__)
     return call
 
 
@@ -80,7 +83,11 @@ def main(
     parser.add_argument("--split", choices=["smoke", "full"], required=True)
     parser.add_argument("--release", default="release_1", help="the thresholds.yaml table to gate on")
     args = parser.parse_args(argv)
-    thresholds = load_thresholds(args.release)
+    try:
+        thresholds = load_thresholds(args.release)
+    except ValueError as e:
+        print(f"Can't gate on {args.release}: {e}", file=sys.stderr)
+        return 1
     models = Settings().models
     metadata = {"agent_model": models.agent.model_id, "judge_model": models.judge.model_id}
     groups = by_dataset(discover() if suites is None else suites)
@@ -91,10 +98,14 @@ def main(
     except (DatasetError, LoadError) as e:
         print(f"Can't run the {args.split} split: {e}", file=sys.stderr)
         return 1
+    except LangSmithError as e:
+        print(f"Can't reach LangSmith: {e} (check LANGSMITH_API_KEY)", file=sys.stderr)
+        return 1
     rows = check(thresholds, scores)
     print(render(rows, links))
     if not ran(rows):
-        print(f"Nothing ran: no suite's dataset has a {args.split} split.", file=sys.stderr)
+        why = f"no suite's dataset has a {args.split} split, or every evaluator failed"
+        print(f"Nothing ran: no metric was scored ({why}).", file=sys.stderr)
         return 1
     return 0 if passed(rows) else 1
 

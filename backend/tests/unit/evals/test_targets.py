@@ -135,6 +135,22 @@ def test_a_seed_document_missing_from_the_library_says_to_load_the_learners() ->
         learners.document_id("learner@example.com", "react-2022")
 
 
+def test_a_learner_missing_a_seed_document_stops_the_run_with_the_load_hint() -> None:
+    learners = EvalLearners({"learner@example.com": StubTutor({"abc": "doc-7"})}, SEEDS | {"b": _seed("b", "def")})
+    with pytest.raises(LoadError, match="make evals-learners"):
+        learners.check_libraries({"learner@example.com": ["react-2022", "b"]})
+
+
+def test_a_complete_library_passes_the_check() -> None:
+    learners = EvalLearners({"learner@example.com": StubTutor({"abc": "doc-7"})}, SEEDS)
+    learners.check_libraries({"learner@example.com": ["react-2022"]})
+    assert learners.document_id("learner@example.com", "react-2022") == "doc-7"
+
+
+def _seed(seed_id: str, sha: str) -> SeedDocument:
+    return SeedDocument(seed_id, "https://arxiv.org/pdf/y", sha, ("LLM agents",), "y.pdf")
+
+
 def test_signing_in_again_gives_a_fresh_token() -> None:
     tutor = StubTutor({})
     learners = EvalLearners({"learner@example.com": tutor}, SEEDS)

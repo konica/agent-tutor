@@ -81,6 +81,13 @@ class EvalLearners:
             self._ids[key] = str(found)
         return self._ids[key]
 
+    def check_libraries(self, holdings: Mapping[str, Sequence[str]]) -> None:
+        """Raise LoadError unless each learner holds all of their seed documents. Done before the run: inside the
+        target, LangSmith would only log the error and the run would go on to a misleading gate table."""
+        for username, seed_ids in holdings.items():
+            for seed_id in seed_ids:
+                self.document_id(username, seed_id)
+
 
 class AskTarget:
     def __init__(
@@ -131,12 +138,14 @@ class AskTarget:
 def ask_target() -> AskTarget:
     """The ask target against the local stack: the agent model, the MCP server, Keycloak, and the API."""
     settings, seeds = Settings(), load_manifest()
+    learners = load_learners(LEARNERS, seeds)
     tutors = {  # each learner in their own client: Keycloak's session cookie must not carry over
-        learner.username: Tutor(httpx.Client(timeout=60), learner.username, learner.password)
-        for learner in load_learners(LEARNERS, seeds)
+        learner.username: Tutor(httpx.Client(timeout=60), learner.username, learner.password) for learner in learners
     }
+    eval_learners = EvalLearners(tutors, seeds)
+    eval_learners.check_libraries({learner.username: learner.documents for learner in learners})
     return AskTarget(
-        EvalLearners(tutors, seeds),
+        eval_learners,
         lambda token: McpRetriever(settings.mcp_url, token),
         ModelFactory(settings).chat(ChatRole.AGENT),
         settings.answer_floor,

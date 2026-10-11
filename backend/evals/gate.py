@@ -37,8 +37,9 @@ class Row:
 
 def load_thresholds(release: str, path: Path = THRESHOLDS) -> list[Threshold]:
     tree = yaml.safe_load(path.read_text(encoding="utf-8"))
-    if release not in tree:
-        raise ValueError(f"{release!r} is not in {path.name} (it has {', '.join(tree)})")
+    releases = [name for name in tree if name.startswith("release_")]
+    if release not in releases:
+        raise ValueError(f"{release!r} is not a release table in {path.name} (it has {', '.join(releases)})")
     return list(_leaves(tree[release], ""))
 
 
