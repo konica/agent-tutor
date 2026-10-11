@@ -67,6 +67,10 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-m 'not integration and not bedrock' --import-mode=importlib"
 pythonpath = ["tests", "."]  # so tests can `import fakes` and `import evals`
+filterwarnings = [
+    # langsmith 0.14's own code; remove when upgraded
+    "ignore:ast.Str is deprecated:DeprecationWarning:langsmith.evaluation._key_extraction",
+]
 markers = [
     "integration: needs the Docker Compose stack (make up)",
     "bedrock: real Bedrock calls in us-east-1 with your AWS credentials (make bedrock-check)",

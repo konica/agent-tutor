@@ -27,7 +27,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from smart_tutor.apps.agent.graph import AskGraph, build_graph
-from smart_tutor.apps.agent.state import AgentContext, AskState, DeclineCode
+from smart_tutor.apps.agent.state import DECLINE_MESSAGES, AgentContext, AskState
 from smart_tutor.apps.agent.tracing import AskRun, AskTracing
 from smart_tutor.shared.adapters.auth.bearer import BearerToken, CurrentPrincipal
 from smart_tutor.shared.adapters.auth.keycloak_introspection import keycloak_verifier
@@ -37,7 +37,7 @@ from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.ports.token_verifier import TokenVerifier
 from smart_tutor.tutoring.adapters.mcp_retriever import McpRetriever
-from smart_tutor.tutoring.application import LIMITED_DECLINE, NO_DOCUMENTS_DECLINE, RetrievedChunk
+from smart_tutor.tutoring.application import RetrievedChunk
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,6 @@ UNAVAILABLE = "The tutor couldn't answer right now. Try again in a moment."
 # Proxies must pass each event on as it comes, and nothing may cache the answer.
 SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 STREAM_MODES: list[Literal["messages", "updates"]] = ["messages", "updates"]
-DECLINE_MESSAGES: dict[DeclineCode, str] = {"limited": LIMITED_DECLINE, "no_documents": NO_DOCUMENTS_DECLINE}
 
 
 class AskRequest(BaseModel):

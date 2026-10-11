@@ -134,10 +134,15 @@ class Tutor:
             raise LoadError(f"{self.username}: the token endpoint gave {token.status_code}")
         self._token = token.json()["access_token"]
 
-    def _send(self, method: str, path: str, body: object | None) -> httpx.Response:
+    def access_token(self) -> str:
+        """This learner's access token, signing in first when there is none."""
         if self._token is None:
             self.sign_in()
-        headers = {"Authorization": f"Bearer {self._token}"}
+        assert self._token is not None
+        return self._token
+
+    def _send(self, method: str, path: str, body: object | None) -> httpx.Response:
+        headers = {"Authorization": f"Bearer {self.access_token()}"}
         return self._http.request(method, f"{self._api}{path}", json=body, headers=headers)
 
     def call(self, method: str, path: str, body: object | None = None, ok: int = 200) -> Any:

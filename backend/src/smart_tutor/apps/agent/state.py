@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Literal, TypedDict
 
 from smart_tutor.shared.domain.citation import Citation
-from smart_tutor.tutoring.application import RetrievedChunk
+from smart_tutor.tutoring.application import LIMITED_DECLINE, NO_DOCUMENTS_DECLINE, RetrievedChunk
 
 
 @dataclass
@@ -14,6 +14,8 @@ class AgentContext:
 
 # "limited": a limited search that doesn't cover the question (US-4c); "no_documents": nothing is readable (US-3).
 DeclineCode = Literal["limited", "no_documents"]
+# What the learner reads for each decline (the server's decline event, the eval target's answer).
+DECLINE_MESSAGES: dict[DeclineCode, str] = {"limited": LIMITED_DECLINE, "no_documents": NO_DOCUMENTS_DECLINE}
 
 
 class AskState(TypedDict, total=False):
