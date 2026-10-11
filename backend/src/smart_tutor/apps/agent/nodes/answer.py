@@ -23,7 +23,7 @@ def answer_node(model: BaseChatModel, answer_floor: float) -> AnswerNode:
         chunks = state.get("chunks", [])
         if state.get("document_ids") is not None and not covers(chunks, answer_floor):
             return {"answer": "", "citations": [], "decline": "limited"}
-        reply = await model.ainvoke(answer_messages(state["question"], chunks))
+        reply = await model.ainvoke(answer_messages(state["question"], chunks, state.get("history", [])))
         text = reply.text
         return {"answer": text, "citations": [c.citation(n) for n, c in cited_chunks(text, chunks)]}
 
