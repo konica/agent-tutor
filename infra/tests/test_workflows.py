@@ -414,8 +414,8 @@ def test_native_cloud_release_waits_with_the_legacy_strategy() -> None:
 
 def test_native_cloud_stack_outputs_fail_loudly_when_missing() -> None:
     run = str(step(native_cloud_job(), "Read the stack outputs")["run"])
-    assert run.count("!= None") == 5
-    assert run.count("::error::") == 5
+    assert run.count("!= None") == 6
+    assert run.count("::error::") == 6
 
 
 def test_native_cloud_release_is_followed_by_an_in_cluster_service_check() -> None:

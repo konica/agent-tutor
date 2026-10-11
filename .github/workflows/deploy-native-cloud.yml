@@ -89,6 +89,7 @@ jobs:
           ingest_queue_url=$(output Storage IngestQueueUrl)
           [[ -n "$ingest_queue_url" && "$ingest_queue_url" != None ]] || { echo "::error::SmartTutor-prod-Storage has no IngestQueueUrl output"; exit 1; }
           trace_sampling_rate=$(aws ssm get-parameter --name /smart-tutor/trace-sampling-rate --query Parameter.Value --output text)
+          [[ -n "$trace_sampling_rate && "$trace_sampling_rate != None ]] || { echo "::error::/smart-tutor/trace-sampling-rate is not set (deploy the Config stack)"; exit 1; }
           {
             echo "REGISTRY=$registry"
             echo "CLOUDFRONT_URL=$cloudfront_url"

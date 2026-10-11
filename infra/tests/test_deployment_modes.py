@@ -152,6 +152,7 @@ def test_on_premise_deploy_role_trusts_its_own_environment_and_reads_only_its_st
         "ReadDeployStatus",
         "ReadStackOutputs",
     ]
+    assert not [s for s in statements if "ssm:GetParameter" in str(s["Action"])]
     (outputs,) = (s for s in statements if s["Sid"] == "ReadStackOutputs")
     assert "stack/SmartTutor-OnPremise-prod-*/*" in str(outputs["Resource"])
 

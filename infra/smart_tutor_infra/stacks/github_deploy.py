@@ -22,7 +22,7 @@ class GitHubDeployStack(cdk.Stack):
 
     It can assume the CDK bootstrap roles (so CloudFormation, not the role, changes infrastructure), push app images
     to its mode's ECR repositories (`<repository prefix>/*`, #206), read its mode's stack outputs, and, with `eks`,
-    describe the EKS cluster. With `deploy_document` (on-premise, #150), it runs that one SSM document on the mode's
+    describe the EKS cluster and read the trace sampling rate parameter the deploy passes to Helm (#229). With `deploy_document` (on-premise, #150), it runs that one SSM document on the mode's
     instances and reads the result.
     """
 
@@ -94,7 +94,13 @@ class GitHubDeployStack(cdk.Stack):
                         sid="EksKubeconfig",
                         actions=["eks:DescribeCluster"],
                         resources=[f"arn:aws:eks:{region}:{account}:cluster/smart-tutor-*"],
-                    )
+                    ),
+                    # The deploy passes the trace sampling rate to Helm (#229).
+                    iam.PolicyStatement(
+                        sid="ReadTraceSamplingRate",
+                        actions=["ssm:GetParameter"],
+                        resources=[f"arn:aws:ssm:{region}:{account}:parameter{names.ssm_path}/trace-sampling-rate"],
+                    ),
                 ]
                 if eks
                 else []
