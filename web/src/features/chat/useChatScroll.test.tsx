@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { useChatScroll } from "./useChatScroll";
+import { GESTURE_GAP_MS, useChatScroll } from "./useChatScroll";
 
 // A pane over a list of items, with the page's Jump button.
 function Harness({ items, onLand }: { items: string[]; onLand?: (land: () => void) => void }) {
@@ -47,6 +47,7 @@ function motion(reduce: boolean) {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  delete (HTMLElement.prototype as Partial<HTMLElement>).scrollTo;
 });
 
 describe("useChatScroll", () => {
@@ -104,7 +105,6 @@ describe("useChatScroll", () => {
     await userEvent.click(jump()!);
     expect(scrollToSpy).toHaveBeenLastCalledWith({ top: 1400, behavior: "smooth" });
     expect(jump()).toBeNull();
-    delete (HTMLElement.prototype as Partial<HTMLElement>).scrollTo;
   });
 
   it("scrolls instantly under reduced motion", async () => {
@@ -117,7 +117,6 @@ describe("useChatScroll", () => {
     await userEvent.click(jump()!);
     expect(scrollToSpy).not.toHaveBeenCalled();
     expect(pane().scrollTop).toBe(1400);
-    delete (HTMLElement.prototype as Partial<HTMLElement>).scrollTo;
   });
 
   it("land() follows again from the bottom, instantly", () => {
@@ -171,5 +170,38 @@ describe("useChatScroll", () => {
     g.content = 2600;
     act(() => callbacks.forEach((c) => c()));
     expect(pane().scrollTop).toBe(300);
+  });
+
+  // The learner scrolls up, then wheels back down while the answer streams.
+  function wheelBackDown(waitBeforeLanding: number) {
+    let now = 1_000_000;
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+    const g = geometry();
+    const { rerender } = render(<Harness items={["a"]} />);
+    scrollTo(500);
+    now += GESTURE_GAP_MS + 1;
+    scrollTo(900); // the gesture begins; the bottom is at 1400
+    g.content = 2100;
+    rerender(<Harness items={["a", "b"]} />);
+    expect(pane().scrollTop).toBe(900);
+    now += waitBeforeLanding;
+    scrollTo(1400); // 100px above the bottom as it is now
+    return { g, rerender };
+  }
+
+  it("scrolling down to where the bottom was when the scroll began resumes following, though the answer grew meanwhile", () => {
+    const { g, rerender } = wheelBackDown(16);
+    expect(jump()).toBeNull();
+    g.content = 2400;
+    rerender(<Harness items={["a", "b", "c"]} />);
+    expect(pane().scrollTop).toBe(1800);
+  });
+
+  it("a new scroll gesture measures from the bottom as it is now", () => {
+    const { g, rerender } = wheelBackDown(GESTURE_GAP_MS + 1);
+    expect(jump()).toBeInTheDocument();
+    g.content = 2400;
+    rerender(<Harness items={["a", "b", "c"]} />);
+    expect(pane().scrollTop).toBe(1400);
   });
 });
