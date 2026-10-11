@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Draft v2.40 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; conversations over all of a learner's documents; per-learner contents; on-premise deployment by default; research map in Release 2) |
+| **Status** | Draft v2.41 (learners upload their own documents; shared subject catalog; documents with 1–3 subjects; conversations over all of a learner's documents; per-learner contents; on-premise deployment by default; research map in Release 2) |
+| **Changes from v2.40** | The native-cloud pilot was torn down on 2026-10-11 with its data (#156, product owner decision): on-premise had passed its smoke test, and the idle pilot cost about $275 a month. Native-cloud stays deployable from the opt-in workflow and starts with an empty database. §9.12. No product behavior changes. |
 | **Changes from v2.39** | Each deployment mode has its own image registry (#206; ADR 0016): on-premise pushes to and pulls from `smart-tutor-on-premise/<service>`, native-cloud keeps `smart-tutor/<service>`, and each mode's deploy role pushes only to its own. The modes share no stack except the account's CDK bootstrap and the GitHub OIDC provider. Appendix A. No product behavior changes. |
 | **Changes from v2.38** | List conversations (#188, US-13): `GET /threads` (operation `list_threads`) returns the owner's active threads, newest last activity first, each with `title`, `subjects` (of its listed documents that still exist, archived included, by the learner's names; D11, Q63 L1), `documents` (the number listed), and `last_activity` (`last_learner_message_at`, else `created_at`). A question in an existing thread now sets `last_learner_message_at`. The web's Conversations page lists them (at most two subject chips, then "+N"; empty state "No conversations yet" with "Start a conversation"), and the side nav shows the three most recent. Archived tab, filters, search, and the note indicator come in their own slices. |
 | **Changes from v2.37** | Open a document from the Library (#209, US-3, US-10): a ready or *choose subjects* row's title opens the document viewer as an overlay at page 1 (Details stays in the row's More menu; archived, processing, and failed rows' titles open details). Document details offers **Open** for ready, *choose subjects*, and archived documents; it replaces the panel, and closing the viewer returns to details. An archived document opens read-only with "Archived" and Restore; restoring there moves the row out of Archived and keeps the viewer open. Web only. |
@@ -541,7 +542,7 @@ Bedrock AgentCore Runtime for the agent and MCP server was considered and reject
 
 - **On-premise**, on every merge to `main`: tests and the smoke evaluation split → images to on-premise's ECR repositories → `cdk deploy` → SSM Run Command on the VM (pull images, migrate, `docker compose up -d`) → smoke test. Brief downtime during a deploy is acceptable.
 - **Native-cloud** (`cdk deploy` → `helm upgrade`) runs by `workflow_dispatch`, or on every merge when `NATIVE_CLOUD_AUTO_DEPLOY=true`. CI still runs `cdk synth` and `helm lint` for native-cloud on every change, so it doesn't rot.
-- The running EKS pilot stays, deployed only by hand, until on-premise passes its smoke test; then the product owner decides what happens to it.
+- The EKS pilot was torn down on 2026-10-11 once on-premise had passed its smoke test, and its data was deleted (#156). A native-cloud deploy creates the stacks again with an empty database.
 - Releases are gated on the full evaluation split.
 
 ### 9.13 Stack

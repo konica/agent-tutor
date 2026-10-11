@@ -1,6 +1,6 @@
 # Pilot teardown (#177)
 
-Stops the native-cloud pilot (`SmartTutor-prod-*`) from costing money. It needs an account admin whose principal is in `smart-tutor:eks-admin-principal-arns` in `infra/cdk.json`. Whether to tear down is the product owner's decision (#156); this runbook only says how.
+Stops the native-cloud pilot (`SmartTutor-prod-*`) from costing money. It needs an account admin whose principal is in `smart-tutor:eks-admin-principal-arns` in `infra/cdk.json`. Whether to tear down is the product owner's decision (#156); this runbook only says how. The pilot was torn down on 2026-10-11 with `-DeleteDatabaseSnapshots -DeleteDocumentsBucket -DeleteLogGroups`, so a redeploy (section 8) starts from scratch.
 
 Commands are for **PowerShell 7** (`pwsh`). Run them from the repository root. The script ignores LocalStack endpoints and access keys from your terminal (like `pilot-aws-prerequisites.ps1`), so it always talks to real AWS.
 
