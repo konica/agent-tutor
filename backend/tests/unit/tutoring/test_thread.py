@@ -2,9 +2,9 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from smart_tutor.shared.domain.ids import ThreadId, UserId
+from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.tutoring.domain.errors import InvalidTitleError, NoListedDocumentsError, ThreadArchivedError
-from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
+from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadFilter, ThreadStatus
 
 NOW = datetime(2026, 10, 9, tzinfo=UTC)
 
@@ -93,3 +93,35 @@ def test_an_archived_thread_takes_no_question() -> None:
     thread = Thread(ThreadId("t"), UserId("ada"), datetime(2026, 10, 1, tzinfo=UTC), status=ThreadStatus.ARCHIVED)
     with pytest.raises(ThreadArchivedError):
         thread.ask(datetime(2026, 10, 2, tzinfo=UTC))
+
+
+def test_no_filter_matches_every_thread() -> None:
+    thread = Thread.start(ThreadId("t"), UserId("ada"), datetime(2026, 10, 1, tzinfo=UTC), title="Q?")
+    assert thread.matches(ThreadFilter(), [])
+
+
+def test_matches_by_last_activity_from_inclusive_and_before_exclusive() -> None:
+    at = datetime(2026, 10, 1, 12, tzinfo=UTC)
+    thread = Thread.start(ThreadId("t"), UserId("ada"), at)
+    assert thread.matches(ThreadFilter(active_from=at, active_before=at + timedelta(seconds=1)), [])
+    assert not thread.matches(ThreadFilter(active_from=at + timedelta(seconds=1)), [])
+    assert not thread.matches(ThreadFilter(active_before=at), [])
+
+
+def test_matches_when_any_listed_document_is_one_of_the_filters() -> None:
+    thread = Thread.start(ThreadId("t"), UserId("ada"), datetime(2026, 10, 1, tzinfo=UTC))
+    d1, d2 = DocumentId("d1"), DocumentId("d2")
+    assert thread.matches(ThreadFilter(document_ids=frozenset({d2})), [d1, d2])
+    assert not thread.matches(ThreadFilter(document_ids=frozenset({d2})), [d1])
+    assert not thread.matches(ThreadFilter(document_ids=frozenset()), [d1])
+
+
+def test_title_matches_case_insensitively_and_literally() -> None:
+    thread = Thread.start(
+        ThreadId("t"), UserId("ada"), datetime(2026, 10, 1, tzinfo=UTC), title="Is RAG 100% grounded?"
+    )
+    assert thread.matches(ThreadFilter(title="rag"), [])
+    assert thread.matches(ThreadFilter(title="100%"), [])
+    assert not thread.matches(ThreadFilter(title="1_0"), [])
+    untitled = Thread.start(ThreadId("u"), UserId("ada"), datetime(2026, 10, 1, tzinfo=UTC))
+    assert not untitled.matches(ThreadFilter(title="rag"), [])
