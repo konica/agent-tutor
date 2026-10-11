@@ -117,10 +117,12 @@ class ConversationService:
         never of the answers (Q63 N3). A row's subjects are read now the same way; a deleted document adds none."""
         search = (title or "").strip()
         thread_filter = ThreadFilter(
-            None if not subject_ids else self._documents.documents_with_subjects(user_id, subject_ids),
-            None if active_from is None else datetime.combine(active_from, time(), tzinfo=self._tz),
-            None if active_to is None else datetime.combine(active_to + timedelta(days=1), time(), tzinfo=self._tz),
-            search or None,
+            document_ids=None if not subject_ids else self._documents.documents_with_subjects(user_id, subject_ids),
+            active_from=None if active_from is None else datetime.combine(active_from, time(), tzinfo=self._tz),
+            active_before=(
+                None if active_to is None else datetime.combine(active_to + timedelta(days=1), time(), tzinfo=self._tz)
+            ),
+            title=search or None,
         )
         threads = self._threads.list_owned(user_id, ThreadStatus.ACTIVE, thread_filter)
         rows = self._threads.documents_used_by_thread([ThreadId(t.thread_id) for t in threads])
@@ -130,11 +132,11 @@ class ConversationService:
         summaries: list[ThreadSummary] = []
         for t in threads:
             listed = rows.get(ThreadId(t.thread_id), [])
-            subject_ids = dict.fromkeys(
+            row_subjects = dict.fromkeys(
                 s for r in listed if (view := views.get(r.document_id)) is not None for s in view.subject_ids
             )
             summaries.append(
-                ThreadSummary(ThreadId(t.thread_id), t.title, tuple(subject_ids), len(listed), t.last_activity)
+                ThreadSummary(ThreadId(t.thread_id), t.title, tuple(row_subjects), len(listed), t.last_activity)
             )
         return summaries
 
