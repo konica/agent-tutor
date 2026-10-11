@@ -1,6 +1,6 @@
 # One entry point for local work. On Windows, run from Git Bash/WSL with `make` installed,
 # or run the commands below directly.
-.PHONY: help up down up-app api agent mcp worker api-debug agent-debug mcp-debug worker-debug sync migrate lint test test-integration bedrock-check sweep retention evals-smoke evals-learners evals-publish web api-client infra-synth helm-lint
+.PHONY: help up down up-app api agent mcp worker api-debug agent-debug mcp-debug worker-debug sync migrate lint test test-integration bedrock-check sweep retention evals-smoke evals-learners evals-generate evals-publish web api-client infra-synth helm-lint
 .PHONY: design-states design-accept design-shots design-diff
 
 BACKEND := cd backend &&
@@ -69,6 +69,8 @@ evals-smoke:   ## smoke split as a LangSmith experiment, gated on thresholds.yam
 	$(HOST) --extra eval python -m evals.run --split smoke
 evals-learners: ## load the eval learners' libraries from the seed corpus (needs the app stack and your AWS profile)
 	$(BACKEND) uv run --extra eval python -m evals.learners
+evals-generate: ## propose Q&A and decline candidates from the seed corpus into the LangSmith annotation queue (AWS profile, LANGSMITH_API_KEY)
+	$(HOST) --extra eval --extra ingest python -m evals.generate ask
 evals-publish: ## publish accepted annotation-queue candidates as the next smoke and full versions in LangSmith (LANGSMITH_API_KEY)
 	$(HOST) --extra eval python -m evals.publish
 
