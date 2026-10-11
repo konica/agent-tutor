@@ -135,7 +135,7 @@ export function DocumentTable({ documents, onRetry, retrying, onChooseSubjects, 
                 <span className={styles.doc}>
                   <FileText className={styles.fileIcon} strokeWidth={1.5} aria-hidden="true" />
                   {onOpen && !uploading.has(doc.document_id) ? (
-                    <button type="button" className={`${styles.title} ${styles.titleButton}`} title={doc.title} onClick={() => (onView && !doc.archived && viewable(doc) ? onView(doc) : onOpen(doc))}>
+                    <button type="button" className={`${styles.title} ${styles.titleButton}`} title={doc.title} aria-label={onView && !doc.archived && viewable(doc) ? `${doc.title}, open in the document viewer` : undefined} onClick={() => (onView && !doc.archived && viewable(doc) ? onView(doc) : onOpen(doc))}>
                       {doc.title}
                     </button>
                   ) : (

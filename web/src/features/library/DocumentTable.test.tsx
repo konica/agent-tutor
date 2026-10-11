@@ -212,8 +212,8 @@ describe("DocumentTable open details", () => {
       { ...doc, document_id: "d5", title: "Busy", state: "processing" as const },
     ];
     render(<DocumentTable documents={rows} {...props} onOpen={onOpen} onView={onView} onRestore={vi.fn()} />);
-    await userEvent.click(screen.getByRole("button", { name: "Toolformer" }));
-    await userEvent.click(screen.getByRole("button", { name: "Waiting" }));
+    await userEvent.click(screen.getByRole("button", { name: "Toolformer, open in the document viewer" }));
+    await userEvent.click(screen.getByRole("button", { name: "Waiting, open in the document viewer" }));
     expect(onView.mock.calls.map(([d]) => d.document_id)).toEqual(["d1", "d2"]);
     for (const name of ["Old", "Broken", "Busy"]) await userEvent.click(screen.getByRole("button", { name }));
     expect(onOpen.mock.calls.map(([d]) => d.document_id)).toEqual(["d3", "d4", "d5"]);

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { RefObject } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -82,6 +82,21 @@ describe("ViewerDialog", () => {
     expect(deps.restore).toHaveBeenCalledWith("d1");
     expect(screen.queryByText("Archived · read-only")).toBeNull();
     expect(screen.getByRole("dialog", { name: "ReAct" })).toBeVisible();
+    expect(within(screen.getByRole("dialog", { name: "ReAct" })).getByText("Document restored.")).toBeInTheDocument(); // announced inside the modal
+  });
+
+  it("shows the restore error and does not report onRestored when the restore fails", async () => {
+    const restore = vi.fn(async () => {
+      throw new Error("nope");
+    });
+    const deps = { ...fakeViewerDeps(), loadFile: vi.fn(async () => fakeFile({ archived: true })), restore };
+    const onRestored = vi.fn();
+    render(<ViewerDialog documentId="d1" closeLabel="Close" onClose={vi.fn()} onRestored={onRestored} viewerDeps={deps} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Restore" }));
+    expect(await screen.findByText("Couldn't restore. Try again.")).toBeVisible();
+    expect(restore).toHaveBeenCalledWith("d1");
+    expect(onRestored).not.toHaveBeenCalled();
+    expect(screen.queryByText("Document restored.")).toBeNull();
   });
 
   it("returns focus to returnFocusTo when it closes", async () => {

@@ -126,7 +126,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
   const pickerFromDetails = useRef<string | null>(null); // the details panel to reopen when the picker closes
   const statusRegion = useRef<HTMLParagraphElement>(null);
   const wasPicking = useRef(false);
-  const [details, setDetails] = useState<{ id: string; editing: boolean; focusOpen?: boolean } | null>(null);
+  const [details, setDetails] = useState<{ id: string; editing: boolean; focusOpen?: boolean; reload?: number } | null>(null);
   const [viewing, setViewing] = useState<{ id: string; fromDetails: boolean } | null>(null); // the document open in the viewer
   const detailsOpener = useRef<string | null>(null); // the document whose details were last open
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -167,6 +167,16 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
     const title = document.querySelector<HTMLElement>(`#document-${id} td:first-child button`);
     (title ?? statusRegion.current)?.focus();
   }, [details, viewing]);
+
+  // The viewer's dialog refocuses its opener on close; when that row left the list meanwhile, the status region takes focus.
+  const wasViewing = useRef(false);
+  useEffect(() => {
+    if (viewing) wasViewing.current = true;
+    else if (wasViewing.current) {
+      wasViewing.current = false;
+      if (!details && (document.activeElement === document.body || document.activeElement === null)) statusRegion.current?.focus();
+    }
+  }, [viewing, details]);
 
   const allReadyNow = finished && counts.allReady && !archivedView;
   // Once none waits, the Library shows every document, not an emptied "needs subjects" filter.
@@ -236,6 +246,8 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
 
   function restoredInViewer(doc: DocumentResponse) {
     setStatus(`${doc.title} restored.`);
+    // Closing the viewer mid-restore may have reopened details before it landed; reload them.
+    setDetails((d) => (d?.id === doc.document_id ? { ...d, reload: (d.reload ?? 0) + 1 } : d));
     void Promise.all([refresh(), counts.refresh(), refreshSubjects()]);
   }
 
@@ -814,7 +826,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
       })()}
       {details && (
         <DocumentDetailsPanel
-          key={details.id}
+          key={`${details.id}:${details.reload ?? 0}`}
           documentId={details.id}
           startEditing={details.editing}
           focusOpen={details.focusOpen}

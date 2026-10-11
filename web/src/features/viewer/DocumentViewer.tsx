@@ -193,6 +193,7 @@ function Viewer({
 
   const [restoring, setRestoring] = useState(false);
   const [restoreFailed, setRestoreFailed] = useState(false);
+  const [restored, setRestored] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const focusTitle = useRef(false);
   // A restored document loses its Restore button; focus moves to the title rather than dropping to <body>.
@@ -207,6 +208,7 @@ function Viewer({
     restore(documentId).then(
       (updated) => {
         setRestoring(false);
+        setRestored(true);
         focusTitle.current = true;
         setKnownDocument(updated);
         setDocument(updated);
@@ -287,6 +289,9 @@ function Viewer({
       </div>
       <p className="visually-hidden" aria-live="polite">
         {status(rendered, page, numPages, passage !== undefined && !moved && page === passage.page, highlight)}
+      </p>
+      <p className="visually-hidden" aria-live="polite">
+        {restored ? "Document restored." : ""}
       </p>
     </div>
   );
