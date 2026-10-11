@@ -1,8 +1,8 @@
 """Fixed AWS resource names, per deployment mode (#139, #147).
 
 IAM in ClusterStack builds ARNs from these instead of referencing StorageStack, so Cluster → Storage → Edge → Cluster
-can't form a cycle. Each mode has its own stacks, bucket, queues, SSM parameters, secrets, and deploy role; the modes
-share only the ECR repositories `smart-tutor/<service>`. Native-cloud keeps the names the pilot was deployed with.
+can't form a cycle. Each mode has its own stacks, bucket, queues, SSM parameters, secrets, deploy role, and ECR
+repositories (#206). Native-cloud keeps the names the pilot was deployed with.
 """
 
 from dataclasses import dataclass
@@ -18,7 +18,7 @@ class ModeNames:
     mode: str
     stack_prefix: str  # CloudFormation stacks: <stack_prefix>-Storage
     resource_prefix: str  # per-environment resources: the budget, the EKS cluster
-    data_prefix: str  # the bucket, queues, SSM path, secrets, and deploy role
+    data_prefix: str  # the bucket, queues, SSM path, secrets, deploy role, and ECR repositories
 
     @property
     def ingest_queue(self) -> str:
@@ -35,6 +35,14 @@ class ModeNames:
     @property
     def secret_prefix(self) -> str:
         return self.data_prefix
+
+    @property
+    def repository_prefix(self) -> str:
+        """ECR repositories `<repository_prefix>/<service>` (RegistryStack, #206)."""
+        return self.data_prefix
+
+    def repository(self, service: str) -> str:
+        return f"{self.repository_prefix}/{service}"
 
     @property
     def deploy_role(self) -> str:

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AskRefusedError, ConversationNotFoundError, type ChatEvent } from "../../api/chat";
 import type { DocumentResponse, ThreadDocumentResponse, ThreadResponse, TurnResponse } from "../../api/generated/types.gen";
 import { SessionExpiredError, sessionExpiry } from "../../auth/authClient";
+import { ConversationsContext } from "../../app/conversations";
 import { fakeViewerDeps } from "../viewer/testFakes";
 import { ChatPage } from "./ChatPage";
 
@@ -983,6 +984,55 @@ describe("ChatPage", () => {
         const sources = within(screen.getByRole("list", { name: "Sources" }));
         for (const c of sources.getAllByRole("button")) expect(c).not.toHaveAttribute("aria-current");
       });
+    });
+  });
+
+  describe("the shell's conversations list", () => {
+    function renderInShell(props: ComponentProps<typeof ChatPage>) {
+      const refresh = vi.fn();
+      render(
+        <ConversationsContext.Provider value={{ list: null, failed: false, refresh }}>
+          <MemoryRouter initialEntries={["/chat"]}>
+            <Routes>
+              <Route path="/chat/:threadId?" element={<ChatPage loadDocs={async () => [doc("ready")]} loadUsed={async () => []} {...props} />} />
+            </Routes>
+          </MemoryRouter>
+        </ConversationsContext.Provider>,
+      );
+      return refresh;
+    }
+    const started = () => events({ type: "thread", thread_id: "t1" }, { type: "done" });
+
+    it("is refreshed once an answer ends with done", async () => {
+      const refresh = renderInShell({ ask: vi.fn(started) });
+      await userEvent.type(await question(), "What is attention?");
+      expect(refresh).not.toHaveBeenCalled();
+      await userEvent.click(askButton());
+      await screen.findByRole("button", { name: "What is attention?. Edit title" });
+      await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+    });
+
+    it("is refreshed once when an answer ends with an error after the thread started", async () => {
+      const refresh = renderInShell({
+        ask: vi.fn(() => events({ type: "thread", thread_id: "t1" }, { type: "error", code: "unavailable", message: "The tutor is unavailable." })),
+      });
+      await userEvent.type(await question(), "What is attention?");
+      await userEvent.click(askButton());
+      await screen.findByText("The tutor is unavailable.");
+      await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+    });
+
+    it("is refreshed after a rename is saved", async () => {
+      const rename = vi.fn(async (_id: string, title: string) => title);
+      const refresh = renderInShell({ ask: vi.fn(started), rename });
+      await userEvent.type(await question(), "What is attention?");
+      await userEvent.click(askButton());
+      await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+      await userEvent.click(await screen.findByRole("button", { name: "What is attention?. Edit title" }));
+      await userEvent.paste("Attention basics");
+      await userEvent.keyboard("{Enter}");
+      await screen.findByRole("button", { name: "Attention basics. Edit title" });
+      expect(refresh).toHaveBeenCalledTimes(2);
     });
   });
 

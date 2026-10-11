@@ -446,6 +446,32 @@ export type ThreadResponse = {
 };
 
 /**
+ * ThreadSummaryResponse
+ */
+export type ThreadSummaryResponse = {
+    /**
+     * Documents
+     */
+    documents: number;
+    /**
+     * Last Activity
+     */
+    last_activity: string;
+    /**
+     * Subjects
+     */
+    subjects: Array<SubjectResponse>;
+    /**
+     * Thread Id
+     */
+    thread_id: string;
+    /**
+     * Title
+     */
+    title: string | null;
+};
+
+/**
  * TurnCitationResponse
  */
 export type TurnCitationResponse = {
@@ -1098,6 +1124,24 @@ export type SearchSubjectsResponses = {
 };
 
 export type SearchSubjectsResponse = SearchSubjectsResponses[keyof SearchSubjectsResponses];
+
+export type ListThreadsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/threads';
+};
+
+export type ListThreadsResponses = {
+    /**
+     * Response List Threads
+     *
+     * Successful Response
+     */
+    200: Array<ThreadSummaryResponse>;
+};
+
+export type ListThreadsResponse = ListThreadsResponses[keyof ListThreadsResponses];
 
 export type AskInNewThreadData = {
     body: AskRequest;

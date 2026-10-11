@@ -113,7 +113,7 @@ On-premise has no Kubernetes CronJobs. A scheduled job is a **systemd timer** on
 
    ```yaml
    retention:
-     image: ${REGISTRY:?}/smart-tutor/api:${IMAGE_TAG:?}
+     image: ${REGISTRY:?}/${REPOSITORY_PREFIX:?}/api:${IMAGE_TAG:?}
      profiles: [jobs]
      logging: *logging
      command: ["python", "-m", "smart_tutor.apps.jobs.retention"]

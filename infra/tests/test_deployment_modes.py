@@ -13,7 +13,9 @@ from smart_tutor_infra.app_stacks import build_app
 from smart_tutor_infra.names import NATIVE_CLOUD, ON_PREMISE, mode_names
 from tests.test_synth import CDK_CONTEXT, make_app, template
 
-ON_PREMISE_STACKS = {f"SmartTutor-OnPremise-prod-{s}" for s in ("Storage", "Config", "Budgets", "GitHubDeploy", "Host")}
+ON_PREMISE_STACKS = {
+    f"SmartTutor-OnPremise-prod-{s}" for s in ("Storage", "Config", "Budgets", "GitHubDeploy", "Registry", "Host")
+}
 NATIVE_CLOUD_STACKS = {
     f"SmartTutor-prod-{s}"
     for s in ("Network", "Data", "Storage", "Cluster", "Registry", "Config", "Budgets", "GitHubDeploy", "Edge")
@@ -178,11 +180,43 @@ def test_deploy_document_name_comes_from_mode_names() -> None:
     on_premise("Host").has_resource_properties("AWS::SSM::Document", {"Name": "smart-tutor-on-premise-deploy"})
 
 
-def test_on_premise_references_the_shared_registry_instead_of_creating_one() -> None:
+def test_each_mode_names_its_repositories_after_its_data_prefix() -> None:
+    assert mode_names(ON_PREMISE).repository("api") == "smart-tutor-on-premise/api"
+    assert mode_names(NATIVE_CLOUD).repository("api") == "smart-tutor/api"  # the names the pilot was deployed with
+    # The globs each deploy role pushes to (GitHubDeployStack) don't overlap.
+    native, onprem = mode_names(NATIVE_CLOUD), mode_names(ON_PREMISE)
+    assert not fnmatch(onprem.repository("api"), f"{native.repository_prefix}/*")
+    assert not fnmatch(native.repository("api"), f"{onprem.repository_prefix}/*")
+
+
+def test_on_premise_has_a_registry_of_its_own() -> None:
+    t = on_premise("Registry")
+
+    repos = t.find_resources("AWS::ECR::Repository")
+    names = sorted(r["Properties"]["RepositoryName"] for r in repos.values())
+    assert names == [f"smart-tutor-on-premise/{s}" for s in ["agent", "api", "keycloak", "mcp", "web", "worker"]]
+    for repo in repos.values():
+        assert repo["Properties"]["ImageScanningConfiguration"] == {"ScanOnPush": True}
+        assert repo["Properties"]["EmptyOnDelete"] is True
+        assert repo["DeletionPolicy"] == "Delete"
+        assert '"countNumber":30' in repo["Properties"]["LifecyclePolicy"]["LifecyclePolicyText"]
+    t.has_output("RegistryUri", {})
+
+
+def test_no_on_premise_template_names_a_native_cloud_repository() -> None:
     app = make_app(**{"smart-tutor:mode": ON_PREMISE})
 
     for stack in build_app(app):
-        Template.from_stack(stack).resource_count_is("AWS::ECR::Repository", 0)
+        rendered = json.dumps(Template.from_stack(stack).to_json())
+        assert not re.search(r"smart-tutor/(api|web|keycloak|agent|mcp|worker)\b", rendered), stack.stack_name
+
+
+def test_on_premise_deploy_role_pushes_only_to_its_own_repositories() -> None:
+    (policy,) = on_premise("GitHubDeploy").find_resources("AWS::IAM::Policy").values()
+    push = next(s for s in policy["Properties"]["PolicyDocument"]["Statement"] if s["Sid"] == "EcrPushAppImages")
+    resource = json.dumps(push["Resource"])
+    assert ":repository/smart-tutor-on-premise/*" in resource
+    assert ":repository/smart-tutor/*" not in resource
 
 
 def test_native_cloud_access_patterns_match_none_of_on_premise_names() -> None:

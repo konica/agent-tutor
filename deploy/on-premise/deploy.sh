@@ -38,6 +38,7 @@ mkdir -p /data/postgres /data/caddy/data /data/caddy/config
 echo "Reading settings and secrets for $prefix"
 domain=$(param host/domain)
 registry=$(param host/registry)
+repository_prefix=$(param host/repository-prefix)
 documents_bucket=$(param host/documents-bucket)
 ingest_queue_url=$(param host/ingest-queue-url)
 postgres_password=$(secret db/postgres)
@@ -60,6 +61,7 @@ rendered=$(mktemp "$env_file.XXXXXX")
 cat > "$rendered" <<EOF
 IMAGE_TAG=$tag
 REGISTRY=$registry
+REPOSITORY_PREFIX=$repository_prefix
 DOMAIN=$domain
 AWS_REGION=$region
 SSM_PATH=/$prefix
@@ -91,7 +93,7 @@ if [[ $domain == *.duckdns.org ]]; then
   fi
 fi
 
-echo "Pulling $tag from $registry"
+echo "Pulling $tag from $registry/$repository_prefix"
 aws ecr get-login-password --region "$region" | docker login --username AWS --password-stdin "$registry" >/dev/null
 "${compose[@]}" pull --quiet
 

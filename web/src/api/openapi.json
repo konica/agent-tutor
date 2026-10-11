@@ -779,6 +779,50 @@
         "title": "ThreadResponse",
         "type": "object"
       },
+      "ThreadSummaryResponse": {
+        "properties": {
+          "documents": {
+            "title": "Documents",
+            "type": "integer"
+          },
+          "last_activity": {
+            "format": "date-time",
+            "title": "Last Activity",
+            "type": "string"
+          },
+          "subjects": {
+            "items": {
+              "$ref": "#/components/schemas/SubjectResponse"
+            },
+            "title": "Subjects",
+            "type": "array"
+          },
+          "thread_id": {
+            "title": "Thread Id",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "thread_id",
+          "title",
+          "subjects",
+          "documents",
+          "last_activity"
+        ],
+        "title": "ThreadSummaryResponse",
+        "type": "object"
+      },
       "TurnCitationResponse": {
         "properties": {
           "archived": {
@@ -1921,6 +1965,35 @@
       }
     },
     "/threads": {
+      "get": {
+        "description": "The learner's active conversations, newest last activity first (PRD US-13): title, subjects of the documents\nused (deleted ones excluded), number of documents, last activity.",
+        "operationId": "list_threads",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ThreadSummaryResponse"
+                  },
+                  "title": "Response List Threads",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Threads",
+        "tags": [
+          "tutoring"
+        ]
+      },
       "post": {
         "operationId": "ask_in_new_thread",
         "requestBody": {

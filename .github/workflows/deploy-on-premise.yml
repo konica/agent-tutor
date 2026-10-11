@@ -29,6 +29,7 @@ jobs:
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
       IMAGE_TAG: ${{ inputs.image_tag }}
+      REPOSITORY_PREFIX: smart-tutor-on-premise  # its own ECR repositories (#206); never native-cloud's
       JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION: "1"
     steps:
       # Reject a malformed tag before checking out or signing in.
@@ -54,11 +55,12 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
+      # Images of commits merged before #206 are only in native-cloud's repositories; they are never pulled from there.
       - name: Check the images exist
         run: |
           for repo in api web keycloak agent mcp worker; do
-            aws ecr describe-images --repository-name "smart-tutor/$repo" --image-ids imageTag="$IMAGE_TAG" > /dev/null \
-              || { echo "::error::smart-tutor/$repo:$IMAGE_TAG is not in ECR (it keeps the last 30 images)"; exit 1; }
+            aws ecr describe-images --repository-name "$REPOSITORY_PREFIX/$repo" --image-ids imageTag="$IMAGE_TAG" > /dev/null \
+              || { echo "::error::$REPOSITORY_PREFIX/$repo:$IMAGE_TAG is not in ECR (it keeps the last 30 images; a commit merged before #206 has none here: build them by hand, docs/runbooks/on-premise-deploy.md)"; exit 1; }
           done
 
       # Uploads deploy/ as the bundle the SSM document unpacks. A new Amazon Linux image replaces the instance here.

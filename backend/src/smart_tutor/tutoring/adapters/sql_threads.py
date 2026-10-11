@@ -100,6 +100,17 @@ def _turn(row: Any) -> Turn:
     )
 
 
+def _thread_document(row: Any) -> ThreadDocument:
+    return ThreadDocument(
+        thread_id=ThreadId(str(row.thread_id)),
+        document_id=DocumentId(str(row.document_id)),
+        added_by=row.added_by,
+        added_at=row.added_at,
+        first_used_at=row.first_used_at,
+        deleted_title=row.deleted_title,
+    )
+
+
 def _thread(row: Any) -> Thread:
     return Thread(
         thread_id=ThreadId(str(row.thread_id)),
@@ -136,6 +147,35 @@ class SqlThreadRepository(ThreadRepository):
                 select(threads).where(threads.c.thread_id == thread_id, threads.c.user_id == user_id)
             ).first()
         return _thread(row) if row else None
+
+    def list_owned(self, user_id: UserId, status: ThreadStatus) -> list[Thread]:
+        last_activity = func.coalesce(threads.c.last_learner_message_at, threads.c.created_at)
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                select(threads)
+                .where(threads.c.user_id == user_id, threads.c.status == status.value)
+                .order_by(last_activity.desc(), threads.c.created_at.desc(), threads.c.thread_id)
+            ).all()
+        return [_thread(r) for r in rows]
+
+    def documents_used_by_thread(self, thread_ids: Sequence[ThreadId]) -> dict[ThreadId, list[ThreadDocument]]:
+        if not thread_ids:
+            return {}
+        # One query for all the threads, so listing N conversations doesn't cost N queries.
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                select(thread_documents)
+                .where(thread_documents.c.thread_id.in_(thread_ids))
+                .order_by(thread_documents.c.thread_id, thread_documents.c.added_at, thread_documents.c.seq)
+            ).all()
+        grouped: dict[ThreadId, list[ThreadDocument]] = {}
+        for r in rows:
+            grouped.setdefault(ThreadId(str(r.thread_id)), []).append(_thread_document(r))
+        return grouped
+
+    def set_last_learner_message_at(self, thread_id: ThreadId, at: datetime) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(threads.update().where(threads.c.thread_id == thread_id).values(last_learner_message_at=at))
 
     def set_title(self, thread_id: ThreadId, title: str) -> None:
         with self._engine.begin() as conn:
@@ -186,17 +226,7 @@ class SqlThreadRepository(ThreadRepository):
                 .where(thread_documents.c.thread_id == thread_id)
                 .order_by(thread_documents.c.added_at, thread_documents.c.seq)
             ).all()
-        return [
-            ThreadDocument(
-                thread_id=ThreadId(str(r.thread_id)),
-                document_id=DocumentId(str(r.document_id)),
-                added_by=r.added_by,
-                added_at=r.added_at,
-                first_used_at=r.first_used_at,
-                deleted_title=r.deleted_title,
-            )
-            for r in rows
-        ]
+        return [_thread_document(r) for r in rows]
 
     def add_turn(self, turn: Turn, document_ids: Sequence[DocumentId]) -> None:
         with self._engine.begin() as conn:

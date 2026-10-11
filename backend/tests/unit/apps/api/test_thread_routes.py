@@ -5,7 +5,8 @@ the turns."""
 import dataclasses
 import json
 import uuid
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Collection
+from datetime import timedelta
 from typing import Any
 
 import httpx
@@ -16,6 +17,7 @@ from fakes import (
     FakeTokenVerifier,
     FixedClock,
     InMemoryLibrary,
+    InMemorySubjects,
     InMemoryThreads,
     api_services,
     fake_agent,
@@ -24,8 +26,9 @@ from fakes import (
 from smart_tutor.apps.api.main import create_app
 from smart_tutor.knowledge.application import DocumentService
 from smart_tutor.shared.config import Settings
-from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
+from smart_tutor.shared.domain.ids import DocumentId, SubjectId, ThreadId, UserId
 from smart_tutor.shared.domain.principal import Principal
+from smart_tutor.subjects.application import SubjectNames
 from smart_tutor.tutoring.application import AnsweredTurn, ConversationService, Thread, Turn
 from smart_tutor.tutoring.domain.thread import ThreadStatus
 
@@ -1025,3 +1028,97 @@ def test_a_turn_kept_without_a_run_id_lists_none() -> None:
     threads.turn_rows[:] = [dataclasses.replace(t, run_id=None) for t in threads.turn_rows]
     [older] = client.get(f"/threads/{thread.thread_id}/turns", headers=AUTH).json()
     assert older["run_id"] is None
+
+
+IR = SubjectId("00000000-0000-4000-8000-0000000000a1")
+
+
+class _PersonalNames(SubjectNames):
+    """Ada calls "Information Retrieval" "My IR notes"."""
+
+    def names_for(self, user_id: UserId, subject_ids: Collection[SubjectId]) -> dict[SubjectId, str]:
+        names = super().names_for(user_id, subject_ids)
+        if IR in names:
+            names[IR] = "My IR notes"
+        return names
+
+
+def listing(
+    handler: Handler = sse_ok,
+) -> tuple[TestClient, InMemoryThreads, FixedClock, DocumentId]:
+    """Ada has one ready document in IR (personal name "My IR notes")."""
+    verifier = FakeTokenVerifier()
+    verifier.add("t-ada", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
+    library, threads, clock = InMemoryLibrary(), InMemoryThreads(), FixedClock()
+    document = ingest_ready(library, "ada", "Attention weighs tokens.", subject_ids=[IR])
+    catalog = InMemorySubjects({IR: "Information Retrieval"})
+    services = api_services(
+        library, threads=threads, clock=clock, catalog=catalog, names=_PersonalNames(catalog), agent=fake_agent(handler)
+    )
+    return TestClient(create_app(Settings(), verifier=verifier, services=services)), threads, clock, document
+
+
+def test_lists_the_callers_threads_with_subject_names_newest_first() -> None:
+    # The first question's answer used the document; the second's did not.
+    answers: list[bytes] = []
+
+    def answering(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=answers.pop(0), headers={"content-type": "text/event-stream"})
+
+    client, _, clock, doc = listing(answering)
+    answers += [sources(doc) + AGENT_ANSWER, AGENT_ANSWER]
+    client.post("/threads", json={"question": "First?"}, headers=AUTH)
+    first_at = clock.current
+    clock.current += timedelta(minutes=1)
+    client.post("/threads", json={"question": "Second?"}, headers=AUTH)
+
+    response = client.get("/threads", headers=AUTH)
+
+    assert response.status_code == 200
+    second, first = response.json()
+    assert (second["title"], second["subjects"], second["documents"]) == ("Second?", [], 0)
+    assert (first["title"], first["documents"]) == ("First?", 1)
+    assert first["subjects"] == [{"subject_id": IR, "name": "My IR notes"}]
+    assert second["last_activity"] > first["last_activity"]
+    assert first["last_activity"].startswith(first_at.strftime("%Y-%m-%dT%H:%M:%S"))
+    assert set(first) == {"thread_id", "title", "subjects", "documents", "last_activity"}
+
+
+def test_asking_in_a_thread_makes_it_the_newest() -> None:
+    client, threads, clock, _ = listing()
+    client.post("/threads", json={"question": "First?"}, headers=AUTH)
+    clock.current += timedelta(minutes=1)
+    client.post("/threads", json={"question": "Second?"}, headers=AUTH)
+    first = next(t for t in threads.threads.values() if t.title == "First?")
+    clock.current += timedelta(minutes=5)
+    asked_at = clock.current
+
+    assert client.post(f"/threads/{first.thread_id}/questions", json=QUESTION, headers=AUTH).status_code == 200
+
+    listed = client.get("/threads", headers=AUTH).json()
+    assert [t["title"] for t in listed] == ["First?", "Second?"]
+    assert listed[0]["last_activity"].startswith(asked_at.strftime("%Y-%m-%dT%H:%M:%S"))
+
+
+def test_an_archived_thread_is_refused_and_keeps_its_activity() -> None:
+    client, threads, clock, _ = listing()
+    client.post("/threads", json={"question": "First?"}, headers=AUTH)
+    [thread] = threads.threads.values()
+    before = thread.last_learner_message_at
+    thread.status = ThreadStatus.ARCHIVED
+    clock.current += timedelta(minutes=5)
+
+    response = client.post(f"/threads/{thread.thread_id}/questions", json=QUESTION, headers=AUTH)
+
+    assert response.status_code == 409
+    assert threads.threads[thread.thread_id].last_learner_message_at == before
+
+
+def test_listing_needs_a_token() -> None:
+    client, _, _, _ = listing()
+    assert client.get("/threads").status_code == 401
+
+
+def test_openapi_names_the_list_operation() -> None:
+    client, _, _, _ = listing()
+    assert client.get("/openapi.json").json()["paths"]["/threads"]["get"]["operationId"] == "list_threads"

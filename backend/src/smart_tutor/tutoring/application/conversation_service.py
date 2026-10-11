@@ -14,6 +14,7 @@ from smart_tutor.tutoring.domain.errors import (
 )
 from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
+from smart_tutor.tutoring.domain.thread_summary import ThreadSummary
 from smart_tutor.tutoring.domain.turn import AnsweredTurn, CitationView, Turn, TurnCitation, TurnView
 from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
 
@@ -65,6 +66,32 @@ class ConversationService:
         if search_scope is not None:
             self._threads.set_search_scope(thread_id, search_scope)
         return thread
+
+    def list_threads(self, user_id: UserId) -> list[ThreadSummary]:
+        """The learner's active conversations, newest last activity first (US-13). A row's subjects are those of its
+        listed documents that still exist, archived included, read now (D11); a deleted document adds none."""
+        threads = self._threads.list_owned(user_id, ThreadStatus.ACTIVE)
+        rows = self._threads.documents_used_by_thread([ThreadId(t.thread_id) for t in threads])
+        views = self._documents.documents_by_id(
+            user_id, list(dict.fromkeys(r.document_id for listed in rows.values() for r in listed))
+        )
+        summaries: list[ThreadSummary] = []
+        for t in threads:
+            listed = rows.get(ThreadId(t.thread_id), [])
+            subject_ids = dict.fromkeys(
+                s for r in listed if (view := views.get(r.document_id)) is not None for s in view.subject_ids
+            )
+            summaries.append(
+                ThreadSummary(ThreadId(t.thread_id), t.title, tuple(subject_ids), len(listed), t.last_activity)
+            )
+        return summaries
+
+    def note_question(self, thread_id: ThreadId, user_id: UserId) -> None:
+        """A question asked in the thread now is its latest activity (US-13)."""
+        thread = self._get(thread_id, user_id)
+        now = self._clock.now()
+        thread.ask(now)
+        self._threads.set_last_learner_message_at(thread_id, now)
 
     def get_thread(self, thread_id: ThreadId, user_id: UserId) -> Thread:
         return self._get(thread_id, user_id)
