@@ -1005,6 +1005,16 @@ describe("ChatPage", () => {
       await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
     });
 
+    it("is refreshed once when an answer ends with an error after the thread started", async () => {
+      const refresh = renderInShell({
+        ask: vi.fn(() => events({ type: "thread", thread_id: "t1" }, { type: "error", code: "unavailable", message: "The tutor is unavailable." })),
+      });
+      await userEvent.type(await question(), "What is attention?");
+      await userEvent.click(askButton());
+      await screen.findByText("The tutor is unavailable.");
+      await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+    });
+
     it("is refreshed after a rename is saved", async () => {
       const rename = vi.fn(async (_id: string, title: string) => title);
       const refresh = renderInShell({ ask: vi.fn(started), rename });

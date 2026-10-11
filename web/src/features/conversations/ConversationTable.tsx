@@ -42,7 +42,10 @@ export function ConversationTable({ conversations }: { conversations: ThreadSumm
                 {t.subjects.length ? (
                   <div className={styles.subjects}>
                     {t.subjects.slice(0, SHOWN_SUBJECTS).map((s) => <SubjectChip key={s.subject_id} name={s.name} hueKey={s.subject_id} size="sm" truncate />)}
-                    {hidden > 0 && <span className={styles.more} title={rest} aria-label={`${hidden} more: ${rest}`}>+{hidden}</span>}
+                    {hidden > 0 && <span className={styles.more} title={rest}>
+                        <span aria-hidden="true">+{hidden}</span>
+                        <span className="visually-hidden">{hidden} more: {rest}</span>
+                      </span>}
                   </div>
                 ) : (
                   <span className={styles.muted}>None yet</span>

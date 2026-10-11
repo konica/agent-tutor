@@ -57,9 +57,10 @@ describe("ConversationTable", () => {
     expect(row.getByText("AI Agents")).toBeInTheDocument();
     expect(row.getByText("LLMs")).toBeInTheDocument();
     expect(row.queryByText("Reinforcement Learning")).not.toBeInTheDocument();
-    const more = row.getByLabelText("1 more: Reinforcement Learning");
-    expect(more).toHaveTextContent("+1");
-    expect(more).toHaveAttribute("title", "Reinforcement Learning");
+    expect(row.getByText("+1")).toBeInTheDocument();
+    const reader = row.getByText("1 more: Reinforcement Learning");
+    expect(reader).toHaveClass("visually-hidden");
+    expect(reader.parentElement).toHaveAttribute("title", "Reinforcement Learning");
   });
 
   it("says None yet without subjects", () => {

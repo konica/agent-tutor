@@ -430,8 +430,9 @@ export function ChatPage({
       if (!current()) return;
       // Any partial answer stays visible above the message.
       if (!ended) setProblem({ message: GENERIC_FAILURE });
-      // The answered conversation moves to the top of the shell's list.
-      if (done) conversations.refresh();
+      // The answered conversation moves to the top of the shell's list. An error or a dropped stream after the thread
+      // started still updated its last activity on the server.
+      if (done || thread) conversations.refresh();
       // A decline used no documents; reloading the list is harmless.
       if (done && thread) {
         setAnswered(true);
@@ -439,6 +440,8 @@ export function ChatPage({
       }
     } catch (error) {
       if (!current()) return;
+      // A stream that broke after the thread started: the server updated its last activity.
+      if (thread) conversations.refresh();
       // The last ready document was archived since the page loaded. A limited conversation keeps its history and says
       // so under it; a new conversation (its history already cleared) shows the upload prompt.
       if (error instanceof NoDocumentsError) {
