@@ -11,7 +11,7 @@ import {
   Search,
   Upload,
 } from "lucide-react";
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import {
@@ -20,7 +20,6 @@ import {
   askInThread,
   AskRefusedError,
   ConversationNotFoundError,
-  formatCitation,
   loadConversation as loadConversationApi,
   loadDocumentsUsed,
   removeThreadDocument,
@@ -44,6 +43,7 @@ import { PageHeader } from "../../components/PageHeader/PageHeader";
 import { DocumentPane } from "../viewer/DocumentPane";
 import type { Passage } from "../viewer/DocumentViewer";
 import type { ViewerDeps } from "../viewer/ViewerDialog";
+import { Answer } from "./Answer";
 import styles from "./ChatPage.module.css";
 import { ConversationPanel } from "./ConversationPanel";
 import { DocumentPicker } from "./DocumentPicker";
@@ -194,7 +194,6 @@ export function ChatPage({
   const input = useRef<HTMLTextAreaElement>(null);
   const alive = useRef(true);
   const busy = useRef(false);
-  const sourcesId = useId();
   // Counts the conversations shown (a new thread, or one a URL opens), so a late reply or stream event of an earlier
   // one never reaches a newer one. A question in the same thread keeps it.
   const turn = useRef(0);
@@ -774,7 +773,6 @@ export function ChatPage({
 
               {turns.map((t, index) => {
                 const last = index === turns.length - 1;
-                const listId = `${sourcesId}-${index}`;
                 return (
                   // Turns are only ever added at the end or all replaced, so the index is a stable key.
                   <div key={index} className={styles.turn}>
@@ -833,53 +831,14 @@ export function ChatPage({
                           <p>{t.decline.message}</p>
                         </div>
                       ) : (
-                        t.answer && <p className={styles.answer}>{t.answer}</p>
-                      )}
-                      {t.decline === null && showCitations && t.citations.length > 0 && (
-                        <div className={styles.sources}>
-                          <span className={styles.sourcesLabel} id={listId}>
-                            Sources
-                          </span>
-                          {/* Each source shows the [n] the answer's text uses for it; an answer may cite [2] without [1]. */}
-                          <ul className={styles.sourceList} aria-labelledby={listId}>
-                            {t.citations.map((c) => {
-                              if (c.deleted || deletedIds.has(c.document_id)) {
-                                return (
-                                  <li key={c.chunk_id}>
-                                    <span className={`${styles.source} ${styles.sourceDeleted}`} title="Deleted document">
-                                      <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
-                                      <span className={styles.sourceMarker}>[{c.n}]</span> Deleted document
-                                    </span>
-                                  </li>
-                                );
-                              }
-                              // The chip whose passage is open beside the conversation; a panel row's open clears it.
-                              const isShown = viewer?.chunkId === c.chunk_id && viewer.turn === index;
-                              const pageText = c.page === null ? "page unavailable" : `p. ${c.page}`;
-                              const state = isShown ? "Shown beside the conversation" : "Open beside the conversation";
-                              return (
-                                <li key={c.chunk_id}>
-                                  <button
-                                    type="button"
-                                    className={isShown ? `${styles.source} ${styles.sourceShown}` : styles.source}
-                                    title={formatCitation(c)}
-                                    aria-label={`${c.document_title}, ${pageText}${c.archived ? ", archived" : ""}. ${state}`}
-                                    aria-current={isShown ? "true" : undefined}
-                                    data-chunk-id={c.chunk_id}
-                                    onClick={(event) => openCitation(c, index, event.currentTarget)}
-                                  >
-                                    <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
-                                    <span className={styles.sourceMarker}>[{c.n}]</span>{" "}
-                                    <span className={styles.sourceTitle}>{c.document_title}</span>{" "}
-                                    <span className={styles.sourcePage}>· {pageText}</span>
-                                    {/* An archived document's citation still opens it, marked as archived. */}
-                                    {c.archived && <span className={styles.sourceBadge}>Archived</span>}
-                                  </button>
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        </div>
+                        <Answer
+                          text={t.answer}
+                          citations={t.citations}
+                          showCitations={showCitations}
+                          deletedIds={deletedIds}
+                          shownChunkId={viewer?.turn === index ? (viewer.chunkId ?? null) : null}
+                          onOpenCitation={(c, from) => openCitation(c, index, from)}
+                        />
                       )}
                       {last && problem && (
                         <p className={styles.problem}>
