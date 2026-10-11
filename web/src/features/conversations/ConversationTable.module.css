@@ -6,6 +6,7 @@
 .table th.colSubjects { width: 34%; }
 .table th.colDocuments { width: 96px; }
 .table th.colActivity { width: 144px; }
+.table th.colActions { width: 64px; }
 .table th {
   position: sticky; top: 0; z-index: 1; height: 28px; text-align: left; padding: 0 var(--sp-3);
   background: var(--surface-2); color: var(--text-2);
@@ -30,6 +31,7 @@
 .muted { color: var(--text-2); font-size: var(--fs-13); }
 .number { font-size: var(--fs-13); font-variant-numeric: tabular-nums; }
 .date { font-size: var(--fs-12); color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.actions { text-align: right; white-space: nowrap; }
 /* No overflow clipping on the table, so the sticky header works and focus rings show; corners are rounded per cell. */
 .table thead th:first-child { border-top-left-radius: calc(var(--r-md) - 1px); }
 .table thead th:last-child { border-top-right-radius: calc(var(--r-md) - 1px); }

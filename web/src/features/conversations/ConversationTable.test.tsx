@@ -1,7 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ComponentProps } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { ThreadSummaryResponse } from "../../api/conversations";
 import { ConversationTable } from "./ConversationTable";
@@ -17,11 +18,13 @@ const thread = (over: Partial<ThreadSummaryResponse> = {}): ThreadSummaryRespons
   ...over,
 });
 
-function renderTable(conversations: ThreadSummaryResponse[]) {
+type Extra = Partial<Omit<ComponentProps<typeof ConversationTable>, "conversations">>;
+
+function renderTable(conversations: ThreadSummaryResponse[], extra: Extra = {}) {
   render(
     <MemoryRouter initialEntries={["/conversations"]}>
       <Routes>
-        <Route path="/conversations" element={<ConversationTable conversations={conversations} />} />
+        <Route path="/conversations" element={<ConversationTable conversations={conversations} archived={false} onArchive={() => {}} onRestore={() => {}} {...extra} />} />
         <Route path="/chat/:threadId" element={<p>Chat page</p>} />
       </Routes>
     </MemoryRouter>,
@@ -29,9 +32,9 @@ function renderTable(conversations: ThreadSummaryResponse[]) {
 }
 
 describe("ConversationTable", () => {
-  it("has the four columns", () => {
+  it("has the four columns and a header-less actions one", () => {
     renderTable([thread()]);
-    expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Conversation", "Subjects of documents used", "Documents", "Last activity"]);
+    expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Conversation", "Subjects of documents used", "Documents", "Last activity", "Actions"]);
   });
 
   it("links the title to the conversation", () => {
@@ -79,5 +82,46 @@ describe("ConversationTable", () => {
   it("an untitled conversation reads Untitled conversation", () => {
     renderTable([thread({ title: null })]);
     expect(screen.getByRole("link", { name: "Untitled conversation" })).toHaveAttribute("href", "/chat/t1");
+  });
+
+  const menuItems = () => screen.getAllByRole("menuitem").map((i) => i.textContent);
+
+  it("an active row's menu offers Open and Archive", async () => {
+    const onArchive = vi.fn();
+    const row = thread();
+    renderTable([row], { onArchive });
+    await userEvent.click(screen.getByRole("button", { name: "Actions for How does ReAct work?" }));
+    expect(menuItems()).toEqual(["Open", "Archive"]);
+    await userEvent.click(screen.getByRole("menuitem", { name: "Archive" }));
+    expect(onArchive).toHaveBeenCalledWith(row);
+    expect(screen.queryByText("Chat page")).not.toBeInTheDocument(); // the row's click-to-open stayed out of it
+  });
+
+  it("an archived row's menu offers Open and Restore", async () => {
+    const onRestore = vi.fn();
+    const row = thread();
+    renderTable([row], { archived: true, onRestore });
+    await userEvent.click(screen.getByRole("button", { name: "Actions for How does ReAct work?" }));
+    expect(menuItems()).toEqual(["Open", "Restore"]);
+    await userEvent.click(screen.getByRole("menuitem", { name: "Restore" }));
+    expect(onRestore).toHaveBeenCalledWith(row);
+  });
+
+  it("Open navigates to the conversation", async () => {
+    renderTable([thread()]);
+    await userEvent.click(screen.getByRole("button", { name: "Actions for How does ReAct work?" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Open" }));
+    expect(screen.getByText("Chat page")).toBeInTheDocument();
+  });
+
+  it("opening the menu does not open the conversation", async () => {
+    renderTable([thread()]);
+    await userEvent.click(screen.getByRole("button", { name: "Actions for How does ReAct work?" }));
+    expect(screen.queryByText("Chat page")).not.toBeInTheDocument();
+  });
+
+  it("a busy row's menu is disabled", () => {
+    renderTable([thread()], { busy: new Set(["t1"]) });
+    expect(screen.getByRole("button", { name: "Actions for How does ReAct work?" })).toBeDisabled();
   });
 });

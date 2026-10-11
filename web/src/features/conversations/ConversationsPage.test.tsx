@@ -1,9 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ComponentProps } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { ThreadSummaryResponse } from "../../api/conversations";
+import { SessionExpiredError } from "../../auth/authClient";
 import { ConversationsContext, type ConversationsList } from "../../app/conversations";
 import { ConversationsPage } from "./ConversationsPage";
 
@@ -15,11 +17,13 @@ const thread = (id: string, title: string | null): ThreadSummaryResponse => ({
   last_activity: "2026-09-30T03:00:00Z",
 });
 
-const page = (value: Partial<ConversationsList>) => (
+type Injected = ComponentProps<typeof ConversationsPage>;
+
+const page = (value: Partial<ConversationsList>, props: Injected = {}) => (
   <ConversationsContext.Provider value={{ list: null, failed: false, refresh: () => {}, ...value }}>
     <MemoryRouter initialEntries={["/conversations"]}>
       <Routes>
-        <Route path="/conversations" element={<ConversationsPage />} />
+        <Route path="/conversations" element={<ConversationsPage loadArchived={async () => []} {...props} />} />
         <Route path="/chat" element={<p>New chat page</p>} />
       </Routes>
     </MemoryRouter>
@@ -42,7 +46,7 @@ describe("ConversationsPage", () => {
 
   it("invites the learner to start a conversation when there are none", async () => {
     render(page({ list: [] }));
-    expect(screen.getByRole("heading", { name: "No conversations yet" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "No conversations yet" })).toBeInTheDocument();
     expect(screen.getByText("Ask a question about your documents. Every conversation is saved here so you can come back to it.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Start a conversation" }));
     expect(screen.getByText("New chat page")).toBeInTheDocument();
@@ -71,5 +75,83 @@ describe("ConversationsPage", () => {
     rerender(page({ list: [thread("a", "New title")] }));
     expect(screen.getByRole("link", { name: "New title" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Old title" })).not.toBeInTheDocument();
+  });
+
+  describe("archiving", () => {
+    const chooseAction = async (title: string, action: string) => {
+      await userEvent.click(await screen.findByRole("button", { name: `Actions for ${title}` }));
+      await userEvent.click(screen.getByRole("menuitem", { name: action }));
+    };
+
+    it("tabs show active and archived counts", async () => {
+      render(page({ list: [thread("a", "First"), thread("b", "Second")] }, { loadArchived: vi.fn().mockResolvedValue([thread("c", "Old")]) }));
+      expect(await screen.findByRole("tab", { name: /^Archived\s*1$/ })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /^Active\s*2$/ })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByText("2 conversations")).toBeInTheDocument();
+    });
+
+    it("the Archived tab lists archived conversations with the notice", async () => {
+      render(page({ list: [thread("a", "First")] }, { loadArchived: vi.fn().mockResolvedValue([thread("c", "Old")]) }));
+      await userEvent.click(await screen.findByRole("tab", { name: /^Archived\s*1$/ }));
+      expect(screen.getByRole("link", { name: "Old" })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "First" })).not.toBeInTheDocument();
+      expect(screen.getByText("Archived conversations stay readable. Restore one to keep asking.")).toBeInTheDocument();
+    });
+
+    it("an empty Archived tab", async () => {
+      render(page({ list: [thread("a", "First")] }));
+      await userEvent.click(await screen.findByRole("tab", { name: /^Archived\s*0$/ }));
+      expect(screen.getByRole("heading", { name: "No archived conversations" })).toBeInTheDocument();
+      expect(screen.getByText("Conversations you archive appear here. You can restore them at any time.")).toBeInTheDocument();
+    });
+
+    it("Active empty while archived exist", async () => {
+      render(page({ list: [] }, { loadArchived: vi.fn().mockResolvedValue([thread("c", "Old")]) }));
+      expect(await screen.findByRole("heading", { name: "No active conversations" })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Start a conversation" }));
+      expect(screen.getByText("New chat page")).toBeInTheDocument();
+    });
+
+    it("archiving from the list refreshes the shell list", async () => {
+      const archive = vi.fn().mockResolvedValue({});
+      const refresh = vi.fn();
+      const loadArchived = vi.fn().mockResolvedValue([]);
+      render(page({ list: [thread("a", "First")], refresh }, { archive, loadArchived }));
+      await waitFor(() => expect(loadArchived).toHaveBeenCalledTimes(1));
+      await chooseAction("First", "Archive");
+      expect(archive).toHaveBeenCalledWith("a");
+      await waitFor(() => expect(loadArchived).toHaveBeenCalledTimes(2));
+      expect(refresh).toHaveBeenCalled();
+      expect(await screen.findByText("First archived. Find it under Archived.")).toBeInTheDocument();
+    });
+
+    it("restoring from the Archived tab", async () => {
+      const restore = vi.fn().mockResolvedValue({});
+      const refresh = vi.fn();
+      const loadArchived = vi.fn().mockResolvedValue([thread("c", "Old")]);
+      render(page({ list: [], refresh }, { restore, loadArchived }));
+      await userEvent.click(await screen.findByRole("tab", { name: /^Archived\s*1$/ }));
+      await chooseAction("Old", "Restore");
+      expect(restore).toHaveBeenCalledWith("c");
+      await waitFor(() => expect(loadArchived).toHaveBeenCalledTimes(2));
+      expect(refresh).toHaveBeenCalled();
+      expect(await screen.findByText("Old restored.")).toBeInTheDocument();
+    });
+
+    it("a failed archive says so", async () => {
+      const archive = vi.fn().mockRejectedValue(new Error("x"));
+      render(page({ list: [thread("a", "First")] }, { archive }));
+      await chooseAction("First", "Archive");
+      expect(await screen.findByText("Couldn't archive First. Try again.")).toBeInTheDocument();
+    });
+
+    it("an expired session says nothing", async () => {
+      const archive = vi.fn().mockRejectedValue(new SessionExpiredError());
+      const loadArchived = vi.fn().mockResolvedValue([]);
+      render(page({ list: [thread("a", "First")] }, { archive, loadArchived }));
+      await chooseAction("First", "Archive");
+      await waitFor(() => expect(loadArchived).toHaveBeenCalledTimes(2));
+      expect(screen.getByRole("status")).toHaveTextContent("");
+    });
   });
 });
