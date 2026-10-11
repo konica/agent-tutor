@@ -13,9 +13,11 @@ The idle pilot costs about **$270-275 a month**: EKS $73, two `t3.large` nodes $
 | | Stacks | Why |
 |---|---|---|
 | Deleted | `Storage`, `Edge`, `Data`, `Cluster`, `Config`, `Registry`, `Network` | They hold the cost; the `Registry` holds only images, which the next build recreates. Storage goes before Edge because it imports Edge's CloudFront URL. |
-| Kept | `Budgets` | The budget `smart-tutor-prod-monthly` is the account's only budget, and it is free. `-DeleteBudget` deletes it. |
-| Kept | `GitHubDeploy` | It owns the account's GitHub OIDC provider, which on-premise's deploy role imports. IAM only, free. |
-| Kept | `CDKToolkit` and the GitHub environment `native-cloud` | So the pilot can be redeployed. |
+| Kept | `Budgets` | The budget `smart-tutor-prod-monthly` is free. `-DeleteBudget` deletes it. |
+| Kept | `GitHubDeploy` | It owns the account's GitHub OIDC provider, which on-premise's deploy role imports: the one resource the two modes share (ADR 0016). IAM only, free. |
+| Kept | `CDKToolkit` and the GitHub environment `native-cloud` | The bootstrap is the account's, and both modes deploy with it; the environment lets the pilot be redeployed. |
+
+On-premise keeps running. The script deletes only native-cloud's names: the stacks `SmartTutor-prod-*`, the secrets `smart-tutor/...`, the log groups of `smart-tutor-prod`, the snapshots of the `smart-tutor-prod` database, and the bucket `smart-tutor-documents-<account>`. Nothing it deletes starts with `SmartTutor-OnPremise-` or `smart-tutor-on-premise`. To tear down on-premise instead, see [`on-premise-deploy.md`](on-premise-deploy.md) §8.
 
 The script also removes what Kubernetes created outside CloudFormation: the `smart-tutor` release and its TargetGroupBindings, then the AWS Load Balancer Controller, External Secrets, and metrics-server. If those stayed, their security-group rules and ENIs would block the Edge and Network deletes. Before Network it deletes unattached VPC-CNI ENIs of the cluster and waits for CloudFront to release its VPC-origin ENIs (up to 45 min), then deletes `CloudFront-VPCOrigins-Service-SG`. All of this is scoped to the pilot's VPC.
 
@@ -35,7 +37,7 @@ gh variable delete NATIVE_CLOUD_AUTO_DEPLOY --repo konica/agent-tutor   # or set
 ./docs/runbooks/pilot-teardown.ps1 -AwsProfile default -DryRun
 ```
 
-It only reads. It prints the stacks it would delete and keep, each step it would run, and the leftovers (snapshots, bucket, log groups, secrets). It never prompts, and only warns about the variable.
+It only reads. It prints the stacks it would delete, each stack it keeps with the reason, each step it would run, and the leftovers (snapshots, bucket, log groups, secrets). It never prompts, and only warns about the variable.
 
 ## 5. Real run (about 25 to 60 min)
 

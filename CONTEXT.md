@@ -87,7 +87,7 @@ How one installation of Smart Tutor is hosted: **on-premise** (the default) or *
 _Avoid_: Environment, flavor, target
 
 **On-premise mode**:
-Smart Tutor's own services (web, API, agent, MCP server, worker, sign-in) run on a virtual machine we operate instead of managed Kubernetes. File storage, the ingest queue, settings, and its own image registry stay on the cloud provider's managed services; the model provider and the tracing service are external. It is the default and is deployed on every merge to `main`.
+Smart Tutor's own services (web, API, agent, MCP server, worker, sign-in) run on a virtual machine we operate instead of managed Kubernetes. File storage, the ingest queue, settings, and its own image registry stay on the cloud provider's managed services; the model provider and the tracing service are external. It is the default and is deployed on every merge to `main`, unless `ON_PREMISE_AUTO_DEPLOY` is `false`.
 _Avoid_: Self-host, local, EC2 mode
 
 **Native-cloud mode**:
