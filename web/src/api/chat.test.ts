@@ -10,6 +10,7 @@ import {
   formatCitation,
   loadConversation,
   loadDocumentsUsed,
+  rateAnswer,
   removeThreadDocument,
   renameConversation,
   setSearchScope,
@@ -46,7 +47,7 @@ async function collect(events: AsyncIterable<ChatEvent>): Promise<ChatEvent[]> {
 }
 
 const answer = [
-  'event: thread\ndata: {"thread_id": "t1"}\n\n',
+  'event: thread\ndata: {"thread_id": "t1", "run_id": "r1"}\n\n',
   'event: delta\ndata: {"text": "It weighs "}\n\n',
   'event: delta\ndata: {"text": "tokens [1]."}\n\n',
   'event: citations\ndata: {"citations": [{"n": 1, "chunk_id": "c1", "document_id": "d1", "document_title": "a.pdf", "page": 3}]}\n\n',
@@ -60,7 +61,7 @@ describe("askInNewThread", () => {
     const events = await collect(askInNewThread("What is attention?", undefined, apiClient));
 
     expect(events).toEqual([
-      { type: "thread", thread_id: "t1" },
+      { type: "thread", thread_id: "t1", run_id: "r1" },
       { type: "delta", text: "It weighs " },
       { type: "delta", text: "tokens [1]." },
       { type: "citations", citations: [{ n: 1, chunk_id: "c1", document_id: "d1", document_title: "a.pdf", page: 3 }] },
@@ -289,7 +290,7 @@ describe("askInThread", () => {
     expect(request.headers.get("Authorization")).toBe("Bearer t");
     expect(await request.json()).toEqual({ question: "Why?" });
     expect(events).toEqual([
-      { type: "thread", thread_id: "t1" },
+      { type: "thread", thread_id: "t1", run_id: null },
       { type: "decline", code: "limited", message: "These documents don't cover this." },
       { type: "done" },
     ]);
@@ -384,5 +385,30 @@ describe("loadConversation", () => {
     await expect(failure).rejects.toThrow("500");
     await expect(failure).rejects.not.toBeInstanceOf(ConversationNotFoundError);
     await expect(failure).rejects.not.toBeInstanceOf(SessionExpiredError);
+  });
+});
+
+describe("rateAnswer", () => {
+  it("puts the rating on the turn with the token and returns the saved rating", async () => {
+    const { apiClient, fetch } = api(() => json({ rating: "down" }));
+
+    expect(await rateAnswer("t1", "r1", "down", apiClient)).toBe("down");
+
+    const request = fetch.mock.calls[0]![0] as Request;
+    expect(request.method).toBe("PUT");
+    expect(request.url).toBe("http://api.test/threads/t1/turns/r1/rating");
+    expect(request.headers.get("Authorization")).toBe("Bearer t");
+    expect(await request.json()).toEqual({ rating: "down" });
+  });
+
+  it("rejects with an Error on 404", async () => {
+    const { apiClient } = api(() => json({ detail: "Not found" }, 404));
+    await expect(rateAnswer("t1", "r1", "up", apiClient)).rejects.toThrow(/failed \(404\)/);
+  });
+
+  it("rejects with SessionExpiredError on 401 and reports it", async () => {
+    const { apiClient, onUnauthorized } = api(() => json({ detail: "Not authenticated" }, 401));
+    await expect(rateAnswer("t1", "r1", "up", apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+    expect(onUnauthorized).toHaveBeenCalled();
   });
 });

@@ -103,6 +103,7 @@ button.source:focus-visible { outline: 2px solid var(--focus); outline-offset: 2
   border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface);
   color: var(--text); font-size: var(--fs-14);
 }
+.ratingLine { display: flex; justify-content: flex-end; }
 .muted { color: var(--text-2); font-size: var(--fs-13); }
 .declineActions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 

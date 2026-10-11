@@ -1,0 +1,3 @@
+.rating { display: inline-flex; align-items: center; gap: var(--sp-1); margin-left: auto; }
+.rating [aria-pressed="true"] { color: var(--accent-text); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.note { font-size: var(--fs-12); color: var(--text-2); }
