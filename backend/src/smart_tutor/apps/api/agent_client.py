@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator, Sequence
 import httpx
 
 from smart_tutor.shared.domain.errors import UnauthenticatedError
+from smart_tutor.tutoring.application import HistoryTurn
 
 
 class AgentUnavailableError(Exception):
@@ -37,10 +38,12 @@ class AgentClient:
         *,
         thread_id: str | None = None,
         run_id: str | None = None,
+        history: Sequence[HistoryTurn] = (),
     ) -> AgentAnswer:
         """Ask the agent; it searches the learner's ready documents with their token, only `document_ids` of them
         when given (a conversation limited to its documents, US-4c). `thread_id` and `run_id` name the ask's trace
-        (PRD §10.4); the run id is kept with the turn."""
+        (PRD §10.4); the run id is kept with the turn. `history` is the conversation's last turns, oldest first
+        (ADR 0015); a new conversation has none."""
         body: dict[str, object] = {"question": question}
         if document_ids is not None:
             body["document_ids"] = list(document_ids)
@@ -48,6 +51,8 @@ class AgentClient:
             body["thread_id"] = thread_id
         if run_id is not None:
             body["run_id"] = run_id
+        if history:
+            body["history"] = [{"question": h.question, "answer": h.answer} for h in history]
         request = self._http.build_request(
             "POST", self._url, json=body, headers={"Authorization": f"Bearer {access_token}"}
         )
