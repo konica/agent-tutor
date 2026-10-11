@@ -38,7 +38,7 @@ afterEach(() => vi.restoreAllMocks());
 describe("usePageFlip with a wheel", () => {
   it("flips down once a gesture that starts at the bottom goes FLIP_DISTANCE past it", () => {
     const { flip, wheel } = setup(2000, 1400);
-    expect(wheel(FLIP_DISTANCE - 10)).toBe(true);
+    expect(wheel(FLIP_DISTANCE - 10)).toBe(false); // swallowed from its first step: nothing to scroll past the edge
     expect(flip).not.toHaveBeenCalled();
     expect(wheel(10)).toBe(false);
     expect(flip).toHaveBeenCalledExactlyOnceWith(1);
@@ -94,11 +94,11 @@ describe("usePageFlip with a wheel", () => {
     expect(flip).toHaveBeenCalledExactlyOnceWith(1);
   });
 
-  it("does nothing more on the first or last page, and doesn't swallow the scroll", () => {
+  it("does nothing more on the first or last page, and swallows the scroll there", () => {
     const flip = vi.fn((_dir: FlipDirection) => false);
     const { wheel } = setup(600, 0, flip);
-    expect(wheel(100)).toBe(true);
-    expect(wheel(100)).toBe(true);
+    expect(wheel(100)).toBe(false);
+    expect(wheel(100)).toBe(false);
     expect(flip).toHaveBeenCalledWith(1);
   });
 
@@ -108,10 +108,9 @@ describe("usePageFlip with a wheel", () => {
     expect(flip).toHaveBeenCalledExactlyOnceWith(1);
   });
 
-  it("counts a wheel in lines (Firefox) and in pages", () => {
+  it("one 3-line notch (Firefox) or one page step flips", () => {
     const { flip, wheel } = setup(600, 0);
-    wheel(3, { deltaMode: 1 }); // 48px: just short
-    wheel(1, { deltaMode: 1 });
+    wheel(3, { deltaMode: 1 });
     expect(flip).toHaveBeenCalledExactlyOnceWith(1);
     pause();
     wheel(-1, { deltaMode: 2 });
@@ -124,11 +123,29 @@ describe("usePageFlip with a wheel", () => {
     wheel(0, { deltaX: 100 });
     expect(flip).not.toHaveBeenCalled();
   });
+
+  it("a mostly sideways wheel at an edge pans the zoomed page: not swallowed, no flip", () => {
+    const { flip, wheel } = setup(600, 0);
+    for (let i = 0; i < 5; i++) expect(wheel(10, { deltaX: 100 })).toBe(true);
+    expect(flip).not.toHaveBeenCalled();
+  });
+
+  it("a Chrome wheel set to one line per notch (33px) flips on one notch", () => {
+    const { flip, wheel } = setup(2000, 1400);
+    expect(wheel(33)).toBe(false);
+    expect(flip).toHaveBeenCalledExactlyOnceWith(1);
+  });
 });
 
 describe("usePageFlip with touch", () => {
-  const touch = (area: HTMLElement, type: "touchStart" | "touchMove" | "touchEnd", clientY?: number) =>
-    fireEvent[type](area, { touches: clientY === undefined ? [] : [{ clientY }] });
+  // fireEvent returns false when the handler called preventDefault (the move was swallowed).
+  const touch = (area: HTMLElement, type: "touchStart" | "touchMove" | "touchEnd", clientY?: number, init: { clientX?: number; cancelable?: boolean } = {}) =>
+    fireEvent[type](area, {
+      touches: clientY === undefined ? [] : [{ clientX: init.clientX ?? 0, clientY }],
+      ...(init.cancelable === undefined ? {} : { cancelable: init.cancelable }),
+    });
+  const twoFingers = (area: HTMLElement, type: "touchStart" | "touchMove", clientY: number) =>
+    fireEvent[type](area, { touches: [{ clientX: 0, clientY }, { clientX: 100, clientY }] });
 
   it("a swipe up that starts at the bottom flips to the next page once", () => {
     const { area, flip } = setup(2000, 1400);
@@ -155,5 +172,57 @@ describe("usePageFlip with touch", () => {
     touch(area, "touchMove", 300);
     touch(area, "touchEnd");
     expect(flip).not.toHaveBeenCalled();
+  });
+
+  it("swallows a touch that starts at the edge from its first move, before it flips", () => {
+    const { area, flip } = setup(2000, 1400);
+    touch(area, "touchStart", 500);
+    expect(touch(area, "touchMove", 495)).toBe(false);
+    expect(flip).not.toHaveBeenCalled();
+  });
+
+  it("a second finger (a pinch) never flips and isn't swallowed", () => {
+    const { area, flip } = setup(600, 0);
+    twoFingers(area, "touchStart", 500);
+    expect(twoFingers(area, "touchMove", 300)).toBe(true);
+    expect(touch(area, "touchMove", 300)).toBe(true);
+    touch(area, "touchEnd");
+    touch(area, "touchStart", 500);
+    expect(twoFingers(area, "touchMove", 300)).toBe(true);
+    expect(touch(area, "touchMove", 200)).toBe(true);
+    expect(flip).not.toHaveBeenCalled();
+  });
+
+  it("doesn't flip under a move the browser is already scrolling (not cancelable)", () => {
+    const { area, flip } = setup(600, 0);
+    touch(area, "touchStart", 500);
+    touch(area, "touchMove", 300, { cancelable: false });
+    touch(area, "touchMove", 200);
+    expect(flip).not.toHaveBeenCalled();
+  });
+
+  it("a sideways swipe at an edge pans the zoomed page: not swallowed, no flip", () => {
+    const { area, flip } = setup(600, 0);
+    touch(area, "touchStart", 500, { clientX: 300 });
+    expect(touch(area, "touchMove", 440, { clientX: 100 })).toBe(true);
+    expect(flip).not.toHaveBeenCalled();
+  });
+
+  it("a touch that reverses counts from the other edge", () => {
+    const { area, flip } = setup(600, 0);
+    touch(area, "touchStart", 300);
+    touch(area, "touchMove", 310); // down at the top: not far enough
+    touch(area, "touchMove", 300 - FLIP_DISTANCE); // up past where it started: a fresh start at the bottom
+    expect(flip).toHaveBeenCalledExactlyOnceWith(1);
+  });
+
+  it("a new touch after a flip flips again", () => {
+    const { area, flip } = setup(600, 0);
+    touch(area, "touchStart", 500);
+    touch(area, "touchMove", 100);
+    touch(area, "touchEnd");
+    touch(area, "touchStart", 500);
+    touch(area, "touchMove", 100);
+    expect(flip.mock.calls).toEqual([[1], [1]]);
   });
 });

@@ -7,7 +7,7 @@ import { DocumentNotFoundError, DocumentNotOpenableError, type DocumentResponse 
 import type { ChunkPassage } from "../../api/chunks";
 import { DocumentViewer, type Passage } from "./DocumentViewer";
 import type { TextItem } from "./passage";
-import type { PdfDoc } from "./pdf";
+import type { PdfDoc, PdfPage } from "./pdf";
 import { GESTURE_GAP_MS } from "./usePageFlip";
 import { fakeDocument, fakeFile, fakePdf, fakeViewerDeps } from "./testFakes";
 
@@ -490,9 +490,19 @@ describe("DocumentViewer flip at the edge", () => {
   let now = 1_000_000;
   const wheel = (deltaY: number) => {
     now += 16;
-    fireEvent.wheel(area(), { deltaY });
+    return fireEvent.wheel(area(), { deltaY });
   };
   const pause = () => (now += GESTURE_GAP_MS + 100);
+  // Lets the flipped-to page render (the fake PDF resolves in microtasks); until then a pending landing blocks a flip.
+  const rendered = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+  // A 3-page PDF whose page 2 loads only when `page2.resolve` is called.
+  function slowPage2() {
+    const fake = pdf();
+    const fast = fake.page;
+    const page2 = deferred<PdfPage>();
+    fake.page = vi.fn((n: number) => (n === 2 ? page2.promise : fast(n)));
+    return { fake, page2, fast };
+  }
   beforeEach(() => {
     vi.spyOn(Date, "now").mockImplementation(() => now);
   });
@@ -544,6 +554,7 @@ describe("DocumentViewer flip at the edge", () => {
     await ready();
     wheel(100);
     expect(screen.getByText("p. 2 / 3")).toBeInTheDocument();
+    await rendered();
     pause();
     wheel(-100);
     expect(screen.getByText("p. 1 / 3")).toBeInTheDocument();
@@ -559,6 +570,7 @@ describe("DocumentViewer flip at the edge", () => {
     for (let i = 0; i < 3; i++) {
       pause();
       wheel(100);
+      await rendered();
     }
     expect(screen.getByText("p. 3 / 3")).toBeInTheDocument();
     expect(onPageChange.mock.calls).toEqual([[2], [3]]);
@@ -574,6 +586,37 @@ describe("DocumentViewer flip at the edge", () => {
     expect(area().scrollTop).toBe(700);
   });
 
+  it("PageDown before the flipped-to page renders drops its landing", async () => {
+    scrollArea();
+    const { fake, page2, fast } = slowPage2();
+    renderViewer({ loadPdfDoc: vi.fn().mockResolvedValue(fake) });
+    await ready();
+    area().scrollTop = 1400;
+    wheel(100);
+    expect(screen.getByText("p. 2 / 3")).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole("heading", { level: 2 }), { key: "PageDown" });
+    expect(screen.getByText("p. 3 / 3")).toBeInTheDocument();
+    page2.resolve(await fast(2));
+    await rendered();
+    expect(await screen.findByText("Page 3 of 3")).toBeInTheDocument();
+    expect(area().scrollTop).toBe(1400);
+  });
+
+  it("another gesture while the flipped-to page loads doesn't turn a page the learner hasn't seen", async () => {
+    scrollArea();
+    const { fake, page2, fast } = slowPage2();
+    renderViewer({ loadPdfDoc: vi.fn().mockResolvedValue(fake) });
+    await ready();
+    area().scrollTop = 1400;
+    wheel(100);
+    pause();
+    expect(wheel(100)).toBe(false); // swallowed
+    expect(screen.getByText("p. 2 / 3")).toBeInTheDocument();
+    page2.resolve(await fast(2));
+    await waitFor(() => expect(area().scrollTop).toBe(0));
+    expect(screen.getByText("p. 2 / 3")).toBeInTheDocument();
+  });
+
   it("the citation reveal's scroll never flips", async () => {
     // The reveal scrolls the passage to a third from the top: 40 + 300 - 600 / 3 = 140, the bottom of a 740px page.
     scrollArea(740);
@@ -581,7 +624,7 @@ describe("DocumentViewer flip at the edge", () => {
     renderCited([CITED]);
     await screen.findByTestId("passage-box");
     await waitFor(() => expect(area().scrollTop).toBe(140));
-    fireEvent.scroll(area());
+    fireEvent.scroll(area()); // guards against a future scroll listener: the hook counts only wheel and touch
     await waitFor(() => expect(status()).toHaveTextContent("Opened page 2 of 3. Cited passage highlighted."));
     expect(screen.getByText("p. 2 / 3")).toBeInTheDocument();
   });

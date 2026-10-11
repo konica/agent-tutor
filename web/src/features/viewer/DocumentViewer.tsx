@@ -83,8 +83,9 @@ function Viewer({
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const renderChain = useRef<Promise<void>>(Promise.resolve());
-  // Where a page reached by flipping opens: its top going down, its bottom going up, so reading continues (#212).
-  const landAt = useRef<FlipDirection | null>(null);
+  // Where a page reached by flipping opens: its top going down, its bottom going up, so reading continues (#212). It is
+  // kept until the next render, which drops it if another move (PageDown, the toolbar) got there first.
+  const landAt = useRef<{ page: number; dir: FlipDirection } | null>(null);
 
   // The document stays known while Retry fetches a new link, so the title doesn't flicker back to "Document".
   const [document, setKnownDocument] = useState<DocumentResponse | null>(null);
@@ -136,10 +137,11 @@ function Viewer({
       if (!live || !canvasRef.current) return;
       const drawn = pdfPage.render(canvasRef.current, zoom / 100);
       // A flipped-to page lands once the canvas has its size, which render sets before it draws.
+      const land = landAt.current;
       const area = canvasAreaRef.current;
-      if (landAt.current !== null && area) {
-        area.scrollTop = landAt.current > 0 ? 0 : Math.max(0, area.scrollHeight - area.clientHeight);
+      if (land) {
         landAt.current = null;
+        if (land.page === page && area) area.scrollTop = land.dir > 0 ? 0 : Math.max(0, area.scrollHeight - area.clientHeight);
       }
       await drawn;
       if (live) setRendered(true);
@@ -188,7 +190,8 @@ function Viewer({
 
   const flip = (dir: FlipDirection) => {
     if (numPages === null || page + dir < 1 || page + dir > numPages) return false;
-    landAt.current = dir;
+    if (landAt.current) return true; // a flipped-to page is still loading: swallow, don't skip a page the learner hasn't seen
+    landAt.current = { page: page + dir, dir };
     goTo(page + dir);
     return true;
   };
