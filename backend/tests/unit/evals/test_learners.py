@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import httpx
 import pytest
 
 from evals.corpus import SeedDocument, load_manifest, sha256_of
@@ -157,6 +158,39 @@ def test_a_ready_document_keeps_its_subjects(tmp_path: Path) -> None:
     _load(stack, tmp_path)
     react = next(d for d in stack.library("learner@example.com") if d.sha256 == sha256_of(REACT))
     assert react.subjects == ["Agents I chose"]
+
+
+def test_a_dropped_connection_while_polling_is_retried(tmp_path: Path) -> None:
+    stack = FakeStack()
+    stack.process = lambda doc: None  # stays processing until the first poll
+
+    def finish(request: httpx.Request) -> bool:
+        for doc in stack.documents.values():
+            doc.state = "awaiting_subjects" if doc.state == "processing" else doc.state
+        return request.method == "GET"
+
+    stack.disconnects, stack.disconnect_if = 3, finish
+    assert _load(stack, tmp_path) == []
+    assert all(d.state == "ready" for d in stack.library("learner@example.com"))
+
+
+def test_a_connection_that_stays_down_while_polling_times_out_naming_the_error(tmp_path: Path) -> None:
+    stack = FakeStack()
+    stack.disconnects, stack.disconnect_if = 10**9, lambda request: request.url.path.startswith("/uploads/")
+    problems = _load(stack, tmp_path, timeout=0.05)
+    assert len(problems) == 2
+    assert all("timed out" in p and "Server disconnected without sending a response." in p for p in problems)
+
+
+def test_a_dropped_connection_starting_one_document_is_a_problem_for_that_document_only(tmp_path: Path) -> None:
+    stack = FakeStack()
+    cot = sha256_of(COT).encode()
+    stack.disconnects = 1
+    stack.disconnect_if = lambda request: request.url.path == "/documents/duplicate-check" and cot in request.content
+    problems = _load(stack, tmp_path)
+    assert len(problems) == 1 and problems[0].startswith("cot-2022: ")
+    assert [d.state for d in stack.library("learner@example.com")] == ["ready"]
+    assert stack.uploads_started == 1
 
 
 def _load_all(stack: FakeStack, tmp_path: Path, learners: list[Learner]) -> list[str]:

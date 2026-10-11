@@ -43,6 +43,8 @@ class FakeStack:
         self.sign_ins = 0
         self.retries = 0
         self.always_unauthorized = False  # the API answers 401 whatever the token
+        self.disconnects = 0  # the next N API requests matching disconnect_if drop the connection
+        self.disconnect_if: Callable[[httpx.Request], bool] = lambda request: True
         self.process: Callable[[FakeDocument], None] = lambda d: setattr(d, "state", "awaiting_subjects")
         self._ids = (f"00000000-0000-0000-0000-{n:012d}" for n in itertools.count(1))
         self._codes: dict[str, tuple[str, str]] = {}  # code -> (username, PKCE challenge)
@@ -147,6 +149,9 @@ class FakeStack:
         }
 
     def _api(self, request: httpx.Request) -> httpx.Response:
+        if self.disconnects and self.disconnect_if(request):
+            self.disconnects -= 1
+            raise httpx.RemoteProtocolError("Server disconnected without sending a response.")
         user = self._tokens.get(request.headers.get("authorization", "").removeprefix("Bearer "))
         if user is None or self.always_unauthorized:
             return httpx.Response(401)

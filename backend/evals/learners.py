@@ -168,6 +168,7 @@ class _Pending:
     found: bool = False  # already in the library before this run
     retried: bool = False
     state: str = "uploading"
+    last_error: str | None = None  # the last dropped connection while polling
 
 
 def _advance(tutor: Tutor, p: _Pending) -> bool:
@@ -220,7 +221,7 @@ def load_library(
             else:
                 pending.append(_Pending(seed, upload_id=tutor.upload(seed.file_name, paths[seed.id].read_bytes())))
                 log(f"{tutor.username} {seed.id}: uploaded")
-        except LoadError as e:
+        except (LoadError, httpx.HTTPError) as e:  # not retried: POST /uploads creates a document each time
             problems.append(f"{seed.id}: {e}")
     while pending:
         for p in list(pending):
@@ -230,11 +231,18 @@ def load_library(
                 problems.append(f"{p.seed.id}: {e}")
                 pending.remove(p)
                 continue
+            except httpx.TransportError as e:  # a dropped connection: look again next time round
+                p.last_error = str(e) or type(e).__name__
+                continue
             if done:
                 log(f"{tutor.username} {p.seed.id}: ready")
                 pending.remove(p)
         if pending and time.monotonic() >= deadline:
-            problems += [f"{p.seed.id}: timed out after {timeout:g}s while {p.state}" for p in pending]
+            problems += [
+                f"{p.seed.id}: timed out after {timeout:g}s while {p.state}"
+                + (f" (last error: {p.last_error})" if p.last_error else "")
+                for p in pending
+            ]
             break
         if pending:
             time.sleep(interval)
