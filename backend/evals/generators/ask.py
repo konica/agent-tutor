@@ -7,6 +7,7 @@ declined otherwise; every candidate keeps the seed chunk ids it was written from
 """
 
 import asyncio
+import logging
 import random
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -21,6 +22,7 @@ from evals.chunks import SeedChunk
 from evals.publish import TYPES
 from evals.review import Candidate
 
+LOG = logging.getLogger(__name__)
 PROMPT = Path(__file__).parent / "prompts" / "ask_question.md"
 MIN_CHARS = 400
 MIN_LETTERS = 0.6  # share of letters and spaces: reference lists and tables fall below it
@@ -120,8 +122,12 @@ async def write_candidates(drafts: Sequence[Draft], write: Write, concurrency: i
 
     async def one(draft: Draft) -> Candidate | None:
         async with gate:
-            history = [await write("factual", [chunk]) for chunk in draft.history]
-            question = await write(draft.type, draft.chunks)
+            try:
+                history = [await write("factual", [chunk]) for chunk in draft.history]
+                question = await write(draft.type, draft.chunks)
+            except Exception as error:  # a parse error or throttling drops this draft, not the batch
+                LOG.warning("Dropped a %s draft: %s: %s", draft.type, type(error).__name__, error)
+                return None
         if question is None or None in history:
             return None
         inputs: dict[str, Any] = {
@@ -148,7 +154,9 @@ async def write_candidates(drafts: Sequence[Draft], write: Write, concurrency: i
 class Question(BaseModel):
     """The question for the dataset."""
 
-    question: str | None = Field(description="The question, or null when the passages can't support a good one.")
+    question: str | None = Field(
+        default=None, description="The question, or null when the passages can't support a good one."
+    )
 
 
 def question_writer(model: BaseChatModel) -> Write:
