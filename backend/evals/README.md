@@ -24,7 +24,7 @@ Every eval asks as one of two synthetic learners whose libraries are built from 
 
     cd backend && uv run --extra eval python -m evals.learners     # or: make evals-learners
 
-It downloads the seed PDFs into `data/seed_corpus/` (checked against the manifest's SHA-256), signs in as `learner@example.com` and `learner2@example.com`, uploads each document through the real upload path, chooses its labeled subjects, and waits until it is ready. It exits 1 when a document fails or doesn't get ready within `--timeout` seconds per learner (default 900). A second run uploads nothing: the learner's own duplicate check finds each document; a document an earlier run left failed is retried once, an archived one is restored.
+It downloads the seed PDFs into `data/seed_corpus/` (checked against the manifest's SHA-256), signs in as `learner@example.com` and `learner2@example.com`, uploads each document through the real upload path, chooses its labeled subjects, and waits until it is ready. It exits 1 when a document fails or doesn't get ready within `--timeout` seconds per learner (default 900). A second run uploads nothing for documents already in the library; an archived document is uploaded once more, which finds it, and is then restored; a document an earlier run left failed is retried once when it can be. A run interrupted between starting an upload and storing the file can leave a "processing" entry in the learner's Library; delete it there.
 
 Prerequisites:
 - The Compose stack with the app profile (`docker compose --profile app up -d`), or the dependencies plus host processes (`make api`, `make worker`; README "Run the app").

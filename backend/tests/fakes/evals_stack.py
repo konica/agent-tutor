@@ -42,6 +42,7 @@ class FakeStack:
         self.uploads_started = 0
         self.sign_ins = 0
         self.retries = 0
+        self.redirect_to: str | None = None  # Keycloak sends the code to this URI instead of the requested one
         self.always_unauthorized = False  # the API answers 401 whatever the token
         self.disconnects = 0  # the next N API requests matching disconnect_if drop the connection
         self.disconnect_if: Callable[[httpx.Request], bool] = lambda request: True
@@ -71,7 +72,7 @@ class FakeStack:
     def _redirect_with_code(self, username: str, auth: dict[str, str]) -> httpx.Response:
         code = next(self._ids)
         self._codes[code] = (username, auth["code_challenge"])
-        location = f"{auth['redirect_uri']}?state={auth['state']}&session_state=x&code={code}"
+        location = f"{self.redirect_to or auth['redirect_uri']}?state={auth['state']}&session_state=x&code={code}"
         return httpx.Response(
             302, headers={"Location": location, "Set-Cookie": f"KC_SESSION={username}; {SECURE_COOKIE}"}
         )
@@ -126,7 +127,9 @@ class FakeStack:
         upload = self.uploads[fields["key"].decode()]
         sha = hashlib.sha256(fields["file"]).hexdigest()
         new = self.documents[upload["document_id"]]
-        existing = next((d for d in self.library(upload["owner"]) if d.sha256 == sha), None)
+        existing = next(  # archived documents count here, as in the real _store
+            (d for d in self.library(upload["owner"]) if d.sha256 == sha), None
+        )
         if existing:  # the server-side duplicate check: the upload points at the learner's own copy
             del self.documents[new.document_id]
             upload.update(outcome="duplicate", document_id=existing.document_id)
@@ -158,7 +161,9 @@ class FakeStack:
         method, path = request.method, request.url.path
         body = json.loads(request.content) if request.content else None
         if (method, path) == ("POST", "/documents/duplicate-check"):
-            found = next((d for d in self.library(user) if d.sha256 == body["sha256"]), None)
+            found = next(
+                (d for d in self.library(user) if d.sha256 == body["sha256"] and not d.archived), None
+            )  # as find_in_library
             return httpx.Response(200, json={"document_id": found.document_id if found else None})
         if (method, path) == ("POST", "/uploads"):
             self.uploads_started += 1

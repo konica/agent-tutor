@@ -5,7 +5,8 @@ from pathlib import Path
 import httpx
 import pytest
 
-from evals.corpus import SeedDocument, load_manifest, sha256_of
+from evals import learners
+from evals.corpus import CorpusError, SeedDocument, load_manifest, sha256_of
 from evals.learners import (
     API,
     APP,
@@ -145,11 +146,60 @@ def test_a_document_that_failed_in_an_earlier_run_is_retried(tmp_path: Path) -> 
     assert all(d.state == "ready" for d in stack.library("learner@example.com"))
 
 
-def test_an_archived_document_is_restored(tmp_path: Path) -> None:
+def test_an_archived_document_is_uploaded_once_more_found_as_a_duplicate_and_restored(tmp_path: Path) -> None:
     stack = FakeStack()
-    stack.add("learner@example.com", REACT, state="awaiting_subjects", archived=True)
+    archived = stack.add("learner@example.com", REACT, state="awaiting_subjects", archived=True)
     assert _load(stack, tmp_path) == []
-    assert all(not d.archived and d.state == "ready" for d in stack.library("learner@example.com"))
+    assert stack.uploads_started == 2  # react again (the duplicate check skips archived documents) and cot
+    react = [d for d in stack.library("learner@example.com") if d.sha256 == sha256_of(REACT)]
+    assert [d.document_id for d in react] == [archived.document_id]  # no new document
+    assert not archived.archived and archived.state == "ready"
+
+
+def test_an_archived_and_failed_document_is_retried_once_and_restored(tmp_path: Path) -> None:
+    stack = FakeStack()
+    doc = stack.add("learner@example.com", REACT, state="failed", archived=True, failure_reason="Bedrock throttled")
+    assert _load(stack, tmp_path) == []
+    assert stack.retries == 1
+    assert not doc.archived and doc.state == "ready"
+
+
+def test_the_duplicate_check_skips_archived_documents() -> None:
+    stack = FakeStack()
+    stack.add("learner@example.com", REACT, archived=True)
+    tutor = Tutor(stack.client(), "learner@example.com", "learner")
+    assert tutor.call("POST", "/documents/duplicate-check", {"sha256": sha256_of(REACT)}) == {"document_id": None}
+
+
+def test_the_redirect_error_does_not_print_the_authorization_code() -> None:
+    stack = FakeStack()
+    stack.redirect_to = "http://localhost:9/other"
+    tutor = Tutor(stack.client(), "learner@example.com", "learner")
+    with pytest.raises(LoadError, match="redirected to http://localhost:9/other,") as error:
+        tutor.sign_in()
+    assert "code=" not in str(error.value)
+
+
+def _main(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, problems: list[str]) -> int:
+    monkeypatch.setattr(learners, "download", lambda wanted, directory: {})
+    monkeypatch.setattr(learners, "load_all", lambda *args, **kwargs: problems)
+    return learners.main(["--downloads", str(tmp_path)])
+
+
+def test_main_exits_1_when_a_library_has_problems(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    assert _main(monkeypatch, tmp_path, ["x"]) == 1
+
+
+def test_main_exits_0_when_every_library_is_ready(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    assert _main(monkeypatch, tmp_path, []) == 0
+
+
+def test_main_exits_1_when_the_corpus_cannot_be_downloaded(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def refuse(wanted: object, directory: object) -> dict[str, Path]:
+        raise CorpusError("hash mismatch")
+
+    monkeypatch.setattr(learners, "download", refuse)
+    assert learners.main(["--downloads", str(tmp_path)]) == 1
 
 
 def test_a_ready_document_keeps_its_subjects(tmp_path: Path) -> None:
