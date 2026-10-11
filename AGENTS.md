@@ -10,7 +10,7 @@ Sources of truth — read the relevant one before changing behavior or structure
 
 | Need | Read |
 |---|---|
-| Product behavior, user stories, data model, flows, evals, roadmap | `sdd/prd.md` (v2.44) |
+| Product behavior, user stories, data model, flows, evals, roadmap | `sdd/prd.md` (v2.48) |
 | Folder structure, module boundaries, import rules | `sdd/specs/2026-10-02-project-structure-design.md` |
 | Why an architecture choice was made | `sdd/adr/` (0001–0016) |
 | Why the PRD changed in v2.1 | `sdd/reviews/2026-10-03-prd-v2.0-review.md` |
@@ -67,7 +67,7 @@ Other tasks (Compose, jobs, evals, CDK synth) are targets in the `Makefile`; ima
 
 - Every behavior change comes with tests. Unit tests use the fakes in `backend/tests/fakes/`; real Bedrock is reached only by evals.
 - Endpoints and MCP tools that return learner data get a test in `backend/tests/isolation/`.
-- Agent quality is gated by LangSmith evals in `backend/evals/`, targets in `thresholds.yaml`, data from the seed corpus manifest. Fix the agent until a run meets its threshold.
+- Agent quality is gated by LangSmith evals in `backend/evals/`, targets in `thresholds.yaml`, data from the seed corpus manifest. Fix the agent until a run meets its threshold. CI runs the smoke split on PRs that change the agent (`.github/workflows/evals-smoke.yml`, `docs/runbooks/evals-ci.md`).
 
 ## Agent skills
 

@@ -12,6 +12,8 @@ for a request with ``document_ids`` (only those documents are searched), ``limit
 scores at least ``answer_floor`` (US-4c).
 
 The request may carry ``thread_id`` and ``run_id`` (set by the API); each ask is traced as one ``ask`` run (PRD §10.4).
+It may also carry ``history``, the conversation's last turns (``question``, ``answer``), oldest first: the answer
+model reads them before the chunks, and the search adds the previous question (PRD §9.2, ADR 0015).
 """
 
 import json
@@ -33,11 +35,11 @@ from smart_tutor.shared.adapters.auth.bearer import BearerToken, CurrentPrincipa
 from smart_tutor.shared.adapters.auth.keycloak_introspection import keycloak_verifier
 from smart_tutor.shared.adapters.model_factory import ChatRole, ModelFactory
 from smart_tutor.shared.adapters.tracing import LearnerHasher, run_metadata, start_tracing
-from smart_tutor.shared.config import Settings
+from smart_tutor.shared.config import MAX_HISTORY_ANSWER_CHARS, MAX_HISTORY_TURNS, Settings
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.ports.token_verifier import TokenVerifier
 from smart_tutor.tutoring.adapters.mcp_retriever import McpRetriever
-from smart_tutor.tutoring.application import RetrievedChunk
+from smart_tutor.tutoring.application import HistoryTurn, RetrievedChunk
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +50,12 @@ SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 STREAM_MODES: list[Literal["messages", "updates"]] = ["messages", "updates"]
 
 
+class HistoryTurnBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    question: str = Field(min_length=1, max_length=4000)
+    answer: str = Field(max_length=MAX_HISTORY_ANSWER_CHARS)  # the API cuts answers to history_answer_chars
+
+
 class AskRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     question: str = Field(min_length=1, max_length=4000)
@@ -56,6 +64,8 @@ class AskRequest(BaseModel):
     # (evals) still trace, under a fresh run id.
     thread_id: uuid.UUID | None = None
     run_id: uuid.UUID | None = None
+    # Set by the API for a question in an existing conversation (ADR 0015): its last turns, oldest first.
+    history: list[HistoryTurnBody] = Field(default_factory=list, max_length=MAX_HISTORY_TURNS)
 
 
 def sse(event: str, data: dict[str, Any]) -> str:
@@ -65,7 +75,11 @@ def sse(event: str, data: dict[str, Any]) -> str:
 async def answer_events(
     graph: AskGraph, body: AskRequest, token: str, run: AskRun, tracing: AskTracing
 ) -> AsyncIterator[str]:
-    state: AskState = {"question": body.question, "document_ids": body.document_ids}
+    state: AskState = {
+        "question": body.question,
+        "document_ids": body.document_ids,
+        "history": [HistoryTurn(h.question, h.answer) for h in body.history],
+    }
     chunks: list[RetrievedChunk] = []  # what search found; the answer node gives the model exactly these
     answer = ""
     decline: str | None = None
@@ -135,7 +149,10 @@ def create_app(
         if graph is None:
             model = ModelFactory(settings).chat(ChatRole.AGENT)
             app.state.graph = build_graph(
-                lambda token: McpRetriever(settings.mcp_url, token), model, settings.answer_floor
+                lambda token: McpRetriever(settings.mcp_url, token),
+                model,
+                settings.answer_floor,
+                settings.answer_max_tokens,
             )
         async with httpx.AsyncClient(timeout=5) as http:
             app.state.verifier = keycloak_verifier(settings, http)

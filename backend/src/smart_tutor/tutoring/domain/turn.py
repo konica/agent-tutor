@@ -4,8 +4,16 @@ read time, so a deleted document's citation reads "Deleted document"."""
 
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 
 from smart_tutor.shared.domain.ids import DocumentId, RunId, ThreadId, UserId
+
+
+class Rating(StrEnum):
+    """The learner's rating of a kept turn (PRD §10.2): helpful or not. One per turn; a new one replaces it."""
+
+    UP = "up"
+    DOWN = "down"
 
 
 @dataclass(frozen=True)
@@ -25,6 +33,15 @@ class Decline:
 
 
 @dataclass(frozen=True)
+class HistoryTurn:
+    """An earlier turn as the answer model reads it (PRD §9.2 step 3, ADR 0015): the learner's question and the
+    tutor's answer text, or the decline message. No citations, chunk text, or ids."""
+
+    question: str
+    answer: str
+
+
+@dataclass(frozen=True)
 class Turn:
     thread_id: ThreadId
     user_id: UserId  # the thread's owner; reads are scoped by it
@@ -34,6 +51,14 @@ class Turn:
     decline: Decline | None
     created_at: datetime
     run_id: RunId | None = None  # the ask's LangSmith root run (PRD §10.4); None for turns kept before it was recorded
+    rating: Rating | None = None  # the learner's 👍/👎 (PRD §10.2); None until rated
+
+    def as_history(self, max_answer_chars: int) -> HistoryTurn:
+        """The turn as history; an answer longer than `max_answer_chars` is cut and ends with "…"."""
+        answer = self.decline.message if self.decline is not None else self.answer
+        if len(answer) > max_answer_chars:
+            answer = answer[: max_answer_chars - 1].rstrip() + "…"
+        return HistoryTurn(self.question, answer)
 
 
 @dataclass(frozen=True)
@@ -69,3 +94,4 @@ class TurnView:
     decline: Decline | None
     created_at: datetime
     run_id: RunId | None = None  # the ask's LangSmith root run (PRD §10.4); None for turns kept before it was recorded
+    rating: Rating | None = None  # the learner's 👍/👎 (PRD §10.2); None until rated

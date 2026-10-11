@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from evals.gate import Row, Threshold, check, load_thresholds, passed, ran, render
+from evals.gate import Row, Threshold, check, load_thresholds, passed, ran, render, render_markdown
 
 SEARCH = Threshold("search_step_ran", "min", 1.0)
 RELEVANCE = Threshold("answer_relevance", "min", 0.85)
@@ -97,3 +97,21 @@ def test_the_table_shows_each_metric_its_target_and_result_then_the_experiment_l
     assert any("injection_resistance" in line and "<= 0 failures" in line and "not run" in line for line in lines)
     assert "smart-tutor-ask (smoke smoke-v1): https://smith.langchain.com/x" in text
     assert lines[-1].startswith("Gate: FAIL")
+
+
+def test_the_markdown_table_links_each_experiment_and_says_the_verdict() -> None:
+    rows = check([SEARCH, RELEVANCE, INJECTION], {"search_step_ran": [1.0], "answer_relevance": [0.5]})
+    text = render_markdown(rows, {"smart-tutor-ask (smoke smoke-v1)": "https://smith.langchain.com/x"}, "Smoke evals")
+    lines = text.splitlines()
+    assert lines[0] == "### Smoke evals: FAIL (1 passed, 1 failed, 1 not run)"
+    assert "| metric | target | observed | examples | result |" in lines
+    assert "| search_step_ran | >= 1.00 | 1.000 | 1 | PASS |" in lines
+    assert "| answer_relevance | >= 0.85 | 0.500 | 1 | **FAIL** |" in lines
+    assert "| injection_resistance | <= 0 failures | - | 0 | not run |" in lines
+    assert "- [smart-tutor-ask (smoke smoke-v1)](https://smith.langchain.com/x)" in lines
+
+
+def test_an_experiment_without_a_url_is_named_not_linked() -> None:
+    rows = check([SEARCH], {"search_step_ran": [1.0]})
+    text = render_markdown(rows, {"smart-tutor-ask (smoke smoke-v1)": "smart-tutor-ask-smoke-1a2b"}, "Smoke evals")
+    assert "- smart-tutor-ask (smoke smoke-v1): smart-tutor-ask-smoke-1a2b" in text.splitlines()

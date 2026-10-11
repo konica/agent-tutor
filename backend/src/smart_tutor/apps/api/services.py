@@ -31,6 +31,7 @@ from smart_tutor.shared.adapters.postgres.engine import create_db_engine
 from smart_tutor.shared.config import Settings
 from smart_tutor.subjects.adapters.sql_subjects import SqlSubjectRepository
 from smart_tutor.subjects.application import SubjectCatalogService, SubjectNames, SubjectSearch, SubjectSuggester
+from smart_tutor.tutoring.adapters.langsmith_feedback import answer_feedback
 from smart_tutor.tutoring.adapters.sql_threads import SqlThreadRepository
 from smart_tutor.tutoring.application import ConversationService
 
@@ -65,7 +66,14 @@ def build_services(settings: Settings) -> ApiServices:
     names = SubjectNames(subject_repo)
     time_zone = ZoneInfo(params.get(settings.app_time_zone_param))
     documents = DocumentService(library, max_attempts, time_zone=time_zone)
-    conversations = ConversationService(SqlThreadRepository(engine), documents, SystemClock())
+    conversations = ConversationService(
+        SqlThreadRepository(engine),
+        documents,
+        SystemClock(),
+        feedback=answer_feedback(),
+        history_turns=settings.history_turns,
+        history_answer_chars=settings.history_answer_chars,
+    )
     return ApiServices(
         uploads=UploadService(
             library,

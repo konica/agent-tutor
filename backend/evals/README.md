@@ -42,7 +42,7 @@ Prerequisites:
 
     make evals-smoke     # or: cd backend && uv run --env-file ../.env --extra eval python -m evals.run --split smoke
 
-It runs every suite whose dataset has the split, one LangSmith experiment per dataset, then prints each `release_1` metric of `thresholds.yaml` as PASS, FAIL, or "not run" (no suite scores it yet) with the experiment links, and exits 1 when a metric fails or nothing ran. `--release` picks another table.
+It runs every suite whose dataset has the split, one LangSmith experiment per dataset, then prints each `release_1` metric of `thresholds.yaml` as PASS, FAIL, or "not run" (no suite scores it yet) with the experiment links, and exits 1 when a metric fails or nothing ran. `--release` picks another table. `--summary PATH` appends the table as Markdown to a file (CI passes `$GITHUB_STEP_SUMMARY`); CI runs the smoke split on PRs that change the agent (`.github/workflows/evals-smoke.yml`, see `docs/runbooks/evals-ci.md`).
 
 Prerequisites: the app stack and the eval learners' libraries (`make evals-learners`, above); your AWS profile (the agent and the Qwen judge run on Bedrock); `LANGSMITH_API_KEY` in your shell or `.env`.
 
@@ -76,7 +76,7 @@ The runner then uses the pinned tag for that split (and stops if LangSmith doesn
 
    A type the corpus can't support (no learner holds the documents it needs) gets no drafts, and the command doesn't stop for it.
 
-   Each candidate is a run in the `smart-tutor-ask-candidates` project, added to the annotation queue of the same name. Its outputs show the expected behavior, the source chunk ids, and the passages (`evidence`). The ask target asks only the last question of a `drift` example until the graph takes history (#210, #214).
+   Each candidate is a run in the `smart-tutor-ask-candidates` project, added to the annotation queue of the same name. Its outputs show the expected behavior, the source chunk ids, and the passages (`evidence`). The ask target asks only the last question of a `drift` example until it sends the example's history to the graph (#214).
 
 2. **Review** in LangSmith → Annotation Queues → `smart-tutor-ask-candidates`. For each item, score **accepted**: 1 when the question is clear, a learner could ask it, and the passages support the expected behavior (for an answer, they answer it); 0 otherwise. Don't edit items: reject them, and generate more. Your latest score counts. Review a batch before its runs expire with the candidates project's trace retention: unreviewed candidates are lost with them. A published example stays in later versions after its run expires. To withdraw one, score it 0 while its run still exists; after that, leave a note on the example in the dataset.
 

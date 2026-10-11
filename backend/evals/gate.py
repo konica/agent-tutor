@@ -109,6 +109,12 @@ def _observed(r: Row) -> str:
     return f"{r.observed:.3f}"
 
 
+def _verdict(rows: Sequence[Row]) -> str:
+    counts = {s: sum(1 for r in rows if r.status == s) for s in ("pass", "fail", "not run")}
+    verdict = "PASS" if passed(rows) else "FAIL"
+    return f"{verdict} ({counts['pass']} passed, {counts['fail']} failed, {counts['not run']} not run)"
+
+
 def render(rows: Sequence[Row], links: Mapping[str, str]) -> str:
     table = [("metric", "target", "observed", "examples", "result")]
     table += [
@@ -126,7 +132,24 @@ def render(rows: Sequence[Row], links: Mapping[str, str]) -> str:
     lines.insert(1, "  ".join("-" * w for w in widths))
     if links:
         lines += ["", "Experiments:"] + [f"  {name}: {url}" for name, url in links.items()]
-    counts = {s: sum(1 for r in rows if r.status == s) for s in ("pass", "fail", "not run")}
-    verdict = "PASS" if passed(rows) else "FAIL"
-    lines += ["", f"Gate: {verdict} ({counts['pass']} passed, {counts['fail']} failed, {counts['not run']} not run)"]
+    lines += ["", f"Gate: {_verdict(rows)}"]
+    return "\n".join(lines)
+
+
+def render_markdown(rows: Sequence[Row], links: Mapping[str, str], title: str) -> str:
+    """The table for a GitHub job summary: a heading with the verdict, the metrics, then the experiments."""
+    result = {"pass": "PASS", "fail": "**FAIL**"}
+    lines = [
+        f"### {title}: {_verdict(rows)}",
+        "",
+        "| metric | target | observed | examples | result |",
+        "|---|---|---|---|---|",
+    ]
+    lines += [
+        f"| {r.metric} | {_target(r.threshold)} | {_observed(r)} | {r.examples} | {result.get(r.status, r.status)} |"
+        for r in rows
+    ]
+    if links:
+        lines += ["", "Experiments:", ""]
+        lines += [f"- [{name}]({url})" if url.startswith("http") else f"- {name}: {url}" for name, url in links.items()]
     return "\n".join(lines)

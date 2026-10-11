@@ -1,4 +1,4 @@
-"""Threads in Postgres. The table schemas live in migrations 0005, 0007, 0009, 0010, 0011, 0014 and 0015."""
+"""Threads in Postgres. The table schemas live in migrations 0005, 0007, 0009, 0010, 0011, 0014, 0015 and 0016."""
 
 from collections.abc import Sequence
 from datetime import datetime
@@ -24,7 +24,7 @@ from sqlalchemy.dialects.postgresql import JSONB, insert
 from smart_tutor.shared.domain.ids import DocumentId, RunId, ThreadId, UserId
 from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
-from smart_tutor.tutoring.domain.turn import Decline, Turn, TurnCitation
+from smart_tutor.tutoring.domain.turn import Decline, Rating, Turn, TurnCitation
 from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
 
 threads = Table(
@@ -64,6 +64,7 @@ thread_turns = Table(
     Column("decline_message", Text),
     Column("created_at", DateTime(timezone=True)),
     Column("run_id", Uuid(as_uuid=False)),
+    Column("rating", Text),
 )
 
 
@@ -97,6 +98,7 @@ def _turn(row: Any) -> Turn:
         decline,
         row.created_at,
         RunId(str(row.run_id)) if row.run_id else None,
+        Rating(row.rating) if row.rating else None,
     )
 
 
@@ -248,6 +250,18 @@ class SqlThreadRepository(ThreadRepository):
             )
             _add_documents_used(conn, turn.thread_id, document_ids, turn.created_at)
 
+    def last_turns(self, thread_id: ThreadId, user_id: UserId, limit: int) -> list[Turn]:
+        if limit <= 0:
+            return []
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                select(thread_turns)
+                .where(thread_turns.c.thread_id == thread_id, thread_turns.c.user_id == user_id)
+                .order_by(thread_turns.c.turn_id.desc())
+                .limit(limit)
+            ).all()
+        return [_turn(r) for r in reversed(rows)]
+
     def turns(self, thread_id: ThreadId, user_id: UserId) -> list[Turn]:
         with self._engine.connect() as conn:
             rows = conn.execute(
@@ -256,3 +270,16 @@ class SqlThreadRepository(ThreadRepository):
                 .order_by(thread_turns.c.turn_id)
             ).all()
         return [_turn(r) for r in rows]
+
+    def set_rating(self, thread_id: ThreadId, user_id: UserId, run_id: RunId, rating: Rating) -> bool:
+        with self._engine.begin() as conn:
+            result = conn.execute(
+                update(thread_turns)
+                .where(
+                    thread_turns.c.thread_id == thread_id,
+                    thread_turns.c.user_id == user_id,
+                    thread_turns.c.run_id == run_id,
+                )
+                .values(rating=rating.value)
+            )
+        return result.rowcount > 0

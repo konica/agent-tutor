@@ -6,6 +6,7 @@ import {
   getThread,
   listThreadDocuments,
   listThreadTurns,
+  rateTurn,
   removeThreadDocument as removeThreadDocumentSdk,
   updateThread,
 } from "./generated/sdk.gen";
@@ -38,10 +39,12 @@ export type ChatCitation = {
   deleted?: boolean;
 };
 
+export type Rating = "up" | "down";
+
 export type DeclineCode = "limited" | "no_documents";
 
 export type ChatEvent =
-  | { type: "thread"; thread_id: string }
+  | { type: "thread"; thread_id: string; run_id: string | null }
   | { type: "delta"; text: string }
   | { type: "citations"; citations: ChatCitation[] }
   | { type: "decline"; code: DeclineCode; message: string }
@@ -75,8 +78,10 @@ function detail(error: unknown): string | null {
 function toEvent(event: string, data: string): ChatEvent | null {
   const payload = () => JSON.parse(data) as Record<string, unknown>;
   switch (event) {
-    case "thread":
-      return { type: "thread", thread_id: payload().thread_id as string };
+    case "thread": {
+      const p = payload();
+      return { type: "thread", thread_id: p.thread_id as string, run_id: (p.run_id as string | undefined) ?? null };
+    }
     case "delta":
       return { type: "delta", text: payload().text as string };
     case "citations":
@@ -219,4 +224,18 @@ export async function setSearchScope(threadId: string, scope: SearchScope, apiCl
 
 export function formatCitation(c: ChatCitation): string {
   return `${c.document_title}, ${c.page === null ? "page unavailable" : `p. ${c.page}`}`;
+}
+
+// Rates a kept answer or decline of the learner's conversation; a new rating replaces the last (PRD §10.2). Another
+// learner's conversation, or an answer that wasn't kept, is a 404.
+export async function rateAnswer(threadId: string, runId: string, rating: Rating, apiClient: Client = client): Promise<Rating> {
+  const { data, error, response } = await rateTurn({
+    client: apiClient,
+    path: { thread_id: threadId, run_id: runId },
+    body: { rating },
+    throwOnError: false,
+  });
+  if (sessionOver(error, response)) throw new SessionExpiredError();
+  if (!data) throw new Error(`PUT /threads/${threadId}/turns/${runId}/rating failed (${response?.status ?? "no response"})`);
+  return data.rating;
 }

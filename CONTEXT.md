@@ -49,6 +49,10 @@ _Avoid_: Chat, session, conversation (in code; "conversation" is fine in UI copy
 **Turn**:
 One question and its answer (or decline) in a thread, kept when the answer ends with `done`. A thread's turns, oldest first, are its history; a reopened conversation shows them.
 
+**Rating**:
+A learner's 👍/👎 (Helpful / Not helpful) on a kept turn: one per turn, a new one replaces it. Saved with the turn, then sent to LangSmith as `learner_rating` feedback on the turn's run; 👎 extends the trace's retention.
+_Avoid_: Vote, like, review
+
 **Documents used**:
 The documents whose chunks were given to the model for a conversation's answered turns, in order of first use. A deleted one stays listed as "Deleted" and can't be opened.
 

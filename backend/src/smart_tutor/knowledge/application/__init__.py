@@ -7,7 +7,7 @@ from smart_tutor.knowledge.application.document_service import DocumentDetails, 
 from smart_tutor.knowledge.application.ingestion_service import IngestionService, ProcessingTools
 from smart_tutor.knowledge.application.limits import load_file_limits, load_max_attempts
 from smart_tutor.knowledge.application.retry_service import RetryService, retried_content, retry_message
-from smart_tutor.knowledge.application.search_service import SearchService
+from smart_tutor.knowledge.application.search_service import MAX_QUERY_CHARS, SearchService
 from smart_tutor.knowledge.application.start_index_backfill import BackfillResult, StartIndexBackfill
 from smart_tutor.knowledge.application.subject_choice import SubjectChoiceService, SubjectSuggestions
 from smart_tutor.knowledge.application.upload_service import (
@@ -43,6 +43,7 @@ from smart_tutor.knowledge.ports.pdf_extractor import (
 
 __all__ = [
     "FIRST_PAGES",
+    "MAX_QUERY_CHARS",
     "PDF_CONTENT_TYPE",
     "VIEWER_LINK_SECONDS",
     "ArchiveService",

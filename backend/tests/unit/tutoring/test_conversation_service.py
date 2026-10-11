@@ -1,5 +1,6 @@
 """ConversationService: a thread answers from all the learner's ready documents (PRD §8 US-3)."""
 
+import logging
 import uuid
 from dataclasses import replace
 from datetime import timedelta
@@ -10,6 +11,7 @@ from fakes import (
     APP_TZ,
     TEST_LIMITS,
     TEST_UPLOAD_LIMITS,
+    FakeAnswerFeedback,
     FakeObjectStore,
     FixedClock,
     InMemoryLibrary,
@@ -26,19 +28,27 @@ from smart_tutor.tutoring.application import (
     Decline,
     DocumentNotAvailableError,
     DocumentUsed,
+    HistoryTurn,
     InvalidTitleError,
     NoListedDocumentsError,
+    Rating,
     SearchScope,
     ThreadArchivedError,
     ThreadNotFoundError,
     Turn,
     TurnCitation,
+    TurnNotFoundError,
 )
 from smart_tutor.tutoring.domain.thread import ThreadStatus
 
 
-def service(library: InMemoryLibrary, threads: InMemoryThreads, clock: FixedClock) -> ConversationService:
-    return ConversationService(threads, DocumentService(library.unit_of_work, max_attempts=3), clock)
+def service(
+    library: InMemoryLibrary,
+    threads: InMemoryThreads,
+    clock: FixedClock,
+    feedback: FakeAnswerFeedback | None = None,
+) -> ConversationService:
+    return ConversationService(threads, DocumentService(library.unit_of_work, max_attempts=3), clock, feedback)
 
 
 def test_starts_a_thread_owned_by_the_learner() -> None:
@@ -589,3 +599,141 @@ def test_noting_a_question_needs_the_owners_active_thread() -> None:
     threads.threads[thread.thread_id].status = ThreadStatus.ARCHIVED
     with pytest.raises(ThreadArchivedError):
         svc.note_question(ThreadId(thread.thread_id), UserId("ada"))
+
+
+def _history_service(**limits: int) -> tuple[ConversationService, ThreadId]:
+    conversations = ConversationService(
+        InMemoryThreads(), DocumentService(InMemoryLibrary().unit_of_work, max_attempts=3), FixedClock(), **limits
+    )
+    return conversations, ThreadId(conversations.start_thread(UserId("ada"), "Q1").thread_id)
+
+
+def _kept(conversations: ConversationService, thread_id: ThreadId, n: int) -> None:
+    for i in range(1, n + 1):
+        conversations.record_turn(thread_id, UserId("ada"), AnsweredTurn(f"Q{i}", f"A{i}"))
+
+
+def test_history_is_the_last_turns_oldest_first() -> None:
+    conversations, tid = _history_service(history_turns=5)
+    _kept(conversations, tid, 7)
+
+    assert conversations.history(tid, UserId("ada")) == [HistoryTurn(f"Q{i}", f"A{i}") for i in range(3, 8)]
+
+
+def test_a_declined_turn_is_its_question_and_the_decline_message() -> None:
+    conversations, tid = _history_service()
+    decline = Decline("limited", "These documents don't cover this.")
+    conversations.record_turn(tid, UserId("ada"), AnsweredTurn("Explain transformers", decline=decline))
+
+    assert conversations.history(tid, UserId("ada")) == [
+        HistoryTurn("Explain transformers", "These documents don't cover this.")
+    ]
+
+
+def test_a_long_earlier_answer_is_cut() -> None:
+    conversations, tid = _history_service(history_answer_chars=10)
+    conversations.record_turn(tid, UserId("ada"), AnsweredTurn("Q", "x" * 50))
+
+    [turn] = conversations.history(tid, UserId("ada"))
+    assert len(turn.answer) <= 10 and turn.answer.endswith("…") and turn.answer.startswith("x")
+
+
+def test_a_zero_cap_sends_no_history() -> None:
+    conversations, tid = _history_service(history_turns=0)
+    _kept(conversations, tid, 2)
+
+    assert conversations.history(tid, UserId("ada")) == []
+
+
+def test_another_learners_thread_has_no_history() -> None:
+    conversations, tid = _history_service()
+    _kept(conversations, tid, 1)
+
+    with pytest.raises(ThreadNotFoundError):
+        conversations.history(tid, UserId("bob"))
+
+
+def _rated_setup(
+    feedback: FakeAnswerFeedback, *, decline: Decline | None = None
+) -> tuple[ConversationService, InMemoryThreads, ThreadId, RunId]:
+    threads = InMemoryThreads()
+    svc = service(InMemoryLibrary(), threads, FixedClock(), feedback)
+    thread = svc.start_thread(LEARNER, "What is attention?")
+    thread_id, run = ThreadId(thread.thread_id), RunId(str(uuid.uuid4()))
+    kept = (
+        AnsweredTurn("What is attention?", decline=decline, run_id=run)
+        if decline
+        else AnsweredTurn("What is attention?", "It weighs tokens.", run_id=run)
+    )
+    svc.record_turn(thread_id, LEARNER, kept)
+    return svc, threads, thread_id, run
+
+
+def test_a_learner_rates_their_turn_and_the_rating_is_kept_and_sent() -> None:
+    feedback = FakeAnswerFeedback()
+    svc, _, thread_id, run = _rated_setup(feedback)
+
+    svc.rate_turn(thread_id, LEARNER, run, Rating.UP)
+
+    [turn] = svc.turns(thread_id, LEARNER)
+    assert turn.rating is Rating.UP
+    assert feedback.sent == [(run, Rating.UP)]
+
+
+def test_changing_a_rating_replaces_it() -> None:
+    feedback = FakeAnswerFeedback()
+    svc, _, thread_id, run = _rated_setup(feedback)
+
+    svc.rate_turn(thread_id, LEARNER, run, Rating.UP)
+    svc.rate_turn(thread_id, LEARNER, run, Rating.DOWN)
+
+    [turn] = svc.turns(thread_id, LEARNER)
+    assert turn.rating is Rating.DOWN
+    assert feedback.sent == [(run, Rating.UP), (run, Rating.DOWN)]
+
+
+def test_a_declined_turn_can_be_rated() -> None:
+    svc, _, thread_id, run = _rated_setup(FakeAnswerFeedback(), decline=Decline("limited", "Not in your documents."))
+
+    svc.rate_turn(thread_id, LEARNER, run, Rating.DOWN)
+
+    assert svc.turns(thread_id, LEARNER)[0].rating is Rating.DOWN
+
+
+def test_rating_another_learners_thread_is_not_found_and_changes_nothing() -> None:
+    feedback = FakeAnswerFeedback()
+    svc, _, thread_id, run = _rated_setup(feedback)
+
+    with pytest.raises(ThreadNotFoundError):
+        svc.rate_turn(thread_id, OTHER, run, Rating.DOWN)
+
+    assert svc.turns(thread_id, LEARNER)[0].rating is None
+    assert feedback.sent == []
+
+
+def test_rating_a_run_that_is_not_in_the_thread_is_not_found() -> None:
+    feedback = FakeAnswerFeedback()
+    svc, _, thread_id, _ = _rated_setup(feedback)
+
+    with pytest.raises(TurnNotFoundError):
+        svc.rate_turn(thread_id, LEARNER, RunId(str(uuid.uuid4())), Rating.UP)
+
+    assert feedback.sent == []
+
+
+def test_a_failing_feedback_send_still_keeps_the_rating(caplog: pytest.LogCaptureFixture) -> None:
+    svc, _, thread_id, run = _rated_setup(FakeAnswerFeedback(error=RuntimeError("LangSmith down")))
+
+    with caplog.at_level(logging.ERROR):
+        svc.rate_turn(thread_id, LEARNER, run, Rating.UP)
+
+    assert svc.turns(thread_id, LEARNER)[0].rating is Rating.UP
+    [record] = [r for r in caplog.records if r.levelno == logging.ERROR]
+    assert "RuntimeError" in record.getMessage()
+    assert LEARNER not in record.getMessage()
+
+
+def test_an_unrated_turn_reads_none() -> None:
+    svc, _, thread_id, _ = _rated_setup(FakeAnswerFeedback())
+
+    assert svc.turns(thread_id, LEARNER)[0].rating is None

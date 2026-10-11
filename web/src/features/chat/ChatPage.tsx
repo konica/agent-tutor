@@ -23,12 +23,14 @@ import {
   formatCitation,
   loadConversation as loadConversationApi,
   loadDocumentsUsed,
+  rateAnswer,
   removeThreadDocument,
   renameConversation,
   setSearchScope,
   type ChatCitation,
   type ChatEvent,
   type Conversation,
+  type Rating,
   type SearchScope,
 } from "../../api/chat";
 import { loadDocuments } from "../../api/documents";
@@ -45,6 +47,7 @@ import { DocumentPane } from "../viewer/DocumentPane";
 import type { Passage } from "../viewer/DocumentViewer";
 import type { ViewerDeps } from "../viewer/ViewerDialog";
 import styles from "./ChatPage.module.css";
+import { AnswerRating } from "./AnswerRating";
 import { ConversationPanel } from "./ConversationPanel";
 import { DocumentPicker } from "./DocumentPicker";
 import { ThreadTitle } from "./ThreadTitle";
@@ -69,6 +72,8 @@ type Props = {
   setScope?: (threadId: string, scope: SearchScope) => Promise<SearchScope>;
   /** The conversation `/chat/<id>` names; rejects with ConversationNotFoundError for an unknown or another learner's. */
   loadConversation?: (threadId: string) => Promise<Conversation>;
+  /** Resolves with the saved rating; a failure rejects. */
+  rate?: (threadId: string, runId: string, rating: Rating) => Promise<Rating>;
 };
 
 type Exchange = {
@@ -78,6 +83,11 @@ type Exchange = {
   /** A turn the tutor didn't answer: "limited" (the conversation's documents don't cover it) or "no_documents" (nothing
    * can be read: the request to upload a document). */
   decline: { code: string; message: string } | null;
+  /** The turn's run, which a rating names; null until the server has started it, and for turns saved before ratings. */
+  runId: string | null;
+  rating: Rating | null;
+  /** The stream ended with done: only then was the turn saved, so only then can it be rated. */
+  kept: boolean;
 };
 
 // "ended" is a session that expired while loading: the session screen takes over, this page shows nothing.
@@ -106,6 +116,7 @@ const defaultRemoveDoc = (threadId: string, documentId: string) => removeThreadD
 const defaultRename = (threadId: string, title: string) => renameConversation(threadId, title);
 const defaultSetScope = (threadId: string, scope: SearchScope) => setSearchScope(threadId, scope);
 const defaultLoadConversation = (threadId: string) => loadConversationApi(threadId);
+const defaultRate = (threadId: string, runId: string, rating: Rating) => rateAnswer(threadId, runId, rating);
 
 const documentCount = (n: number) => (n === 1 ? "1 document" : `${n} documents`);
 
@@ -149,6 +160,7 @@ export function ChatPage({
   viewerDeps,
   setScope: saveScope = defaultSetScope,
   loadConversation = defaultLoadConversation,
+  rate = defaultRate,
 }: Props) {
   const conversations = useConversations();
   const [question, setQuestion] = useState("");
@@ -193,6 +205,7 @@ export function ChatPage({
   const [starting, setStarting] = useState<DocumentResponse | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const alive = useRef(true);
+  const rateRequests = useRef<Record<string, number>>({});
   const busy = useRef(false);
   const sourcesId = useId();
   // Counts the conversations shown (a new thread, or one a URL opens), so a late reply or stream event of an earlier
@@ -364,7 +377,17 @@ export function ChatPage({
       setThreadId(thread.thread_id);
       setFirstQuestion(thread.title ?? null);
       setScope(thread.search_scope);
-      setTurns(turns.map((t) => ({ question: t.question, answer: t.answer, citations: t.citations, decline: t.decline ?? null })));
+      setTurns(
+        turns.map((t) => ({
+          question: t.question,
+          answer: t.answer,
+          citations: t.citations,
+          decline: t.decline ?? null,
+          runId: t.run_id ?? null,
+          rating: t.rating ?? null,
+          kept: true,
+        })),
+      );
       setAnswered(turns.length > 0);
       setOpened({ status: "none" });
       // Its list agrees with the scope: the server turns the limit off for an empty list, as showList does.
@@ -392,7 +415,7 @@ export function ChatPage({
     busy.current = true;
     setAnswering(true);
     setProblem(null);
-    const asked: Exchange = { question: text, answer: "", citations: [], decline: null };
+    const asked: Exchange = { question: text, answer: "", citations: [], decline: null, runId: null, rating: null, kept: false };
     setTurns((list) => [...list, asked]);
     await run(() => (inThread === null ? ask(text, documentId) : askIn(inThread, text)), turn.current, inThread === null);
   }
@@ -413,7 +436,10 @@ export function ChatPage({
       for await (const event of events()) {
         if (!current()) break;
         if (event.type === "done" || event.type === "error") ended = true;
-        if (event.type === "done") done = true;
+        if (event.type === "done") {
+          done = true;
+          updateLast((e) => ({ ...e, kept: true }));
+        }
         if (event.type === "thread") {
           thread = event.thread_id;
           if (newThread) {
@@ -422,6 +448,7 @@ export function ChatPage({
             navigate(`/chat/${thread}`);
           }
           setThreadId(thread);
+          updateLast((e) => ({ ...e, runId: event.run_id }));
         } else if (event.type === "delta") {
           updateLast((e) => ({ ...e, answer: e.answer + event.text }));
           // The server found readable documents after all (one was uploaded elsewhere): no longer the empty-library state.
@@ -592,6 +619,16 @@ export function ChatPage({
     const saved = await rename(threadId, newTitle);
     conversations.refresh();
     if (alive.current && turn.current === forTurn) setRenamed(saved);
+  }
+
+  // Saves the learner's rating of one turn and shows what the server kept. A failure rejects to the buttons, which say so.
+  // Only the newest request for a turn may update it: replies can arrive out of order.
+  async function rateTurn(runId: string, rating: Rating) {
+    if (threadId === null) return;
+    const forTurn = turn.current;
+    const request = (rateRequests.current[runId] = (rateRequests.current[runId] ?? 0) + 1);
+    const saved = await rate(threadId, runId, rating);
+    if (alive.current && turn.current === forTurn && rateRequests.current[runId] === request) setTurns((list) => list.map((e) => (e.runId === runId ? { ...e, rating: saved } : e)));
   }
 
   function onSubmit(event: FormEvent) {
@@ -775,6 +812,10 @@ export function ChatPage({
               {turns.map((t, index) => {
                 const last = index === turns.length - 1;
                 const listId = `${sourcesId}-${index}`;
+                // A turn that didn't end with done wasn't saved, so it can't be rated.
+                const runId = t.kept ? t.runId : null;
+                const rating = runId !== null && threadId !== null ? <AnswerRating rating={t.rating} onRate={(r) => rateTurn(runId, r)} onAnnounce={setAnnouncement} /> : null;
+                const hasSources = t.decline === null && showCitations && t.citations.length > 0;
                 return (
                   // Turns are only ever added at the end or all replaced, so the index is a stable key.
                   <div key={index} className={styles.turn}>
@@ -835,7 +876,7 @@ export function ChatPage({
                       ) : (
                         t.answer && <p className={styles.answer}>{t.answer}</p>
                       )}
-                      {t.decline === null && showCitations && t.citations.length > 0 && (
+                      {hasSources && (
                         <div className={styles.sources}>
                           <span className={styles.sourcesLabel} id={listId}>
                             Sources
@@ -879,8 +920,10 @@ export function ChatPage({
                               );
                             })}
                           </ul>
+                          {rating}
                         </div>
                       )}
+                      {!hasSources && rating && <div className={styles.ratingLine}>{rating}</div>}
                       {last && problem && (
                         <p className={styles.problem}>
                           <CircleAlert className={styles.problemIcon} strokeWidth={1.5} aria-hidden="true" />
