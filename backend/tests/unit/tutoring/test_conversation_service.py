@@ -1,5 +1,6 @@
 """ConversationService: a thread answers from all the learner's ready documents (PRD §8 US-3)."""
 
+import uuid
 from dataclasses import replace
 
 import pytest
@@ -15,7 +16,7 @@ from fakes import (
     ingest_ready,
 )
 from smart_tutor.knowledge.application import DocumentService, UploadService
-from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
+from smart_tutor.shared.domain.ids import DocumentId, RunId, ThreadId, UserId
 from smart_tutor.tutoring.application import (
     DELETED_DOCUMENT,
     AnsweredTurn,
@@ -476,3 +477,32 @@ def test_turns_of_another_learners_thread_are_not_found() -> None:
 
     with pytest.raises(ThreadNotFoundError):
         svc.turns(t, OTHER)
+
+
+def test_a_thread_can_start_with_a_given_id() -> None:
+    library, threads = InMemoryLibrary(), InMemoryThreads()
+    given = ThreadId(str(uuid.uuid4()))
+
+    thread = service(library, threads, FixedClock()).start_thread(LEARNER, "Q?", thread_id=given)
+
+    assert thread.thread_id == given
+    assert list(threads.threads) == [given]
+
+
+def test_a_kept_turn_keeps_its_run_id_and_shows_it() -> None:
+    svc = service(InMemoryLibrary(), InMemoryThreads(), FixedClock())
+    thread = svc.start_thread(LEARNER, "Q?")
+    run = RunId(str(uuid.uuid4()))
+
+    svc.record_turn(thread.thread_id, LEARNER, AnsweredTurn("Q?", "A.", run_id=run))
+
+    assert [t.run_id for t in svc.turns(thread.thread_id, LEARNER)] == [run]
+
+
+def test_a_turn_without_a_run_id_shows_none() -> None:
+    svc = service(InMemoryLibrary(), InMemoryThreads(), FixedClock())
+    thread = svc.start_thread(LEARNER, "Q?")
+
+    svc.record_turn(thread.thread_id, LEARNER, AnsweredTurn("Q?", "A."))
+
+    assert [t.run_id for t in svc.turns(thread.thread_id, LEARNER)] == [None]

@@ -9,7 +9,7 @@ from sqlalchemy import Engine, inspect, select
 from smart_tutor.shared.adapters.postgres.engine import create_db_engine
 from smart_tutor.shared.adapters.postgres.migrate import upgrade_to_head
 from smart_tutor.shared.config import Settings
-from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
+from smart_tutor.shared.domain.ids import DocumentId, RunId, ThreadId, UserId
 from smart_tutor.tutoring.adapters.sql_threads import SqlThreadRepository, thread_documents, thread_turns
 from smart_tutor.tutoring.domain.thread import SearchScope, Thread
 from smart_tutor.tutoring.domain.turn import Decline, Turn, TurnCitation
@@ -189,9 +189,26 @@ def test_a_turn_row_holds_no_title_or_text_beyond_what_the_learner_saw(engine: E
         "decline_code",
         "decline_message",
         "created_at",
+        "run_id",
     }
     with engine.connect() as conn:
         [citations] = conn.execute(
             select(thread_turns.c.citations).where(thread_turns.c.thread_id == thread.thread_id)
         ).scalars()
     assert citations == [{"n": 1, "document_id": doc, "chunk_id": "c1", "page": 3}]
+
+
+def test_a_turn_keeps_its_run_id_and_one_without_reads_none(engine: Engine) -> None:
+    repo = SqlThreadRepository(engine)
+    owner = UserId(f"ada-{uuid.uuid4()}")
+    thread = Thread.start(ThreadId(str(uuid.uuid4())), owner, datetime.now(UTC))
+    repo.add(thread)
+    now = datetime(2026, 10, 11, 9, 0, tzinfo=UTC)
+    run = RunId(str(uuid.uuid4()))
+    with_run = Turn(thread.thread_id, owner, "Q1", "A.", (), None, now, run_id=run)
+    without = Turn(thread.thread_id, owner, "Q2", "A.", (), None, now)
+
+    repo.add_turn(with_run, [])
+    repo.add_turn(without, [])
+
+    assert [t.run_id for t in repo.turns(thread.thread_id, owner)] == [run, None]
