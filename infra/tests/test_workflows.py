@@ -526,3 +526,21 @@ def test_the_on_premise_auto_deploy_switch_is_documented() -> None:
     for path in (RUNBOOKS / "on-premise-deploy.md", WORKFLOWS.parents[1] / "sdd/prd.md"):
         assert "ON_PREMISE_AUTO_DEPLOY" in path.read_text(encoding="utf-8"), path.name
     assert "ON_PREMISE_AUTO_DEPLOY" in (WORKFLOWS / "deploy.yml").read_text(encoding="utf-8").split("name: deploy")[0]
+
+
+def test_on_premise_runbook_tears_down_the_whole_mode_without_naming_native_cloud() -> None:
+    text = (RUNBOOKS / "on-premise-deploy.md").read_text(encoding="utf-8")
+    section = text.split("### Tear down the whole mode")[1].split("\n## ")[0]
+    assert "SmartTutor-prod-" not in section
+    assert 'destroy "SmartTutor-OnPremise-prod-*" -c smart-tutor:mode=on-premise' in section
+    assert "gh variable set ON_PREMISE_AUTO_DEPLOY --body false" in section
+    for stack in ("Host", "Registry", "Config", "Storage", "Budgets", "GitHubDeploy"):
+        assert f"| Deleted | `{stack}`" in section, stack
+    for kept in (
+        "smart-tutor-on-premise-documents-",
+        "final data-volume snapshot",
+        "smart-tutor-on-premise/duckdns/token",
+        "GitHub OIDC provider",
+    ):
+        assert kept in section, kept
+    assert "native-cloud keeps running" in text.split("## 8. Tear down")[1].split("###")[0]

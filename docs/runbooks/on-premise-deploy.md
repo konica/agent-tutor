@@ -265,6 +265,10 @@ The data volume keeps a snapshot if the stack is deleted (`DeletionPolicy: Snaps
 
 ## 8. Tear down
 
+Tear down the Host alone to stop paying for the VM and keep the rest, or the whole mode. Either way native-cloud keeps running: the modes share no stack (ADR 0016), and with `-c smart-tutor:mode=on-premise` the CDK app contains only `SmartTutor-OnPremise-prod-*` stacks.
+
+### Tear down the Host
+
 ```powershell
 Push-Location infra
 npx aws-cdk@latest destroy SmartTutor-OnPremise-prod-Host -c smart-tutor:mode=on-premise
@@ -272,6 +276,59 @@ Pop-Location
 ```
 
 This deletes the VM, the Elastic IP, and the VPC. The data volume is deleted after a final snapshot. Note the `DataVolumeId` output before you destroy, and delete that volume's snapshot by hand when the data must go (EC2 → Snapshots, filter by volume id). The Storage stack keeps the documents bucket, as in native-cloud. No other stack references the Host (Storage's CORS names the configured domain or `*.sslip.io`, not the Elastic IP), so the Host can be destroyed on its own. The DuckDNS token's secret isn't part of any stack, so it stays. When the Host is deployed again, its first deploy points the name at the new Elastic IP.
+
+### Tear down the whole mode
+
+Deletes every on-premise stack, in this order:
+
+1. **Stop deploys on merge** (section 3). Otherwise the next merge's image build deploys the deploy role and the registry again, or fails once the role is gone. Wait until no deploy run is in progress:
+
+   ```powershell
+   gh variable set ON_PREMISE_AUTO_DEPLOY --body false --repo konica/agent-tutor
+   gh run list --workflow deploy.yml --limit 5
+   ```
+
+2. **Note the data volume id.** Its snapshots outlive the stack:
+
+   ```powershell
+   aws cloudformation describe-stacks --stack-name SmartTutor-OnPremise-prod-Host `
+       --query "Stacks[0].Outputs[?OutputKey=='DataVolumeId'].OutputValue" --output text
+   ```
+
+3. **Destroy the stacks** (about 10 min; it asks you to confirm):
+
+   ```powershell
+   Push-Location infra
+   npx aws-cdk@latest destroy "SmartTutor-OnPremise-prod-*" -c smart-tutor:mode=on-premise
+   Pop-Location
+   ```
+
+| | What | Notes |
+|---|---|---|
+| Deleted | `Host`: the VM, the Elastic IP, the VPC, the data volume (after a final snapshot), the snapshot policy, the alarms and alert topic, the uptime check, the patching window, the deploy document, and the database and test-learner secrets | |
+| Deleted | `Registry`: the repositories `smart-tutor-on-premise/*` and their images | The next build recreates them, empty. |
+| Deleted | `Config`: the SSM parameters under `/smart-tutor-on-premise/` and the Keycloak secrets | |
+| Deleted | `Storage`: the queues `smart-tutor-on-premise-ingest` and `smart-tutor-on-premise-ingest-dlq` | The bucket stays (below). |
+| Deleted | `Budgets`: the budget `smart-tutor-on-premise-prod-monthly` | |
+| Deleted | `GitHubDeploy`: the role `smart-tutor-on-premise-github-deploy` | The role only imports the GitHub OIDC provider, so the provider stays. |
+| Kept | The documents bucket `smart-tutor-on-premise-documents-<account>` | Learner PDFs, and the nightly dumps under `backups/`, which still expire after 30 days. The stack retains it. |
+| Kept | The final data-volume snapshot and the daily snapshots (up to 7) | The database, Keycloak's users, and Caddy's certificates. Data Lifecycle Manager leaves its snapshots behind when its policy is deleted. |
+| Kept | The secret `smart-tutor-on-premise/duckdns/token` | Created by hand, not by a stack (section 9). |
+| Kept | The account's GitHub OIDC provider and the CDK bootstrap (`CDKToolkit`) | Native-cloud created the provider and still uses it; both modes deploy with the bootstrap. |
+| Kept | The GitHub environment `on-premise` and its variables | So on-premise can be redeployed. |
+
+What is left costs a few dollars a month: snapshots about $0.05 per GB-month (incremental, at most the 50 GB volume) and the bucket about $0.023 per GB-month. Each is the only copy of learner data, so delete it by hand only when the data must go:
+
+```powershell
+$VolumeId = "<the DataVolumeId from step 2>"
+aws ec2 describe-snapshots --owner-ids self --filters "Name=volume-id,Values=$VolumeId" --query "Snapshots[].SnapshotId" --output text
+aws ec2 delete-snapshot --snapshot-id <snapshot id>   # once per snapshot
+aws secretsmanager delete-secret --secret-id smart-tutor-on-premise/duckdns/token --force-delete-without-recovery
+```
+
+The bucket is versioned: in the S3 console, **Empty** it (all versions), then **Delete** it. `aws s3 rm --recursive` would leave the old versions behind.
+
+**Redeploy later.** Deploy the stacks from a laptop (section 2), because GitHub can't create the role it signs in with. Deal with the kept bucket first: its name is fixed, so creating `Storage` fails with "already exists" until you bring the bucket into the stack with `cdk import` or delete it. To keep the data, set `smart-tutor:on-premise-data-snapshot-id` to the final snapshot before deploying (`on-premise-backups.md`, "Restore from a snapshot"); the first deploy resets the database roles' passwords to the new secrets. Then turn deploys on merge back on (`gh variable delete ON_PREMISE_AUTO_DEPLOY --repo konica/agent-tutor`), and merge or deploy a tag by hand (section 4).
 
 ## 9. DuckDNS name (#154)
 
