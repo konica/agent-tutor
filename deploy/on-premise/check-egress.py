@@ -112,6 +112,10 @@ def _aws_problems(region: str) -> list[str]:
     return problems
 
 
+def _tracing() -> bool:
+    return os.environ.get("LANGSMITH_TRACING", "").lower() == "true"
+
+
 def unreachable() -> list[str]:
     """Destinations the worker needs that don't answer."""
     region = os.environ["AWS_REGION"]
@@ -123,13 +127,15 @@ def unreachable() -> list[str]:
         pass
     except OSError as error:
         problems.append(f"Bedrock: {error}")
-    # LangSmith (the ingest traces): any HTTP answer proves the route.
-    try:
-        urllib.request.urlopen(f"https://{LANGSMITH_HOST}/info", timeout=TIMEOUT)
-    except urllib.error.HTTPError:
-        pass
-    except OSError as error:
-        problems.append(f"LangSmith: {error}")
+    # LangSmith (the ingest traces): any HTTP answer proves the route. Required only while the worker traces; an
+    # outage, or a key not yet created, must not fail a deploy for a non-critical feature.
+    if _tracing():
+        try:
+            urllib.request.urlopen(f"https://{LANGSMITH_HOST}/info", timeout=TIMEOUT)
+        except urllib.error.HTTPError:
+            pass
+        except OSError as error:
+            problems.append(f"LangSmith: {error}")
     if not _connects("postgres", 5432):
         problems.append("Postgres: postgres:5432 refused or timed out")
     return problems
@@ -145,7 +151,8 @@ def main() -> int:
         return 1
     if missing:
         return 2
-    print("The worker reaches S3, SQS, SSM, Bedrock, LangSmith, and Postgres, and nothing else")
+    langsmith = "LangSmith (tracing on), " if _tracing() else ""
+    print(f"The worker reaches S3, SQS, SSM, Bedrock, {langsmith}and Postgres, and nothing else")
     return 0
 
 

@@ -161,4 +161,24 @@ def test_unreachable_reports_langsmith(check: ModuleType, monkeypatch) -> None:
     monkeypatch.setattr(check.urllib.request, "urlopen", urlopen)
     monkeypatch.setattr(check, "_connects", lambda host, port: True)
     monkeypatch.setattr(check, "_aws_problems", lambda region: [])
+    monkeypatch.setenv("LANGSMITH_TRACING", "True")
     assert check.unreachable() == ["LangSmith: Tunnel connection failed: 403 Forbidden"]
+
+
+@pytest.mark.parametrize("tracing", [None, "false", ""])
+def test_unreachable_ignores_langsmith_while_tracing_is_off(check: ModuleType, monkeypatch, tracing) -> None:
+    # Tracing is non-critical: a LangSmith outage, or a key not yet created, must not fail a deploy.
+    def urlopen(url: str, timeout: float) -> None:
+        if "smith.langchain.com" in url:
+            raise OSError("unreachable")
+        raise check.urllib.error.HTTPError(url, 404, "nf", {}, None)
+
+    monkeypatch.setenv("AWS_REGION", "us-east-1")
+    if tracing is None:
+        monkeypatch.delenv("LANGSMITH_TRACING", raising=False)
+    else:
+        monkeypatch.setenv("LANGSMITH_TRACING", tracing)
+    monkeypatch.setattr(check.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(check, "_connects", lambda host, port: True)
+    monkeypatch.setattr(check, "_aws_problems", lambda region: [])
+    assert check.unreachable() == []

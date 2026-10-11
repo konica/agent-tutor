@@ -28,9 +28,10 @@ check_worker() {
     return 1
   fi
 
-  # The worker reaches only Postgres and, through egress-proxy, its AWS endpoints. Prove it from inside: a leak, or a
-  # check that can't run, stops the worker like a failed isolation check; an unreachable AWS endpoint or database
-  # only fails the check.
+  # The worker reaches only Postgres and, through egress-proxy, its AWS endpoints and LangSmith's API (required only
+  # while LANGSMITH_TRACING is true). Prove it from inside: a leak, or a check that can't run, stops the worker like
+  # a failed isolation check; an unreachable AWS endpoint, LangSmith while tracing, or the database only fails the
+  # check.
   echo "Checking the worker's egress"
   "${compose[@]}" exec -T worker python - <"$here/check-egress.py" || status=$?
   case $status in
