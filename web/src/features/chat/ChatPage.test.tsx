@@ -1564,6 +1564,131 @@ describe("ChatPage", () => {
       expect(chips[1]).toHaveAttribute("aria-current", "true");
       expect(chips[0]).not.toHaveAttribute("aria-current");
     });
+
+    describe("scrolling the conversation", () => {
+      // The messages pane as the learner scrolls it: a 600px window over `content` px of turns.
+      function geometry(content = 2000) {
+        const g = { content };
+        const isPane = (el: Element) => el.getAttribute("aria-label") === "Messages";
+        vi.spyOn(Element.prototype, "clientHeight", "get").mockImplementation(function (this: Element) {
+          return isPane(this) ? 600 : 0;
+        });
+        vi.spyOn(Element.prototype, "scrollHeight", "get").mockImplementation(function (this: Element) {
+          return isPane(this) ? g.content : 0;
+        });
+        return g;
+      }
+      const messages = () => screen.getByRole("region", { name: "Messages" });
+      function scrollPane(top: number) {
+        messages().scrollTop = top;
+        fireEvent.scroll(messages());
+      }
+      const jump = () => screen.queryByRole("button", { name: "Jump to latest" });
+      const many = (n: number) => Array.from({ length: n }, (_, i) => turn({ question: `Question ${i + 1}?`, answer: `Answer ${i + 1}.` }));
+
+      it("reopening lands on the newest turn, with every earlier turn above it", async () => {
+        geometry(9000);
+        renderChat({ loadConversation: conversation(many(30)) }, "/chat/t1");
+        expect(await screen.findByText("Answer 30.")).toBeInTheDocument();
+        expect(screen.getAllByText("You asked:")).toHaveLength(30);
+        expect(messages().scrollTop).toBe(9000 - 600);
+        expect(jump()).toBeNull();
+      });
+
+      it("asking scrolls the question into view", async () => {
+        const g = geometry();
+        const askIn = vi.fn(() => events({ type: "thread", thread_id: "t1", run_id: "r2" }, { type: "delta", text: "More." }, { type: "done" }));
+        renderChat({ loadConversation: conversation(many(5), { search_scope: "listed" }), loadUsed: async () => [usedDoc], askIn }, "/chat/t1");
+        await screen.findByText("Answer 5.");
+        scrollPane(200);
+        expect(jump()).toBeInTheDocument();
+        g.content = 2400;
+        await userEvent.type(await question(), "Next?{Enter}");
+        expect(await screen.findByText("More.")).toBeInTheDocument();
+        expect(messages().scrollTop).toBe(2400 - 600);
+        expect(jump()).toBeNull();
+      });
+
+      it("follows a streaming answer only while at the bottom", async () => {
+        const g = geometry(600);
+        const control = controlledStream();
+        renderChat({ ask: vi.fn(() => control.stream()) });
+        await userEvent.type(await question(), "What is attention?{Enter}");
+        control.push({ type: "thread", thread_id: "t1", run_id: "r1" });
+        g.content = 1000;
+        control.push({ type: "delta", text: "It weighs " });
+        await screen.findByText("It weighs");
+        expect(messages().scrollTop).toBe(400); // follows
+
+        scrollPane(100); // the learner scrolls up to read
+        expect(jump()).toBeInTheDocument();
+        g.content = 1400;
+        control.push({ type: "delta", text: "tokens." });
+        await screen.findByText("It weighs tokens.");
+        expect(messages().scrollTop).toBe(100); // stays put
+
+        scrollPane(800); // back at the bottom
+        expect(jump()).toBeNull();
+        g.content = 1800;
+        control.push({ type: "delta", text: " More." });
+        await screen.findByText("It weighs tokens. More.");
+        expect(messages().scrollTop).toBe(1200); // follows again
+        control.push({ type: "done" });
+        control.push(null);
+      });
+
+      it("Jump to latest works from the keyboard and moves focus to the question box", async () => {
+        geometry();
+        renderChat({ loadConversation: conversation(many(5)) }, "/chat/t1");
+        await screen.findByText("Answer 5.");
+        scrollPane(200);
+        const button = jump()!;
+        expect(button).toHaveAccessibleName("Jump to latest");
+        button.focus();
+        await userEvent.keyboard("{Enter}");
+        expect(messages().scrollTop).toBe(1400);
+        expect(jump()).toBeNull();
+        expect(await question()).toHaveFocus();
+      });
+
+      it("while answering, Jump to latest moves focus to the messages", async () => {
+        const g = geometry(600);
+        const control = controlledStream();
+        renderChat({ ask: vi.fn(() => control.stream()) });
+        await userEvent.type(await question(), "What is attention?{Enter}");
+        control.push({ type: "thread", thread_id: "t1", run_id: "r1" });
+        g.content = 2000;
+        control.push({ type: "delta", text: "It weighs" });
+        await screen.findByText("It weighs");
+        scrollPane(100);
+        await userEvent.click(jump()!);
+        expect(messages()).toHaveFocus();
+        control.push({ type: "done" });
+        control.push(null);
+      });
+
+      it("only the newest turn's answer is a live region", async () => {
+        renderChat({ loadConversation: conversation(many(3)) }, "/chat/t1");
+        const newest = await screen.findByText("Answer 3.");
+        const live = document.querySelectorAll('[aria-live="polite"]');
+        expect(live).toHaveLength(1);
+        expect(live[0]).toContainElement(newest);
+        expect(screen.getByText("Answer 1.").closest("[aria-live]")).toBeNull();
+      });
+
+      it("opening and closing a document leaves the messages where they were", async () => {
+        geometry();
+        renderChat(
+          { loadConversation: conversation([cited({ document_title: "ReAct", page: 2 }), ...many(4)]), viewerDeps: fakeViewerDeps() },
+          "/chat/t1",
+        );
+        const chip = await screen.findByRole("button", { name: /^ReAct, p\. 2/ });
+        scrollPane(300);
+        await userEvent.click(chip);
+        await userEvent.click(await screen.findByRole("button", { name: "Close" }));
+        expect(messages().scrollTop).toBe(300);
+      });
+    });
   });
 
   describe("rating an answer", () => {
