@@ -76,6 +76,7 @@ def test_deploy_role_gets_only_the_deployment_permissions() -> None:
         "EcrLogin",
         "EcrPushAppImages",
         "EksKubeconfig",
+        "ReadTraceSamplingRate",
         "ReadStackOutputs",
     ]
     # Only the ECR login, which has no resource, may use "*".
@@ -84,6 +85,16 @@ def test_deploy_role_gets_only_the_deployment_permissions() -> None:
     assert not [a for a in actions if a.startswith(("iam:", "cloudformation:Create", "cloudformation:Update"))]
     push = next(s for s in statements if s["Sid"] == "EcrPushAppImages")
     assert ":repository/smart-tutor/*" in json.dumps(push["Resource"])
+
+
+def test_deploy_role_reads_only_the_trace_sampling_rate_parameter() -> None:
+    t = template(make_app(), "GitHubDeploy")
+
+    statements = next(iter(t.find_resources("AWS::IAM::Policy").values()))["Properties"]["PolicyDocument"]["Statement"]
+    (read,) = (s for s in statements if s["Sid"] == "ReadTraceSamplingRate")
+    assert read["Action"] == "ssm:GetParameter"
+    assert "parameter/smart-tutor/trace-sampling-rate" in json.dumps(read["Resource"])
+    assert [s["Sid"] for s in statements if "ssm:GetParameter" in str(s["Action"])] == ["ReadTraceSamplingRate"]
 
 
 def test_an_existing_oidc_provider_is_imported_instead_of_created() -> None:

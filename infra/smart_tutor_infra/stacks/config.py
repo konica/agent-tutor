@@ -1,4 +1,4 @@
-"""SSM parameters (per-file limits, processing attempts, upload rate limits and daily caps) and the Keycloak secrets in Secrets Manager (#57)."""
+"""SSM parameters (per-file limits, processing attempts, upload rate limits and daily caps, trace sampling rate) and the Keycloak and LangSmith learner-hash secrets in Secrets Manager (#57, #229)."""
 
 import json
 from typing import Any
@@ -19,7 +19,8 @@ class ConfigStack(cdk.Stack):
         super().__init__(scope, construct_id, **kwargs)
 
         # Per-file limits, processing attempts, and upload rate limits and daily caps (PRD §11, §9.5), read at startup by the API and the worker, and the
-        # app time zone (D27), read by the API; change them here, not in code.
+        # app time zone (D27), read by the API, and the share of runs traced in LangSmith (PRD §10.4: every run), read at deploy time; change them here,
+        # not in code.
         for name, value in (
             ("max-upload-mb", "50"),
             ("max-pages", "500"),
@@ -27,6 +28,7 @@ class ConfigStack(cdk.Stack):
             ("max-uploads-per-hour", "20"),
             ("max-uploads-per-day", "100"),
             ("app-time-zone", APP_TIME_ZONE),
+            ("trace-sampling-rate", "1"),
         ):
             ssm.StringParameter(self, f"Param-{name}", parameter_name=f"{names.ssm_path}/{name}", string_value=value)
 
@@ -53,3 +55,14 @@ class ConfigStack(cdk.Stack):
                     exclude_punctuation=True, password_length=40
                 ),
             )
+
+        # Traces name a learner only by an HMAC of their user id (PRD §10.4); the agent and worker read this key. The
+        # LangSmith API key is <prefix>/langsmith/api-key, which the operator creates (a LangSmith key can't be minted
+        # here; runbooks).
+        secretsmanager.Secret(
+            self,
+            "LearnerHashKeySecret",
+            secret_name=f"{names.secret_prefix}/langsmith/learner-hash-key",
+            description="HMAC key for the learner hash in LangSmith traces",
+            generate_secret_string=secretsmanager.SecretStringGenerator(exclude_punctuation=True, password_length=64),
+        )

@@ -3,7 +3,7 @@
 # <prefix>-deploy (HostStack), after unpacking the deploy bundle to /opt/smart-tutor:
 #   SMART_TUTOR_PREFIX=smart-tutor-on-premise AWS_REGION=us-east-1 deploy.sh <full commit SHA>
 #
-# 1. Renders settings (SSM) and secrets (Secrets Manager) into a root-only env file. A DuckDNS domain is pointed at this
+# 1. Renders settings (SSM) and secrets (Secrets Manager), including the LangSmith tracing settings, into a root-only env file. A DuckDNS domain is pointed at this
 #    instance's Elastic IP (#154).
 # 2. Pulls the images, starts Postgres, and creates or updates the app and Keycloak roles and databases.
 # 3. Migrates, then starts every service and waits until all are healthy. Compose recreates only the services whose
@@ -53,6 +53,18 @@ keycloak_admin_password=$(field password <<<"$keycloak_admin")
 api_client_secret=$(secret keycloak/api-client)
 mcp_client_secret=$(secret keycloak/mcp-client)
 test_learner=$(secret keycloak/test-learner)
+learner_hash_key=$(secret langsmith/learner-hash-key)
+trace_sampling_rate=$(param trace-sampling-rate)
+# Traces go to the LangSmith project smart-tutor-on-premise (#229). The operator creates the API key's secret
+# (docs/runbooks/on-premise-deploy.md); until then the services run untraced rather than failing the deploy.
+langsmith_api_key=
+langsmith_tracing=false
+if langsmith_api_key=$(secret langsmith/api-key 2>/dev/null) && [[ -n $langsmith_api_key ]]; then
+  langsmith_tracing=true
+else
+  langsmith_api_key=
+  echo "Warning: no LangSmith API key (is the secret $prefix/langsmith/api-key set?); deploying without tracing" >&2
+fi
 caddyfile_sha256=$(sha256sum "$here/Caddyfile" | cut -d' ' -f1)
 
 umask 077
@@ -76,6 +88,10 @@ KEYCLOAK_ADMIN_USERNAME=$keycloak_admin_username
 KEYCLOAK_ADMIN_PASSWORD=$keycloak_admin_password
 API_CLIENT_SECRET=$api_client_secret
 MCP_CLIENT_SECRET=$mcp_client_secret
+LANGSMITH_TRACING=$langsmith_tracing
+LANGSMITH_API_KEY=$langsmith_api_key
+TRACE_SAMPLING_RATE=$trace_sampling_rate
+LEARNER_HASH_KEY=$learner_hash_key
 EOF
 mv "$rendered" "$env_file"
 

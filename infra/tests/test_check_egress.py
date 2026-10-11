@@ -82,7 +82,10 @@ def test_leaks_reports_a_proxy_that_forwards_plain_http(refused: ModuleType, mon
 
 def test_leaks_reports_a_tunnel_to_an_allowed_host_on_another_port(refused: ModuleType, monkeypatch) -> None:
     monkeypatch.setattr(refused, "_tunnel_status", lambda host, port=443: 403 if port == 443 else 200)
-    assert refused.leaks() == ["the proxy answered 200 to CONNECT sqs.us-east-1.amazonaws.com:80, not 403"]
+    assert refused.leaks() == [
+        "the proxy answered 200 to CONNECT sqs.us-east-1.amazonaws.com:80, not 403",
+        "the proxy answered 200 to CONNECT api.smith.langchain.com:80, not 403",
+    ]
 
 
 class FakeConnection:
@@ -137,3 +140,45 @@ def test_a_crash_is_not_exit_code_2(check: ModuleType, monkeypatch) -> None:
     monkeypatch.setattr(check, "unreachable", lambda: [])
     with pytest.raises(KeyError, match="HTTPS_PROXY"):
         check.main()  # an uncaught exception exits Python with status 1
+
+
+def test_leaks_reports_a_proxy_that_lets_another_langchain_host_or_port_through(
+    refused: ModuleType, monkeypatch
+) -> None:
+    monkeypatch.setattr(refused, "_tunnel_status", lambda host, port=443: 200 if "langchain" in host else 403)
+    problems = refused.leaks()
+    assert any("to CONNECT smith.langchain.com:443," in p for p in problems)  # another name of the same service
+    assert any("to CONNECT api.smith.langchain.com:80," in p for p in problems)  # the allowed name, wrong port
+
+
+def test_unreachable_reports_langsmith(check: ModuleType, monkeypatch) -> None:
+    def urlopen(url: str, timeout: float) -> None:
+        if "smith.langchain.com" in url:
+            raise OSError("Tunnel connection failed: 403 Forbidden")
+        raise check.urllib.error.HTTPError(url, 404, "nf", {}, None)  # Bedrock answers
+
+    monkeypatch.setenv("AWS_REGION", "us-east-1")
+    monkeypatch.setattr(check.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(check, "_connects", lambda host, port: True)
+    monkeypatch.setattr(check, "_aws_problems", lambda region: [])
+    monkeypatch.setenv("LANGSMITH_TRACING", "True")
+    assert check.unreachable() == ["LangSmith: Tunnel connection failed: 403 Forbidden"]
+
+
+@pytest.mark.parametrize("tracing", [None, "false", ""])
+def test_unreachable_ignores_langsmith_while_tracing_is_off(check: ModuleType, monkeypatch, tracing) -> None:
+    # Tracing is non-critical: a LangSmith outage, or a key not yet created, must not fail a deploy.
+    def urlopen(url: str, timeout: float) -> None:
+        if "smith.langchain.com" in url:
+            raise OSError("unreachable")
+        raise check.urllib.error.HTTPError(url, 404, "nf", {}, None)
+
+    monkeypatch.setenv("AWS_REGION", "us-east-1")
+    if tracing is None:
+        monkeypatch.delenv("LANGSMITH_TRACING", raising=False)
+    else:
+        monkeypatch.setenv("LANGSMITH_TRACING", tracing)
+    monkeypatch.setattr(check.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(check, "_connects", lambda host, port: True)
+    monkeypatch.setattr(check, "_aws_problems", lambda region: [])
+    assert check.unreachable() == []

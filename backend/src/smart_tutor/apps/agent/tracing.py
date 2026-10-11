@@ -3,18 +3,22 @@ for which thread, whether the search was limited to the conversation's documents
 and how many chunks the model was given. The learner appears only as a keyed hash; the token stays in runtime context
 (ADR 0007)."""
 
+import logging
 import uuid
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
+from typing import Any
 
 import langsmith
 from langsmith.run_trees import RunTree
 
-from smart_tutor.shared.adapters.tracing import LearnerHasher
+from smart_tutor.shared.adapters.tracing import LearnerHasher, never_raising
 from smart_tutor.shared.domain.ids import UserId
 
 NO_DECLINE = "none"
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -27,19 +31,27 @@ class AskRun:
 
 
 class AskTrace:
-    def __init__(self, run: RunTree) -> None:
-        self._run = run
+    def __init__(self, run: RunTree | None) -> None:
+        self._run = run  # None: the trace didn't start, so there is nothing to end
 
     def finish(self, answer: str, decline: str | None, chunks: int) -> None:
         """What the run ended with: a decline gives the model no chunks."""
-        self._run.end(
+        self._end(
             outputs={"answer": answer, "decline": decline},
             metadata={"decline": decline or NO_DECLINE, "chunks": 0 if decline else chunks},
         )
 
     def fail(self, code: str) -> None:
         """The run ended with an error event; the learner saw `code`."""
-        self._run.end(error=code, metadata={"decline": NO_DECLINE, "chunks": 0})
+        self._end(error=code, metadata={"decline": NO_DECLINE, "chunks": 0})
+
+    def _end(self, **fields: Any) -> None:
+        if self._run is None:
+            return
+        try:
+            self._run.end(**fields)
+        except Exception:  # tracing never fails the ask (#229)
+            logger.warning("could not end the ask trace", exc_info=True)
 
 
 class AskTracing:
@@ -57,11 +69,12 @@ class AskTracing:
             metadata["thread_id"] = run.thread_id
         if self._hasher is not None:
             metadata["learner_hash"] = self._hasher(run.user_id)
-        with langsmith.trace(
+        trace = langsmith.trace(
             "ask",
             run_id=run.run_id,
             inputs={"question": run.question, "document_ids": run.document_ids},
             metadata=metadata,
             client=self._client,
-        ) as root:
+        )
+        with never_raising(trace, None) as root:
             yield AskTrace(root)

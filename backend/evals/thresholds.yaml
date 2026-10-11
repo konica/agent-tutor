@@ -1,5 +1,7 @@
-# Release-gate targets from PRD v2.1 §10.1. The gate reads this file; change targets here, not in code.
-# Comparators: min = score must be >= value; max = score must be <= value.
+# Release-gate targets from PRD §10.1. The gate (gate.py, run by evals.run) reads this file; change targets here, not in code.
+# Metrics are named by their dotted path (subject_name_check.false_rejections); evaluators report under that name.
+# Comparators: min = mean score >= value; max = mean score <= value; max_failures = examples scoring below 1 <= value.
+# A metric no suite has scored yet is reported as "not run", never as a pass.
 release_1:
   search_step_ran:        {type: code,  min: 1.00}
   subject_suggestion_top3: {type: code, min: 0.90}

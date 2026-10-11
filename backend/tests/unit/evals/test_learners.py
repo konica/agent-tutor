@@ -43,6 +43,14 @@ def test_a_learner_signs_in_through_the_login_form_with_pkce() -> None:
     assert tutor.call("POST", "/documents/duplicate-check", {"sha256": "0" * 64}) == {"document_id": None}
 
 
+def test_access_token_signs_in_once_and_reuses_the_token() -> None:
+    stack = FakeStack()
+    tutor = Tutor(stack.client(), "learner@example.com", "learner")
+    first = tutor.access_token()
+    assert tutor.access_token() == first
+    assert stack.sign_ins == 1
+
+
 def test_a_wrong_password_is_reported() -> None:
     with pytest.raises(LoadError, match="learner@example.com"):
         Tutor(FakeStack().client(), "learner@example.com", "wrong").sign_in()
