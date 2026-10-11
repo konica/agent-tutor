@@ -1,13 +1,14 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DocumentNotFoundError, DocumentNotOpenableError, type DocumentResponse } from "../../api/documents";
 import type { ChunkPassage } from "../../api/chunks";
 import { DocumentViewer, type Passage } from "./DocumentViewer";
 import type { TextItem } from "./passage";
-import type { PdfDoc } from "./pdf";
+import type { PdfDoc, PdfPage } from "./pdf";
+import { GESTURE_GAP_MS } from "./usePageFlip";
 import { fakeDocument, fakeFile, fakePdf, fakeViewerDeps } from "./testFakes";
 
 const doc = fakeDocument;
@@ -475,5 +476,156 @@ describe("DocumentViewer citation highlight", () => {
     expect(await screen.findByText("Page 1 of 3")).toBeInTheDocument();
     expect(loadChunk).not.toHaveBeenCalled();
     expect(boxes()).toHaveLength(0);
+  });
+});
+
+// The canvas area as the learner scrolls it: a 600px window over a 2000px page (or a page that fits), at `top`.
+function scrollArea(height = 2000) {
+  vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(600);
+  vi.spyOn(Element.prototype, "scrollHeight", "get").mockReturnValue(height);
+}
+const area = () => document.querySelector<HTMLElement>(".canvasArea")!;
+
+describe("DocumentViewer flip at the edge", () => {
+  let now = 1_000_000;
+  const wheel = (deltaY: number) => {
+    now += 16;
+    return fireEvent.wheel(area(), { deltaY });
+  };
+  const pause = () => (now += GESTURE_GAP_MS + 100);
+  // Lets the flipped-to page render (the fake PDF resolves in microtasks); until then a pending landing blocks a flip.
+  const rendered = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+  // A 3-page PDF whose page 2 loads only when `page2.resolve` is called.
+  function slowPage2() {
+    const fake = pdf();
+    const fast = fake.page;
+    const page2 = deferred<PdfPage>();
+    fake.page = vi.fn((n: number) => (n === 2 ? page2.promise : fast(n)));
+    return { fake, page2, fast };
+  }
+  beforeEach(() => {
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it("scrolling down past the bottom opens the next page at its top", async () => {
+    scrollArea();
+    const onPageChange = vi.fn();
+    const onOpenInDialog = vi.fn();
+    renderViewer({ onPageChange, onOpenInDialog });
+    await ready();
+    area().scrollTop = 1400;
+    wheel(100);
+    expect(screen.getByText("p. 2 / 3")).toBeInTheDocument();
+    expect(onPageChange).toHaveBeenLastCalledWith(2);
+    await waitFor(() => expect(area().scrollTop).toBe(0));
+    expect(await screen.findByText("Page 2 of 3")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Open in dialog" }));
+    expect(onOpenInDialog).toHaveBeenCalledWith(2);
+  });
+
+  it("scrolling up past the top opens the previous page at its bottom", async () => {
+    scrollArea();
+    renderViewer({ initialPage: 3 });
+    expect(await screen.findByText("p. 3 / 3")).toBeInTheDocument();
+    area().scrollTop = 0;
+    wheel(-100);
+    expect(screen.getByText("p. 2 / 3")).toBeInTheDocument();
+    await waitFor(() => expect(area().scrollTop).toBe(2000 - 600));
+  });
+
+  it("the gesture that reaches the bottom doesn't flip; one more gesture flips one page", async () => {
+    scrollArea();
+    renderViewer();
+    await ready();
+    area().scrollTop = 1300;
+    wheel(100);
+    area().scrollTop = 1400; // the browser scrolled to the bottom
+    for (let i = 0; i < 20; i++) wheel(100);
+    expect(screen.getByText("p. 1 / 3")).toBeInTheDocument();
+    pause();
+    for (let i = 0; i < 20; i++) wheel(100); // a flick with momentum
+    expect(screen.getByText("p. 2 / 3")).toBeInTheDocument();
+  });
+
+  it("a page with no scrollbar flips on one gesture either way", async () => {
+    scrollArea(600);
+    renderViewer();
+    await ready();
+    wheel(100);
+    expect(screen.getByText("p. 2 / 3")).toBeInTheDocument();
+    await rendered();
+    pause();
+    wheel(-100);
+    expect(screen.getByText("p. 1 / 3")).toBeInTheDocument();
+  });
+
+  it("nothing happens past the first or last page", async () => {
+    scrollArea(600);
+    const onPageChange = vi.fn();
+    renderViewer({ onPageChange });
+    await ready();
+    wheel(-100);
+    expect(screen.getByText("p. 1 / 3")).toBeInTheDocument();
+    for (let i = 0; i < 3; i++) {
+      pause();
+      wheel(100);
+      await rendered();
+    }
+    expect(screen.getByText("p. 3 / 3")).toBeInTheDocument();
+    expect(onPageChange.mock.calls).toEqual([[2], [3]]);
+  });
+
+  it("PageDown keeps the scroll position (no landing)", async () => {
+    scrollArea();
+    renderViewer();
+    await ready();
+    area().scrollTop = 700;
+    fireEvent.keyDown(screen.getByRole("heading", { level: 2 }), { key: "PageDown" });
+    expect(await screen.findByText("Page 2 of 3")).toBeInTheDocument();
+    expect(area().scrollTop).toBe(700);
+  });
+
+  it("PageDown before the flipped-to page renders drops its landing", async () => {
+    scrollArea();
+    const { fake, page2, fast } = slowPage2();
+    renderViewer({ loadPdfDoc: vi.fn().mockResolvedValue(fake) });
+    await ready();
+    area().scrollTop = 1400;
+    wheel(100);
+    expect(screen.getByText("p. 2 / 3")).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole("heading", { level: 2 }), { key: "PageDown" });
+    expect(screen.getByText("p. 3 / 3")).toBeInTheDocument();
+    page2.resolve(await fast(2));
+    await rendered();
+    expect(await screen.findByText("Page 3 of 3")).toBeInTheDocument();
+    expect(area().scrollTop).toBe(1400);
+  });
+
+  it("another gesture while the flipped-to page loads doesn't turn a page the learner hasn't seen", async () => {
+    scrollArea();
+    const { fake, page2, fast } = slowPage2();
+    renderViewer({ loadPdfDoc: vi.fn().mockResolvedValue(fake) });
+    await ready();
+    area().scrollTop = 1400;
+    wheel(100);
+    pause();
+    expect(wheel(100)).toBe(false); // swallowed
+    expect(screen.getByText("p. 2 / 3")).toBeInTheDocument();
+    page2.resolve(await fast(2));
+    await waitFor(() => expect(area().scrollTop).toBe(0));
+    expect(screen.getByText("p. 2 / 3")).toBeInTheDocument();
+  });
+
+  it("the citation reveal's scroll never flips", async () => {
+    // The reveal scrolls the passage to a third from the top: 40 + 300 - 600 / 3 = 140, the bottom of a 740px page.
+    scrollArea(740);
+    vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockReturnValue(40);
+    renderCited([CITED]);
+    await screen.findByTestId("passage-box");
+    await waitFor(() => expect(area().scrollTop).toBe(140));
+    fireEvent.scroll(area()); // guards against a future scroll listener: the hook counts only wheel and touch
+    await waitFor(() => expect(status()).toHaveTextContent("Opened page 2 of 3. Cited passage highlighted."));
+    expect(screen.getByText("p. 2 / 3")).toBeInTheDocument();
   });
 });

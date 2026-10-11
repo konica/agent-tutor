@@ -109,4 +109,19 @@ describe("ViewerDialog", () => {
     expect(opener).toHaveFocus();
     opener.remove();
   });
+
+  it("flips at the edge and closes with the flipped page", async () => {
+    vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(600);
+    vi.spyOn(Element.prototype, "scrollHeight", "get").mockReturnValue(600);
+    try {
+      const { onClose } = open();
+      await ready();
+      fireEvent.wheel(document.querySelector(".canvasArea")!, { deltaY: 100 });
+      expect(screen.getByText("p. 2 / 3")).toBeInTheDocument();
+      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+      expect(onClose).toHaveBeenCalledWith(2);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
 });
