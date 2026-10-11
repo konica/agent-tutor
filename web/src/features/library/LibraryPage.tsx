@@ -14,6 +14,7 @@ import { PageHeader } from "../../components/PageHeader/PageHeader";
 import { Tabs } from "../../components/Tabs/Tabs";
 import { UploadTray, type TrayItem } from "../../components/UploadTray/UploadTray";
 import { limitTime } from "../../time";
+import { ViewerDialog, type ViewerDeps } from "../viewer/ViewerDialog";
 import { DeleteDialog } from "./DeleteDialog";
 import { DocumentDetailsPanel } from "./DocumentDetails";
 import { DocumentTable } from "./DocumentTable";
@@ -38,6 +39,7 @@ type Props = {
   loadUpload?: (uploadId: string) => Promise<UploadStatus>;
   archive?: (documentId: string) => Promise<DocumentResponse>;
   restore?: (documentId: string) => Promise<DocumentResponse>;
+  viewerDeps?: ViewerDeps; // tests: the viewer's file link and PDF loader
   loadDetails?: (documentId: string) => Promise<DocumentDetails>;
   saveTitle?: (documentId: string, title: string | null) => Promise<DocumentDetails>;
   remove?: (documentId: string) => Promise<void>;
@@ -79,7 +81,7 @@ const defaultLoadSuggestions = (id: string) => loadSubjectSuggestions(id);
 const defaultSaveSubjects = (id: string, choice: { subject_ids: string[]; new_names: string[] }) => saveChosenSubjects(id, choice);
 
 // Library: upload by picking or dropping PDFs (US-2), the upload tray, and the Active and Archived lists narrowed by subject, upload dates and state (US-10).
-export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSubjects, upload = defaultUpload, retry = defaultRetry, loadLimits = defaultLoadLimits, loadRateLimit = defaultLoadRateLimit, check = defaultCheck, loadSuggestions = defaultLoadSuggestions, saveSubjects = defaultSaveSubjects, loadUpload = defaultLoadUpload, archive = defaultArchive, restore = defaultRestore, loadDetails = defaultLoadDetails, saveTitle = defaultSaveTitle, remove = defaultRemove, pollMs = 2000 }: Props) {
+export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSubjects, upload = defaultUpload, retry = defaultRetry, loadLimits = defaultLoadLimits, loadRateLimit = defaultLoadRateLimit, check = defaultCheck, loadSuggestions = defaultLoadSuggestions, saveSubjects = defaultSaveSubjects, loadUpload = defaultLoadUpload, archive = defaultArchive, restore = defaultRestore, viewerDeps, loadDetails = defaultLoadDetails, saveTitle = defaultSaveTitle, remove = defaultRemove, pollMs = 2000 }: Props) {
   const navigate = useNavigate();
   const [filters, setFilters] = useState<DocumentFilters>({});
   const [view, setView] = useState<View>("active");
@@ -124,7 +126,8 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
   const pickerFromDetails = useRef<string | null>(null); // the details panel to reopen when the picker closes
   const statusRegion = useRef<HTMLParagraphElement>(null);
   const wasPicking = useRef(false);
-  const [details, setDetails] = useState<{ id: string; editing: boolean } | null>(null);
+  const [details, setDetails] = useState<{ id: string; editing: boolean; focusOpen?: boolean; reload?: number } | null>(null);
+  const [viewing, setViewing] = useState<{ id: string; fromDetails: boolean } | null>(null); // the document open in the viewer
   const detailsOpener = useRef<string | null>(null); // the document whose details were last open
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [deleting, setDeleting] = useState<DocumentResponse | null>(null); // the document whose delete dialog is open
@@ -156,13 +159,24 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
       detailsOpener.current = details.id;
       return;
     }
+    if (viewing) return; // the viewer replaced the panel and gives it back when it closes
     const id = detailsOpener.current;
     if (!id) return;
     detailsOpener.current = null;
     if (document.activeElement !== document.body && document.activeElement !== null) return;
     const title = document.querySelector<HTMLElement>(`#document-${id} td:first-child button`);
     (title ?? statusRegion.current)?.focus();
-  }, [details]);
+  }, [details, viewing]);
+
+  // The viewer's dialog refocuses its opener on close; when that row left the list meanwhile, the status region takes focus.
+  const wasViewing = useRef(false);
+  useEffect(() => {
+    if (viewing) wasViewing.current = true;
+    else if (wasViewing.current) {
+      wasViewing.current = false;
+      if (!details && (document.activeElement === document.body || document.activeElement === null)) statusRegion.current?.focus();
+    }
+  }, [viewing, details]);
 
   const allReadyNow = finished && counts.allReady && !archivedView;
   // Once none waits, the Library shows every document, not an emptied "needs subjects" filter.
@@ -216,6 +230,25 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
     pickerFromDetails.current = doc.document_id;
     setDetails(null);
     setPicking({ queue: [doc], index: 0, saved: 0 });
+  }
+
+  // Like the picker, the viewer replaces the details panel (both are modal) and gives it back, with Open focused, when it closes.
+  function openFromDetails(doc: DocumentDetails) {
+    setDetails(null);
+    setViewing({ id: doc.document_id, fromDetails: true });
+  }
+
+  function closeViewer() {
+    const v = viewing;
+    setViewing(null);
+    if (v?.fromDetails) setDetails({ id: v.id, editing: false, focusOpen: true });
+  }
+
+  function restoredInViewer(doc: DocumentResponse) {
+    setStatus(`${doc.title} restored.`);
+    // Closing the viewer mid-restore may have reopened details before it landed; reload them.
+    setDetails((d) => (d?.id === doc.document_id ? { ...d, reload: (d.reload ?? 0) + 1 } : d));
+    void Promise.all([refresh(), counts.refresh(), refreshSubjects()]);
   }
 
   function closePicker() {
@@ -486,7 +519,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
   }
 
   const dragging = usePageDrop((files) => {
-    if (!picking && !details && !limitedRef.current) void addFiles(files); // the dialogs are modal
+    if (!picking && !details && !viewing && !limitedRef.current) void addFiles(files); // the dialogs are modal
   });
 
   function closeTray() {
@@ -766,6 +799,7 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
           onArchive={(d) => void changeArchived(d, true)}
           onRestore={(d) => void changeArchived(d, false)}
           onChat={(d) => navigate(`/chat?document=${d.document_id}`)}
+          onView={(d) => setViewing({ id: d.document_id, fromDetails: false })}
           onOpen={(d, o) => setDetails({ id: d.document_id, editing: Boolean(o?.editTitle) })}
           onDelete={openDelete}
           busy={busy}
@@ -792,20 +826,32 @@ export function LibraryPage({ load = loadDocuments, loadSubjects = defaultLoadSu
       })()}
       {details && (
         <DocumentDetailsPanel
-          key={details.id}
+          key={`${details.id}:${details.reload ?? 0}`}
           documentId={details.id}
           startEditing={details.editing}
+          focusOpen={details.focusOpen}
           load={loadDetails}
           saveTitle={saveTitle}
           archive={archive}
           restore={restore}
           onChanged={() => void Promise.all([refresh(), counts.refresh(), refreshSubjects()])}
           onChangeSubjects={changeFromDetails}
+          onOpenDocument={openFromDetails}
           onClose={() => setDetails(null)}
         />
       )}
+      {viewing && (
+        <ViewerDialog
+          key={viewing.id}
+          documentId={viewing.id}
+          closeLabel="Close"
+          onClose={closeViewer}
+          onRestored={restoredInViewer}
+          viewerDeps={{ restore, ...viewerDeps }}
+        />
+      )}
       {deleting && <DeleteDialog doc={deleting} busy={deleteBusy} error={deleteError} onCancel={cancelDelete} onDelete={() => void confirmDelete(deleting)} onArchive={() => archiveInstead(deleting)} />}
-      {dragging && !picking && !details && !limited && <DropOverlay />}
+      {dragging && !picking && !details && !viewing && !limited && <DropOverlay />}
       <UploadTray items={tray} onClose={closeTray} onRestore={(item) => void restoreFromTray(item)} />
     </>
   );

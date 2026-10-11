@@ -1,4 +1,4 @@
-import { Archive, CircleAlert, Pencil, RotateCcw, Tag } from "lucide-react";
+import { Archive, CircleAlert, FileText, Pencil, RotateCcw, Tag } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import type { DocumentDetails } from "../../api/documents";
@@ -10,6 +10,7 @@ import { StateBadge } from "../../components/StateBadge/StateBadge";
 import { SubjectChip } from "../../components/SubjectChip/SubjectChip";
 import { APP_TIME_ZONE } from "../../time";
 import styles from "./DocumentDetails.module.css";
+import { viewable } from "./DocumentTable";
 
 const MAX_TITLE = 300;
 
@@ -22,6 +23,8 @@ type Props = {
   restore: (id: string) => Promise<unknown>;
   onChanged: () => void; // the Library re-lists after a title, archive, or restore change
   onChangeSubjects?: (details: DocumentDetails) => void; // a ready document's subjects; archived ones are restored first (PRD US-10)
+  onOpenDocument?: (details: DocumentDetails) => void; // the viewer; archived documents open read-only
+  focusOpen?: boolean; // the viewer closed back to details: Open gets focus again
   onClose: () => void;
 };
 
@@ -34,7 +37,7 @@ function emptyHint(details: DocumentDetails): string {
 }
 
 // The side panel behind a Library row (PRD US-10): facts, summary, subjects, the editable display title, and Archive or Restore.
-export function DocumentDetailsPanel({ documentId, startEditing = false, load, saveTitle, archive, restore, onChanged, onChangeSubjects, onClose }: Props) {
+export function DocumentDetailsPanel({ documentId, startEditing = false, load, saveTitle, archive, restore, onChanged, onChangeSubjects, onOpenDocument, focusOpen = false, onClose }: Props) {
   const [details, setDetails] = useState<DocumentDetails | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [editing, setEditing] = useState(startEditing);
@@ -51,6 +54,7 @@ export function DocumentDetailsPanel({ documentId, startEditing = false, load, s
   const errorId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const titleRowRef = useRef<HTMLDivElement>(null);
+  const openRef = useRef<HTMLButtonElement>(null);
   const loadRef = useRef(load);
 
   useEffect(() => {
@@ -71,6 +75,12 @@ export function DocumentDetailsPanel({ documentId, startEditing = false, load, s
       live = false;
     };
   }, [documentId]); // load is read through a ref: a new function from the parent must not refetch or reset the draft
+
+  // Back from the viewer: Open had focus when the panel made way for it.
+  const loaded = details !== null;
+  useEffect(() => {
+    if (focusOpen && loaded) openRef.current?.focus();
+  }, [focusOpen, loaded]);
 
   const canRename = details !== null && !details.archived && details.state !== "failed";
   const isEditing = editing && canRename;
@@ -206,12 +216,17 @@ export function DocumentDetailsPanel({ documentId, startEditing = false, load, s
       footer={
         <div className={styles.footer}>
           {details.archived ? (
-            <Button variant="primary" icon={RotateCcw} disabled={busy || isEditing} onClick={() => void changeArchive(false)}>
+            <Button variant={onOpenDocument && viewable(details) ? "secondary" : "primary"} icon={RotateCcw} disabled={busy || isEditing} onClick={() => void changeArchive(false)}>
               Restore
             </Button>
           ) : (
             <Button icon={Archive} disabled={busy || isEditing} onClick={() => void changeArchive(true)}>
               Archive
+            </Button>
+          )}
+          {onOpenDocument && viewable(details) && (
+            <Button ref={openRef} variant="primary" icon={FileText} disabled={busy || isEditing} onClick={() => onOpenDocument(details)}>
+              Open
             </Button>
           )}
         </div>
