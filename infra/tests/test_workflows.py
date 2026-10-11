@@ -544,3 +544,10 @@ def test_on_premise_runbook_tears_down_the_whole_mode_without_naming_native_clou
     ):
         assert kept in section, kept
     assert "native-cloud keeps running" in text.split("## 8. Tear down")[1].split("###")[0]
+
+
+def test_native_cloud_release_passes_the_trace_sampling_rate_from_ssm() -> None:
+    text = steps_text(native_cloud_job())
+    assert "/smart-tutor/trace-sampling-rate" in text
+    release = step(native_cloud_job(), "Release the app (Helm)")["run"]
+    assert '--set-string global.langsmith.samplingRate="$TRACE_SAMPLING_RATE"' in release

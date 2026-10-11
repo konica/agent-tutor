@@ -88,12 +88,14 @@ jobs:
           [[ -n "$documents_bucket" && "$documents_bucket" != None ]] || { echo "::error::SmartTutor-prod-Storage has no DocumentsBucketName output"; exit 1; }
           ingest_queue_url=$(output Storage IngestQueueUrl)
           [[ -n "$ingest_queue_url" && "$ingest_queue_url" != None ]] || { echo "::error::SmartTutor-prod-Storage has no IngestQueueUrl output"; exit 1; }
+          trace_sampling_rate=$(aws ssm get-parameter --name /smart-tutor/trace-sampling-rate --query Parameter.Value --output text)
           {
             echo "REGISTRY=$registry"
             echo "CLOUDFRONT_URL=$cloudfront_url"
             echo "VPC_ID=$vpc_id"
             echo "DOCUMENTS_BUCKET=$documents_bucket"
             echo "INGEST_QUEUE_URL=$ingest_queue_url"
+            echo "TRACE_SAMPLING_RATE=$trace_sampling_rate"
           } >> "$GITHUB_ENV"
 
       - name: Connect to the cluster
@@ -120,6 +122,7 @@ jobs:
             --set global.publicUrl="$CLOUDFRONT_URL" \
             --set global.documentsBucket="$DOCUMENTS_BUCKET" \
             --set global.ingestQueueUrl="$INGEST_QUEUE_URL" \
+            --set-string global.langsmith.samplingRate="$TRACE_SAMPLING_RATE" \
             --wait=legacy --timeout 15m
 
       # The agent and MCP server are in-cluster only, so the smoke test can't reach them: check from an API pod that
