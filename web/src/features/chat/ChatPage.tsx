@@ -420,8 +420,14 @@ export function ChatPage({
             navigate(`/chat/${thread}`);
           }
           setThreadId(thread);
-        } else if (event.type === "delta") updateLast((e) => ({ ...e, answer: e.answer + event.text }));
-        else if (event.type === "citations") updateLast((e) => ({ ...e, citations: event.citations }));
+        } else if (event.type === "delta") {
+          updateLast((e) => ({ ...e, answer: e.answer + event.text }));
+          // The server found readable documents after all (one was uploaded elsewhere): no longer the empty-library state.
+          setNoDocuments(false);
+        } else if (event.type === "citations") {
+          updateLast((e) => ({ ...e, citations: event.citations }));
+          setNoDocuments(false);
+        }
         else if (event.type === "decline") {
           updateLast((e) => ({ ...e, decline: { code: event.code, message: event.message } }));
           if (event.code === "no_documents") setNoDocuments(true);
@@ -791,7 +797,7 @@ export function ChatPage({
                             </>
                           )}
                         </div>
-                      ) : t.decline != null ? (
+                      ) : t.decline?.code === "limited" ? (
                         <div className={styles.declineCard}>
                           <p>{t.decline.message}</p>
                           {/* The way out is for the latest question only; an earlier decline keeps just its message. */}
@@ -812,6 +818,11 @@ export function ChatPage({
                               </div>
                             </>
                           )}
+                        </div>
+                      ) : t.decline != null ? (
+                        // A code this page has no way out for: the message alone.
+                        <div className={styles.declineCard}>
+                          <p>{t.decline.message}</p>
                         </div>
                       ) : (
                         t.answer && <p className={styles.answer}>{t.answer}</p>

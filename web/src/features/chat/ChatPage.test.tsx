@@ -1464,6 +1464,37 @@ describe("ChatPage", () => {
       expect(screen.getByRole("link", { name: "Upload" })).toHaveAttribute("href", "/library");
     });
 
+    it("once an answer arrives the no-documents state is over: the next question starts a new conversation", async () => {
+      const ask = vi.fn(() => events({ type: "thread", thread_id: "t2" }, { type: "delta", text: "Fresh." }, { type: "done" }));
+      const askIn = vi.fn(() =>
+        events(
+          { type: "thread", thread_id: "t1" },
+          { type: "delta", text: "Found one." },
+          { type: "citations", citations: [{ n: 1, chunk_id: "c1", document_id: "d1", document_title: "a.pdf", page: 3 }] },
+          { type: "done" },
+        ),
+      );
+      renderChat({ loadConversation: conversation([turn()]), loadDocs: async () => [], ask, askIn }, "/chat/t1");
+      await screen.findByText("It weighs tokens [1].");
+      await userEvent.type(await question(), "First?");
+      await userEvent.click(askButton());
+      expect(await screen.findByText("Found one.")).toBeInTheDocument();
+      expect(askIn).toHaveBeenCalledTimes(1);
+      await userEvent.type(await question(), "Second?");
+      await userEvent.click(askButton());
+      await waitFor(() => expect(ask).toHaveBeenCalledWith("Second?", undefined));
+      expect(askIn).toHaveBeenCalledTimes(1);
+    });
+
+    it("a decline with an unknown code shows its message and no way out", async () => {
+      const odd = turn({ question: "Q?", answer: "", citations: [], decline: { code: "something_new", message: "Not now." } });
+      renderChat({ loadConversation: conversation([odd]) }, "/chat/t1");
+      expect(await screen.findByText("Not now.")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Search all my documents" })).not.toBeInTheDocument();
+      expect(screen.queryByText(/This conversation only searches/)).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Upload" })).not.toBeInTheDocument();
+    });
+
     it("a no_documents decline in the history shows its message, with Upload only on the last turn", async () => {
       const nodocs = turn({ question: "Q?", answer: "", citations: [], decline: { code: "no_documents", message: NO_DOCUMENTS } });
       renderChat({ loadConversation: conversation([nodocs, turn()]) }, "/chat/t1");
