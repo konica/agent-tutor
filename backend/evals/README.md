@@ -14,9 +14,12 @@ Datasets live in **LangSmith** (versioned there; never edit a version a release 
 | `targets.py` | How an evaluation run invokes the agent |
 | `thresholds.yaml` | Release-gate targets |
 | `highlight_fixture.py` | The worker's chunks of seed-corpus PDFs for the viewer's highlight test: `uv run --extra ingest python -m evals.highlight_fixture --pages 6 --out ../data/highlight-chunks.json ../data/seed_corpus/*.pdf` (then `web/src/features/viewer/fixtures/README.md`) |
-| `run.py` | `uv run --extra eval python -m evals.run --split smoke` → LangSmith experiment |
+| `run.py` | `make evals-smoke` → one LangSmith experiment per dataset, gated on `thresholds.yaml` (see "Run a split") |
+| `gate.py` | Compares scores with `thresholds.yaml`: min, max, max_failures; unscored metrics are "not run" |
+| `suite.py` | A suite: dataset + target + evaluators; discovered in `evaluators/` |
+| `dataset.py`, `datasets/` | Hand-written datasets, one YAML per LangSmith dataset, pushed once per split version |
 
-Splits: **smoke** (~30 items, every PR) and **full** (before release).
+Splits: **smoke** (every PR that changes the agent; about 10 hand-written questions today, growing to ~30 as suites are added) and **full** (before release).
 
 ## Eval learners
 
@@ -30,3 +33,22 @@ Prerequisites:
 - The Compose stack with the app profile (`docker compose --profile app up -d`), or the dependencies plus host processes (`make api`, `make worker`; README "Run the app").
 - Your AWS profile (`AWS_PROFILE` in `.env`, logged in): the worker describes and embeds each PDF with Bedrock in us-east-1.
 - Internet access to arxiv.org for the first download.
+
+## Run a split
+
+    make evals-smoke     # or: cd backend && uv run --env-file ../.env --extra eval python -m evals.run --split smoke
+
+It runs every suite whose dataset has the split, one LangSmith experiment per dataset, then prints each `release_1` metric of `thresholds.yaml` as PASS, FAIL, or "not run" (no suite scores it yet) with the experiment links, and exits 1 when a metric fails or nothing ran. `--release` picks another table.
+
+Prerequisites: the app stack and the eval learners' libraries (`make evals-learners`, above); your AWS profile (the agent and the Qwen judge run on Bedrock); `LANGSMITH_API_KEY` in your shell or `.env`.
+
+## Datasets
+
+Each `datasets/<key>.yaml` is one LangSmith dataset (`name`), its examples grouped in splits. The first run of a split's `version` replaces that split's examples in LangSmith and tags the result with the version; later runs read the tagged version. A run refuses when the file no longer matches its version: to change a split, edit it **and** give it a new version (`smoke-v2`), so a version a run was gated on is never edited. Examples name seed documents by manifest id; the target finds each learner's own copy.
+
+## Add a suite
+
+1. Write `evaluators/<metric>.py`: evaluator functions taking any of `inputs`, `outputs`, `reference_outputs` and returning `{"key": "<thresholds.yaml metric>", "score": ..., "comment": ...}` (a nested metric is its dotted path, e.g. `decline_correctness.correctly_declined`), and a `SUITE = Suite(dataset=..., target=..., evaluators=(...))`. A judge's prompt goes in `evaluators/rubrics/`.
+2. Add its examples as a split of `datasets/<dataset>.yaml` (a new split, or a new version of an existing one). A suite on a new dataset brings a target in `targets.py` that turns one example into the outputs its evaluators read.
+
+The runner finds the suite; no change to `run.py`. Suites on the same dataset must name the same target and share one experiment.
