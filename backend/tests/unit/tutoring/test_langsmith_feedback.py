@@ -4,6 +4,7 @@ import uuid
 from typing import Any
 
 import pytest
+from langsmith import utils as ls_utils
 
 from fakes import FeedbackClient, InlineExecutor
 from smart_tutor.shared.domain.ids import RunId
@@ -45,6 +46,34 @@ def test_a_new_rating_replaces_the_runs_earlier_one() -> None:
     assert f["value"] == "up"
 
 
+def test_a_lagging_list_does_not_leave_two_ratings() -> None:
+    client = FeedbackClient(lagging=True)  # LangSmith has not yet listed what was created a moment ago
+    sender = feedback(client)
+    sender.send(RUN, Rating.UP)
+    sender.send(RUN, Rating.DOWN)
+    [f] = client.feedback.values()
+    assert f["value"] == "down"
+
+
+def test_feedback_already_gone_does_not_stop_the_new_rating() -> None:
+    client = FeedbackClient(lagging=True)
+    sender = feedback(client)
+    sender.send(RUN, Rating.UP)
+    client.feedback.clear()  # deleted elsewhere; the remembered id is now unknown
+    sender.send(RUN, Rating.DOWN)
+    [f] = client.feedback.values()
+    assert f["value"] == "down"
+
+
+def test_the_remembered_runs_are_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("smart_tutor.tutoring.adapters.langsmith_feedback.REMEMBERED_RUNS", 2)
+    sender = feedback(FeedbackClient())
+    runs = [RunId(str(uuid.uuid4())) for _ in range(3)]
+    for run in runs:
+        sender.send(run, Rating.UP)
+    assert list(sender._created) == runs[1:]  # noqa: SLF001
+
+
 def test_another_runs_feedback_is_left_alone() -> None:
     client = FeedbackClient()
     other = RunId(str(uuid.uuid4()))
@@ -58,7 +87,17 @@ def test_the_feedback_carries_nothing_but_the_rating() -> None:
     client = FeedbackClient()
     feedback(client).send(RUN, Rating.DOWN)
     [(_, created)] = [c for c in client.calls if c[0] == "create_feedback"]
-    assert set(created) == {"run_id", "key", "score", "value", "session_id", "extend_trace_retention"}
+    assert set(created) == {
+        "run_id",
+        "key",
+        "score",
+        "value",
+        "session_id",
+        "feedback_id",
+        "stop_after_attempt",
+        "extend_trace_retention",
+    }
+    assert created["stop_after_attempt"] == 3
 
 
 def test_the_project_is_read_once() -> None:
@@ -91,6 +130,20 @@ def test_the_send_runs_off_the_callers_thread() -> None:
     release.set()
     sender.close()
     assert len(client.feedback) == 1
+
+
+def test_answer_feedback_sends_to_the_traced_project_while_tracing_is_on(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("langsmith.utils.tracing_is_enabled", lambda *a: True)
+    monkeypatch.setenv("LANGSMITH_PROJECT", "smart-tutor-prod")
+    monkeypatch.setenv("LANGSMITH_API_KEY", "test-not-a-key")
+    ls_utils.get_env_var.cache_clear()  # langsmith caches environment reads
+    try:
+        sender = answer_feedback()
+        assert isinstance(sender, LangSmithAnswerFeedback)
+        assert sender.project == "smart-tutor-prod"
+        sender.close()
+    finally:
+        ls_utils.get_env_var.cache_clear()
 
 
 def test_answer_feedback_is_off_while_tracing_is_off() -> None:

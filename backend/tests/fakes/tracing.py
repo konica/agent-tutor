@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from typing import Any, TypeVar
 
 import langsmith
+from langsmith.utils import LangSmithNotFoundError
 
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.ports.run_tracing import RunTracing
@@ -42,14 +43,16 @@ class FakeRunTracing(RunTracing):
 
 class FeedbackClient(langsmith.Client):
     """LangSmith client that keeps feedback in memory and records each call's arguments; never reaches the network.
-    `fail` makes every call raise, as an outage would."""
+    `fail` makes every call raise, as an outage would; `lagging` makes `list_feedback` return nothing, as LangSmith does
+    for feedback created a moment ago."""
 
-    def __init__(self, fail: Exception | None = None) -> None:
+    def __init__(self, fail: Exception | None = None, lagging: bool = False) -> None:
         super().__init__(api_key="test-not-a-key", api_url="http://127.0.0.1:9", auto_batch_tracing=False)
         self.project_id = uuid.uuid4()
         self.feedback: dict[uuid.UUID, dict[str, Any]] = {}
         self.calls: list[tuple[str, dict[str, Any]]] = []
         self._fail = fail
+        self.lagging = lagging
 
     def _call(self, name: str, kwargs: dict[str, Any]) -> None:
         self.calls.append((name, kwargs))
@@ -64,6 +67,8 @@ class FeedbackClient(langsmith.Client):
         self._call("list_feedback", kwargs)
         runs = {str(r) for r in kwargs.get("run_ids") or []}
         keys = set(kwargs.get("feedback_key") or [])
+        if self.lagging:
+            return iter([])
         return iter(
             [
                 SimpleNamespace(id=i, **f)
@@ -74,11 +79,13 @@ class FeedbackClient(langsmith.Client):
 
     def delete_feedback(self, feedback_id: Any) -> None:
         self._call("delete_feedback", {"feedback_id": feedback_id})
+        if feedback_id not in self.feedback:
+            raise LangSmithNotFoundError(f"feedback {feedback_id} not found")
         del self.feedback[feedback_id]
 
     def create_feedback(self, run_id: Any = None, key: str = "unnamed", **kwargs: Any) -> Any:
         self._call("create_feedback", {"run_id": run_id, "key": key, **kwargs})
-        feedback_id = uuid.uuid4()
+        feedback_id = kwargs.pop("feedback_id", None) or uuid.uuid4()
         self.feedback[feedback_id] = {"run_id": run_id, "key": key, **kwargs}
         return SimpleNamespace(id=feedback_id)
 
