@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -73,3 +73,23 @@ def test_an_archived_thread_cannot_change_its_search_scope() -> None:
     thread.status = ThreadStatus.ARCHIVED
     with pytest.raises(ThreadArchivedError, match="Restore it first"):
         thread.limit_search(SearchScope.LISTED, 1)
+
+
+def test_last_activity_is_the_last_learner_message_or_the_start() -> None:
+    start = datetime(2026, 10, 1, tzinfo=UTC)
+    assert Thread(ThreadId("t"), UserId("ada"), start).last_activity == start
+    later = start + timedelta(hours=2)
+    assert Thread(ThreadId("t"), UserId("ada"), start, last_learner_message_at=later).last_activity == later
+
+
+def test_asking_moves_the_last_learner_message() -> None:
+    start = datetime(2026, 10, 1, tzinfo=UTC)
+    thread = Thread.start(ThreadId("t"), UserId("ada"), start)
+    thread.ask(start + timedelta(minutes=5))
+    assert thread.last_learner_message_at == start + timedelta(minutes=5)
+
+
+def test_an_archived_thread_takes_no_question() -> None:
+    thread = Thread(ThreadId("t"), UserId("ada"), datetime(2026, 10, 1, tzinfo=UTC), status=ThreadStatus.ARCHIVED)
+    with pytest.raises(ThreadArchivedError):
+        thread.ask(datetime(2026, 10, 2, tzinfo=UTC))

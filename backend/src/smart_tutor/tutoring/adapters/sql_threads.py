@@ -129,6 +129,15 @@ class SqlThreadRepository(ThreadRepository):
             ).first()
         return _thread(row) if row else None
 
+    def list_owned(self, user_id: UserId, status: ThreadStatus) -> list[Thread]:
+        raise NotImplementedError  # Task 2
+
+    def documents_used_by_thread(self, thread_ids: Sequence[ThreadId]) -> dict[ThreadId, list[ThreadDocument]]:
+        raise NotImplementedError  # Task 2
+
+    def set_last_learner_message_at(self, thread_id: ThreadId, at: datetime) -> None:
+        raise NotImplementedError  # Task 2
+
     def set_title(self, thread_id: ThreadId, title: str) -> None:
         with self._engine.begin() as conn:
             conn.execute(threads.update().where(threads.c.thread_id == thread_id).values(title=title))
