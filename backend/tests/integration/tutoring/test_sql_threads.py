@@ -1,7 +1,7 @@
 """SqlThreadRepository against the Compose Postgres (scratch database; see the plan's Global Constraints)."""
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import Engine, inspect, select
@@ -11,7 +11,7 @@ from smart_tutor.shared.adapters.postgres.migrate import upgrade_to_head
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.tutoring.adapters.sql_threads import SqlThreadRepository, thread_documents, thread_turns
-from smart_tutor.tutoring.domain.thread import SearchScope, Thread
+from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
 from smart_tutor.tutoring.domain.turn import Decline, Turn, TurnCitation
 
 pytestmark = pytest.mark.integration
@@ -195,3 +195,55 @@ def test_a_turn_row_holds_no_title_or_text_beyond_what_the_learner_saw(engine: E
             select(thread_turns.c.citations).where(thread_turns.c.thread_id == thread.thread_id)
         ).scalars()
     assert citations == [{"n": 1, "document_id": doc, "chunk_id": "c1", "page": 3}]
+
+
+def test_list_owned_is_the_owners_threads_newest_activity_first(engine: Engine) -> None:
+    repo = SqlThreadRepository(engine)
+    owner, other = UserId(f"ada-{uuid.uuid4()}"), UserId(f"bob-{uuid.uuid4()}")
+    t0 = datetime(2026, 10, 1, tzinfo=UTC)
+    older = Thread.start(ThreadId(str(uuid.uuid4())), owner, t0, title="Older")
+    newer = Thread.start(ThreadId(str(uuid.uuid4())), owner, t0 + timedelta(hours=1), title="Newer")
+    archived = Thread(ThreadId(str(uuid.uuid4())), owner, t0, status=ThreadStatus.ARCHIVED)
+    theirs = Thread.start(ThreadId(str(uuid.uuid4())), other, t0 + timedelta(hours=2))
+    for t in (older, newer, archived, theirs):
+        repo.add(t)
+
+    assert [t.thread_id for t in repo.list_owned(owner, ThreadStatus.ACTIVE)] == [newer.thread_id, older.thread_id]
+
+    repo.set_last_learner_message_at(older.thread_id, t0 + timedelta(hours=3))
+    listed = repo.list_owned(owner, ThreadStatus.ACTIVE)
+    assert [t.thread_id for t in listed] == [older.thread_id, newer.thread_id]
+    assert listed[0].last_learner_message_at == t0 + timedelta(hours=3)
+    assert [t.thread_id for t in repo.list_owned(owner, ThreadStatus.ARCHIVED)] == [archived.thread_id]
+
+
+def test_a_thread_with_no_learner_message_sorts_by_its_start(engine: Engine) -> None:
+    repo = SqlThreadRepository(engine)
+    owner = UserId(f"ada-{uuid.uuid4()}")
+    t0 = datetime(2026, 10, 1, tzinfo=UTC)
+    quiet = Thread(ThreadId(str(uuid.uuid4())), owner, t0 + timedelta(hours=2))  # last_learner_message_at None
+    asked = Thread.start(ThreadId(str(uuid.uuid4())), owner, t0 + timedelta(hours=1))
+    repo.add(quiet)
+    repo.add(asked)
+    assert [t.thread_id for t in repo.list_owned(owner, ThreadStatus.ACTIVE)] == [quiet.thread_id, asked.thread_id]
+
+
+def test_documents_used_by_thread_groups_each_threads_list_in_order(engine: Engine) -> None:
+    repo = SqlThreadRepository(engine)
+    owner = UserId(f"ada-{uuid.uuid4()}")
+    now = datetime.now(UTC)
+    a = Thread.start(ThreadId(str(uuid.uuid4())), owner, now)
+    b = Thread.start(ThreadId(str(uuid.uuid4())), owner, now)
+    empty = Thread.start(ThreadId(str(uuid.uuid4())), owner, now)
+    for t in (a, b, empty):
+        repo.add(t)
+    d1, d2, d3 = (DocumentId(str(uuid.uuid4())) for _ in range(3))
+    repo.add_documents_used(a.thread_id, [d2, d1], now)
+    repo.add_documents(b.thread_id, [d3], now)
+
+    grouped = repo.documents_used_by_thread([a.thread_id, b.thread_id, empty.thread_id])
+
+    assert [r.document_id for r in grouped[a.thread_id]] == [d2, d1]
+    assert [r.document_id for r in grouped[b.thread_id]] == [d3]
+    assert grouped.get(empty.thread_id, []) == []
+    assert repo.documents_used_by_thread([]) == {}
