@@ -15,7 +15,7 @@ export function ConversationFilters({ filters, onChange, subjects, count, onClea
   return (
     <FilterBar label="Filter conversations" noun="conversation" count={count} active={hasConversationFilters(filters)} onClear={onClear}>
       <FilterField id="filter-title" label="Search titles">
-        <input id="filter-title" type="search" placeholder="Search titles" value={filters.q ?? ""} onChange={(e) => set({ q: e.target.value })} />
+        <input id="filter-title" type="search" maxLength={120} placeholder="Search titles" value={filters.q ?? ""} onChange={(e) => set({ q: e.target.value })} />
       </FilterField>
       <FilterField id="filter-subject" label="Subject">
         <select id="filter-subject" value={filters.subject_id ?? ""} onChange={(e) => set({ subject_id: e.target.value })}>

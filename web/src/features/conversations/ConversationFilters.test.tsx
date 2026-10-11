@@ -22,6 +22,11 @@ describe("ConversationFilters", () => {
     expect(onChange).toHaveBeenLastCalledWith({ q: "r" });
   });
 
+  it("limits the search to a title's 120 characters", () => {
+    setup();
+    expect(screen.getByRole("searchbox", { name: "Search titles" })).toHaveAttribute("maxlength", "120");
+  });
+
   it("keeps a typed blank search so the box shows it", async () => {
     const { onChange } = setup();
     await userEvent.type(screen.getByRole("searchbox", { name: "Search titles" }), " ");

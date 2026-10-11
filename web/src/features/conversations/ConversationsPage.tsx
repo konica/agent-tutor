@@ -54,7 +54,9 @@ export function ConversationsPage({ loadConversations = listConversations, loadS
         </EmptyState>
       )}
       {list && list.length > 0 && (
-        <ConversationFilters filters={filters} onChange={setFilters} subjects={subjects} count={rows ? rows.length : null} onClear={clear} />
+        <div className={styles.toolbar}>
+          <ConversationFilters filters={filters} onChange={setFilters} subjects={subjects} count={rows ? rows.length : null} onClear={clear} />
+        </div>
       )}
       {filtering && filtered.failed && <p className={styles.error}>Can't load your conversations. Reload the page to try again.</p>}
       {rows && rows.length === 0 && filtering && (
