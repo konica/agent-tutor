@@ -315,8 +315,8 @@ def test_data_volume_can_be_restored_from_a_snapshot() -> None:
     restored = host(**{"smart-tutor:on-premise-data-snapshot-id": "snap-0123456789abcdef0"})
     (volume,) = restored.find_resources("AWS::EC2::Volume").values()
     assert volume["Properties"]["SnapshotId"] == "snap-0123456789abcdef0"
-    (default_volume,) = host().find_resources("AWS::EC2::Volume").values()
-    assert "SnapshotId" not in default_volume["Properties"]
+    (blank_volume,) = host(**{"smart-tutor:on-premise-data-snapshot-id": ""}).find_resources("AWS::EC2::Volume").values()
+    assert "SnapshotId" not in blank_volume["Properties"]
 
 
 def test_a_restored_data_volume_is_a_new_resource() -> None:
@@ -336,7 +336,7 @@ def test_a_restored_data_volume_is_a_new_resource() -> None:
 
 def test_a_new_data_volume_replaces_the_instance_so_it_attaches_at_first_boot() -> None:
     # The user data names the volume and runs only at first boot, so a changed user data must replace the instance.
-    (before,) = host().find_resources("AWS::EC2::Instance")
+    (before,) = host(**{"smart-tutor:on-premise-data-snapshot-id": ""}).find_resources("AWS::EC2::Instance")
     (after,) = host(**{"smart-tutor:on-premise-data-snapshot-id": "snap-0123456789abcdef0"}).find_resources(
         "AWS::EC2::Instance"
     )
