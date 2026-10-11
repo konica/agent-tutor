@@ -29,6 +29,7 @@ type Props = {
   onOpenInDialog?: (page: number) => void; // pane only; shows the Open in dialog button when set
   openInDialogRef?: Ref<HTMLButtonElement>;
   onPageChange?: (page: number) => void;
+  onRestored?: (document: DocumentResponse) => void; // the Library re-lists (the row leaves the Archived tab)
   showDetails?: boolean; // dialog: the details strip
   loadFile?: (id: string) => Promise<DocumentFile>; // tests
   loadPdfDoc?: PdfLoader; // tests
@@ -63,6 +64,7 @@ function Viewer({
   onOpenInDialog,
   openInDialogRef,
   onPageChange,
+  onRestored,
   showDetails = false,
   loadFile,
   loadPdfDoc = defaultLoadPdf,
@@ -191,6 +193,7 @@ function Viewer({
 
   const [restoring, setRestoring] = useState(false);
   const [restoreFailed, setRestoreFailed] = useState(false);
+  const [restored, setRestored] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const focusTitle = useRef(false);
   // A restored document loses its Restore button; focus moves to the title rather than dropping to <body>.
@@ -205,9 +208,11 @@ function Viewer({
     restore(documentId).then(
       (updated) => {
         setRestoring(false);
+        setRestored(true);
         focusTitle.current = true;
         setKnownDocument(updated);
         setDocument(updated);
+        onRestored?.(updated);
       },
       () => {
         setRestoring(false);
@@ -284,6 +289,9 @@ function Viewer({
       </div>
       <p className="visually-hidden" aria-live="polite">
         {status(rendered, page, numPages, passage !== undefined && !moved && page === passage.page, highlight)}
+      </p>
+      <p className="visually-hidden" aria-live="polite">
+        {restored ? "Document restored." : ""}
       </p>
     </div>
   );
