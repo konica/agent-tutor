@@ -1122,3 +1122,68 @@ def test_listing_needs_a_token() -> None:
 def test_openapi_names_the_list_operation() -> None:
     client, _, _, _ = listing()
     assert client.get("/openapi.json").json()["paths"]["/threads"]["get"]["operationId"] == "list_threads"
+
+
+def history_client(seen: list[httpx.Request], history_turns: int | None = None) -> tuple[TestClient, InMemoryThreads]:
+    verifier = FakeTokenVerifier()
+    verifier.add("t-ada", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
+    library, threads = InMemoryLibrary(), InMemoryThreads()
+    ingest_ready(library, "ada", "Attention weighs tokens.")
+    overrides: dict[str, Any] = {}
+    if history_turns is not None:
+        documents = DocumentService(library.unit_of_work, max_attempts=3)
+        overrides["conversations"] = ConversationService(threads, documents, FixedClock(), history_turns=history_turns)
+    services = api_services(library, threads=threads, agent=fake_agent(recording(seen)), **overrides)
+    return TestClient(create_app(Settings(), verifier=verifier, services=services)), threads
+
+
+def test_a_question_in_an_existing_thread_sends_its_last_turns_oldest_first() -> None:
+    seen: list[httpx.Request] = []
+    client, threads = history_client(seen)
+    client.post("/threads", json={"question": "Explain the transformer architecture"}, headers=AUTH)
+    [thread] = threads.threads.values()
+    seen.clear()
+
+    client.post(f"/threads/{thread.thread_id}/questions", json={"question": "What are its limitations?"}, headers=AUTH)
+
+    [request] = seen
+    body = json.loads(request.content)
+    assert body["question"] == "What are its limitations?"
+    assert body["history"] == [{"question": "Explain the transformer architecture", "answer": "It weighs tokens [1]."}]
+
+
+def test_a_new_thread_sends_no_history() -> None:
+    seen: list[httpx.Request] = []
+    client, _ = history_client(seen)
+
+    client.post("/threads", json=QUESTION, headers=AUTH)
+
+    [request] = seen
+    assert "history" not in json.loads(request.content)
+
+
+def test_the_history_sent_is_capped_by_the_service() -> None:
+    seen: list[httpx.Request] = []
+    client, threads = history_client(seen, history_turns=2)
+    client.post("/threads", json={"question": "Q1"}, headers=AUTH)
+    [thread] = threads.threads.values()
+    for n in (2, 3, 4, 5):
+        client.post(f"/threads/{thread.thread_id}/questions", json={"question": f"Q{n}"}, headers=AUTH)
+
+    assert [h["question"] for h in json.loads(seen[-1].content)["history"]] == ["Q3", "Q4"]
+
+
+def test_the_history_holds_no_token_user_id_or_chunk_text() -> None:
+    seen: list[httpx.Request] = []
+    client, threads = history_client(seen)
+    client.post("/threads", json={"question": "Explain the transformer architecture"}, headers=AUTH)
+    [thread] = threads.threads.values()
+    client.post(f"/threads/{thread.thread_id}/questions", json={"question": "What are its limitations?"}, headers=AUTH)
+
+    sent = json.loads(seen[-1].content)["history"]
+
+    assert all(set(h) == {"question", "answer"} for h in sent)
+    dumped = json.dumps(sent)
+    assert "t-ada" not in dumped  # no token
+    assert "ada" not in dumped  # no user id
+    assert "c1" not in dumped  # no chunk id or citation
