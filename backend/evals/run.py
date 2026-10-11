@@ -26,6 +26,14 @@ from smart_tutor.shared.config import Settings
 MAX_CONCURRENCY = 4  # examples in flight; Bedrock throttling backs off in the models' boto config
 
 
+def _coroutine_function(target: Callable[[dict[str, Any]], Any]) -> Callable[[dict[str, Any]], Any]:
+    # aevaluate accepts only coroutine functions; it would read a callable object as an iterable of runs
+    async def call(inputs: dict[str, Any]) -> Any:
+        return await target(inputs)
+
+    return call
+
+
 async def run_split(
     client: Any,
     groups: Sequence[DatasetSuites],
@@ -43,16 +51,18 @@ async def run_split(
             continue  # its metrics stay "not run"
         version = dataset.splits[split]
         results = await client.aevaluate(
-            group.target(),
+            _coroutine_function(group.target()),
             data=versioned_examples(client, dataset, version),
             evaluators=list(group.evaluators),
             experiment_prefix=f"{dataset.name}-{split}",
             metadata={**(metadata or {}), "split": split, "dataset_version": version.version},
             max_concurrency=MAX_CONCURRENCY,
         )
-        async for row in results:
-            for result in row["evaluation_results"]["results"]:
-                scores[result.key].append(result.score)
+        rows = [{r.key: r.score for r in row["evaluation_results"]["results"]} async for row in results]
+        # An evaluator that raised leaves its key out of that row: count it as unscored, not as absent, or the
+        # gate would average only the survivors.
+        for key in {key for row in rows for key in row}:
+            scores[key].extend(row.get(key) for row in rows)
         links[f"{dataset.name} ({split} {version.version})"] = (
             await results.get_comparison_url() or results.url or results.experiment_name
         )

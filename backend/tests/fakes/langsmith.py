@@ -133,6 +133,8 @@ class FakeLangSmith:
         metadata: dict[str, Any],
         max_concurrency: int,
     ) -> FakeResults:
+        if not inspect.iscoroutinefunction(target):  # as langsmith's _arunner: a callable object is read as runs
+            raise TypeError(f"{target!r} is not iterable")
         examples, rows = list(data), []
         for example in examples:
             try:
@@ -143,9 +145,12 @@ class FakeLangSmith:
             for evaluator in evaluators:
                 given = {"inputs": example.inputs, "outputs": outputs, "reference_outputs": example.outputs or {}}
                 wanted = {k: v for k, v in given.items() if k in inspect.signature(evaluator).parameters}
-                result = evaluator(**wanted)
-                if inspect.isawaitable(result):
-                    result = await result
+                try:
+                    result = evaluator(**wanted)
+                    if inspect.isawaitable(result):
+                        result = await result
+                except Exception:
+                    continue  # error_handling="log": the row keeps its other results and lacks this one
                 results.append(EvaluationResult(**result))
             rows.append({"example": example, "outputs": outputs, "evaluation_results": {"results": results}})
         self.experiments.append(Experiment(experiment_prefix, metadata, [e.id for e in examples]))

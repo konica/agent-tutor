@@ -49,6 +49,33 @@ async def test_suites_on_one_dataset_run_as_one_experiment_on_the_versioned_spli
     assert links == {"smart-tutor-ask (smoke smoke-v1)": "https://smith.example/smart-tutor-ask-smoke-1"}
 
 
+async def test_a_callable_object_target_runs_as_a_coroutine_function() -> None:
+    class ObjectTarget:
+        async def __call__(self, inputs: dict[str, Any]) -> dict[str, Any]:
+            return {"answer": inputs["question"]}
+
+    group = DatasetSuites("ask", ObjectTarget, (scored("search_step_ran", 1.0),))
+    scores, _ = await run_split(FakeLangSmith(), [group], "smoke", load=lambda key: ASK)
+    assert scores == {"search_step_ran": [1.0, 1.0]}
+
+
+def _flaky_relevance(inputs: dict[str, Any]) -> dict[str, Any]:
+    if inputs["question"] == "b":
+        raise RuntimeError("judge failed")
+    return {"key": "answer_relevance", "score": 0.9, "comment": ""}
+
+
+async def test_an_example_whose_evaluator_raised_counts_as_unscored() -> None:
+    group = DatasetSuites("ask", make_target, (_flaky_relevance,))
+    scores, _ = await run_split(FakeLangSmith(), [group], "smoke", load=lambda key: ASK)
+    assert scores == {"answer_relevance": [0.9, None]}
+
+
+def test_a_run_where_an_evaluator_raised_fails_the_gate(capsys: pytest.CaptureFixture[str]) -> None:
+    suites = [Suite("ask", make_target, (scored("search_step_ran", 1.0), _flaky_relevance))]
+    assert main(["--split", "smoke"], client=FakeLangSmith(), suites=suites, load=lambda key: ASK) == 1
+
+
 async def test_a_dataset_without_the_split_runs_nothing() -> None:
     client = FakeLangSmith()
     group = DatasetSuites("ask", make_target, (scored("search_step_ran", 1.0),))
