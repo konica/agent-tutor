@@ -16,12 +16,12 @@
 .table tbody tr:last-child td { border-bottom: 0; }
 .row { cursor: pointer; }
 .table tbody tr:hover td { background: var(--surface-2); }
-.right { text-align: right; }
+.table th.right, .table td.right { text-align: right; }
 .title {
-  display: block; min-width: 0; font-size: var(--fs-14); font-weight: 600; color: var(--text);
+  display: block; text-decoration: none; min-width: 0; font-size: var(--fs-14); font-weight: 600; color: var(--text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.title:hover { text-decoration: underline; }
+.title:hover, .title:focus-visible { text-decoration: underline; }
 .subjects { display: flex; align-items: center; gap: var(--sp-1); min-width: 0; white-space: nowrap; overflow: hidden; }
 .more {
   flex: none; display: inline-flex; align-items: center; height: 20px; padding: 0 var(--sp-2); border-radius: 999px;
