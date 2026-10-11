@@ -1,9 +1,12 @@
 """Static checks of the GitHub Actions workflows (#59, #150): what runs, when, and with which AWS access."""
 
 import re
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 
 from smart_tutor_infra.app_stacks import ON_PREMISE_GITHUB_ENVIRONMENT
@@ -551,3 +554,19 @@ def test_native_cloud_release_passes_the_trace_sampling_rate_from_ssm() -> None:
     assert "/smart-tutor/trace-sampling-rate" in text
     release = step(native_cloud_job(), "Release the app (Helm)")["run"]
     assert '--set-string global.langsmith.samplingRate="$TRACE_SAMPLING_RATE"' in release
+
+
+def test_every_workflow_run_script_is_valid_bash() -> None:
+    if shutil.which("bash") is None:
+        pytest.skip("bash is not installed")
+    broken = []
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+        for job_name, job in (doc.get("jobs") or {}).items():
+            for s in job.get("steps", []):
+                if "run" not in s:
+                    continue
+                result = subprocess.run(["bash", "-n"], input=str(s["run"]).encode(), capture_output=True)
+                if result.returncode != 0:
+                    broken.append(f"{path.name}:{job_name}:{s.get('name')}: {result.stderr.decode().strip()}")
+    assert not broken
