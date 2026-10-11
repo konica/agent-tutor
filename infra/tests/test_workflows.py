@@ -1,5 +1,6 @@
 """Static checks of the GitHub Actions workflows (#59, #150): what runs, when, and with which AWS access."""
 
+import os
 import re
 import shutil
 import subprocess
@@ -570,3 +571,104 @@ def test_every_workflow_run_script_is_valid_bash() -> None:
                 if result.returncode != 0:
                     broken.append(f"{path.name}:{job_name}:{s.get('name')}: {result.stderr.decode().strip()}")
     assert not broken
+
+
+# --- Smoke evals (#226) ------------------------------------------------------------------------------------------
+
+EVAL_PATHS = {
+    "backend/src/smart_tutor/tutoring/**",
+    "backend/src/smart_tutor/apps/agent/**",
+    "backend/src/smart_tutor/apps/mcp_server/**",
+    "backend/src/smart_tutor/shared/config.py",
+    "backend/src/smart_tutor/shared/adapters/model_factory.py",
+    "backend/src/smart_tutor/shared/adapters/bedrock/**",
+    "backend/evals/**",
+    "compose.yaml",
+    "compose.ci.yaml",
+    ".github/workflows/evals-smoke.yml",
+}
+
+
+def evals_job() -> dict[str, Any]:
+    return only_job("evals-smoke.yml")
+
+
+def test_smoke_evals_run_on_agent_changes_and_by_hand() -> None:
+    on = workflow("evals-smoke.yml")["on"]
+    assert set(on) == {"pull_request", "workflow_dispatch"}
+    assert set(on["pull_request"]["paths"]) == EVAL_PATHS
+    # a newer push cancels the run it replaces
+    assert workflow("evals-smoke.yml")["concurrency"]["cancel-in-progress"] is True
+
+
+def test_smoke_evals_sign_in_with_the_bedrock_only_role() -> None:
+    wf, job = workflow("evals-smoke.yml"), evals_job()
+    assert wf["permissions"] == {"contents": "read"}
+    assert job["permissions"] == {"contents": "read", "id-token": "write"}
+    creds = step(job, "Sign in to AWS (Bedrock only)")
+    assert creds["with"] == {"role-to-assume": "${{ vars.EVALS_AWS_ROLE_ARN }}", "aws-region": "us-east-1"}
+    assert job["timeout-minutes"] <= 60  # the role's session lasts 1 hour
+    for ref in (str(s["uses"]) for s in job["steps"] if "uses" in s):
+        assert re.fullmatch(r"[\w./-]+@[0-9a-f]{40}", ref), ref
+    creds_at = index_of(job, "configure-aws-credentials")
+    assert index_of(job, "setup-uv") < creds_at
+    assert index_of(job, "compose.ci.yaml --profile app build") < creds_at  # build without credentials
+
+
+def test_smoke_evals_skip_with_a_reason_without_the_secrets() -> None:
+    job = evals_job()
+    check = step(job, "Check access to the eval secrets")
+    assert check["id"] == "access"
+    assert job["steps"].index(check) < index_of(job, "configure-aws-credentials")
+    script = check["run"]
+    assert "GITHUB_STEP_SUMMARY" in script and "::notice" in script and "::warning" in script
+    assert "fork" in script and "docs/runbooks/evals-ci.md" in script
+    for s in job["steps"][job["steps"].index(check) + 1 :]:
+        assert "steps.access.outputs.run == 'true'" in str(s.get("if", "")), s.get("name") or s.get("uses")
+
+
+def test_smoke_evals_skip_script_decides_correctly(tmp_path: Path) -> None:
+    bash = shutil.which("bash")  # the full path: on Windows a bare "bash" can reach the WSL launcher in System32
+    if bash is None:
+        pytest.skip("bash is not installed")
+    script = step(evals_job(), "Check access to the eval secrets")["run"]
+
+    def run(**env: str) -> tuple[str, str]:
+        out, summary = tmp_path / "out", tmp_path / "summary"
+        out.write_text(""), summary.write_text("")
+        result = subprocess.run(
+            [bash, "-c", script],
+            env={"PATH": os.environ["PATH"], "GITHUB_OUTPUT": str(out), "GITHUB_STEP_SUMMARY": str(summary), **env},
+            capture_output=True, text=True, check=True,
+        )
+        return out.read_text() + summary.read_text(), result.stdout
+
+    files, stdout = run(HEAD_REPO="someone/agent-tutor", REPO="konica/agent-tutor", ROLE="", HAS_KEY="false")
+    assert "run=false" in files and "fork" in files and "::notice" in stdout
+    files, stdout = run(HEAD_REPO="konica/agent-tutor", REPO="konica/agent-tutor", ROLE="", HAS_KEY="true")
+    assert "run=false" in files and "EVALS_AWS_ROLE_ARN" in files and "::warning" in stdout
+    files, stdout = run(HEAD_REPO="konica/agent-tutor", REPO="konica/agent-tutor", ROLE="arn:x", HAS_KEY="false")
+    assert "run=false" in files and "LANGSMITH_API_KEY" in files
+    files, _ = run(HEAD_REPO="", REPO="konica/agent-tutor", ROLE="arn:x", HAS_KEY="true")  # workflow_dispatch
+    assert "run=true" in files
+
+
+def test_smoke_evals_load_the_learners_then_gate_into_the_summary() -> None:
+    job = evals_job()
+    assert index_of(job, "configure-aws-credentials") < index_of(job, "compose.ci.yaml --profile app up")
+    assert index_of(job, "compose.ci.yaml --profile app up") < index_of(job, "evals.learners")
+    gate = step(job, "Run the smoke split")
+    assert index_of(job, "evals.learners") < job["steps"].index(gate)
+    assert "--split smoke" in gate["run"] and '--summary "$GITHUB_STEP_SUMMARY"' in gate["run"]
+    assert gate["env"]["LANGSMITH_API_KEY"] == "${{ secrets.LANGSMITH_API_KEY }}"
+    assert "smart-tutor-ci" in step(job, "Prepare .env")["run"]
+    for s in job["steps"]:
+        assert "${{" not in str(s.get("run", "")), s.get("name")
+
+
+def test_ci_compose_override_passes_the_oidc_session_not_a_profile() -> None:
+    override = yaml.safe_load((WORKFLOWS.parents[1] / "compose.ci.yaml").read_text(encoding="utf-8"))
+    for service in ("api", "agent", "mcp", "worker"):
+        env = override["services"][service]["environment"]
+        assert {"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "LANGSMITH_API_KEY"} <= set(env), service
+    assert "AWS_PROFILE" in step(evals_job(), "Prepare .env")["run"]  # removed, so botocore uses the session
