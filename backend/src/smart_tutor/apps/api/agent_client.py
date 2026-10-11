@@ -30,13 +30,24 @@ class AgentClient:
         self._http = http
 
     async def open_answer(
-        self, access_token: str, question: str, document_ids: Sequence[str] | None = None
+        self,
+        access_token: str,
+        question: str,
+        document_ids: Sequence[str] | None = None,
+        *,
+        thread_id: str | None = None,
+        run_id: str | None = None,
     ) -> AgentAnswer:
         """Ask the agent; it searches the learner's ready documents with their token, only `document_ids` of them
-        when given (a conversation limited to its documents, US-4c)."""
+        when given (a conversation limited to its documents, US-4c). `thread_id` and `run_id` name the ask's trace
+        (PRD §10.4); the run id is kept with the turn."""
         body: dict[str, object] = {"question": question}
         if document_ids is not None:
             body["document_ids"] = list(document_ids)
+        if thread_id is not None:
+            body["thread_id"] = thread_id
+        if run_id is not None:
+            body["run_id"] = run_id
         request = self._http.build_request(
             "POST", self._url, json=body, headers={"Authorization": f"Bearer {access_token}"}
         )

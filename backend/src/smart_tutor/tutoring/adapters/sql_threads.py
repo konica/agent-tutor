@@ -1,4 +1,4 @@
-"""Threads in Postgres. The table schemas live in migrations 0005, 0007, 0009, 0010, 0011 and 0014."""
+"""Threads in Postgres. The table schemas live in migrations 0005, 0007, 0009, 0010, 0011, 0014 and 0015."""
 
 from collections.abc import Sequence
 from datetime import datetime
@@ -21,7 +21,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB, insert
 
-from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
+from smart_tutor.shared.domain.ids import DocumentId, RunId, ThreadId, UserId
 from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
 from smart_tutor.tutoring.domain.turn import Decline, Turn, TurnCitation
@@ -63,6 +63,7 @@ thread_turns = Table(
     Column("decline_code", Text),
     Column("decline_message", Text),
     Column("created_at", DateTime(timezone=True)),
+    Column("run_id", Uuid(as_uuid=False)),
 )
 
 
@@ -88,7 +89,14 @@ def _turn(row: Any) -> Turn:
         TurnCitation(c["n"], DocumentId(c["document_id"]), c["chunk_id"], c["page"]) for c in row.citations
     )
     return Turn(
-        ThreadId(str(row.thread_id)), UserId(row.user_id), row.question, row.answer, citations, decline, row.created_at
+        ThreadId(str(row.thread_id)),
+        UserId(row.user_id),
+        row.question,
+        row.answer,
+        citations,
+        decline,
+        row.created_at,
+        RunId(str(row.run_id)) if row.run_id else None,
     )
 
 
@@ -235,6 +243,7 @@ class SqlThreadRepository(ThreadRepository):
                     decline_code=turn.decline.code if turn.decline else None,
                     decline_message=turn.decline.message if turn.decline else None,
                     created_at=turn.created_at,
+                    run_id=turn.run_id,
                 )
             )
             _add_documents_used(conn, turn.thread_id, document_ids, turn.created_at)

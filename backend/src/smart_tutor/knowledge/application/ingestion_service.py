@@ -12,7 +12,7 @@ import json
 import logging
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from langchain_core.documents import BaseDocumentTransformer
 from langchain_core.documents import Document as TextDocument
@@ -42,6 +42,7 @@ from smart_tutor.knowledge.ports.pdf_extractor import (
     UnreadablePdfError,
 )
 from smart_tutor.shared.domain.ids import ContentId, UploadId, UserId
+from smart_tutor.shared.ports.run_tracing import NoRunTracing, RunTracing
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +65,7 @@ class ProcessingTools:
     embeddings: Embeddings
     embedding_model: str
     embedding_dim: int
+    tracing: RunTracing = field(default_factory=NoRunTracing)  # groups a content's model calls in one trace (PRD §10.4)
 
 
 class IngestionService:
@@ -152,6 +154,11 @@ class IngestionService:
             content = tx.contents.get_for_update(content_id)
         if content is None or content.state is not ContentState.PROCESSING:
             return None
+        with self._tools.tracing.run("ingest", content.owner_id, {"content_id": content_id}):
+            return self._process(content)
+
+    def _process(self, content: Content) -> ContentState | None:
+        content_id = content.content_id
         data = self._objects.read(content.s3_key)
         try:
             if not content.described:

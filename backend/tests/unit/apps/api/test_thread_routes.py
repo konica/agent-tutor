@@ -2,6 +2,7 @@
 and record the documents used on `done`; GET /threads/{id}/documents lists the documents and GET /threads/{id}/turns
 the turns."""
 
+import dataclasses
 import json
 import uuid
 from collections.abc import AsyncIterator, Callable, Collection
@@ -94,7 +95,7 @@ def test_starts_a_thread_and_relays_the_agents_answer_after_a_thread_event() -> 
     [request] = seen
     assert request.url == "http://agent.test/ask"
     assert request.headers["authorization"] == "Bearer t-ada"  # the same token, forwarded (ADR 0007)
-    assert json.loads(request.content) == {"question": "What is attention?"}
+    assert json.loads(request.content)["question"] == "What is attention?"
     assert "t-ada" not in request.content.decode()  # never in the body
 
 
@@ -681,7 +682,7 @@ def test_a_question_in_a_limited_thread_sends_its_listed_documents_to_the_agent(
     assert json.loads(first.split("data: ", 1)[1]) == {"thread_id": thread_id}
     assert rest == AGENT_ANSWER.decode()
     [request] = seen
-    assert json.loads(request.content) == {"question": "What is attention?", "document_ids": [doc]}
+    assert json.loads(request.content)["document_ids"] == [doc]
 
 
 def test_a_prompt_naming_other_documents_changes_nothing() -> None:
@@ -704,7 +705,7 @@ def test_a_question_in_an_unlimited_thread_sends_no_document_ids() -> None:
     response = client.post(f"/threads/{thread.thread_id}/questions", json=QUESTION, headers=AUTH)
 
     assert response.status_code == 200
-    assert json.loads(seen[-1].content) == {"question": "What is attention?"}
+    assert "document_ids" not in json.loads(seen[-1].content)
 
 
 def test_a_question_in_a_thread_records_its_documents() -> None:
@@ -880,7 +881,7 @@ def test_a_done_answer_is_kept_as_a_turn_with_its_citations() -> None:
             "deleted": False,
         }
     ]
-    assert set(turn) == {"question", "answer", "citations", "decline", "created_at"}
+    assert set(turn) == {"question", "answer", "citations", "decline", "created_at", "run_id"}
 
 
 def test_a_decline_is_kept_as_a_turn() -> None:
@@ -985,6 +986,48 @@ def test_a_kept_turn_holds_no_token() -> None:
     client.post("/threads", json=QUESTION, headers=AUTH)
     [turn] = threads.turn_rows
     assert "t-ada" not in repr(turn) and turn.user_id == "ada"
+
+
+def test_a_new_thread_sends_its_thread_id_and_a_fresh_run_id_to_the_agent_and_keeps_the_run_id() -> None:
+    seen: list[httpx.Request] = []
+    client, threads, _ = setup(recording(seen))
+    client.post("/threads", json=QUESTION, headers=AUTH)
+    [thread] = threads.threads.values()
+    body = json.loads(seen[0].content)
+    assert body["thread_id"] == thread.thread_id
+    run_id = str(uuid.UUID(body["run_id"]))
+    [turn] = client.get(f"/threads/{thread.thread_id}/turns", headers=AUTH).json()
+    assert turn["run_id"] == run_id
+
+
+def test_each_question_in_a_thread_gets_its_own_run_id() -> None:
+    seen: list[httpx.Request] = []
+    client, threads, _ = setup(recording(seen))
+    client.post("/threads", json=QUESTION, headers=AUTH)
+    [thread] = threads.threads.values()
+    client.post(f"/threads/{thread.thread_id}/questions", json=QUESTION, headers=AUTH)
+    first, second = (json.loads(r.content) for r in seen)
+    assert second["thread_id"] == thread.thread_id and first["run_id"] != second["run_id"]
+    turns = client.get(f"/threads/{thread.thread_id}/turns", headers=AUTH).json()
+    assert [t["run_id"] for t in turns] == [first["run_id"], second["run_id"]]
+
+
+def test_a_declined_turn_keeps_its_run_id_too() -> None:
+    seen: list[httpx.Request] = []
+    client, threads, _ = setup(recording(seen, sse_no_documents), ready_document=False)
+    client.post("/threads", json=QUESTION, headers=AUTH)
+    [thread] = threads.threads.values()
+    [turn] = client.get(f"/threads/{thread.thread_id}/turns", headers=AUTH).json()
+    assert turn["run_id"] == json.loads(seen[0].content)["run_id"]
+
+
+def test_a_turn_kept_without_a_run_id_lists_none() -> None:
+    client, threads, _ = setup()
+    client.post("/threads", json=QUESTION, headers=AUTH)
+    [thread] = threads.threads.values()
+    threads.turn_rows[:] = [dataclasses.replace(t, run_id=None) for t in threads.turn_rows]
+    [older] = client.get(f"/threads/{thread.thread_id}/turns", headers=AUTH).json()
+    assert older["run_id"] is None
 
 
 IR = SubjectId("00000000-0000-4000-8000-0000000000a1")
