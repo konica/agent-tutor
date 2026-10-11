@@ -248,16 +248,19 @@ SHARED_REFERENCES = {
                 ]
             }
         ),
+        "allows",
     ),
     "on-premise pulls a native-cloud image": (
         ON_PREMISE,
         "SmartTutor-OnPremise-prod-Host",
         _parameter(f"{ACCOUNT}.dkr.ecr.{REGION}.amazonaws.com/smart-tutor/api:0123abc"),
+        "names",
     ),
     "an on-premise glob too wide for its SSM path": (
         ON_PREMISE,
         "SmartTutor-OnPremise-prod-Host",
         _allow("arn:aws:ssm:us-east-1:*:parameter/smart-tutor*"),
+        "allows",
     ),
     "on-premise imports a native-cloud export": (
         ON_PREMISE,
@@ -265,32 +268,39 @@ SHARED_REFERENCES = {
         _parameter(
             {"Fn::ImportValue": "SmartTutor-prod-Edge:ExportsOutputFnGetAttDistribution830FAC52DomainNameBEB09E30"}
         ),
+        "imports",
     ),
     "on-premise reads a sub-path of native-cloud's SSM path": (
         ON_PREMISE,
         "SmartTutor-OnPremise-prod-Host",
         _allow("arn:aws:ssm:us-east-1:*:parameter/smart-tutor/agent/*"),
+        "names",
     ),
     "native-cloud reads on-premise's secrets": (
         NATIVE_CLOUD,
         "SmartTutor-prod-Cluster",
         _allow("arn:aws:secretsmanager:us-east-1:*:secret:smart-tutor-on-premise/*"),
+        "allows",
     ),
     "native-cloud names on-premise's queue": (
         NATIVE_CLOUD,
         "SmartTutor-prod-Config",
         _parameter("smart-tutor-on-premise-ingest"),
+        "names",
     ),
     "native-cloud acts on on-premise's deploy role": (
         NATIVE_CLOUD,
         "SmartTutor-prod-GitHubDeploy",
         _allow("arn:aws:iam::*:role/smart-tutor-on-premise-github-deploy"),
+        "allows",
     ),
 }
 
 
-@pytest.mark.parametrize(("mode", "stack", "resource"), SHARED_REFERENCES.values(), ids=SHARED_REFERENCES.keys())
-def test_a_shared_reference_fails_the_check(mode: str, stack: str, resource: dict[str, Any]) -> None:
+@pytest.mark.parametrize(
+    ("mode", "stack", "resource", "kind"), SHARED_REFERENCES.values(), ids=SHARED_REFERENCES.keys()
+)
+def test_a_shared_reference_fails_the_check(mode: str, stack: str, resource: dict[str, Any], kind: str) -> None:
     other = owned(NATIVE_CLOUD if mode == ON_PREMISE else ON_PREMISE)
     templates = synth(mode)
     before = set(violations(templates, other))
@@ -299,3 +309,5 @@ def test_a_shared_reference_fails_the_check(mode: str, stack: str, resource: dic
     added = set(violations(templates, other)) - before
 
     assert added and all(v.startswith(f"{stack} ") for v in added), added
+    # Each case is caught by the layer it targets, not only by a neighbouring one (an export name is also a name).
+    assert any(v.startswith(f"{stack} {kind} ") for v in added), (kind, added)
