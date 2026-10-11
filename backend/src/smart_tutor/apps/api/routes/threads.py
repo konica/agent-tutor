@@ -47,7 +47,10 @@ UNAVAILABLE = "The tutor is unavailable. Try again in a moment."
 SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 SSE_RESPONSE: dict[int | str, dict[str, object]] = {
     200: {
-        "description": "Server-sent events: thread, then delta*, citations, done (or error).",
+        "description": (
+            "Server-sent events: thread, then delta*, citations, done; or decline then done "
+            "(no_documents: nothing readable, upload first; limited: the listed documents don't cover it); or error."
+        ),
         "content": {"text/event-stream": {"schema": {"type": "string"}}},
     },
     404: {"description": "A document that isn't the caller's ready one."},
