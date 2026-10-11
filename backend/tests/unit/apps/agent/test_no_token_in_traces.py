@@ -5,6 +5,7 @@ the token in the question, so the check is proven able to fire.
 """
 
 import json
+import uuid
 from typing import Any
 
 import langsmith
@@ -13,7 +14,11 @@ from langchain_core.tracers import LangChainTracer
 
 from fakes import FakeRetriever, RecordingClient, fake_chat_model
 from smart_tutor.apps.agent.graph import build_graph
+from smart_tutor.apps.agent.server import AskRequest, answer_events
 from smart_tutor.apps.agent.state import AgentContext
+from smart_tutor.apps.agent.tracing import AskRun, AskTracing
+from smart_tutor.shared.adapters.tracing import LearnerHasher
+from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 
 TOKEN = "eyJhbGciOi.token-under-test.signature-xyz"
@@ -50,3 +55,31 @@ async def test_positive_control_a_token_in_the_question_is_caught() -> None:
 
 def test_the_context_repr_hides_the_token() -> None:
     assert TOKEN not in repr(AgentContext(access_token=TOKEN))
+
+
+USER_ID = "user-id-under-test-42"
+EMAIL = "ada.lovelace@example.com"
+
+
+async def ask_payloads(question: str) -> str:
+    recorder = RecordingClient()
+    tracing = AskTracing({"deployment": "local"}, LearnerHasher("k"), client=recorder)
+    graph = build_graph(lambda token: FakeRetriever(CHUNKS), fake_chat_model(AIMessage("It weighs tokens [1].")))
+    body = AskRequest(question=question)
+    run = AskRun(uuid.uuid4(), None, UserId(USER_ID), body.question, None)
+    with langsmith.tracing_context(enabled=True):
+        async for _ in answer_events(graph, body, TOKEN, run, tracing):
+            pass
+    assert recorder.payloads
+    return json.dumps(recorder.payloads, default=str)
+
+
+async def test_the_ask_trace_holds_no_token_user_id_or_email() -> None:
+    traces = await ask_payloads("What is attention?")
+    assert "What is attention?" in traces
+    for secret in (TOKEN, USER_ID, EMAIL):
+        assert secret not in traces
+
+
+async def test_positive_control_a_user_id_in_the_question_is_caught() -> None:
+    assert USER_ID in await ask_payloads(f"What is attention? {USER_ID} {EMAIL}")
