@@ -17,3 +17,5 @@
 .attn .icon { color: var(--attn); }
 .danger { background: var(--danger-soft); }
 .danger .icon { color: var(--danger); }
+.neutral { background: var(--surface-2); border-color: var(--border); }
+.neutral .icon { color: var(--text-2); }

@@ -1,3 +1,4 @@
+import dataclasses
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -93,6 +94,37 @@ def test_an_archived_thread_takes_no_question() -> None:
     thread = Thread(ThreadId("t"), UserId("ada"), datetime(2026, 10, 1, tzinfo=UTC), status=ThreadStatus.ARCHIVED)
     with pytest.raises(ThreadArchivedError):
         thread.ask(datetime(2026, 10, 2, tzinfo=UTC))
+
+
+def test_archive_and_restore_change_only_the_status() -> None:
+    thread = new_thread()
+    thread.limit_search(SearchScope.LIBRARY, 0)
+    before = dataclasses.replace(thread)
+
+    thread.archive()
+    assert thread.status is ThreadStatus.ARCHIVED
+    assert dataclasses.replace(thread, status=ThreadStatus.ACTIVE) == before
+
+    thread.restore()
+    assert thread == before
+
+
+def test_archive_and_restore_are_idempotent() -> None:
+    thread = new_thread()
+    thread.archive()
+    thread.archive()
+    assert thread.status is ThreadStatus.ARCHIVED
+    thread.restore()
+    thread.restore()
+    assert thread.status is ThreadStatus.ACTIVE
+
+
+def test_require_active_refuses_an_archived_thread() -> None:
+    thread = new_thread()
+    thread.require_active("nope")
+    thread.archive()
+    with pytest.raises(ThreadArchivedError, match="nope"):
+        thread.require_active("nope")
 
 
 def test_no_filter_matches_every_thread() -> None:

@@ -7,8 +7,9 @@ thread; the learner adds documents to that list and removes them (US-4c). The le
 read its search scope. A learner with no ready, non-archived document still gets a stream: the agent's request
 to upload a document (a "no_documents" decline), kept as a turn like any decline (US-3, US-10). Each ask gets a run
 id that names its trace and is kept with the turn. The learner lists their active conversations, newest activity
-first (US-13). The learner rates a kept answer or decline 👍/👎 (PRD §10.2); the rating is saved with the turn and sent
-to LangSmith on its run."""
+first (US-13); the learner archives and restores a conversation, and an archived one is read-only (US-13). The
+learner rates a kept answer or decline 👍/👎 (PRD §10.2); the rating is saved with the turn and sent to LangSmith on
+its run."""
 
 import json
 import logging
@@ -399,10 +400,16 @@ class ThreadResponse(BaseModel):
     thread_id: str
     title: str | None
     search_scope: Literal["library", "listed"]
+    status: Literal["active", "archived"]
 
 
 def _thread_response(thread: Thread) -> ThreadResponse:
-    return ThreadResponse(thread_id=thread.thread_id, title=thread.title, search_scope=thread.search_scope.value)
+    return ThreadResponse(
+        thread_id=thread.thread_id,
+        title=thread.title,
+        search_scope=thread.search_scope.value,
+        status=thread.status.value,
+    )
 
 
 class ThreadSummaryResponse(BaseModel):
@@ -418,13 +425,14 @@ def list_threads(
     principal: CurrentPrincipal,
     conversations: Conversations,
     subjects: Subjects,
+    archived: bool = False,
     subject_id: Annotated[list[uuid.UUID], Query(max_length=100)] = [],  # noqa: B006 - FastAPI copies the default
     active_from: date | None = None,
     active_to: date | None = None,
     q: Annotated[str | None, Query(max_length=120)] = None,  # a title is at most 120 characters (US-13)
 ) -> list[ThreadSummaryResponse]:
-    """The learner's active conversations, newest last activity first (PRD US-13): title, subjects of the documents
-    used (deleted ones excluded), number of documents, last activity.
+    """The learner's active conversations, or with `archived=true` the archived ones, newest last activity first
+    (PRD US-13): title, subjects of the documents used (deleted ones excluded), number of documents, last activity.
 
     `subject_id` repeats; a conversation matches when any of its listed documents that still exist has any of them.
     `active_from` and `active_to` are inclusive calendar days of last activity in the app time zone (D27). `q` is a
@@ -432,6 +440,7 @@ def list_threads(
     """
     summaries = conversations.list_threads(
         principal.user_id,
+        archived=archived,
         subject_ids=[SubjectId(str(s)) for s in subject_id],
         active_from=active_from,
         active_to=active_to,
@@ -448,6 +457,33 @@ def list_threads(
         )
         for t in summaries
     ]
+
+
+@router.post(
+    "/threads/{thread_id}/archive",
+    operation_id="archive_thread",
+    responses={404: {"description": "Not the caller's conversation."}},
+)
+def archive_thread(thread_id: uuid.UUID, principal: CurrentPrincipal, conversations: Conversations) -> ThreadResponse:
+    """Archive the learner's conversation (PRD US-13): it leaves the active list and becomes read-only; its history,
+    documents used, and title stay. Archiving an archived one changes nothing."""
+    try:
+        return _thread_response(conversations.archive_thread(ThreadId(str(thread_id)), principal.user_id))
+    except ThreadNotFoundError as e:
+        raise HTTPException(404, str(e)) from None
+
+
+@router.post(
+    "/threads/{thread_id}/restore",
+    operation_id="restore_thread",
+    responses={404: {"description": "Not the caller's conversation."}},
+)
+def restore_thread(thread_id: uuid.UUID, principal: CurrentPrincipal, conversations: Conversations) -> ThreadResponse:
+    """Restore the learner's archived conversation: active again; restoring an active one changes nothing."""
+    try:
+        return _thread_response(conversations.restore_thread(ThreadId(str(thread_id)), principal.user_id))
+    except ThreadNotFoundError as e:
+        raise HTTPException(404, str(e)) from None
 
 
 @router.get(
@@ -538,7 +574,10 @@ def list_thread_documents(
 @router.post(
     "/threads/{thread_id}/documents",
     operation_id="add_thread_documents",
-    responses={404: {"description": "Not the caller's conversation, or a document that isn't their ready one."}},
+    responses={
+        404: {"description": "Not the caller's conversation, or a document that isn't their ready one."},
+        409: {"description": "The conversation is archived."},
+    },
 )
 def add_thread_documents(
     thread_id: uuid.UUID, body: AddThreadDocumentsRequest, principal: CurrentPrincipal, conversations: Conversations
@@ -550,6 +589,8 @@ def add_thread_documents(
         )
     except (ThreadNotFoundError, DocumentNotAvailableError) as e:
         raise HTTPException(404, str(e)) from None
+    except ThreadArchivedError as e:
+        raise HTTPException(409, str(e)) from None
     return [_response(d) for d in listed]
 
 
@@ -557,7 +598,10 @@ def add_thread_documents(
     "/threads/{thread_id}/documents/{document_id}",
     operation_id="remove_thread_document",
     status_code=204,
-    responses={404: {"description": "Not the caller's conversation."}},
+    responses={
+        404: {"description": "Not the caller's conversation."},
+        409: {"description": "The conversation is archived."},
+    },
 )
 def remove_thread_document(
     thread_id: uuid.UUID, document_id: uuid.UUID, principal: CurrentPrincipal, conversations: Conversations
@@ -567,6 +611,8 @@ def remove_thread_document(
         conversations.remove_document(ThreadId(str(thread_id)), principal.user_id, DocumentId(str(document_id)))
     except ThreadNotFoundError as e:
         raise HTTPException(404, str(e)) from None
+    except ThreadArchivedError as e:
+        raise HTTPException(409, str(e)) from None
 
 
 class TurnCitationResponse(BaseModel):

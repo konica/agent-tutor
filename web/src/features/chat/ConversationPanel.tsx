@@ -1,4 +1,4 @@
-import { Archive, FileText, Info, NotebookPen, Plus, X } from "lucide-react";
+import { Archive, ArchiveRestore, FileText, Info, NotebookPen, Plus, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import type { ThreadDocumentResponse } from "../../api/generated/types.gen";
@@ -29,6 +29,13 @@ type Props = {
   searchListed: boolean;
   /** Turns the limit on or off; the switch is disabled without it (no conversation yet). */
   onSearchListedChange?: (on: boolean) => void;
+  /** The conversation is archived (US-13): its documents can't change, and Actions offers Restore instead of Archive. */
+  archived?: boolean;
+  /** Archives the conversation; Archive conversation is disabled without it. */
+  onArchive?: () => void;
+  onRestore?: () => void;
+  /** Archive and Restore are off while an answer streams or the status is changing. */
+  actionsDisabled?: boolean;
 };
 
 // Where focus goes once a removed row is gone: a row's remove button, or Add documents.
@@ -44,9 +51,11 @@ function tooltip(d: ThreadDocumentResponse): string {
  * The chat's left pane (DESIGN.md → Chat, PRD Q60): the conversation's documents, its Lesson Note, and actions.
  * A row opens the document beside the conversation (US-4b), and its remove button, a sibling of that open button, takes it
  * off the list (US-4c); Add documents opens the picker once the conversation exists. A document the learner added that no
- * answer has used yet is marked "Added". Summarize lesson (US-7) and Archive conversation (US-13) stay disabled until
- * their stories. "Only search these documents" limits the conversation's search to its list; it is disabled while the
- * list is empty, since there is nothing to limit the search to.
+ * answer has used yet is marked "Added". Summarize lesson (US-7) stays disabled until its story. "Only search these
+ * documents" limits the conversation's search to its list; it is disabled while the list is empty, since there is nothing
+ * to limit the search to. Actions archive the conversation, or restore it when it is archived (US-13); an archived
+ * conversation's documents are read-only: no remove buttons, no Add documents, and the switch is disabled, while its
+ * rows still open the documents.
  */
 export function ConversationPanel({
   id,
@@ -62,6 +71,10 @@ export function ConversationPanel({
   openId = null,
   searchListed,
   onSearchListedChange,
+  archived = false,
+  onArchive,
+  onRestore,
+  actionsDisabled = false,
 }: Props) {
   const panel = useRef<HTMLElement>(null);
   const focusAfterRemove = useRef<FocusTarget | null>(null);
@@ -84,6 +97,8 @@ export function ConversationPanel({
   }
 
   const listEmpty = !documentsFailed && documents.length === 0;
+  // An archived conversation can't add documents, so the hint has nothing to point to.
+  const scopeHint = listEmpty && !archived;
 
   return (
     <aside ref={panel} id={id} className={styles.panel} aria-label="Conversation">
@@ -131,7 +146,7 @@ export function ConversationPanel({
                     </button>
                   )}
                   {/* A sibling of the open button, never inside it: nested buttons are invalid. */}
-                  {onRemoveDocument && (
+                  {onRemoveDocument && !archived && (
                     <IconButton
                       label={`Remove ${d.title} from this conversation`}
                       data-tip="Remove from this conversation"
@@ -152,7 +167,7 @@ export function ConversationPanel({
             Deleted documents can't be opened.
           </p>
         )}
-        {onAddDocuments && threadId !== null && (
+        {onAddDocuments && threadId !== null && !archived && (
           <Button
             variant="quiet"
             size="sm"
@@ -169,10 +184,10 @@ export function ConversationPanel({
           type="button"
           role="switch"
           aria-checked={searchListed}
-          aria-describedby={listEmpty ? `${id}-scope-hint` : undefined}
+          aria-describedby={scopeHint ? `${id}-scope-hint` : undefined}
           className={styles.switch}
           data-scope-switch
-          disabled={!onSearchListedChange || documents.length === 0 || documentsFailed}
+          disabled={!onSearchListedChange || documents.length === 0 || documentsFailed || archived}
           onClick={() => onSearchListedChange?.(!searchListed)}
         >
           <span className={styles.track} aria-hidden="true">
@@ -180,7 +195,7 @@ export function ConversationPanel({
           </span>
           Only search these documents
         </button>
-        {listEmpty && (
+        {scopeHint && (
           <p id={`${id}-scope-hint`} className={styles.text}>
             Add documents to limit the search.
           </p>
@@ -219,11 +234,32 @@ export function ConversationPanel({
           </span>
           Show citations
         </button>
-        {threadId !== null && (
-          <Button variant="quiet" size="sm" icon={Archive} className={styles.action} disabled>
-            Archive conversation
-          </Button>
-        )}
+        {threadId !== null &&
+          (archived ? (
+            <Button
+              variant="quiet"
+              size="sm"
+              icon={ArchiveRestore}
+              className={styles.action}
+              data-thread-action
+              disabled={actionsDisabled}
+              onClick={onRestore}
+            >
+              Restore conversation
+            </Button>
+          ) : (
+            <Button
+              variant="quiet"
+              size="sm"
+              icon={Archive}
+              className={styles.action}
+              data-thread-action
+              disabled={actionsDisabled || !onArchive}
+              onClick={onArchive}
+            >
+              Archive conversation
+            </Button>
+          ))}
       </section>
     </aside>
   );

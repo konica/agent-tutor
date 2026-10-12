@@ -10,7 +10,7 @@ const SAVE_FAILED = "The title couldn't be saved. Try again.";
 
 type Props = {
   title: string;
-  /** Off while there is no conversation to rename yet (or, later, while it is archived): the title is plain text. */
+  /** Off while there is no conversation to rename yet, or while it is archived: the title is plain text. */
   editable: boolean;
   /** Saves the trimmed title; rejects with the learner's message when the server refuses it. */
   onRename: (title: string) => Promise<void>;

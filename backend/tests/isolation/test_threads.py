@@ -1,7 +1,8 @@
 """US-12: each learner's POST /threads starts a thread owned by that learner; no one else can get it, its
-documents used (GET /threads/{id}/documents), its turns (GET /threads/{id}/turns), or rename it (PATCH
-/threads/{id}), or rate one of its turns (PUT /threads/{id}/turns/{run_id}/rating); GET /threads lists only the
-caller's own threads. A thread starts from a document only if it is the learner's own ready, active one."""
+documents used (GET /threads/{id}/documents), its turns (GET /threads/{id}/turns), rename it (PATCH /threads/{id}),
+archive or restore it (POST /threads/{id}/archive, /restore), or rate one of its turns (PUT
+/threads/{id}/turns/{run_id}/rating); GET /threads lists only the caller's own threads, active or archived. A thread
+starts from a document only if it is the learner's own ready, active one."""
 
 import json
 
@@ -410,3 +411,21 @@ def test_only_the_owner_rates_a_turn() -> None:
     assert feedback.sent == []
     mine = client.put(f"/threads/{a_turn.thread_id}/turns/{a_turn.run_id}/rating", json={"rating": "up"}, headers=A)
     assert mine.status_code == 200 and feedback.sent == [(a_turn.run_id, Rating.UP)]
+
+
+def test_another_learner_cant_archive_restore_or_list_an_archived_thread() -> None:
+    library, threads = InMemoryLibrary(), InMemoryThreads()
+    ingest_ready(library, "learner-a", "Attention weighs tokens.")
+    services = api_services(library, threads=threads, agent=fake_agent(answers))
+    client = TestClient(create_app(Settings(), verifier=learners(), services=services))
+    assert client.post("/threads", json={"question": "What is attention?"}, headers=A).status_code == 200
+    [thread] = threads.threads.values()
+
+    assert client.post(f"/threads/{thread.thread_id}/archive", headers=B).status_code == 404
+    assert threads.threads[thread.thread_id].status.value == "active"
+
+    assert client.post(f"/threads/{thread.thread_id}/archive", headers=A).status_code == 200
+    assert client.get("/threads?archived=true", headers=B).json() == []
+    assert client.post(f"/threads/{thread.thread_id}/restore", headers=B).status_code == 404
+    assert threads.threads[thread.thread_id].status.value == "archived"
+    assert [t["thread_id"] for t in client.get("/threads?archived=true", headers=A).json()] == [thread.thread_id]

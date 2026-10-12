@@ -40,6 +40,10 @@ class ThreadRepository(ABC):
         """Store the thread's title (committed when this returns). (Callers check ownership first with `get_owned`.)"""
 
     @abstractmethod
+    def set_status(self, thread_id: ThreadId, status: ThreadStatus) -> None:
+        """Store the thread's status (committed when this returns). (Callers check ownership first.)"""
+
+    @abstractmethod
     def set_search_scope(self, thread_id: ThreadId, scope: SearchScope) -> None:
         """Store the thread's search scope (committed when this returns). (Callers check ownership first.)"""
 
