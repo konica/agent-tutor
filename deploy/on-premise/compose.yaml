@@ -4,7 +4,7 @@
 # Our images come from on-premise's ECR repositories (`smart-tutor-on-premise/<service>`) by commit tag. Caddy is the
 # only service with public ports. Data lives on the data volume (/data). The worker, agent, and MCP server (#149) run
 # as the image's non-root user on a read-only root filesystem, like the Helm charts. The worker reaches Postgres and
-# Phoenix directly and, through the egress proxy, its AWS endpoints and LangSmith (#153, #229); deploy.sh checks the running worker's isolation and egress
+# Phoenix directly and, through the egress proxy, its AWS endpoints (#153); deploy.sh checks the running worker's isolation and egress
 # after every deploy. Phoenix keeps the production traces (#288, ADR 0017): people reach it at /phoenix through Caddy, and
 # services reach it at http://phoenix:6006 inside Compose, the worker too (it shares the worker network).
 
@@ -41,7 +41,7 @@ services:
       retries: 12
 
   # Runtime traces (#288, ADR 0017): Arize Phoenix. People sign in at https://<domain>/phoenix (Caddy strips the prefix;
-  # PHOENIX_HOST_ROOT_PATH puts it back into the pages' links). The production services will send OTLP/HTTP to
+  # PHOENIX_HOST_ROOT_PATH puts it back into the pages' links). The agent and worker send OTLP/HTTP to
   # http://phoenix:6006/v1/traces with the system key <prefix>/phoenix/api-key (runbook); on the worker's network so the
   # worker reaches it without the egress proxy. Its traces live in the `phoenix` database, which the backup leaves out.
   phoenix:
@@ -200,11 +200,11 @@ services:
     environment:
       SMART_TUTOR_ENVIRONMENT: prod
       SMART_TUTOR_DEPLOYMENT: on-premise
-      # Traces (PRD §10.4, #229): tracing is off until the LangSmith API key's secret exists (deploy.sh).
-      LANGSMITH_TRACING: ${LANGSMITH_TRACING:?}
-      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY}
-      LANGSMITH_PROJECT: smart-tutor-on-premise
-      LANGSMITH_TRACING_SAMPLING_RATE: ${TRACE_SAMPLING_RATE:?}
+      # Traces (PRD §10.4, ADR 0017): untraced until the Phoenix key's secret exists (deploy.sh).
+      SMART_TUTOR_PHOENIX_URL: http://phoenix:6006
+      SMART_TUTOR_PHOENIX_API_KEY: ${PHOENIX_API_KEY}
+      SMART_TUTOR_PHOENIX_PROJECT: smart-tutor-on-premise
+      SMART_TUTOR_TRACE_SAMPLING_RATE: ${TRACE_SAMPLING_RATE:?}
       SMART_TUTOR_LEARNER_HASH_KEY: ${LEARNER_HASH_KEY:?}
       SMART_TUTOR_AWS_REGION: ${AWS_REGION:?}
       AWS_REGION: ${AWS_REGION:?}
@@ -265,7 +265,7 @@ services:
       postgres: {condition: service_healthy}
       keycloak: {condition: service_started}
 
-  # The worker's only way out (#153): CONNECT to its AWS endpoints and LangSmith's API, plain HTTP to the instance metadata service (the
+  # The worker's only way out (#153): CONNECT to its AWS endpoints, plain HTTP to the instance metadata service (the
   # instance profile's credentials); everything else gets 403. The config is an environment variable rather than a
   # file so a changed bucket or region recreates the container (Compose can't inject a config into a read-only one).
   egress-proxy:
@@ -279,14 +279,11 @@ services:
         http_port 3128
         # Exact names, no reverse lookups (-n): not bare s3.*, whose path-style requests could name any bucket.
         acl aws dstdomain -n ${DOCUMENTS_BUCKET:?}.s3.amazonaws.com ${DOCUMENTS_BUCKET:?}.s3.${AWS_REGION:?}.amazonaws.com sqs.${AWS_REGION:?}.amazonaws.com ssm.${AWS_REGION:?}.amazonaws.com bedrock-runtime.${AWS_REGION:?}.amazonaws.com
-        # The worker's ingest traces (#229).
-        acl langsmith dstdomain -n api.smith.langchain.com
         acl imds dstdomain -n 169.254.169.254
         acl tls port 443
         acl http port 80
         acl CONNECT method CONNECT
         http_access allow CONNECT aws tls
-        http_access allow CONNECT langsmith tls
         http_access allow !CONNECT imds http
         http_access deny all
         # IMDSv2 refuses a token request that carries X-Forwarded-For.
@@ -332,11 +329,11 @@ services:
     environment:
       SMART_TUTOR_ENVIRONMENT: prod
       SMART_TUTOR_DEPLOYMENT: on-premise
-      # Traces (PRD §10.4, #229): tracing is off until the LangSmith API key's secret exists (deploy.sh).
-      LANGSMITH_TRACING: ${LANGSMITH_TRACING:?}
-      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY}
-      LANGSMITH_PROJECT: smart-tutor-on-premise  # its ingest traces go to smart-tutor-on-premise-ingestion
-      LANGSMITH_TRACING_SAMPLING_RATE: ${TRACE_SAMPLING_RATE:?}
+      # Traces (PRD §10.4, ADR 0017): untraced until the Phoenix key's secret exists (deploy.sh).
+      SMART_TUTOR_PHOENIX_URL: http://phoenix:6006
+      SMART_TUTOR_PHOENIX_API_KEY: ${PHOENIX_API_KEY}
+      SMART_TUTOR_PHOENIX_PROJECT: smart-tutor-on-premise  # the worker's ingest traces go to smart-tutor-on-premise-ingestion
+      SMART_TUTOR_TRACE_SAMPLING_RATE: ${TRACE_SAMPLING_RATE:?}
       SMART_TUTOR_LEARNER_HASH_KEY: ${LEARNER_HASH_KEY:?}
       SMART_TUTOR_AWS_REGION: ${AWS_REGION:?}
       AWS_REGION: ${AWS_REGION:?}
@@ -349,6 +346,8 @@ services:
       # Its only way out (egress-proxy); botocore also fetches the instance profile's credentials through it.
       HTTP_PROXY: http://egress-proxy:3128
       HTTPS_PROXY: http://egress-proxy:3128
+      NO_PROXY: phoenix  # on the worker's internal network; requests reads either spelling
+      no_proxy: phoenix
       AWS_METADATA_SERVICE_TIMEOUT: "2"  # one more hop to IMDS than the default 1 s assumes
       AWS_METADATA_SERVICE_NUM_ATTEMPTS: "3"
       HOME: /tmp  # botocore looks for ~/.aws; the root filesystem is read-only
