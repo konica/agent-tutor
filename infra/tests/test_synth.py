@@ -199,7 +199,8 @@ def test_admin_and_deploy_role_get_cluster_admin_access_entries() -> None:
     entries = t.find_resources("AWS::EKS::AccessEntry")
     principals = [json.dumps(e["Properties"]["PrincipalArn"]) for e in entries.values()]
     assert len(entries) == 2
-    assert any("arn:aws:iam::685394474162:user/poweruser" in p for p in principals)
+    # cdk.json names the admin by IAM path only; the stack adds the deploy account, so no account id is committed.
+    assert any('"arn:aws:iam::", {"Ref": "AWS::AccountId"}, ":user/poweruser"' in p for p in principals)
     assert any("role/smart-tutor-github-deploy" in p for p in principals)
     assert all("AmazonEKSClusterAdminPolicy" in json.dumps(e["Properties"]["AccessPolicies"]) for e in entries.values())
 

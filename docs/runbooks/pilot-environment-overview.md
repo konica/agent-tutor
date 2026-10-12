@@ -17,7 +17,7 @@ flowchart TB
     WF -->|"id-token: write"| TOK["OIDC token<br/>sub = repo:konica@1114311/agent-tutor@1399048529:environment:native-cloud"]
   end
 
-  subgraph AWS["AWS account 685394474162 — us-east-1"]
+  subgraph AWS["AWS account ACCOUNT_ID — us-east-1"]
     subgraph IAM["IAM — stack SmartTutor-prod-GitHubDeploy + CDK bootstrap (#55)"]
       OIDC["OIDC provider<br/>token.actions.githubusercontent.com"]
       ROLE["Role smart-tutor-github-deploy<br/>trusts only that sub"]

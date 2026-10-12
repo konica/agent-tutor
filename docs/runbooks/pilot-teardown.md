@@ -1,6 +1,6 @@
 # Pilot teardown (#177)
 
-Stops the native-cloud pilot (`SmartTutor-prod-*`) from costing money. It needs an account admin whose principal is in `smart-tutor:eks-admin-principal-arns` in `infra/cdk.json`. Whether to tear down is the product owner's decision (#156); this runbook only says how. The pilot was torn down on 2026-10-11 with `-DeleteDatabaseSnapshots -DeleteDocumentsBucket -DeleteLogGroups`, so a redeploy (section 8) starts from scratch.
+Stops the native-cloud pilot (`SmartTutor-prod-*`) from costing money. It needs an account admin whose principal is in `smart-tutor:eks-admin-principals` in `infra/cdk.json`. Whether to tear down is the product owner's decision (#156); this runbook only says how. The pilot was torn down on 2026-10-11 with `-DeleteDatabaseSnapshots -DeleteDocumentsBucket -DeleteLogGroups`, so a redeploy (section 8) starts from scratch.
 
 Commands are for **PowerShell 7** (`pwsh`). Run them from the repository root. The script ignores LocalStack endpoints and access keys from your terminal (like `pilot-aws-prerequisites.ps1`), so it always talks to real AWS.
 
@@ -76,7 +76,7 @@ Under **$2 a month**: the bootstrap bucket, the RDS final snapshot (about $2 for
 
 The script is safe to run again: it skips what is gone and retries stacks in `DELETE_FAILED`.
 
-- **`Unauthorized` from kubectl or helm.** Your principal is not in `smart-tutor:eks-admin-principal-arns`. Use the right profile.
+- **`Unauthorized` from kubectl or helm.** Your principal is not in `smart-tutor:eks-admin-principals`. Use the right profile.
 - **Edge or Network is `DELETE_FAILED`.** An ENI or a security-group rule is still attached, or the Kubernetes cleanup was skipped. Wait and run the script again. Look at the stack's **Events** in the CloudFormation console, or list what uses the VPC: `aws ec2 describe-network-interfaces --filters "Name=vpc-id,Values=<vpc id>"`.
 - **TargetGroupBindings remain after 10 min.** The controller could not deregister targets, often because it was already uninstalled. Remove the finalizers: `kubectl patch targetgroupbinding <name> -n smart-tutor --type merge -p '{"metadata":{"finalizers":null}}'`, then rerun.
 - **Network is `DELETE_FAILED` on a security group named `eks-cluster-sg-smart-tutor-prod-*`.** EKS sometimes leaves its cluster security group behind. Delete it once no network interface uses it (`aws ec2 delete-security-group --group-id <id>`), then rerun.

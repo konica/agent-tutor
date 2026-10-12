@@ -28,7 +28,7 @@
 #>
 [CmdletBinding()]
 param(
-    # An AWS CLI profile whose principal is in smart-tutor:eks-admin-principal-arns (infra/cdk.json).
+    # An AWS CLI profile whose principal is in smart-tutor:eks-admin-principals (infra/cdk.json).
     [string] $AwsProfile = $(if ($env:AWS_PROFILE) { $env:AWS_PROFILE } else { "default" }),
     [string] $Region = "us-east-1",
     [string] $Repo = "konica/agent-tutor",
@@ -148,8 +148,10 @@ try {
     Write-Host "AWS account $AccountId as $Caller, region $Region"
 
     $Context = (Get-Content (Join-Path $InfraDir "cdk.json") -Raw | ConvertFrom-Json).context
-    if ($Caller -notin $Context."smart-tutor:eks-admin-principal-arns") {
-        Write-Warning ("$Caller is not in smart-tutor:eks-admin-principal-arns (infra/cdk.json). kubectl and helm " +
+    # cdk.json lists IAM paths ("user/poweruser"); the cluster's access entries add this account.
+    $AdminArns = $Context."smart-tutor:eks-admin-principals" | ForEach-Object { "arn:aws:iam::${AccountId}:$_" }
+    if ($Caller -notin $AdminArns) {
+        Write-Warning ("$Caller is not in smart-tutor:eks-admin-principals (infra/cdk.json). kubectl and helm " +
             "will say Unauthorized, and the Kubernetes cleanup will fail.")
     }
 
