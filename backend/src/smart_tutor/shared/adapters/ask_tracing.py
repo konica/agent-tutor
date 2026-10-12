@@ -86,7 +86,6 @@ class PhoenixAskTracing(AskTracing):
             yield ask
         finally:
             ask.close()
-            try:
-                context.detach(token)
-            except Exception:
-                logger.warning("could not leave the ask trace's context", exc_info=True)
+            # detach logs its own failure; a stream the client abandoned is ended when the generator is finalized, and
+            # OTel may then log a detach error from another context.
+            context.detach(token)

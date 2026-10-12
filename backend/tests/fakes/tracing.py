@@ -1,4 +1,5 @@
-"""Fakes for LangSmith tracing: a client that records payloads, and a RunTracing that records runs."""
+"""Fakes for tracing: LangSmith (evals, and the test guard) with a client that records payloads, and Phoenix with a
+RunTracing that records runs."""
 
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager, contextmanager, nullcontext

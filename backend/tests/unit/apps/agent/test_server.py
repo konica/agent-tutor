@@ -9,10 +9,12 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
+from openinference.instrumentation.langchain import LangChainInstrumentor
 
 from fakes import FakeRetriever, FakeTokenVerifier, fake_chat_model
 from smart_tutor.apps.agent.graph import build_graph
 from smart_tutor.apps.agent.server import create_app
+from smart_tutor.shared.adapters.ask_tracing import PhoenixAskTracing
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.domain.ids import UserId
@@ -224,6 +226,28 @@ def test_without_a_phoenix_url_the_agent_starts_untraced(monkeypatch: pytest.Mon
     app = create_app(Settings(keycloak_client_secret="s"), graph=graph)
     with TestClient(app):
         assert isinstance(app.state.tracing, NoAskTracing)
+
+
+def test_with_a_phoenix_url_the_agent_starts_traced_and_stops_instrumenting_on_exit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("smart_tutor.apps.agent.server.keycloak_verifier", lambda settings, http: FakeTokenVerifier())
+    graph = build_graph(lambda token: FakeRetriever([CHUNK]), fake_chat_model(AIMessage("x")))
+    settings = Settings(
+        keycloak_client_secret="s", learner_hash_key="k", phoenix_url="http://127.0.0.1:9"
+    )  # nothing listens on :9, and no ask is made
+    app = create_app(settings, graph=graph)
+    with TestClient(app):
+        assert isinstance(app.state.tracing, PhoenixAskTracing)
+        assert LangChainInstrumentor().is_instrumented_by_opentelemetry
+    assert not LangChainInstrumentor().is_instrumented_by_opentelemetry
+
+
+def test_a_refused_startup_for_a_missing_client_secret_leaves_langchain_uninstrumented() -> None:
+    settings = Settings(keycloak_client_secret="", learner_hash_key="k", phoenix_url="http://127.0.0.1:9")
+    with pytest.raises(RuntimeError, match="KEYCLOAK_CLIENT_SECRET"), TestClient(create_app(settings)):
+        pass
+    assert not LangChainInstrumentor().is_instrumented_by_opentelemetry
 
 
 class _RecordingTracing(AskTracing):
