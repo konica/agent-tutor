@@ -106,8 +106,12 @@ def test_only_main_and_rollback_reach_the_deploy_environments() -> None:
             if job.get("uses", "").removeprefix("./.github/workflows/") in ENVIRONMENT_WORKFLOWS:
                 callers += 1
                 assert job["permissions"] == {"contents": "read", "id-token": "write"}, (name, job_name)
+                # A called workflow sees no secret the caller doesn't pass, not even its environment's own
+                # AWS_ROLE_ARN: without this the role is an empty string and the sign-in fails.
+                assert job["secrets"] == "inherit", (name, job_name)
             else:
                 assert job["permissions"] == {"contents": "read"}, (name, job_name)
+                assert "secrets" not in job, (name, job_name)
     assert callers == 6  # deploy: images per mode, on-premise, native-cloud; rollback: on-premise, native-cloud
     # Only the environment workflows name a deploy role (openwiki-update.yml has its own Bedrock-only role).
     for path in WORKFLOWS.glob("*.yml"):

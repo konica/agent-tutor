@@ -24,6 +24,7 @@ jobs:
       contents: read
       id-token: write  # OIDC sign-in to AWS, used only inside the `on-premise` environment
     uses: ./.github/workflows/deploy-on-premise.yml
+    secrets: inherit  # the environment's AWS_ROLE_ARN reaches a called workflow only this way
     with:
       image_tag: ${{ inputs.image_tag }}
       infrastructure: false
@@ -34,6 +35,7 @@ jobs:
       contents: read
       id-token: write  # OIDC sign-in to AWS, used only inside the `native-cloud` environment
     uses: ./.github/workflows/deploy-native-cloud.yml
+    secrets: inherit  # the environment's AWS_ROLE_ARN reaches a called workflow only this way
     with:
       image_tag: ${{ inputs.image_tag }}
       infrastructure: false

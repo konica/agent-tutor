@@ -4,6 +4,8 @@
 # Native-cloud is opt-in: run this workflow by hand with mode native-cloud, or set the repository variable
 # NATIVE_CLOUD_AUTO_DEPLOY to `true` to deploy it on every push as well (unset or anything else keeps it off).
 # Runbooks: docs/runbooks/on-premise-deploy.md, docs/runbooks/pilot-deploy.md (native-cloud).
+# Jobs that call an environment workflow pass `secrets: inherit`: a called workflow sees no secret the caller doesn't
+# pass, not even its environment's own AWS_ROLE_ARN (it would be an empty string, with no error).
 name: deploy
 
 on:
@@ -32,6 +34,7 @@ jobs:
       contents: read
       id-token: write  # OIDC sign-in to AWS, used only inside the `on-premise` environment
     uses: ./.github/workflows/build-images.yml
+    secrets: inherit
     with:
       image_tag: ${{ github.sha }}
       environment: on-premise
@@ -43,6 +46,7 @@ jobs:
       contents: read
       id-token: write  # OIDC sign-in to AWS, used only inside the `native-cloud` environment
     uses: ./.github/workflows/build-images.yml
+    secrets: inherit
     with:
       image_tag: ${{ github.sha }}
       environment: native-cloud
@@ -54,6 +58,7 @@ jobs:
       contents: read
       id-token: write  # OIDC sign-in to AWS, used only inside the `on-premise` environment
     uses: ./.github/workflows/deploy-on-premise.yml
+    secrets: inherit
     with:
       image_tag: ${{ github.sha }}
       infrastructure: true
@@ -65,6 +70,7 @@ jobs:
       contents: read
       id-token: write  # OIDC sign-in to AWS, used only inside the `native-cloud` environment
     uses: ./.github/workflows/deploy-native-cloud.yml
+    secrets: inherit
     with:
       image_tag: ${{ github.sha }}
       infrastructure: true
