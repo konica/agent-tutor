@@ -1,4 +1,4 @@
-# On-premise deploy (#148, #149, #150, #153, #154, #229)
+# On-premise deploy (#148, #149, #150, #153, #154, #229, #288)
 
 Deploys on-premise mode (ADR 0012, PRD §9.12): one EC2 VM runs Smart Tutor with Docker Compose, and Caddy serves it over HTTPS at `https://smart-tutor.duckdns.org` (a DuckDNS name pointed at the Elastic IP, section 9) with a Let's Encrypt certificate. Every merge to `main` deploys on-premise automatically while the production switch `PRODUCTION_DEPLOY` is `true`, unless `ON_PREMISE_AUTO_DEPLOY` is `false` (section 3). This runbook also covers the one-time setup, the first deploy, and a deploy by hand. It brings up Postgres, Keycloak, the API, the web app, Caddy, the agent, the MCP server, and the worker, so a learner can sign in, upload a PDF, and ask about it (#149). Backups and restore: `on-premise-backups.md` (#151). Alarms and weekly patching: `on-premise-monitoring.md` (#152); after the first deploy, every alert recipient confirms the subscription email.
 
@@ -13,7 +13,7 @@ Commands are for **PowerShell 7** (`pwsh`). Run them from the repository root wi
 | Files on the VM | `deploy/` is uploaded as a CDK asset; the deploy unpacks it to `/opt/smart-tutor` and runs `/opt/smart-tutor/on-premise/deploy.sh` |
 | Settings and secrets | SSM `/smart-tutor-on-premise/*` and Secrets Manager `smart-tutor-on-premise/*`. On the VM, `deploy.sh` renders them into `/etc/smart-tutor/smart-tutor.env` (root only, mode 600) |
 | AWS from the containers | The agent, MCP server, worker, and API use the instance profile (IMDSv2, hop limit 2): Bedrock, the on-premise bucket and ingest queue, and SSM `/smart-tutor-on-premise/*`. One role holds what native-cloud gives each service separately. The worker reaches them, and LangSmith for tracing, only through `egress-proxy` (an allowlist; ADR 0014) |
-| Data | The data volume, mounted at `/data`: Postgres in `/data/postgres` (the app and Keycloak databases), and Caddy's certificates in `/data/caddy` |
+| Data | The data volume, mounted at `/data`: Postgres in `/data/postgres` (the app, Keycloak, and `phoenix` databases), and Caddy's certificates in `/data/caddy` |
 | Public name | `smart-tutor.duckdns.org` on DuckDNS, in the account of the Google account `dtrungthao@gmail.com`. Its token is the secret `smart-tutor-on-premise/duckdns/token`, created by hand, not by CDK (section 9) |
 
 The Host stack creates a VPC with one public subnet, no NAT, and an S3 gateway endpoint. It also creates a `t3.large` Amazon Linux 2023 instance with no SSH key and a security group that admits TCP 80 and 443 only, plus an Elastic IP and a 50 GB encrypted gp3 data volume. The SSM document `smart-tutor-on-premise-deploy` runs the deploy. The instance size is the context `smart-tutor:on-premise-instance-type` in `infra/cdk.json`. The domain is `smart-tutor:on-premise-domain`: `smart-tutor.duckdns.org`, and empty means `<Elastic IP>.sslip.io`.
@@ -336,7 +336,7 @@ Deletes every on-premise stack, in this order:
 
 | | What | Notes |
 |---|---|---|
-| Deleted | `Host`: the VM, the Elastic IP, the VPC, the data volume (after a final snapshot), the snapshot policy, the alarms and alert topic, the uptime check, the patching window, the deploy document, and the database and test-learner secrets | |
+| Deleted | `Host`: the VM, the Elastic IP, the VPC, the data volume (after a final snapshot), the snapshot policy, the alarms and alert topic, the uptime check, the patching window, the deploy document, and the database, test-learner, and Phoenix secrets (`db/phoenix`, `phoenix/secret`, `phoenix/admin-password`) | |
 | Deleted | `Registry`: the repositories `smart-tutor-on-premise/*` and their images | The next build recreates them, empty. |
 | Deleted | `Config`: the SSM parameters under `/smart-tutor-on-premise/`, the Keycloak secrets, and the LangSmith learner-hash key `smart-tutor-on-premise/langsmith/learner-hash-key` | |
 | Deleted | `Storage`: the queues `smart-tutor-on-premise-ingest` and `smart-tutor-on-premise-ingest-dlq` | The bucket stays (below). |
@@ -347,6 +347,7 @@ Deletes every on-premise stack, in this order:
 | Kept | The DuckDNS name `smart-tutor.duckdns.org` | In the DuckDNS account, pointed at `127.0.0.1` by step 4. The next deploy points it at the new Elastic IP. |
 | Kept | The secret `smart-tutor-on-premise/duckdns/token` | Created by hand, not by a stack (section 9). |
 | Kept | The secret `smart-tutor-on-premise/langsmith/api-key` | Created by hand, not by a stack (section 10). |
+| Kept | The secret `smart-tutor-on-premise/phoenix/api-key` | Created by hand, not by a stack (section 11). |
 | Kept | The account's GitHub OIDC provider and the CDK bootstrap (`CDKToolkit`) | Native-cloud created the provider and still uses it; both modes deploy with the bootstrap. |
 | Kept | The GitHub environment `on-premise` and its variables | So on-premise can be redeployed. |
 
@@ -358,11 +359,12 @@ aws ec2 describe-snapshots --owner-ids self --filters "Name=volume-id,Values=$Vo
 aws ec2 delete-snapshot --snapshot-id <snapshot id>   # once per snapshot
 aws secretsmanager delete-secret --secret-id smart-tutor-on-premise/duckdns/token --force-delete-without-recovery
 aws secretsmanager delete-secret --secret-id smart-tutor-on-premise/langsmith/api-key --force-delete-without-recovery
+aws secretsmanager delete-secret --secret-id smart-tutor-on-premise/phoenix/api-key --force-delete-without-recovery
 ```
 
 The bucket is versioned: in the S3 console, **Empty** it (all versions), then **Delete** it. `aws s3 rm --recursive` would leave the old versions behind.
 
-**Redeploy later.** Deploy the stacks from a laptop (section 2), because GitHub can't create the role it signs in with. Deal with the kept bucket first: its name is fixed, so creating `Storage` fails with "already exists" until you bring the bucket into the stack with `cdk import` or delete it. To keep the data, set `smart-tutor:on-premise-data-snapshot-id` to the final snapshot before deploying (`on-premise-backups.md`, "Restore from a snapshot"); the first deploy resets the passwords of the `smart_tutor` and `keycloak` roles only. A redeploy without a restore starts with an empty database and just works. Keeping the data is manual and outside this runbook, because the teardown deleted every secret and the restored volume still holds the old ones. After the first deploy on the restored volume:
+**Redeploy later.** Deploy the stacks from a laptop (section 2), because GitHub can't create the role it signs in with. Deal with the kept bucket first: its name is fixed, so creating `Storage` fails with "already exists" until you bring the bucket into the stack with `cdk import` or delete it. To keep the data, set `smart-tutor:on-premise-data-snapshot-id` to the final snapshot before deploying (`on-premise-backups.md`, "Restore from a snapshot"); the first deploy resets the passwords of the `smart_tutor`, `keycloak`, and `phoenix` roles. Phoenix's admin keeps its old password on a restored volume, and the old system key keeps working until you delete it in Phoenix. A redeploy without a restore starts with an empty database and just works. Keeping the data is manual and outside this runbook, because the teardown deleted every secret and the restored volume still holds the old ones. After the first deploy on the restored volume:
 
 - Set the secrets of the Keycloak clients `smart-tutor-api` and `rag-mcp` (realm `smart-tutor`) to the new `smart-tutor-on-premise/keycloak/api-client` and `smart-tutor-on-premise/keycloak/mcp-client` values. The realm already exists, so Keycloak doesn't import it again. Until then, sign-in and the smoke test fail.
 - Sign in to the Keycloak console with the old admin password saved in step 2. The bootstrap admin keeps it. It is lost if you didn't save it.
@@ -428,6 +430,42 @@ LANGSMITH_API_KEY=<key> SMOKE_TEST_USERNAME=... SMOKE_TEST_PASSWORD=... python3 
 
 It ends with `ask trace <run id> is in smart-tutor-on-premise`.
 
+## 11. Phoenix (traces) (#288)
+
+Production runs its own Arize Phoenix at `https://<domain>/phoenix` (ADR 0017). Its traces live in the `phoenix` database on the VM's Postgres, which the nightly dump leaves out. The projects `smart-tutor-on-premise` and `smart-tutor-on-premise-ingestion` appear with their first trace. No service sends traces yet: ticket #289 wires the agent and the worker. Section 10 still describes the tracing that runs today.
+
+**First sign-in.** Open `$Url/phoenix` and sign in as `admin@localhost` with the password from `smart-tutor-on-premise/phoenix/admin-password`. Phoenix makes you set a new one. It needs 12 or more characters with an upper-case letter, a lower-case letter, a digit, and one of `!@#$%^&*()_+`. Store the new password in your password manager. The secret only seeds the first start.
+
+**Accounts.** Create them in *Settings, Users*. The product owner is a **Viewer**, engineers are **Members**, and nobody else is an admin.
+
+**System API key.** Open *Settings, API Keys, System keys* and create a key named `smart-tutor-on-premise` with no expiry. Store it:
+
+```bash
+MSYS_NO_PATHCONV=1 aws secretsmanager create-secret --name smart-tutor-on-premise/phoenix/api-key --secret-string <key>
+```
+
+Nothing uses the key until the services send traces (#289). Local development has no key.
+
+**Rotate the key.** Create a new system key, run `put-secret-value` on the same secret name, redeploy (section 6), and then delete the old key in Phoenix.
+
+**Retention (D25).** In *Settings, Data Retention*, the Default policy shows 180 days. Set its schedule to daily (`0 0 * * *`). The default sweeps weekly, so a trace could otherwise live up to 186 days. Phoenix creates this policy once, at its first start, from `PHOENIX_DEFAULT_RETENTION_POLICY_DAYS`. Changing that variable later has no effect on a running instance, so edit the policy in the UI.
+
+**Check.** The sign-in page shows at `$Url/phoenix` (Caddy redirects `/phoenix` to `/phoenix/`). An unauthenticated trace post is refused:
+
+```powershell
+Invoke-WebRequest -Method Post "$Url/phoenix/v1/traces" -SkipHttpErrorCheck   # StatusCode 401
+```
+
+Then send a test span with the system key. From a Session Manager shell (section 7):
+
+```bash
+PHOENIX_API_KEY=$(aws secretsmanager get-secret-value --secret-id smart-tutor-on-premise/phoenix/api-key --query SecretString --output text) docker run --rm -i --network smart-tutor_worker --entrypoint /usr/bin/python3.13 -e PHOENIX_API_KEY arizephoenix/phoenix:version-20.16.0-nonroot - http://phoenix:6006 smart-tutor-on-premise < /opt/smart-tutor/on-premise/send-test-span.py
+```
+
+It prints `test-span (...) is in the Phoenix project smart-tutor-on-premise`. Delete that trace in the UI afterwards if you like.
+
+**Host memory.** Phoenix idles at about 450 MiB with Postgres, and its `mem_limit` is 1 GB. After the deploy, run `free -m` and `docker stats --no-stream`, and record the numbers in the PR or this runbook. `on-premise-monitoring.md` says what to watch afterwards.
+
 ## Troubleshooting
 
 | Symptom | Cause and fix |
@@ -443,3 +481,4 @@ It ends with `ask trace <run id> is in smart-tutor-on-premise`.
 | `The worker cannot reach a destination it needs` (deploy fails) | `dc logs egress-proxy` shows `TCP_DENIED` for a host the worker needs (a new endpoint: add its exact name to the matching `acl` line, `aws` or `langsmith`), or AWS answered with errors. The worker keeps running. |
 | A document stays processing | The worker isn't running or can't reach AWS: `dc ps worker`, `dc logs --tail 100 worker`, `dc logs --tail 50 egress-proxy`. `AccessDenied` means the instance role lacks a permission (Host stack); a Bedrock `ThrottlingException` retries on its own. |
 | `Warning: could not check the sign-in client or the test learner` | The bootstrap admin was deleted. The deploy still succeeded. Create the test learner by hand if you need it. After a domain change, set the sign-in client's addresses by hand too (row "Invalid parameter: redirect_uri"). |
+| `phoenix` is unhealthy (the deploy waits on it, or `/phoenix` answers 502) | Read `dc logs phoenix`. Common causes: a `PHOENIX_SECRET` Phoenix refuses (it needs 32 or more characters with a digit and a lower-case letter), or the `phoenix` role's password out of sync with the secret. A redeploy resets the role's password. |
