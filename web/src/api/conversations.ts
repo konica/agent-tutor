@@ -7,9 +7,28 @@ import { sessionOver } from "./documents";
 
 export type { ThreadResponse, ThreadSummaryResponse };
 
-// The learner's active conversations, or archived ones, newest last activity first (owner only).
-export async function listConversations({ archived = false }: { archived?: boolean } = {}, apiClient: Client = client): Promise<ThreadSummaryResponse[]> {
-  const { data, error, response } = await listThreads({ client: apiClient, query: archived ? { archived: true } : undefined, throwOnError: false });
+// What the Conversations list narrows by (PRD US-13); every field is optional and they combine. Dates are YYYY-MM-DD
+// calendar days of last activity; `q` searches titles only.
+export type ConversationFilters = { subject_id?: string; active_from?: string; active_to?: string; q?: string };
+
+// A blank search is not a filter.
+export const hasConversationFilters = (f: ConversationFilters) => Boolean(f.subject_id || f.active_from || f.active_to || f.q?.trim());
+
+// The learner's active conversations, or with `archived` the archived ones, newest last activity first (owner only),
+// narrowed by the filters.
+export async function listConversations(
+  { archived = false, ...filters }: ConversationFilters & { archived?: boolean } = {},
+  apiClient: Client = client,
+): Promise<ThreadSummaryResponse[]> {
+  const q = filters.q?.trim();
+  const query = {
+    ...(archived ? { archived: true } : {}),
+    ...(filters.subject_id ? { subject_id: [filters.subject_id] } : {}),
+    ...(filters.active_from ? { active_from: filters.active_from } : {}),
+    ...(filters.active_to ? { active_to: filters.active_to } : {}),
+    ...(q ? { q } : {}),
+  };
+  const { data, error, response } = await listThreads({ client: apiClient, query, throwOnError: false });
   if (sessionOver(error, response)) throw new SessionExpiredError();
   if (!data) throw new Error(`GET /threads failed (${response?.status ?? "no response"})`);
   return data;

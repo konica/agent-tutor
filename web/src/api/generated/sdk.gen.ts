@@ -209,6 +209,10 @@ export const searchSubjects = <ThrowOnError extends boolean = false>(options: Op
  *
  * The learner's active conversations, or with `archived=true` the archived ones, newest last activity first
  * (PRD US-13): title, subjects of the documents used (deleted ones excluded), number of documents, last activity.
+ *
+ * `subject_id` repeats; a conversation matches when any of its listed documents that still exist has any of them.
+ * `active_from` and `active_to` are inclusive calendar days of last activity in the app time zone (D27). `q` is a
+ * case-insensitive part of the title; answers are not searched (Q63). The filters combine; blank `q` is ignored.
  */
 export const listThreads = <ThrowOnError extends boolean = false>(options?: Options<ListThreadsData, ThrowOnError>): RequestResult<ListThreadsResponses, ListThreadsErrors, ThrowOnError> => (options?.client ?? client).get<ListThreadsResponses, ListThreadsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

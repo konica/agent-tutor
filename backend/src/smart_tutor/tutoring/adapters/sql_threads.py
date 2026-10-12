@@ -15,6 +15,8 @@ from sqlalchemy import (
     Table,
     Text,
     Uuid,
+    exists,
+    false,
     func,
     select,
     update,
@@ -22,7 +24,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, insert
 
 from smart_tutor.shared.domain.ids import DocumentId, RunId, ThreadId, UserId
-from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
+from smart_tutor.tutoring.domain.thread import NO_THREAD_FILTER, SearchScope, Thread, ThreadFilter, ThreadStatus
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
 from smart_tutor.tutoring.domain.turn import Decline, Rating, Turn, TurnCitation
 from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
@@ -150,14 +152,34 @@ class SqlThreadRepository(ThreadRepository):
             ).first()
         return _thread(row) if row else None
 
-    def list_owned(self, user_id: UserId, status: ThreadStatus) -> list[Thread]:
+    def list_owned(
+        self, user_id: UserId, status: ThreadStatus, thread_filter: ThreadFilter = NO_THREAD_FILTER
+    ) -> list[Thread]:
+        f = thread_filter
         last_activity = func.coalesce(threads.c.last_learner_message_at, threads.c.created_at)
+        stmt = (
+            select(threads)
+            .where(threads.c.user_id == user_id, threads.c.status == status.value)
+            .order_by(last_activity.desc(), threads.c.created_at.desc(), threads.c.thread_id)
+        )
+        # The twin of Thread.matches: each part applies only when set.
+        if f.document_ids is not None:
+            stmt = stmt.where(
+                exists().where(
+                    thread_documents.c.thread_id == threads.c.thread_id,
+                    thread_documents.c.document_id.in_(list(f.document_ids)),
+                )
+                if f.document_ids
+                else false()
+            )
+        if f.active_from is not None:
+            stmt = stmt.where(last_activity >= f.active_from)
+        if f.active_before is not None:
+            stmt = stmt.where(last_activity < f.active_before)
+        if f.title is not None:
+            stmt = stmt.where(threads.c.title.icontains(f.title, autoescape=True))
         with self._engine.connect() as conn:
-            rows = conn.execute(
-                select(threads)
-                .where(threads.c.user_id == user_id, threads.c.status == status.value)
-                .order_by(last_activity.desc(), threads.c.created_at.desc(), threads.c.thread_id)
-            ).all()
+            rows = conn.execute(stmt).all()
         return [_thread(r) for r in rows]
 
     def documents_used_by_thread(self, thread_ids: Sequence[ThreadId]) -> dict[ThreadId, list[ThreadDocument]]:

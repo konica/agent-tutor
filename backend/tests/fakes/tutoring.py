@@ -8,7 +8,7 @@ from datetime import datetime
 
 from smart_tutor.shared.domain.ids import DocumentId, RunId, ThreadId, UserId
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
-from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
+from smart_tutor.tutoring.domain.thread import NO_THREAD_FILTER, SearchScope, Thread, ThreadFilter, ThreadStatus
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
 from smart_tutor.tutoring.domain.turn import Rating, Turn
 from smart_tutor.tutoring.ports.answer_feedback import AnswerFeedback
@@ -29,8 +29,16 @@ class InMemoryThreads(ThreadRepository):
         found = self.threads.get(thread_id)
         return copy.deepcopy(found) if found and found.is_owned_by(user_id) else None
 
-    def list_owned(self, user_id: UserId, status: ThreadStatus) -> list[Thread]:
-        mine = [copy.deepcopy(t) for t in self.threads.values() if t.user_id == user_id and t.status is status]
+    def list_owned(
+        self, user_id: UserId, status: ThreadStatus, thread_filter: ThreadFilter = NO_THREAD_FILTER
+    ) -> list[Thread]:
+        mine = [
+            copy.deepcopy(t)
+            for t in self.threads.values()
+            if t.user_id == user_id
+            and t.status is status
+            and t.matches(thread_filter, [r.document_id for r in self.documents_used_rows.get(t.thread_id, [])])
+        ]
         mine.sort(key=lambda t: t.thread_id)
         mine.sort(key=lambda t: (t.last_activity, t.created_at), reverse=True)
         return mine

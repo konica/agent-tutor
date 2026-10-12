@@ -1,10 +1,11 @@
 """One conversation (PRD §9.4 Thread). It has no subjects; it keeps its documents used (US-4b)."""
 
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
-from smart_tutor.shared.domain.ids import ThreadId, UserId
+from smart_tutor.shared.domain.ids import DocumentId, ThreadId, UserId
 from smart_tutor.tutoring.domain.errors import InvalidTitleError, NoListedDocumentsError, ThreadArchivedError
 
 MAX_TITLE = 120
@@ -19,6 +20,19 @@ class ThreadStatus(StrEnum):
 class SearchScope(StrEnum):
     LIBRARY = "library"
     LISTED = "listed"
+
+
+@dataclass(frozen=True)
+class ThreadFilter:
+    """What the Conversations list narrows to (PRD US-13, US-13b); `None` puts no constraint on that part."""
+
+    document_ids: frozenset[DocumentId] | None = None  # the thread lists any of them (a subject's documents)
+    active_from: datetime | None = None  # last activity, inclusive
+    active_before: datetime | None = None  # last activity, exclusive
+    title: str | None = None  # a case-insensitive part of the title, taken literally (Q63: titles only)
+
+
+NO_THREAD_FILTER = ThreadFilter()
 
 
 @dataclass
@@ -40,6 +54,17 @@ class Thread:
     def last_activity(self) -> datetime:
         """The learner's last question in it, or when it started (US-13)."""
         return self.last_learner_message_at or self.created_at
+
+    def matches(self, thread_filter: ThreadFilter, listed: Collection[DocumentId]) -> bool:
+        """The Conversations filter (US-13); `listed` is the thread's document list. The SQL `WHERE` of
+        `SqlThreadRepository.list_owned` is its twin."""
+        f = thread_filter
+        return (
+            (f.document_ids is None or not f.document_ids.isdisjoint(listed))
+            and (f.active_from is None or self.last_activity >= f.active_from)
+            and (f.active_before is None or self.last_activity < f.active_before)
+            and (f.title is None or (self.title is not None and f.title.lower() in self.title.lower()))
+        )
 
     def ask(self, now: datetime) -> None:
         """The learner asks in it now; an archived thread is read-only."""

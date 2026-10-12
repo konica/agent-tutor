@@ -287,3 +287,17 @@ def test_a_renamed_document_is_cited_by_its_new_title() -> None:
     DocumentService(library.unit_of_work, max_attempts=3).set_title(ADA, doc, "Mine")
     hits = SearchService(library.unit_of_work, fake_embeddings()).search(ADA, "attention mechanisms")
     assert [h.document_title for h in hits] == ["Mine"]
+
+
+def test_documents_with_subjects_are_the_learners_archived_included() -> None:
+    library = InMemoryLibrary()
+    s1, s2 = SubjectId("00000000-0000-4000-8000-000000000001"), SubjectId("00000000-0000-4000-8000-000000000002")
+    live = ingest_ready(library, "ada", "Live.", subject_ids=[s1])
+    archived = ingest_ready(library, "ada", "Archived.", subject_ids=[s1, s2])
+    ingest_ready(library, "ada", "Other.", subject_ids=[s2])
+    ingest_ready(library, "bob", "Theirs.", subject_ids=[s1])
+    library.state.documents[archived].archived = True
+    svc = DocumentService(library.unit_of_work, max_attempts=3)
+
+    assert svc.documents_with_subjects(UserId("ada"), [s1]) == {live, archived}
+    assert svc.documents_with_subjects(UserId("ada"), []) == frozenset()

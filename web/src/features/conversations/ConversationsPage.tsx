@@ -1,8 +1,17 @@
-import { Archive, Info, MessageSquare, Plus } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Archive, Filter, Info, MessageSquare, Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
-import { archiveConversation, listConversations, restoreConversation, type ThreadSummaryResponse } from "../../api/conversations";
+import {
+  archiveConversation,
+  hasConversationFilters,
+  listConversations,
+  restoreConversation,
+  type ConversationFilters as Filters,
+  type ThreadSummaryResponse,
+} from "../../api/conversations";
+import type { SubjectResponse } from "../../api/generated/types.gen";
+import { loadMySubjects } from "../../api/subjects";
 import { conversationTitle, useConversations } from "../../app/conversations";
 import { NAV } from "../../app/nav";
 import { SessionExpiredError } from "../../auth/authClient";
@@ -10,22 +19,35 @@ import { Button } from "../../components/Button/Button";
 import { EmptyState } from "../../components/EmptyState/EmptyState";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
 import { Tabs } from "../../components/Tabs/Tabs";
+import { ConversationFilters } from "./ConversationFilters";
 import { ConversationTable } from "./ConversationTable";
 import styles from "./ConversationsPage.module.css";
+import { useFilteredConversations } from "./useFilteredConversations";
 
 type View = "active" | "archived";
 const ARCHIVED_NOTICE = "Archived conversations stay readable. Restore one to keep asking.";
 const defaultLoadArchived = () => listConversations({ archived: true });
+const defaultLoadSubjects = () => loadMySubjects();
 
 type Props = {
+  /** Loads the conversations matching the filters, active or archived. */
+  loadConversations?: (filters: Filters & { archived?: boolean }) => Promise<ThreadSummaryResponse[]>;
   loadArchived?: () => Promise<ThreadSummaryResponse[]>;
+  loadSubjects?: () => Promise<SubjectResponse[]>;
   archive?: (threadId: string) => Promise<unknown>;
   restore?: (threadId: string) => Promise<unknown>;
 };
 
 // The learner's conversations (PRD US-13): active ones from the app shell, which reloads them on every navigation and
-// feeds the side nav too, and archived ones loaded here. A row's menu archives or restores it.
-export function ConversationsPage({ loadArchived = defaultLoadArchived, archive = archiveConversation, restore = restoreConversation }: Props) {
+// feeds the side nav too, and archived ones loaded here. While filters are set this page loads the matching ones of the
+// shown tab itself, so the side nav keeps the most recent unfiltered. A row's menu archives or restores it.
+export function ConversationsPage({
+  loadConversations = listConversations,
+  loadArchived = defaultLoadArchived,
+  loadSubjects = defaultLoadSubjects,
+  archive = archiveConversation,
+  restore = restoreConversation,
+}: Props = {}) {
   const { list, failed, refresh } = useConversations();
   const navigate = useNavigate();
   const [view, setView] = useState<View>("active");
@@ -33,12 +55,22 @@ export function ConversationsPage({ loadArchived = defaultLoadArchived, archive 
   const [archivedFailed, setArchivedFailed] = useState(false);
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
   const [status, setStatus] = useState("");
+  const [filters, setFilters] = useState<Filters>({});
+  const [subjects, setSubjects] = useState<SubjectResponse[]>([]);
   const statusRegion = useRef<HTMLParagraphElement>(null);
   const loadRef = useRef(loadArchived);
   const latest = useRef(0);
   useEffect(() => {
     loadRef.current = loadArchived; // an inline `loadArchived` must not reload
   }, [loadArchived]);
+
+  useEffect(() => {
+    let alive = true;
+    loadSubjects().then((s) => alive && setSubjects(s), () => {}); // the Subject filter just stays empty
+    return () => {
+      alive = false;
+    };
+  }, [loadSubjects]);
 
   // Only the latest answer is applied, and a failure keeps the last list.
   const reloadArchived = useCallback(async () => {
@@ -58,6 +90,15 @@ export function ConversationsPage({ loadArchived = defaultLoadArchived, archive 
       latest.current++; // unmounted: ignore loads still running
     };
   }, [reloadArchived]);
+
+  const archivedView = view === "archived";
+  // The filters narrow the tab shown. Switching tabs, or either list changing (an archive, a restore, the shell's
+  // reload), loads the matching ones again.
+  const loadFiltered = useCallback((f: Filters) => loadConversations({ ...f, archived: archivedView }), [loadConversations, archivedView]);
+  const reloadKey = useMemo(() => ({ view, list, archived }), [view, list, archived]);
+  const filtering = hasConversationFilters(filters);
+  const filtered = useFilteredConversations(loadFiltered, filters, reloadKey);
+  const clear = () => setFilters({});
 
   async function change(t: ThreadSummaryResponse, archiving: boolean) {
     const title = conversationTitle(t);
@@ -84,11 +125,11 @@ export function ConversationsPage({ loadArchived = defaultLoadArchived, archive 
 
   const start = () => navigate("/chat");
   const description = NAV.find((item) => item.path === "/conversations")?.description;
-  const archivedView = view === "archived";
-  const shown = archivedView ? archived : list;
+  const shown = filtering ? filtered.list : archivedView ? archived : list;
   // Without the archived list (its load failed), an empty Active list still gets the plain "No conversations yet".
   const bothEmpty = list?.length === 0 && (archived?.length === 0 || (archived === null && archivedFailed));
   const waiting = list?.length === 0 && archived === null && !archivedFailed; // an empty Active tab says nothing until Archived is known
+  const toolbar = list && !bothEmpty && !waiting;
   return (
     <>
       <PageHeader
@@ -101,7 +142,7 @@ export function ConversationsPage({ loadArchived = defaultLoadArchived, archive 
         {status}
       </p>
       {failed && list === null && <p className={styles.error}>Can't load your conversations. Reload the page to try again.</p>}
-      {list && !bothEmpty && !waiting && (
+      {toolbar && (
         <div className={styles.toolbar}>
           <Tabs
             label="Conversations view"
@@ -112,28 +153,35 @@ export function ConversationsPage({ loadArchived = defaultLoadArchived, archive 
             value={view}
             onChange={setView}
           />
+          <ConversationFilters filters={filters} onChange={setFilters} subjects={subjects} count={shown ? shown.length : null} onClear={clear} />
         </div>
       )}
-      {list && !bothEmpty && !waiting && archivedView && (
+      {toolbar && archivedView && (
         <p className={styles.notice}>
           <Info aria-hidden="true" strokeWidth={1.5} />
           {ARCHIVED_NOTICE}
         </p>
       )}
-      {list && archivedView && archived === null && archivedFailed && !bothEmpty && (
+      {list && archivedView && !filtering && archived === null && archivedFailed && !bothEmpty && (
         <p className={styles.error}>Can't load your archived conversations. Reload the page to try again.</p>
       )}
+      {filtering && filtered.failed && <p className={styles.error}>Can't load your conversations. Reload the page to try again.</p>}
       {bothEmpty && (
         <EmptyState icon={MessageSquare} title="No conversations yet" actions={<Button variant="primary" icon={Plus} onClick={start}>Start a conversation</Button>}>
           <p>Ask a question about your documents. Every conversation is saved here so you can come back to it.</p>
         </EmptyState>
       )}
-      {!bothEmpty && !waiting && list && archivedView && archived?.length === 0 && (
+      {toolbar && filtering && shown?.length === 0 && (
+        <EmptyState icon={Filter} title="No conversations match these filters" actions={<Button onClick={clear}>Clear filters</Button>}>
+          <p>Try another subject, a wider date range or another search.</p>
+        </EmptyState>
+      )}
+      {toolbar && !filtering && archivedView && archived?.length === 0 && (
         <EmptyState icon={Archive} title="No archived conversations">
           <p>Conversations you archive appear here. You can restore them at any time.</p>
         </EmptyState>
       )}
-      {!bothEmpty && !waiting && !archivedView && list?.length === 0 && (
+      {toolbar && !filtering && !archivedView && list.length === 0 && (
         <EmptyState icon={MessageSquare} title="No active conversations" actions={<Button variant="primary" icon={Plus} onClick={start}>Start a conversation</Button>}>
           <p>Start a new conversation, or restore one from Archived.</p>
         </EmptyState>

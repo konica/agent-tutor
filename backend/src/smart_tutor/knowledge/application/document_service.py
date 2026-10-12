@@ -105,6 +105,15 @@ class DocumentService:
             documents = tx.documents.list_readable_by_ids(user_id, document_ids)
         return {d.document_id: document_view(d, self._max_attempts) for d in documents}
 
+    def documents_with_subjects(self, user_id: UserId, subject_ids: Collection[SubjectId]) -> frozenset[DocumentId]:
+        """The learner's documents with any of these subjects, archived included and in any state; a deleted one is
+        gone, so its subjects no longer count (PRD D11, Q63 L1)."""
+        if not subject_ids:
+            return frozenset()
+        with self._uow() as tx:
+            documents = tx.documents.list_readable_by(user_id, DocumentFilter(subject_ids=frozenset(subject_ids)))
+        return frozenset(d.document_id for d in documents)
+
     def learner_subjects(self, user_id: UserId) -> frozenset[SubjectId]:
         """My subjects: those of the learner's ready, non-archived documents (PRD §9.4)."""
         with self._uow() as tx:

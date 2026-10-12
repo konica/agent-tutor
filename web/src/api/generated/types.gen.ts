@@ -1163,6 +1163,22 @@ export type ListThreadsData = {
          * Archived
          */
         archived?: boolean;
+        /**
+         * Subject Id
+         */
+        subject_id?: Array<string>;
+        /**
+         * Active From
+         */
+        active_from?: string | null;
+        /**
+         * Active To
+         */
+        active_to?: string | null;
+        /**
+         * Q
+         */
+        q?: string | null;
     };
     url: '/threads';
 };

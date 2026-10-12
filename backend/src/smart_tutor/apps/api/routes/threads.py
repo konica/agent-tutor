@@ -16,11 +16,11 @@ import logging
 import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Literal, Self
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
@@ -29,7 +29,7 @@ from smart_tutor.apps.api.agent_client import AgentAnswer, AgentUnavailableError
 from smart_tutor.apps.api.deps import Agent, BearerToken, Conversations, CurrentPrincipal, Subjects
 from smart_tutor.apps.api.routes.knowledge import SubjectResponse
 from smart_tutor.shared.domain.errors import UnauthenticatedError
-from smart_tutor.shared.domain.ids import DocumentId, RunId, ThreadId, UserId
+from smart_tutor.shared.domain.ids import DocumentId, RunId, SubjectId, ThreadId, UserId
 from smart_tutor.tutoring.application import (
     AnsweredTurn,
     Decline,
@@ -422,11 +422,30 @@ class ThreadSummaryResponse(BaseModel):
 
 @router.get("/threads", operation_id="list_threads")
 def list_threads(
-    principal: CurrentPrincipal, conversations: Conversations, subjects: Subjects, archived: bool = False
+    principal: CurrentPrincipal,
+    conversations: Conversations,
+    subjects: Subjects,
+    archived: bool = False,
+    subject_id: Annotated[list[uuid.UUID], Query(max_length=100)] = [],  # noqa: B006 - FastAPI copies the default
+    active_from: date | None = None,
+    active_to: date | None = None,
+    q: Annotated[str | None, Query(max_length=120)] = None,  # a title is at most 120 characters (US-13)
 ) -> list[ThreadSummaryResponse]:
     """The learner's active conversations, or with `archived=true` the archived ones, newest last activity first
-    (PRD US-13): title, subjects of the documents used (deleted ones excluded), number of documents, last activity."""
-    summaries = conversations.list_threads(principal.user_id, archived=archived)
+    (PRD US-13): title, subjects of the documents used (deleted ones excluded), number of documents, last activity.
+
+    `subject_id` repeats; a conversation matches when any of its listed documents that still exist has any of them.
+    `active_from` and `active_to` are inclusive calendar days of last activity in the app time zone (D27). `q` is a
+    case-insensitive part of the title; answers are not searched (Q63). The filters combine; blank `q` is ignored.
+    """
+    summaries = conversations.list_threads(
+        principal.user_id,
+        archived=archived,
+        subject_ids=[SubjectId(str(s)) for s in subject_id],
+        active_from=active_from,
+        active_to=active_to,
+        title=q,
+    )
     names = subjects.names_for(principal.user_id, {s for t in summaries for s in t.subject_ids})
     return [
         ThreadSummaryResponse(
