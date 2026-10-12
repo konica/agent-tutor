@@ -9,7 +9,7 @@ from langsmith.utils import LangSmithError
 from evals.dataset import Dataset, Example, publish_split
 from evals.learners import LoadError
 from evals.run import main, run_split
-from evals.suite import DatasetSuites, Suite
+from evals.suite import DatasetSuites, Suite, not_applicable
 from fakes.langsmith import FakeLangSmith
 
 ASK = Dataset(
@@ -78,6 +78,24 @@ async def test_an_example_whose_evaluator_raised_counts_as_unscored() -> None:
 def test_a_run_where_an_evaluator_raised_fails_the_gate(capsys: pytest.CaptureFixture[str]) -> None:
     suites = [Suite("ask", make_target, (scored("search_step_ran", 1.0), _flaky_relevance))]
     assert main(["--split", "smoke"], client=published(), suites=suites, load=lambda key: ASK) == 1
+
+
+def _declines(inputs: dict[str, Any]) -> dict[str, Any]:
+    if inputs["question"] == "a":
+        return not_applicable("decline_correctness.correctly_declined", "covered")
+    return {"key": "decline_correctness.correctly_declined", "score": 1, "comment": "declined"}
+
+
+async def test_a_not_applicable_result_is_left_out_of_its_metric() -> None:
+    group = DatasetSuites("ask", make_target, (_declines,))
+    scores, _ = await run_split(published(), [group], "smoke", load=lambda key: ASK)
+    assert scores == {"decline_correctness.correctly_declined": [1]}
+
+
+async def test_a_metric_that_applied_to_no_example_is_not_run() -> None:
+    group = DatasetSuites("ask", make_target, (lambda inputs: not_applicable("answer_relevance", "n/a"),))
+    scores, _ = await run_split(published(), [group], "smoke", load=lambda key: ASK)
+    assert scores == {}
 
 
 async def test_a_dataset_without_the_split_runs_nothing() -> None:
