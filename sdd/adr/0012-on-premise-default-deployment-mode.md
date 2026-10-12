@@ -1,6 +1,6 @@
 # 0012. On-premise is the default deployment mode; native-cloud is opt-in
 
-- Status: accepted; "ECR is shared" superseded by 0016 (the modes share no stack)
+- Status: accepted; "ECR is shared" superseded by 0016 (the modes share no stack); delivery amended 2026-10-12 (production deploy switch)
 - Date: 2026-10-09
 - Supersedes: the parts of 0009 and 0010 listed under "What still holds from 0009 and 0010", which now apply only to native-cloud mode
 
@@ -56,3 +56,7 @@ The product behaves the same in both modes.
 - **Two deploy paths.** Infrastructure changes are made per mode. The product code, images, and Keycloak realm are the same in both.
 - **Address changes.** Moving to a custom domain needs a DNS record for the Elastic IP, a new `KC_HOSTNAME`, and new Keycloak redirect URIs. Caddy obtains the certificate itself.
 - **Local development is unchanged.**
+
+## Addendum 2026-10-12: production deploy switch (#282)
+
+The repository became public. The repository variable `PRODUCTION_DEPLOY` now sits above the delivery rules in this ADR. Only `true` deploys anything. Otherwise no merge deploy, manual deploy, rollback, or image build runs in either mode. It is checked as a job-level `if:` in the three workflows that enter a production environment (`build-images.yml`, `deploy-on-premise.yml`, `deploy-native-cloud.yml`), so every caller is covered. No AWS-side control was added: the deploy roles already trust only the GitHub environments, and a hand-made IAM deny would drift from CDK. It is an operating control, not a security boundary. Design: `sdd/specs/2026-10-12-production-deploy-switch-design.md`.

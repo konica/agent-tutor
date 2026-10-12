@@ -653,6 +653,31 @@ def test_the_on_premise_auto_deploy_switch_is_documented() -> None:
     assert "ON_PREMISE_AUTO_DEPLOY" in (WORKFLOWS / "deploy.yml").read_text(encoding="utf-8").split("name: deploy")[0]
 
 
+def test_the_production_deploy_switch_is_documented() -> None:
+    root = WORKFLOWS.parents[1]
+    for path in (
+        RUNBOOKS / "on-premise-deploy.md",
+        RUNBOOKS / "pilot-deploy.md",
+        RUNBOOKS / "pilot-teardown.md",
+        root / "README.md",
+        root / "sdd/prd.md",
+        root / "sdd/adr/0012-on-premise-default-deployment-mode.md",
+        root / "docs/architecture/solution-architecture.md",
+    ):
+        assert "PRODUCTION_DEPLOY" in path.read_text(encoding="utf-8"), path.name
+    text = (RUNBOOKS / "on-premise-deploy.md").read_text(encoding="utf-8")
+    section = text.split("### Turn all production deploys off or on (#282)")[1].split("\n## ")[0]
+    for phrase in (
+        "gh variable set PRODUCTION_DEPLOY --body false --repo konica/agent-tutor",
+        "gh variable set PRODUCTION_DEPLOY --body true --repo konica/agent-tutor",
+        "Settings → Secrets and variables → Actions → Variables",
+        "queued",
+        "not a security boundary",
+    ):
+        assert phrase in section, phrase
+    assert "Draft v2.53" in (root / "sdd/prd.md").read_text(encoding="utf-8")
+
+
 def test_on_premise_runbook_tears_down_the_whole_mode_without_naming_native_cloud() -> None:
     text = (RUNBOOKS / "on-premise-deploy.md").read_text(encoding="utf-8")
     section = text.split("### Tear down the whole mode")[1].split("\n## ")[0]
