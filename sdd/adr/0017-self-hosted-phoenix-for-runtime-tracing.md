@@ -57,7 +57,14 @@ Without a key, a process runs untraced, as it does today without a LangSmith key
 - **Upgrade LangSmith to Plus.** Restores traces quickly for about $39 a seat per month plus per-trace overage. Rejected by the product owner in favour of self-hosting; production trace volume would keep the bill growing with usage.
 - **Self-hosted LangSmith.** Enterprise contract only.
 - **Langfuse v3** (MIT). Needs Postgres, ClickHouse, Redis, and S3 storage beside its web and worker containers (about 4 vCPU / 8 GB), which doesn't fit beside the app on the t3.large. Retention policies are Enterprise-only, so D25 would need a deletion job of ours.
-- **LangSmith SDK in OpenTelemetry-only mode, sending to Phoenix.** Mostly configuration. But we don't control trace and span ids, so ratings would need a lookup. LangSmith's span attributes show as generic spans in Phoenix, not as LLM, retriever, and chain spans. And the private `run_helpers` restore in our current wrapper would stay.
+- **LangSmith SDK in OpenTelemetry-only mode, sending to Phoenix.** It works with configuration only (`LANGSMITH_OTEL_ENABLED`, `LANGSMITH_OTEL_ONLY`, `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`). A spike on 2026-10-12 ran our real `answer_events` and ask graph (fake model and retriever) against Phoenix 20.16.0 and found:
+  - Only the model call shows as an LLM span. `ask`, LangGraph, `search`, and `answer` arrive with an UNKNOWN kind: the SDK writes OpenTelemetry GenAI and `langsmith.*` attributes, not the OpenInference ones Phoenix reads.
+  - Traces land in Phoenix's `default` project whatever `LANGSMITH_PROJECT` or `OTEL_RESOURCE_ATTRIBUTES` say.
+  - The trace id is not the `run_id` we store with the turn, so a rating can't find its trace without a lookup.
+  - SDK settings leak in as metadata (`langsmith.metadata.LANGSMITH_OTEL_ENABLED` and the like). The learner hash and thread id do arrive, and no token leaked.
+  - The private `run_helpers` restore in our current wrapper would stay.
+
+  The same ask through OpenInference showed CHAIN and LLM spans with the model's messages, in the named project, with trace id = `run_id`.
 - **A Phoenix per developer in local Compose.** No shared key and no internet hop. Rejected so the product owner and engineers look at one place for both environments.
 - **Keycloak OIDC sign-in to Phoenix.** Our realm holds learners. Staff accounts and roles in it are a separate decision. Phoenix's `PHOENIX_OAUTH2_*` settings leave the door open.
 
