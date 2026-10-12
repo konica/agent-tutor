@@ -56,7 +56,8 @@ A new cross-module dependency means moving a module in the order on purpose and 
 - `tests/unit/<module>/` — domain and application with fakes from `tests/fakes/` (`from fakes import fake_chat_model, fake_embeddings`); the default `pytest` run. Async tests need no decorator.
 - `tests/integration/<module>/` — adapters against the Compose stack, marked `@pytest.mark.integration`.
 - `tests/isolation/` — cross-user access, per-learner contents, and delete guarantees (PRD US-10c, US-11, US-12).
-- `tests/bedrock/` — real Bedrock calls through `ModelFactory`, marked `@pytest.mark.bedrock` (`make bedrock-check`). Run it after changing a model ID, an adapter, or boto3. Unit tests never trace to LangSmith (`tests/unit/conftest.py`).
+- `tests/bedrock/` — real Bedrock calls through `ModelFactory`, marked `@pytest.mark.bedrock` (`make bedrock-check`). Run it after changing a model ID, an adapter, or boto3.
+- No test traces, whatever environment is loaded (ADR 0017): `tests/conftest.py` turns tracing off for the whole session and makes LangSmith's default client a `RecordingClient`, and fails any test that leaves a trace on it. A test that checks a trace turns tracing on (`langsmith.tracing_context(enabled=True)`) and sends to its own `RecordingClient`.
 
 ## Images
 
