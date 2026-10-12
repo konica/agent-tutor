@@ -12,10 +12,11 @@ import {
   PanelLeft,
   Plus,
   Search,
+  SquarePen,
   Upload,
 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 
 import {
   addThreadDocuments,
@@ -155,11 +156,11 @@ function processingHint(count: number) {
     : `${count} documents are still processing and can't be used yet.`;
 }
 
-// Each unlimited question starts a new thread (and moves to its URL), replacing the turns shown. A conversation limited
-// to its documents (US-4c) is the exception: its questions are asked in the same thread and add a turn under the
-// history. `/chat/<id>` reopens a conversation with its turns (US-13). With no active documents, a question in a
-// conversation stays in it too (US-10). An archived conversation is read-only (US-13): a banner offers Restore, and the
-// composer, the title, and the panel's document controls are off; its citations, documents, and ratings still work.
+// The first question starts a thread (and moves to its URL); every later question is asked in it and adds a turn under
+// the history, whether or not its search is limited (US-4c). New conversation in the header, or the Chat nav, starts
+// over at /chat. `/chat/<id>` reopens a conversation with its turns (US-13). An archived conversation is read-only
+// (US-13): a banner offers Restore, and the composer, the title, and the panel's document controls are off; its
+// citations, documents, and ratings still work.
 export function ChatPage({
   ask = defaultAsk,
   askIn = defaultAskIn,
@@ -201,6 +202,7 @@ export function ChatPage({
   // Where focus goes once an archive or restore has rendered: the panel's action that replaced the one clicked, or the
   // composer that came back.
   const [focusAfterStatus, setFocusAfterStatus] = useState<"action" | "composer" | "banner" | null>(null);
+  const [focusQuestion, setFocusQuestion] = useState(false);
   const [storedOpen, togglePanel] = usePanelOpen();
   // A starting document opens the panel once without saving it, so the learner's remembered choice stays as it was.
   const [forceOpen, setForceOpen] = useState(false);
@@ -227,27 +229,35 @@ export function ChatPage({
   const input = useRef<HTMLTextAreaElement>(null);
   const alive = useRef(true);
   const rateRequests = useRef<Record<string, number>>({});
+  const usedRequests = useRef(0);
   const busy = useRef(false);
-  // Counts the conversations shown (a new thread, or one a URL opens), so a late reply or stream event of an earlier
-  // one never reaches a newer one. A question in the same thread keeps it.
+  // Counts the conversations shown (a new one at /chat, or one a URL opens), so a late reply or stream event of an
+  // earlier one never reaches a newer one. A question in the same conversation keeps it.
   const turn = useRef(0);
   // The messages pane follows new text only while the learner is at the bottom (DESIGN.md → Chat).
   const scroll = useChatScroll([turns, answering, problem]);
   const { threadId: routeThreadId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   // The conversation the page shows, by its URL or just created: null at /chat.
   const shown = useRef<string | null>(null);
+  // The navigation last handled, and whether the page made the next one itself (dropping the starting document's param).
+  const seenKey = useRef(location.key);
+  const ownNavigation = useRef(false);
 
   // The URL names the conversation. A change the page made itself (a new thread's URL) is already shown; any other
-  // change (reload, Back, a pasted link, the Chat nav) opens that conversation, or a new one at /chat. Runs only when
-  // the URL changes.
+  // change (reload, Back, a pasted link, the Chat nav) opens that conversation, or a new one at /chat. The Chat nav
+  // clicked at /chat (say, under a first question that failed) starts over too. Runs only when the location changes.
   useEffect(() => {
     const target = routeThreadId ?? null;
-    if (target === shown.current) return;
+    const visit = location.key !== seenKey.current && !ownNavigation.current;
+    seenKey.current = location.key;
+    ownNavigation.current = false;
+    if (target === shown.current && !(target === null && visit)) return;
     shown.current = target;
     if (target === null) reset();
     else void openConversation(target);
-  }, [routeThreadId]);
+  }, [routeThreadId, location.key]);
 
   useEffect(() => {
     alive.current = true;
@@ -270,6 +280,14 @@ export function ChatPage({
       (pageRef.current?.querySelector<HTMLElement>("[data-banner-restore]") ?? pageRef.current?.querySelector<HTMLElement>("[data-thread-action]") ?? toggleRef.current)?.focus();
     } else (pageRef.current?.querySelector<HTMLElement>("[data-thread-action]") ?? toggleRef.current)?.focus();
   }, [focusAfterStatus]);
+
+  // After New conversation the question box takes focus, once it is enabled again: the button may be clicked mid-answer,
+  // and the page clears in the render after it.
+  useEffect(() => {
+    if (!focusQuestion || answering) return;
+    setFocusQuestion(false);
+    input.current?.focus();
+  }, [focusQuestion, answering]);
 
   // The documents decide what a new conversation is: none ready → upload first; still processing → a hint. A
   // conversation opened from its URL shows its history either way.
@@ -310,6 +328,7 @@ export function ChatPage({
   // Once the starting document is used or dropped, a reload or Back doesn't bring it back.
   function forgetStartParam() {
     if (!searchParams.has("document")) return;
+    ownNavigation.current = true;
     setSearchParams(
       (params) => {
         params.delete("document");
@@ -363,22 +382,30 @@ export function ChatPage({
   }
 
   const trimmed = question.trim();
-  // An archived conversation takes no questions until it is restored; the server refuses them too.
-  const canAsk = !answering && !archived && !changingStatus && trimmed.length > 0;
+  // An archived conversation takes no questions until it is restored; the server refuses them too. Nor does one whose URL
+  // is still loading: its question belongs in it, not in a new thread.
+  const canAsk = !answering && !archived && !changingStatus && opened.status === "none" && trimmed.length > 0;
 
   function submit() {
     // The ref also stops a second Enter that lands before the disabled state renders.
     if (!canAsk || busy.current) return;
     setQuestion("");
-    // A limited conversation keeps its thread, so the limit applies. So does a conversation when the learner has no
-    // active documents: there is nothing to start a new one from, and the upload request goes under its history.
-    // Otherwise a question starts a new thread.
-    const keepThread = threadId !== null && (scope === "listed" || noDocuments);
-    void answer(trimmed, keepThread ? threadId : null);
+    // Once the conversation exists, every question is asked in it, within its search scope.
+    void answer(trimmed, threadId);
   }
 
-  // Clears the page for another conversation: a new thread, a new one at /chat, or the one a URL opens. Bumping `turn`
-  // drops the late replies and stream events of the conversation shown before.
+  // New conversation in the header: /chat, empty. From a conversation's URL it is a push, so Back returns to it; at /chat
+  // (a first question still before its thread, or one that failed) the page just starts over. Either way a stream being
+  // read stops, and none of its late events reach the new page.
+  function newConversation() {
+    // `shown`, not the route: a new thread's own URL may not have rendered yet.
+    if (shown.current === null) reset();
+    else navigate("/chat");
+    setFocusQuestion(true);
+  }
+
+  // Clears the page for another conversation: a new one at /chat, or the one a URL opens. Bumping `turn` drops the late
+  // replies and stream events of the conversation shown before. A starting document not yet asked about goes too.
   function reset() {
     ++turn.current;
     busy.current = false;
@@ -402,6 +429,8 @@ export function ChatPage({
     opener.current = null;
     setViewer(null);
     setPanelDuringViewer(false);
+    setStarting(null);
+    forgetStartParam();
   }
 
   // Shows the conversation a URL names: its title, scope, turns, and documents used.
@@ -438,15 +467,15 @@ export function ChatPage({
     }
   }
 
-  // Asks in the given thread, adding a turn under the history, or in a new one when it is null: the turns, the panel,
-  // the title, and the scope then start over.
+  // Asks in the given thread, adding a turn under the history, or starts the conversation's thread when it is null. A
+  // document open beside the conversation stays open either way.
   async function answer(text: string, inThread: string | null) {
-    // The starting document goes with the first question only; later questions start library-wide threads.
+    // The starting document goes with the first question only.
     let documentId: string | undefined;
     if (inThread === null) {
       documentId = pendingStart?.document_id;
-      // A question in a limited conversation keeps its list, so an open document stays beside it; a new thread closes it.
-      reset();
+      // A first question that failed before its thread existed was never saved: asking again replaces it.
+      setTurns([]);
       setFirstQuestion(text);
       setStarting(null);
       forgetStartParam();
@@ -527,12 +556,6 @@ export function ChatPage({
       // A SessionExpiredError was already reported by the API client; the session screen replaces this page.
       else if (!(error instanceof SessionExpiredError)) setProblem({ message: GENERIC_FAILURE });
     } finally {
-      // A new conversation asked from a conversation URL that failed before its thread existed: the old history is
-      // already cleared, so the URL moves to /chat to match. A push, so Back returns to the old conversation.
-      if (newThread && thread === null && shown.current !== null && current()) {
-        shown.current = null;
-        navigate("/chat");
-      }
       // Otherwise a newer conversation has already reset these.
       if (turn.current === thisTurn) {
         busy.current = false;
@@ -590,14 +613,20 @@ export function ChatPage({
   }
 
   // The server recorded the documents the answer drew on before it sent done. A failure says so in the panel, so an
-  // empty list never reads as "nothing was used"; a SessionExpiredError was already reported by the API client.
+  // empty list never reads as "nothing was used", until a later answer loads the list; a SessionExpiredError was already
+  // reported by the API client.
   async function showDocumentsUsed(threadId: string, forTurn: number) {
+    // Follow-ups reload the same thread's list: only the newest load may show, as replies can arrive out of order.
+    const request = ++usedRequests.current;
+    const current = () => alive.current && turn.current === forTurn && usedRequests.current === request;
     try {
       const documents = await loadUsed(threadId);
-      if (alive.current && turn.current === forTurn) showList(documents);
+      if (!current()) return;
+      showList(documents);
+      setUsedFailed(false);
     } catch {
       // The answer is complete either way; only the panel's list is missing.
-      if (alive.current && turn.current === forTurn) setUsedFailed(true);
+      if (current()) setUsedFailed(true);
     }
   }
 
@@ -812,7 +841,7 @@ export function ChatPage({
 
   return (
     <div ref={pageRef} className={styles.page}>
-      {/* One 40px row: the panel toggle and the conversation's title (DESIGN.md → Chat). */}
+      {/* One 40px row: the panel toggle, the conversation's title, and New conversation (DESIGN.md → Chat). */}
       <header className={styles.header}>
         <button
           ref={toggleRef}
@@ -828,6 +857,12 @@ export function ChatPage({
         </button>
         {/* Editable once the server has started the conversation, until it is archived (US-13). */}
         <ThreadTitle title={title} editable={threadId !== null && !archived} onRename={renameTitle} />
+        {/* Not on an empty /chat: that is already a new conversation. */}
+        {(routeThreadId !== undefined || turns.length > 0) && (
+          <Button size="sm" variant="quiet" icon={SquarePen} className={styles.newConversation} onClick={newConversation}>
+            New conversation
+          </Button>
+        )}
       </header>
 
       <p role="status" className="visually-hidden">
