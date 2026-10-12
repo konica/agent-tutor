@@ -92,6 +92,17 @@ async def test_history_reaches_the_answer_model_as_earlier_turns() -> None:
     assert any("What is ReAct?" in str(m.content) for m in sent[:-1])
 
 
+async def test_a_drift_examples_question_only_history_is_not_replayed() -> None:
+    # generators/ask.py keeps a drift example's earlier questions without answers: only its last question is asked
+    seen, model = _Seen(), fake_chat_model(AIMessage("It interleaves them [1]."))
+    model.callbacks = [seen]
+    target = AskTarget(FakeLearners(), lambda token: FakeRetriever(CHUNKS), model, 0.3)
+    out = await target({**ASK, "question": "How does it work?", "history": ["What is ReAct?"]})
+    [sent] = seen.messages
+    assert len(sent) == 2  # the system prompt and the question: no earlier turns
+    assert out["trajectory"][0]["query"] == "How does it work?"
+
+
 async def test_the_answer_is_capped_at_the_configured_tokens() -> None:
     seen, model = _Seen(), fake_chat_model(AIMessage("Short [1]."))
     model.callbacks = [seen]

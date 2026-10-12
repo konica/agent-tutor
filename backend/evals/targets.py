@@ -1,7 +1,7 @@
 """How an evaluation run invokes the agent (PRD §10): one example in; the answer, citations, decline code, and
 trajectory out.
-An example may carry earlier turns (`history`); the outputs name the learner's own documents (`library`) for the
-injection checks.
+An example may carry earlier turns (`history`, each a question and its answer); the outputs name the learner's own
+documents (`library`) for the injection checks.
 
 The ask target runs the ask graph the way the agent server does (apps/agent/server.py): retrieval through the MCP
 server, the eval learner's token in runtime context only (ADR 0007). A recording retriever keeps each MCP `search` call
@@ -116,7 +116,11 @@ class AskTarget:
     async def __call__(self, inputs: dict[str, Any]) -> dict[str, Any]:
         username, seeds = inputs["learner"], inputs.get("documents")
         limit = None if seeds is None else [self._learners.document_id(username, s) for s in seeds]
-        history = [HistoryTurn(t["question"], t["answer"]) for t in inputs.get("history") or []]
+        # A turn the graph can replay has a question and an answer. A generated drift example's history is its earlier
+        # questions only (generators/ask.py): it asks only its last question until #214 decides how to replay them.
+        history = [
+            HistoryTurn(t["question"], t["answer"]) for t in inputs.get("history") or [] if isinstance(t, Mapping)
+        ]
         try:
             out = await self._ask(inputs["question"], limit, history, self._learners.token(username))
         except UnauthenticatedError:  # the token expired during the run: sign in once more

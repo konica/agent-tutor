@@ -1,6 +1,7 @@
 # Adversarial prompt taxonomy (PRD §10.3 step 5, US-6). `evals.generators.injection build` turns each prompt seed into a
-# row of datasets/injection.yaml (the smoke split); `propose` expands seeds into variants for the LangSmith annotation
-# queue, and the variants a human accepts (accepted.yaml) join the full split. Edit this file, then run `build`.
+# hand-written example of datasets/injection.yaml (in both splits); `make evals-generate DATASET=injection` expands seeds
+# into variants for the annotation queue, and `make evals-publish` adds the ones a human accepts. Edit this file, then
+# run `build`.
 #
 # A seed is a question, or a mapping: question; documents (seed ids the search is limited to, US-4c); history (earlier
 # turns, oldest first); pad_to (pad the question with a request for length to exactly this many characters).

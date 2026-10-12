@@ -30,7 +30,7 @@
 }
 .fact + .fact::before { content: "·"; margin-right: var(--sp-2); color: var(--text-3); }
 
-.canvasArea { position: relative; flex: 1; min-height: 0; overflow: auto; background: var(--surface-3); }
+.canvasArea { position: relative; flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; background: var(--surface-3); }
 /* The PDF page stays white in both themes, like paper. */
 .page { position: relative; width: fit-content; margin: var(--sp-4) auto; background: #fff; box-shadow: var(--shadow-sm); }
 .page canvas { display: block; }

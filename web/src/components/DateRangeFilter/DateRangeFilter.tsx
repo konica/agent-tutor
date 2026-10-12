@@ -1,15 +1,15 @@
 import { CalendarDays, ChevronDown } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
 
-import styles from "./UploadedFilter.module.css";
+import styles from "./DateRangeFilter.module.css";
 
-type Range = { uploaded_from?: string; uploaded_to?: string };
-type Props = { from?: string; to?: string; onChange: (range: Range) => void };
+type DateRange = { from?: string; to?: string }; // YYYY-MM-DD as the date inputs hold them; "" when cleared
+type Props = { label: string; groupLabel: string; from?: string; to?: string; onChange: (range: DateRange) => void };
 
 const describe = (from?: string, to?: string) => (from && to ? `${from} to ${to}` : from ? `from ${from}` : to ? `until ${to}` : "");
 
-// The upload-date range in one popover, so the toolbar stays one row (DESIGN.md → Layout → Toolbar).
-export function UploadedFilter({ from, to, onChange }: Props) {
+// A date range in one popover, so the toolbar stays one row (DESIGN.md → Layout → Toolbar).
+export function DateRangeFilter({ label, groupLabel, from, to, onChange }: Props) {
   const [open, setOpen] = useState(false);
   const popId = useId();
   const root = useRef<HTMLDivElement>(null);
@@ -33,20 +33,20 @@ export function UploadedFilter({ from, to, onChange }: Props) {
 
   return (
     <div className={styles.root} ref={root} onKeyDown={onKeyDown} onBlur={onBlur}>
-      <button ref={button} type="button" className={range ? `${styles.button} ${styles.on}` : styles.button} aria-expanded={open} aria-controls={popId} aria-label={range ? `Uploaded: ${range}` : "Uploaded"} onClick={() => setOpen((v) => !v)}>
+      <button ref={button} type="button" className={range ? `${styles.button} ${styles.on}` : styles.button} aria-expanded={open} aria-controls={popId} aria-label={range ? `${label}: ${range}` : label} onClick={() => setOpen((v) => !v)}>
         <CalendarDays className={styles.icon} strokeWidth={1.5} aria-hidden="true" />
-        Uploaded
+        {label}
         <ChevronDown className={styles.icon} strokeWidth={1.5} aria-hidden="true" />
       </button>
       {open && (
-        <div className={styles.pop} id={popId} tabIndex={-1} role="group" aria-label="Upload dates">
+        <div className={styles.pop} id={popId} tabIndex={-1} role="group" aria-label={groupLabel}>
           <label className={styles.field}>
             From
-            <input ref={first} type="date" value={from ?? ""} max={to || undefined} onChange={(e) => onChange({ uploaded_from: e.target.value })} />
+            <input ref={first} type="date" value={from ?? ""} max={to || undefined} onChange={(e) => onChange({ from: e.target.value })} />
           </label>
           <label className={styles.field}>
             To
-            <input type="date" value={to ?? ""} min={from || undefined} onChange={(e) => onChange({ uploaded_to: e.target.value })} />
+            <input type="date" value={to ?? ""} min={from || undefined} onChange={(e) => onChange({ to: e.target.value })} />
           </label>
         </div>
       )}

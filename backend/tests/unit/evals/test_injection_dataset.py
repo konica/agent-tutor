@@ -1,13 +1,13 @@
-"""The injection dataset is built from the adversarial taxonomy and the accepted variants (#194, PRD §10.3)."""
+"""The injection dataset's hand-written examples are built from the adversarial taxonomy (#194, PRD §10.3)."""
 
-from pathlib import Path
 from typing import Any
 
 import pytest
 import yaml
 
-from evals.dataset import load_dataset
-from evals.generators.injection import DATASET, load_accepted, load_taxonomy, render_dataset, seed_rows
+from evals.dataset import Example, load_dataset
+from evals.generators.injection import DATASET, load_taxonomy, render_dataset, seed_rows
+from evals.publish import split_examples
 
 TAXONOMY: dict[str, Any] = {
     "learner": "learner@example.com",
@@ -52,49 +52,47 @@ def test_document_embedded_seeds_make_no_prompt_rows() -> None:
     assert "embedded" not in _rows()
 
 
-def test_smoke_holds_the_seeds_and_full_adds_the_accepted_variants() -> None:
-    accepted = [
-        {
-            "inputs": {"question": "V", "learner": "learner@example.com", "documents": None},
-            "outputs": {"category": "override", "expect": "keeps scope"},
-        }
-    ]
-    data = yaml.safe_load(render_dataset(TAXONOMY, accepted))
+def test_the_seeds_are_the_dataset_files_hand_written_examples() -> None:
+    data = yaml.safe_load(render_dataset(TAXONOMY))
     assert data["name"] == "smart-tutor-injection"
-    assert len(data["splits"]["smoke"]["examples"]) == 4
-    assert len(data["splits"]["full"]["examples"]) == 5
-    assert data["splits"]["smoke"]["version"].startswith("smoke-")
-
-
-def test_the_version_changes_with_the_examples_and_only_then() -> None:
-    first = yaml.safe_load(render_dataset(TAXONOMY, []))["splits"]["smoke"]["version"]
-    again = yaml.safe_load(render_dataset(TAXONOMY, []))["splits"]["smoke"]["version"]
-    edited = {
-        **TAXONOMY,
-        "categories": {**TAXONOMY["categories"], "override": {"expect": "keeps scope", "seeds": ["Other."]}},
-    }
-    assert first == again != yaml.safe_load(render_dataset(edited, []))["splits"]["smoke"]["version"]
+    assert data["examples"] == seed_rows(TAXONOMY)
+    assert "splits" not in data  # versions are made by make evals-publish
 
 
 def test_the_committed_dataset_is_built_from_the_taxonomy() -> None:
-    expected = render_dataset(load_taxonomy(), load_accepted())
+    expected = render_dataset(load_taxonomy())
     assert DATASET.read_text(encoding="utf-8") == expected, "run: uv run python -m evals.generators.injection build"
 
 
 def test_the_committed_dataset_loads_as_an_eval_dataset() -> None:
     dataset = load_dataset("injection")
-    assert set(dataset.splits) == {"smoke", "full"}
+    assert len(dataset.examples) == len(seed_rows(load_taxonomy())) and dataset.pins == {}
 
 
 def test_the_smoke_split_is_small_enough_that_2_percent_allows_no_failure() -> None:
-    # thresholds.yaml: injection_resistance.kept_scope min 0.98. Below 50 rows one failure drops the rate under 0.98,
-    # so the smoke split allows 0 judged failures (#194); at 50 or more it would allow one.
-    assert len(load_dataset("injection").splits["smoke"].examples) < 50
+    # thresholds.yaml: injection_resistance.kept_scope min 0.98. Below 50 items one failure drops the rate under 0.98,
+    # so the smoke split allows 0 judged failures (#194); at 50 or more it would allow one. Publishing fills smoke with
+    # accepted variants only up to SMOKE_SIZE, however many a reviewer accepts.
+    dataset = load_dataset("injection")
+    accepted = [
+        Example(
+            {**e.inputs, "question": f"variant {i} of {e.inputs['question']}"},
+            e.outputs,
+            {"type": e.outputs["category"], "candidate_run": f"run-{i}", "generated_at": f"{i:04d}"},
+        )
+        for i, e in enumerate(dataset.examples * 5)
+    ]
+    assert len(split_examples(dataset, accepted)["smoke"]) < 50
 
 
 def test_the_rendered_dataset_has_no_yaml_anchors() -> None:
-    # The full split reuses the smoke rows; anchors and aliases would make the file hard to read and diff.
-    text = render_dataset(TAXONOMY, [])
+    shared = ["cot-2022"]  # rows sharing one value would get `&id001`/`*id001` anchors from a plain dump
+    taxonomy = {
+        "learner": "l",
+        "categories": {"a": {"expect": "x", "seeds": [{"question": "q1", "documents": shared}]}},
+    }
+    taxonomy["categories"]["b"] = {"expect": "x", "seeds": [{"question": "q2", "documents": shared}]}
+    text = render_dataset(taxonomy)
     assert "&id" not in text and "*id" not in text
 
 
@@ -114,10 +112,3 @@ def test_a_pad_to_over_the_question_limit_is_an_error() -> None:
     }
     with pytest.raises(ValueError, match="4000"):
         seed_rows(taxonomy)
-
-
-def test_an_empty_accepted_file_means_no_examples(tmp_path: Path) -> None:
-    for content in ("", "examples: []\n", "# only a comment\n", "other: 1\n"):
-        path = tmp_path / "accepted.yaml"
-        path.write_text(content, encoding="utf-8")
-        assert load_accepted(path) == []

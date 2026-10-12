@@ -1,10 +1,13 @@
 """Run an evaluation split as LangSmith experiments and check the scores against thresholds.yaml (PRD §10).
 
-Usage: uv run --env-file ../.env --extra eval python -m evals.run --split smoke|full [--release release_1]
+Usage: uv run --env-file ../.env --extra eval python -m evals.run --split smoke|full
+    [--release release_1] [--summary PATH]
 
-Every suite in evaluators/ whose dataset has the split runs; suites on one dataset share one experiment. The gate
+Every suite in evaluators/ whose dataset has a published version of the split runs, on its newest version unless the
+dataset file pins one; suites on one dataset share one experiment. The gate
 prints each of the release's metrics as pass, fail, or not run, with the experiments' links, and the run exits 1 when
-a metric fails or when nothing ran. Needs the local stack with the eval learners loaded (make evals-learners), your
+a metric fails or when nothing ran. --summary appends the same table as Markdown to a file (GitHub's
+$GITHUB_STEP_SUMMARY). Needs the local stack with the eval learners loaded (make evals-learners), your
 AWS profile (agent and judge models), and LANGSMITH_API_KEY.
 """
 
@@ -13,13 +16,14 @@ import asyncio
 import sys
 from collections import defaultdict
 from collections.abc import Callable, Mapping, Sequence
+from pathlib import Path
 from typing import Any
 
 import langsmith
 from langsmith.utils import LangSmithError
 
-from evals.dataset import Dataset, DatasetError, load_dataset, versioned_examples
-from evals.gate import check, load_thresholds, passed, ran, render
+from evals.dataset import Dataset, DatasetError, examples_at, load_dataset, version_to_run
+from evals.gate import check, load_thresholds, passed, ran, render, render_markdown
 from evals.learners import LoadError
 from evals.suite import DatasetSuites, Suite, by_dataset, discover
 from smart_tutor.shared.config import Settings
@@ -50,15 +54,16 @@ async def run_split(
     links: dict[str, str] = {}
     for group in groups:
         dataset = load(group.dataset)
-        if split not in dataset.splits:
-            continue  # its metrics stay "not run"
-        version = dataset.splits[split]
+        version = version_to_run(client, dataset, split)
+        if version is None:  # its metrics stay "not run"
+            print(f"{dataset.name} has no {split} version yet: publish one (make evals-publish)", file=sys.stderr)
+            continue
         results = await client.aevaluate(
             _coroutine_function(group.target()),
-            data=versioned_examples(client, dataset, version),
+            data=examples_at(client, dataset, split, version),
             evaluators=list(group.evaluators),
             experiment_prefix=f"{dataset.name}-{split}",
-            metadata={**(metadata or {}), "split": split, "dataset_version": version.version},
+            metadata={**(metadata or {}), "split": split, "dataset_version": version},
             max_concurrency=MAX_CONCURRENCY,
         )
         rows = [{r.key: r.score for r in row["evaluation_results"]["results"]} async for row in results]
@@ -66,10 +71,23 @@ async def run_split(
         # gate would average only the survivors.
         for key in {key for row in rows for key in row}:
             scores[key].extend(row.get(key) for row in rows)
-        links[f"{dataset.name} ({split} {version.version})"] = (
+        links[f"{dataset.name} ({split} {version})"] = (
             await results.get_comparison_url() or results.url or results.experiment_name
         )
     return dict(scores), links
+
+
+def _append(path: Path | None, text: str) -> None:
+    if path is not None:
+        with path.open("a", encoding="utf-8") as f:
+            f.write(text + "\n")
+
+
+def _stop(summary: Path | None, message: str) -> int:
+    """Say why the run stopped, on stderr and in the job summary."""
+    print(message, file=sys.stderr)
+    _append(summary, f"**{message}**")
+    return 1
 
 
 def main(
@@ -82,12 +100,14 @@ def main(
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--split", choices=["smoke", "full"], required=True)
     parser.add_argument("--release", default="release_1", help="the thresholds.yaml table to gate on")
+    parser.add_argument(
+        "--summary", type=Path, help="append the gate table as Markdown to this file (GitHub's $GITHUB_STEP_SUMMARY)"
+    )
     args = parser.parse_args(argv)
     try:
         thresholds = load_thresholds(args.release)
     except ValueError as e:
-        print(f"Can't gate on {args.release}: {e}", file=sys.stderr)
-        return 1
+        return _stop(args.summary, f"Can't gate on {args.release}: {e}")
     models = Settings().models
     metadata = {"agent_model": models.agent.model_id, "judge_model": models.judge.model_id}
     groups = by_dataset(discover() if suites is None else suites)
@@ -96,17 +116,15 @@ def main(
             run_split(client or langsmith.Client(), groups, args.split, load=load, metadata=metadata)
         )
     except (DatasetError, LoadError) as e:
-        print(f"Can't run the {args.split} split: {e}", file=sys.stderr)
-        return 1
+        return _stop(args.summary, f"Can't run the {args.split} split: {e}")
     except LangSmithError as e:
-        print(f"Can't reach LangSmith: {e} (check LANGSMITH_API_KEY)", file=sys.stderr)
-        return 1
+        return _stop(args.summary, f"Can't reach LangSmith: {e} (check LANGSMITH_API_KEY)")
     rows = check(thresholds, scores)
     print(render(rows, links))
+    _append(args.summary, render_markdown(rows, links, f"{args.split.capitalize()} evals"))
     if not ran(rows):
         why = f"no suite's dataset has a {args.split} split, or every evaluator failed"
-        print(f"Nothing ran: no metric was scored ({why}).", file=sys.stderr)
-        return 1
+        return _stop(args.summary, f"Nothing ran: no metric was scored ({why}).")
     return 0 if passed(rows) else 1
 
 

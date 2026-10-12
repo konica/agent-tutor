@@ -3,7 +3,12 @@
 from smart_tutor.knowledge.application.archive_service import ArchiveService
 from smart_tutor.knowledge.application.delete_service import DeleteService
 from smart_tutor.knowledge.application.describer import FIRST_PAGES, Described, DocumentDescriber
-from smart_tutor.knowledge.application.document_service import DocumentDetails, DocumentService, DocumentView
+from smart_tutor.knowledge.application.document_service import (
+    DEFAULT_TIME_ZONE,
+    DocumentDetails,
+    DocumentService,
+    DocumentView,
+)
 from smart_tutor.knowledge.application.ingestion_service import IngestionService, ProcessingTools
 from smart_tutor.knowledge.application.limits import load_file_limits, load_max_attempts
 from smart_tutor.knowledge.application.retry_service import RetryService, retried_content, retry_message
@@ -42,6 +47,7 @@ from smart_tutor.knowledge.ports.pdf_extractor import (
 )
 
 __all__ = [
+    "DEFAULT_TIME_ZONE",
     "FIRST_PAGES",
     "MAX_QUERY_CHARS",
     "PDF_CONTENT_TYPE",

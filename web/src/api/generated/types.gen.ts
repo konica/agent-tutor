@@ -1154,9 +1154,35 @@ export type SearchSubjectsResponse = SearchSubjectsResponses[keyof SearchSubject
 export type ListThreadsData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Subject Id
+         */
+        subject_id?: Array<string>;
+        /**
+         * Active From
+         */
+        active_from?: string | null;
+        /**
+         * Active To
+         */
+        active_to?: string | null;
+        /**
+         * Q
+         */
+        q?: string | null;
+    };
     url: '/threads';
 };
+
+export type ListThreadsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListThreadsError = ListThreadsErrors[keyof ListThreadsErrors];
 
 export type ListThreadsResponses = {
     /**

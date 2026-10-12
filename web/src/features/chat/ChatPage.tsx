@@ -1,4 +1,5 @@
 import {
+  ArrowDown,
   ArrowUp,
   CircleAlert,
   Clock,
@@ -11,7 +12,7 @@ import {
   Search,
   Upload,
 } from "lucide-react";
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import {
@@ -20,7 +21,6 @@ import {
   askInThread,
   AskRefusedError,
   ConversationNotFoundError,
-  formatCitation,
   loadConversation as loadConversationApi,
   loadDocumentsUsed,
   rateAnswer,
@@ -46,11 +46,13 @@ import { PageHeader } from "../../components/PageHeader/PageHeader";
 import { DocumentPane } from "../viewer/DocumentPane";
 import type { Passage } from "../viewer/DocumentViewer";
 import type { ViewerDeps } from "../viewer/ViewerDialog";
+import { Answer } from "./Answer";
 import styles from "./ChatPage.module.css";
 import { AnswerRating } from "./AnswerRating";
 import { ConversationPanel } from "./ConversationPanel";
 import { DocumentPicker } from "./DocumentPicker";
 import { ThreadTitle } from "./ThreadTitle";
+import { useChatScroll } from "./useChatScroll";
 import { usePanelOpen } from "./usePanelOpen";
 
 type Props = {
@@ -98,8 +100,8 @@ type Problem = { message: string };
 // Loading the conversation a URL names; "none" once it is shown, or at /chat.
 type Opened = { status: "none" | "loading" | "not-found" | "failed" };
 
-// `chunkId`, `turn`, and `passage` are set only when a Sources chip opened the document; a panel row's open leaves
-// them out. `turn` tells apart the same passage cited in two turns.
+// `chunkId`, `turn`, and `passage` are set only when a Sources chip or an answer's marker opened the document; a panel
+// row's open leaves them out. `turn` tells apart the same passage cited in two turns.
 type Viewer = { documentId: string; chunkId?: string; turn?: number; passage?: Passage };
 
 const MAX_QUESTION = 4000;
@@ -207,10 +209,11 @@ export function ChatPage({
   const alive = useRef(true);
   const rateRequests = useRef<Record<string, number>>({});
   const busy = useRef(false);
-  const sourcesId = useId();
   // Counts the conversations shown (a new thread, or one a URL opens), so a late reply or stream event of an earlier
   // one never reaches a newer one. A question in the same thread keeps it.
   const turn = useRef(0);
+  // The messages pane follows new text only while the learner is at the bottom (DESIGN.md → Chat).
+  const scroll = useChatScroll([turns, answering, problem]);
   const { threadId: routeThreadId } = useParams();
   const navigate = useNavigate();
   // The conversation the page shows, by its URL or just created: null at /chat.
@@ -300,8 +303,8 @@ export function ChatPage({
     const id = from?.dataset.documentId;
     const rows = Array.from(document.querySelectorAll<HTMLElement>(`#${PANEL_ID} [data-document-id]`));
     const live = from?.isConnected ? from : rows.find((row) => row.dataset.documentId === id);
-    // Sources chips stay mounted while the pane is open, so they take focus back directly. The toggle is the fallback
-    // for a row that is no longer shown.
+    // Sources chips and answer markers stay mounted while the pane is open, so they take focus back directly. The toggle
+    // is the fallback for a row that is no longer shown.
     (live ?? toggleRef.current)?.focus();
   }, [viewer]);
 
@@ -311,8 +314,8 @@ export function ChatPage({
     setViewer({ documentId });
   }
 
-  // A Sources chip opens its document at the cited passage. `passage` is a new object on every click, so clicking the
-  // same chip again jumps back to it; a citation without a page opens the document at page 1.
+  // A Sources chip or an answer's marker opens its document at the cited passage. `passage` is a new object on every
+  // click, so clicking it again jumps back to it; a citation without a page opens the document at page 1.
   function openCitation(c: ChatCitation, turnIndex: number, from: HTMLElement) {
     opener.current = from;
     setViewer({
@@ -350,6 +353,8 @@ export function ChatPage({
     busy.current = false;
     setAnswering(false);
     setTurns([]);
+    // The next conversation opens on its newest turn.
+    scroll.land();
     setProblem(null);
     setOpened({ status: "none" });
     setUsed([]);
@@ -417,6 +422,8 @@ export function ChatPage({
     setProblem(null);
     const asked: Exchange = { question: text, answer: "", citations: [], decline: null, runId: null, rating: null, kept: false };
     setTurns((list) => [...list, asked]);
+    // The question scrolls into view, and the answer is followed from the bottom.
+    scroll.toLatest();
     await run(() => (inThread === null ? ask(text, documentId) : askIn(inThread, text)), turn.current, inThread === null);
   }
 
@@ -631,6 +638,14 @@ export function ChatPage({
     if (alive.current && turn.current === forTurn && rateRequests.current[runId] === request) setTurns((list) => list.map((e) => (e.runId === runId ? { ...e, rating: saved } : e)));
   }
 
+  // The button goes once the pane is at the bottom, so focus moves on: to the question box, or while it is disabled
+  // during an answer, to the newest turn (so the next Tab continues from there, not from the first turn).
+  function jumpToLatest() {
+    scroll.toLatest();
+    if (answering) scroll.element?.querySelector<HTMLElement>("[data-newest-turn]")?.focus({ preventScroll: true });
+    else input.current?.focus();
+  }
+
   function onSubmit(event: FormEvent) {
     event.preventDefault();
     void submit();
@@ -788,7 +803,7 @@ export function ChatPage({
 
         {/* The messages scroll; the composer row stays pinned under them (DESIGN.md → Chat). */}
         <div className={styles.conversation}>
-          <div className={styles.messages}>
+          <div ref={scroll.ref} className={styles.messages} role="region" aria-label="Messages">
             <div className={styles.column}>
               {pendingStart && (
                 <p className={styles.notice}>
@@ -811,14 +826,14 @@ export function ChatPage({
 
               {turns.map((t, index) => {
                 const last = index === turns.length - 1;
-                const listId = `${sourcesId}-${index}`;
                 // A turn that didn't end with done wasn't saved, so it can't be rated.
                 const runId = t.kept ? t.runId : null;
                 const rating = runId !== null && threadId !== null ? <AnswerRating rating={t.rating} onRate={(r) => rateTurn(runId, r)} onAnnounce={setAnnouncement} /> : null;
+                // Answer shows the Sources line on the same condition, with the rating at its end.
                 const hasSources = t.decline === null && showCitations && t.citations.length > 0;
                 return (
                   // Turns are only ever added at the end or all replaced, so the index is a stable key.
-                  <div key={index} className={styles.turn}>
+                  <div key={index} className={styles.turn} {...(last ? { "data-newest-turn": "", tabIndex: -1 } : {})}>
                     <p className={styles.question}>
                       <span className="visually-hidden">You asked: </span>
                       {t.question}
@@ -874,54 +889,15 @@ export function ChatPage({
                           <p>{t.decline.message}</p>
                         </div>
                       ) : (
-                        t.answer && <p className={styles.answer}>{t.answer}</p>
-                      )}
-                      {hasSources && (
-                        <div className={styles.sources}>
-                          <span className={styles.sourcesLabel} id={listId}>
-                            Sources
-                          </span>
-                          {/* Each source shows the [n] the answer's text uses for it; an answer may cite [2] without [1]. */}
-                          <ul className={styles.sourceList} aria-labelledby={listId}>
-                            {t.citations.map((c) => {
-                              if (c.deleted || deletedIds.has(c.document_id)) {
-                                return (
-                                  <li key={c.chunk_id}>
-                                    <span className={`${styles.source} ${styles.sourceDeleted}`} title="Deleted document">
-                                      <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
-                                      <span className={styles.sourceMarker}>[{c.n}]</span> Deleted document
-                                    </span>
-                                  </li>
-                                );
-                              }
-                              // The chip whose passage is open beside the conversation; a panel row's open clears it.
-                              const isShown = viewer?.chunkId === c.chunk_id && viewer.turn === index;
-                              const pageText = c.page === null ? "page unavailable" : `p. ${c.page}`;
-                              const state = isShown ? "Shown beside the conversation" : "Open beside the conversation";
-                              return (
-                                <li key={c.chunk_id}>
-                                  <button
-                                    type="button"
-                                    className={isShown ? `${styles.source} ${styles.sourceShown}` : styles.source}
-                                    title={formatCitation(c)}
-                                    aria-label={`${c.document_title}, ${pageText}${c.archived ? ", archived" : ""}. ${state}`}
-                                    aria-current={isShown ? "true" : undefined}
-                                    data-chunk-id={c.chunk_id}
-                                    onClick={(event) => openCitation(c, index, event.currentTarget)}
-                                  >
-                                    <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
-                                    <span className={styles.sourceMarker}>[{c.n}]</span>{" "}
-                                    <span className={styles.sourceTitle}>{c.document_title}</span>{" "}
-                                    <span className={styles.sourcePage}>· {pageText}</span>
-                                    {/* An archived document's citation still opens it, marked as archived. */}
-                                    {c.archived && <span className={styles.sourceBadge}>Archived</span>}
-                                  </button>
-                                </li>
-                              );
-                            })}
-                          </ul>
-                          {rating}
-                        </div>
+                        <Answer
+                          text={t.answer}
+                          citations={t.citations}
+                          showCitations={showCitations}
+                          deletedIds={deletedIds}
+                          shownChunkId={viewer?.turn === index ? (viewer.chunkId ?? null) : null}
+                          onOpenCitation={(c, from) => openCitation(c, index, from)}
+                          rating={rating}
+                        />
                       )}
                       {!hasSources && rating && <div className={styles.ratingLine}>{rating}</div>}
                       {last && problem && (
@@ -940,6 +916,12 @@ export function ChatPage({
           </div>
 
           <form className={styles.form} onSubmit={onSubmit}>
+            {/* Floats above the composer while the learner reads earlier turns; not a live region. */}
+            {scroll.away && turns.length > 0 && (
+              <Button size="sm" icon={ArrowDown} className={styles.jump} onClick={jumpToLatest}>
+                Jump to latest
+              </Button>
+            )}
             <label htmlFor="chat-question" className="visually-hidden">
               Your question
             </label>

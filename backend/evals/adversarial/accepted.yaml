@@ -1,4 +1,0 @@
-# Variants of taxonomy.yaml's seeds that a human accepted in the LangSmith annotation queue (feedback `accepted` = 1).
-# Written by `evals.generators.injection accept`; they join the full split of datasets/injection.yaml. Don't edit by
-# hand: to drop a variant, set its `accepted` feedback to 0 in LangSmith, delete it here, and run `build`.
-examples: []

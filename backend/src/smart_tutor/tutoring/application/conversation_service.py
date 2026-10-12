@@ -2,10 +2,11 @@
 
 import logging
 import uuid
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
+from datetime import date, datetime, time, timedelta, tzinfo
 
-from smart_tutor.knowledge.application import DocumentService, DocumentView
-from smart_tutor.shared.domain.ids import DocumentId, RunId, ThreadId, UserId
+from smart_tutor.knowledge.application import DEFAULT_TIME_ZONE, DocumentService, DocumentView
+from smart_tutor.shared.domain.ids import DocumentId, RunId, SubjectId, ThreadId, UserId
 from smart_tutor.shared.ports.clock import Clock
 from smart_tutor.tutoring.domain.document_used import DELETED_DOCUMENT, DocumentUsed
 from smart_tutor.tutoring.domain.errors import (
@@ -14,7 +15,7 @@ from smart_tutor.tutoring.domain.errors import (
     ThreadNotFoundError,
     TurnNotFoundError,
 )
-from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
+from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadFilter, ThreadStatus
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
 from smart_tutor.tutoring.domain.thread_summary import ThreadSummary
 from smart_tutor.tutoring.domain.turn import (
@@ -42,6 +43,7 @@ class ConversationService:
         *,
         history_turns: int = 5,
         history_answer_chars: int = 2000,
+        time_zone: tzinfo = DEFAULT_TIME_ZONE,
     ) -> None:
         self._threads = threads
         self._documents = documents
@@ -49,6 +51,7 @@ class ConversationService:
         self._feedback = feedback or NoAnswerFeedback()
         self._history_turns = history_turns
         self._history_answer_chars = history_answer_chars
+        self._tz = time_zone
 
     def history(self, thread_id: ThreadId, user_id: UserId) -> list[HistoryTurn]:
         """What a new question in the thread sends the agent (PRD §9.2 step 3, ADR 0015): its last `history_turns`
@@ -99,10 +102,29 @@ class ConversationService:
             self._threads.set_search_scope(thread_id, search_scope)
         return thread
 
-    def list_threads(self, user_id: UserId) -> list[ThreadSummary]:
-        """The learner's active conversations, newest last activity first (US-13). A row's subjects are those of its
-        listed documents that still exist, archived included, read now (D11); a deleted document adds none."""
-        threads = self._threads.list_owned(user_id, ThreadStatus.ACTIVE)
+    def list_threads(
+        self,
+        user_id: UserId,
+        *,
+        subject_ids: Collection[SubjectId] = (),
+        active_from: date | None = None,
+        active_to: date | None = None,
+        title: str | None = None,
+    ) -> list[ThreadSummary]:
+        """The learner's active conversations, newest last activity first (US-13), narrowed by any subset of the
+        filters: any of the subjects of its listed documents that still exist, archived included (D11, Q63 L1); last
+        activity between two inclusive calendar days in the app time zone (D27); a case-insensitive part of the title,
+        never of the answers (Q63 N3). A row's subjects are read now the same way; a deleted document adds none."""
+        search = (title or "").strip()
+        thread_filter = ThreadFilter(
+            document_ids=None if not subject_ids else self._documents.documents_with_subjects(user_id, subject_ids),
+            active_from=None if active_from is None else datetime.combine(active_from, time(), tzinfo=self._tz),
+            active_before=(
+                None if active_to is None else datetime.combine(active_to + timedelta(days=1), time(), tzinfo=self._tz)
+            ),
+            title=search or None,
+        )
+        threads = self._threads.list_owned(user_id, ThreadStatus.ACTIVE, thread_filter)
         rows = self._threads.documents_used_by_thread([ThreadId(t.thread_id) for t in threads])
         views = self._documents.documents_by_id(
             user_id, list(dict.fromkeys(r.document_id for listed in rows.values() for r in listed))
@@ -110,11 +132,11 @@ class ConversationService:
         summaries: list[ThreadSummary] = []
         for t in threads:
             listed = rows.get(ThreadId(t.thread_id), [])
-            subject_ids = dict.fromkeys(
+            row_subjects = dict.fromkeys(
                 s for r in listed if (view := views.get(r.document_id)) is not None for s in view.subject_ids
             )
             summaries.append(
-                ThreadSummary(ThreadId(t.thread_id), t.title, tuple(subject_ids), len(listed), t.last_activity)
+                ThreadSummary(ThreadId(t.thread_id), t.title, tuple(row_subjects), len(listed), t.last_activity)
             )
         return summaries
 
