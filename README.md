@@ -52,6 +52,10 @@ Two ways, on the same ports: dependency services count up from 10400, app servic
 | Web | 10453 | Docker (nginx build) | `make web` (Vite, hot reload) |
 
 **Option A** (same images as production): `make up-app`, then open http://localhost:10453.
+Or use
+```bash
+docker compose --profile app up -d --build 
+```
 
 **Option B** (faster to iterate): dependencies in Docker, app processes on your machine.
 
