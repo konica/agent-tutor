@@ -3,6 +3,7 @@
 
 import http.server
 import json
+import random
 import threading
 import uuid
 from collections.abc import Iterator
@@ -206,6 +207,40 @@ def test_the_sampling_rate_keeps_that_share_of_traces() -> None:
             for _ in range(20):
                 traces.tracer().start_span("ask").end()
         assert len(spans.get_finished_spans()) == kept
+
+
+def _kept_share(rate: float, run_ids: list[uuid.UUID]) -> float:
+    with recorded_traces(sampling_rate=rate) as (traces, spans):
+        for run_id in run_ids:
+            with root_ids(run_id):
+                traces.tracer().start_span("ask").end()
+    return len(spans.get_finished_spans()) / len(run_ids)
+
+
+def test_run_id_traces_are_kept_at_the_configured_share() -> None:
+    rng = random.Random(0)
+    run_ids = [uuid.UUID(int=rng.getrandbits(128), version=4) for _ in range(2000)]
+    assert 0.4 < _kept_share(0.5, run_ids) < 0.6
+    assert 0.15 < _kept_share(0.25, run_ids) < 0.35
+
+
+def test_a_run_id_is_always_sampled_the_same_way() -> None:
+    rng = random.Random(1)
+    run_ids = [uuid.UUID(int=rng.getrandbits(128), version=4) for _ in range(200)]
+    assert _kept_share(0.5, run_ids) == _kept_share(0.5, run_ids)
+
+
+def test_only_the_root_span_takes_the_run_ids() -> None:
+    run_id = uuid.uuid4()
+    with recorded_traces() as (traces, spans):
+        with root_ids(run_id):
+            first = traces.tracer().start_span("ask")
+            second = traces.tracer().start_span("other")
+        first.end()
+        second.end()
+    a, b = spans.get_finished_spans()
+    assert a.context.span_id == root_span_id(run_id)
+    assert b.context.span_id != root_span_id(run_id)
 
 
 class _Collector(http.server.BaseHTTPRequestHandler):

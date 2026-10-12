@@ -9,7 +9,7 @@ import hmac
 import json
 import logging
 import uuid
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -20,13 +20,16 @@ from langsmith import utils as ls_utils
 from openinference.instrumentation.langchain import LangChainInstrumentor
 from openinference.semconv.resource import ResourceAttributes
 from openinference.semconv.trace import OpenInferenceMimeTypeValues, OpenInferenceSpanKindValues, SpanAttributes
+from opentelemetry.context import Context
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import SpanProcessor, TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.sdk.trace.id_generator import IdGenerator, RandomIdGenerator
-from opentelemetry.sdk.trace.sampling import ParentBased, TraceIdRatioBased
-from opentelemetry.trace import Tracer
+from opentelemetry.sdk.trace.sampling import Decision, ParentBased, Sampler, SamplingResult
+from opentelemetry.trace import Link, SpanKind, Tracer, get_current_span
+from opentelemetry.trace.span import TraceState
+from opentelemetry.util.types import Attributes
 
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
@@ -47,7 +50,7 @@ def root_span_id(run_id: uuid.UUID) -> int:
 
 @contextmanager
 def root_ids(run_id: uuid.UUID) -> Iterator[None]:
-    """Spans started inside take `run_id` as their trace id and `root_span_id(run_id)` as their span id."""
+    """The next root span started inside takes `run_id` as its trace id and `root_span_id(run_id)` as its span id."""
     token = _root_run.set(run_id)
     try:
         yield
@@ -56,7 +59,7 @@ def root_ids(run_id: uuid.UUID) -> Iterator[None]:
 
 
 class RunIds(IdGenerator):
-    """Random ids, except inside `root_ids`."""
+    """Random ids, except the root span started inside `root_ids`, which takes the run's ids once."""
 
     def __init__(self) -> None:
         self._random = RandomIdGenerator()
@@ -67,7 +70,42 @@ class RunIds(IdGenerator):
 
     def generate_span_id(self) -> int:
         run_id = _root_run.get()
-        return (root_span_id(run_id) if run_id else 0) or self._random.generate_span_id()
+        if run_id is None:
+            return self._random.generate_span_id()
+        _root_run.set(None)  # one-shot: later spans get random ids; root_ids restores the previous value on exit
+        return root_span_id(run_id) or self._random.generate_span_id()
+
+
+class RunIdRatio(Sampler):
+    """Keeps a share of traces by hashing the whole 128-bit trace id. The SDK's TraceIdRatioBased reads only the low 64
+    bits, and a uuid4 run id's low bits always start with the variant bits `10`, which would keep none at rates up to
+    0.5 and skew the rest."""
+
+    def __init__(self, rate: float) -> None:
+        self._rate = rate
+        self._bound = round(rate * 2**64)
+
+    def should_sample(
+        self,
+        parent_context: Context | None,
+        trace_id: int,
+        name: str,
+        kind: SpanKind | None = None,
+        attributes: Attributes = None,
+        links: Sequence[Link] | None = None,
+        trace_state: TraceState | None = None,
+    ) -> SamplingResult:
+        digest = hashlib.blake2b(trace_id.to_bytes(16, "big"), digest_size=8).digest()
+        keep = int.from_bytes(digest, "big") < self._bound
+        parent = get_current_span(parent_context).get_span_context()
+        return SamplingResult(
+            Decision.RECORD_AND_SAMPLE if keep else Decision.DROP,
+            attributes=None,
+            trace_state=parent.trace_state if parent.is_valid else None,
+        )
+
+    def get_description(self) -> str:
+        return f"RunIdRatio{{{self._rate}}}"
 
 
 class LearnerHasher:
@@ -145,7 +183,7 @@ def phoenix_traces(
 ) -> PhoenixTraces:
     provider = TracerProvider(
         resource=Resource({ResourceAttributes.PROJECT_NAME: project}),
-        sampler=ParentBased(TraceIdRatioBased(sampling_rate)),
+        sampler=ParentBased(RunIdRatio(sampling_rate)),
         id_generator=RunIds(),
     )
     provider.add_span_processor(processor)
