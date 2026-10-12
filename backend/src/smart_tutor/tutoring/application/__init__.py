@@ -32,6 +32,7 @@ from smart_tutor.tutoring.domain.turn import (
     Turn,
     TurnCitation,
     TurnView,
+    history_turn,
 )
 from smart_tutor.tutoring.ports.answer_feedback import AnswerFeedback, NoAnswerFeedback
 from smart_tutor.tutoring.ports.retriever import Retriever
@@ -70,5 +71,6 @@ __all__ = [
     "answer_messages",
     "cited_chunks",
     "covers",
+    "history_turn",
     "search_query",
 ]

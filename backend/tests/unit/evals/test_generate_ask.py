@@ -61,6 +61,38 @@ def test_drift_drafts_limit_the_conversation_to_one_held_document_and_end_on_ano
         assert draft.chunks[0].seed_id != limit and not draft.covered
 
 
+def test_follow_up_drafts_continue_on_a_held_document_from_a_different_passage() -> None:
+    drafts = [d for d in plan() if d.type == "follow_up"]
+    assert drafts
+    for draft in drafts:
+        [seed] = draft.sources
+        assert seed in HOLDINGS[draft.learner] and draft.covered and draft.documents is None
+        [earlier], [last] = draft.history, draft.chunks
+        assert earlier.seed_id == last.seed_id == seed and earlier != last
+
+
+def test_topic_switch_drafts_move_from_one_held_document_to_another() -> None:
+    drafts = [d for d in plan() if d.type == "topic_switch"]
+    assert drafts and all(d.learner == "learner@example.com" for d in drafts)
+    for draft in drafts:
+        [first], [last] = draft.history, draft.chunks
+        held = HOLDINGS[draft.learner]
+        assert first.seed_id in held and last.seed_id in held and first.seed_id != last.seed_id
+        assert draft.covered and draft.documents is None and draft.sources == (last.seed_id,)
+
+
+def test_no_topic_switch_is_planned_when_no_learner_holds_two_documents() -> None:
+    holdings = {"learner@example.com": ["react-2022"], "learner2@example.com": ["self-rag-2023"]}
+    drafts = plan_drafts(CHUNKS, holdings, 3, random.Random(7))
+    assert not any(d.type == "topic_switch" for d in drafts) and any(d.type == "follow_up" for d in drafts)
+
+
+def test_follow_up_needs_a_held_document_with_two_usable_passages() -> None:
+    chunks = {"react-2022": CHUNKS["react-2022"][:1]}
+    drafts = plan_drafts(chunks, {"learner@example.com": ["react-2022"]}, 2, random.Random(1))
+    assert "follow_up" not in {d.type for d in drafts}
+
+
 def test_a_learner_holding_one_document_never_gets_a_multi_document_draft() -> None:
     assert all(d.learner == "learner@example.com" for d in plan() if d.type == "multi_document")
 

@@ -36,8 +36,11 @@ def judged_by(judge: Callable[[], Judge]) -> Evaluator:
     ) -> dict[str, Any]:
         if "answer" not in outputs:
             return {"key": KEY, "score": 0.0, "comment": "the run failed before it answered"}
+        judged = {"question": inputs["question"]}
+        if inputs.get("history"):
+            judged = {"earlier_questions": inputs["history"], **judged}
         result = await judge()(
-            inputs={"question": inputs["question"]},
+            inputs=judged,
             outputs={"answer": outputs["answer"]},
             reference_outputs={"covered": reference_outputs.get("covered")},
         )

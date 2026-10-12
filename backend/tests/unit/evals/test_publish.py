@@ -21,9 +21,9 @@ def generated(question: str, kind: str) -> Example:
 
 def test_full_holds_every_accepted_item_and_smoke_a_balanced_share_up_to_its_size() -> None:
     items = [generated(f"{kind}-{i}", kind) for kind in TYPES for i in range(10)]
-    splits = split_examples(ASK, items, smoke_size=13)
+    splits = split_examples(ASK, items, smoke_size=17)
     assert splits["full"] == [*HAND, *items]
-    assert len(splits["smoke"]) == 13 and splits["smoke"][0] == HAND[0]
+    assert len(splits["smoke"]) == 17 and splits["smoke"][0] == HAND[0]
     assert Counter(e.metadata["type"] for e in splits["smoke"][1:]) == {kind: 2 for kind in TYPES}
     assert set(map(id, splits["smoke"])) <= set(map(id, splits["full"]))
 

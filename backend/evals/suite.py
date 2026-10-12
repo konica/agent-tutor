@@ -14,6 +14,11 @@ from typing import Any
 from evals.targets import Target
 
 Evaluator = Callable[..., Any]  # takes any of inputs, outputs, reference_outputs; sync or async
+NOT_APPLICABLE = "n/a"  # an evaluator's `value` for an example its metric doesn't cover; the runner leaves it out
+
+
+def not_applicable(key: str, why: str) -> dict[str, Any]:
+    return {"key": key, "score": None, "value": NOT_APPLICABLE, "comment": why}
 
 
 @dataclass(frozen=True)

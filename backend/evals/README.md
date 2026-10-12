@@ -8,7 +8,7 @@ Datasets live in **LangSmith** (versioned there; never edit a version a release 
 | `seed_corpus/learners.yaml` | The two eval learners and the seed documents in each library |
 | `corpus.py` | Downloads the seed PDFs into `data/seed_corpus/` and checks each against the manifest's SHA-256 |
 | `learners.py` | Loads the eval learners' libraries through the upload path (see "Eval learners") |
-| `generators/` | Candidate generators; `ask.py` writes Q&A and decline candidates of six question types from seed chunks (judge model), `prompts/` holds its prompt; `injection.py` builds `datasets/injection.yaml` from the taxonomy and writes variants of its seeds (see "Injection eval") |
+| `generators/` | Candidate generators; `ask.py` writes Q&A and decline candidates of eight question types from seed chunks (judge model), `prompts/` holds its prompt; `injection.py` builds `datasets/injection.yaml` from the taxonomy and writes variants of its seeds (see "Injection eval") |
 | `chunks.py` | Seed PDFs cut into the worker's chunks, ids `<seed id>:<seq>` |
 | `generate.py` | `make evals-generate` → candidates in the annotation queue |
 | `review.py` | The annotation queue: candidates as runs, the `accepted` rubric item, accepted items read back |
@@ -43,7 +43,7 @@ Prerequisites:
 
     make evals-smoke     # or: cd backend && uv run --env-file ../.env --extra eval python -m evals.run --split smoke
 
-It runs every suite whose dataset has the split, one LangSmith experiment per dataset, then prints each `release_1` metric of `thresholds.yaml` as PASS, FAIL, or "not run" (no suite scores it yet) with the experiment links, and exits 1 when a metric fails or nothing ran. `--release` picks another table. `--summary PATH` appends the table as Markdown to a file (CI passes `$GITHUB_STEP_SUMMARY`); CI runs the smoke split on PRs that change the agent (`.github/workflows/evals-smoke.yml`, see `docs/runbooks/evals-ci.md`).
+It runs every suite whose dataset has the split, one LangSmith experiment per dataset, then prints each `release_1` metric of `thresholds.yaml` as PASS, FAIL, or "not run" (no suite scores it yet) with the experiment links, and exits 1 when a metric fails or nothing ran. An example whose evaluator raised counts as a failure in the gate: a score of 0 for a `min` metric, 1 for a `max` metric, and a failing example for `max_failures`. `--release` picks another table. `--summary PATH` appends the table as Markdown to a file (CI passes `$GITHUB_STEP_SUMMARY`); CI runs the smoke split on PRs that change the agent (`.github/workflows/evals-smoke.yml`, see `docs/runbooks/evals-ci.md`).
 
 Prerequisites: the app stack and the eval learners' libraries (`make evals-learners`, above); your AWS profile (the agent and the Qwen judge run on Bedrock); `LANGSMITH_API_KEY` in your shell or `.env`.
 
@@ -59,6 +59,18 @@ Each `datasets/<key>.yaml` is one LangSmith dataset (`name`) and its hand-writte
 
 The runner then uses the pinned tag for that split (and stops if LangSmith doesn't have it), so the release gate can be rerun on exactly the examples it passed. Record the pinned versions in the release PR.
 
+## Multi-turn conversations
+
+An `ask` example may have `inputs.history`: the earlier turns of the conversation, oldest first. A turn that is a question alone is asked first, as the same learner and with the example's `documents` limit, and its answer kept; a turn written as `{question, answer}` (the injection dataset's multi-turn attacks) is kept as written. Each ask gets the turns before it the way the API sends them: the last `history_turns` turns, each answer cut to `history_answer_chars`. Only the last question is scored. The outputs of the run carry the `history` and the `chunks` the last search found.
+
+Metrics that score the last turn:
+- `retrieval_relevance`: the Qwen judge rates each chunk the last search found; covered examples only.
+- `answer_relevance`: the judge also reads the earlier questions, so "What are its limitations?" is judged in context.
+- `decline_correctness.correctly_declined`: 1 when a limited, uncovered example gets the `limited` decline. Unlimited conversations are not applicable until the relevance gate covers every turn (US-5, #14).
+- `decline_correctness.wrongly_declined`: 1 when a covered example is declined.
+
+Hand-written conversations (follow-ups, topic switches, and drift in a limited conversation) are in both splits of `smart-tutor-ask`. Accepted `follow_up`, `topic_switch`, and `drift` candidates join `full` always, but `smoke` only as far as its 30 items go (taken in turn by type), so they may reach only `full`. There is no separate command: run `make evals-publish` once to publish new examples, then `make evals-smoke`. In the LangSmith experiment, filter on examples whose inputs have `history`.
+
 ## Grow a dataset: generate, review, publish
 
 1. **Generate** candidates (your AWS profile for the judge model, `LANGSMITH_API_KEY`; downloads the seed PDFs the first time):
@@ -73,11 +85,13 @@ The runner then uses the pinned tag for that split (and stops if LangSmith doesn
    | `multi_chunk` | two passages of one document they hold | answer |
    | `multi_document` | one passage each of two documents they hold | answer |
    | `unanswerable` | on topic, from a seed document they don't hold | decline |
+   | `follow_up` | two passages of one document they hold; the follow-up names it only as "it", "this", or "they" | answer |
+   | `topic_switch` | an earlier turn from one held document, the last turn from another held document, unlimited | answer |
    | `drift` | a conversation limited to one held document whose second turn comes from another document | decline (limited) |
 
    A type the corpus can't support (no learner holds the documents it needs) gets no drafts, and the command doesn't stop for it.
 
-   Each candidate is a run in the `smart-tutor-ask-candidates` project, added to the annotation queue of the same name. Its outputs show the expected behavior, the source chunk ids, and the passages (`evidence`). The ask target asks only the last question of a `drift` example until it sends the example's history to the graph (#214).
+   Each candidate is a run in the `smart-tutor-ask-candidates` project, added to the annotation queue of the same name. Its outputs show the expected behavior, the source chunk ids, and the passages (`evidence`).
 
 2. **Review** in LangSmith → Annotation Queues → `smart-tutor-ask-candidates`. For each item, score **accepted**: 1 when the question is clear, a learner could ask it, and the passages support the expected behavior (for an answer, they answer it); 0 otherwise. Don't edit items: reject them, and generate more. Your latest score counts. Review a batch before its runs expire with the candidates project's trace retention: unreviewed candidates are lost with them. A published example stays in later versions after its run expires. To withdraw one, score it 0 while its run still exists; after that, leave a note on the example in the dataset.
 
@@ -103,6 +117,8 @@ and publish (`make evals-publish`). To grow it, generate variants of each seed (
 
 1. Write `evaluators/<metric>.py`: evaluator functions taking any of `inputs`, `outputs`, `reference_outputs` and returning `{"key": "<thresholds.yaml metric>", "score": ..., "comment": ...}` (a nested metric is its dotted path, e.g. `decline_correctness.correctly_declined`), and a `SUITE = Suite(dataset=..., target=..., evaluators=(...))`. A judge's prompt goes in `evaluators/rubrics/`.
 2. Add its hand-written examples to `datasets/<dataset>.yaml` (a suite on a new dataset brings a new file and a target in `targets.py` that turns one example into the outputs its evaluators read), then `make evals-publish`.
+
+An evaluator returns `not_applicable(key, why)` (from `evals.suite`) for an example its metric doesn't cover; the runner leaves that result out of the metric.
 
 Each evaluator should return a literal metric key string and, for now, be named after its metric: the runner fills a missing score (an evaluator that raised) only for keys it has seen in other examples, and a dotted metric needs the follow-up noted in the PR. An evaluator for a dotted metric (`injection_resistance.kept_scope`) must not raise: return score 0 with the reason instead (see `_fail_closed` in `injection_resistance.py`), or a crash on every row reads as "not run". A canary check with no canaries also scores 0.
 

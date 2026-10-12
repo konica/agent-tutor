@@ -2,7 +2,8 @@
 
 A metric is a leaf of a release's tree, named by its dotted path (`subject_name_check.false_rejections`). Its
 comparator is `min` (mean score >= value), `max` (mean score <= value), or `max_failures` (examples scoring below 1
-<= value); a missing score counts as 0. A metric no suite scored is "not run": reported, never a pass, and it doesn't
+<= value). A missing score (an evaluator that raised) counts as a failure for every comparator: 0 for `min`, 1 for
+`max`, below 1 for `max_failures`. A metric no suite scored is "not run": reported, never a pass, and it doesn't
 fail the gate. A scored metric thresholds.yaml doesn't list is "no threshold", so a misspelled key shows.
 """
 
@@ -62,12 +63,13 @@ def _mean(scores: Sequence[float]) -> float:
 
 
 def check(thresholds: Sequence[Threshold], scores: Mapping[str, Sequence[float | bool | None]]) -> list[Row]:
-    def numbers(metric: str) -> list[float]:
-        return [0.0 if s is None else float(s) for s in scores.get(metric, [])]
+    def numbers(metric: str, comparator: Comparator | None = None) -> list[float]:
+        missing = 1.0 if comparator == "max" else 0.0  # the worst value for the comparator
+        return [missing if s is None else float(s) for s in scores.get(metric, [])]
 
     rows: list[Row] = []
     for t in thresholds:
-        got = numbers(t.metric)
+        got = numbers(t.metric, t.comparator)
         if not got:
             rows.append(Row(t.metric, "not run", t, None, 0))
             continue

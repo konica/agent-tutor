@@ -25,7 +25,7 @@ from langsmith.utils import LangSmithError
 from evals.dataset import Dataset, DatasetError, examples_at, load_dataset, version_to_run
 from evals.gate import check, load_thresholds, passed, ran, render, render_markdown
 from evals.learners import LoadError
-from evals.suite import DatasetSuites, Suite, by_dataset, discover
+from evals.suite import NOT_APPLICABLE, DatasetSuites, Suite, by_dataset, discover
 from smart_tutor.shared.config import Settings
 
 MAX_CONCURRENCY = 4  # examples in flight; Bedrock throttling backs off in the models' boto config
@@ -66,11 +66,16 @@ async def run_split(
             metadata={**(metadata or {}), "split": split, "dataset_version": version},
             max_concurrency=MAX_CONCURRENCY,
         )
-        rows = [{r.key: r.score for r in row["evaluation_results"]["results"]} async for row in results]
+        rows = [row["evaluation_results"]["results"] async for row in results]
         # An evaluator that raised leaves its key out of that row: count it as unscored, not as absent, or the
-        # gate would average only the survivors.
-        for key in {key for row in rows for key in row}:
-            scores[key].extend(row.get(key) for row in rows)
+        # gate would average only the survivors. A result marked not applicable is left out of its metric.
+        for key in {r.key for row in rows for r in row}:
+            for row in rows:
+                found = [r for r in row if r.key == key]
+                if not found:
+                    scores[key].append(None)
+                elif found[0].value != NOT_APPLICABLE:
+                    scores[key].append(found[0].score)
         links[f"{dataset.name} ({split} {version})"] = (
             await results.get_comparison_url() or results.url or results.experiment_name
         )

@@ -38,6 +38,7 @@ from smart_tutor.tutoring.application import (
     Turn,
     TurnCitation,
     TurnNotFoundError,
+    history_turn,
 )
 from smart_tutor.tutoring.domain.thread import ThreadStatus
 
@@ -707,6 +708,11 @@ def test_a_long_earlier_answer_is_cut() -> None:
 
     [turn] = conversations.history(tid, UserId("ada"))
     assert len(turn.answer) <= 10 and turn.answer.endswith("…") and turn.answer.startswith("x")
+
+
+def test_history_turn_cuts_a_long_answer_and_keeps_a_short_one() -> None:
+    assert history_turn("q", "abcdef", 4) == HistoryTurn("q", "abc…")
+    assert history_turn("q", "abc", 4).answer == "abc"
 
 
 def test_a_zero_cap_sends_no_history() -> None:

@@ -47,6 +47,22 @@ def test_the_ask_dataset_asks_eval_learners_about_their_own_seed_documents() -> 
     assert any(e.inputs["documents"] for e in uncovered)  # and one that doesn't cover the question
 
 
+def test_the_ask_dataset_has_multi_turn_conversations_of_every_kind_naming_seed_documents() -> None:
+    manifest = load_manifest()
+    examples = load_dataset("ask").examples
+    with_history = [e for e in examples if "history" in e.inputs]
+    for e in with_history:
+        history = e.inputs["history"]
+        assert isinstance(history, list) and history
+        assert all(isinstance(turn, str) and turn.strip() for turn in history)
+    for e in examples:
+        assert set(e.inputs.get("documents") or []) <= set(manifest)
+        assert set(e.outputs.get("sources") or []) <= set(manifest)
+    assert len(with_history) >= 10
+    kinds = {(e.inputs["documents"] is not None, e.outputs["covered"]) for e in with_history}
+    assert {(True, False), (False, True), (True, True)} <= kinds
+
+
 def test_a_dataset_without_examples_or_with_an_unknown_pinned_split_is_refused(tmp_path: Path) -> None:
     (tmp_path / "x.yaml").write_text("name: x\nexamples: []\n", encoding="utf-8")
     with pytest.raises(DatasetError, match="no examples"):
