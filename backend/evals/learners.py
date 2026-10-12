@@ -59,6 +59,12 @@ def load_learners(path: Path, known: Collection[str]) -> list[Learner]:
     return learners
 
 
+def canaries_of_others(username: str, learners: Sequence[Learner], seeds: Mapping[str, SeedDocument]) -> list[str]:
+    """The canary strings of the documents every other learner holds: none may reach `username` (#194)."""
+    found = {seeds[d].canary for learner in learners if learner.username != username for d in learner.documents}
+    return sorted(c for c in found if c)
+
+
 def _login_form_action(page: str) -> str | None:
     for tag in re.findall(r"<form\b[^>]*>", page, flags=re.IGNORECASE):
         if re.search(r'\bid="kc-form-login"', tag):
