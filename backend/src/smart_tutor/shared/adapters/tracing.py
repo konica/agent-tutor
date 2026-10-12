@@ -36,8 +36,8 @@ from smart_tutor.shared.ports.run_tracing import RunTracing
 KEY_SETTING = "SMART_TUTOR_LEARNER_HASH_KEY"
 EXPORT_TIMEOUT_SECONDS = 10.0
 _LOW_64_BITS = 0xFFFF_FFFF_FFFF_FFFF
-# langchain-core traces every run to LangSmith while either is on (ADR 0017: LangSmith is for evals only).
-LANGSMITH_SWITCHES = ("LANGSMITH_TRACING", "LANGCHAIN_TRACING_V2")
+# langchain-core traces every run to LangSmith while any is on (ADR 0017: LangSmith is for evals only).
+LANGSMITH_SWITCHES = ("LANGSMITH_TRACING_V2", "LANGSMITH_TRACING", "LANGCHAIN_TRACING_V2")
 _root_run: ContextVar[uuid.UUID | None] = ContextVar("root_run", default=None)
 
 logger = logging.getLogger(__name__)

@@ -22,6 +22,8 @@ from smart_tutor.shared.config import Settings
 @pytest.fixture
 def tracing_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[RecordingClient]:
     """A developer's `.env`: tracing on, with a key. Yields LangSmith's default client, where a leak would go."""
+    monkeypatch.delenv("LANGCHAIN_TRACING_V2", raising=False)
+    monkeypatch.delenv("LANGSMITH_TRACING_V2", raising=False)
     monkeypatch.setenv("LANGSMITH_TRACING", "true")
     monkeypatch.setenv("LANGSMITH_API_KEY", "test-not-a-key")
     ls_utils.get_env_var.cache_clear()  # langsmith caches environment reads
@@ -75,6 +77,7 @@ def test_start_tracing_keeps_langsmith_off_whatever_the_environment_says(
         call_a_model()
     assert os.environ["LANGSMITH_TRACING"] == "false"
     assert os.environ["LANGCHAIN_TRACING_V2"] == "false"
+    assert os.environ["LANGSMITH_TRACING_V2"] == "false"
     assert tracing_env.payloads == []
 
 
