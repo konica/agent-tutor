@@ -1,7 +1,7 @@
 # Runs the smoke split (PRD §10.3, #226) on pull requests that change the agent, and by hand from the Actions tab:
 # starts the Compose app stack, loads the eval learners' libraries, and gates on thresholds.yaml. The gate table and
 # the experiment link go to the job summary; a breached threshold fails the check.
-# Needs the repository variable EVALS_AWS_ROLE_ARN (a Bedrock-only role trusted through GitHub OIDC) and the secret
+# Needs the repository secret EVALS_AWS_ROLE_ARN (a Bedrock-only role trusted through GitHub OIDC) and the secret
 # LANGSMITH_API_KEY (docs/runbooks/evals-ci.md). Without them (a fork, Dependabot, or before they exist) the job skips
 # and says why.
 name: evals-smoke
@@ -49,7 +49,7 @@ jobs:
         env:
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           REPO: ${{ github.repository }}
-          ROLE: ${{ vars.EVALS_AWS_ROLE_ARN }}
+          HAS_ROLE: ${{ secrets.EVALS_AWS_ROLE_ARN != '' }}
           HAS_KEY: ${{ secrets.LANGSMITH_API_KEY != '' }}
         run: |
           skip() {
@@ -61,7 +61,7 @@ jobs:
           if [[ -n "$HEAD_REPO" && "$HEAD_REPO" != "$REPO" ]]; then
             skip ::notice "This pull request comes from a fork, which can't use the eval role or the LangSmith key. A maintainer can push its branch to $REPO, or run evals-smoke on such a branch from the Actions tab."
           fi
-          [[ -n "$ROLE" ]] || skip ::warning "The repository variable EVALS_AWS_ROLE_ARN isn't set (docs/runbooks/evals-ci.md)."
+          [[ "$HAS_ROLE" == true ]] || skip ::warning "The secret EVALS_AWS_ROLE_ARN isn't set (docs/runbooks/evals-ci.md)."
           [[ "$HAS_KEY" == true ]] || skip ::warning "The secret LANGSMITH_API_KEY isn't available to this run (not set, or a Dependabot pull request; docs/runbooks/evals-ci.md)."
           echo "run=true" >> "$GITHUB_OUTPUT"
 
@@ -88,8 +88,9 @@ jobs:
         if: steps.access.outputs.run == 'true'
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
-          role-to-assume: ${{ vars.EVALS_AWS_ROLE_ARN }}
+          role-to-assume: ${{ secrets.EVALS_AWS_ROLE_ARN }}
           aws-region: us-east-1
+          mask-aws-account-id: true
 
       - name: Start the stack
         if: steps.access.outputs.run == 'true'
