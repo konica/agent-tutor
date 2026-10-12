@@ -13,7 +13,7 @@ import {
   Search,
   Upload,
 } from "lucide-react";
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import {
@@ -22,7 +22,6 @@ import {
   askInThread,
   AskRefusedError,
   ConversationNotFoundError,
-  formatCitation,
   loadConversation as loadConversationApi,
   loadDocumentsUsed,
   rateAnswer,
@@ -50,6 +49,7 @@ import { PageHeader } from "../../components/PageHeader/PageHeader";
 import { DocumentPane } from "../viewer/DocumentPane";
 import type { Passage } from "../viewer/DocumentViewer";
 import type { ViewerDeps } from "../viewer/ViewerDialog";
+import { Answer } from "./Answer";
 import styles from "./ChatPage.module.css";
 import { AnswerRating } from "./AnswerRating";
 import { ConversationPanel } from "./ConversationPanel";
@@ -105,8 +105,8 @@ type Problem = { message: string };
 // Loading the conversation a URL names; "none" once it is shown, or at /chat.
 type Opened = { status: "none" | "loading" | "not-found" | "failed" };
 
-// `chunkId`, `turn`, and `passage` are set only when a Sources chip opened the document; a panel row's open leaves
-// them out. `turn` tells apart the same passage cited in two turns.
+// `chunkId`, `turn`, and `passage` are set only when a Sources chip or an answer's marker opened the document; a panel
+// row's open leaves them out. `turn` tells apart the same passage cited in two turns.
 type Viewer = { documentId: string; chunkId?: string; turn?: number; passage?: Passage };
 
 const MAX_QUESTION = 4000;
@@ -226,7 +226,6 @@ export function ChatPage({
   const alive = useRef(true);
   const rateRequests = useRef<Record<string, number>>({});
   const busy = useRef(false);
-  const sourcesId = useId();
   // Counts the conversations shown (a new thread, or one a URL opens), so a late reply or stream event of an earlier
   // one never reaches a newer one. A question in the same thread keeps it.
   const turn = useRef(0);
@@ -330,8 +329,8 @@ export function ChatPage({
     const id = from?.dataset.documentId;
     const rows = Array.from(document.querySelectorAll<HTMLElement>(`#${PANEL_ID} [data-document-id]`));
     const live = from?.isConnected ? from : rows.find((row) => row.dataset.documentId === id);
-    // Sources chips stay mounted while the pane is open, so they take focus back directly. The toggle is the fallback
-    // for a row that is no longer shown.
+    // Sources chips and answer markers stay mounted while the pane is open, so they take focus back directly. The toggle
+    // is the fallback for a row that is no longer shown.
     (live ?? toggleRef.current)?.focus();
   }, [viewer]);
 
@@ -341,8 +340,8 @@ export function ChatPage({
     setViewer({ documentId });
   }
 
-  // A Sources chip opens its document at the cited passage. `passage` is a new object on every click, so clicking the
-  // same chip again jumps back to it; a citation without a page opens the document at page 1.
+  // A Sources chip or an answer's marker opens its document at the cited passage. `passage` is a new object on every
+  // click, so clicking it again jumps back to it; a citation without a page opens the document at page 1.
   function openCitation(c: ChatCitation, turnIndex: number, from: HTMLElement) {
     opener.current = from;
     setViewer({
@@ -881,10 +880,10 @@ export function ChatPage({
 
               {turns.map((t, index) => {
                 const last = index === turns.length - 1;
-                const listId = `${sourcesId}-${index}`;
                 // A turn that didn't end with done wasn't saved, so it can't be rated.
                 const runId = t.kept ? t.runId : null;
                 const rating = runId !== null && threadId !== null ? <AnswerRating rating={t.rating} onRate={(r) => rateTurn(runId, r)} onAnnounce={setAnnouncement} /> : null;
+                // Answer shows the Sources line on the same condition, with the rating at its end.
                 const hasSources = t.decline === null && showCitations && t.citations.length > 0;
                 return (
                   // Turns are only ever added at the end or all replaced, so the index is a stable key.
@@ -945,54 +944,15 @@ export function ChatPage({
                           <p>{t.decline.message}</p>
                         </div>
                       ) : (
-                        t.answer && <p className={styles.answer}>{t.answer}</p>
-                      )}
-                      {hasSources && (
-                        <div className={styles.sources}>
-                          <span className={styles.sourcesLabel} id={listId}>
-                            Sources
-                          </span>
-                          {/* Each source shows the [n] the answer's text uses for it; an answer may cite [2] without [1]. */}
-                          <ul className={styles.sourceList} aria-labelledby={listId}>
-                            {t.citations.map((c) => {
-                              if (c.deleted || deletedIds.has(c.document_id)) {
-                                return (
-                                  <li key={c.chunk_id}>
-                                    <span className={`${styles.source} ${styles.sourceDeleted}`} title="Deleted document">
-                                      <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
-                                      <span className={styles.sourceMarker}>[{c.n}]</span> Deleted document
-                                    </span>
-                                  </li>
-                                );
-                              }
-                              // The chip whose passage is open beside the conversation; a panel row's open clears it.
-                              const isShown = viewer?.chunkId === c.chunk_id && viewer.turn === index;
-                              const pageText = c.page === null ? "page unavailable" : `p. ${c.page}`;
-                              const state = isShown ? "Shown beside the conversation" : "Open beside the conversation";
-                              return (
-                                <li key={c.chunk_id}>
-                                  <button
-                                    type="button"
-                                    className={isShown ? `${styles.source} ${styles.sourceShown}` : styles.source}
-                                    title={formatCitation(c)}
-                                    aria-label={`${c.document_title}, ${pageText}${c.archived ? ", archived" : ""}. ${state}`}
-                                    aria-current={isShown ? "true" : undefined}
-                                    data-chunk-id={c.chunk_id}
-                                    onClick={(event) => openCitation(c, index, event.currentTarget)}
-                                  >
-                                    <FileText className={styles.sourceIcon} strokeWidth={1.5} aria-hidden="true" />
-                                    <span className={styles.sourceMarker}>[{c.n}]</span>{" "}
-                                    <span className={styles.sourceTitle}>{c.document_title}</span>{" "}
-                                    <span className={styles.sourcePage}>· {pageText}</span>
-                                    {/* An archived document's citation still opens it, marked as archived. */}
-                                    {c.archived && <span className={styles.sourceBadge}>Archived</span>}
-                                  </button>
-                                </li>
-                              );
-                            })}
-                          </ul>
-                          {rating}
-                        </div>
+                        <Answer
+                          text={t.answer}
+                          citations={t.citations}
+                          showCitations={showCitations}
+                          deletedIds={deletedIds}
+                          shownChunkId={viewer?.turn === index ? (viewer.chunkId ?? null) : null}
+                          onOpenCitation={(c, from) => openCitation(c, index, from)}
+                          rating={rating}
+                        />
                       )}
                       {!hasSources && rating && <div className={styles.ratingLine}>{rating}</div>}
                       {last && problem && (
