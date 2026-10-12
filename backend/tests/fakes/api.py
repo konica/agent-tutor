@@ -58,7 +58,7 @@ def api_services(
     queue = queue or FakeQueue()
     names = names or SubjectNames(catalog)
     documents = DocumentService(library.unit_of_work, max_attempts=3)
-    conversations = ConversationService(threads, documents, clock, feedback=feedback)
+    conversations = ConversationService(threads, documents, clock, feedback=feedback, time_zone=APP_TZ)
     fields: dict[str, Any] = {
         "uploads": UploadService(
             library.unit_of_work, objects, clock, TEST_LIMITS, rate=TEST_UPLOAD_LIMITS, time_zone=APP_TZ

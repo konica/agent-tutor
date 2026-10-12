@@ -3,7 +3,7 @@
 import logging
 import uuid
 from dataclasses import replace
-from datetime import timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
@@ -48,7 +48,9 @@ def service(
     clock: FixedClock,
     feedback: FakeAnswerFeedback | None = None,
 ) -> ConversationService:
-    return ConversationService(threads, DocumentService(library.unit_of_work, max_attempts=3), clock, feedback)
+    return ConversationService(
+        threads, DocumentService(library.unit_of_work, max_attempts=3), clock, feedback, time_zone=APP_TZ
+    )
 
 
 def test_starts_a_thread_owned_by_the_learner() -> None:
@@ -536,6 +538,75 @@ def test_lists_the_learners_active_threads_newest_activity_first() -> None:
 
     assert [(s.thread_id, s.title) for s in listed] == [(first.thread_id, "First?"), (second.thread_id, "Second?")]
     assert listed[0].last_activity == clock.now()
+
+
+def test_filters_by_any_listed_documents_subject_and_a_deleted_documents_subjects_dont_count() -> None:
+    library, threads, clock = InMemoryLibrary(), InMemoryThreads(), FixedClock()
+    d1 = ingest_ready(library, "ada", "Live paper.", subject_ids=[S1])
+    d2 = ingest_ready(library, "ada", "Archived paper.", subject_ids=[S2])
+    d3 = ingest_ready(library, "ada", "Deleted paper.", subject_ids=[S3])
+    svc = service(library, threads, clock)
+    live = svc.start_thread(UserId("ada"), "Live?")
+    svc.record_turn(ThreadId(live.thread_id), UserId("ada"), answered(d1, d2))
+    gone = svc.start_thread(UserId("ada"), "Gone?")
+    svc.record_turn(ThreadId(gone.thread_id), UserId("ada"), answered(d3))
+    library.state.documents[d2].archived = True
+    del library.state.documents[d3]
+
+    assert [s.thread_id for s in svc.list_threads(UserId("ada"), subject_ids=[S2])] == [live.thread_id]
+    assert [s.thread_id for s in svc.list_threads(UserId("ada"), subject_ids=[S1, S3])] == [live.thread_id]
+    assert svc.list_threads(UserId("ada"), subject_ids=[S3]) == []
+
+
+def test_filters_by_last_activity_in_gmt7_calendar_days() -> None:
+    library, threads = InMemoryLibrary(), InMemoryThreads()
+    clock = FixedClock(datetime(2026, 10, 1, 17, 30, tzinfo=UTC))  # 00:30 on 2 October in GMT+7
+    ingest_ready(library, "ada", "Paper.")
+    svc = service(library, threads, clock)
+    thread = svc.start_thread(UserId("ada"), "Late?")
+
+    def ids(**kw: date) -> list[str]:
+        return [s.thread_id for s in svc.list_threads(UserId("ada"), **kw)]
+
+    assert ids(active_from=date(2026, 10, 2), active_to=date(2026, 10, 2)) == [thread.thread_id]
+    assert ids(active_to=date(2026, 10, 1)) == []
+    assert ids(active_from=date(2026, 10, 3)) == []
+
+
+def test_title_search_is_case_insensitive_ignores_answers_and_blank_means_all() -> None:
+    library, threads, clock = InMemoryLibrary(), InMemoryThreads(), FixedClock()
+    d1 = ingest_ready(library, "ada", "Paper.")
+    svc = service(library, threads, clock)
+    rag = svc.start_thread(UserId("ada"), "What is RAG?")
+    other = svc.start_thread(UserId("ada"), "Attention?")
+    svc.record_turn(
+        ThreadId(other.thread_id), UserId("ada"), AnsweredTurn("Attention?", "Unlike RAG, it...", document_ids=(d1,))
+    )
+
+    assert [s.thread_id for s in svc.list_threads(UserId("ada"), title="rag")] == [rag.thread_id]
+    assert len(svc.list_threads(UserId("ada"), title="   ")) == 2
+
+
+def test_title_search_treats_slash_and_wildcards_literally() -> None:
+    library, threads, clock = InMemoryLibrary(), InMemoryThreads(), FixedClock()
+    ingest_ready(library, "ada", "Paper.")
+    svc = service(library, threads, clock)
+    tcp = svc.start_thread(UserId("ada"), "TCP/IP basics?")
+    svc.start_thread(UserId("ada"), "TCPxIP basics?")
+
+    assert [s.thread_id for s in svc.list_threads(UserId("ada"), title="p/i")] == [tcp.thread_id]
+    assert svc.list_threads(UserId("ada"), title="%") == []
+
+
+def test_filters_combine() -> None:
+    library, threads, clock = InMemoryLibrary(), InMemoryThreads(), FixedClock()
+    d1 = ingest_ready(library, "ada", "Paper.", subject_ids=[S1])
+    svc = service(library, threads, clock)
+    both = svc.start_thread(UserId("ada"), "RAG and S1?")
+    svc.record_turn(ThreadId(both.thread_id), UserId("ada"), answered(d1))
+    svc.start_thread(UserId("ada"), "RAG only?")
+
+    assert [s.thread_id for s in svc.list_threads(UserId("ada"), subject_ids=[S1], title="rag")] == [both.thread_id]
 
 
 def test_lists_no_archived_and_no_one_elses_threads() -> None:

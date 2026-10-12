@@ -11,7 +11,7 @@ from smart_tutor.shared.adapters.postgres.migrate import upgrade_to_head
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import DocumentId, RunId, ThreadId, UserId
 from smart_tutor.tutoring.adapters.sql_threads import SqlThreadRepository, thread_documents, thread_turns
-from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadStatus
+from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadFilter, ThreadStatus
 from smart_tutor.tutoring.domain.turn import Decline, Rating, Turn, TurnCitation
 
 pytestmark = pytest.mark.integration
@@ -298,3 +298,33 @@ def test_last_turns_are_the_newest_n_oldest_first_for_the_owner_only(engine: Eng
     assert [t.question for t in repo.last_turns(thread.thread_id, owner, 5)] == ["Q3", "Q4", "Q5", "Q6", "Q7"]
     assert repo.last_turns(thread.thread_id, owner, 0) == []
     assert repo.last_turns(thread.thread_id, UserId("bob"), 5) == []
+
+
+def test_list_owned_filters_by_last_activity_documents_and_title(engine: Engine) -> None:
+    repo = SqlThreadRepository(engine)
+    owner, other = UserId(f"ada-{uuid.uuid4()}"), UserId(f"bob-{uuid.uuid4()}")
+    t0 = datetime(2026, 10, 1, tzinfo=UTC)
+    early = Thread.start(ThreadId(str(uuid.uuid4())), owner, t0, title="What is RAG?")
+    late = Thread.start(ThreadId(str(uuid.uuid4())), owner, t0 + timedelta(days=2), title="Is it 100% grounded?")
+    quiet = Thread(ThreadId(str(uuid.uuid4())), owner, t0 + timedelta(days=1), title="rag again")  # no question yet
+    theirs = Thread.start(ThreadId(str(uuid.uuid4())), other, t0, title="What is RAG?")
+    for t in (early, late, quiet, theirs):
+        repo.add(t)
+    doc, their_doc = DocumentId(str(uuid.uuid4())), DocumentId(str(uuid.uuid4()))
+    repo.add_documents(early.thread_id, [doc], t0)
+    repo.add_documents(theirs.thread_id, [doc, their_doc], t0)
+
+    def ids(f: ThreadFilter) -> list[str]:
+        return [t.thread_id for t in repo.list_owned(owner, ThreadStatus.ACTIVE, f)]
+
+    assert ids(ThreadFilter()) == [late.thread_id, quiet.thread_id, early.thread_id]
+    assert ids(ThreadFilter(active_from=t0 + timedelta(days=1))) == [late.thread_id, quiet.thread_id]
+    assert ids(ThreadFilter(active_before=t0 + timedelta(days=1))) == [early.thread_id]
+    assert ids(ThreadFilter(document_ids=frozenset({doc}))) == [early.thread_id]
+    assert ids(ThreadFilter(document_ids=frozenset({their_doc}))) == []
+    assert ids(ThreadFilter(document_ids=frozenset())) == []
+    assert ids(ThreadFilter(title="RAG")) == [quiet.thread_id, early.thread_id]
+    assert ids(ThreadFilter(title="100%")) == [late.thread_id]
+    assert ids(ThreadFilter(title="%")) == [late.thread_id]
+    assert ids(ThreadFilter(title="_s")) == []
+    assert ids(ThreadFilter(title="rag", active_from=t0 + timedelta(hours=1))) == [quiet.thread_id]

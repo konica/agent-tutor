@@ -24,6 +24,7 @@ from fakes import (
     fake_agent,
     ingest_ready,
 )
+from fakes.parameters import APP_TZ
 from smart_tutor.apps.api.main import create_app
 from smart_tutor.knowledge.application import DocumentService
 from smart_tutor.shared.config import Settings
@@ -1176,6 +1177,37 @@ def test_lists_the_callers_threads_with_subject_names_newest_first() -> None:
     assert second["last_activity"] > first["last_activity"]
     assert first["last_activity"].startswith(first_at.strftime("%Y-%m-%dT%H:%M:%S"))
     assert set(first) == {"thread_id", "title", "subjects", "documents", "last_activity"}
+
+
+def test_the_list_narrows_by_subject_date_and_title() -> None:
+    answers: list[bytes] = []
+
+    def answering(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=answers.pop(0), headers={"content-type": "text/event-stream"})
+
+    client, _, clock, doc = listing(answering)
+    answers += [sources(doc) + AGENT_ANSWER, AGENT_ANSWER]
+    client.post("/threads", json={"question": "What is retrieval?"}, headers=AUTH)
+    day = clock.current.astimezone(APP_TZ).date()
+    clock.current += timedelta(days=3)
+    client.post("/threads", json={"question": "Later question?"}, headers=AUTH)
+
+    def titles(params: dict[str, str]) -> list[str]:
+        response = client.get("/threads", params=params, headers=AUTH)
+        assert response.status_code == 200
+        return [t["title"] for t in response.json()]
+
+    assert titles({"subject_id": IR}) == ["What is retrieval?"]
+    assert titles({"active_from": day.isoformat(), "active_to": day.isoformat()}) == ["What is retrieval?"]
+    assert titles({"q": "LATER"}) == ["Later question?"]
+    assert titles({"q": "later", "subject_id": IR}) == []
+
+
+def test_the_list_refuses_a_bad_filter() -> None:
+    client, _, _, _ = listing()
+    assert client.get("/threads", params={"active_from": "yesterday"}, headers=AUTH).status_code == 422
+    assert client.get("/threads", params={"subject_id": "not-a-uuid"}, headers=AUTH).status_code == 422
+    assert client.get("/threads", params={"q": "x" * 121}, headers=AUTH).status_code == 422
 
 
 def test_asking_in_a_thread_makes_it_the_newest() -> None:

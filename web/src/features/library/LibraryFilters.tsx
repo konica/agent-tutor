@@ -4,9 +4,9 @@ import { forwardRef } from "react";
 import type { DocumentFilters } from "../../api/documents";
 import { needsSubjectsLabel } from "../../app/needsSubjects";
 import type { SubjectResponse } from "../../api/generated/types.gen";
+import { DateRangeFilter } from "../../components/DateRangeFilter/DateRangeFilter";
 import { FilterBar, FilterField } from "../../components/FilterBar/FilterBar";
 import styles from "./LibraryFilters.module.css";
-import { UploadedFilter } from "./UploadedFilter";
 
 // Same wording as StateBadge; the value is the API's state.
 const STATES: { value: NonNullable<DocumentFilters["state"]>; label: string }[] = [
@@ -53,7 +53,7 @@ export const LibraryFilters = forwardRef<HTMLSelectElement, Props>(function Libr
           ))}
         </select>
       </FilterField>
-      <UploadedFilter from={filters.uploaded_from} to={filters.uploaded_to} onChange={set} />
+      <DateRangeFilter label="Uploaded" groupLabel="Upload dates" from={filters.uploaded_from} to={filters.uploaded_to} onChange={(r) => set({ ...("from" in r ? { uploaded_from: r.from } : {}), ...("to" in r ? { uploaded_to: r.to } : {}) })} />
       {showState && (
         <FilterField id="filter-state" label="State">
           <select id="filter-state" value={filters.state ?? ""} onChange={(e) => set({ state: (e.target.value || undefined) as DocumentFilters["state"] })}>

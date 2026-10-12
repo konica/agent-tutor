@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { LibraryFilters } from "./LibraryFilters";
-import uploadedStyles from "./UploadedFilter.module.css";
 
 const subjects = [
   { subject_id: "s1", name: "AI Agents" },
@@ -123,42 +122,5 @@ describe("LibraryFilters", () => {
     expect(screen.getByLabelText("Subject")).toBeInTheDocument();
     expect(screen.getByLabelText("State")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Uploaded" })).toHaveAttribute("aria-expanded", "false");
-  });
-});
-
-describe("UploadedFilter", () => {
-  it("opens a From/To group with focus on From", async () => {
-    setup();
-    await openUploaded();
-    expect(screen.getByRole("group", { name: "Upload dates" })).toBeVisible();
-    expect(screen.getByLabelText("From")).toHaveFocus();
-    expect(screen.getByLabelText("To")).toBeVisible();
-  });
-
-  it("closes on Escape and returns focus to the button", async () => {
-    setup();
-    await openUploaded();
-    await userEvent.keyboard("{Escape}");
-    expect(screen.queryByRole("group", { name: "Upload dates" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Uploaded" })).toHaveFocus();
-  });
-
-  it("closes when focus leaves it", async () => {
-    setup();
-    await openUploaded();
-    await userEvent.tab({ shift: true });
-    await userEvent.tab({ shift: true });
-    expect(screen.queryByRole("group", { name: "Upload dates" })).toBeNull();
-  });
-
-  it("names the range on the button and marks it active", () => {
-    setup({ uploaded_from: "2026-09-01" });
-    const button = screen.getByRole("button", { name: "Uploaded: from 2026-09-01" });
-    expect(button).toHaveClass(uploadedStyles.on);
-  });
-
-  it("is not marked active without a range", () => {
-    setup();
-    expect(screen.getByRole("button", { name: "Uploaded" })).not.toHaveClass(uploadedStyles.on);
   });
 });

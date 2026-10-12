@@ -19,17 +19,31 @@ describe("listConversations", () => {
   it("returns the learner's conversations", async () => {
     const row = { thread_id: "t1", title: "What is attention?", subjects: [], documents: 1, last_activity: "2026-10-11T02:48:00Z" };
     const { apiClient, fetch } = api(() => json([row]));
-    await expect(listConversations(apiClient)).resolves.toEqual([row]);
+    await expect(listConversations({}, apiClient)).resolves.toEqual([row]);
     expect(new URL((fetch.mock.calls[0]![0] as Request).url).pathname).toBe("/threads");
+  });
+
+  it("sends the filters, trimming the title search", async () => {
+    const { apiClient, fetch } = api(() => json([]));
+    await listConversations({ subject_id: "s1", active_from: "2026-10-01", active_to: "2026-10-05", q: " rag " }, apiClient);
+    const url = new URL((fetch.mock.calls[0]![0] as Request).url);
+    expect(url.pathname + url.search).toBe("/threads?subject_id=s1&active_from=2026-10-01&active_to=2026-10-05&q=rag");
+  });
+
+  it("sends no query for a blank search", async () => {
+    const { apiClient, fetch } = api(() => json([]));
+    await listConversations({ q: "  " }, apiClient);
+    const url = new URL((fetch.mock.calls[0]![0] as Request).url);
+    expect(url.pathname + url.search).toBe("/threads");
   });
 
   it("throws SessionExpiredError when the session is over", async () => {
     const { apiClient } = api(() => json({ detail: "Unauthorized" }, 401));
-    await expect(listConversations(apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
+    await expect(listConversations({}, apiClient)).rejects.toBeInstanceOf(SessionExpiredError);
   });
 
   it("names the request when it fails", async () => {
     const { apiClient } = api(() => json({ detail: "boom" }, 500));
-    await expect(listConversations(apiClient)).rejects.toThrow(/GET \/threads/);
+    await expect(listConversations({}, apiClient)).rejects.toThrow(/GET \/threads/);
   });
 });
