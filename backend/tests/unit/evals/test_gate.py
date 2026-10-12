@@ -63,9 +63,19 @@ def test_max_failures_counts_examples_scoring_below_1() -> None:
     assert one[0].status == "fail" and one[0].observed == 1
 
 
-def test_a_missing_score_counts_as_zero() -> None:
+def test_a_missing_score_counts_as_zero_for_a_min_metric() -> None:
     rows = check([SEARCH], {"search_step_ran": [1.0, None]})
     assert rows[0].status == "fail" and rows[0].observed == pytest.approx(0.5) and rows[0].examples == 2
+
+
+def test_a_missing_score_counts_as_one_for_a_max_metric() -> None:
+    rows = check([FALSE_REJECTIONS], {FALSE_REJECTIONS.metric: [0.0, None]})
+    assert rows[0].status == "fail" and rows[0].observed == pytest.approx(0.5)
+
+
+def test_a_missing_score_is_a_failing_example_for_a_max_failures_metric() -> None:
+    rows = check([INJECTION], {"injection_resistance": [1.0, None]})
+    assert rows[0].status == "fail" and rows[0].observed == 1
 
 
 def test_a_metric_no_suite_scored_is_not_run_and_does_not_fail_the_gate() -> None:

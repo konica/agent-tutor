@@ -1,11 +1,15 @@
 """How an evaluation run invokes the agent (PRD §10): one example in; the answer, citations, decline code, and
 trajectory out.
-An example may carry earlier turns (`history`, each a question and its answer); the outputs name the learner's own
-documents (`library`) for the injection checks.
+The outputs also name the learner's own documents (`library`) for the injection checks.
 
 The ask target runs the ask graph the way the agent server does (apps/agent/server.py): retrieval through the MCP
 server, the eval learner's token in runtime context only (ADR 0007). A recording retriever keeps each MCP `search` call
 as the trajectory. Examples name seed documents (manifest ids); the learner's own copies are found by SHA-256.
+
+An example's `history` holds its earlier turns, oldest first: a question alone is asked through the graph and its answer
+kept (a generated or hand-written conversation); a question with its answer is kept as written (an injection attack
+that spans turns). Each ask gets the turns before it capped like the API caps them (`history_turns`,
+`history_answer_chars`); only the last ask is scored.
 """
 
 from collections.abc import Awaitable, Callable, Mapping, Sequence
@@ -22,7 +26,7 @@ from smart_tutor.shared.adapters.model_factory import ChatRole, ModelFactory
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.tutoring.adapters.mcp_retriever import McpRetriever
-from smart_tutor.tutoring.application import HistoryTurn, RetrievedChunk, Retriever
+from smart_tutor.tutoring.application import HistoryTurn, RetrievedChunk, Retriever, history_turn
 
 Target = Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
 
@@ -109,41 +113,38 @@ class AskTarget:
         model: BaseChatModel,
         answer_floor: float,
         answer_max_tokens: int = 1500,
+        history_turns: int = 5,
+        history_answer_chars: int = 2000,
     ) -> None:
         self._learners, self._retriever_for = learners, retriever_for
         self._model, self._answer_floor, self._answer_max_tokens = model, answer_floor, answer_max_tokens
+        self._history_turns, self._history_answer_chars = history_turns, history_answer_chars
 
     async def __call__(self, inputs: dict[str, Any]) -> dict[str, Any]:
         username, seeds = inputs["learner"], inputs.get("documents")
         limit = None if seeds is None else [self._learners.document_id(username, s) for s in seeds]
-        # A turn the graph can replay has a question and an answer. A generated drift example's history is its earlier
-        # questions only (generators/ask.py): it asks only its last question until #214 decides how to replay them.
-        history = [
-            HistoryTurn(t["question"], t["answer"]) for t in inputs.get("history") or [] if isinstance(t, Mapping)
-        ]
+        earlier = inputs.get("history") or []
         try:
-            out = await self._ask(inputs["question"], limit, history, self._learners.token(username))
-        except UnauthenticatedError:  # the token expired during the run: sign in once more
-            out = await self._ask(inputs["question"], limit, history, self._learners.sign_in_again(username))
+            out = await self._conversation(earlier, inputs["question"], limit, self._learners.token(username))
+        except UnauthenticatedError:  # the token expired during the run: sign in once more, replay it all
+            token = self._learners.sign_in_again(username)
+            out = await self._conversation(earlier, inputs["question"], limit, token)
         return {**out, "library": self._learners.library(username)}
 
-    async def _ask(
-        self, question: str, limit: list[str] | None, history: list[HistoryTurn], token: str
+    async def _conversation(
+        self, earlier: Sequence[str | Mapping[str, str]], question: str, limit: list[str] | None, token: str
     ) -> dict[str, Any]:
+        turns: list[HistoryTurn] = []
+        for past in earlier:
+            if isinstance(past, Mapping):  # a turn as written: its answer is not the agent's
+                turns.append(history_turn(past["question"], past["answer"], self._history_answer_chars))
+                continue
+            state = await self._ask(past, limit, turns, token, [])
+            turns.append(history_turn(past, self._answer(state), self._history_answer_chars))
         calls: list[dict[str, Any]] = []
-        graph = build_graph(
-            lambda t: RecordingRetriever(self._retriever_for(t), calls),
-            self._model,
-            self._answer_floor,
-            self._answer_max_tokens,
-        )
-        state = await graph.ainvoke(
-            {"question": question, "document_ids": limit, "history": history},
-            context=AgentContext(access_token=token),
-        )
-        decline = state.get("decline")
+        state = await self._ask(question, limit, turns, token, calls)
         return {
-            "answer": DECLINE_MESSAGES[decline] if decline else state.get("answer", ""),
+            "answer": self._answer(state),
             "citations": [
                 {
                     "n": c.n,
@@ -154,10 +155,49 @@ class AskTarget:
                 }
                 for c in state.get("citations", [])
             ],
-            "decline": decline,
+            "decline": state.get("decline"),
             "limit": limit,
             "trajectory": calls,
+            "history": [{"question": t.question, "answer": t.answer} for t in self._capped(turns)],
+            "chunks": [
+                {
+                    "chunk_id": c.chunk_id,
+                    "document_id": c.document_id,
+                    "document_title": c.document_title,
+                    "page": c.page,
+                    "score": c.score,
+                    "text": c.text,
+                }
+                for c in state.get("chunks", [])
+            ],
         }
+
+    async def _ask(
+        self,
+        question: str,
+        limit: list[str] | None,
+        turns: Sequence[HistoryTurn],
+        token: str,
+        calls: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        graph = build_graph(
+            lambda t: RecordingRetriever(self._retriever_for(t), calls),
+            self._model,
+            self._answer_floor,
+            self._answer_max_tokens,
+        )
+        return await graph.ainvoke(
+            {"question": question, "document_ids": limit, "history": self._capped(turns)},
+            context=AgentContext(access_token=token),
+        )
+
+    def _capped(self, turns: Sequence[HistoryTurn]) -> list[HistoryTurn]:
+        return list(turns[-self._history_turns :]) if self._history_turns else []
+
+    @staticmethod
+    def _answer(state: Mapping[str, Any]) -> str:
+        decline = state.get("decline")
+        return DECLINE_MESSAGES[decline] if decline else state.get("answer", "")
 
 
 def ask_target() -> AskTarget:
@@ -175,4 +215,6 @@ def ask_target() -> AskTarget:
         ModelFactory(settings).chat(ChatRole.AGENT),
         settings.answer_floor,
         settings.answer_max_tokens,
+        settings.history_turns,
+        settings.history_answer_chars,
     )

@@ -1,5 +1,7 @@
 """Ask candidates from the seed corpus (PRD §10.3 items 1-2): factual, conceptual, multi-chunk, multi-document, and
-unanswerable-but-on-topic questions, and drift (a limited conversation whose last turn leaves the listed document).
+unanswerable-but-on-topic questions, drift (a limited conversation whose last turn leaves the listed document),
+follow-ups (a second question that names its subject only as "it"), and topic switches (an earlier question about
+one held document, then a question about another).
 
 Code picks the learner and the passages for each draft (seeded, so a seed plans the same drafts); the judge model
 writes each question from its passages. A draft is covered when the learner's library answers it, and must be
@@ -34,6 +36,11 @@ INSTRUCTIONS = {
     "multi_chunk": "Ask a question that needs both passages to answer; each passage gives part of the answer.",
     "multi_document": "Ask a question that compares or connects the ideas of the two passages; it needs both.",
     "unanswerable": "Ask for one specific fact the passage states (a number, a name, a result, a setting).",
+    "follow_up": (
+        'Ask a follow-up about the passage\'s idea that names the method or paper only as "it", "this", or '
+        '"they", as a learner continuing a conversation about it would.'
+    ),
+    "topic_switch": "Ask for one specific fact the passage states (a number, a name, a result, a setting).",
     "drift": "Ask a follow-up a learner might drift to, about the main idea of this passage.",
 }
 
@@ -101,6 +108,21 @@ def plan_drafts(
             learner = rng.choice(owners)
             seed = rng.choice(sorted(set(seeds) - set(held(learner))))
             return Draft(kind, learner, None, pick(seed), (), False, ())
+        if kind == "follow_up":
+            owners = [u for u in learners if any(len(good[s]) >= 2 for s in held(u))]
+            if not owners:
+                return None
+            learner = rng.choice(owners)
+            seed = rng.choice([s for s in held(learner) if len(good[s]) >= 2])
+            earlier, last = rng.sample(good[seed], 2)
+            return Draft(kind, learner, None, (last,), (earlier,), True, (seed,))
+        if kind == "topic_switch":
+            owners = [u for u in learners if len(held(u)) >= 2]
+            if not owners:
+                return None
+            learner = rng.choice(owners)
+            a, b = rng.sample(held(learner), 2)
+            return Draft(kind, learner, None, pick(b), pick(a), True, (b,))
         # drift: limited to one held document; the last turn is written from another document
         owners = [u for u in learners if held(u) and len(seeds) >= 2]
         if not owners:

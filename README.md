@@ -66,7 +66,7 @@ make agent                            # the tutor; Chat needs it
 make mcp                              # search for the agent; Chat needs it
 ```
 
-Without `make` (PowerShell, from the repository root):
+Without `make` (PowerShell, from the repository root). Each backend line starts with `cd backend;`: in a terminal that is already in `backend/`, drop it, or you get `Cannot find path '...\backend\backend'`.
 
 ```powershell
 docker compose up -d
@@ -79,7 +79,13 @@ cd backend; uv run --env-file ../.env uvicorn smart_tutor.apps.agent.server:app 
 cd backend; $env:SMART_TUTOR_KEYCLOAK_CLIENT_ID="rag-mcp"; $env:SMART_TUTOR_KEYCLOAK_CLIENT_SECRET="local-mcp-secret"; $env:SMART_TUTOR_KEYCLOAK_AUDIENCE="rag-mcp"; uv run --env-file ../.env python -m smart_tutor.apps.mcp_server.server
 ```
 
-- Always start backend processes with `--env-file ../.env`. Settings read `.env` only from the working directory (`backend/`), and boto3 reads the `AWS_ENDPOINT_URL_*` variables only from the environment. Without that file, uploads would go to real AWS instead of LocalStack. A variable already set in your shell wins over `--env-file`: if a stale `AWS_ENDPOINT_URL_*` or `AWS_IGNORE_CONFIGURED_ENDPOINT_URLS` is set there, startup stops with an error naming it. Remove it (`Remove-Item env:AWS_ENDPOINT_URL_SSM` in PowerShell, `unset AWS_ENDPOINT_URL_SSM` in Bash) or open a new terminal.
+- Always start backend processes with `--env-file ../.env`. Settings read `.env` only from the working directory (`backend/`), and boto3 reads the `AWS_ENDPOINT_URL_*` variables only from the environment. Without that file, uploads would go to real AWS instead of LocalStack.
+- With `SMART_TUTOR_LOCALSTACK=true`, the S3, SQS, and SSM clients pass the `AWS_ENDPOINT_URL_*` endpoints to boto3 explicitly and sign with LocalStack's dummy keys. A terminal set up for a deploy (`pilot-deploy.md` §1 sets `AWS_IGNORE_CONFIGURED_ENDPOINT_URLS=true`) therefore still reaches LocalStack; before, the dummy keys went to real AWS and startup failed with `UnrecognizedClientException ... The security token included in the request is invalid`.
+- A variable already set in your shell wins over `--env-file` (and so over `make api` and the other targets). If startup stops with `SMART_TUTOR_LOCALSTACK is on, but AWS_ENDPOINT_URL_... is not set`, or a backend process behaves as if it ignored `.env`, list what the shell sets and open a new terminal (or `Remove-Item env:<name>`):
+
+  ```powershell
+  Get-ChildItem env: | Where-Object Name -match '^(AWS_|SMART_TUTOR_)'
+  ```
 - The MCP server checks tokens as Keycloak's `rag-mcp` client (ADR 0007), while `.env` names the API's client. `make mcp`, `make mcp-debug`, the VS Code **MCP server** config, and the commands here set `SMART_TUTOR_KEYCLOAK_CLIENT_ID=rag-mcp`, `SMART_TUTOR_KEYCLOAK_CLIENT_SECRET=local-mcp-secret`, and `SMART_TUTOR_KEYCLOAK_AUDIENCE=rag-mcp` in the environment, which wins over `--env-file`. In PowerShell, run the MCP server in its own terminal: the `$env:` values stay set there.
 - The MCP server listens on `SMART_TUTOR_MCP_PORT`: 10452 on the host from `.env`, and 8000 inside its container. If your `.env` was copied before this setting existed, add `SMART_TUTOR_MCP_PORT=10452` to it.
 - The web app's defaults already point at the API (:10450) and Keycloak (:10401), and Keycloak's `smart-tutor-web` client allows only http://localhost:10453. Keep Vite on that port; `strictPort` makes it fail rather than move to another one.
@@ -101,7 +107,7 @@ Backend services run under [debugpy](https://github.com/microsoft/debugpy) on th
 - **API**, **Worker**, **Agent**, **MCP server**: VS Code starts the service under the debugger with `backend/.venv` and the root `.env`. **API + Worker** starts both, which lets you follow an upload from the API through the worker.
 - **Attach: API** (and the others): connects to a service you started with `make <service>-debug`. Use this from a terminal, or with any editor that speaks the Debug Adapter Protocol. In PyCharm, use a "Python Debug Server"-style remote config or the debugpy attach plugin.
 
-Without `make` (PowerShell, from the repository root, one terminal each):
+Without `make` (PowerShell, from the repository root, one terminal each; in a terminal already in `backend/`, drop `cd backend;`):
 
 ```powershell
 # First time: dependencies with the worker's ingest extra, and the database schema (make up, sync, migrate)
@@ -124,6 +130,7 @@ Notes:
 
 - Run `make sync` once first (without `make`: `uv sync --extra ingest` in `backend/`). It installs the worker's `ingest` extra, which the **Worker** launch config needs.
 - Debug runs don't reload on change: restart the session after you edit code.
+- The terminal commands and `make <service>-debug` load `.env` with `--env-file`, as in Run the app: they reach LocalStack from a terminal set up for a deploy, and a variable already set in your shell wins over `.env`. If startup stops with `SMART_TUTOR_LOCALSTACK is on, but AWS_ENDPOINT_URL_... is not set`, see the notes there.
 - To stop before startup code runs (settings, app factory), add `--wait-for-client` after the `--listen` port in the `make` target. The process then waits until a debugger attaches.
 - Breakpoints in requests: use **API**, open http://localhost:10453 (or http://localhost:10450/docs), and act in the app. Breakpoints in ingestion: use **Worker**, then upload a PDF from the Library.
 

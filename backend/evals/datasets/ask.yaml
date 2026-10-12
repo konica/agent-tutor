@@ -4,7 +4,8 @@
 # uses each split's newest version unless `pins` names one (e.g. `pins: {full: full-v1}`).
 #
 # inputs:  question; learner (username); documents: seed ids the search is limited to (US-4c), or null for all;
-#          history (generated drift examples only): earlier questions in the conversation.
+#          history (multi-turn examples, hand-written and generated drift, follow_up, and topic_switch): the earlier
+#          questions of the conversation; the target asks them first, with the conversation's limit, and scores the last.
 # outputs: covered: whether the learner's library answers the question; sources: seed ids that answer it;
 #          chunks (generated examples only): the seed chunks (`<seed id>:<seq>`) the question was written from.
 name: smart-tutor-ask
@@ -32,4 +33,36 @@ examples:
   - inputs: {question: "What is the recommended daily intake of vitamin D for adults?", learner: learner@example.com, documents: null}
     outputs: {covered: false, sources: []}
   - inputs: {question: "How does Reflexion store feedback between trials?", learner: learner@example.com, documents: [cot-2022]}
+    outputs: {covered: false, sources: []}
+  # Multi-turn conversations (#214): `history` holds the earlier questions, which the target asks first; only the
+  # last question is scored. Pronoun and ellipsis follow-ups: the search must find the document the conversation is
+  # about.
+  - inputs: {question: "What are its limitations?", history: ["What is the ReAct approach to prompting language models?"], learner: learner@example.com, documents: null}
+    outputs: {covered: true, sources: [react-2022]}
+  - inputs: {question: "How many of them does it keep?", history: ["How does Reflexion improve an agent without updating the model's weights?", "Where does it keep those reflections between trials?"], learner: learner@example.com, documents: null}
+    outputs: {covered: true, sources: [reflexion-2023]}
+  - inputs: {question: "Which arithmetic reasoning benchmarks was it tested on?", history: ["What is chain-of-thought prompting?"], learner: learner@example.com, documents: null}
+    outputs: {covered: true, sources: [cot-2022]}
+  - inputs: {question: "Why does model size matter for it?", history: ["What results did chain-of-thought prompting get on GSM8K?", "Does it help small models too?"], learner: learner@example.com, documents: null}
+    outputs: {covered: true, sources: [cot-2022]}
+  - inputs: {question: "And Reflexion?", history: ["On which interactive decision-making benchmarks was ReAct evaluated?"], learner: learner@example.com, documents: null}
+    outputs: {covered: true, sources: [reflexion-2023]}
+  - inputs: {question: "How is the model trained to generate them?", history: ["What are reflection tokens in Self-RAG?"], learner: learner2@example.com, documents: null}
+    outputs: {covered: true, sources: [self-rag-2023]}
+  - inputs: {question: "What are its limitations?", history: ["How does Reflexion use verbal feedback?"], learner: learner@example.com, documents: [reflexion-2023]}
+    outputs: {covered: true, sources: [reflexion-2023]}
+  # Topic switch: a follow-up about another document in the library is answered from that document.
+  - inputs: {question: "What pass@1 accuracy did Reflexion reach on HumanEval?", history: ["How does ReAct combine reasoning traces with actions?"], learner: learner@example.com, documents: null}
+    outputs: {covered: true, sources: [reflexion-2023]}
+  - inputs: {question: "How can an agent learn from its own failed attempts through verbal feedback?", history: ["What is chain-of-thought prompting?"], learner: learner@example.com, documents: null}
+    outputs: {covered: true, sources: [reflexion-2023]}
+  - inputs: {question: "Separately, how much does chain-of-thought prompting help on math word problems?", history: ["On which question answering benchmarks was ReAct evaluated?", "Which external tool did it use?"], learner: learner@example.com, documents: null}
+    outputs: {covered: true, sources: [cot-2022]}
+  # Drift in a limited conversation: the listed documents don't cover the last question, which must be declined
+  # ("These documents don't cover this."), not answered from the earlier turns.
+  - inputs: {question: "What pass@1 accuracy did Reflexion reach on HumanEval?", history: ["What is ReAct?"], learner: learner@example.com, documents: [react-2022]}
+    outputs: {covered: false, sources: []}
+  - inputs: {question: "How does Reflexion store feedback between trials?", history: ["What is chain-of-thought prompting?", "At what model scale does it start to help?"], learner: learner@example.com, documents: [cot-2022]}
+    outputs: {covered: false, sources: []}
+  - inputs: {question: "What is the recommended daily intake of vitamin D for adults?", history: ["How does Reflexion improve an agent without updating the model's weights?"], learner: learner@example.com, documents: [reflexion-2023]}
     outputs: {covered: false, sources: []}

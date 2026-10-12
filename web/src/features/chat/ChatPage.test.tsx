@@ -404,11 +404,12 @@ describe("ChatPage", () => {
       expect(loadUsed).not.toHaveBeenCalled();
     });
 
-    it("says the documents used couldn't be loaded, until the next question", async () => {
-      const loadUsed = vi.fn(() => Promise.reject(new Error("GET /threads/t1/documents failed (500)")));
-      const control = controlledStream();
-      const ask = vi.fn().mockImplementationOnce(answered).mockImplementationOnce(() => control.stream());
-      renderChat({ ask, loadUsed });
+    it("says the documents used couldn't be loaded, until a later answer loads them", async () => {
+      const loadUsed = vi
+        .fn<(threadId: string) => Promise<ThreadDocumentResponse[]>>()
+        .mockRejectedValueOnce(new Error("GET /threads/t1/documents failed (500)"))
+        .mockResolvedValue([used("d1", "ReAct")]);
+      renderChat({ ask: vi.fn(answered), askIn: vi.fn(answered), loadUsed });
       await userEvent.type(await question(), "What is attention?");
       await userEvent.click(askButton());
       expect(await screen.findByText(answerText("It weighs tokens [1]."))).toBeInTheDocument();
@@ -418,26 +419,54 @@ describe("ChatPage", () => {
       await userEvent.type(await question(), "Second?");
       await waitFor(() => expect(askButton()).toBeEnabled());
       await userEvent.click(askButton());
+      expect(await within(panel()!).findByText("ReAct")).toBeInTheDocument();
       expect(within(panel()!).queryByText("Couldn't load the documents used.")).not.toBeInTheDocument();
-      expect(within(panel()!).getByText("Documents used to answer will appear here.")).toBeInTheDocument();
-      control.push(null);
     });
 
-    it("clears the documents used when a new question starts a new conversation", async () => {
+    it("keeps the documents used through a follow-up and lists both turns' documents once it is answered", async () => {
       const control = controlledStream();
-      const ask = vi.fn().mockImplementationOnce(answered).mockImplementationOnce(() => control.stream());
-      renderChat({ ask, loadUsed: async () => [used("d1", "ReAct")] });
+      const loadUsed = vi
+        .fn<(threadId: string) => Promise<ThreadDocumentResponse[]>>()
+        .mockResolvedValueOnce([used("d1", "ReAct")])
+        .mockResolvedValue([used("d1", "ReAct"), used("d2", "PPO")]);
+      const askIn = vi.fn(() => control.stream());
+      renderChat({ ask: vi.fn(answered), askIn, loadUsed });
       await userEvent.type(await question(), "First?");
       await userEvent.click(askButton());
       expect(await within(panel()!).findByText("ReAct")).toBeInTheDocument();
       await userEvent.type(await question(), "Second?");
       await waitFor(() => expect(askButton()).toBeEnabled());
       await userEvent.click(askButton());
-      expect(within(panel()!).queryByText("ReAct")).not.toBeInTheDocument();
+      expect(askIn).toHaveBeenCalledWith("t1", "Second?");
+      // While the follow-up is answered, the first turn's documents stay listed.
+      expect(within(panel()!).getByText("ReAct")).toBeInTheDocument();
+      control.push({ type: "thread", thread_id: "t1", run_id: "r2" });
+      control.push({ type: "delta", text: "PPO clips." });
+      control.push({ type: "done" });
       control.push(null);
+      expect(await within(panel()!).findByText("PPO")).toBeInTheDocument();
+      expect(loadUsed).toHaveBeenLastCalledWith("t1");
+      const rows = within(panel()!).getAllByRole("button", { name: /^(ReAct|PPO)$/ });
+      expect(rows.map((r) => r.textContent)).toEqual(["ReAct", "PPO"]);
     });
 
-    it("never shows the documents used of an earlier conversation that arrive after a new question", async () => {
+    it("shows only the newest documents used when two loads for the conversation arrive out of order", async () => {
+      const releases: ((documents: ThreadDocumentResponse[]) => void)[] = [];
+      const loadUsed = vi.fn(() => new Promise<ThreadDocumentResponse[]>((resolve) => releases.push(resolve)));
+      renderChat({ ask: vi.fn(answered), askIn: vi.fn(answered), loadUsed });
+      await userEvent.type(await question(), "First?");
+      await userEvent.click(askButton());
+      await waitFor(() => expect(loadUsed).toHaveBeenCalledTimes(1));
+      await userEvent.type(await question(), "Second?");
+      await waitFor(() => expect(askButton()).toBeEnabled());
+      await userEvent.click(askButton());
+      await waitFor(() => expect(loadUsed).toHaveBeenCalledTimes(2));
+      await act(async () => releases[1]!([used("d1", "ReAct"), used("d2", "PPO")]));
+      await act(async () => releases[0]!([used("d1", "ReAct")]));
+      expect(within(panel()!).getByText("PPO")).toBeInTheDocument();
+    });
+
+    it("never shows the documents used of an earlier conversation that arrive after New conversation", async () => {
       let release!: (documents: ThreadDocumentResponse[]) => void;
       const loadUsed = vi.fn(
         () =>
@@ -445,21 +474,17 @@ describe("ChatPage", () => {
             release = resolve;
           }),
       );
-      const control = controlledStream();
-      const ask = vi.fn().mockImplementationOnce(answered).mockImplementationOnce(() => control.stream());
-      renderChat({ ask, loadUsed });
+      renderChat({ ask: vi.fn(answered), loadUsed });
       await userEvent.type(await question(), "First?");
       await userEvent.click(askButton());
       await waitFor(() => expect(loadUsed).toHaveBeenCalledWith("t1"));
-      await userEvent.type(await question(), "Second?");
-      await waitFor(() => expect(askButton()).toBeEnabled());
-      await userEvent.click(askButton());
-      await waitFor(() => expect(ask).toHaveBeenCalledTimes(2));
+      await userEvent.click(screen.getByRole("button", { name: "New conversation" }));
+      await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent(/^\/chat$/));
+      expect(await screen.findByRole("heading", { name: "Ask about your documents" })).toBeInTheDocument();
 
       await act(async () => release([used("d1", "ReAct")]));
       expect(within(panel()!).queryByText("ReAct")).not.toBeInTheDocument();
       expect(within(panel()!).getByText("Documents used to answer will appear here.")).toBeInTheDocument();
-      control.push(null);
     });
 
     it("archive is disabled while answering", async () => {
@@ -587,6 +612,8 @@ describe("ChatPage", () => {
         await userEvent.click(askButton());
         expect(await within(panel()!).findByText("a.pdf")).toBeInTheDocument();
         await userEvent.click(scopeSwitch());
+        // The saved scope arrives a microtask later.
+        await act(async () => {});
         return { ask, askIn, setScope };
       }
 
@@ -746,7 +773,7 @@ describe("ChatPage", () => {
         expect(screen.getByText("Searching 1 document")).toBeInTheDocument();
       });
 
-      it("starts a new conversation for a question while the limit is off", async () => {
+      it("asks a follow-up in the same conversation while the limit is off", async () => {
         const askIn = vi.fn(answered);
         const ask = vi.fn(answered);
         renderChat({ ask, askIn, loadUsed: vi.fn(async () => [used("d1", "a.pdf")]) });
@@ -755,9 +782,9 @@ describe("ChatPage", () => {
         expect(await within(panel()!).findByText("a.pdf")).toBeInTheDocument();
         await userEvent.type(await question(), "Second?");
         await userEvent.click(askButton());
-        await waitFor(() => expect(ask).toHaveBeenCalledTimes(2));
-        expect(ask).toHaveBeenLastCalledWith("Second?", undefined);
-        expect(askIn).not.toHaveBeenCalled();
+        await waitFor(() => expect(askIn).toHaveBeenCalledWith("t1", "Second?"));
+        expect(ask).toHaveBeenCalledTimes(1);
+        expect(scopeSwitch()).toHaveAttribute("aria-checked", "false");
       });
     });
 
@@ -792,7 +819,7 @@ describe("ChatPage", () => {
     // Asks one question and waits for the documents used to fill the panel.
     async function answer(props: ComponentProps<typeof ChatPage> = {}) {
       const ask = vi.fn().mockImplementation(answered);
-      renderChat({ ask, viewerDeps: fakeViewerDeps(), loadUsed: async () => [used("d1", "ReAct"), used("d2", "PPO")], ...props });
+      renderChat({ ask, askIn: vi.fn(answered), viewerDeps: fakeViewerDeps(), loadUsed: async () => [used("d1", "ReAct"), used("d2", "PPO")], ...props });
       await userEvent.type(await question(), "How does ReAct work?");
       await userEvent.click(askButton());
       await row("ReAct");
@@ -852,16 +879,25 @@ describe("ChatPage", () => {
       setItem.mockRestore();
     });
 
-    it("closes the document when a new question is asked", async () => {
+    it("keeps the document open beside the conversation after a follow-up", async () => {
       await answer();
       await openReAct();
       await userEvent.type(await question(), "Second?");
       await waitFor(() => expect(askButton()).toBeEnabled());
       await userEvent.click(askButton());
+      await waitFor(() => expect(screen.getAllByText(answerText("It weighs tokens [1]."))).toHaveLength(2));
+      expect(pane("ReAct")).toBeInTheDocument();
+    });
+
+    it("New conversation closes the document and starts over", async () => {
+      await answer();
+      await openReAct();
+      await userEvent.click(screen.getByRole("button", { name: "New conversation" }));
       await waitFor(() => expect(pane("ReAct")).not.toBeInTheDocument());
-      // The learner is asking: focus is not pulled back into the panel.
+      expect(await screen.findByRole("heading", { name: "Ask about your documents" })).toBeInTheDocument();
+      // The learner is starting over: focus goes to the question box, not back into the panel.
       expect(panel()).toBeInTheDocument();
-      expect(panel()).not.toContainElement(document.activeElement as HTMLElement);
+      await waitFor(() => expect(screen.getByRole("textbox", { name: /question/i })).toHaveFocus());
     });
 
     it("closes the pane when the open document is removed, focus moving to the next row's remove button", async () => {
@@ -1237,9 +1273,21 @@ describe("ChatPage", () => {
       expect(await screen.findByRole("button", { name: "Renamed. Edit title" })).toHaveFocus();
     });
 
-    it("goes back to the question when a new question starts a new conversation", async () => {
-      const ask = vi.fn(started);
-      renderChat({ ask, rename: async (_id, title) => title });
+    it("keeps the first question as the title through a follow-up", async () => {
+      const askIn = vi.fn(started);
+      renderChat({ ask: vi.fn(started), askIn });
+      await userEvent.type(await question(), "What is attention?");
+      await userEvent.click(askButton());
+      await titleButton();
+      await userEvent.type(await question(), "And in RAG?");
+      await waitFor(() => expect(askButton()).toBeEnabled());
+      await userEvent.click(askButton());
+      await waitFor(() => expect(askIn).toHaveBeenCalledWith("t1", "And in RAG?"));
+      expect(await titleButton()).toBeInTheDocument();
+    });
+
+    it("keeps the learner's rename through a follow-up, and New conversation starts untitled", async () => {
+      renderChat({ ask: vi.fn(started), askIn: vi.fn(started), rename: async (_id, title) => title });
       await userEvent.type(await question(), "What is attention?");
       await userEvent.click(askButton());
       await userEvent.click(await titleButton());
@@ -1249,7 +1297,10 @@ describe("ChatPage", () => {
       await userEvent.click(await question());
       await userEvent.paste("What is a transformer?");
       await userEvent.click(askButton());
-      expect(await screen.findByRole("button", { name: "What is a transformer?. Edit title" })).toBeInTheDocument();
+      await waitFor(() => expect(screen.getAllByText("You asked:")).toHaveLength(2));
+      expect(screen.getByRole("button", { name: "Attention basics. Edit title" })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "New conversation" }));
+      expect(await screen.findByRole("heading", { level: 1, name: "New conversation" })).toBeInTheDocument();
     });
   });
 
@@ -1276,17 +1327,20 @@ describe("ChatPage", () => {
 
     it("sends the document with the first question only, and drops the notice once asked", async () => {
       const control = controlledStream();
-      const ask = vi.fn().mockImplementationOnce(answered).mockImplementationOnce(() => control.stream());
-      startChat({ ask });
+      const ask = vi.fn(answered);
+      const askIn = vi.fn(() => control.stream());
+      startChat({ ask, askIn });
       await userEvent.type(await question(), "q");
       await userEvent.click(askButton());
-      expect(ask).toHaveBeenNthCalledWith(1, "q", "d1");
+      expect(ask).toHaveBeenCalledWith("q", "d1");
       expect(await screen.findByText("Yes.")).toBeInTheDocument();
       expect(notice()).not.toBeInTheDocument();
       await userEvent.type(await question(), "q2");
       await waitFor(() => expect(askButton()).toBeEnabled());
       await userEvent.click(askButton());
-      expect(ask).toHaveBeenNthCalledWith(2, "q2", undefined);
+      // A follow-up is asked in the conversation, without the document.
+      expect(askIn).toHaveBeenCalledWith("t1", "q2");
+      expect(ask).toHaveBeenCalledTimes(1);
       expect(within(panel()!).queryByText(TITLE)).not.toBeInTheDocument();
       control.push(null);
     });
@@ -1520,7 +1574,33 @@ describe("ChatPage", () => {
       expect(screen.getByRole("button", { name: "Conversation. Edit title" })).toBeInTheDocument();
     });
 
-    it("an unlimited question that fails before its thread moves to /chat, and Back reopens the conversation", async () => {
+    it("a failed follow-up keeps the earlier turns and shows the problem under it; asking again works", async () => {
+      const askIn = vi
+        .fn()
+        .mockImplementationOnce(() =>
+          events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "error", code: "unavailable", message: "The tutor is unavailable. Try again in a moment." }),
+        )
+        .mockImplementationOnce(() => events({ type: "thread", thread_id: "t1", run_id: "r2" }, { type: "delta", text: "Self-attention." }, { type: "done" }));
+      renderChat({ loadConversation: conversation([turn()]), askIn }, "/chat/t1");
+      expect(await screen.findByText(answerText("It weighs tokens [1]."))).toBeInTheDocument();
+      await userEvent.type(await question(), "Next?");
+      await userEvent.click(askButton());
+      const problem = await screen.findByText("The tutor is unavailable. Try again in a moment.");
+      expect(asked()).toEqual(["You asked: What is attention?", "You asked: Next?"]);
+      // The problem sits under the failed turn, the newest.
+      expect(problem.closest("[data-newest-turn]")).toHaveTextContent("You asked: Next?");
+      expect(screen.getByText(answerText("It weighs tokens [1]."))).toBeInTheDocument();
+      expect(location()).toBe("/chat/t1");
+
+      await userEvent.type(await question(), "Next?");
+      await userEvent.click(askButton());
+      expect(await screen.findByText("Self-attention.")).toBeInTheDocument();
+      expect(askIn).toHaveBeenNthCalledWith(2, "t1", "Next?");
+      expect(screen.queryByText("The tutor is unavailable. Try again in a moment.")).not.toBeInTheDocument();
+      expect(asked()).toEqual(["You asked: What is attention?", "You asked: Next?", "You asked: Next?"]);
+    });
+
+    it("New conversation goes to an empty /chat, and Back returns to the conversation with its history", async () => {
       function Back() {
         const navigate = useNavigate();
         return (
@@ -1529,29 +1609,110 @@ describe("ChatPage", () => {
           </button>
         );
       }
-      const loadConversation = conversation([turn()]);
-      const ask = vi.fn(() => events({ type: "error", code: "unavailable", message: "The tutor is unavailable. Try again in a moment." }));
+      const loadConversation = conversation([turn()], { search_scope: "listed" });
       render(
         <MemoryRouter initialEntries={["/chat/t1"]}>
           <Routes>
-            <Route path="/chat/:threadId?" element={<ChatPage loadDocs={async () => [doc("ready")]} loadUsed={async () => []} loadConversation={loadConversation} ask={ask} />} />
+            <Route path="/chat/:threadId?" element={<ChatPage loadDocs={async () => [doc("ready")]} loadUsed={async () => [usedDoc]} loadConversation={loadConversation} />} />
           </Routes>
           <Location />
           <Back />
         </MemoryRouter>,
       );
       expect(await screen.findByText(answerText("It weighs tokens [1]."))).toBeInTheDocument();
-      await userEvent.type(await question(), "Next?");
-      await userEvent.click(askButton());
-      expect(await screen.findByText("The tutor is unavailable. Try again in a moment.")).toBeInTheDocument();
+      expect(await within(panel()!).findByText("a.pdf")).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "New conversation" }));
       await waitFor(() => expect(location()).toBe("/chat"));
-      // The page stays as it is: the failed question and its message, not the welcome of a fresh /chat.
-      expect(asked()).toEqual(["You asked: Next?"]);
-      expect(screen.queryByRole("heading", { name: "Ask about your documents" })).not.toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Ask about your documents" })).toBeInTheDocument();
+      expect(screen.queryByText("You asked:")).not.toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 1, name: "New conversation" })).toBeInTheDocument();
+      // The panel and the scope start over; an empty /chat offers no New conversation.
+      expect(within(panel()!).queryByText("a.pdf")).not.toBeInTheDocument();
+      expect(screen.queryByText("Searching 1 document")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "New conversation" })).not.toBeInTheDocument();
+
       await userEvent.click(screen.getByRole("button", { name: "Go back" }));
       await waitFor(() => expect(location()).toBe("/chat/t1"));
       expect(await screen.findByText(answerText("It weighs tokens [1]."))).toBeInTheDocument();
       expect(loadConversation).toHaveBeenCalledTimes(2);
+    });
+
+    it("New conversation mid-answer stops the stream, and no late event reaches the new page", async () => {
+      const control = controlledStream();
+      renderChat({ loadConversation: conversation([turn()]), askIn: vi.fn(() => control.stream()) }, "/chat/t1");
+      await screen.findByText(answerText("It weighs tokens [1]."));
+      await userEvent.type(await question(), "Next?");
+      await userEvent.click(askButton());
+      control.push({ type: "thread", thread_id: "t1", run_id: "r2" });
+      control.push({ type: "delta", text: "Partial" });
+      expect(await screen.findByText("Partial")).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "New conversation" }));
+      expect(await screen.findByRole("heading", { name: "Ask about your documents" })).toBeInTheDocument();
+      control.push({ type: "delta", text: " late." });
+      control.push({ type: "done" });
+      await act(async () => {});
+      expect(screen.queryByText(/late\./)).not.toBeInTheDocument();
+      expect(location()).toBe("/chat");
+      // The composer is free for the new conversation's first question.
+      await waitFor(() => expect(screen.getByRole("textbox", { name: /question/i })).toHaveFocus());
+      expect(screen.getByRole("textbox", { name: /question/i })).toBeEnabled();
+      control.push(null);
+    });
+
+    it("New conversation before the first answer's thread exists starts over at /chat", async () => {
+      const control = controlledStream();
+      renderChat({ ask: vi.fn(() => control.stream()) });
+      await userEvent.type(await question(), "What is attention?");
+      await userEvent.click(askButton());
+      expect(await screen.findByText("You asked:")).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "New conversation" }));
+      expect(await screen.findByRole("heading", { name: "Ask about your documents" })).toBeInTheDocument();
+      // The thread the server creates late doesn't move the page to it.
+      control.push({ type: "thread", thread_id: "t9", run_id: "r1" });
+      control.push({ type: "delta", text: "Late." });
+      await act(async () => {});
+      expect(location()).toBe("/chat");
+      expect(screen.queryByText("Late.")).not.toBeInTheDocument();
+      control.push(null);
+    });
+
+    it("the Chat link at /chat clears a first question that failed", async () => {
+      const ask = vi.fn(() => events({ type: "error", code: "unavailable", message: "The tutor is unavailable. Try again in a moment." }));
+      renderChat({ ask });
+      await userEvent.type(await question(), "What is attention?");
+      await userEvent.click(askButton());
+      expect(await screen.findByText("The tutor is unavailable. Try again in a moment.")).toBeInTheDocument();
+      expect(location()).toBe("/chat");
+      await userEvent.click(screen.getByRole("link", { name: "Chat" }));
+      expect(await screen.findByRole("heading", { name: "Ask about your documents" })).toBeInTheDocument();
+      expect(screen.queryByText("You asked:")).not.toBeInTheDocument();
+      expect(screen.queryByText("The tutor is unavailable. Try again in a moment.")).not.toBeInTheDocument();
+    });
+
+    it("asking again after a first question that failed before its thread replaces it", async () => {
+      const ask = vi
+        .fn()
+        .mockImplementationOnce(() => events({ type: "error", code: "unavailable", message: "The tutor is unavailable. Try again in a moment." }))
+        .mockImplementationOnce(() => events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "delta", text: "Weights." }, { type: "done" }));
+      renderChat({ ask });
+      await userEvent.type(await question(), "What is attention?");
+      await userEvent.click(askButton());
+      await screen.findByText("The tutor is unavailable. Try again in a moment.");
+      await userEvent.type(await question(), "What is attention?");
+      await userEvent.click(askButton());
+      expect(await screen.findByText("Weights.")).toBeInTheDocument();
+      expect(ask).toHaveBeenCalledTimes(2);
+      expect(asked()).toEqual(["You asked: What is attention?"]);
+      await waitFor(() => expect(location()).toBe("/chat/t1"));
+    });
+
+    it("takes no question while the conversation at its URL is loading", async () => {
+      const ask = vi.fn();
+      renderChat({ loadConversation: vi.fn(() => new Promise<never>(() => {})), ask }, "/chat/t1");
+      await userEvent.type(await question(), "Next?");
+      expect(askButton()).toBeDisabled();
+      await userEvent.keyboard("{Enter}");
+      expect(ask).not.toHaveBeenCalled();
     });
 
     it("a new conversation moves to its URL when its thread is created, and keeps streaming", async () => {
@@ -1570,19 +1731,20 @@ describe("ChatPage", () => {
       expect(loadConversation).not.toHaveBeenCalled();
     });
 
-    it("an unlimited question in a reopened conversation starts a new conversation at a new URL", async () => {
-      const ask = vi.fn(() => events({ type: "thread", thread_id: "t2", run_id: "r1" }, { type: "delta", text: "Next answer." }, { type: "done" }));
-      const askIn = vi.fn();
+    it("a question in a reopened unlimited conversation adds a turn under the history, keeping its URL and title", async () => {
+      const ask = vi.fn();
+      const askIn = vi.fn(() => events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "delta", text: "Next answer." }, { type: "done" }));
       renderChat({ loadConversation: conversation([turn()]), ask, askIn }, "/chat/t1");
       expect(await screen.findByText(answerText("It weighs tokens [1]."))).toBeInTheDocument();
       await userEvent.type(await question(), "Next?");
       await userEvent.click(askButton());
       expect(await screen.findByText("Next answer.")).toBeInTheDocument();
-      await waitFor(() => expect(location()).toBe("/chat/t2"));
-      expect(screen.queryByText(answerText("It weighs tokens [1]."))).not.toBeInTheDocument();
-      expect(asked()).toEqual(["You asked: Next?"]);
-      expect(ask).toHaveBeenCalledWith("Next?", undefined);
-      expect(askIn).not.toHaveBeenCalled();
+      expect(asked()).toEqual(["You asked: What is attention?", "You asked: Next?"]);
+      expect(screen.getByText(answerText("It weighs tokens [1]."))).toBeInTheDocument();
+      expect(location()).toBe("/chat/t1");
+      expect(screen.getByRole("button", { name: "Attention basics. Edit title" })).toBeInTheDocument();
+      expect(askIn).toHaveBeenCalledWith("t1", "Next?");
+      expect(ask).not.toHaveBeenCalled();
     });
 
     it("a question in a limited conversation adds a turn under the history", async () => {
@@ -1647,8 +1809,7 @@ describe("ChatPage", () => {
       expect(screen.getByRole("link", { name: "Upload" })).toHaveAttribute("href", "/library");
     });
 
-    it("once an answer arrives the no-documents state is over: the next question starts a new conversation", async () => {
-      const ask = vi.fn(() => events({ type: "thread", thread_id: "t2", run_id: "r1" }, { type: "delta", text: "Fresh." }, { type: "done" }));
+    it("once an answer arrives the no-documents state is over: New conversation shows the welcome, not the upload request", async () => {
       const askIn = vi.fn(() =>
         events(
           { type: "thread", thread_id: "t1", run_id: "r1" },
@@ -1657,16 +1818,14 @@ describe("ChatPage", () => {
           { type: "done" },
         ),
       );
-      renderChat({ loadConversation: conversation([turn()]), loadDocs: async () => [], ask, askIn }, "/chat/t1");
+      renderChat({ loadConversation: conversation([turn()]), loadDocs: async () => [], askIn }, "/chat/t1");
       await screen.findByText(answerText("It weighs tokens [1]."));
       await userEvent.type(await question(), "First?");
       await userEvent.click(askButton());
       expect(await screen.findByText("Found one.")).toBeInTheDocument();
-      expect(askIn).toHaveBeenCalledTimes(1);
-      await userEvent.type(await question(), "Second?");
-      await userEvent.click(askButton());
-      await waitFor(() => expect(ask).toHaveBeenCalledWith("Second?", undefined));
-      expect(askIn).toHaveBeenCalledTimes(1);
+      await userEvent.click(screen.getByRole("button", { name: "New conversation" }));
+      expect(await screen.findByRole("heading", { name: "Ask about your documents" })).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Upload a document first" })).not.toBeInTheDocument();
     });
 
     it("a decline with an unknown code shows its message and no way out", async () => {
@@ -2157,23 +2316,23 @@ describe("ChatPage", () => {
 
     it("no question is sent while an archive is in flight", async () => {
       const archive = vi.fn(() => new Promise<unknown>(() => {}));
-      const ask = vi.fn(() => events({ type: "done" }));
-      renderConversation({ loadConversation: loader({ t1: "active" }), archive, ask });
+      const askIn = vi.fn(() => events({ type: "done" }));
+      renderConversation({ loadConversation: loader({ t1: "active" }), archive, askIn });
       await screen.findByText(answerText("It weighs tokens [1]."));
       await userEvent.type(await question(), "Next?");
       expect(askButton()).toBeEnabled();
       await userEvent.click(within(panel()).getByRole("button", { name: "Archive conversation" }));
       await waitFor(() => expect(askButton()).toBeDisabled());
       await userEvent.type(await question(), "{Enter}");
-      expect(ask).not.toHaveBeenCalled();
+      expect(askIn).not.toHaveBeenCalled();
     });
 
     it("a successful archive keeps an unrelated failed-ask problem", async () => {
       const archive = vi.fn(async () => ({}));
-      const ask = vi.fn(() =>
+      const askIn = vi.fn(() =>
         events({ type: "thread", thread_id: "t1", run_id: "r2" }, { type: "error", code: "unavailable", message: "The tutor is unavailable. Try again in a moment." }),
       );
-      renderConversation({ loadConversation: loader({ t1: "active" }), archive, ask });
+      renderConversation({ loadConversation: loader({ t1: "active" }), archive, askIn });
       await screen.findByText(answerText("It weighs tokens [1]."));
       await userEvent.type(await question(), "Next?");
       await userEvent.click(askButton());

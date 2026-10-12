@@ -11,6 +11,8 @@
 }
 .toggle:hover { background: var(--surface-2); color: var(--text); }
 .toggleIcon { width: 16px; height: 16px; }
+/* At the row's end, after the title, which takes the rest of the row and truncates first. */
+.newConversation { flex: none; }
 
 /* One explicit row, so the panel and the conversation each get the body's height and scroll on their own. */
 .body { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); min-height: 0; }
