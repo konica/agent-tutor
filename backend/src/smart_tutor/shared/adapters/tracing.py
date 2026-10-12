@@ -8,6 +8,7 @@ import hashlib
 import hmac
 import json
 import logging
+import os
 import uuid
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager, contextmanager
@@ -35,6 +36,8 @@ from smart_tutor.shared.ports.run_tracing import RunTracing
 KEY_SETTING = "SMART_TUTOR_LEARNER_HASH_KEY"
 EXPORT_TIMEOUT_SECONDS = 10.0
 _LOW_64_BITS = 0xFFFF_FFFF_FFFF_FFFF
+# langchain-core traces every run to LangSmith while either is on (ADR 0017: LangSmith is for evals only).
+LANGSMITH_SWITCHES = ("LANGSMITH_TRACING", "LANGCHAIN_TRACING_V2")
 _root_run: ContextVar[uuid.UUID | None] = ContextVar("root_run", default=None)
 
 logger = logging.getLogger(__name__)
@@ -188,9 +191,17 @@ def phoenix_traces(
     return PhoenixTraces(provider, hasher, dict(metadata))
 
 
+def stop_langsmith_tracing() -> None:
+    """Runtime traces go to Phoenix only: LangSmith's tracing stays off in this process even when the environment (a
+    developer's shell or `.env`) turns it on. Call before the first model call: LangSmith caches what it reads."""
+    for name in LANGSMITH_SWITCHES:
+        os.environ[name] = "false"
+
+
 def start_tracing(settings: Settings, project: str) -> PhoenixTraces | None:
-    """Startup for a process that traces: refuses tracing without a learner-hash key (see `learner_hasher`); None
-    leaves the process untraced."""
+    """Startup for a process that traces: turns LangSmith tracing off, then refuses tracing without a learner-hash key
+    (see `learner_hasher`); None leaves the process untraced."""
+    stop_langsmith_tracing()
     hasher = learner_hasher(settings)
     if not tracing_enabled(settings):
         if settings.phoenix_url:

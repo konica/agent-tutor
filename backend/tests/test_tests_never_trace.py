@@ -2,6 +2,7 @@
 exported shell). This file sits outside `tests/unit` on purpose: the guarantee comes from the root conftest, not from
 a folder's."""
 
+import os
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -61,6 +62,20 @@ def test_positive_control_without_the_guard_the_environment_turns_tracing_on(tra
         call_a_model()
     assert any(p["op"] == "create" for p in tracing_env.payloads)
     tracing_env.payloads.clear()  # sent on purpose; the root conftest fails a test that leaves a trace behind
+
+
+def test_start_tracing_keeps_langsmith_off_whatever_the_environment_says(
+    tracing_env: RecordingClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LANGCHAIN_TRACING_V2", "true")
+    with without_the_guard():
+        ls_utils.get_env_var.cache_clear()
+        assert start_tracing(Settings(phoenix_url=""), "p") is None
+        ls_utils.get_env_var.cache_clear()  # a fresh process reads the environment after startup
+        call_a_model()
+    assert os.environ["LANGSMITH_TRACING"] == "false"
+    assert os.environ["LANGCHAIN_TRACING_V2"] == "false"
+    assert tracing_env.payloads == []
 
 
 def test_a_phoenix_url_in_the_environment_does_not_reach_settings(
