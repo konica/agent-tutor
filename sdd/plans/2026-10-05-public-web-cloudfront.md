@@ -14,7 +14,7 @@
 
 - Names the deploy role's policy depends on: cluster `smart-tutor-prod`, ECR repositories `smart-tutor/<service>`, stacks `SmartTutor-prod-*`, deploy role `smart-tutor-github-deploy`. Region `us-east-1`.
 - Resource name prefix `smart-tutor-<env>` (`smart-tutor-prod`): ALB `smart-tutor-prod`, web target group `smart-tutor-prod-web`, budget `smart-tutor-prod-monthly`, node group `smart-tutor-prod-default`, VPC origin `smart-tutor-prod`.
-- Context in `infra/cdk.json`: `smart-tutor:eks-admin-principal-arns` = `["arn:aws:iam::685394474162:user/poweruser"]`, `smart-tutor:budget-monthly-usd` = `400`, `smart-tutor:budget-alert-emails` = `["dtrungthao@gmail.com"]` (decided on #55).
+- Context in `infra/cdk.json`: `smart-tutor:eks-admin-principal-arns` = `["arn:aws:iam::<ACCOUNT_ID>:user/poweruser"]`, `smart-tutor:budget-monthly-usd` = `400`, `smart-tutor:budget-alert-emails` = `["dtrungthao@gmail.com"]` (decided on #55).
 - Budget: monthly COST budget, USD 400, email at 80% of ACTUAL and 100% of FORECASTED spend.
 - VPC: 2 AZs, CIDR `10.40.0.0/16`, public `/24` subnets (NAT and the internet gateway that VPC origins require; no public IPs on launch), private-with-egress `/20` subnets, exactly 1 NAT gateway.
 - EKS: version 1.36, endpoint public and private, managed node group 2× `t3.large` (min 2, max 3, AL2023 x86_64, 30 GiB), no Auto Mode, `eks-pod-identity-agent` add-on; cluster-admin access entries for each admin principal and for the deploy role; the cluster creator gets no automatic admin.
@@ -54,7 +54,7 @@
     "smart-tutor:region": "us-east-1",
     "smart-tutor:github-oidc-subject-prefix": "repo:konica@1114311/agent-tutor@1399048529",
     "smart-tutor:github-environment": "pilot",
-    "smart-tutor:eks-admin-principal-arns": ["arn:aws:iam::685394474162:user/poweruser"],
+    "smart-tutor:eks-admin-principal-arns": ["arn:aws:iam::<ACCOUNT_ID>:user/poweruser"],
     "smart-tutor:budget-monthly-usd": 400,
     "smart-tutor:budget-alert-emails": ["dtrungthao@gmail.com"]
   }
@@ -298,7 +298,7 @@ def test_admin_and_deploy_role_get_cluster_admin_access_entries() -> None:
     entries = t.find_resources("AWS::EKS::AccessEntry")
     principals = [json.dumps(e["Properties"]["PrincipalArn"]) for e in entries.values()]
     assert len(entries) == 2
-    assert any("arn:aws:iam::685394474162:user/poweruser" in p for p in principals)
+    assert any("arn:aws:iam::<ACCOUNT_ID>:user/poweruser" in p for p in principals)
     assert any("role/smart-tutor-github-deploy" in p for p in principals)
     assert all("AmazonEKSClusterAdminPolicy" in json.dumps(e["Properties"]["AccessPolicies"]) for e in entries.values())
 
@@ -986,10 +986,10 @@ args: []
 helm lint deploy/helm/smart-tutor
 helm lint deploy/helm/smart-tutor -f deploy/helm/smart-tutor/values-prod.yaml
 helm template smart-tutor deploy/helm/smart-tutor -f deploy/helm/smart-tutor/values-prod.yaml \
-  --set global.imageRegistry=685394474162.dkr.ecr.us-east-1.amazonaws.com --set global.imageTag=abc123
+  --set global.imageRegistry=<ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com --set global.imageTag=abc123
 ```
 
-Expected: both lints pass; the template renders exactly a Deployment (2 replicas, image `685394474162.dkr.ecr.us-east-1.amazonaws.com/smart-tutor/web:abc123`), a Service, and a TargetGroupBinding naming `smart-tutor-prod-web`. Without `-f values-prod.yaml`, no TargetGroupBinding.
+Expected: both lints pass; the template renders exactly a Deployment (2 replicas, image `<ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/smart-tutor/web:abc123`), a Service, and a TargetGroupBinding naming `smart-tutor-prod-web`. Without `-f values-prod.yaml`, no TargetGroupBinding.
 
 - [ ] **Step 6: Commit** — `Run the web app on EKS behind the CDK target group`
 

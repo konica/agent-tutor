@@ -24,7 +24,7 @@ $env:JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION = "1"
 aws sts get-caller-identity
 ```
 
-- The profile must resolve to a principal listed in `smart-tutor:eks-admin-principal-arns` in `infra/cdk.json` (pilot: `arn:aws:iam::685394474162:user/poweruser`). The cluster creator gets no admin access, so any other principal gets `Unauthorized` from kubectl and helm. Check the `Arn` that `aws sts get-caller-identity` prints.
+- The profile must resolve to a principal listed in `smart-tutor:eks-admin-principals` in `infra/cdk.json` (pilot: `user/poweruser`, an IAM path in the deploy account). The cluster creator gets no admin access, so any other principal gets `Unauthorized` from kubectl and helm. Check the `Arn` that `aws sts get-caller-identity` prints.
 
 ## 2. Deploy the stacks (about 35 min; EKS is most of it, RDS adds about 10)
 
@@ -57,7 +57,7 @@ aws eks update-kubeconfig --name smart-tutor-prod --region us-east-1
 kubectl get nodes        # 2 nodes, both Ready
 ```
 
-Your admin principal and the deploy role have cluster-admin access entries; no other principal does. If kubectl says `Unauthorized`, run `aws sts get-caller-identity` and compare the `Arn` with `smart-tutor:eks-admin-principal-arns` in `infra/cdk.json`.
+Your admin principal and the deploy role have cluster-admin access entries; no other principal does. If kubectl says `Unauthorized`, run `aws sts get-caller-identity` and compare the `Arn` with `smart-tutor:eks-admin-principals` in `infra/cdk.json`.
 
 ## 4. Install the add-ons
 

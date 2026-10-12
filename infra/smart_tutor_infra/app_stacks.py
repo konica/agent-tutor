@@ -108,7 +108,7 @@ def _native_cloud(app: cdk.App, env: cdk.Environment, names: ModeNames) -> list[
         env=env,
         vpc=network.vpc,
         names=names,
-        admin_principal_arns=app.node.get_context("smart-tutor:eks-admin-principal-arns"),
+        admin_principals=app.node.get_context("smart-tutor:eks-admin-principals"),
     )
     # The cluster's access entry names the deploy role by ARN string, so CloudFormation cannot infer the order.
     cluster.add_stack_dependency(deploy)

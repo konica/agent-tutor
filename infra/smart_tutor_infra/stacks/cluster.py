@@ -30,7 +30,7 @@ class ClusterStack(cdk.Stack):
         *,
         vpc: ec2.IVpc,
         names: ModeNames,
-        admin_principal_arns: Sequence[str],
+        admin_principals: Sequence[str],
         **kwargs: Any,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -69,8 +69,9 @@ class ClusterStack(cdk.Stack):
         cluster_admin = eks.AccessPolicy.from_access_policy_name(
             "AmazonEKSClusterAdminPolicy", access_scope_type=eks.AccessScopeType.CLUSTER
         )
-        for i, arn in enumerate(admin_principal_arns):
-            self.cluster.grant_access(f"AdminAccess{i}", arn, [cluster_admin])
+        # Admins are IAM paths in this account (e.g. "user/poweruser"), so cdk.json carries no account id.
+        for i, principal in enumerate(admin_principals):
+            self.cluster.grant_access(f"AdminAccess{i}", f"arn:aws:iam::{self.account}:{principal}", [cluster_admin])
         self.cluster.grant_access(
             "DeployRoleAccess", f"arn:aws:iam::{self.account}:role/{names.deploy_role}", [cluster_admin]
         )
