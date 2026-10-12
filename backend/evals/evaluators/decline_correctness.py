@@ -13,23 +13,28 @@ WRONGLY_DECLINED = "decline_correctness.wrongly_declined"
 FAILED = "the run failed before it answered"
 
 
-def correctly_declined(outputs: dict[str, Any], reference_outputs: dict[str, Any]) -> dict[str, Any]:
+def correctly_declined(
+    inputs: dict[str, Any], outputs: dict[str, Any], reference_outputs: dict[str, Any]
+) -> dict[str, Any]:
     if reference_outputs["covered"]:
         return not_applicable(CORRECTLY_DECLINED, "the library covers the question: wrongly_declined scores it")
+    if inputs["documents"] is None:  # the example's limit: a failed run's outputs have none
+        return not_applicable(CORRECTLY_DECLINED, "an unlimited conversation has no relevance gate until US-5 (#14)")
     if "decline" not in outputs:
         return {"key": CORRECTLY_DECLINED, "score": 0, "comment": FAILED}
-    if outputs["limit"] is None:
-        return not_applicable(CORRECTLY_DECLINED, "an unlimited conversation has no relevance gate until US-5 (#14)")
     if outputs["decline"]:
         return {"key": CORRECTLY_DECLINED, "score": 1, "comment": f"declined ({outputs['decline']})"}
+    answer = outputs.get("answer") or ""
     return {
         "key": CORRECTLY_DECLINED,
         "score": 0,
-        "comment": f"answered a question the listed documents don't cover: {outputs['answer'][:120]}",
+        "comment": f"answered a question the listed documents don't cover: {answer[:120]}",
     }
 
 
-def wrongly_declined(outputs: dict[str, Any], reference_outputs: dict[str, Any]) -> dict[str, Any]:
+def wrongly_declined(
+    inputs: dict[str, Any], outputs: dict[str, Any], reference_outputs: dict[str, Any]
+) -> dict[str, Any]:
     if not reference_outputs["covered"]:
         return not_applicable(WRONGLY_DECLINED, "the library doesn't cover the question: correctly_declined scores it")
     if "decline" not in outputs:
