@@ -4,7 +4,7 @@ every patch window:
     docker compose exec -T worker python - <check-egress.py
 
 The worker must not reach the internet, directly, by DNS, or through the proxy (CONNECT to another host or port, or
-plain HTTP), while S3, SQS, SSM, Bedrock, LangSmith, and Postgres work. The AWS calls are read-only and use the instance profile, whose credentials come through the proxy too.
+plain HTTP), while S3, SQS, SSM, Bedrock, Phoenix (while tracing), and Postgres work. The AWS calls are read-only and use the instance profile, whose credentials come through the proxy too.
 Exit 0: as expected. Exit 2: blocked, but a needed destination is unreachable. Exit 1, or a crash: treat as a leak.
 """
 
@@ -16,7 +16,6 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-LANGSMITH_HOST = "api.smith.langchain.com"
 ARBITRARY_HOST = "example.com"
 ARBITRARY_IP = "1.1.1.1"
 TIMEOUT = 10
@@ -80,8 +79,7 @@ def leaks() -> list[str]:
         problems.append(f"the proxy answered {status} to GET {url}, not 403")
     tunnels = [(host, 443) for host in (ARBITRARY_HOST, ARBITRARY_IP, f"other-{os.getpid()}.s3.amazonaws.com")]
     tunnels.append((sqs_host, 80))  # an allowed host, but only on 443
-    tunnels.append(("smith.langchain.com", 443))  # another name of the same service
-    tunnels.append((LANGSMITH_HOST, 80))  # the allowed name, but only on 443
+    tunnels.append(("api.smith.langchain.com", 443))  # LangSmith left the allowlist (ADR 0017)
     for host, port in tunnels:
         status = _tunnel_status(host, port)
         if status != 403:
@@ -113,7 +111,8 @@ def _aws_problems(region: str) -> list[str]:
 
 
 def _tracing() -> bool:
-    return os.environ.get("LANGSMITH_TRACING", "").lower() == "true"
+    """The worker traces when it has a Phoenix URL and its key (deploy.sh leaves the key empty without the secret)."""
+    return bool(os.environ.get("SMART_TUTOR_PHOENIX_URL")) and bool(os.environ.get("SMART_TUTOR_PHOENIX_API_KEY"))
 
 
 def unreachable() -> list[str]:
@@ -127,15 +126,16 @@ def unreachable() -> list[str]:
         pass
     except OSError as error:
         problems.append(f"Bedrock: {error}")
-    # LangSmith (the ingest traces): any HTTP answer proves the route. Required only while the worker traces; an
-    # outage, or a key not yet created, must not fail a deploy for a non-critical feature.
+    # Phoenix (the ingest traces), on the worker's internal network: any HTTP answer proves the route.
     if _tracing():
+        url = os.environ["SMART_TUTOR_PHOENIX_URL"].rstrip("/") + "/healthz"
+        direct = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         try:
-            urllib.request.urlopen(f"https://{LANGSMITH_HOST}/info", timeout=TIMEOUT)
+            direct.open(url, timeout=TIMEOUT)
         except urllib.error.HTTPError:
             pass
         except OSError as error:
-            problems.append(f"LangSmith: {error}")
+            problems.append(f"Phoenix: {error}")
     if not _connects("postgres", 5432):
         problems.append("Postgres: postgres:5432 refused or timed out")
     return problems
@@ -151,8 +151,8 @@ def main() -> int:
         return 1
     if missing:
         return 2
-    langsmith = "LangSmith (tracing on), " if _tracing() else ""
-    print(f"The worker reaches S3, SQS, SSM, Bedrock, {langsmith}and Postgres, and nothing else")
+    phoenix = "Phoenix (tracing on), " if _tracing() else ""
+    print(f"The worker reaches S3, SQS, SSM, Bedrock, {phoenix}and Postgres, and nothing else")
     return 0
 
 

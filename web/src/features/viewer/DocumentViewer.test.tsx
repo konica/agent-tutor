@@ -342,7 +342,8 @@ describe("DocumentViewer citation highlight", () => {
     expect(await screen.findByRole("note")).toHaveTextContent("Couldn't highlight the passage on this page.");
     expect(screen.getByText("p. 2 / 3")).toBeInTheDocument();
     expect(boxes()).toHaveLength(0);
-    expect(recordMiss).toHaveBeenCalledTimes(1);
+    // The miss is recorded in an effect after the rejected request re-renders, which can land after the note shows.
+    await waitFor(() => expect(recordMiss).toHaveBeenCalledTimes(1));
   });
 
   it("a second chip of the same document moves the highlight", async () => {

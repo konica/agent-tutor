@@ -3,7 +3,7 @@
 # <prefix>-deploy (HostStack), after unpacking the deploy bundle to /opt/smart-tutor:
 #   SMART_TUTOR_PREFIX=smart-tutor-on-premise AWS_REGION=us-east-1 deploy.sh <full commit SHA>
 #
-# 1. Renders settings (SSM) and secrets (Secrets Manager), including the LangSmith tracing settings, into a root-only env file. A DuckDNS domain is pointed at this
+# 1. Renders settings (SSM) and secrets (Secrets Manager), including the Phoenix tracing settings, into a root-only env file. A DuckDNS domain is pointed at this
 #    instance's Elastic IP (#154).
 # 2. Pulls the images, starts Postgres, and creates or updates the app, Keycloak, and Phoenix roles and databases.
 # 3. Migrates, then starts every service and waits until all are healthy. Compose recreates only the services whose
@@ -58,15 +58,13 @@ phoenix_db_password=$(secret db/phoenix)
 phoenix_secret=$(secret phoenix/secret)
 phoenix_admin_password=$(secret phoenix/admin-password)
 trace_sampling_rate=$(param trace-sampling-rate)
-# Traces go to the LangSmith project smart-tutor-on-premise (#229). The operator creates the API key's secret
-# (docs/runbooks/on-premise-deploy.md); until then the services run untraced rather than failing the deploy.
-langsmith_api_key=
-langsmith_tracing=false
-if langsmith_api_key=$(secret langsmith/api-key 2>/dev/null) && [[ -n $langsmith_api_key ]]; then
-  langsmith_tracing=true
-else
-  langsmith_api_key=
-  echo "Warning: no LangSmith API key (is the secret $prefix/langsmith/api-key set?); deploying without tracing" >&2
+# Traces go to the on-premise Phoenix, projects smart-tutor-on-premise and -ingestion (ADR 0017). The operator creates
+# the system key's secret in Phoenix (docs/runbooks/on-premise-deploy.md); until then the services run untraced rather
+# than failing the deploy.
+phoenix_api_key=
+if ! phoenix_api_key=$(secret phoenix/api-key 2>/dev/null) || [[ -z $phoenix_api_key ]]; then
+  phoenix_api_key=
+  echo "Warning: no Phoenix API key (is the secret $prefix/phoenix/api-key set?); deploying without tracing" >&2
 fi
 caddyfile_sha256=$(sha256sum "$here/Caddyfile" | cut -d' ' -f1)
 
@@ -91,8 +89,7 @@ KEYCLOAK_ADMIN_USERNAME=$keycloak_admin_username
 KEYCLOAK_ADMIN_PASSWORD=$keycloak_admin_password
 API_CLIENT_SECRET=$api_client_secret
 MCP_CLIENT_SECRET=$mcp_client_secret
-LANGSMITH_TRACING=$langsmith_tracing
-LANGSMITH_API_KEY=$langsmith_api_key
+PHOENIX_API_KEY=$phoenix_api_key
 TRACE_SAMPLING_RATE=$trace_sampling_rate
 LEARNER_HASH_KEY=$learner_hash_key
 PHOENIX_DB_PASSWORD=$phoenix_db_password

@@ -2,9 +2,11 @@
 exported shell). This file sits outside `tests/unit` on purpose: the guarantee comes from the root conftest, not from
 a folder's."""
 
+import os
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 
 import langsmith
 import pytest
@@ -13,11 +15,15 @@ from langsmith import run_trees
 from langsmith import utils as ls_utils
 
 from fakes import RecordingClient, fake_chat_model
+from smart_tutor.shared.adapters.tracing import start_tracing
+from smart_tutor.shared.config import Settings
 
 
 @pytest.fixture
 def tracing_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[RecordingClient]:
     """A developer's `.env`: tracing on, with a key. Yields LangSmith's default client, where a leak would go."""
+    monkeypatch.delenv("LANGCHAIN_TRACING_V2", raising=False)
+    monkeypatch.delenv("LANGSMITH_TRACING_V2", raising=False)
     monkeypatch.setenv("LANGSMITH_TRACING", "true")
     monkeypatch.setenv("LANGSMITH_API_KEY", "test-not-a-key")
     ls_utils.get_env_var.cache_clear()  # langsmith caches environment reads
@@ -58,3 +64,36 @@ def test_positive_control_without_the_guard_the_environment_turns_tracing_on(tra
         call_a_model()
     assert any(p["op"] == "create" for p in tracing_env.payloads)
     tracing_env.payloads.clear()  # sent on purpose; the root conftest fails a test that leaves a trace behind
+
+
+def test_start_tracing_keeps_langsmith_off_whatever_the_environment_says(
+    tracing_env: RecordingClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LANGCHAIN_TRACING_V2", "true")
+    with without_the_guard():
+        ls_utils.get_env_var.cache_clear()
+        assert start_tracing(Settings(phoenix_url=""), "p") is None
+        ls_utils.get_env_var.cache_clear()  # a fresh process reads the environment after startup
+        call_a_model()
+    assert os.environ["LANGSMITH_TRACING"] == "false"
+    assert os.environ["LANGCHAIN_TRACING_V2"] == "false"
+    assert os.environ["LANGSMITH_TRACING_V2"] == "false"
+    assert tracing_env.payloads == []
+
+
+def test_a_phoenix_url_in_the_environment_does_not_reach_settings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / ".env").write_text("SMART_TUTOR_PHOENIX_URL=http://localhost:10404\n")
+    monkeypatch.chdir(tmp_path)  # Settings reads ./.env
+    assert Settings().phoenix_url == ""
+    assert start_tracing(Settings(learner_hash_key="k"), "smart-tutor-local") is None
+
+
+def test_positive_control_without_the_guard_a_dotenv_url_turns_tracing_on(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / ".env").write_text("SMART_TUTOR_PHOENIX_URL=http://localhost:10404\n")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("SMART_TUTOR_PHOENIX_URL")
+    assert Settings().phoenix_url == "http://localhost:10404"

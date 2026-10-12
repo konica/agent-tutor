@@ -210,7 +210,7 @@ class ConversationService:
 
     def rate_turn(self, thread_id: ThreadId, user_id: UserId, run_id: RunId, rating: Rating) -> None:
         """The learner rates a kept answer or decline of their conversation (PRD §10.2); a new rating replaces the
-        last. It is saved first; sending it to LangSmith never fails the rating."""
+        last. It is saved first; sending it on never fails the rating."""
         self._owned(thread_id, user_id)
         if not self._threads.set_rating(thread_id, user_id, run_id, rating):
             raise TurnNotFoundError("Answer not found")

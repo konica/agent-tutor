@@ -34,7 +34,7 @@ Each module has `domain/` (entities and rules, no I/O), `application/` (one serv
 
 ## Architecture rules
 
-Enforced by `PYTHONUTF8=1 uv run lint-imports` (18 contracts in `pyproject.toml` under `[tool.importlinter]`, generated from one module list):
+Enforced by `PYTHONUTF8=1 uv run lint-imports` (19 contracts in `pyproject.toml` under `[tool.importlinter]`, generated from one module list):
 
 1. Inside a module: `adapters | application` → `ports` → `domain`.
 2. Another module is used only through its `application` package; `shared` is open to all and imports no module.
@@ -57,7 +57,7 @@ A new cross-module dependency means moving a module in the order on purpose and 
 - `tests/integration/<module>/` — adapters against the Compose stack, marked `@pytest.mark.integration`.
 - `tests/isolation/` — cross-user access, per-learner contents, and delete guarantees (PRD US-10c, US-11, US-12).
 - `tests/bedrock/` — real Bedrock calls through `ModelFactory`, marked `@pytest.mark.bedrock` (`make bedrock-check`). Run it after changing a model ID, an adapter, or boto3.
-- No test traces, whatever environment is loaded (ADR 0017): `tests/conftest.py` turns tracing off for the whole session and makes LangSmith's default client a `RecordingClient`, and fails any test that leaves a trace on it. A test that checks a trace turns tracing on (`langsmith.tracing_context(enabled=True)`) and sends to its own `RecordingClient`.
+- No test traces, whatever environment is loaded (ADR 0017): `tests/conftest.py` blanks `SMART_TUTOR_PHOENIX_URL` for the session and fails a test that leaves LangChain instrumented; it also turns LangSmith tracing off (evals use LangSmith) and makes its default client a `RecordingClient`. A test that checks spans traces inside `fakes.recorded_traces()` (in-memory exporter).
 
 ## Images
 

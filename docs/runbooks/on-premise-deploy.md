@@ -12,7 +12,7 @@ Commands are for **PowerShell 7** (`pwsh`). Run them from the repository root wi
 | Images | ECR `smart-tutor-on-premise/<service>:<commit SHA>`, on-premise's own `SmartTutor-OnPremise-prod-Registry` stack (#206) |
 | Files on the VM | `deploy/` is uploaded as a CDK asset; the deploy unpacks it to `/opt/smart-tutor` and runs `/opt/smart-tutor/on-premise/deploy.sh` |
 | Settings and secrets | SSM `/smart-tutor-on-premise/*` and Secrets Manager `smart-tutor-on-premise/*`. On the VM, `deploy.sh` renders them into `/etc/smart-tutor/smart-tutor.env` (root only, mode 600) |
-| AWS from the containers | The agent, MCP server, worker, and API use the instance profile (IMDSv2, hop limit 2): Bedrock, the on-premise bucket and ingest queue, and SSM `/smart-tutor-on-premise/*`. One role holds what native-cloud gives each service separately. The worker reaches them, and LangSmith for tracing, only through `egress-proxy` (an allowlist; ADR 0014) |
+| AWS from the containers | The agent, MCP server, worker, and API use the instance profile (IMDSv2, hop limit 2): Bedrock, the on-premise bucket and ingest queue, and SSM `/smart-tutor-on-premise/*`. One role holds what native-cloud gives each service separately. The worker reaches them only through `egress-proxy` (an allowlist; ADR 0014), and reaches Phoenix for tracing directly |
 | Data | The data volume, mounted at `/data`: Postgres in `/data/postgres` (the app, Keycloak, and `phoenix` databases), and Caddy's certificates in `/data/caddy` |
 | Public name | `smart-tutor.duckdns.org` on DuckDNS, in the account of the Google account `dtrungthao@gmail.com`. Its token is the secret `smart-tutor-on-premise/duckdns/token`, created by hand, not by CDK (section 9) |
 
@@ -22,7 +22,7 @@ The Host stack creates a VPC with one public subnet, no NAT, and an S3 gateway e
 
 - CDK is bootstrapped in the account (`pilot-aws-prerequisites.md` §2), and the GitHub OIDC provider exists (native-cloud's `SmartTutor-prod-GitHubDeploy` created it; the on-premise deploy role reuses it).
 - The ECR repositories come from `SmartTutor-OnPremise-prod-Registry`. `build-images.yml` deploys that stack (and the deploy role) before its first push, so nothing is deployed by hand for them. The repositories hold images for the commit you want: `deploy.yml` builds and pushes them for every merge to `main`, tagged with the full commit SHA. On-premise needs `api`, `web`, `keycloak`, `agent`, `mcp`, and `worker`. A commit merged while no images were built (while `PRODUCTION_DEPLOY` was off, before #150, while `NATIVE_CLOUD_AUTO_DEPLOY=false`) has none, and neither has a commit merged before #206 (its images are only in native-cloud's `smart-tutor/*`): build them by hand (section 4, "Build images by hand").
-- A LangSmith service key for tracing (section 10); deploys work without it, untraced.
+- A Phoenix system key for tracing (section 10, made in section 11); deploys work without it, untraced.
 - The DuckDNS token is stored (section 9). Without it a deploy still works but can't point the name at a new Elastic IP.
 - A `cdk deploy` from your machine bundles your working copy of `deploy/`, which must have LF line endings: the VM pipes `db-bootstrap.sql` to psql, which misreads `\set ON_ERROR_STOP on` with a CR. `.gitattributes` keeps `deploy/**` LF on every checkout since #155; a Windows checkout from before it keeps CRLF copies until you check them out again (Git Bash: `git ls-files -z deploy | xargs -0 rm -f && git checkout -- deploy`, then `git ls-files --eol deploy | grep -c w/crlf` prints 0). CDK's fingerprint ignores CR, so delete `infra/cdk.out` too, or it reuses the old copy.
 - Tools: Node 22+, uv, AWS CLI v2, and the [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) to open a shell on the VM.
@@ -152,7 +152,7 @@ aws ssm get-command-invocation --command-id $CommandId --instance-id $InstanceId
 1. It waits for `/data`, then renders settings from SSM and secrets from Secrets Manager into `/etc/smart-tutor/smart-tutor.env`.
 2. It pulls the images, starts Postgres, and creates or updates the `smart_tutor` and `keycloak` roles and databases (`deploy/helm/smart-tutor/files/db-bootstrap.sql`, the same script as native-cloud).
 3. It runs the migrations, then `docker compose up -d --wait`, which waits until every service is healthy. A deploy fails if any service doesn't become healthy within 15 minutes.
-4. It checks the worker's isolation (user 10001, read-only root filesystem, all capabilities dropped, no new privileges) and fails the deploy otherwise, and proves the worker's egress block from inside it (`check-egress.py`): a direct connection or a proxied one to another host must fail, and S3, SQS, SSM, Bedrock, LangSmith, and Postgres must answer. It also checks from the API container that the agent answers `/healthz` and the MCP server refuses a call without a token.
+4. It checks the worker's isolation (user 10001, read-only root filesystem, all capabilities dropped, no new privileges) and fails the deploy otherwise, and proves the worker's egress block from inside it (`check-egress.py`): a direct connection or a proxied one to another host must fail, and S3, SQS, SSM, Bedrock, Phoenix (while tracing), and Postgres must answer. It also checks from the API container that the agent answers `/healthz` and the MCP server refuses a call without a token.
 5. It creates the test learner if it is missing.
 
 The first deploy of #153 recreates Postgres once (it joins the worker network); the API, Keycloak, and worker reconnect within seconds.
@@ -251,13 +251,13 @@ docker inspect --format 'user={{.Config.User}} readonly={{.HostConfig.ReadonlyRo
 
 It prints `user=10001:10001 readonly=true capdrop=[ALL] secopt=[no-new-privileges:true]`. The worker parses each PDF in a child process, which it stops after `SMART_TUTOR_EXTRACTION_TIMEOUT_SECONDS` (300); the document then fails with "This PDF took too long to read". Each extraction starts a fresh Python interpreter, and its start-up counts toward the limit.
 
-**Worker egress.** The worker sits on an internal Compose network with no route out of the VM. It reaches Postgres and Phoenix directly. Everything else goes through `egress-proxy` (Squid), which allows only the documents bucket, SQS, SSM, and Bedrock runtime in the region, LangSmith's API (`api.smith.langchain.com:443`), and the instance metadata service, by exact name. `deploy.sh` proves this on every deploy; to run the check by hand:
+**Worker egress.** The worker sits on an internal Compose network with no route out of the VM. It reaches Postgres and Phoenix directly. Everything else goes through `egress-proxy` (Squid), which allows only the documents bucket, SQS, SSM, and Bedrock runtime in the region, and the instance metadata service, by exact name (LangSmith is not on the list). `deploy.sh` proves this on every deploy; to run the check by hand:
 
 ```bash
 dc exec -T worker python - < /opt/smart-tutor/on-premise/check-egress.py
 ```
 
-It exits 0 when the worker reaches nothing it must not and everything it needs. It exits 1 (or crashes) when the worker reached something it must not, or the check couldn't run: the deploy stops the worker. It exits 2 when a needed destination is unreachable: the deploy fails, and the worker keeps running. The proxy's log shows what it refused: `dc logs --tail 50 egress-proxy`; `TCP_DENIED/403` lines are refused requests. To let the worker reach a new endpoint, add its exact name to the matching `acl` line in `compose.yaml` (`aws`, or `langsmith` for LangSmith's API); until then the deploy check fails. The proxy image is pinned by digest; to bump it, pull the tag (`docker pull ubuntu/squid:6.6-24.04_edge`), read its digest with `docker image inspect --format '{{index .RepoDigests 0}}' ubuntu/squid:6.6-24.04_edge`, and replace the image's `@sha256:` part in `compose.yaml` with it.
+It exits 0 when the worker reaches nothing it must not and everything it needs. It exits 1 (or crashes) when the worker reached something it must not, or the check couldn't run: the deploy stops the worker. It exits 2 when a needed destination is unreachable: the deploy fails, and the worker keeps running. The proxy's log shows what it refused: `dc logs --tail 50 egress-proxy`; `TCP_DENIED/403` lines are refused requests. To let the worker reach a new endpoint, add its exact name to the matching `acl` line in `compose.yaml` (`aws`); until then the deploy check fails. The proxy image is pinned by digest; to bump it, pull the tag (`docker pull ubuntu/squid:6.6-24.04_edge`), read its digest with `docker image inspect --format '{{index .RepoDigests 0}}' ubuntu/squid:6.6-24.04_edge`, and replace the image's `@sha256:` part in `compose.yaml` with it.
 
 **Dead-letter drill.** A message the worker fails on 5 times moves to `smart-tutor-on-premise-ingest-dlq`. To check the redrive, stop the worker so it doesn't take the message, send one, receive it 5 times without deleting it, and look in the DLQ. From your laptop, with `dc stop worker` done on the VM first:
 
@@ -338,7 +338,7 @@ Deletes every on-premise stack, in this order:
 |---|---|---|
 | Deleted | `Host`: the VM, the Elastic IP, the VPC, the data volume (after a final snapshot), the snapshot policy, the alarms and alert topic, the uptime check, the patching window, the deploy document, and the database, test-learner, and Phoenix secrets (`db/phoenix`, `phoenix/secret`, `phoenix/admin-password`) | |
 | Deleted | `Registry`: the repositories `smart-tutor-on-premise/*` and their images | The next build recreates them, empty. |
-| Deleted | `Config`: the SSM parameters under `/smart-tutor-on-premise/`, the Keycloak secrets, and the LangSmith learner-hash key `smart-tutor-on-premise/langsmith/learner-hash-key` | |
+| Deleted | `Config`: the SSM parameters under `/smart-tutor-on-premise/`, the Keycloak secrets, and the learner-hash key for Phoenix traces `smart-tutor-on-premise/langsmith/learner-hash-key` (a legacy name from when traces went to LangSmith) | |
 | Deleted | `Storage`: the queues `smart-tutor-on-premise-ingest` and `smart-tutor-on-premise-ingest-dlq` | The bucket stays (below). |
 | Deleted | `Budgets`: the budget `smart-tutor-on-premise-prod-monthly` | |
 | Deleted | `GitHubDeploy`: the role `smart-tutor-on-premise-github-deploy` | The role only imports the GitHub OIDC provider, so the provider stays. |
@@ -346,7 +346,6 @@ Deletes every on-premise stack, in this order:
 | Kept | The final data-volume snapshot and the daily snapshots (up to 7) | The database, Keycloak's users, and Caddy's certificates. Data Lifecycle Manager leaves its snapshots behind when its policy is deleted. |
 | Kept | The DuckDNS name `smart-tutor.duckdns.org` | In the DuckDNS account, pointed at `127.0.0.1` by step 4. The next deploy points it at the new Elastic IP. |
 | Kept | The secret `smart-tutor-on-premise/duckdns/token` | Created by hand, not by a stack (section 9). |
-| Kept | The secret `smart-tutor-on-premise/langsmith/api-key` | Created by hand, not by a stack (section 10). |
 | Kept | The secret `smart-tutor-on-premise/phoenix/api-key` | Created by hand, not by a stack (section 11). |
 | Kept | The account's GitHub OIDC provider and the CDK bootstrap (`CDKToolkit`) | Native-cloud created the provider and still uses it; both modes deploy with the bootstrap. |
 | Kept | The GitHub environment `on-premise` and its variables | So on-premise can be redeployed. |
@@ -358,7 +357,6 @@ $VolumeId = "<the DataVolumeId from step 2>"
 aws ec2 describe-snapshots --owner-ids self --filters "Name=volume-id,Values=$VolumeId" --query "Snapshots[].SnapshotId" --output text
 aws ec2 delete-snapshot --snapshot-id <snapshot id>   # once per snapshot
 aws secretsmanager delete-secret --secret-id smart-tutor-on-premise/duckdns/token --force-delete-without-recovery
-aws secretsmanager delete-secret --secret-id smart-tutor-on-premise/langsmith/api-key --force-delete-without-recovery
 aws secretsmanager delete-secret --secret-id smart-tutor-on-premise/phoenix/api-key --force-delete-without-recovery
 ```
 
@@ -402,37 +400,31 @@ Get-Output PublicIp
 
 **Switch the domain** (another DuckDNS name, or empty for `<Elastic IP>.sslip.io`): change `smart-tutor:on-premise-domain` in `infra/cdk.json`, deploy the stacks (section 2: the Storage stack's CORS, the Host's `domain` setting, and the uptime check follow it), and deploy an image tag (section 4, or merge to `main`). For another DuckDNS name, store its account's token first. Caddy requests a certificate for the new name. Learners signed in at the old address sign in again, because the token issuer changes with it.
 
-## 10. Tracing (LangSmith) (#229)
+## 10. Tracing (Phoenix) (#229, #289)
 
-The agent traces each ask into the LangSmith project `smart-tutor-on-premise`, and the worker traces each content's processing into `smart-tutor-on-premise-ingestion`. Traces carry a keyed learner hash, never a user id, email, or token (PRD §10.4).
+The agent traces each ask into the Phoenix project `smart-tutor-on-premise`, and the worker traces each content's processing into `smart-tutor-on-premise-ingestion` (ADR 0017). Traces carry a keyed learner hash, never a user id, email, or token (PRD §10.4).
 
-**Turn it on.** Create a LangSmith **service key** (Settings, API keys), store it, and redeploy (section 6):
+**Turn it on.** Make the Phoenix system key `smart-tutor-on-premise` and store it as `smart-tutor-on-premise/phoenix/api-key` (section 11), then redeploy (section 6). To rotate it, use `put-secret-value` with the same name and redeploy. Until the secret exists, deploys print `Warning: no Phoenix API key (is the secret smart-tutor-on-premise/phoenix/api-key set?); deploying without tracing`, and the agent and worker run untraced.
 
-```bash
-MSYS_NO_PATHCONV=1 aws secretsmanager create-secret --name smart-tutor-on-premise/langsmith/api-key --secret-string <key>
-```
+**Learner-hash key.** `smart-tutor-on-premise/langsmith/learner-hash-key` is generated by the Config stack (the name predates Phoenix). Rotating it starts new learner hashes (per-learner grouping restarts); do it only on a suspected leak.
 
-To rotate it, use `put-secret-value` with the same name and redeploy. Until the secret exists, deploys print `Warning: no LangSmith API key (is the secret smart-tutor-on-premise/langsmith/api-key set?); deploying without tracing`, and the app runs untraced.
-
-**Learner-hash key.** `smart-tutor-on-premise/langsmith/learner-hash-key` is generated by the Config stack. Rotating it starts new learner hashes (per-learner grouping restarts); do it only on a suspected leak.
-
-**Retention (D25).** In LangSmith, open *Projects, smart-tutor-on-premise, Retention* and choose **Extended (180 days)**; do the same for `smart-tutor-on-premise-ingestion`. LangSmith SaaS keeps no trace longer than 180 days (base: 14 days), so D25 needs no deletion job. Extended keeps 4 weeks of sampled production traces and the thumbs-up/down history for judge calibration. Retention applies to traces sent after the change.
+**Retention (D25).** Phoenix deletes traces after 180 days: `PHOENIX_DEFAULT_RETENTION_POLICY_DAYS` in `compose.yaml`, so D25 needs no deletion job. That holds once the policy's schedule is set to daily in the Phoenix UI (the retention step in section 11); the default weekly sweep keeps a trace up to about 187 days.
 
 **Sampling.** SSM `/smart-tutor-on-premise/trace-sampling-rate` (default `1`, every run; 0 to 1). Change it in `infra/smart_tutor_infra/stacks/config.py` and deploy with the infrastructure (a hand edit in SSM is overwritten by the next `cdk deploy`), then redeploy. A value outside 0 to 1 stops the agent and worker from starting.
 
-**Egress.** The worker reaches `api.smith.langchain.com:443` through the proxy. The deploy's egress check proves it and that nothing else new is reachable (section 7).
+**Egress.** The worker reaches `phoenix:6006` directly on its internal network (`NO_PROXY=phoenix`), so the egress proxy allows nothing new. The deploy's egress check proves Phoenix answers while tracing, and that LangSmith and every other host stay unreachable (section 7).
 
 **Check.** Take the credentials from `smart-tutor-on-premise/keycloak/test-learner`:
 
 ```bash
-LANGSMITH_API_KEY=<key> SMOKE_TEST_USERNAME=... SMOKE_TEST_PASSWORD=... python3 deploy/pilot/smoke_test.py https://<domain> --end-to-end --trace-project smart-tutor-on-premise
+PHOENIX_API_KEY=<key> SMOKE_TEST_USERNAME=... SMOKE_TEST_PASSWORD=... python3 deploy/pilot/smoke_test.py https://<domain> --end-to-end --trace-project smart-tutor-on-premise
 ```
 
 It ends with `ask trace <run id> is in smart-tutor-on-premise`.
 
 ## 11. Phoenix (traces) (#288)
 
-Production runs its own Arize Phoenix at `https://<domain>/phoenix` (ADR 0017). Its traces live in the `phoenix` database on the VM's Postgres, which the nightly dump leaves out. The projects `smart-tutor-on-premise` and `smart-tutor-on-premise-ingestion` appear with their first trace. No service sends traces yet: ticket #289 wires the agent and the worker. Section 10 still describes the tracing that runs today.
+Production runs its own Arize Phoenix at `https://<domain>/phoenix` (ADR 0017). Its traces live in the `phoenix` database on the VM's Postgres, which the nightly dump leaves out. The projects `smart-tutor-on-premise` and `smart-tutor-on-premise-ingestion` appear with their first trace. The agent and the worker send traces with the system key (section 10); the API's traces are ticket #290.
 
 **First sign-in.** Open `$Url/phoenix` and sign in as `admin@localhost` with the password from `smart-tutor-on-premise/phoenix/admin-password`. Phoenix makes you set a new one. It needs 12 or more characters with an upper-case letter, a lower-case letter, a digit, and one of `!@#$%^&*()_+`. Store the new password in your password manager. The secret only seeds the first start.
 
@@ -444,7 +436,7 @@ Production runs its own Arize Phoenix at `https://<domain>/phoenix` (ADR 0017). 
 MSYS_NO_PATHCONV=1 aws secretsmanager create-secret --name smart-tutor-on-premise/phoenix/api-key --secret-string <key>
 ```
 
-Nothing uses the key until the services send traces (#289). Local development has no key.
+The agent and worker use the key from the next deploy (section 10). Local development has no key.
 
 **Rotate the secret.** Rotating `smart-tutor-on-premise/phoenix/secret` invalidates every Phoenix API key and sign-in. Create and store a new system key afterwards (see below).
 
@@ -480,7 +472,7 @@ It prints `test-span (...) is in the Phoenix project smart-tutor-on-premise`. De
 | `Warning: could not update <domain> on DuckDNS` | The secret `smart-tutor-on-premise/duckdns/token` is missing, or its token isn't the account's current one (section 9). The name keeps its old address: if the Elastic IP changed, sign-in and the certificate fail until it's fixed. |
 | `The worker is not isolated: ...` (deploy or patch window fails) | `compose.yaml` lost one of the worker's `user`, `read_only`, `cap_drop`, or `security_opt` settings. The check stops the worker, so uploads wait in the queue. Restore the settings and deploy again; never run the worker without them. |
 | `Stopped the worker: the egress check found a leak or could not run (see above)` (deploy or patch window fails) | The output above names the host the worker reached (lines `The worker can reach what it must not: ...`) or the error that kept the check from running. A reached host means `compose.yaml` lost the worker's `networks: [worker]`, or the proxy's rules allow more than they should. The worker is stopped, so uploads wait in the queue. Restore the file and deploy again. The weekly patch window runs the same checks. |
-| `The worker cannot reach a destination it needs` (deploy fails) | `dc logs egress-proxy` shows `TCP_DENIED` for a host the worker needs (a new endpoint: add its exact name to the matching `acl` line, `aws` or `langsmith`), or AWS answered with errors. The worker keeps running. |
+| `The worker cannot reach a destination it needs` (deploy fails) | `dc logs egress-proxy` shows `TCP_DENIED` for a host the worker needs (a new endpoint: add its exact name to the `aws` `acl` line), or AWS answered with errors. The worker keeps running. |
 | A document stays processing | The worker isn't running or can't reach AWS: `dc ps worker`, `dc logs --tail 100 worker`, `dc logs --tail 50 egress-proxy`. `AccessDenied` means the instance role lacks a permission (Host stack); a Bedrock `ThrottlingException` retries on its own. |
 | `Warning: could not check the sign-in client or the test learner` | The bootstrap admin was deleted. The deploy still succeeded. Create the test learner by hand if you need it. After a domain change, set the sign-in client's addresses by hand too (row "Invalid parameter: redirect_uri"). |
 | `phoenix` is unhealthy (the deploy waits on it, or `/phoenix` answers 502) | Read `dc logs phoenix`. Common causes: a `PHOENIX_SECRET` Phoenix refuses (it needs 32 or more characters with a digit and a lower-case letter), or the `phoenix` role's password out of sync with the secret. A redeploy resets the role's password. |
