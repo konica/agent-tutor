@@ -12,7 +12,7 @@ An AI tutor for your own documents: learners upload PDFs, the system suggests su
 | `infra/` | AWS CDK app (Python), us-east-1 |
 | `deploy/helm/` | Umbrella Helm chart for EKS and cluster add-on values |
 | `local/` | Files used only by Docker Compose (Keycloak realm, LocalStack and Postgres init) |
-| `docs/` | The native-cloud pilot's [solution architecture](docs/architecture/solution-architecture.md) for stakeholders, and [runbooks](docs/runbooks/) for engineers (on-premise deploy first; native-cloud deploy, environment overview, AWS prerequisites) |
+| `docs/` | Solution architecture for stakeholders: [on-premise](docs/architecture/on-premise-solution-architecture.md) (the running deployment) and the torn-down [native-cloud pilot](docs/architecture/solution-architecture.md), with their [diagrams](docs/architecture/diagrams/); and [runbooks](docs/runbooks/) for engineers (on-premise deploy first; native-cloud deploy, environment overview, AWS prerequisites) |
 
 ## Local development
 

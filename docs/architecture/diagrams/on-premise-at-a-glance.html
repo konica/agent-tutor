@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>On-premise at a glance</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      color-scheme: light;
+      --color-paper:  #f6f7f9;
+      --color-ink:    #14202b;
+      --color-muted:  #4a5866;
+      --color-accent: #0b6b66;
+      --font-sans:    system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      --font-serif:   Charter, 'Bitstream Charter', 'Iowan Old Style', 'Palatino Linotype', Cambria, Georgia, serif;
+      --font-mono:    ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+
+    .frame { max-width: 1200px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+
+    svg { width: 100%; min-width: 960px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Architecture · Smart Tutor on-premise</p>
+    <h1>On-premise at a glance</h1>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 960 680" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="on-premise-at-a-glance-title on-premise-at-a-glance-desc">
+        <title id="on-premise-at-a-glance-title">Smart Tutor on-premise at a glance</title>
+        <desc id="on-premise-at-a-glance-desc">The learner's browser reaches one EC2 virtual machine in our own AWS account, which runs every Smart Tutor service with Docker Compose and still uses six managed AWS services: the documents bucket, the ingest queue, Bedrock models, settings and secrets, the image registry, and monitoring.</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4a5866"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#0b6b66"/></marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#1d5fa8"/></marker>
+        </defs>
+        <rect width="100%" height="100%" fill="#f6f7f9"/>
+        <rect x="208" y="24" width="720" height="576" rx="8" fill="rgba(20,32,43,0.02)" stroke="rgba(20,32,43,0.14)" stroke-width="0.8"/>
+        <rect x="220" y="28" width="160" height="12" rx="2" fill="#f6f7f9"/>
+        <text x="224" y="37" fill="#5b6875" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">OUR AWS ACCOUNT · US-EAST-1</text>
+        <rect x="232" y="80" width="248" height="504" rx="8" fill="rgba(20,32,43,0.02)" stroke="rgba(20,32,43,0.14)" stroke-width="0.8"/>
+        <rect x="244" y="84" width="136" height="12" rx="2" fill="#f6f7f9"/>
+        <text x="248" y="93" fill="#5b6875" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">VPC · ONE PUBLIC SUBNET</text>
+        <line x1="168" y1="340" x2="256" y2="340" stroke="#0b6b66" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+        <path d="M 104,308 V 72 Q 104,64 112,64 H 768 Q 776,64 776,72 V 112" fill="none" stroke="#1d5fa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <line x1="776" y1="168" x2="776" y2="192" stroke="#4a5866" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <line x1="456" y1="140" x2="656" y2="140" stroke="#1d5fa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <line x1="456" y1="220" x2="656" y2="220" stroke="#1d5fa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <line x1="456" y1="300" x2="656" y2="300" stroke="#1d5fa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <line x1="456" y1="380" x2="656" y2="380" stroke="#1d5fa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <line x1="656" y1="460" x2="456" y2="460" stroke="#4a5866" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <line x1="656" y1="540" x2="456" y2="540" stroke="#4a5866" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <rect x="182" y="320" width="60" height="12" rx="2" fill="#f6f7f9"/>
+        <text x="212" y="329" fill="#0b6b66" font-size="8" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.06em">HTTPS 443</text>
+        <rect x="400" y="44" width="80" height="12" rx="2" fill="#f6f7f9"/>
+        <text x="440" y="53" fill="#1d5fa8" font-size="8" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.06em">SIGNED UPLOAD</text>
+        <rect x="784" y="174" width="60" height="12" rx="2" fill="#f6f7f9"/>
+        <text x="788" y="183" fill="#5b6875" font-size="8" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.06em">NEW OBJECT</text>
+        <rect x="518" y="120" width="76" height="12" rx="2" fill="#f6f7f9"/>
+        <text x="556" y="129" fill="#1d5fa8" font-size="8" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.06em">READ · WRITE</text>
+        <rect x="540" y="200" width="32" height="12" rx="2" fill="#f6f7f9"/>
+        <text x="556" y="209" fill="#1d5fa8" font-size="8" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.06em">POLL</text>
+        <rect x="522" y="280" width="68" height="12" rx="2" fill="#f6f7f9"/>
+        <text x="556" y="289" fill="#1d5fa8" font-size="8" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.06em">MODEL CALLS</text>
+        <rect x="540" y="360" width="32" height="12" rx="2" fill="#f6f7f9"/>
+        <text x="556" y="369" fill="#1d5fa8" font-size="8" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.06em">READ</text>
+        <rect x="534" y="440" width="44" height="12" rx="2" fill="#f6f7f9"/>
+        <text x="556" y="449" fill="#5b6875" font-size="8" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.06em">IMAGES</text>
+        <rect x="532" y="520" width="48" height="12" rx="2" fill="#f6f7f9"/>
+        <text x="556" y="529" fill="#5b6875" font-size="8" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.06em">WATCHES</text>
+        <rect x="40" y="308" width="128" height="64" rx="6" fill="#f6f7f9"/>
+        <rect x="40" y="308" width="128" height="64" rx="6" fill="rgba(74,88,102,0.1)" stroke="#5b6875" stroke-width="1"/>
+        <rect x="48" y="314" width="28" height="12" rx="2" fill="none" stroke="#5b6875" stroke-width="0.8"/>
+        <text x="62" y="323" fill="#5b6875" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">USER</text>
+        <text x="104" y="340" fill="#14202b" font-size="12" font-weight="600" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">Learner's browser</text>
+        <text x="104" y="355" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">on the internet</text>
+        <rect x="656" y="112" width="240" height="56" rx="6" fill="#f6f7f9"/>
+        <rect x="656" y="112" width="240" height="56" rx="6" fill="rgba(20,32,43,0.05)" stroke="#4a5866" stroke-width="1"/>
+        <rect x="664" y="118" width="20" height="12" rx="2" fill="none" stroke="rgba(74,88,102,0.5)" stroke-width="0.8"/>
+        <text x="674" y="127" fill="#4a5866" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">S3</text>
+        <text x="776" y="144" fill="#14202b" font-size="12" font-weight="600" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">Documents bucket</text>
+        <text x="776" y="159" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">S3 · PDFs, page text, nightly dumps</text>
+        <rect x="656" y="192" width="240" height="56" rx="6" fill="#f6f7f9"/>
+        <rect x="656" y="192" width="240" height="56" rx="6" fill="rgba(20,32,43,0.05)" stroke="#4a5866" stroke-width="1"/>
+        <rect x="664" y="198" width="24" height="12" rx="2" fill="none" stroke="rgba(74,88,102,0.5)" stroke-width="0.8"/>
+        <text x="676" y="207" fill="#4a5866" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">SQS</text>
+        <text x="776" y="224" fill="#14202b" font-size="12" font-weight="600" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">Ingest queue</text>
+        <text x="776" y="239" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">SQS · dead-letter queue after 5 tries</text>
+        <rect x="656" y="272" width="240" height="56" rx="6" fill="#f6f7f9"/>
+        <rect x="656" y="272" width="240" height="56" rx="6" fill="rgba(20,32,43,0.03)" stroke="rgba(20,32,43,0.3)" stroke-width="1"/>
+        <rect x="664" y="278" width="20" height="12" rx="2" fill="none" stroke="rgba(20,32,43,0.22)" stroke-width="0.8"/>
+        <text x="674" y="287" fill="#5b6875" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">AI</text>
+        <text x="776" y="304" fill="#14202b" font-size="12" font-weight="600" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">Bedrock models</text>
+        <text x="776" y="319" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">Nova 2 Lite · Nova 2 embeddings</text>
+        <rect x="656" y="352" width="240" height="56" rx="6" fill="#f6f7f9"/>
+        <rect x="656" y="352" width="240" height="56" rx="6" fill="rgba(20,32,43,0.03)" stroke="rgba(20,32,43,0.3)" stroke-width="1"/>
+        <rect x="664" y="358" width="24" height="12" rx="2" fill="none" stroke="rgba(20,32,43,0.22)" stroke-width="0.8"/>
+        <text x="676" y="367" fill="#5b6875" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">CFG</text>
+        <text x="776" y="384" fill="#14202b" font-size="12" font-weight="600" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">Settings and secrets</text>
+        <text x="776" y="399" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">SSM Parameter Store · Secrets Manager</text>
+        <rect x="656" y="432" width="240" height="56" rx="6" fill="#f6f7f9"/>
+        <rect x="656" y="432" width="240" height="56" rx="6" fill="rgba(20,32,43,0.03)" stroke="rgba(20,32,43,0.3)" stroke-width="1"/>
+        <rect x="664" y="438" width="24" height="12" rx="2" fill="none" stroke="rgba(20,32,43,0.22)" stroke-width="0.8"/>
+        <text x="676" y="447" fill="#5b6875" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">ECR</text>
+        <text x="776" y="464" fill="#14202b" font-size="12" font-weight="600" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">Image registry</text>
+        <text x="776" y="479" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">ECR · images tagged by commit</text>
+        <rect x="656" y="512" width="240" height="56" rx="6" fill="#f6f7f9"/>
+        <rect x="656" y="512" width="240" height="56" rx="6" fill="rgba(20,32,43,0.03)" stroke="rgba(20,32,43,0.3)" stroke-width="1"/>
+        <rect x="664" y="518" width="24" height="12" rx="2" fill="none" stroke="rgba(20,32,43,0.22)" stroke-width="0.8"/>
+        <text x="676" y="527" fill="#5b6875" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">OPS</text>
+        <text x="776" y="544" fill="#14202b" font-size="12" font-weight="600" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">Monitoring and alerts</text>
+        <text x="776" y="559" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">CloudWatch · Route 53 · email</text>
+        <rect x="256" y="112" width="200" height="456" rx="6" fill="#f6f7f9"/>
+        <rect x="256" y="112" width="200" height="456" rx="6" fill="rgba(11,107,102,0.08)" stroke="#0b6b66" stroke-width="1"/>
+        <rect x="264" y="118" width="28" height="12" rx="2" fill="none" stroke="rgba(11,107,102,0.5)" stroke-width="0.8"/>
+        <text x="278" y="127" fill="#0b6b66" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">EC2</text>
+        <text x="356" y="152" fill="#14202b" font-size="12" font-weight="600" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">One virtual machine</text>
+        <text x="356" y="168" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">t3.large · Amazon Linux 2023</text>
+        <text x="356" y="182" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">50 GB encrypted data volume</text>
+        <line x1="272" y1="200" x2="440" y2="200" stroke="rgba(20,32,43,0.14)" stroke-width="0.8"/>
+        <text x="272" y="220" fill="#5b6875" font-size="8" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">DOCKER COMPOSE</text>
+        <text x="272" y="244" fill="#14202b" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">caddy</text>
+        <text x="440" y="244" fill="#4a5866" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">HTTPS, routing</text>
+        <text x="272" y="268" fill="#14202b" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">web</text>
+        <text x="440" y="268" fill="#4a5866" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">React app</text>
+        <text x="272" y="292" fill="#14202b" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">api</text>
+        <text x="440" y="292" fill="#4a5866" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">app API</text>
+        <text x="272" y="316" fill="#14202b" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">keycloak</text>
+        <text x="440" y="316" fill="#4a5866" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">sign-in</text>
+        <text x="272" y="340" fill="#14202b" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">agent</text>
+        <text x="440" y="340" fill="#4a5866" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">the tutor</text>
+        <text x="272" y="364" fill="#14202b" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">mcp</text>
+        <text x="440" y="364" fill="#4a5866" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">document search</text>
+        <text x="272" y="388" fill="#14202b" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">worker</text>
+        <text x="440" y="388" fill="#4a5866" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">PDF processing</text>
+        <text x="272" y="412" fill="#14202b" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">postgres</text>
+        <text x="440" y="412" fill="#4a5866" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">data, pgvector</text>
+        <text x="272" y="436" fill="#14202b" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">egress-proxy</text>
+        <text x="440" y="436" fill="#4a5866" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">worker allowlist</text>
+        <line x1="272" y1="472" x2="440" y2="472" stroke="rgba(20,32,43,0.14)" stroke-width="0.8"/>
+        <text x="356" y="496" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">inbound: TCP 80 and 443 only</text>
+        <text x="356" y="512" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">no SSH · Session Manager</text>
+        <text x="356" y="528" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">no NAT · S3 gateway endpoint</text>
+        <line x1="40" y1="620" x2="920" y2="620" stroke="rgba(20,32,43,0.14)" stroke-width="0.8"/>
+        <text x="40" y="636" fill="#4a5866" font-size="8" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.18em">LEGEND</text>
+        <rect x="40" y="648" width="14" height="10" rx="2" fill="rgba(11,107,102,0.08)" stroke="#0b6b66" stroke-width="1"/>
+        <text x="60" y="656" fill="#4a5866" font-size="8.5" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif">The VM</text>
+        <rect x="116" y="648" width="14" height="10" rx="2" fill="rgba(20,32,43,0.05)" stroke="#4a5866" stroke-width="1"/>
+        <text x="136" y="656" fill="#4a5866" font-size="8.5" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif">Data store</text>
+        <rect x="208" y="648" width="14" height="10" rx="2" fill="rgba(20,32,43,0.03)" stroke="rgba(20,32,43,0.3)" stroke-width="1"/>
+        <text x="228" y="656" fill="#4a5866" font-size="8.5" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif">AWS managed service</text>
+        <rect x="348" y="648" width="14" height="10" rx="2" fill="rgba(74,88,102,0.1)" stroke="#5b6875" stroke-width="1"/>
+        <text x="368" y="656" fill="#4a5866" font-size="8.5" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif">Learner</text>
+        <line x1="424" y1="653" x2="452" y2="653" stroke="#0b6b66" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+        <text x="460" y="656" fill="#4a5866" font-size="8.5" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif">Learner traffic</text>
+        <line x1="552" y1="653" x2="580" y2="653" stroke="#1d5fa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <text x="588" y="656" fill="#4a5866" font-size="8.5" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif">AWS API call</text>
+        <line x1="668" y1="653" x2="696" y2="653" stroke="#4a5866" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="704" y="656" fill="#4a5866" font-size="8.5" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif">Event or image pull</text>
+        <line x1="812" y1="653" x2="840" y2="653" stroke="#4a5866" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <text x="848" y="656" fill="#4a5866" font-size="8.5" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif">Health check</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>
