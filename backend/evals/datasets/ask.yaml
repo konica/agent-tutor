@@ -1,35 +1,35 @@
 # Questions to the ask graph (PRD §9.2), asked as an eval learner (seed_corpus/learners.yaml). LangSmith dataset
-# `name`; each split is pushed once per `version` (a LangSmith tag) and never edited after: change a split by giving
-# it a new version (README "Datasets").
+# `name`. These hand-written examples are in every version of both splits; generated examples join them after a human
+# accepts them in the annotation queue. Versions are made only by `make evals-publish` (README "Datasets"); the runner
+# uses each split's newest version unless `pins` names one (e.g. `pins: {full: full-v1}`).
 #
-# inputs:  question; learner (username); documents: seed ids the search is limited to (US-4c), or null for all.
-# outputs: covered: whether the learner's library answers the question; sources: seed ids that answer it.
+# inputs:  question; learner (username); documents: seed ids the search is limited to (US-4c), or null for all;
+#          history (generated drift examples only): earlier questions in the conversation.
+# outputs: covered: whether the learner's library answers the question; sources: seed ids that answer it;
+#          chunks (generated examples only): the seed chunks (`<seed id>:<seq>`) the question was written from.
 name: smart-tutor-ask
 description: Questions to the Smart Tutor ask graph over the eval learners' seed-corpus libraries (backend/evals/datasets/ask.yaml).
-splits:
-  smoke:
-    version: smoke-v1
-    examples:
-      - inputs: {question: "How does ReAct combine reasoning traces with actions?", learner: learner@example.com, documents: null}
-        outputs: {covered: true, sources: [react-2022]}
-      - inputs: {question: "Which question answering and fact verification benchmarks was ReAct evaluated on, and what external tool did it use?", learner: learner@example.com, documents: null}
-        outputs: {covered: true, sources: [react-2022]}
-      - inputs: {question: "What is chain-of-thought prompting?", learner: learner@example.com, documents: null}
-        outputs: {covered: true, sources: [cot-2022]}
-      - inputs: {question: "At what model scale does chain-of-thought prompting start to improve reasoning?", learner: learner@example.com, documents: null}
-        outputs: {covered: true, sources: [cot-2022]}
-      - inputs: {question: "How does Reflexion improve an agent without updating the model's weights?", learner: learner@example.com, documents: null}
-        outputs: {covered: true, sources: [reflexion-2023]}
-      - inputs: {question: "What pass@1 accuracy did Reflexion reach on HumanEval?", learner: learner@example.com, documents: null}
-        outputs: {covered: true, sources: [reflexion-2023]}
-      - inputs: {question: "On which interactive decision-making benchmarks was ReAct evaluated?", learner: learner@example.com, documents: [react-2022]}
-        outputs: {covered: true, sources: [react-2022]}
-      - inputs: {question: "What are reflection tokens in Self-RAG?", learner: learner2@example.com, documents: null}
-        outputs: {covered: true, sources: [self-rag-2023]}
-      # Not covered: another learner's document, an unrelated topic, and a limited search that excludes the answer.
-      - inputs: {question: "What are reflection tokens in Self-RAG?", learner: learner@example.com, documents: null}
-        outputs: {covered: false, sources: []}
-      - inputs: {question: "What is the recommended daily intake of vitamin D for adults?", learner: learner@example.com, documents: null}
-        outputs: {covered: false, sources: []}
-      - inputs: {question: "How does Reflexion store feedback between trials?", learner: learner@example.com, documents: [cot-2022]}
-        outputs: {covered: false, sources: []}
+examples:
+  - inputs: {question: "How does ReAct combine reasoning traces with actions?", learner: learner@example.com, documents: null}
+    outputs: {covered: true, sources: [react-2022]}
+  - inputs: {question: "Which question answering and fact verification benchmarks was ReAct evaluated on, and what external tool did it use?", learner: learner@example.com, documents: null}
+    outputs: {covered: true, sources: [react-2022]}
+  - inputs: {question: "What is chain-of-thought prompting?", learner: learner@example.com, documents: null}
+    outputs: {covered: true, sources: [cot-2022]}
+  - inputs: {question: "At what model scale does chain-of-thought prompting start to improve reasoning?", learner: learner@example.com, documents: null}
+    outputs: {covered: true, sources: [cot-2022]}
+  - inputs: {question: "How does Reflexion improve an agent without updating the model's weights?", learner: learner@example.com, documents: null}
+    outputs: {covered: true, sources: [reflexion-2023]}
+  - inputs: {question: "What pass@1 accuracy did Reflexion reach on HumanEval?", learner: learner@example.com, documents: null}
+    outputs: {covered: true, sources: [reflexion-2023]}
+  - inputs: {question: "On which interactive decision-making benchmarks was ReAct evaluated?", learner: learner@example.com, documents: [react-2022]}
+    outputs: {covered: true, sources: [react-2022]}
+  - inputs: {question: "What are reflection tokens in Self-RAG?", learner: learner2@example.com, documents: null}
+    outputs: {covered: true, sources: [self-rag-2023]}
+  # Not covered: another learner's document, an unrelated topic, and a limited search that excludes the answer.
+  - inputs: {question: "What are reflection tokens in Self-RAG?", learner: learner@example.com, documents: null}
+    outputs: {covered: false, sources: []}
+  - inputs: {question: "What is the recommended daily intake of vitamin D for adults?", learner: learner@example.com, documents: null}
+    outputs: {covered: false, sources: []}
+  - inputs: {question: "How does Reflexion store feedback between trials?", learner: learner@example.com, documents: [cot-2022]}
+    outputs: {covered: false, sources: []}

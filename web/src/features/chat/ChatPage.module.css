@@ -58,41 +58,6 @@
 .turn:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; border-radius: var(--r-md); }
 
 .answerRegion { display: grid; gap: var(--sp-3); }
-/* The tutor's words: plain prose on the page, never smaller than --fs-16 (DESIGN.md → Density). */
-.answer {
-  max-width: var(--chat-w); color: var(--text);
-  font-size: var(--fs-16); line-height: var(--lh-read);
-  white-space: pre-wrap; overflow-wrap: anywhere;
-}
-
-/* One line of source chips under the answer (DESIGN.md → Chat). Each opens its document beside the conversation. */
-.sources { display: flex; align-items: flex-start; flex-wrap: wrap; gap: var(--sp-2); font-size: var(--fs-12); color: var(--text-2); }
-.sourcesLabel { font-weight: 600; line-height: 22px; }
-.sourceList { display: flex; flex: 1; min-width: 0; flex-wrap: wrap; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
-.source {
-  display: inline-flex; align-items: center; gap: var(--sp-1); height: 22px; padding: 0 var(--sp-2);
-  border: 1px solid var(--border-strong); border-radius: var(--r-sm); background: var(--surface);
-  font-family: inherit; font-size: var(--fs-12); color: var(--text); white-space: nowrap;
-}
-/* The chip is a button. The ::before widens the hit area to 24px without changing the 22px chip: it is offset from the
-   padding box (22px - 2 x 1px border = 20px), so -2px top and bottom make 24px. */
-button.source { position: relative; cursor: pointer; }
-button.source::before { content: ""; position: absolute; inset: -2px 0; }
-button.source:hover { border-color: var(--accent); }
-button.source:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-/* The chip whose passage is open beside the conversation (DESIGN.md: --accent-soft marks the selected item). */
-.sourceShown { background: var(--accent-soft); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-.sourceShown .sourceTitle, .sourceShown .sourcePage { color: var(--accent-text); }
-.sourceDeleted { border-style: dashed; background: var(--surface-2); color: var(--text-2); }
-/* An archived document's chip still opens it; the badge has DESIGN.md's archived look. */
-.sourceBadge {
-  margin-left: var(--sp-1); padding: 0 var(--sp-1);
-  border: 1px dashed var(--border-strong); border-radius: var(--r-sm);
-  background: var(--surface-2); color: var(--text-2); font-size: var(--fs-12);
-}
-.sourceIcon { width: 14px; height: 14px; flex: none; color: var(--text-2); }
-.sourceMarker { color: var(--text-2); font-variant-numeric: tabular-nums; }
-.sourceTitle { max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .problem {
   display: flex; align-items: flex-start; gap: var(--sp-2);
