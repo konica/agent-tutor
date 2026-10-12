@@ -1,4 +1,4 @@
-"""Keyed learner hash, LangSmith run tracing (until Task 2 replaces it), and Phoenix tracing setup (PRD §10.4, ADR
+"""Keyed learner hash, run tracing, and Phoenix tracing setup (PRD §10.4, ADR
 0017): where spans go, with which key, how many, and the learner only as an HMAC of their user id."""
 
 import http.server
@@ -8,18 +8,17 @@ import threading
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any
 
-import langsmith
 import pytest
 from langchain_core.messages import AIMessage
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor
+from opentelemetry.trace import StatusCode
 from pydantic import ValidationError
 
-from fakes import RecordingClient, fake_chat_model, recorded_traces
+from fakes import FailingExporter, fake_chat_model, recorded_traces
 from smart_tutor.shared.adapters.tracing import (
-    LangSmithRunTracing,
     LearnerHasher,
+    PhoenixRunTracing,
     ingestion_project,
     learner_hasher,
     never_raising,
@@ -68,23 +67,6 @@ def test_run_metadata_names_the_deployment_and_models() -> None:
     }
 
 
-def test_a_run_and_its_model_calls_trace_into_the_given_project_with_the_learner_hash() -> None:
-    recorder = RecordingClient()
-    tracing = LangSmithRunTracing(LearnerHasher("k"), "proj-ingestion", {"deployment": "local"}, client=recorder)
-    model = fake_chat_model(AIMessage("A summary."))
-    with langsmith.tracing_context(enabled=True), tracing.run("ingest", UserId("user-123"), {"content_id": "c-1"}):
-        model.invoke("Describe these pages.")
-    created = [p for p in recorder.payloads if p["op"] == "create"]
-    root = next(p for p in created if p["name"] == "ingest")
-    assert root["session_name"] == "proj-ingestion"
-    meta = root["extra"]["metadata"]
-    assert meta["content_id"] == "c-1" and meta["deployment"] == "local"
-    assert meta["learner_hash"] == LearnerHasher("k")(UserId("user-123"))
-    children = [p for p in created if p.get("parent_run_id") is not None]
-    assert children and all(p["session_name"] == "proj-ingestion" for p in children)
-    assert "user-123" not in json.dumps(recorder.payloads, default=str)
-
-
 @contextmanager
 def _broken(on: str) -> Iterator[str]:
     if on == "enter":
@@ -111,43 +93,60 @@ def test_the_works_own_error_still_propagates() -> None:
         raise KeyError("work failed")
 
 
-class _FailingClient(RecordingClient):
-    def create_run(self, *args: Any, **kwargs: Any) -> None:
-        raise ConnectionError("LangSmith is down")
-
-    def update_run(self, *args: Any, **kwargs: Any) -> None:
-        raise ConnectionError("LangSmith is down")
-
-
-def test_a_failing_langsmith_never_fails_the_work_of_a_run() -> None:
-    client = _FailingClient()
-    tracing = LangSmithRunTracing(LearnerHasher("k"), "proj-ingestion", {}, client=client)
-    model = fake_chat_model(AIMessage("A summary."))
-    with langsmith.tracing_context(enabled=True, client=client), tracing.run("ingest", UserId("u"), {}):
-        assert model.invoke("Describe these pages.").content == "A summary."
+def ingest(tracing: PhoenixRunTracing, user: str = "user-123", content: str = "c-1", fail: bool = False) -> str:
+    with tracing.run("ingest", UserId(user), {"content_id": content}):
+        reply = fake_chat_model(AIMessage("A summary.")).invoke("Describe these pages.")
+        if fail:
+            raise KeyError("work failed")
+    return str(reply.content)
 
 
-class _UpdateFailsClient(RecordingClient):
-    def update_run(self, *args: Any, **kwargs: Any) -> None:
-        raise ConnectionError("LangSmith is down")
+def test_an_ingest_is_a_root_span_with_its_metadata_and_the_model_call_beneath_it() -> None:
+    with recorded_traces(metadata={"deployment": "local"}) as (traces, spans):
+        ingest(PhoenixRunTracing(traces))
+    finished = spans.get_finished_spans()
+    [root] = [s for s in finished if s.name == "ingest"]
+    assert root.parent is None
+    assert root.attributes is not None
+    metadata = json.loads(str(root.attributes["metadata"]))
+    assert metadata == {
+        "deployment": "local",
+        "content_id": "c-1",
+        "learner_hash": LearnerHasher("k")(UserId("user-123")),
+    }
+    children = [s for s in finished if s is not root]
+    assert children and all(s.context.trace_id == root.context.trace_id for s in children)
+    assert "user-123" not in json.dumps([s.to_json() for s in finished])
 
 
-def test_a_trace_that_cannot_end_leaves_no_context_for_the_next_run() -> None:
-    """LangSmith skips restoring its context when ending fails; a long-lived worker would carry the run's metadata."""
-    failing, recording = _UpdateFailsClient(), RecordingClient()
-    hasher = LearnerHasher("k")
-    first = LangSmithRunTracing(hasher, "p", {}, client=failing).run("ingest", UserId("a"), {"content_id": "c-1"})
-    with langsmith.tracing_context(enabled=True, client=failing):
-        with first:
-            pass
-        assert not langsmith.get_tracing_context()["metadata"]
-        assert langsmith.get_tracing_context()["parent"] is None
-    second = LangSmithRunTracing(hasher, "p", {}, client=recording).run("ingest", UserId("b"), {"content_id": "c-2"})
-    with langsmith.tracing_context(enabled=True, client=recording), second:
-        pass
-    created = next(p for p in recording.payloads if p["op"] == "create")
-    assert created["extra"]["metadata"]["content_id"] == "c-2"
-    assert created["extra"]["metadata"]["learner_hash"] == hasher(UserId("b"))
+def test_each_ingest_is_its_own_trace() -> None:
+    with recorded_traces() as (traces, spans):
+        tracing = PhoenixRunTracing(traces)
+        ingest(tracing, content="c-1")
+        ingest(tracing, content="c-2")
+    roots = [s for s in spans.get_finished_spans() if s.name == "ingest"]
+    assert len({s.context.trace_id for s in roots}) == 2 and all(s.parent is None for s in roots)
+
+
+def test_a_failed_ingest_ends_its_span_as_an_error_and_the_error_propagates() -> None:
+    with recorded_traces() as (traces, spans), pytest.raises(KeyError):
+        ingest(PhoenixRunTracing(traces), fail=True)
+    [root] = [s for s in spans.get_finished_spans() if s.name == "ingest"]
+    assert root.status.status_code is StatusCode.ERROR
+
+
+def test_a_failing_exporter_never_fails_the_ingest() -> None:
+    with recorded_traces(exporter=FailingExporter()) as (traces, _):
+        assert ingest(PhoenixRunTracing(traces)) == "A summary."
+
+
+def test_a_collector_that_is_down_never_fails_the_ingest() -> None:
+    settings = Settings(phoenix_url=URL)  # nothing listens
+    traces = phoenix_traces("p", 1.0, BatchSpanProcessor(otlp_exporter(settings, timeout=1)), LearnerHasher("k"), {})
+    try:
+        assert ingest(PhoenixRunTracing(traces)) == "A summary."
+    finally:
+        traces.shutdown()  # the failed export is logged, not raised
 
 
 def test_without_a_phoenix_url_the_process_is_untraced() -> None:

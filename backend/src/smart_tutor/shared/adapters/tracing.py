@@ -14,8 +14,6 @@ from contextlib import AbstractContextManager, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 
-import langsmith
-from langsmith import run_helpers
 from langsmith import utils as ls_utils
 from openinference.instrumentation.langchain import LangChainInstrumentor
 from openinference.semconv.resource import ResourceAttributes
@@ -100,7 +98,7 @@ class RunIdRatio(Sampler):
         parent = get_current_span(parent_context).get_span_context()
         return SamplingResult(
             Decision.RECORD_AND_SAMPLE if keep else Decision.DROP,
-            attributes=None,
+            attributes=attributes,  # the SDK takes a span's start attributes from the result, so pass them on
             trace_state=parent.trace_state if parent.is_valid else None,
         )
 
@@ -223,38 +221,49 @@ def span_attributes(inputs: Mapping[str, object] | None, metadata: Mapping[str, 
     return attributes
 
 
-# --- LangSmith, until the worker (Task 2) and the agent (Task 3) move to Phoenix and these are deleted ---
-
-
 @contextmanager
 def never_raising[T](cm: AbstractContextManager[T], fallback: T) -> Iterator[T]:
     """Runs the block inside `cm`, a trace, but a trace that can't start or end is logged and skipped: tracing never
     fails the work it traces (#229). The block's own errors still propagate."""
-    # When ending fails, LangSmith never restores the context it set (metadata, tags, parent run), and a long-lived
-    # worker would carry this run's values into every later trace. `tracing_context` can't restore a snapshot fully,
-    # so use what the trace's own teardown uses.
-    before = run_helpers.get_tracing_context()
-
-    def end(exc_type: type[BaseException] | None, error: BaseException | None) -> None:
-        try:
-            cm.__exit__(exc_type, error, error.__traceback__ if error else None)
-        except Exception:
-            logger.warning("tracing could not end", exc_info=True)
-            run_helpers._set_tracing_context(before)
-
     try:
         value = cm.__enter__()
     except Exception:
         logger.warning("tracing could not start; running untraced", exc_info=True)
-        run_helpers._set_tracing_context(before)
         yield fallback
         return
     try:
         yield value
     except BaseException as error:
-        end(type(error), error)
+        _end(cm, type(error), error)
         raise
-    end(None, None)
+    _end(cm, None, None)
+
+
+def _end(cm: AbstractContextManager[object], exc_type: type[BaseException] | None, error: BaseException | None) -> None:
+    try:
+        cm.__exit__(exc_type, error, error.__traceback__ if error else None)
+    except Exception:
+        logger.warning("tracing could not end", exc_info=True)
+
+
+class PhoenixRunTracing(RunTracing):
+    """Each run is a root span (its own trace) in this process's project; the model calls inside nest beneath it."""
+
+    def __init__(self, traces: PhoenixTraces) -> None:
+        self._traces = traces
+
+    @contextmanager
+    def run(self, name: str, user_id: UserId, metadata: Mapping[str, str]) -> Iterator[None]:
+        attributes = span_attributes(
+            None, {**self._traces.metadata, **metadata, "learner_hash": self._traces.hasher(user_id)}
+        )
+        # An empty context: a root span, whatever span is current.
+        span = self._traces.tracer().start_as_current_span(name, context=Context(), attributes=attributes)
+        with never_raising(span, None):
+            yield
+
+
+# --- LangSmith, until the agent (Task 3) moves to Phoenix and this is deleted ---
 
 
 def start_langsmith_tracing(settings: Settings) -> LearnerHasher | None:
@@ -266,31 +275,3 @@ def start_langsmith_tracing(settings: Settings) -> LearnerHasher | None:
     if ls_utils.tracing_is_enabled():
         run_trees.get_cached_client()
     return hasher
-
-
-def langsmith_ingestion_project() -> str:
-    """The worker's own project, beside the ask project, so ask traces stay readable."""
-    return f"{ls_utils.get_tracer_project()}-ingestion"
-
-
-class LangSmithRunTracing(RunTracing):
-    def __init__(
-        self,
-        hasher: LearnerHasher | None,
-        project_name: str,
-        metadata: Mapping[str, str],
-        client: langsmith.Client | None = None,
-    ) -> None:
-        self._hasher = hasher
-        self._project = project_name
-        self._metadata = dict(metadata)
-        self._client = client  # None: LangSmith's default client; tests pass a recording one
-
-    @contextmanager
-    def run(self, name: str, user_id: UserId, metadata: Mapping[str, str]) -> Iterator[None]:
-        learner = {"learner_hash": self._hasher(user_id)} if self._hasher else {}
-        trace = langsmith.trace(
-            name, project_name=self._project, metadata={**self._metadata, **metadata, **learner}, client=self._client
-        )
-        with never_raising(trace, None):
-            yield

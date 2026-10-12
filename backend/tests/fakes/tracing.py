@@ -1,7 +1,7 @@
 """Fakes for LangSmith tracing: a client that records payloads, and a RunTracing that records runs."""
 
 import uuid
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from concurrent.futures import Executor, Future
 from contextlib import AbstractContextManager, contextmanager, nullcontext
 from types import SimpleNamespace
@@ -9,7 +9,8 @@ from typing import Any, TypeVar
 
 import langsmith
 from langsmith.utils import LangSmithNotFoundError
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExporter
+from opentelemetry.sdk.trace import ReadableSpan
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExporter, SpanExportResult
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from smart_tutor.shared.adapters.tracing import LearnerHasher, PhoenixTraces, phoenix_traces
@@ -19,6 +20,16 @@ from smart_tutor.shared.ports.run_tracing import RunTracing
 T = TypeVar("T")
 
 META = {"deployment": "local", "chat_model": "chat-x", "embedding_model": "embed-y"}
+
+
+class FailingExporter(SpanExporter):
+    """An exporter whose every export raises, as a Phoenix that is down would."""
+
+    def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+        raise ConnectionError("Phoenix is down")
+
+    def shutdown(self) -> None:
+        pass
 
 
 @contextmanager

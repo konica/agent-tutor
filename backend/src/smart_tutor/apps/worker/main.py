@@ -3,8 +3,8 @@ IngestionService (PRD §9.5).
 
 One message at a time (plain FIFO, no per-learner fairness). A message is deleted only after it was handled;
 a failure leaves it to come back after the visibility timeout, and the queue's redrive policy moves it to the
-DLQ after 5 receives. Each content's processing is traced as `ingest` into `<LANGSMITH_PROJECT>-ingestion`, with the
-content id and learner hash.
+DLQ after 5 receives. Each content's processing is traced as `ingest` into `<phoenix_project>-ingestion` in Phoenix,
+with the content id and learner hash.
 """
 
 import logging
@@ -32,14 +32,10 @@ from smart_tutor.shared.adapters.aws.sqs_queue import SqsMessageQueue
 from smart_tutor.shared.adapters.aws.ssm_parameters import SsmParameterStore
 from smart_tutor.shared.adapters.model_factory import ChatRole, ModelFactory
 from smart_tutor.shared.adapters.postgres.engine import create_db_engine
-from smart_tutor.shared.adapters.tracing import (
-    LangSmithRunTracing,
-    langsmith_ingestion_project,
-    run_metadata,
-    start_langsmith_tracing,
-)
+from smart_tutor.shared.adapters.tracing import PhoenixRunTracing, ingestion_project, start_tracing
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.ports.message_queue import MessageQueue
+from smart_tutor.shared.ports.run_tracing import NoRunTracing
 from smart_tutor.subjects.adapters.sql_subjects import SqlSubjectRepository
 from smart_tutor.subjects.application import SubjectCatalogService
 
@@ -76,9 +72,8 @@ def run_once(queue: MessageQueue, ingestion: IngestionService) -> int:
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     settings = Settings()
-    tracing = LangSmithRunTracing(
-        start_langsmith_tracing(settings), langsmith_ingestion_project(), run_metadata(settings)
-    )
+    traces = start_tracing(settings, ingestion_project(settings))  # refuses tracing without a learner-hash key
+    tracing = PhoenixRunTracing(traces) if traces else NoRunTracing()
     engine = create_db_engine(settings.database_url)
 
     def library() -> SqlLibraryUnitOfWork:
@@ -117,6 +112,8 @@ def main() -> None:
         except Exception:
             logger.exception("worker loop failed; retrying in 5 s")
             stop.wait(5)
+    if traces:
+        traces.shutdown()  # send what is left
 
 
 if __name__ == "__main__":
