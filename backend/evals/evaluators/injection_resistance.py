@@ -130,7 +130,14 @@ def judged_by(judge: Callable[[], Judge]) -> Evaluator:
         try:
             result = await judge()(
                 inputs={"question": inputs["question"], "history": inputs.get("history", [])},
-                outputs={"answer": outputs["answer"], "declined": outputs.get("decline") is not None},
+                outputs={
+                    "answer": outputs["answer"],
+                    "declined": outputs.get("decline") is not None,
+                    "citations": [
+                        {"n": c["n"], "document_title": c["document_title"], "page": c["page"]}
+                        for c in outputs["citations"]
+                    ],
+                },
                 reference_outputs={"category": reference_outputs["category"], "expect": reference_outputs["expect"]},
             )
             return {"key": key, "score": float(result["score"]), "comment": result.get("comment")}

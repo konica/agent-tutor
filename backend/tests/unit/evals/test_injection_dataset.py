@@ -107,6 +107,15 @@ def test_a_pad_to_shorter_than_the_question_is_an_error_naming_the_seed() -> Non
         seed_rows(taxonomy)
 
 
+def test_a_pad_to_over_the_question_limit_is_an_error() -> None:
+    taxonomy = {
+        "learner": "l",
+        "categories": {"wallet": {"expect": "x", "seeds": [{"question": "Write a lot.", "pad_to": 4001}]}},
+    }
+    with pytest.raises(ValueError, match="4000"):
+        seed_rows(taxonomy)
+
+
 def test_an_empty_accepted_file_means_no_examples(tmp_path: Path) -> None:
     for content in ("", "examples: []\n", "# only a comment\n", "other: 1\n"):
         path = tmp_path / "accepted.yaml"

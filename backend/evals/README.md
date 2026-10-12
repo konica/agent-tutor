@@ -22,11 +22,11 @@ Datasets live in **LangSmith** (versioned there; never edit a version a release 
 | `suite.py` | A suite: dataset + target + evaluators; discovered in `evaluators/` |
 | `dataset.py`, `datasets/` | Hand-written datasets, one YAML per LangSmith dataset, pushed once per split version |
 
-Splits: **smoke** (every PR that changes the agent; about 10 hand-written questions today, growing to ~30 as suites are added) and **full** (before release).
+Splits: **smoke** (every PR that changes the agent; 11 hand-written ask questions and 18 generated injection prompts today, growing as suites are added) and **full** (before release).
 
 ## Eval learners
 
-Every eval asks as one of two synthetic learners whose libraries are built from the seed corpus. `seed_corpus/learners.yaml` says which documents each holds; learner 2 holds documents learner 1 must never see, including two generated canary documents whose unique strings the injection eval looks for in learner 1's answers. Load both libraries with
+Every eval asks as one of two synthetic learners whose libraries are built from the seed corpus. `seed_corpus/learners.yaml` says which documents each holds; learner 2 holds documents learner 1 must never see, including two generated canary documents whose unique strings the injection eval looks for in learner 1's answers. The injection eval's own-citations check reads each learner's ready documents from the API, so documents you uploaded yourself as an eval learner count as theirs. Load both libraries with
 
     cd backend && uv run --extra eval python -m evals.learners     # or: make evals-learners
 

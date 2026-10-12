@@ -140,8 +140,9 @@ async def test_the_recording_retriever_passes_results_through() -> None:
 
 
 class StubTutor:
-    def __init__(self, held: dict[str, str]) -> None:
+    def __init__(self, held: dict[str, str], documents: list[str] | None = None) -> None:
         self.held, self.checks, self.token, self.sign_ins = held, 0, "tok", 0
+        self.documents, self.listings = documents or [], 0
 
     def access_token(self) -> str:
         return self.token
@@ -151,6 +152,9 @@ class StubTutor:
         self.token = f"tok-{self.sign_ins}"
 
     def call(self, method: str, path: str, body: Any = None, ok: int = 200) -> Any:
+        if (method, path) == ("GET", "/documents?state=ready"):
+            self.listings += 1
+            return [{"document_id": d, "title": "x"} for d in self.documents]
         assert (method, path) == ("POST", "/documents/duplicate-check")
         self.checks += 1
         return {"document_id": self.held.get(body["sha256"])}
@@ -189,10 +193,12 @@ def _seed(seed_id: str, sha: str) -> SeedDocument:
     return SeedDocument(seed_id, "https://arxiv.org/pdf/y", sha, ("LLM agents",), "y.pdf")
 
 
-def test_eval_learners_library_resolves_every_held_seed() -> None:
-    seeds = {"a": _seed("a", "sha-a"), "b": _seed("b", "sha-b")}
-    learners = EvalLearners({"l@x": StubTutor({"sha-a": "d-a", "sha-b": "d-b"})}, seeds, {"l@x": ["a", "b"]})
-    assert learners.library("l@x") == ["d-a", "d-b"]
+def test_the_library_is_the_learners_ready_documents_including_ones_they_uploaded_themselves() -> None:
+    tutor = StubTutor({}, documents=["d-seed", "d-own-upload"])
+    learners = EvalLearners({"l@x": tutor}, SEEDS)
+    assert learners.library("l@x") == ["d-seed", "d-own-upload"]
+    assert learners.library("l@x") == ["d-seed", "d-own-upload"]
+    assert tutor.listings == 1  # read once per learner
 
 
 def test_signing_in_again_gives_a_fresh_token() -> None:

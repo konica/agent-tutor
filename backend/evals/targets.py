@@ -57,15 +57,10 @@ class Learners(Protocol):
 class EvalLearners:
     """The eval learners' sessions, signed in on first use, and their own copies of the seed documents."""
 
-    def __init__(
-        self,
-        tutors: Mapping[str, Tutor],
-        seeds: Mapping[str, SeedDocument],
-        holdings: Mapping[str, Sequence[str]] | None = None,
-    ) -> None:
+    def __init__(self, tutors: Mapping[str, Tutor], seeds: Mapping[str, SeedDocument]) -> None:
         self._tutors, self._seeds = dict(tutors), seeds
-        self._holdings = dict(holdings or {})
         self._ids: dict[tuple[str, str], str] = {}
+        self._libraries: dict[str, list[str]] = {}
 
     def _tutor(self, username: str) -> Tutor:
         if username not in self._tutors:
@@ -91,8 +86,12 @@ class EvalLearners:
         return self._ids[key]
 
     def library(self, username: str) -> list[str]:
-        """The learner's own copies of their seed documents (learners.yaml): the documents they can read."""
-        return [self.document_id(username, seed_id) for seed_id in self._holdings.get(username, ())]
+        """The documents the learner can read now: their ready, non-archived documents (GET /documents). Read once
+        per learner and run; it includes documents the learner uploaded beyond the seed corpus."""
+        if username not in self._libraries:
+            listed = self._tutor(username).call("GET", "/documents?state=ready")
+            self._libraries[username] = [str(d["document_id"]) for d in listed]
+        return list(self._libraries[username])
 
     def check_libraries(self, holdings: Mapping[str, Sequence[str]]) -> None:
         """Raise LoadError unless each learner holds all of their seed documents. Done before the run: inside the
@@ -164,9 +163,8 @@ def ask_target() -> AskTarget:
     tutors = {  # each learner in their own client: Keycloak's session cookie must not carry over
         learner.username: Tutor(httpx.Client(timeout=60), learner.username, learner.password) for learner in learners
     }
-    holdings = {learner.username: learner.documents for learner in learners}
-    eval_learners = EvalLearners(tutors, seeds, holdings)
-    eval_learners.check_libraries(holdings)
+    eval_learners = EvalLearners(tutors, seeds)
+    eval_learners.check_libraries({learner.username: learner.documents for learner in learners})
     return AskTarget(
         eval_learners,
         lambda token: McpRetriever(settings.mcp_url, token),
