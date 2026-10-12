@@ -111,12 +111,18 @@ class FakeAnswerFeedback(AnswerFeedback):
 
     def __init__(self, error: Exception | None = None) -> None:
         self.sent: list[tuple[RunId, Rating]] = []
+        self.cleared: list[RunId] = []
         self._error = error
 
     def send(self, run_id: RunId, rating: Rating) -> None:
         if self._error is not None:
             raise self._error
         self.sent.append((run_id, rating))
+
+    def clear(self, run_id: RunId) -> None:
+        if self._error is not None:
+            raise self._error
+        self.cleared.append(run_id)
 
 
 class FakeRetriever(Retriever):
