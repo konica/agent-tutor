@@ -41,6 +41,13 @@ class HistoryTurn:
     answer: str
 
 
+def history_turn(question: str, answer: str, max_answer_chars: int) -> HistoryTurn:
+    """An earlier turn as history; an answer longer than `max_answer_chars` is cut and ends with "…"."""
+    if len(answer) > max_answer_chars:
+        answer = answer[: max_answer_chars - 1].rstrip() + "…"
+    return HistoryTurn(question, answer)
+
+
 @dataclass(frozen=True)
 class Turn:
     thread_id: ThreadId
@@ -56,9 +63,7 @@ class Turn:
     def as_history(self, max_answer_chars: int) -> HistoryTurn:
         """The turn as history; an answer longer than `max_answer_chars` is cut and ends with "…"."""
         answer = self.decline.message if self.decline is not None else self.answer
-        if len(answer) > max_answer_chars:
-            answer = answer[: max_answer_chars - 1].rstrip() + "…"
-        return HistoryTurn(self.question, answer)
+        return history_turn(self.question, answer, max_answer_chars)
 
 
 @dataclass(frozen=True)

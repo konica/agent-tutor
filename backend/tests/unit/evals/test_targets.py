@@ -40,8 +40,14 @@ class FakeLearners:
 def _target(
     retriever: Retriever, reply: str | None = "ReAct interleaves reasoning and acting [1].", **kw: Any
 ) -> AskTarget:
-    model = fake_chat_model(AIMessage(reply)) if reply else fake_chat_model()
-    return AskTarget(kw.get("learners", FakeLearners()), kw.get("retriever_for", lambda token: retriever), model, 0.3)
+    model = fake_chat_model(*[AIMessage(reply)] * 5) if reply else fake_chat_model()
+    return AskTarget(
+        kw.get("learners", FakeLearners()),
+        kw.get("retriever_for", lambda token: retriever),
+        model,
+        0.3,
+        **{k: v for k, v in kw.items() if k in ("history_turns", "history_answer_chars")},
+    )
 
 
 async def test_an_answer_comes_with_its_citations_and_the_search_calls() -> None:
@@ -87,6 +93,53 @@ async def test_a_refused_token_signs_in_again_and_asks_once_more() -> None:
     assert learners.sign_ins == 1
     assert out["answer"].startswith("ReAct")
     assert len(out["trajectory"]) == 1  # only the run that answered
+
+
+CONVERSATION = {**ASK, "history": ["What is ReAct?"], "question": "What are its limitations?"}
+
+
+async def test_a_conversation_replays_its_earlier_questions_and_scores_the_last() -> None:
+    retriever = FakeRetriever(CHUNKS)
+    out = await _target(retriever)(CONVERSATION)
+    assert [c[0] for c in retriever.calls] == ["What is ReAct?", "What is ReAct?\nWhat are its limitations?"]
+    assert out["history"] == [{"question": "What is ReAct?", "answer": "ReAct interleaves reasoning and acting [1]."}]
+    assert [c["query"] for c in out["trajectory"]] == ["What is ReAct?\nWhat are its limitations?"]
+    assert out["chunks"][0] == {
+        "chunk_id": "c1",
+        "document_id": "d1",
+        "document_title": "ReAct",
+        "page": 3,
+        "score": 0.9,
+        "text": "ReAct interleaves thoughts and actions.",
+    }
+
+
+async def test_history_is_capped_like_the_api_caps_it() -> None:
+    out = await _target(FakeRetriever(CHUNKS), history_turns=1, history_answer_chars=10)(
+        {**ASK, "history": ["q1", "q2"], "question": "q3"}
+    )
+    assert out["history"] == [{"question": "q2", "answer": "ReAct int…"}]
+
+
+async def test_no_history_turns_sends_no_history() -> None:
+    retriever = FakeRetriever(CHUNKS)
+    out = await _target(retriever, history_turns=0)(CONVERSATION)
+    assert out["history"] == [] and retriever.calls[-1][0] == "What are its limitations?"
+
+
+async def test_a_declined_earlier_turn_is_history_with_its_decline_message() -> None:
+    out = await _target(FakeRetriever([]), reply=None)({**ASK, "history": ["q1"], "question": "q2"})
+    assert out["history"] == [{"question": "q1", "answer": NO_DOCUMENTS_DECLINE}]
+
+
+async def test_an_expired_token_replays_the_whole_conversation_once() -> None:
+    learners, retriever = FakeLearners(tokens=("old", "new")), FakeRetriever(CHUNKS)
+
+    def retriever_for(token: str) -> Retriever:
+        return FakeRetriever(error=UnauthenticatedError("x")) if token == "old" else retriever
+
+    out = await _target(retriever, learners=learners, retriever_for=retriever_for)(CONVERSATION)
+    assert learners.sign_ins == 1 and len(retriever.calls) == 2 and len(out["trajectory"]) == 1
 
 
 async def test_the_trajectory_never_holds_the_token() -> None:
