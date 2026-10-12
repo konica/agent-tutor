@@ -24,6 +24,13 @@ def include_protected(app: FastAPI, router: APIRouter) -> None:
     app.include_router(router, dependencies=[Depends(current_principal)])
 
 
+def _close_services(app: FastAPI) -> None:
+    """Stop the services' background work, so ratings queued for Phoenix don't hold the shutdown up."""
+    built: ApiServices | None = getattr(app.state, "services", None)
+    if built is not None:
+        built.close()
+
+
 def create_app(
     settings: Settings | None = None, verifier: TokenVerifier | None = None, services: ApiServices | None = None
 ) -> FastAPI:
@@ -32,15 +39,21 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if verifier is not None:
-            yield
+            try:
+                yield
+            finally:
+                _close_services(app)
             return
         if not settings.keycloak_client_secret.get_secret_value():
             raise RuntimeError("SMART_TUTOR_KEYCLOAK_CLIENT_SECRET is not set")
         if services is None:
             app.state.services = build_services(settings)
-        async with httpx.AsyncClient(timeout=5) as http:
-            app.state.verifier = keycloak_verifier(settings, http)
-            yield
+        try:
+            async with httpx.AsyncClient(timeout=5) as http:
+                app.state.verifier = keycloak_verifier(settings, http)
+                yield
+        finally:
+            _close_services(app)
 
     app = FastAPI(title="Smart Tutor API", lifespan=lifespan, root_path=settings.root_path)
     if verifier is not None:

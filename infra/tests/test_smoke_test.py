@@ -278,7 +278,7 @@ class FakePilot:
         self.trace_after_polls = 1  # the ask span appears on the 2nd poll
         self.trace_poll_status = 404  # what the polls before that answer
         self.rating_put_status = 200
-        self.rating_label = "down"  # what Phoenix holds for the rating
+        self.rating_label = "up"  # what Phoenix holds for the rating
         self.rating_after_polls = 1  # the annotation appears on the 2nd poll
         self.rating_phoenix_status = 200  # 401 = Phoenix refuses the key
         self.rating_puts: list[object] = []  # bodies; handle() already requires the learner's bearer
@@ -346,7 +346,7 @@ class FakePilot:
                 "identifier": run_id,
                 "result": {
                     "label": self.rating_label,
-                    "score": 0.0 if self.rating_label == "down" else 1.0,
+                    "score": 1.0 if self.rating_label == "up" else 0.0,
                     "explanation": None,
                 },
             }
@@ -801,13 +801,13 @@ def test_trace_project_needs_the_api_key_and_end_to_end(
 # --- The ask's rating in Phoenix (#290) ---------------------------------------------------------------------------
 
 
-def test_rating_check_finds_the_annotation_after_rating_the_turn_down(
+def test_rating_check_finds_the_annotation_after_rating_the_turn_up(
     pilot, monkeypatch, capsys
 ) -> None:
     assert run_with_trace(pilot, monkeypatch) == 0
     out = output_without_secrets(capsys)
     assert f"rating of {pilot.trace_run_id} is in smart-tutor-on-premise" in out
-    assert pilot.rating_puts == [{"rating": "down"}]
+    assert pilot.rating_puts == [{"rating": "up"}]
     assert pilot.rating_polls >= 2  # it waited for the annotation to arrive
     assert pilot.api_without_token == []  # the PUT carried the learner's bearer
     assert set(pilot.phoenix_auth) == {f"Bearer {PHOENIX_KEY}"}
@@ -822,9 +822,9 @@ def test_rating_that_never_arrives_fails_saying_so(pilot, monkeypatch, capsys) -
 
 
 def test_rating_with_the_wrong_label_fails(pilot, monkeypatch, capsys) -> None:
-    pilot.rating_label = "up"
+    pilot.rating_label = "down"
     assert run_with_trace(pilot, monkeypatch) == 1
-    assert "not a HUMAN 'down' with score 0" in output_without_secrets(capsys)
+    assert "not a HUMAN 'up' with score 1" in output_without_secrets(capsys)
 
 
 def test_rating_put_refused_fails_with_its_status(pilot, monkeypatch, capsys) -> None:

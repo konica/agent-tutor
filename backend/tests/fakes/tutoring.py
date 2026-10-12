@@ -107,11 +107,12 @@ class InMemoryThreads(ThreadRepository):
 
 
 class FakeAnswerFeedback(AnswerFeedback):
-    """Records each rating sent; raises `error` from send when given one."""
+    """Records each rating sent and whether it was closed; raises `error` from send when given one."""
 
     def __init__(self, error: Exception | None = None) -> None:
         self.sent: list[tuple[RunId, Rating]] = []
         self.cleared: list[RunId] = []
+        self.closed = False
         self._error = error
 
     def send(self, run_id: RunId, rating: Rating) -> None:
@@ -123,6 +124,9 @@ class FakeAnswerFeedback(AnswerFeedback):
         if self._error is not None:
             raise self._error
         self.cleared.append(run_id)
+
+    def close(self) -> None:
+        self.closed = True
 
 
 class FakeRetriever(Retriever):

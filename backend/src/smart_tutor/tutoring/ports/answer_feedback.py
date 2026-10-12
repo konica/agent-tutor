@@ -17,6 +17,10 @@ class AnswerFeedback(ABC):
         """Remove the run's rating (a learner un-rating a turn; not offered yet, PRD §10.2). Must not block on the
         network."""
 
+    def close(self) -> None:
+        """Process shutdown: drop work not yet sent and release what the adapter holds. Nothing by default."""
+        return None
+
 
 class NoAnswerFeedback(AnswerFeedback):
     """Ratings are only saved with the turn."""

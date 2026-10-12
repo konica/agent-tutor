@@ -2,11 +2,12 @@
 calibrated against them. `learner_rating` is a HUMAN annotation (label up or down, score 1 or 0) whose identifier is
 the run id: Phoenix upserts by name, span, and identifier, so a new rating replaces the last, and a clear deletes it by
 identifier. Sent off the request on one background thread, in the order rated: a slow or unreachable Phoenix never
-delays or fails the rating, which is already saved with the turn. A failure is logged. The annotation says only the
-rating: no user id, email, name, or token (PRD §10.4)."""
+delays or fails the rating, which is already saved with the turn. A failure is logged. `close()` (API shutdown) stops
+the waits and drops the requests not yet started, so a redeploy isn't held up by ratings of asks that were never
+traced. The annotation says only the rating: no user id, email, name, or token (PRD §10.4)."""
 
 import logging
-import time
+import threading
 import urllib.parse
 import uuid
 from collections.abc import Callable, Sequence
@@ -24,13 +25,18 @@ logger = logging.getLogger(__name__)
 
 ANNOTATION_NAME = "learner_rating"
 # Phoenix drops an annotation whose span it doesn't have yet, and the agent exports the ask span a few seconds after the
-# answer ends: a 404 is retried after these waits (31 s in all). Still missing then, the ask was not traced.
+# answer ends: a 404 saying so is retried after these waits (31 s in all). Still missing then, the ask was not traced.
 SPAN_WAITS = (1.0, 2.0, 4.0, 8.0, 16.0)
 REQUEST_TIMEOUT_SECONDS = 10.0
+SPAN_MISSING_TEXT = "do not exist"  # Phoenix's 404 body: "Spans with IDs <id> do not exist."
 
 
 class _SpanNotTraced(Exception):
     pass
+
+
+class _Stopped(Exception):
+    """The adapter is closing: a retry gives up without another request."""
 
 
 class PhoenixAnswerFeedback(AnswerFeedback):
@@ -40,27 +46,30 @@ class PhoenixAnswerFeedback(AnswerFeedback):
         project: str,
         executor: Executor | None = None,
         waits: Sequence[float] = SPAN_WAITS,
-        sleep: Callable[[float], None] = time.sleep,
+        sleep: Callable[[float], None] | None = None,
     ) -> None:
         self.client = client
         self.project = project
         # One worker: requests go in the order the learner rated, so the last rating is the one left.
         self._executor = executor or ThreadPoolExecutor(max_workers=1, thread_name_prefix="answer-feedback")
         self._waits = tuple(waits)
-        self._sleep = sleep
+        self._stopping = threading.Event()
+        self._sleep = sleep or self._stopping.wait  # an injected sleep is for tests; this one wakes at close()
 
     def send(self, run_id: RunId, rating: Rating) -> None:
-        self._submit(self._annotate, run_id, rating)
+        self._submit("sending", self._annotate, run_id, rating)
 
     def clear(self, run_id: RunId) -> None:
-        self._submit(self._delete, run_id)
+        self._submit("clearing", self._delete, run_id)
 
     def close(self) -> None:
-        """Wait for the requests still queued (process shutdown)."""
-        self._executor.shutdown(wait=True)
+        """Process shutdown: stop the retry in progress, drop the requests not yet started, close the client."""
+        self._stopping.set()
+        self._executor.shutdown(wait=True, cancel_futures=True)
+        self.client.close()
 
-    def _submit(self, call: Callable[..., None], run_id: RunId, *args: object) -> None:
-        self._executor.submit(call, run_id, *args).add_done_callback(lambda done: _log_failure(done, run_id))
+    def _submit(self, action: str, call: Callable[..., None], run_id: RunId, *args: object) -> None:
+        self._executor.submit(call, run_id, *args).add_done_callback(lambda done: _log_failure(done, action, run_id))
 
     def _annotate(self, run_id: RunId, rating: Rating) -> None:
         body = {
@@ -75,8 +84,11 @@ class PhoenixAnswerFeedback(AnswerFeedback):
             ]
         }
         for wait in (*self._waits, None):
+            if self._stopping.is_set():
+                raise _Stopped
             response = self.client.post("/v1/span_annotations", params={"sync": "true"}, json=body)
-            if response.status_code != 404:
+            # Any other 404 (a wrong base URL or path, a proxy) is an error, not a span still to come.
+            if response.status_code != 404 or SPAN_MISSING_TEXT not in response.text:
                 response.raise_for_status()
                 return
             if wait is None:
@@ -97,16 +109,21 @@ class PhoenixAnswerFeedback(AnswerFeedback):
             response.raise_for_status()
 
 
-def _log_failure(done: "Future[None]", run_id: RunId) -> None:
+def _log_failure(done: "Future[None]", action: str, run_id: RunId) -> None:
+    if done.cancelled():
+        logger.info("the rating of run %s was not sent: the API is stopping", run_id)
+        return
     error = done.exception()
     if error is None:
         return
-    if isinstance(error, _SpanNotTraced):
+    if isinstance(error, _Stopped):
+        logger.info("the rating of run %s was not sent: the API is stopping", run_id)
+    elif isinstance(error, _SpanNotTraced):
         logger.warning("the rating of run %s was not sent: Phoenix has no ask span for it (not traced?)", run_id)
     elif isinstance(error, httpx.HTTPStatusError):
-        logger.error("sending the rating of run %s to Phoenix failed (%s)", run_id, error.response.status_code)
+        logger.error("%s the rating of run %s to Phoenix failed (%s)", action, run_id, error.response.status_code)
     else:
-        logger.error("sending the rating of run %s to Phoenix failed (%s)", run_id, type(error).__name__)
+        logger.error("%s the rating of run %s to Phoenix failed (%s)", action, run_id, type(error).__name__)
 
 
 def answer_feedback(settings: Settings) -> AnswerFeedback:

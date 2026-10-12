@@ -1,6 +1,7 @@
 import json
 import logging
 import threading
+import time
 import uuid
 
 import httpx
@@ -99,6 +100,25 @@ def test_a_run_that_was_never_traced_is_a_warning_after_the_last_wait(caplog: py
     assert record.levelno == logging.WARNING and RUN in record.getMessage()
 
 
+def test_a_failed_clear_is_logged_as_clearing(caplog: pytest.LogCaptureFixture) -> None:
+    sender, _ = feedback(FakePhoenix(down=True))
+    sender.clear(RUN)
+    [message] = [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR]
+    assert message.startswith("clearing the rating of run")
+
+
+def test_a_404_that_is_not_a_missing_span_is_an_error_and_not_retried(caplog: pytest.LogCaptureFixture) -> None:
+    wrong_path = httpx.Client(
+        base_url="http://phoenix.test", transport=httpx.MockTransport(lambda r: httpx.Response(404))
+    )
+    slept: list[float] = []
+    sender = PhoenixAnswerFeedback(wrong_path, PROJECT, executor=InlineExecutor(), sleep=slept.append)
+    sender.send(RUN, Rating.UP)
+    [record] = [r for r in caplog.records if r.levelno >= logging.WARNING]
+    assert record.levelno == logging.ERROR and "404" in record.getMessage() and RUN in record.getMessage()
+    assert slept == []
+
+
 def test_ratings_and_a_clear_apply_in_the_order_given_even_while_the_span_is_late() -> None:
     phoenix = FakePhoenix(late={SPAN: 1})
     sender, _ = feedback(phoenix)
@@ -160,6 +180,62 @@ def test_the_send_runs_off_the_callers_thread() -> None:
     release.set()
     sender.close()
     assert len(phoenix.annotations) == 1
+
+
+def test_close_stops_a_retry_in_progress_at_once(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO)
+    phoenix = FakePhoenix()
+    posted = threading.Event()
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        posted.set()
+        return phoenix.transport.handle_request(request)
+
+    client = httpx.Client(base_url="http://phoenix.test", transport=httpx.MockTransport(handle))
+    sender = PhoenixAnswerFeedback(client, PROJECT)  # the production waits, 31 s in all
+    sender.send(RUN, Rating.UP)
+    assert posted.wait(timeout=5)
+    time.sleep(0.1)  # the worker is now in its first wait
+    started = time.monotonic()
+    sender.close()
+    assert time.monotonic() - started < 2
+    assert len([r for r in phoenix.requests if r.method == "POST"]) == 1  # no more requests once stopping
+    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+    assert any(r.levelno == logging.INFO and RUN in r.getMessage() for r in caplog.records)
+
+
+def test_close_cancels_ratings_not_yet_started(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO)
+    release = threading.Event()
+    started = threading.Event()
+    phoenix = FakePhoenix(spans=[SPAN])
+
+    def held(request: httpx.Request) -> httpx.Response:
+        started.set()
+        release.wait(timeout=10)
+        return phoenix.transport.handle_request(request)
+
+    sender = PhoenixAnswerFeedback(
+        httpx.Client(base_url="http://phoenix.test", transport=httpx.MockTransport(held)), PROJECT
+    )
+    sender.send(RUN, Rating.UP)
+    assert started.wait(timeout=5)  # the first is running, held in its request
+    queued = RunId(str(uuid.uuid4()))
+    sender.send(queued, Rating.DOWN)
+    closer = threading.Thread(target=sender.close)
+    closer.start()
+    time.sleep(0.1)
+    release.set()
+    closer.join(timeout=5)
+    assert not closer.is_alive()
+    assert [a["identifier"] for a in phoenix.annotations.values()] == [RUN]  # the queued one was never sent
+    assert any(r.levelno == logging.INFO and queued in r.getMessage() for r in caplog.records)
+
+
+def test_close_closes_the_client() -> None:
+    client = FakePhoenix().client()
+    PhoenixAnswerFeedback(client, PROJECT).close()
+    assert client.is_closed
 
 
 def test_answer_feedback_sends_to_the_agents_project_with_the_key() -> None:

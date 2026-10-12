@@ -21,8 +21,8 @@ environment and are never printed.
 --trace-project then reads the ask's run id from the conversation's turns and waits for its trace in that Phoenix
 project (#289): a root span named `ask` whose trace id is the run id and whose span id is its low 64 bits, with the
 run metadata of PRD §10.4, and holding neither the access token, the username, nor the learner's user id.
-It then rates that turn thumbs-down and waits for the `learner_rating` annotation on the ask span (#290): HUMAN,
-label `down`, score 0. That proves the API has the Phoenix settings.
+It then rates that turn thumbs-up (the answer was just checked) and waits for the `learner_rating` annotation on the
+ask span (#290): HUMAN, label `up`, score 1. That proves the API has the Phoenix settings.
 PHOENIX_URL defaults to `<url>/phoenix`. The key is never printed.
 
 Exit 0 when everything passes, 1 otherwise. Standard library only.
@@ -678,14 +678,14 @@ def check_trace(
 def check_rating(
     s: _Session, run: _Run, project: str, phoenix_url: str, api_key: str
 ) -> str:
-    """Rate the ask thumbs-down and wait for its learner_rating annotation on the ask span in Phoenix (#290)."""
+    """Rate the ask thumbs-up and wait for its learner_rating annotation on the ask span in Phoenix (#290)."""
     ask_run_id = run.ask_run_id
     if ask_run_id is None:
         raise SmokeTestError("rating: the ask's run id is unknown (the trace check comes first)")
     r = s.api(
         "PUT",
         f"/api/threads/{run.thread_id}/turns/{ask_run_id}/rating",
-        {"rating": "down"},
+        {"rating": "up"},
     )
     if r.status != 200:
         raise SmokeTestError(
@@ -724,13 +724,13 @@ def check_rating(
     score = result.get("score")
     if (
         mine[0].get("annotator_kind") != "HUMAN"
-        or result.get("label") != "down"
+        or result.get("label") != "up"
         or isinstance(score, bool)
         or not isinstance(score, (int, float))
-        or score != 0
+        or score != 1
     ):
         raise SmokeTestError(
-            f"rating: the annotation is not a HUMAN 'down' with score 0: {mine[0]!r}"
+            f"rating: the annotation is not a HUMAN 'up' with score 1: {mine[0]!r}"
         )
     return f"rating of {ask_run_id} is in {project}"
 

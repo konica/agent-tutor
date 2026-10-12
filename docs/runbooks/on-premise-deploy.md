@@ -400,7 +400,7 @@ Get-Output PublicIp
 
 **Switch the domain** (another DuckDNS name, or empty for `<Elastic IP>.sslip.io`): change `smart-tutor:on-premise-domain` in `infra/cdk.json`, deploy the stacks (section 2: the Storage stack's CORS, the Host's `domain` setting, and the uptime check follow it), and deploy an image tag (section 4, or merge to `main`). For another DuckDNS name, store its account's token first. Caddy requests a certificate for the new name. Learners signed in at the old address sign in again, because the token issuer changes with it.
 
-## 10. Tracing (Phoenix) (#229, #289)
+## 10. Tracing (Phoenix) (#229, #289, #290)
 
 The agent traces each ask into the Phoenix project `smart-tutor-on-premise`, and the worker traces each content's processing into `smart-tutor-on-premise-ingestion` (ADR 0017). Traces carry a keyed learner hash, never a user id, email, or token (PRD §10.4).
 
@@ -412,7 +412,7 @@ The agent traces each ask into the Phoenix project `smart-tutor-on-premise`, and
 
 **Retention (D25).** Phoenix deletes traces after 180 days: `PHOENIX_DEFAULT_RETENTION_POLICY_DAYS` in `compose.yaml`, so D25 needs no deletion job. That holds once the policy's schedule is set to daily in the Phoenix UI (the retention step in section 11); the default weekly sweep keeps a trace up to about 187 days.
 
-**Sampling.** SSM `/smart-tutor-on-premise/trace-sampling-rate` (default `1`, every run; 0 to 1). Change it in `infra/smart_tutor_infra/stacks/config.py` and deploy with the infrastructure (a hand edit in SSM is overwritten by the next `cdk deploy`), then redeploy. A value outside 0 to 1 stops the agent and worker from starting.
+**Sampling.** SSM `/smart-tutor-on-premise/trace-sampling-rate` (default `1`, every run; 0 to 1). Change it in `infra/smart_tutor_infra/stacks/config.py` and deploy with the infrastructure (a hand edit in SSM is overwritten by the next `cdk deploy`), then redeploy. A value outside 0 to 1 stops the agent and worker from starting. Below 1, a rating of an unsampled ask is retried for about 30 s before it is dropped, and it delays the ratings behind it.
 
 **Egress.** The worker reaches `phoenix:6006` directly on its internal network (`NO_PROXY=phoenix`), so the egress proxy allows nothing new. The deploy's egress check proves Phoenix answers while tracing, and that LangSmith and every other host stay unreachable (section 7).
 
@@ -422,7 +422,7 @@ The agent traces each ask into the Phoenix project `smart-tutor-on-premise`, and
 PHOENIX_API_KEY=<key> SMOKE_TEST_USERNAME=... SMOKE_TEST_PASSWORD=... python3 deploy/pilot/smoke_test.py https://<domain> --end-to-end --trace-project smart-tutor-on-premise
 ```
 
-It ends with `ask trace <run id> is in smart-tutor-on-premise` and `rating of <run id> is in smart-tutor-on-premise`: it rates the turn thumbs-down and requires the annotation, which proves the API has the key.
+It ends with `ask trace <run id> is in smart-tutor-on-premise` and `rating of <run id> is in smart-tutor-on-premise`: it rates the turn thumbs-up and requires the annotation, which proves the API has the key.
 
 ## 11. Phoenix (traces) (#288)
 

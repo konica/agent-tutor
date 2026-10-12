@@ -50,6 +50,10 @@ class ApiServices:
     highlight_misses: HighlightMissService
     agent: AgentClient
 
+    def close(self) -> None:
+        """Process shutdown: stop the background work the services started."""
+        self.conversations.close()
+
 
 def build_services(settings: Settings) -> ApiServices:
     engine = create_db_engine(settings.database_url)
