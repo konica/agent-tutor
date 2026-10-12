@@ -351,8 +351,7 @@ export const listThreadTurns = <ThrowOnError extends boolean = false>(options: O
  * Rate Turn
  *
  * Rate an answer or decline of the learner's conversation helpful ("up") or not ("down"); a new rating replaces
- * the last (PRD §10.2). Saved with the turn and sent to LangSmith as feedback on its run; an outage there doesn't fail
- * the rating.
+ * the last (PRD §10.2). Saved with the turn (#290 sends it to Phoenix).
  */
 export const rateTurn = <ThrowOnError extends boolean = false>(options: Options<RateTurnData, ThrowOnError>): RequestResult<RateTurnResponses, RateTurnErrors, ThrowOnError> => (options.client ?? client).put<RateTurnResponses, RateTurnErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

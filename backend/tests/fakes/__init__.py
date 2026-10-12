@@ -24,8 +24,6 @@ from fakes.tracing import META as TRACE_META
 from fakes.tracing import (
     FailingExporter,
     FakeRunTracing,
-    FeedbackClient,
-    InlineExecutor,
     RecordingClient,
     recorded_traces,
 )
@@ -45,8 +43,6 @@ __all__ = [
     "RecordingClient",
     "recorded_traces",
     "TRACE_META",
-    "FeedbackClient",
-    "InlineExecutor",
     "fake_chat_model",
     "fake_embeddings",
     "FakeTokenVerifier",

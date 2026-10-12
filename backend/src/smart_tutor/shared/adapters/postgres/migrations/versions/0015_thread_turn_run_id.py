@@ -1,4 +1,4 @@
-"""The ask's LangSmith run id with its turn (PRD §10.4, #221), so a rating can attach to its trace (#227).
+"""The ask's trace id with its turn (PRD §10.4, #221), so a rating can attach to its trace (#227).
 
 Nullable: turns kept before it have none.
 

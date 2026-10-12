@@ -1,4 +1,4 @@
-"""Learner ratings sent on to where answers are evaluated (PRD §10.2): LangSmith feedback on the answer's run."""
+"""Learner ratings sent on to where answers are traced (PRD §10.2): Phoenix, from #290."""
 
 from abc import ABC, abstractmethod
 
@@ -14,7 +14,7 @@ class AnswerFeedback(ABC):
 
 
 class NoAnswerFeedback(AnswerFeedback):
-    """Tracing is off: there is no run to attach a rating to."""
+    """Ratings are only saved with the turn."""
 
     def send(self, run_id: RunId, rating: Rating) -> None:
         return None

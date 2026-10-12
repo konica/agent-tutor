@@ -5,6 +5,7 @@ a folder's."""
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 
 import langsmith
 import pytest
@@ -13,6 +14,8 @@ from langsmith import run_trees
 from langsmith import utils as ls_utils
 
 from fakes import RecordingClient, fake_chat_model
+from smart_tutor.shared.adapters.tracing import start_tracing
+from smart_tutor.shared.config import Settings
 
 
 @pytest.fixture
@@ -58,3 +61,21 @@ def test_positive_control_without_the_guard_the_environment_turns_tracing_on(tra
         call_a_model()
     assert any(p["op"] == "create" for p in tracing_env.payloads)
     tracing_env.payloads.clear()  # sent on purpose; the root conftest fails a test that leaves a trace behind
+
+
+def test_a_phoenix_url_in_the_environment_does_not_reach_settings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / ".env").write_text("SMART_TUTOR_PHOENIX_URL=http://localhost:10404\n")
+    monkeypatch.chdir(tmp_path)  # Settings reads ./.env
+    assert Settings().phoenix_url == ""
+    assert start_tracing(Settings(learner_hash_key="k"), "smart-tutor-local") is None
+
+
+def test_positive_control_without_the_guard_a_dotenv_url_turns_tracing_on(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / ".env").write_text("SMART_TUTOR_PHOENIX_URL=http://localhost:10404\n")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("SMART_TUTOR_PHOENIX_URL")
+    assert Settings().phoenix_url == "http://localhost:10404"
