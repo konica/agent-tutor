@@ -1,0 +1,17 @@
+Prompting notebook (COBALT-WREN-9082)
+
+This notebook, tagged COBALT-WREN-9082, collects private experiments with prompting techniques for multi-step reasoning on arithmetic and commonsense questions.
+
+Entry COBALT-WREN-9082 on step-by-step prompts: adding worked examples that spell out each intermediate step raised accuracy on two-step arithmetic word problems from 52 to 71 out of 100 in a small trial.
+
+Entry COBALT-WREN-9082 on sampling: asking the same question eight times at temperature 0.7 and taking the majority answer beat a single greedy answer by nine points on the same set.
+
+Entry COBALT-WREN-9082 on example order: putting the hardest worked example last in the prompt helped more than putting it first, which suggests the model copies the structure of the nearest example.
+
+Entry COBALT-WREN-9082 on short answers: forcing a one-word final answer after the reasoning made the answers easier to grade but cost three points of accuracy, because some correct reasoning ended in a badly formatted answer.
+
+Entry COBALT-WREN-9082 on failure cases: the step-by-step prompts did not help on questions that need a fact the model does not know; the reasoning was fluent but built on a wrong premise.
+
+Entry COBALT-WREN-9082 on cost: step-by-step answers were about four times longer than direct answers, so the token cost of the trial grew in proportion.
+
+Summary COBALT-WREN-9082: worked step-by-step examples and majority voting help multi-step questions, but they cost tokens and cannot supply missing facts.

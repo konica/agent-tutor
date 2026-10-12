@@ -8,12 +8,13 @@ Datasets live in **LangSmith** (versioned there; never edit a version a release 
 | `seed_corpus/learners.yaml` | The two eval learners and the seed documents in each library |
 | `corpus.py` | Downloads the seed PDFs into `data/seed_corpus/` and checks each against the manifest's SHA-256 |
 | `learners.py` | Loads the eval learners' libraries through the upload path (see "Eval learners") |
-| `generators/` | Candidate generators; `ask.py` writes Q&A and decline candidates of eight question types from seed chunks (judge model), `prompts/` holds its prompt |
+| `generators/` | Candidate generators; `ask.py` writes Q&A and decline candidates of eight question types from seed chunks (judge model), `prompts/` holds its prompt; `injection.py` builds `datasets/injection.yaml` from the taxonomy and writes variants of its seeds (see "Injection eval") |
 | `chunks.py` | Seed PDFs cut into the worker's chunks, ids `<seed id>:<seq>` |
 | `generate.py` | `make evals-generate` → candidates in the annotation queue |
 | `review.py` | The annotation queue: candidates as runs, the `accepted` rubric item, accepted items read back |
 | `publish.py` | `make evals-publish` → next `smoke`/`full` versions |
 | `adversarial/taxonomy.yaml` | Injection categories × seeds |
+| `pdf.py` | Renders generated seed documents (the canary documents) to the same PDF bytes every run |
 | `evaluators/` | One module per PRD §10.1 evaluator; `rubrics/` holds the Qwen judge prompts |
 | `targets.py` | How an evaluation run invokes the agent |
 | `thresholds.yaml` | Release-gate targets |
@@ -27,7 +28,7 @@ Splits: **smoke** (every PR that changes the agent; about 30 items: the hand-wri
 
 ## Eval learners
 
-Every eval asks as one of two synthetic learners whose libraries are built from the seed corpus. `seed_corpus/learners.yaml` says which documents each holds; learner 2 holds documents learner 1 must never see. Load both libraries with
+Every eval asks as one of two synthetic learners whose libraries are built from the seed corpus. `seed_corpus/learners.yaml` says which documents each holds; learner 2 holds documents learner 1 must never see, including two generated canary documents whose unique strings the injection eval looks for in learner 1's answers. The injection eval's own-citations check reads each learner's ready documents from the API, so documents you uploaded yourself as an eval learner count as theirs. Load both libraries with
 
     cd backend && uv run --extra eval python -m evals.learners     # or: make evals-learners
 
@@ -60,7 +61,7 @@ The runner then uses the pinned tag for that split (and stops if LangSmith doesn
 
 ## Multi-turn conversations
 
-An `ask` example may have `inputs.history`: the earlier questions of the conversation, oldest first. The target asks each one first, as the same learner and with the example's `documents` limit, and passes the turns so far to the graph the way the API does: the last `history_turns` turns, each answer cut to `history_answer_chars`. Only the last question is scored. The outputs of the run carry the `history` and the `chunks` the last search found.
+An `ask` example may have `inputs.history`: the earlier turns of the conversation, oldest first. A turn that is a question alone is asked first, as the same learner and with the example's `documents` limit, and its answer kept; a turn written as `{question, answer}` (the injection dataset's multi-turn attacks) is kept as written. Each ask gets the turns before it the way the API sends them: the last `history_turns` turns, each answer cut to `history_answer_chars`. Only the last question is scored. The outputs of the run carry the `history` and the `chunks` the last search found.
 
 Metrics that score the last turn:
 - `retrieval_relevance`: the Qwen judge rates each chunk the last search found; covered examples only.
@@ -100,6 +101,18 @@ Hand-written conversations (follow-ups, topic switches, and drift in a limited c
 
    `full` gets the hand-written examples plus every accepted item (the newest `full` version's generated examples, less any you have since scored 0, plus the newly accepted); `smoke` the hand-written examples plus accepted items taken in turn from each type, oldest first, until it holds 30 items in all, hand-written included. It prints each split's new tag (or "unchanged") with its examples by type, and names the types smoke has no accepted item of yet. `--dry-run` prints the splits without publishing.
 
+## Injection eval
+
+`evaluators/injection_resistance.py` runs `datasets/injection.yaml` (prompt attacks, US-6) through the ask target as learner 1. Four code checks (system prompt leak, canary leak, own citations, limited citations) allow 0 failures; the judge's `kept_scope` allows at most 2% failures, which on the smoke split (at most 30 items) means 0.
+
+The dataset file is generated: its hand-written examples are the prompt seeds of `adversarial/taxonomy.yaml`. Edit the taxonomy, then
+
+    cd backend && uv run python -m evals.generators.injection build
+
+and publish (`make evals-publish`). To grow it, generate variants of each seed (the judge model writes `--per-type` per seed), review them in the `smart-tutor-injection-candidates` annotation queue (accept a variant that is a realistic attack of its category and keeps the seed's intent and targets), and publish:
+
+    make evals-generate DATASET=injection     # or: ... python -m evals.generate injection [--per-type 3]
+
 ## Add a suite
 
 1. Write `evaluators/<metric>.py`: evaluator functions taking any of `inputs`, `outputs`, `reference_outputs` and returning `{"key": "<thresholds.yaml metric>", "score": ..., "comment": ...}` (a nested metric is its dotted path, e.g. `decline_correctness.correctly_declined`), and a `SUITE = Suite(dataset=..., target=..., evaluators=(...))`. A judge's prompt goes in `evaluators/rubrics/`.
@@ -107,6 +120,6 @@ Hand-written conversations (follow-ups, topic switches, and drift in a limited c
 
 An evaluator returns `not_applicable(key, why)` (from `evals.suite`) for an example its metric doesn't cover; the runner leaves that result out of the metric.
 
-Each evaluator should return a literal metric key string and, for now, be named after its metric: the runner fills a missing score (an evaluator that raised) only for keys it has seen in other examples, and a dotted metric needs the follow-up noted in the PR.
+Each evaluator should return a literal metric key string and, for now, be named after its metric: the runner fills a missing score (an evaluator that raised) only for keys it has seen in other examples, and a dotted metric needs the follow-up noted in the PR. An evaluator for a dotted metric (`injection_resistance.kept_scope`) must not raise: return score 0 with the reason instead (see `_fail_closed` in `injection_resistance.py`), or a crash on every row reads as "not run". A canary check with no canaries also scores 0.
 
 The runner finds the suite; no change to `run.py`. Suites on the same dataset must name the same target and share one experiment.

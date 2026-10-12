@@ -15,6 +15,7 @@ from evals.learners import (
     Learner,
     LoadError,
     Tutor,
+    canaries_of_others,
     load_all,
     load_learners,
     load_library,
@@ -287,3 +288,10 @@ def test_a_learner_who_cannot_sign_in_is_a_problem_for_that_learner_only(tmp_pat
     problems = _load_all(stack, tmp_path, learners)
     assert len(problems) == 1 and problems[0].startswith("learner@example.com")
     assert [d.state for d in stack.library("learner2@example.com")] == ["ready"]
+
+
+def test_canaries_of_others_are_the_other_learners_canary_strings() -> None:
+    seeds = load_manifest()
+    learners = load_learners(LEARNERS, seeds)
+    assert canaries_of_others("learner@example.com", learners, seeds) == ["COBALT-WREN-9082", "VELLUM-HERON-4417"]
+    assert canaries_of_others("learner2@example.com", learners, seeds) == []

@@ -1,11 +1,15 @@
 """How an evaluation run invokes the agent (PRD §10): one example in; the answer, citations, decline code, and
 trajectory out.
+The outputs also name the learner's own documents (`library`) for the injection checks.
 
 The ask target runs the ask graph the way the agent server does (apps/agent/server.py): retrieval through the MCP
 server, the eval learner's token in runtime context only (ADR 0007). A recording retriever keeps each MCP `search` call
-as the trajectory. Examples name seed documents (manifest ids); the learner's own copies are found by SHA-256. An
-example's `history` (earlier questions) is replayed through the graph, one ask per question, and the last ask gets the
-earlier turns capped like the API caps them (`history_turns`, `history_answer_chars`); only that last ask is scored.
+as the trajectory. Examples name seed documents (manifest ids); the learner's own copies are found by SHA-256.
+
+An example's `history` holds its earlier turns, oldest first: a question alone is asked through the graph and its answer
+kept (a generated or hand-written conversation); a question with its answer is kept as written (an injection attack
+that spans turns). Each ask gets the turns before it capped like the API caps them (`history_turns`,
+`history_answer_chars`); only the last ask is scored.
 """
 
 from collections.abc import Awaitable, Callable, Mapping, Sequence
@@ -51,6 +55,7 @@ class Learners(Protocol):
     def token(self, username: str) -> str: ...
     def sign_in_again(self, username: str) -> str: ...
     def document_id(self, username: str, seed_id: str) -> str: ...
+    def library(self, username: str) -> list[str]: ...
 
 
 class EvalLearners:
@@ -59,6 +64,7 @@ class EvalLearners:
     def __init__(self, tutors: Mapping[str, Tutor], seeds: Mapping[str, SeedDocument]) -> None:
         self._tutors, self._seeds = dict(tutors), seeds
         self._ids: dict[tuple[str, str], str] = {}
+        self._libraries: dict[str, list[str]] = {}
 
     def _tutor(self, username: str) -> Tutor:
         if username not in self._tutors:
@@ -83,6 +89,14 @@ class EvalLearners:
             self._ids[key] = str(found)
         return self._ids[key]
 
+    def library(self, username: str) -> list[str]:
+        """The documents the learner can read now: their ready, non-archived documents (GET /documents). Read once
+        per learner and run; it includes documents the learner uploaded beyond the seed corpus."""
+        if username not in self._libraries:
+            listed = self._tutor(username).call("GET", "/documents?state=ready")
+            self._libraries[username] = [str(d["document_id"]) for d in listed]
+        return list(self._libraries[username])
+
     def check_libraries(self, holdings: Mapping[str, Sequence[str]]) -> None:
         """Raise LoadError unless each learner holds all of their seed documents. Done before the run: inside the
         target, LangSmith would only log the error and the run would go on to a misleading gate table."""
@@ -98,11 +112,12 @@ class AskTarget:
         retriever_for: Callable[[str], Retriever],
         model: BaseChatModel,
         answer_floor: float,
+        answer_max_tokens: int = 1500,
         history_turns: int = 5,
         history_answer_chars: int = 2000,
     ) -> None:
         self._learners, self._retriever_for = learners, retriever_for
-        self._model, self._answer_floor = model, answer_floor
+        self._model, self._answer_floor, self._answer_max_tokens = model, answer_floor, answer_max_tokens
         self._history_turns, self._history_answer_chars = history_turns, history_answer_chars
 
     async def __call__(self, inputs: dict[str, Any]) -> dict[str, Any]:
@@ -110,16 +125,20 @@ class AskTarget:
         limit = None if seeds is None else [self._learners.document_id(username, s) for s in seeds]
         earlier = inputs.get("history") or []
         try:
-            return await self._conversation(earlier, inputs["question"], limit, self._learners.token(username))
+            out = await self._conversation(earlier, inputs["question"], limit, self._learners.token(username))
         except UnauthenticatedError:  # the token expired during the run: sign in once more, replay it all
             token = self._learners.sign_in_again(username)
-            return await self._conversation(earlier, inputs["question"], limit, token)
+            out = await self._conversation(earlier, inputs["question"], limit, token)
+        return {**out, "library": self._learners.library(username)}
 
     async def _conversation(
-        self, earlier: Sequence[str], question: str, limit: list[str] | None, token: str
+        self, earlier: Sequence[str | Mapping[str, str]], question: str, limit: list[str] | None, token: str
     ) -> dict[str, Any]:
         turns: list[HistoryTurn] = []
         for past in earlier:
+            if isinstance(past, Mapping):  # a turn as written: its answer is not the agent's
+                turns.append(history_turn(past["question"], past["answer"], self._history_answer_chars))
+                continue
             state = await self._ask(past, limit, turns, token, [])
             turns.append(history_turn(past, self._answer(state), self._history_answer_chars))
         calls: list[dict[str, Any]] = []
@@ -162,7 +181,10 @@ class AskTarget:
         calls: list[dict[str, Any]],
     ) -> dict[str, Any]:
         graph = build_graph(
-            lambda t: RecordingRetriever(self._retriever_for(t), calls), self._model, self._answer_floor
+            lambda t: RecordingRetriever(self._retriever_for(t), calls),
+            self._model,
+            self._answer_floor,
+            self._answer_max_tokens,
         )
         return await graph.ainvoke(
             {"question": question, "document_ids": limit, "history": self._capped(turns)},
@@ -192,6 +214,7 @@ def ask_target() -> AskTarget:
         lambda token: McpRetriever(settings.mcp_url, token),
         ModelFactory(settings).chat(ChatRole.AGENT),
         settings.answer_floor,
+        settings.answer_max_tokens,
         settings.history_turns,
         settings.history_answer_chars,
     )

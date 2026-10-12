@@ -44,8 +44,9 @@ def candidates_name(dataset: Dataset) -> str:
     return f"{dataset.name}-candidates"
 
 
-def ensure_queue(client: langsmith.Client, dataset: Dataset) -> uuid.UUID:
-    """The dataset's annotation queue, created with its `accepted` rubric item on first use."""
+def ensure_queue(client: langsmith.Client, dataset: Dataset, rubric: str = RUBRIC) -> uuid.UUID:
+    """The dataset's annotation queue, created with its `accepted` rubric item on first use; `rubric` tells the
+    reviewer what to accept (the ask rubric by default)."""
     name = candidates_name(dataset)
     for queue in client.list_annotation_queues(name=name):
         return queue.id
@@ -54,7 +55,7 @@ def ensure_queue(client: langsmith.Client, dataset: Dataset) -> uuid.UUID:
     queue = client.create_annotation_queue(
         name=name,
         description=f"Generated candidates for the {dataset.name} dataset (backend/evals, make evals-generate)",
-        rubric_instructions=RUBRIC,
+        rubric_instructions=rubric,
         rubric_items=[
             {
                 "feedback_key": ACCEPTED,
@@ -96,10 +97,11 @@ def submit(
     candidates: Sequence[Candidate],
     metadata: Mapping[str, str],
     *,
+    rubric: str = RUBRIC,
     sleep: Callable[[float], None] = time.sleep,
 ) -> list[uuid.UUID]:
     """Record each candidate as a run in the candidates project and add them all to the queue."""
-    queue_id = ensure_queue(client, dataset)
+    queue_id = ensure_queue(client, dataset, rubric)
     project_id = _project_id(client, dataset)
     ids: list[uuid.UUID] = []
     keys: list[RunKey] = []

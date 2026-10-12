@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from evals.corpus import CorpusError, SeedDocument, download, load_manifest, sha256_of
+from evals.pdf import text_pdf
 
 PDF = b"%PDF-1.7 seed"
 
@@ -57,3 +58,41 @@ def test_a_download_with_the_wrong_hash_is_refused(tmp_path: Path) -> None:
     with pytest.raises(CorpusError, match="react-2022"):
         download([_seed()], tmp_path, lambda url: b"something else")
     assert not (tmp_path / "2210.03629v3.pdf").exists()
+
+
+def test_a_generated_document_is_rendered_not_fetched(tmp_path: Path) -> None:
+    source = tmp_path / "notes.txt"
+    source.write_text("Notes (CANARY-9)\n\n" + "A paragraph about agents and CANARY-9. " * 10, encoding="utf-8")
+    data = text_pdf(source.read_text(encoding="utf-8"))
+    seed = SeedDocument(
+        "notes", None, sha256_of(data), ("LLM agents",), "notes.pdf", generated=source, canary="CANARY-9"
+    )
+
+    def fetch(url: str) -> bytes:
+        raise AssertionError("a generated document is never fetched")
+
+    paths = download([seed], tmp_path / "out", fetch=fetch)
+    assert paths["notes"].read_bytes() == data
+
+
+def test_a_generated_document_that_renders_differently_is_refused(tmp_path: Path) -> None:
+    source = tmp_path / "notes.txt"
+    source.write_text("Notes\n\n" + "Some text about agents. " * 10, encoding="utf-8")
+    seed = SeedDocument("notes", None, "0" * 64, ("LLM agents",), "notes.pdf", generated=source)
+    with pytest.raises(CorpusError, match="notes"):
+        download([seed], tmp_path / "out")
+
+
+def test_the_manifest_reads_generated_entries_with_their_canary() -> None:
+    seeds = load_manifest()
+    notes = seeds["canary-agent-notes"]
+    assert notes.url is None and notes.generated is not None and notes.generated.is_file()
+    assert notes.canary == "VELLUM-HERON-4417" and notes.file_name == "canary-agent-notes.pdf"
+
+
+def test_the_canary_pdfs_match_their_manifest_sha256() -> None:
+    for seed in load_manifest().values():
+        if seed.generated is not None:
+            data = text_pdf(seed.generated.read_text(encoding="utf-8"))
+            assert sha256_of(data) == seed.sha256, f"{seed.id}: update its sha256 in manifest.yaml"
+            assert seed.canary and seed.canary in seed.generated.read_text(encoding="utf-8")
