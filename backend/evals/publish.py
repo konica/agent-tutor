@@ -33,7 +33,7 @@ from evals.review import reviewed
 
 SMOKE_SIZE = 30
 # Question types of generated ask examples (PRD §10.3 items 1-2), in the order smoke takes them.
-TYPES = ("factual", "conceptual", "multi_chunk", "multi_document", "unanswerable", "drift")
+TYPES = ("factual", "conceptual", "multi_chunk", "multi_document", "unanswerable", "follow_up", "topic_switch", "drift")
 
 
 def _key(example: Example) -> str:

@@ -31,11 +31,11 @@ def test_candidates_of_every_type_reach_the_queue(capsys: pytest.CaptureFixture[
     )
     assert code == 0
     [queue] = client.queues.values()
-    assert len(queue.run_ids) == 12
+    assert len(queue.run_ids) == 16
     runs = [client.runs[i] for i in queue.run_ids]
     assert all(r.extra["metadata"]["generator_model"] == "qwen.qwen3-32b-v1:0" for r in runs)
     assert len({r.extra["metadata"]["batch"] for r in runs}) == 1
-    assert "12 candidates" in capsys.readouterr().out
+    assert "16 candidates" in capsys.readouterr().out
 
 
 def test_no_candidate_written_exits_1(capsys: pytest.CaptureFixture[str]) -> None:
