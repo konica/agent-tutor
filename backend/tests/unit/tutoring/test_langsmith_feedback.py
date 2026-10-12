@@ -136,6 +136,7 @@ def test_answer_feedback_sends_to_the_traced_project_while_tracing_is_on(monkeyp
     monkeypatch.setattr("langsmith.utils.tracing_is_enabled", lambda *a: True)
     monkeypatch.setenv("LANGSMITH_PROJECT", "smart-tutor-prod")
     monkeypatch.setenv("LANGSMITH_API_KEY", "test-not-a-key")
+    monkeypatch.setenv("LANGSMITH_ENDPOINT", "http://127.0.0.1:9")  # the real client asks the server for /info
     ls_utils.get_env_var.cache_clear()  # langsmith caches environment reads
     try:
         sender = answer_feedback()
