@@ -1,13 +1,13 @@
 """boto3 clients.
 
-Endpoints come from AWS_ENDPOINT_URL_S3 / AWS_ENDPOINT_URL_SQS / AWS_ENDPOINT_URL_SSM (LocalStack) when set.
+With settings.localstack, each client calls the endpoint in AWS_ENDPOINT_URL_S3 / AWS_ENDPOINT_URL_SQS /
+AWS_ENDPOINT_URL_SSM and signs with LocalStack's dummy keys. Otherwise boto3 resolves endpoints and credentials.
 """
 
-from typing import TYPE_CHECKING
-from urllib.parse import urlparse
+import os
+from typing import TYPE_CHECKING, Any
 
 import boto3
-from botocore.client import BaseClient
 from botocore.config import Config
 
 from smart_tutor.shared.config import Settings
@@ -18,50 +18,32 @@ if TYPE_CHECKING:
     from mypy_boto3_ssm import SSMClient
 
 
-def _dummy_key(settings: Settings) -> str | None:
-    return "test" if settings.localstack else None
+def _localstack(service: str, settings: Settings) -> dict[str, Any]:
+    """LocalStack's endpoint and dummy keys, passed explicitly so real credentials, used for Bedrock, never reach it.
 
-
-def _localstack_only[C: BaseClient](client: C, variable: str, settings: Settings) -> C:
-    """Stop before LocalStack's dummy keys reach real AWS (UnrecognizedClientException: invalid security token)."""
-    endpoint = client.meta.endpoint_url
-    host = urlparse(endpoint).hostname or ""
-    if settings.localstack and (host == "amazonaws.com" or host.endswith(".amazonaws.com")):
+    An explicit endpoint also holds when the shell sets AWS_IGNORE_CONFIGURED_ENDPOINT_URLS (the deploy runbooks do),
+    which would otherwise send the dummy keys to real AWS.
+    """
+    if not settings.localstack:
+        return {}
+    variable = f"AWS_ENDPOINT_URL_{service.upper()}"
+    endpoint = os.environ.get(variable)
+    if not endpoint:
         raise RuntimeError(
-            f"SMART_TUTOR_LOCALSTACK is on, but this client would call {endpoint}. Point {variable} at LocalStack "
-            "(http://localhost:10402) and unset AWS_IGNORE_CONFIGURED_ENDPOINT_URLS: a value already set in your "
-            "shell wins over `uv run --env-file`."
+            f"SMART_TUTOR_LOCALSTACK is on, but {variable} is not set. Start host processes with "
+            "`uv run --env-file ../.env`, which sets it to LocalStack (http://localhost:10402)."
         )
-    return client
+    return {"endpoint_url": endpoint, "aws_access_key_id": "test", "aws_secret_access_key": "test"}
 
 
 def s3_client(settings: Settings) -> "S3Client":
     config = Config(signature_version="s3v4", s3={"addressing_style": "path" if settings.s3_path_style else "auto"})
-    client = boto3.client(
-        "s3",
-        region_name=settings.aws_region,
-        config=config,
-        aws_access_key_id=_dummy_key(settings),
-        aws_secret_access_key=_dummy_key(settings),
-    )
-    return _localstack_only(client, "AWS_ENDPOINT_URL_S3", settings)
+    return boto3.client("s3", region_name=settings.aws_region, config=config, **_localstack("s3", settings))
 
 
 def sqs_client(settings: Settings) -> "SQSClient":
-    client = boto3.client(
-        "sqs",
-        region_name=settings.aws_region,
-        aws_access_key_id=_dummy_key(settings),
-        aws_secret_access_key=_dummy_key(settings),
-    )
-    return _localstack_only(client, "AWS_ENDPOINT_URL_SQS", settings)
+    return boto3.client("sqs", region_name=settings.aws_region, **_localstack("sqs", settings))
 
 
 def ssm_client(settings: Settings) -> "SSMClient":
-    client = boto3.client(
-        "ssm",
-        region_name=settings.aws_region,
-        aws_access_key_id=_dummy_key(settings),
-        aws_secret_access_key=_dummy_key(settings),
-    )
-    return _localstack_only(client, "AWS_ENDPOINT_URL_SSM", settings)
+    return boto3.client("ssm", region_name=settings.aws_region, **_localstack("ssm", settings))
