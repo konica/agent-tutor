@@ -1166,6 +1166,8 @@ def test_phoenix_is_served_at_slash_phoenix_with_sign_in_and_180_day_retention(c
     # Production traces hold learners' questions: no analytics pixels, no assistant sending them to an LLM provider.
     assert env["PHOENIX_TELEMETRY_ENABLED"] == "false"
     assert env["PHOENIX_DISABLE_AGENT_ASSISTANT"] == "true"
+    assert env["PHOENIX_ENABLE_MCP_SERVER"] == "false"  # no /mcp mount
+    assert env["PHOENIX_ALLOWED_SANDBOX_PROVIDERS"] == "NONE"  # Phoenix's kill switch: no sandbox provider
 
 
 def test_deploy_script_bootstraps_the_phoenix_role_and_renders_its_secrets() -> None:

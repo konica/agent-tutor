@@ -3,8 +3,8 @@
 #   docker compose -f /opt/smart-tutor/on-premise/compose.yaml --env-file /etc/smart-tutor/smart-tutor.env ps
 # Our images come from on-premise's ECR repositories (`smart-tutor-on-premise/<service>`) by commit tag. Caddy is the
 # only service with public ports. Data lives on the data volume (/data). The worker, agent, and MCP server (#149) run
-# as the image's non-root user on a read-only root filesystem, like the Helm charts. The worker reaches only Postgres
-# and, through the egress proxy, its AWS endpoints and LangSmith (#153, #229); deploy.sh checks the running worker's isolation and egress
+# as the image's non-root user on a read-only root filesystem, like the Helm charts. The worker reaches Postgres and
+# Phoenix directly and, through the egress proxy, its AWS endpoints and LangSmith (#153, #229); deploy.sh checks the running worker's isolation and egress
 # after every deploy. Phoenix keeps the production traces (#288, ADR 0017): people reach it at /phoenix through Caddy, and
 # services reach it at http://phoenix:6006 inside Compose, the worker too (it shares the worker network).
 
@@ -15,7 +15,7 @@ x-logging: &logging
   options: {max-size: 10m, max-file: "5"}
 
 networks:
-  # The worker parses untrusted PDFs (PRD §9.10). On this network it reaches Postgres and the egress proxy only:
+  # The worker parses untrusted PDFs (PRD §9.10). On this network it reaches Postgres, Phoenix, and the egress proxy only:
   # an internal network has no route out of the VM and no external DNS.
   worker:
     internal: true
@@ -45,7 +45,7 @@ services:
   # http://phoenix:6006/v1/traces with the system key <prefix>/phoenix/api-key (runbook); on the worker's network so the
   # worker reaches it without the egress proxy. Its traces live in the `phoenix` database, which the backup leaves out.
   phoenix:
-    image: &phoenix-image arizephoenix/phoenix:version-20.16.0-nonroot
+    image: arizephoenix/phoenix:version-20.16.0-nonroot
     restart: unless-stopped
     logging: *logging
     environment:
@@ -65,10 +65,13 @@ services:
       PHOENIX_DEFAULT_ADMIN_INITIAL_PASSWORD: ${PHOENIX_ADMIN_PASSWORD:?}
       # D25. Read only when the default retention policy is created (the first start); later, change it in the UI.
       PHOENIX_DEFAULT_RETENTION_POLICY_DAYS: "180"
-      # The traces hold learners' questions and answers: no analytics pixels in the UI, and no assistant that sends
-      # them to an LLM provider.
+      # The traces hold learners' questions and answers: no analytics pixels in the UI, no assistant that sends them
+      # to an LLM provider, and no MCP server (/mcp) or code sandbox providers, which would give tools and third
+      # parties another way to read or send them.
       PHOENIX_TELEMETRY_ENABLED: "false"
       PHOENIX_DISABLE_AGENT_ASSISTANT: "true"
+      PHOENIX_ENABLE_MCP_SERVER: "false"
+      PHOENIX_ALLOWED_SANDBOX_PROVIDERS: NONE
     networks: [default, worker]
     user: "65532:65532"  # the image's nonroot user
     read_only: true

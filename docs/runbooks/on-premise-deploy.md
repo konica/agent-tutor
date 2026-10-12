@@ -251,7 +251,7 @@ docker inspect --format 'user={{.Config.User}} readonly={{.HostConfig.ReadonlyRo
 
 It prints `user=10001:10001 readonly=true capdrop=[ALL] secopt=[no-new-privileges:true]`. The worker parses each PDF in a child process, which it stops after `SMART_TUTOR_EXTRACTION_TIMEOUT_SECONDS` (300); the document then fails with "This PDF took too long to read". Each extraction starts a fresh Python interpreter, and its start-up counts toward the limit.
 
-**Worker egress.** The worker sits on an internal Compose network with no route out of the VM. It reaches Postgres directly. Everything else goes through `egress-proxy` (Squid), which allows only the documents bucket, SQS, SSM, and Bedrock runtime in the region, LangSmith's API (`api.smith.langchain.com:443`), and the instance metadata service, by exact name. `deploy.sh` proves this on every deploy; to run the check by hand:
+**Worker egress.** The worker sits on an internal Compose network with no route out of the VM. It reaches Postgres and Phoenix directly. Everything else goes through `egress-proxy` (Squid), which allows only the documents bucket, SQS, SSM, and Bedrock runtime in the region, LangSmith's API (`api.smith.langchain.com:443`), and the instance metadata service, by exact name. `deploy.sh` proves this on every deploy; to run the check by hand:
 
 ```bash
 dc exec -T worker python - < /opt/smart-tutor/on-premise/check-egress.py
@@ -364,7 +364,7 @@ aws secretsmanager delete-secret --secret-id smart-tutor-on-premise/phoenix/api-
 
 The bucket is versioned: in the S3 console, **Empty** it (all versions), then **Delete** it. `aws s3 rm --recursive` would leave the old versions behind.
 
-**Redeploy later.** Deploy the stacks from a laptop (section 2), because GitHub can't create the role it signs in with. Deal with the kept bucket first: its name is fixed, so creating `Storage` fails with "already exists" until you bring the bucket into the stack with `cdk import` or delete it. To keep the data, set `smart-tutor:on-premise-data-snapshot-id` to the final snapshot before deploying (`on-premise-backups.md`, "Restore from a snapshot"); the first deploy resets the passwords of the `smart_tutor`, `keycloak`, and `phoenix` roles. Phoenix's admin keeps its old password on a restored volume, and the old system key keeps working until you delete it in Phoenix. A redeploy without a restore starts with an empty database and just works. Keeping the data is manual and outside this runbook, because the teardown deleted every secret and the restored volume still holds the old ones. After the first deploy on the restored volume:
+**Redeploy later.** Deploy the stacks from a laptop (section 2), because GitHub can't create the role it signs in with. Deal with the kept bucket first: its name is fixed, so creating `Storage` fails with "already exists" until you bring the bucket into the stack with `cdk import` or delete it. To keep the data, set `smart-tutor:on-premise-data-snapshot-id` to the final snapshot before deploying (`on-premise-backups.md`, "Restore from a snapshot"); the first deploy resets the passwords of the `smart_tutor`, `keycloak`, and `phoenix` roles. Phoenix's admin keeps its old password on a restored volume. Phoenix API keys and sign-ins are signed with `smart-tutor-on-premise/phoenix/secret`, which the teardown deleted and the redeploy generates anew, so every old key and session stops working, with or without a restore. The `smart-tutor-on-premise/phoenix/api-key` secret that the teardown kept is stale either way. After the first deploy, do section 11 again: on a fresh volume the admin's first sign-in; the accounts; a new system key stored with `put-secret-value`; the retention schedule. Keeping the data is manual and outside this runbook, because the teardown deleted every secret and the restored volume still holds the old ones. After the first deploy on the restored volume:
 
 - Set the secrets of the Keycloak clients `smart-tutor-api` and `rag-mcp` (realm `smart-tutor`) to the new `smart-tutor-on-premise/keycloak/api-client` and `smart-tutor-on-premise/keycloak/mcp-client` values. The realm already exists, so Keycloak doesn't import it again. Until then, sign-in and the smoke test fail.
 - Sign in to the Keycloak console with the old admin password saved in step 2. The bootstrap admin keeps it. It is lost if you didn't save it.
@@ -446,9 +446,11 @@ MSYS_NO_PATHCONV=1 aws secretsmanager create-secret --name smart-tutor-on-premis
 
 Nothing uses the key until the services send traces (#289). Local development has no key.
 
+**Rotate the secret.** Rotating `smart-tutor-on-premise/phoenix/secret` invalidates every Phoenix API key and sign-in. Create and store a new system key afterwards (see below).
+
 **Rotate the key.** Create a new system key, run `put-secret-value` on the same secret name, redeploy (section 6), and then delete the old key in Phoenix.
 
-**Retention (D25).** In *Settings, Data Retention*, the Default policy shows 180 days. Set its schedule to daily (`0 0 * * *`). The default sweeps weekly, so a trace could otherwise live up to 186 days. Phoenix creates this policy once, at its first start, from `PHOENIX_DEFAULT_RETENTION_POLICY_DAYS`. Changing that variable later has no effect on a running instance, so edit the policy in the UI.
+**Retention (D25).** In *Settings, Data Retention*, the Default policy shows 180 days. Set its schedule to daily (`0 0 * * *`). The default sweeps weekly, so a trace could otherwise live up to about 187 days (180 plus a full weekly gap). Phoenix creates this policy once, at its first start, from `PHOENIX_DEFAULT_RETENTION_POLICY_DAYS`. Changing that variable later has no effect on a running instance, so edit the policy in the UI.
 
 **Check.** The sign-in page shows at `$Url/phoenix` (Caddy redirects `/phoenix` to `/phoenix/`). An unauthenticated trace post is refused:
 
@@ -459,7 +461,7 @@ Invoke-WebRequest -Method Post "$Url/phoenix/v1/traces" -SkipHttpErrorCheck   # 
 Then send a test span with the system key. From a Session Manager shell (section 7):
 
 ```bash
-PHOENIX_API_KEY=$(aws secretsmanager get-secret-value --secret-id smart-tutor-on-premise/phoenix/api-key --query SecretString --output text) docker run --rm -i --network smart-tutor_worker --entrypoint /usr/bin/python3.13 -e PHOENIX_API_KEY arizephoenix/phoenix:version-20.16.0-nonroot - http://phoenix:6006 smart-tutor-on-premise < /opt/smart-tutor/on-premise/send-test-span.py
+PHOENIX_API_KEY=$(aws secretsmanager get-secret-value --region us-east-1 --secret-id smart-tutor-on-premise/phoenix/api-key --query SecretString --output text) docker run --rm -i --network smart-tutor_worker --entrypoint /usr/bin/python3.13 -e PHOENIX_API_KEY arizephoenix/phoenix:version-20.16.0-nonroot - http://phoenix:6006 smart-tutor-on-premise < /opt/smart-tutor/on-premise/send-test-span.py
 ```
 
 It prints `test-span (...) is in the Phoenix project smart-tutor-on-premise`. Delete that trace in the UI afterwards if you like.

@@ -178,7 +178,7 @@ Each recipient gets an ALARM email. The alarm returns to its real state within a
 
 ## Phoenix's memory and database size (#288)
 
-Phoenix adds about 1 to 2 GB to the t3.large (ADR 0017), and its `mem_limit` is 1 GB. Check monthly, and after a traffic jump. From a Session Manager shell (`on-premise-deploy.md` §7):
+Phoenix itself is capped at 1 GB (`mem_limit`; it idles at about 450 MiB) and is restarted if it goes over. ADR 0017's estimate of 1 to 2 GB includes the database's growth in Postgres, which has no limit. Container limits now total about 5.75 GiB of the t3.large's ~7.6 GiB, with Postgres and Caddy unlimited and no swap, so watch available memory. Check monthly, and after a traffic jump. From a Session Manager shell (`on-premise-deploy.md` §7):
 
 ```bash
 free -m

@@ -10,12 +10,14 @@ The key, when the Phoenix has sign-in on, is the environment variable PHOENIX_AP
 Runbooks: docs/runbooks/on-premise-deploy.md ("Phoenix") and the README ("Local development").
 """
 
+import datetime
 import json
 import os
 import secrets
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
@@ -48,8 +50,11 @@ try:
 except urllib.error.HTTPError as error:
     sys.exit(f"Phoenix answered {error.code}: {error.read().decode(errors='replace')[:200]}")
 
-# Phoenix writes spans in batches: look for this one in the project for up to 30 s.
-spans = urllib.request.Request(f"{collector}/v1/projects/{project}/spans?limit=100", headers=headers)
+# Phoenix writes spans in batches: look for this one in the project for up to 30 s. Only spans that started in the
+# last minute are listed (the spans route filters on start_time), so a busy project can't push this one off the page.
+since = datetime.datetime.fromtimestamp(now / 1e9 - 60, datetime.timezone.utc).isoformat()
+query = urllib.parse.urlencode({"limit": 100, "start_time": since})
+spans = urllib.request.Request(f"{collector}/v1/projects/{project}/spans?{query}", headers=headers)
 for _ in range(15):
     time.sleep(2)
     try:
