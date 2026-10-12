@@ -25,6 +25,8 @@
 .conversation { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 /* Compact page padding, the same as AppShell's .page (DESIGN.md → Density). */
 .messages { flex: 1; min-height: 0; overflow-y: auto; padding: var(--sp-3) var(--sp-4) var(--sp-6); }
+/* Chrome makes a scroller without focusable children keyboard-focusable; the ring sits inside the pane so it isn't clipped. */
+.messages:focus-visible { outline-offset: -2px; }
 .column { max-width: var(--chat-w); margin: 0 auto; }
 /* Loading, failed, and no-documents states: one padded pane, no panel or composer. */
 .fallback { height: 100%; overflow-y: auto; padding: var(--sp-3) var(--sp-4) var(--sp-6); }
@@ -52,6 +54,8 @@
 
 /* Stacked turns: each question and its answer, set apart from the turn before. */
 .turn + .turn { margin-top: var(--sp-6); }
+/* Focused by Jump to latest during an answer, so the next Tab continues from the newest turn. */
+.turn:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; border-radius: var(--r-md); }
 
 .answerRegion { display: grid; gap: var(--sp-3); }
 
@@ -74,10 +78,16 @@
 
 .thinking { margin: var(--sp-3) 0 0; color: var(--text-2); font-size: var(--fs-13); }
 
-/* The composer row is pinned under the messages, as wide as their column (the column plus the pane's side padding). */
+/* The composer row is pinned under the messages, as wide as their column (the column plus the pane's side padding);
+   Jump to latest floats above it. */
 .form {
-  flex: none; width: 100%; max-width: calc(var(--chat-w) + 2 * var(--sp-4)); margin: 0 auto;
+  position: relative; flex: none; width: 100%; max-width: calc(var(--chat-w) + 2 * var(--sp-4)); margin: 0 auto;
   padding: var(--sp-2) var(--sp-4) var(--sp-3); background: var(--bg);
+}
+/* Jump to latest: a small pill centred above the composer, over the bottom of the messages. */
+.jump {
+  position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: var(--sp-2);
+  border-radius: var(--r-pill); box-shadow: var(--shadow-sm);
 }
 /* One quiet 12px line above the box while the conversation searches only its documents. */
 .scopeLine { display: flex; align-items: center; gap: var(--sp-1); margin: 0 0 var(--sp-2); font-size: var(--fs-12); color: var(--text-2); }

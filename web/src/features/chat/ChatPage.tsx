@@ -1,4 +1,5 @@
 import {
+  ArrowDown,
   ArrowUp,
   CircleAlert,
   Clock,
@@ -51,6 +52,7 @@ import { AnswerRating } from "./AnswerRating";
 import { ConversationPanel } from "./ConversationPanel";
 import { DocumentPicker } from "./DocumentPicker";
 import { ThreadTitle } from "./ThreadTitle";
+import { useChatScroll } from "./useChatScroll";
 import { usePanelOpen } from "./usePanelOpen";
 
 type Props = {
@@ -210,6 +212,8 @@ export function ChatPage({
   // Counts the conversations shown (a new thread, or one a URL opens), so a late reply or stream event of an earlier
   // one never reaches a newer one. A question in the same thread keeps it.
   const turn = useRef(0);
+  // The messages pane follows new text only while the learner is at the bottom (DESIGN.md → Chat).
+  const scroll = useChatScroll([turns, answering, problem]);
   const { threadId: routeThreadId } = useParams();
   const navigate = useNavigate();
   // The conversation the page shows, by its URL or just created: null at /chat.
@@ -349,6 +353,8 @@ export function ChatPage({
     busy.current = false;
     setAnswering(false);
     setTurns([]);
+    // The next conversation opens on its newest turn.
+    scroll.land();
     setProblem(null);
     setOpened({ status: "none" });
     setUsed([]);
@@ -416,6 +422,8 @@ export function ChatPage({
     setProblem(null);
     const asked: Exchange = { question: text, answer: "", citations: [], decline: null, runId: null, rating: null, kept: false };
     setTurns((list) => [...list, asked]);
+    // The question scrolls into view, and the answer is followed from the bottom.
+    scroll.toLatest();
     await run(() => (inThread === null ? ask(text, documentId) : askIn(inThread, text)), turn.current, inThread === null);
   }
 
@@ -630,6 +638,14 @@ export function ChatPage({
     if (alive.current && turn.current === forTurn && rateRequests.current[runId] === request) setTurns((list) => list.map((e) => (e.runId === runId ? { ...e, rating: saved } : e)));
   }
 
+  // The button goes once the pane is at the bottom, so focus moves on: to the question box, or while it is disabled
+  // during an answer, to the newest turn (so the next Tab continues from there, not from the first turn).
+  function jumpToLatest() {
+    scroll.toLatest();
+    if (answering) scroll.element?.querySelector<HTMLElement>("[data-newest-turn]")?.focus({ preventScroll: true });
+    else input.current?.focus();
+  }
+
   function onSubmit(event: FormEvent) {
     event.preventDefault();
     void submit();
@@ -787,7 +803,7 @@ export function ChatPage({
 
         {/* The messages scroll; the composer row stays pinned under them (DESIGN.md → Chat). */}
         <div className={styles.conversation}>
-          <div className={styles.messages}>
+          <div ref={scroll.ref} className={styles.messages} role="region" aria-label="Messages">
             <div className={styles.column}>
               {pendingStart && (
                 <p className={styles.notice}>
@@ -817,7 +833,7 @@ export function ChatPage({
                 const hasSources = t.decline === null && showCitations && t.citations.length > 0;
                 return (
                   // Turns are only ever added at the end or all replaced, so the index is a stable key.
-                  <div key={index} className={styles.turn}>
+                  <div key={index} className={styles.turn} {...(last ? { "data-newest-turn": "", tabIndex: -1 } : {})}>
                     <p className={styles.question}>
                       <span className="visually-hidden">You asked: </span>
                       {t.question}
@@ -900,6 +916,12 @@ export function ChatPage({
           </div>
 
           <form className={styles.form} onSubmit={onSubmit}>
+            {/* Floats above the composer while the learner reads earlier turns; not a live region. */}
+            {scroll.away && turns.length > 0 && (
+              <Button size="sm" icon={ArrowDown} className={styles.jump} onClick={jumpToLatest}>
+                Jump to latest
+              </Button>
+            )}
             <label htmlFor="chat-question" className="visually-hidden">
               Your question
             </label>
