@@ -1,5 +1,7 @@
 """How an evaluation run invokes the agent (PRD §10): one example in; the answer, citations, decline code, and
 trajectory out.
+An example may carry earlier turns (`history`, each a question and its answer); the outputs name the learner's own
+documents (`library`) for the injection checks.
 
 The ask target runs the ask graph the way the agent server does (apps/agent/server.py): retrieval through the MCP
 server, the eval learner's token in runtime context only (ADR 0007). A recording retriever keeps each MCP `search` call
@@ -20,7 +22,7 @@ from smart_tutor.shared.adapters.model_factory import ChatRole, ModelFactory
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.tutoring.adapters.mcp_retriever import McpRetriever
-from smart_tutor.tutoring.application import RetrievedChunk, Retriever
+from smart_tutor.tutoring.application import HistoryTurn, RetrievedChunk, Retriever
 
 Target = Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
 
@@ -49,6 +51,7 @@ class Learners(Protocol):
     def token(self, username: str) -> str: ...
     def sign_in_again(self, username: str) -> str: ...
     def document_id(self, username: str, seed_id: str) -> str: ...
+    def library(self, username: str) -> list[str]: ...
 
 
 class EvalLearners:
@@ -57,6 +60,7 @@ class EvalLearners:
     def __init__(self, tutors: Mapping[str, Tutor], seeds: Mapping[str, SeedDocument]) -> None:
         self._tutors, self._seeds = dict(tutors), seeds
         self._ids: dict[tuple[str, str], str] = {}
+        self._libraries: dict[str, list[str]] = {}
 
     def _tutor(self, username: str) -> Tutor:
         if username not in self._tutors:
@@ -81,6 +85,14 @@ class EvalLearners:
             self._ids[key] = str(found)
         return self._ids[key]
 
+    def library(self, username: str) -> list[str]:
+        """The documents the learner can read now: their ready, non-archived documents (GET /documents). Read once
+        per learner and run; it includes documents the learner uploaded beyond the seed corpus."""
+        if username not in self._libraries:
+            listed = self._tutor(username).call("GET", "/documents?state=ready")
+            self._libraries[username] = [str(d["document_id"]) for d in listed]
+        return list(self._libraries[username])
+
     def check_libraries(self, holdings: Mapping[str, Sequence[str]]) -> None:
         """Raise LoadError unless each learner holds all of their seed documents. Done before the run: inside the
         target, LangSmith would only log the error and the run would go on to a misleading gate table."""
@@ -96,25 +108,38 @@ class AskTarget:
         retriever_for: Callable[[str], Retriever],
         model: BaseChatModel,
         answer_floor: float,
+        answer_max_tokens: int = 1500,
     ) -> None:
         self._learners, self._retriever_for = learners, retriever_for
-        self._model, self._answer_floor = model, answer_floor
+        self._model, self._answer_floor, self._answer_max_tokens = model, answer_floor, answer_max_tokens
 
     async def __call__(self, inputs: dict[str, Any]) -> dict[str, Any]:
         username, seeds = inputs["learner"], inputs.get("documents")
         limit = None if seeds is None else [self._learners.document_id(username, s) for s in seeds]
+        # A turn the graph can replay has a question and an answer. A generated drift example's history is its earlier
+        # questions only (generators/ask.py): it asks only its last question until #214 decides how to replay them.
+        history = [
+            HistoryTurn(t["question"], t["answer"]) for t in inputs.get("history") or [] if isinstance(t, Mapping)
+        ]
         try:
-            return await self._ask(inputs["question"], limit, self._learners.token(username))
+            out = await self._ask(inputs["question"], limit, history, self._learners.token(username))
         except UnauthenticatedError:  # the token expired during the run: sign in once more
-            return await self._ask(inputs["question"], limit, self._learners.sign_in_again(username))
+            out = await self._ask(inputs["question"], limit, history, self._learners.sign_in_again(username))
+        return {**out, "library": self._learners.library(username)}
 
-    async def _ask(self, question: str, limit: list[str] | None, token: str) -> dict[str, Any]:
+    async def _ask(
+        self, question: str, limit: list[str] | None, history: list[HistoryTurn], token: str
+    ) -> dict[str, Any]:
         calls: list[dict[str, Any]] = []
         graph = build_graph(
-            lambda t: RecordingRetriever(self._retriever_for(t), calls), self._model, self._answer_floor
+            lambda t: RecordingRetriever(self._retriever_for(t), calls),
+            self._model,
+            self._answer_floor,
+            self._answer_max_tokens,
         )
         state = await graph.ainvoke(
-            {"question": question, "document_ids": limit}, context=AgentContext(access_token=token)
+            {"question": question, "document_ids": limit, "history": history},
+            context=AgentContext(access_token=token),
         )
         decline = state.get("decline")
         return {
@@ -149,4 +174,5 @@ def ask_target() -> AskTarget:
         lambda token: McpRetriever(settings.mcp_url, token),
         ModelFactory(settings).chat(ChatRole.AGENT),
         settings.answer_floor,
+        settings.answer_max_tokens,
     )

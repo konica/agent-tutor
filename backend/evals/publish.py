@@ -114,7 +114,8 @@ def main(
                 state = f"published {tag}" if tag else "unchanged"
                 print(f"{dataset.name} {split}: {state}, {len(examples)} examples ({_summary(examples)})")
             generated = {str(e.metadata.get("type")) for e in splits["smoke"] if e.metadata}
-            if generated and (missing := [t for t in TYPES if t not in generated]):
+            # only the ask question types are expected in every smoke split (injection examples are typed by category)
+            if generated & set(TYPES) and (missing := [t for t in TYPES if t not in generated]):
                 print(f"{dataset.name} smoke: {', '.join(f'no accepted {t}' for t in missing)} (make evals-generate)")
     except DatasetError as e:
         print(f"Can't publish: {e}", file=sys.stderr)
