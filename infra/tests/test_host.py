@@ -408,7 +408,7 @@ def test_deploy_settings_name_on_premise_resources(t: Template) -> None:
     assert "s3://" in json.dumps(_parameter(t, "bundle"))
 
 
-def test_database_and_test_learner_secrets_are_generated(t: Template) -> None:
+def test_database_test_learner_and_phoenix_secrets_are_generated(t: Template) -> None:
     secrets = {
         s["Properties"]["Name"]: s["Properties"] for s in t.find_resources("AWS::SecretsManager::Secret").values()
     }
@@ -416,12 +416,20 @@ def test_database_and_test_learner_secrets_are_generated(t: Template) -> None:
         "smart-tutor-on-premise/db/postgres",
         "smart-tutor-on-premise/db/app",
         "smart-tutor-on-premise/db/keycloak",
+        "smart-tutor-on-premise/db/phoenix",
         "smart-tutor-on-premise/keycloak/test-learner",
+        "smart-tutor-on-premise/phoenix/secret",
+        "smart-tutor-on-premise/phoenix/admin-password",
     }
     assert all("SecretString" not in s and s["GenerateSecretString"]["ExcludePunctuation"] for s in secrets.values())
     learner = secrets["smart-tutor-on-premise/keycloak/test-learner"]["GenerateSecretString"]
     assert learner["GenerateStringKey"] == "password"
     assert json.loads(learner["SecretStringTemplate"])["username"] == "test-learner@example.com"
+    # Phoenix refuses a PHOENIX_SECRET shorter than 32 characters or without a digit and a lowercase letter.
+    phoenix_secret = secrets["smart-tutor-on-premise/phoenix/secret"]["GenerateSecretString"]
+    assert phoenix_secret["PasswordLength"] >= 32 and phoenix_secret["RequireEachIncludedType"] is True
+    admin = secrets["smart-tutor-on-premise/phoenix/admin-password"]["GenerateSecretString"]
+    assert admin["PasswordLength"] >= 12 and admin["RequireEachIncludedType"] is True
 
 
 def test_deploy_document_takes_only_a_commit_sha_and_runs_the_bundled_script(t: Template) -> None:
