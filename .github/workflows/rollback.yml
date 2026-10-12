@@ -2,6 +2,7 @@
 # (on-premise keeps the deploy files of the last cdk deploy), docs/runbooks/pilot-deploy.md (native-cloud).
 # Each mode checks for the images in its own repositories (#206).
 # The deploy environments only accept runs from main: start it from main with the SHA to go back to.
+# Nothing is redeployed unless the repository variable PRODUCTION_DEPLOY is `true` (#282); the run then fails and says so.
 name: rollback
 
 on:
@@ -18,6 +19,27 @@ on:
         required: true
 
 jobs:
+  # Reports the production deploy switch (#282). The environment workflows enforce it; this job only makes it visible.
+  production-switch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Report the production deploy switch
+        env:
+          SWITCH: ${{ vars.PRODUCTION_DEPLOY }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "${SWITCH,,}" = true ]; then
+            echo "Production deploys are ON (PRODUCTION_DEPLOY=true)." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          msg="Production deploys are OFF (PRODUCTION_DEPLOY is not true). Nothing was deployed."
+          echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$EVENT" = push ]; then echo "::notice title=Production deploys off::$msg"; exit 0; fi
+          echo "::error title=Production deploys off::$msg"
+          exit 1
+
   on-premise:
     if: inputs.mode == 'on-premise'
     permissions:

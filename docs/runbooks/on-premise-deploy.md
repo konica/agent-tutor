@@ -1,6 +1,6 @@
 # On-premise deploy (#148, #149, #150, #153, #154, #229)
 
-Deploys on-premise mode (ADR 0012, PRD §9.12): one EC2 VM runs Smart Tutor with Docker Compose, and Caddy serves it over HTTPS at `https://smart-tutor.duckdns.org` (a DuckDNS name pointed at the Elastic IP, section 9) with a Let's Encrypt certificate. Every merge to `main` deploys on-premise automatically, unless `ON_PREMISE_AUTO_DEPLOY` is `false` (section 3). This runbook also covers the one-time setup, the first deploy, and a deploy by hand. It brings up Postgres, Keycloak, the API, the web app, Caddy, the agent, the MCP server, and the worker, so a learner can sign in, upload a PDF, and ask about it (#149). Backups and restore: `on-premise-backups.md` (#151). Alarms and weekly patching: `on-premise-monitoring.md` (#152); after the first deploy, every alert recipient confirms the subscription email.
+Deploys on-premise mode (ADR 0012, PRD §9.12): one EC2 VM runs Smart Tutor with Docker Compose, and Caddy serves it over HTTPS at `https://smart-tutor.duckdns.org` (a DuckDNS name pointed at the Elastic IP, section 9) with a Let's Encrypt certificate. Every merge to `main` deploys on-premise automatically while the production switch `PRODUCTION_DEPLOY` is `true`, unless `ON_PREMISE_AUTO_DEPLOY` is `false` (section 3). This runbook also covers the one-time setup, the first deploy, and a deploy by hand. It brings up Postgres, Keycloak, the API, the web app, Caddy, the agent, the MCP server, and the worker, so a learner can sign in, upload a PDF, and ask about it (#149). Backups and restore: `on-premise-backups.md` (#151). Alarms and weekly patching: `on-premise-monitoring.md` (#152); after the first deploy, every alert recipient confirms the subscription email.
 
 Commands are for **PowerShell 7** (`pwsh`). Run them from the repository root with your admin profile. No command here prints a secret. Don't paste the values you read in step 5 anywhere.
 
@@ -21,7 +21,7 @@ The Host stack creates a VPC with one public subnet, no NAT, and an S3 gateway e
 ## 1. Before you start
 
 - CDK is bootstrapped in the account (`pilot-aws-prerequisites.md` §2), and the GitHub OIDC provider exists (native-cloud's `SmartTutor-prod-GitHubDeploy` created it; the on-premise deploy role reuses it).
-- The ECR repositories come from `SmartTutor-OnPremise-prod-Registry`. `build-images.yml` deploys that stack (and the deploy role) before its first push, so nothing is deployed by hand for them. The repositories hold images for the commit you want: `deploy.yml` builds and pushes them for every merge to `main`, tagged with the full commit SHA. On-premise needs `api`, `web`, `keycloak`, `agent`, `mcp`, and `worker`. A commit merged while no images were built (before #150, while `NATIVE_CLOUD_AUTO_DEPLOY=false`) has none, and neither has a commit merged before #206 (its images are only in native-cloud's `smart-tutor/*`): build them by hand (section 4, "Build images by hand").
+- The ECR repositories come from `SmartTutor-OnPremise-prod-Registry`. `build-images.yml` deploys that stack (and the deploy role) before its first push, so nothing is deployed by hand for them. The repositories hold images for the commit you want: `deploy.yml` builds and pushes them for every merge to `main`, tagged with the full commit SHA. On-premise needs `api`, `web`, `keycloak`, `agent`, `mcp`, and `worker`. A commit merged while no images were built (while `PRODUCTION_DEPLOY` was off, before #150, while `NATIVE_CLOUD_AUTO_DEPLOY=false`) has none, and neither has a commit merged before #206 (its images are only in native-cloud's `smart-tutor/*`): build them by hand (section 4, "Build images by hand").
 - A LangSmith service key for tracing (section 10); deploys work without it, untraced.
 - The DuckDNS token is stored (section 9). Without it a deploy still works but can't point the name at a new Elastic IP.
 - A `cdk deploy` from your machine bundles your working copy of `deploy/`, which must have LF line endings: the VM pipes `db-bootstrap.sql` to psql, which misreads `\set ON_ERROR_STOP on` with a CR. `.gitattributes` keeps `deploy/**` LF on every checkout since #155; a Windows checkout from before it keeps CRLF copies until you check them out again (Git Bash: `git ls-files -z deploy | xargs -0 rm -f && git checkout -- deploy`, then `git ls-files --eol deploy | grep -c w/crlf` prints 0). CDK's fingerprint ignores CR, so delete `infra/cdk.out` too, or it reuses the old copy.
@@ -64,7 +64,7 @@ aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$Instanc
 
 ## 3. Deploy on merge (#150)
 
-**What runs.** On every push to `main`, `deploy.yml` runs the CI checks, then `build-images.yml` (it builds the six images and pushes them, unless all six are already there), then `deploy-on-premise.yml` in the GitHub environment `on-premise`. That workflow checks the images exist, runs `cdk deploy --all -c smart-tutor:mode=on-premise` (uploading `deploy/` as the bundle), reads the Host outputs, and waits until the VM is `Online` in SSM (a deploy that replaces the instance gives it a new id). It then runs the SSM document with the commit SHA and prints its output, and runs `deploy/pilot/smoke_test.py` against `PublicUrl`. The run fails if any step fails, including the smoke test. One on-premise deploy runs at a time (concurrency group `deploy-on-premise`): a later merge waits. GitHub keeps only the newest waiting run per group, so a waiting run can be replaced by a newer one. Native-cloud doesn't deploy unless chosen (see "Native-cloud is optional" in `pilot-deploy.md`). **Stop deploys on merge** by setting the repository variable `ON_PREMISE_AUTO_DEPLOY` to `false` (in any case), for example while on-premise is torn down (section 8): `gh variable set ON_PREMISE_AUTO_DEPLOY --body false --repo konica/agent-tutor`. Unset or any other value deploys on every merge; `gh variable delete ON_PREMISE_AUTO_DEPLOY --repo konica/agent-tutor` turns it back on. A run by hand (`gh workflow run deploy.yml -f mode=on-premise`) deploys either way.
+**What runs.** While `PRODUCTION_DEPLOY` is `true` (see "Turn all production deploys off or on" below), on every push to `main`, `deploy.yml` runs the CI checks, then `build-images.yml` (it builds the six images and pushes them, unless all six are already there), then `deploy-on-premise.yml` in the GitHub environment `on-premise`. That workflow checks the images exist, runs `cdk deploy --all -c smart-tutor:mode=on-premise` (uploading `deploy/` as the bundle), reads the Host outputs, and waits until the VM is `Online` in SSM (a deploy that replaces the instance gives it a new id). It then runs the SSM document with the commit SHA and prints its output, and runs `deploy/pilot/smoke_test.py` against `PublicUrl`. The run fails if any step fails, including the smoke test. One on-premise deploy runs at a time (concurrency group `deploy-on-premise`): a later merge waits. GitHub keeps only the newest waiting run per group, so a waiting run can be replaced by a newer one. Native-cloud doesn't deploy unless chosen (see "Native-cloud is optional" in `pilot-deploy.md`). **Stop deploys on merge** by setting the repository variable `ON_PREMISE_AUTO_DEPLOY` to `false` (in any case), for example while on-premise is torn down (section 8): `gh variable set ON_PREMISE_AUTO_DEPLOY --body false --repo konica/agent-tutor`. Unset or any other value deploys on every merge; `gh variable delete ON_PREMISE_AUTO_DEPLOY --repo konica/agent-tutor` turns it back on. A run by hand (`gh workflow run deploy.yml -f mode=on-premise`) deploys either way, as long as `PRODUCTION_DEPLOY` is `true`.
 
 **One-time setup** (an admin, once). Do these in order, and do step 1 before you merge #150.
 
@@ -105,6 +105,24 @@ aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$Instanc
 **When it fails.** The step "Deploy the images on the VM (SSM Run Command)" prints `deploy.sh`'s output; the Troubleshooting table applies. If the log says "is not Online in SSM after 10 minutes", the instance is still booting or was replaced: read `/var/log/cloud-init-output.log` through Session Manager.
 
 **Every merge can replace the VM.** The AMI is the latest Amazon Linux 2023, read at each `cdk deploy`. After Amazon publishes a new image, the next merge replaces the instance (section 7, "Replace the instance"). The deploy waits for the VM to be `Online`, and the deploy document first waits for the VM's first boot to finish (`cloud-init status --wait`), so it doesn't run before Docker is installed. The data survives; expect a few more minutes of downtime.
+
+### Turn all production deploys off or on (#282)
+
+The repository variable `PRODUCTION_DEPLOY` stops every production deploy in both modes: merges, runs of **deploy** by hand, **rollback**, and image builds. Only `true` deploys. Unset, empty, or any other value is off. CI checks still run on every pull request and merge.
+
+Only the repository owner can change it: **Settings → Secrets and variables → Actions → Variables**, or:
+
+```powershell
+gh variable set PRODUCTION_DEPLOY --body false --repo konica/agent-tutor   # off: nothing deploys
+gh variable set PRODUCTION_DEPLOY --body true --repo konica/agent-tutor    # on: today's rules
+```
+
+- **What a run shows.** Each **deploy** and **rollback** run has a `production-switch` job. With the switch off, a merge's run stays green and its summary says "Production deploys are OFF (PRODUCTION_DEPLOY is not true). Nothing was deployed." A run by hand or a rollback fails with the same message.
+- **After turning it off,** cancel any deploy run that is still queued (`gh run list --workflow deploy.yml --limit 5`, then `gh run cancel <id>`). A queued deploy job passed its check when it was queued and may still start.
+- **While it is off,** merged commits get no images, so a later rollback can't target them. A later deploy builds its own images.
+- **To resume,** set it to `true`. The next merge deploys as usual. To deploy the current `main` now, run **deploy** by hand (section 4).
+- **The per-mode variables** (`ON_PREMISE_AUTO_DEPLOY`, `NATIVE_CLOUD_AUTO_DEPLOY`) choose what deploys only while the switch is on. Tearing down one mode still uses its own variable (section 8).
+- It is an operating control, not a security boundary: anyone with admin rights can flip it, and a merged change to the workflows can remove it.
 
 ## 4. Deploy an image tag by hand
 
@@ -283,7 +301,7 @@ This deletes the VM, the Elastic IP, and the VPC. The data volume is deleted aft
 
 Deletes every on-premise stack, in this order:
 
-1. **Stop deploys on merge** (section 3). Otherwise the next merge's image build deploys the deploy role and the registry again, or fails once the role is gone. Wait until no deploy run is in progress:
+1. **Stop deploys on merge** (section 3). Otherwise the next merge's image build deploys the deploy role and the registry again, or fails once the role is gone. (`PRODUCTION_DEPLOY=false` stops it too, but also stops native-cloud.) Wait until no deploy run is in progress:
 
    ```powershell
    gh variable set ON_PREMISE_AUTO_DEPLOY --body false --repo konica/agent-tutor

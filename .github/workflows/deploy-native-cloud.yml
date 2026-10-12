@@ -3,6 +3,7 @@
 # NATIVE_CLOUD_AUTO_DEPLOY is `true`; rollback.yml calls it with infrastructure false.
 # deploy.yml builds its images into `smart-tutor/*` first.
 # Signs in with the native-cloud deploy role (#55), which trusts only jobs in the `native-cloud` environment.
+# Skipped unless the repository variable PRODUCTION_DEPLOY is `true` (#282).
 name: deploy-native-cloud
 
 on:
@@ -19,6 +20,8 @@ on:
 
 jobs:
   deploy:
+    # The production deploy switch (#282): skipped unless PRODUCTION_DEPLOY is `true`, whoever calls it.
+    if: vars.PRODUCTION_DEPLOY == 'true'
     runs-on: ubuntu-latest
     environment: native-cloud
     # One deployment at a time; a queued one waits instead of cancelling the running release.

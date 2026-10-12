@@ -25,7 +25,7 @@ It runs one `cdk destroy --exclusively <stack>` per stack. Every native-cloud st
 
 ## 3. Stop auto-deploys first
 
-Since #150 native-cloud deploys on a merge only while `NATIVE_CLOUD_AUTO_DEPLOY` is `true`. Make sure it isn't (the script checks it and stops if it is `true`; it never changes it itself):
+Since #150 native-cloud deploys on a merge only while `NATIVE_CLOUD_AUTO_DEPLOY` is `true`, and since #282 only while the production switch `PRODUCTION_DEPLOY` is `true` too. Make sure `NATIVE_CLOUD_AUTO_DEPLOY` isn't `true`. The script checks both and stops only if both are `true`; it never changes either itself:
 
 ```powershell
 gh variable delete NATIVE_CLOUD_AUTO_DEPLOY --repo konica/agent-tutor   # or set it to false
@@ -67,7 +67,7 @@ Under **$2 a month**: the bootstrap bucket, the RDS final snapshot (about $2 for
 ## 8. Redeploy later
 
 1. Deal with the documents bucket if you kept it. Its name is fixed and it is retained, so creating the Storage stack fails with "already exists". Either bring it into the stack with `cdk import`, or delete it first with `-DeleteDocumentsBucket`. Its CORS rule must name the new CloudFront domain; the Storage stack sets it, so after an import redeploy Storage and check `aws s3api get-bucket-cors`.
-2. The image build deploys `Registry` before it pushes, so a redeploy recreates the repositories (they come back empty). Follow [`pilot-deploy.md`](pilot-deploy.md) from step 2. Or run **deploy** by hand with mode `native-cloud`, or set `NATIVE_CLOUD_AUTO_DEPLOY` to `true` and merge; it needs the kept `GitHubDeploy` role, the bootstrap, and the `native-cloud` environment.
+2. The image build deploys `Registry` before it pushes, so a redeploy recreates the repositories (they come back empty). Follow [`pilot-deploy.md`](pilot-deploy.md) from step 2. Or run **deploy** by hand with mode `native-cloud`, or set `NATIVE_CLOUD_AUTO_DEPLOY` to `true` and merge (a merge deploys only while `PRODUCTION_DEPLOY` is `true`); it needs the kept `GitHubDeploy` role, the bootstrap, and the `native-cloud` environment.
 
 - A fresh deploy starts with an **empty database**. To restore the final snapshot instead, restore it to a new instance with the same identifier, then fix the credentials: the stacks' secrets were deleted, so the new ones don't match the restored database. Set the master password with `aws rds modify-db-instance --db-instance-identifier smart-tutor-prod --master-user-password <the new smart-tutor/rds/master secret> --apply-immediately`, and run `ALTER ROLE ... PASSWORD ...` for the app and keycloak roles with the new `smart-tutor/db/app` and `smart-tutor/db/keycloak` secrets. This is manual and outside these runbooks.
 - `rollback.yml` does not work while the pilot is down: it has no infrastructure to roll back onto.

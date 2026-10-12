@@ -136,9 +136,11 @@ Notes:
 
 ## Deploy
 
-**On-premise (default).** Every merge to `main` (unless the repository variable `ON_PREMISE_AUTO_DEPLOY` is `false`) runs the checks, builds the images into on-premise's own ECR repositories, and deploys them to the on-premise VM (`cdk deploy`, then SSM Run Command, then a smoke test): `.github/workflows/deploy.yml`. Setup, a deploy by hand, rollback, and operations: [`docs/runbooks/on-premise-deploy.md`](docs/runbooks/on-premise-deploy.md); backups and monitoring: `on-premise-backups.md`, `on-premise-monitoring.md`.
+**On-premise (default).** While the repository variable `PRODUCTION_DEPLOY` is `true`, every merge to `main` (unless `ON_PREMISE_AUTO_DEPLOY` is `false`) runs the checks, builds the images into on-premise's own ECR repositories, and deploys them to the on-premise VM (`cdk deploy`, then SSM Run Command, then a smoke test): `.github/workflows/deploy.yml`. Setup, a deploy by hand, rollback, and operations: [`docs/runbooks/on-premise-deploy.md`](docs/runbooks/on-premise-deploy.md); backups and monitoring: `on-premise-backups.md`, `on-premise-monitoring.md`.
 
 **Native-cloud (optional).** EKS, RDS, and CloudFront. It deploys only when you run **deploy** by hand with mode `native-cloud`, or on every merge while the repository variable `NATIVE_CLOUD_AUTO_DEPLOY` is `true`: [`docs/runbooks/pilot-deploy.md`](docs/runbooks/pilot-deploy.md), teardown in `pilot-teardown.md`.
+
+**Production switch.** The repository variable `PRODUCTION_DEPLOY` turns every production deploy on or off (merges, deploys by hand, rollbacks, image builds). Only `true` deploys: [`docs/runbooks/on-premise-deploy.md`](docs/runbooks/on-premise-deploy.md), "Turn all production deploys off or on".
 
 ## Architecture rules
 

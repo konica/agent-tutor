@@ -2,6 +2,7 @@
 # the VM, then the smoke test. Called by deploy.yml (every push to main, after the checks and the images) and
 # rollback.yml. Signs in with the on-premise deploy role, which trusts only jobs in the `on-premise` environment.
 # Runbook: docs/runbooks/on-premise-deploy.md.
+# Skipped unless the repository variable PRODUCTION_DEPLOY is `true` (#282).
 name: deploy-on-premise
 
 on:
@@ -18,6 +19,8 @@ on:
 
 jobs:
   deploy:
+    # The production deploy switch (#282): skipped unless PRODUCTION_DEPLOY is `true`, whoever calls it.
+    if: vars.PRODUCTION_DEPLOY == 'true'
     runs-on: ubuntu-latest
     environment: on-premise
     # One deployment at a time; a queued one waits instead of cancelling the running one.

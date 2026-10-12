@@ -238,8 +238,93 @@ def test_rollback_redeploys_the_chosen_mode_without_infrastructure() -> None:
     assert jobs["on-premise"]["uses"] == "./.github/workflows/deploy-on-premise.yml"
     assert jobs["native-cloud"]["if"] == "inputs.mode == 'native-cloud'"
     assert jobs["native-cloud"]["uses"] == "./.github/workflows/deploy-native-cloud.yml"
-    for job in jobs.values():
+    for name, job in jobs.items():
+        if name == "production-switch":  # reports the switch (#282); calls nothing
+            continue
         assert job["with"] == {"image_tag": "${{ inputs.image_tag }}", "infrastructure": False}
+
+
+# --- The production deploy switch (#282) -----------------------------------------------------------------------
+
+# Only `true` deploys (case-insensitive in expressions); unset or anything else stops every production deploy.
+PRODUCTION_SWITCH_IF = "vars.PRODUCTION_DEPLOY == 'true'"
+SWITCH_STEP = "Report the production deploy switch"
+
+
+def test_every_job_that_enters_a_production_environment_needs_the_switch() -> None:
+    for name in ENVIRONMENT_WORKFLOWS:
+        job = only_job(name)
+        assert job["if"] == PRODUCTION_SWITCH_IF, name
+        assert "!=" not in job["if"], name  # fail closed: unset must not deploy
+
+
+def test_no_workflow_job_with_an_environment_lacks_the_switch() -> None:
+    # Scans every workflow, so a new environment job fails here until it carries the switch.
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        for job_name, job in workflow(path.name)["jobs"].items():
+            if "environment" in job:
+                assert job.get("if") == PRODUCTION_SWITCH_IF, f"{path.name}:{job_name}"
+
+
+def test_the_switch_leaves_the_per_mode_conditions_alone() -> None:
+    jobs = workflow("deploy.yml")["jobs"]
+    for mode, condition in (("on-premise", ON_PREMISE_IF), ("native-cloud", NATIVE_CLOUD_IF)):
+        assert jobs[f"images-{mode}"]["if"] == condition
+        assert jobs[mode]["if"] == condition
+    assert "PRODUCTION_DEPLOY" not in str(workflow("ci.yml"))
+
+
+def test_every_caller_of_a_production_workflow_reports_the_switch() -> None:
+    # A new workflow that calls an environment workflow fails here until it reports the switch too.
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        jobs = workflow(path.name)["jobs"]
+        calls = [j for j in jobs.values() if j.get("uses", "").removeprefix("./.github/workflows/") in ENVIRONMENT_WORKFLOWS]
+        if not calls:
+            continue
+        report = jobs["production-switch"]
+        assert report["permissions"] == {"contents": "read"}, path.name
+        assert "needs" not in report and "uses" not in report, path.name
+        assert step(report, SWITCH_STEP)["env"] == {
+            "SWITCH": "${{ vars.PRODUCTION_DEPLOY }}",
+            "EVENT": "${{ github.event_name }}",
+        }, path.name
+    assert step(workflow("deploy.yml")["jobs"]["production-switch"], SWITCH_STEP)["run"] == step(
+        workflow("rollback.yml")["jobs"]["production-switch"], SWITCH_STEP
+    )["run"]
+
+
+def test_the_switch_is_named_in_the_workflow_headers() -> None:
+    for name in ("deploy.yml", "rollback.yml", *ENVIRONMENT_WORKFLOWS):
+        header = (WORKFLOWS / name).read_text(encoding="utf-8").split("\nname: ")[0]
+        assert "PRODUCTION_DEPLOY" in header, name
+
+
+def test_the_switch_report_decides_correctly(tmp_path: Path) -> None:
+    bash = shutil.which("bash")  # the full path: on Windows a bare "bash" can reach the WSL launcher in System32
+    if bash is None:
+        pytest.skip("bash is not installed")
+    script = step(workflow("deploy.yml")["jobs"]["production-switch"], SWITCH_STEP)["run"]
+
+    def run(switch: str, event: str) -> tuple[int, str, str]:
+        summary = tmp_path / "summary"
+        summary.write_text("")
+        result = subprocess.run(
+            [bash, "-c", script],
+            env={"PATH": os.environ["PATH"], "GITHUB_STEP_SUMMARY": str(summary), "SWITCH": switch, "EVENT": event},
+            capture_output=True, text=True, check=False,
+        )
+        return result.returncode, result.stdout, summary.read_text()
+
+    for on in ("true", "True", "TRUE"):
+        code, stdout, summary = run(on, "workflow_dispatch")
+        assert code == 0 and "Production deploys are ON (PRODUCTION_DEPLOY=true)." in summary, on
+        assert "::" not in stdout, on
+    off = "Production deploys are OFF (PRODUCTION_DEPLOY is not true). Nothing was deployed."
+    for value in ("", "false", " true", "yes"):
+        code, stdout, summary = run(value, "push")
+        assert code == 0 and "::notice" in stdout and off in summary, repr(value)
+        code, stdout, summary = run(value, "workflow_dispatch")  # a manual deploy or any rollback
+        assert code == 1 and "::error" in stdout and off in summary, repr(value)
 
 
 # --- build-images.yml ------------------------------------------------------------------------------------------
@@ -560,10 +645,47 @@ def test_native_cloud_teardown_runbook_leaves_on_premise_alone() -> None:
     assert "ECR" not in leftovers and "image" not in leftovers.lower()
 
 
+def test_native_cloud_teardown_stops_only_when_a_merge_would_redeploy() -> None:
+    # A merge redeploys native-cloud only while both the production switch and the native-cloud variable are `true`.
+    script = (RUNBOOKS / "pilot-teardown.ps1").read_text(encoding="utf-8")
+    assert "$ProductionDeploy = gh variable get PRODUCTION_DEPLOY --repo $Repo 2>$null" in script
+    assert 'if ($AutoDeploy -eq "true" -and $ProductionDeploy -eq "true") {' in script
+    assert "PRODUCTION_DEPLOY isn't 'true'" in script
+    # With only the mode variable on, it warns: turning the switch on later would redeploy the torn-down pilot.
+    assert "Write-Warning" in script and "turning it on would redeploy the pilot" in script
+    runbook = (RUNBOOKS / "pilot-teardown.md").read_text(encoding="utf-8")
+    assert "PRODUCTION_DEPLOY" in runbook.split("## 3.")[1].split("## 4.")[0]
+
+
 def test_the_on_premise_auto_deploy_switch_is_documented() -> None:
     for path in (RUNBOOKS / "on-premise-deploy.md", WORKFLOWS.parents[1] / "sdd/prd.md"):
         assert "ON_PREMISE_AUTO_DEPLOY" in path.read_text(encoding="utf-8"), path.name
     assert "ON_PREMISE_AUTO_DEPLOY" in (WORKFLOWS / "deploy.yml").read_text(encoding="utf-8").split("name: deploy")[0]
+
+
+def test_the_production_deploy_switch_is_documented() -> None:
+    root = WORKFLOWS.parents[1]
+    for path in (
+        RUNBOOKS / "on-premise-deploy.md",
+        RUNBOOKS / "pilot-deploy.md",
+        RUNBOOKS / "pilot-teardown.md",
+        root / "README.md",
+        root / "sdd/prd.md",
+        root / "sdd/adr/0012-on-premise-default-deployment-mode.md",
+        root / "docs/architecture/solution-architecture.md",
+    ):
+        assert "PRODUCTION_DEPLOY" in path.read_text(encoding="utf-8"), path.name
+    text = (RUNBOOKS / "on-premise-deploy.md").read_text(encoding="utf-8")
+    section = text.split("### Turn all production deploys off or on (#282)")[1].split("\n## ")[0]
+    for phrase in (
+        "gh variable set PRODUCTION_DEPLOY --body false --repo konica/agent-tutor",
+        "gh variable set PRODUCTION_DEPLOY --body true --repo konica/agent-tutor",
+        "Settings → Secrets and variables → Actions → Variables",
+        "queued",
+        "not a security boundary",
+    ):
+        assert phrase in section, phrase
+    assert "Draft v2.54" in (root / "sdd/prd.md").read_text(encoding="utf-8")
 
 
 def test_on_premise_runbook_tears_down_the_whole_mode_without_naming_native_cloud() -> None:
