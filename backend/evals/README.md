@@ -8,7 +8,7 @@ Datasets live in **LangSmith** (versioned there; never edit a version a release 
 | `seed_corpus/learners.yaml` | The two eval learners and the seed documents in each library |
 | `corpus.py` | Downloads the seed PDFs into `data/seed_corpus/` and checks each against the manifest's SHA-256 |
 | `learners.py` | Loads the eval learners' libraries through the upload path (see "Eval learners") |
-| `generators/` | Candidate generators; `ask.py` writes Q&A and decline candidates of six question types from seed chunks (judge model), `prompts/` holds its prompt |
+| `generators/` | Candidate generators; `ask.py` writes Q&A and decline candidates of eight question types from seed chunks (judge model), `prompts/` holds its prompt |
 | `chunks.py` | Seed PDFs cut into the worker's chunks, ids `<seed id>:<seq>` |
 | `generate.py` | `make evals-generate` → candidates in the annotation queue |
 | `review.py` | The annotation queue: candidates as runs, the `accepted` rubric item, accepted items read back |
@@ -58,6 +58,18 @@ Each `datasets/<key>.yaml` is one LangSmith dataset (`name`) and its hand-writte
 
 The runner then uses the pinned tag for that split (and stops if LangSmith doesn't have it), so the release gate can be rerun on exactly the examples it passed. Record the pinned versions in the release PR.
 
+## Multi-turn conversations
+
+An `ask` example may have `inputs.history`: the earlier questions of the conversation, oldest first. The target asks each one first, as the same learner and with the example's `documents` limit, and passes the turns so far to the graph the way the API does: the last `history_turns` turns, each answer cut to `history_answer_chars`. Only the last question is scored. The outputs of the run carry the `history` and the `chunks` the last search found.
+
+Metrics that score the last turn:
+- `retrieval_relevance`: the Qwen judge rates each chunk the last search found; covered examples only.
+- `answer_relevance`: the judge also reads the earlier questions, so "What are its limitations?" is judged in context.
+- `decline_correctness.correctly_declined`: 1 when a limited, uncovered example gets the `limited` decline. Unlimited conversations are not applicable until the relevance gate covers every turn (US-5, #14).
+- `decline_correctness.wrongly_declined`: 1 when a covered example is declined.
+
+Hand-written conversations (follow-ups, topic switches, and drift in a limited conversation) are in both splits of `smart-tutor-ask`, along with accepted `follow_up`, `topic_switch`, and `drift` candidates. There is no separate command: run `make evals-publish` once to publish new examples, then `make evals-smoke`. In the LangSmith experiment, filter on examples whose inputs have `history`.
+
 ## Grow a dataset: generate, review, publish
 
 1. **Generate** candidates (your AWS profile for the judge model, `LANGSMITH_API_KEY`; downloads the seed PDFs the first time):
@@ -72,11 +84,13 @@ The runner then uses the pinned tag for that split (and stops if LangSmith doesn
    | `multi_chunk` | two passages of one document they hold | answer |
    | `multi_document` | one passage each of two documents they hold | answer |
    | `unanswerable` | on topic, from a seed document they don't hold | decline |
+   | `follow_up` | two passages of one document they hold; the follow-up names it only as "it", "this", or "they" | answer |
+   | `topic_switch` | an earlier turn from one held document, the last turn from another held document, unlimited | answer |
    | `drift` | a conversation limited to one held document whose second turn comes from another document | decline (limited) |
 
    A type the corpus can't support (no learner holds the documents it needs) gets no drafts, and the command doesn't stop for it.
 
-   Each candidate is a run in the `smart-tutor-ask-candidates` project, added to the annotation queue of the same name. Its outputs show the expected behavior, the source chunk ids, and the passages (`evidence`). The ask target asks only the last question of a `drift` example until it sends the example's history to the graph (#214).
+   Each candidate is a run in the `smart-tutor-ask-candidates` project, added to the annotation queue of the same name. Its outputs show the expected behavior, the source chunk ids, and the passages (`evidence`).
 
 2. **Review** in LangSmith → Annotation Queues → `smart-tutor-ask-candidates`. For each item, score **accepted**: 1 when the question is clear, a learner could ask it, and the passages support the expected behavior (for an answer, they answer it); 0 otherwise. Don't edit items: reject them, and generate more. Your latest score counts. Review a batch before its runs expire with the candidates project's trace retention: unreviewed candidates are lost with them. A published example stays in later versions after its run expires. To withdraw one, score it 0 while its run still exists; after that, leave a note on the example in the dataset.
 
