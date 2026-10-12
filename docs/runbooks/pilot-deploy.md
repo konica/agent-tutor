@@ -104,6 +104,8 @@ helm upgrade --install smart-tutor deploy/helm/smart-tutor -n smart-tutor --crea
 
 Before the first install, or the first deploy after #229 on an existing release (the agent and worker pods stay in `CreateContainerConfigError` until `helm --wait` times out), create the LangSmith API key's secret (`aws secretsmanager create-secret --name smart-tutor/langsmith/api-key --secret-string <service key>`); without it the agent and worker pods can't start. Traces go to the LangSmith project `smart-tutor-native-cloud` (ingestion: `smart-tutor-native-cloud-ingestion`). Set both projects' retention in LangSmith (Projects, the project, Retention) to **Extended (180 days)**: LangSmith SaaS keeps no trace longer than 180 days, which meets D25 (details: `on-premise-deploy.md` section 10).
 
+Since #289 the agent and worker no longer read `LANGSMITH_*`, so native-cloud runs untraced until it gets its own Phoenix decision (ADR 0017); the secret and project above are unused until then.
+
 ## 7. Check
 
 A new distribution and new targets can take a few minutes to settle. A 502 or 503 at first is expected: retry after 2 to 3 minutes. If the API pods CrashLoop, run `kubectl -n smart-tutor logs deploy/api`; a `ParameterNotFound` error means the Config stack is not deployed (run step 2).

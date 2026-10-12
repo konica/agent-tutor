@@ -124,7 +124,7 @@ Learners and researchers work through many documents on a topic but lack the bac
 5. Learners can **create, edit, archive, and continue from Lesson Notes**, and a lifetime **learning record** tracks what they learned.
 6. Learners can **manage documents, subjects (personal names), conversations, and notes** (filter by date and subject; archive and restore; delete their own documents).
 7. **Token usage is tracked and shown**, including document processing.
-8. Every agent run is **traced and evaluated** in LangSmith, with human feedback used to calibrate LLM judges.
+8. Every agent run is **traced** in Phoenix (runtime traces) and **evaluated** in LangSmith (evals), with human feedback used to calibrate LLM judges.
 9. All components require **authentication and authorization** via Keycloak; learners can only read their own documents and data.
 10. All services are **deployed on AWS in one of two deployment modes**: **on-premise** (the default: Docker Compose on one EC2 VM) or **native-cloud** (opt-in: Amazon EKS), with the same behavior in both (§9.11); model access is **abstracted** and business logic **encapsulated in classes** (§9.15).
 11. The data model is **ready for later releases**: visibility and grants (sharing), work identity, saved page text, and stored PDFs (research map, topic catalog, knowledge graph backfill from them; D26).
@@ -191,7 +191,7 @@ Learners and researchers work through many documents on a topic but lack the bac
 - Lifetime learning records (note trigger and idle trigger).
 - Conversation and note management (filter by date and subject, archive/restore).
 - Token usage view (chat and document processing); rate limits and daily caps.
-- LangSmith tracing, evaluation suites, human-feedback annotation (§10).
+- Runtime tracing in Phoenix, LangSmith evaluation suites, human-feedback annotation (§10).
 - All services deployed **on-premise** (Docker Compose on one EC2 VM, the default) or **native-cloud** (Amazon EKS with Helm, opt-in); AWS resources with **AWS CDK**; local development with **Docker Compose**.
 
 ### Release 2: research map
@@ -431,7 +431,7 @@ Network layer: agent and MCP are `ClusterIP` services; NetworkPolicies allow onl
 | Personal subject name | PostgreSQL `user_subject_names` | `(user_id, subject_id)`; unique `(user_id, normalized display_name)` | `display_name`, `updated_at`. |
 | Thread | PostgreSQL `threads` | `thread_id` | `user_id`, `title` (the first question until the learner renames it, US-13), `search_scope` (`library` / `listed`, US-4c), `status` (`active` / `archived`), `created_at`, `last_learner_message_at` (the first question and each later one; the list's last activity, US-13), `record_written_at`. |
 | Thread document | PostgreSQL `thread_documents` | `(thread_id, document_id)` | The thread's document list: `added_by` (`answer` / `learner`), `first_used_at` (null until used), `added_at`, `deleted_title` (the display title, copied when the document is deleted; null otherwise). No foreign key to `documents`, so rows outlive a deleted document. |
-| Thread turn | PostgreSQL `thread_turns` | `turn_id` (identity; the order) | `thread_id`, `user_id` (the thread's owner; reads are scoped by it), `question`, `answer` (empty for a decline), `citations` (JSONB list of `n`, `document_id`, `chunk_id`, `page`; titles resolve at read time), `decline_code` and `decline_message` (a declined turn), `run_id` (the ask's LangSmith run; null for older turns), `rating` (`up`, `down`, or null: the learner's rating, §10.2), `created_at`. Only turns whose answer ended with `done` (US-4b). No foreign key to `documents`, so turns outlive a deleted document; deleted with their thread. Read by the API to reopen a conversation (US-13) and as the capped history sent with each follow-up question (ADR 0015). |
+| Thread turn | PostgreSQL `thread_turns` | `turn_id` (identity; the order) | `thread_id`, `user_id` (the thread's owner; reads are scoped by it), `question`, `answer` (empty for a decline), `citations` (JSONB list of `n`, `document_id`, `chunk_id`, `page`; titles resolve at read time), `decline_code` and `decline_message` (a declined turn), `run_id` (the ask's trace id in Phoenix; null for older turns), `rating` (`up`, `down`, or null: the learner's rating, §10.2), `created_at`. Only turns whose answer ended with `done` (US-4b). No foreign key to `documents`, so turns outlive a deleted document; deleted with their thread. Read by the API to reopen a conversation (US-13) and as the capped history sent with each follow-up question (ADR 0015). |
 | Lesson Note | PostgreSQL `lesson_notes` | `thread_id` (unique) | `user_id` (subjects come from the thread's documents used at read time, D11), `markdown`, `status` (`active` / `archived`), `edited_since_generated` (bool), `archived_at`, `source_note_id` (the note a "Discuss this note" thread started from), `updated_at`. |
 | Learning record | LangGraph store, namespace `("learning", user_id)` | `thread_id` | `subject_ids[]`, `topics[]`, `key_points[]`, `note_id`, `trigger`, `learned_at`, `updated_at`. |
 | Decline log | PostgreSQL `declines` | `decline_id` | Scrubbed question text, best score, `reason`, timestamp. **No user id.** Deleted after 90 days. |
@@ -650,7 +650,7 @@ One Python package organized **by module first**, with `domain`, `application`, 
 
 ### 10.2 Aligning LLM judges with human feedback
 
-Under each kept answer or decline the learner rates it Helpful (👍) or Not helpful (👎): one rating per turn, a new one replaces it (`thread_turns.rating`; `PUT /threads/{id}/turns/{run_id}/rating`, operation `rate_turn`). The API saves it, then, only while LangSmith tracing is on in the API process, sends it to LangSmith as feedback `learner_rating` (score 1/0) on the turn's run, off the request (an outage is logged; the rating is kept); a 👎 extends the trace to extended retention so it can be reviewed (§10.3 item 7). The feedback carries no user id, email, or token. The API needs the same `LANGSMITH_TRACING`, `LANGSMITH_API_KEY`, and `LANGSMITH_PROJECT` as the agent, or ratings go to the wrong project or are dropped. Deployed environments (on-premise, native-cloud) give LangSmith settings to the agent and worker (#229) but not yet to the API, so there ratings are saved but not sent until the API gets them too. Admins score a weekly sample in an annotation queue; revise a judge prompt when judge–human agreement drops below ~80%.
+Under each kept answer or decline the learner rates it Helpful (👍) or Not helpful (👎): one rating per turn, a new one replaces it (`thread_turns.rating`; `PUT /threads/{id}/turns/{run_id}/rating`, operation `rate_turn`). The API saves it with the turn. Sending it to Phoenix as a `learner_rating` span annotation on the ask's root span comes with #290; until then a rating is saved and goes nowhere else. Admins score a weekly sample in an annotation queue; revise a judge prompt when judge–human agreement drops below ~80%.
 
 ### 10.3 Building the test dataset quickly
 
@@ -666,7 +666,7 @@ Learners' documents are private, so evaluation uses a **fixed seed corpus** of o
 
 ### 10.4 Online monitoring
 
-Trace every run. Each ask is one `ask` trace whose run id is kept with its turn; traces carry the thread id, deployment, model ids, decline code, chunks given to the model, and whether the search was limited, and name the learner only by a keyed hash of their user id — never the user id, email, or token. An ask's trace id is its run id. The worker's processing traces into its own project with the content id and learner hash. Sample production traces for answer relevance and decline; alert on error rate, latency, ingestion failures and retries, queue age, rate-limit hits, unusual per-user upload or token volume, and evaluator score drops. Deployed services trace into their mode's project in the environment's own self-hosted Phoenix (ADR 0017) (`smart-tutor-on-premise`, `smart-tutor-native-cloud`); the share traced is the setting `trace-sampling-rate` (default every run). A tracing failure never fails the request or the processing.
+Trace every run. Each ask is one `ask` trace whose run id is kept with its turn; traces carry the thread id, deployment, model ids, decline code, chunks given to the model, and whether the search was limited, and name the learner only by a keyed hash of their user id — never the user id, email, or token. An ask's trace id is its run id. The worker's processing traces into its own project with the content id and learner hash. Sample production traces for answer relevance and decline; alert on error rate, latency, ingestion failures and retries, queue age, rate-limit hits, unusual per-user upload or token volume, and evaluator score drops. Deployed services trace into the environment's own self-hosted Phoenix (ADR 0017): production into the project `smart-tutor-on-premise`, local development into `smart-tutor-local`; the share traced is the setting `trace-sampling-rate` (default every run). A tracing failure never fails the request or the processing.
 
 ## 11. Non-functional requirements (pilot scale)
 
@@ -768,7 +768,7 @@ M4 Production launch (R1)
 | M1 Library and ingestion | Presigned upload, browser duplicate check, server SHA-256 duplicate check within the learner's library (insert-or-get), content and document state machines with retry, first-pages step, page text with saved output, work key, chunks and embeddings, subject suggestions and shared catalog (1–3 per document, name check), personal names, archive/restore, delete, MCP search with `can_read` and iterative scans; suggestion, name-check, metadata, retrieval, filtered-recall, and duplicate/isolation tests passing on the seed corpus. |
 | M2 Tutor agent | Search over all of the learner's documents, relevance gate, documents used per thread, answer with document-as-data prompting, decline log, summarize path with edit-aware overwrite, idle sweeper, learning records; Release 1 evals passing on the smoke split, including adversarial PDFs. |
 | M3 App (API + Web) | Auth, library and upload UX, subject choice and rename, chat streaming with documents used and the document viewer at a cited passage, conversation and note management, usage view, rate limits and daily caps; isolation tests passing. |
-| M4 Production launch (R1) | CDK stacks and Helm releases in prod via CI/CD; worker isolation; trace retention set in LangSmith and the decline-log retention job; online evaluation, annotation queue, dashboards and alerts; **data-erasure obligations reviewed** (known gap); release gate passed; **pilot starts**. |
+| M4 Production launch (R1) | CDK stacks and Helm releases in prod via CI/CD; worker isolation; trace retention set by Phoenix's retention policy and the decline-log retention job; online evaluation, annotation queue, dashboards and alerts; **data-erasure obligations reviewed** (known gap); release gate passed; **pilot starts**. |
 
 ### Release 2 — research map
 
@@ -812,7 +812,7 @@ Both deployment modes use the same account, region, and models (ADR 0012), but e
 3. Service quotas for the three models, sized for ingestion of uploads plus 50 concurrent learners; EC2 quotas (a t3.large for on-premise; EKS and its nodes for native-cloud).
 4. ~~Domain and DNS for web, API, and Keycloak (ACM certificate).~~ Not needed for the pilot. *(On-premise)* a DuckDNS subdomain pointed at the Elastic IP, with its token in Secrets Manager (fallback `<eip>.sslip.io`); Caddy gets the certificate. *(Native-cloud)* the CloudFront address with path routing (ADR 0009); a custom domain later needs an ACM certificate in us-east-1 and an alternate domain name on the distribution.
 5. `cdk bootstrap`; CI deploy role trusted by GitHub Actions (OIDC).
-6. Developer access: AWS profile allowed to invoke the models; Phoenix API key. *(On-premise)* a Phoenix system key in `<prefix>/phoenix/api-key`. *(Native-cloud)* LangSmith service key, until native-cloud is picked up again (ADR 0017).
+6. Developer access: AWS profile allowed to invoke the models; the LangSmith API key for evals. No Phoenix key: the local Phoenix has none, and a developer never uses production's. *(On-premise)* a Phoenix system key in `<prefix>/phoenix/api-key`. *(Native-cloud)* LangSmith service key, until native-cloud is picked up again (ADR 0017).
 7. Decisions: PrivateLink for `bedrock-runtime`; monthly budget and alert recipients; optional Bedrock Guardrail; seed corpus license check for evaluation documents; data-erasure obligations for the pilot's users.
 
 **Created by CDK, on-premise (default):**

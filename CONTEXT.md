@@ -50,7 +50,7 @@ _Avoid_: Chat, session, conversation (in code; "conversation" is fine in UI copy
 One question and its answer (or decline) in a thread, kept when the answer ends with `done`. A thread's turns, oldest first, are its history; a reopened conversation shows them.
 
 **Rating**:
-A learner's 👍/👎 (Helpful / Not helpful) on a kept turn: one per turn, a new one replaces it. Saved with the turn; #290 sends it to Phoenix as a `learner_rating` span annotation; 👎 extends the trace's retention.
+A learner's 👍/👎 (Helpful / Not helpful) on a kept turn: one per turn, a new one replaces it. Saved with the turn; #290 sends it to Phoenix as a `learner_rating` span annotation.
 _Avoid_: Vote, like, review
 
 **Documents used**:
