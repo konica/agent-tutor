@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { Archive } from "lucide-react";
 import { describe, expect, it } from "vitest";
 
 import { Banner } from "./Banner";
@@ -21,5 +22,10 @@ describe("Banner", () => {
       </Banner>,
     );
     expect(screen.getByText("Saved")).toBeVisible();
+  });
+
+  it("renders the given icon instead of the variant's", () => {
+    const { container } = render(<Banner variant="info" icon={Archive} title="t" />);
+    expect(container.querySelector("svg")).toHaveClass("lucide-archive");
   });
 });

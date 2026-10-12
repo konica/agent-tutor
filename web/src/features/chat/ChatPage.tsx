@@ -1,4 +1,6 @@
 import {
+  Archive,
+  ArchiveRestore,
   ArrowUp,
   CircleAlert,
   Clock,
@@ -33,10 +35,12 @@ import {
   type Rating,
   type SearchScope,
 } from "../../api/chat";
+import { archiveConversation, restoreConversation } from "../../api/conversations";
 import { loadDocuments } from "../../api/documents";
 import type { DocumentResponse, ThreadDocumentResponse } from "../../api/generated/types.gen";
 import { useConversations } from "../../app/conversations";
 import { SessionExpiredError, sessionExpiry } from "../../auth/authClient";
+import { Banner } from "../../components/Banner/Banner";
 import { Button } from "../../components/Button/Button";
 import { IconButton } from "../../components/Button/IconButton";
 import { LinkButton } from "../../components/Button/LinkButton";
@@ -74,6 +78,9 @@ type Props = {
   loadConversation?: (threadId: string) => Promise<Conversation>;
   /** Resolves with the saved rating; a failure rejects. */
   rate?: (threadId: string, runId: string, rating: Rating) => Promise<Rating>;
+  /** Archive and restore the conversation (US-13); a failure rejects. */
+  archive?: (threadId: string) => Promise<unknown>;
+  restore?: (threadId: string) => Promise<unknown>;
 };
 
 type Exchange = {
@@ -117,6 +124,8 @@ const defaultRename = (threadId: string, title: string) => renameConversation(th
 const defaultSetScope = (threadId: string, scope: SearchScope) => setSearchScope(threadId, scope);
 const defaultLoadConversation = (threadId: string) => loadConversationApi(threadId);
 const defaultRate = (threadId: string, runId: string, rating: Rating) => rateAnswer(threadId, runId, rating);
+const defaultArchive = (threadId: string) => archiveConversation(threadId);
+const defaultRestore = (threadId: string) => restoreConversation(threadId);
 
 const documentCount = (n: number) => (n === 1 ? "1 document" : `${n} documents`);
 
@@ -147,7 +156,8 @@ function processingHint(count: number) {
 // Each unlimited question starts a new thread (and moves to its URL), replacing the turns shown. A conversation limited
 // to its documents (US-4c) is the exception: its questions are asked in the same thread and add a turn under the
 // history. `/chat/<id>` reopens a conversation with its turns (US-13). With no active documents, a question in a
-// conversation stays in it too (US-10).
+// conversation stays in it too (US-10). An archived conversation is read-only (US-13): a banner offers Restore, and the
+// composer, the title, and the panel's document controls are off; its citations, documents, and ratings still work.
 export function ChatPage({
   ask = defaultAsk,
   askIn = defaultAskIn,
@@ -161,6 +171,8 @@ export function ChatPage({
   setScope: saveScope = defaultSetScope,
   loadConversation = defaultLoadConversation,
   rate = defaultRate,
+  archive = defaultArchive,
+  restore = defaultRestore,
 }: Props) {
   const conversations = useConversations();
   const [question, setQuestion] = useState("");
@@ -180,6 +192,12 @@ export function ChatPage({
   const [scope, setScope] = useState<SearchScope>("library");
   const [answered, setAnswered] = useState(false);
   const [showCitations, setShowCitations] = useState(true);
+  const [archived, setArchived] = useState(false);
+  // Set while an archive or restore request is in flight: the Actions and the banner's Restore are off meanwhile.
+  const [changingStatus, setChangingStatus] = useState(false);
+  // Where focus goes once an archive or restore has rendered: the panel's action that replaced the one clicked, or the
+  // composer that came back.
+  const [focusAfterStatus, setFocusAfterStatus] = useState<"action" | "composer" | null>(null);
   const [storedOpen, togglePanel] = usePanelOpen();
   // A starting document opens the panel once without saving it, so the learner's remembered choice stays as it was.
   const [forceOpen, setForceOpen] = useState(false);
@@ -237,6 +255,15 @@ export function ChatPage({
   useEffect(() => {
     if (focusSwitch > 0) pageRef.current?.querySelector<HTMLElement>("[data-scope-switch]")?.focus();
   }, [focusSwitch]);
+
+  // The clicked Archive or Restore is gone once the status has changed. Runs after that render: the composer is enabled
+  // again, and the panel shows its other action, or the panel toggle takes focus while the panel is hidden.
+  useEffect(() => {
+    if (focusAfterStatus === null) return;
+    setFocusAfterStatus(null);
+    if (focusAfterStatus === "composer") input.current?.focus();
+    else (pageRef.current?.querySelector<HTMLElement>("[data-thread-action]") ?? toggleRef.current)?.focus();
+  }, [focusAfterStatus]);
 
   // The documents decide what a new conversation is: none ready → upload first; still processing → a hint. A
   // conversation opened from its URL shows its history either way.
@@ -330,7 +357,8 @@ export function ChatPage({
   }
 
   const trimmed = question.trim();
-  const canAsk = !answering && trimmed.length > 0;
+  // An archived conversation takes no questions until it is restored; the server refuses them too.
+  const canAsk = !answering && !archived && trimmed.length > 0;
 
   function submit() {
     // The ref also stops a second Enter that lands before the disabled state renders.
@@ -360,6 +388,8 @@ export function ChatPage({
     setAnswered(false);
     setPickerOpen(false);
     setScope("library");
+    setArchived(false);
+    setChangingStatus(false);
     // The document closes (the panel starts over); focus stays where the learner is.
     opener.current = null;
     setViewer(null);
@@ -377,6 +407,7 @@ export function ChatPage({
       setThreadId(thread.thread_id);
       setFirstQuestion(thread.title ?? null);
       setScope(thread.search_scope);
+      setArchived(thread.status === "archived");
       setTurns(
         turns.map((t) => ({
           question: t.question,
@@ -621,6 +652,32 @@ export function ChatPage({
     if (alive.current && turn.current === forTurn) setRenamed(saved);
   }
 
+  // Archive or restore the conversation (US-13). Only its status changes; the history stays where it is. A failure keeps
+  // the status and says why; a SessionExpiredError was already reported by the API client.
+  async function changeArchived(archiving: boolean) {
+    if (threadId === null) return;
+    const forTurn = turn.current;
+    setChangingStatus(true);
+    try {
+      await (archiving ? archive : restore)(threadId);
+      if (!alive.current || turn.current !== forTurn) return;
+      setArchived(archiving);
+      setProblem(null);
+      setAnnouncement(archiving ? "Conversation archived." : "Conversation restored.");
+      setFocusAfterStatus(archiving ? "action" : "composer");
+    } catch (error) {
+      if (!alive.current || turn.current !== forTurn || error instanceof SessionExpiredError) return;
+      const message = `Couldn't ${archiving ? "archive" : "restore"} this conversation. Try again.`;
+      setProblem({ message });
+      setAnnouncement(message);
+    } finally {
+      // Another conversation opened meanwhile has its own status to change.
+      if (alive.current && turn.current === forTurn) setChangingStatus(false);
+      // The side nav's recent list drops or regains it.
+      conversations.refresh();
+    }
+  }
+
   // Saves the learner's rating of one turn and shows what the server kept. A failure rejects to the buttons, which say so.
   // Only the newest request for a turn may update it: replies can arrive out of order.
   async function rateTurn(runId: string, rating: Rating) {
@@ -745,8 +802,8 @@ export function ChatPage({
         >
           <PanelLeft className={styles.toggleIcon} strokeWidth={1.5} aria-hidden="true" />
         </button>
-        {/* Editable once the server has started the conversation (US-13). */}
-        <ThreadTitle title={title} editable={threadId !== null} onRename={renameTitle} />
+        {/* Editable once the server has started the conversation, until it is archived (US-13). */}
+        <ThreadTitle title={title} editable={threadId !== null && !archived} onRename={renameTitle} />
       </header>
 
       <p role="status" className="visually-hidden">
@@ -775,6 +832,10 @@ export function ChatPage({
             openId={viewer?.documentId ?? null}
             searchListed={scope === "listed"}
             onSearchListedChange={threadId === null ? undefined : (on) => void changeSearchScope(threadId, on)}
+            archived={archived}
+            onArchive={() => void changeArchived(true)}
+            onRestore={() => void changeArchived(false)}
+            actionsDisabled={answering || changingStatus}
           />
         )}
         {pickerOpen && threadId !== null && (
@@ -854,12 +915,13 @@ export function ChatPage({
                             <>
                               <p className={styles.muted}>This conversation only searches {documentCount(used.length)}.</p>
                               <div className={styles.declineActions}>
-                                <Button icon={Plus} aria-haspopup="dialog" disabled={answering} onClick={() => setPickerOpen(true)}>
+                                {/* Off in an archived conversation: its documents and scope can't change. */}
+                                <Button icon={Plus} aria-haspopup="dialog" disabled={answering || archived} onClick={() => setPickerOpen(true)}>
                                   Add documents
                                 </Button>
                                 <Button
                                   icon={Search}
-                                  disabled={answering || threadId === null}
+                                  disabled={answering || threadId === null || archived}
                                   onClick={() => threadId !== null && void searchAll(threadId, t.question)}
                                 >
                                   Search all my documents
@@ -935,6 +997,14 @@ export function ChatPage({
                 );
               })}
 
+              {/* With no turn to show it under (e.g. an archive that failed), the problem stays above the composer. */}
+              {turns.length === 0 && problem && (
+                <p className={styles.problem}>
+                  <CircleAlert className={styles.problemIcon} strokeWidth={1.5} aria-hidden="true" />
+                  {problem.message}
+                </p>
+              )}
+
               {answering && <p className={styles.thinking}>The tutor is answering…</p>}
             </div>
           </div>
@@ -947,10 +1017,29 @@ export function ChatPage({
               <p className={styles.scopeLine}>
                 <Filter className={styles.scopeIcon} strokeWidth={1.5} aria-hidden="true" />
                 {`Searching ${documentCount(used.length)} `}
-                <button type="button" className={styles.linkButton} onClick={changeScope}>
-                  Change
-                </button>
+                {/* An archived conversation's scope can't change. */}
+                {!archived && (
+                  <button type="button" className={styles.linkButton} onClick={changeScope}>
+                    Change
+                  </button>
+                )}
               </p>
+            )}
+            {archived && (
+              <div className={styles.archivedBanner}>
+                <Banner
+                  variant="info"
+                  icon={Archive}
+                  title="This conversation is archived."
+                  action={
+                    <Button variant="primary" size="sm" icon={ArchiveRestore} disabled={changingStatus} onClick={() => void changeArchived(false)}>
+                      Restore
+                    </Button>
+                  }
+                >
+                  Restore it to keep asking.
+                </Banner>
+              </div>
             )}
             <div className={styles.composer}>
               <textarea
@@ -959,9 +1048,9 @@ export function ChatPage({
                 className={styles.input}
                 rows={1}
                 maxLength={MAX_QUESTION}
-                placeholder="Ask about your documents"
+                placeholder={archived ? "Archived conversation" : "Ask about your documents"}
                 value={question}
-                disabled={answering}
+                disabled={answering || archived}
                 onChange={(e) => setQuestion(e.target.value)}
                 onKeyDown={onKeyDown}
               />

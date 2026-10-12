@@ -117,6 +117,8 @@ button.source:focus-visible { outline: 2px solid var(--focus); outline-offset: 2
 /* One quiet 12px line above the box while the conversation searches only its documents. */
 .scopeLine { display: flex; align-items: center; gap: var(--sp-1); margin: 0 0 var(--sp-2); font-size: var(--fs-12); color: var(--text-2); }
 .scopeIcon { width: 14px; height: 14px; flex: none; }
+/* An archived conversation's banner sits over the disabled composer, spaced like the scope line. */
+.archivedBanner { margin: 0 0 var(--sp-2); }
 .linkButton {
   padding: 0; border: 0; border-radius: var(--r-sm); background: none;
   color: var(--accent-text); font: inherit; text-decoration: underline; cursor: pointer;

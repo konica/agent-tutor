@@ -460,7 +460,7 @@ describe("ChatPage", () => {
       control.push(null);
     });
 
-    it("offers a disabled Archive conversation once the conversation exists", async () => {
+    it("archive is disabled while answering", async () => {
       const control = controlledStream();
       renderChat({ ask: vi.fn(() => control.stream()) });
       await question();
@@ -468,10 +468,11 @@ describe("ChatPage", () => {
       await userEvent.type(await question(), "What is attention?");
       await userEvent.click(askButton());
       control.push({ type: "thread", thread_id: "t1", run_id: "r1" });
-      // The thread exists before its answer is done.
+      // The thread exists before its answer is done; it can be archived once the answer ends.
       expect(await within(panel()!).findByRole("button", { name: "Archive conversation" })).toBeDisabled();
       control.push({ type: "done" });
       control.push(null);
+      await waitFor(() => expect(within(panel()!).getByRole("button", { name: "Archive conversation" })).toBeEnabled());
     });
 
     it("hides and shows the panel with the toggle, by mouse or keyboard, and remembers the choice", async () => {
@@ -1721,6 +1722,152 @@ describe("ChatPage", () => {
 
       expect(notHelpful()).toHaveAttribute("aria-pressed", "true");
       expect(helpful()).toHaveAttribute("aria-pressed", "false");
+    });
+  });
+
+  describe("an archived conversation", () => {
+    const kept: TurnResponse = {
+      question: "What is attention?",
+      answer: "It weighs tokens [1].",
+      citations: [{ n: 1, chunk_id: "c1", document_id: "d1", document_title: "ReAct", page: 2, archived: false, deleted: false }],
+      decline: null,
+      created_at: "2026-10-10T09:00:00Z",
+      run_id: "r1",
+      rating: null,
+    };
+    const usedDoc: ThreadDocumentResponse = { document_id: "d1", title: "ReAct", authors: [], year: null, archived: false, deleted: false, added_by: "answer", used: true };
+    const loader = (statuses: Record<string, "active" | "archived">, turns: TurnResponse[] = [kept], scope: "library" | "listed" = "library") =>
+      vi.fn(async (id: string) => ({
+        thread: { thread_id: id, title: "What is attention?", search_scope: scope, status: statuses[id] ?? ("active" as const) },
+        turns,
+      }));
+    const panel = () => screen.getByRole("complementary", { name: "Conversation" });
+    const banner = () => screen.queryByText("This conversation is archived.");
+
+    // At /chat/t1 inside the shell's conversations list, with a link to another conversation.
+    function renderConversation(props: ComponentProps<typeof ChatPage>) {
+      const refresh = vi.fn();
+      render(
+        <ConversationsContext.Provider value={{ list: null, failed: false, refresh }}>
+          <MemoryRouter initialEntries={["/chat/t1"]}>
+            <Routes>
+              <Route
+                path="/chat/:threadId?"
+                element={<ChatPage loadDocs={async () => [doc("ready")]} loadUsed={async () => [usedDoc]} viewerDeps={fakeViewerDeps()} {...props} />}
+              />
+            </Routes>
+            <Link to="/chat/t2">Other</Link>
+          </MemoryRouter>
+        </ConversationsContext.Provider>,
+      );
+      return refresh;
+    }
+
+    it("an archived conversation shows the banner, a disabled composer, and a plain title", async () => {
+      renderConversation({ loadConversation: loader({ t1: "archived" }) });
+      expect(await screen.findByText("This conversation is archived.")).toBeInTheDocument();
+      expect(screen.getByText("Restore it to keep asking.")).toBeInTheDocument();
+      const box = await question();
+      expect(box).toBeDisabled();
+      expect(box).toHaveAttribute("placeholder", "Archived conversation");
+      expect(askButton()).toBeDisabled();
+      expect(screen.getByRole("heading", { level: 1, name: "What is attention?" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Edit title/ })).not.toBeInTheDocument();
+      expect(screen.getByText("It weighs tokens [1].")).toBeInTheDocument();
+      // The history's citations still open the document.
+      const chip = screen.getByRole("button", { name: /^ReAct, p\. 2\. Open beside the conversation/ });
+      await userEvent.click(chip);
+      expect(await screen.findByText("p. 2 / 3", {}, { timeout: 3000 })).toBeInTheDocument();
+      expect(screen.getByRole("region", { name: "ReAct" })).toBeInTheDocument();
+    });
+
+    it("the banner's Restore is keyboard-reachable", async () => {
+      const restore = vi.fn(async () => ({}));
+      renderConversation({ loadConversation: loader({ t1: "archived" }), restore });
+      const button = await screen.findByRole("button", { name: "Restore" });
+      act(() => button.focus());
+      await userEvent.keyboard("{Enter}");
+      expect(restore).toHaveBeenCalledWith("t1");
+    });
+
+    it("restoring from the banner brings the controls back and focuses the composer", async () => {
+      const restore = vi.fn(async () => ({}));
+      const refresh = renderConversation({ loadConversation: loader({ t1: "archived" }), restore });
+      await userEvent.click(await screen.findByRole("button", { name: "Restore" }));
+      await waitFor(() => expect(banner()).not.toBeInTheDocument());
+      const box = await question();
+      expect(box).toBeEnabled();
+      expect(box).toHaveAttribute("placeholder", "Ask about your documents");
+      expect(screen.getByRole("button", { name: "What is attention?. Edit title" })).toBeInTheDocument();
+      expect(within(panel()).getByRole("button", { name: "Archive conversation" })).toBeEnabled();
+      expect(within(panel()).getByRole("button", { name: "Add documents" })).toBeInTheDocument();
+      await waitFor(() => expect(document.activeElement).toBe(box));
+      expect(refresh).toHaveBeenCalled();
+      expect(screen.getByRole("status")).toHaveTextContent("Conversation restored.");
+    });
+
+    it("archiving from the panel makes it read-only and refreshes the shell list", async () => {
+      const archive = vi.fn(async () => ({}));
+      const refresh = renderConversation({ loadConversation: loader({ t1: "active" }), archive });
+      await screen.findByText("It weighs tokens [1].");
+      expect(banner()).not.toBeInTheDocument();
+      await userEvent.click(within(panel()).getByRole("button", { name: "Archive conversation" }));
+      expect(archive).toHaveBeenCalledWith("t1");
+      expect(await screen.findByText("This conversation is archived.")).toBeInTheDocument();
+      expect(await question()).toBeDisabled();
+      expect(refresh).toHaveBeenCalled();
+      expect(screen.getByRole("status")).toHaveTextContent("Conversation archived.");
+      await waitFor(() => expect(document.activeElement).toBe(within(panel()).getByRole("button", { name: "Restore conversation" })));
+    });
+
+    it("a failed archive keeps the conversation active", async () => {
+      const archive = vi.fn(async () => {
+        throw new Error("409");
+      });
+      renderConversation({ loadConversation: loader({ t1: "active" }), archive });
+      await screen.findByText("It weighs tokens [1].");
+      await userEvent.click(within(panel()).getByRole("button", { name: "Archive conversation" }));
+      expect(await screen.findByText("Couldn't archive this conversation. Try again.", { ignore: "script, style, [role=status]" })).toBeInTheDocument();
+      expect(screen.getByRole("status")).toHaveTextContent("Couldn't archive this conversation. Try again.");
+      expect(banner()).not.toBeInTheDocument();
+      expect(await question()).toBeEnabled();
+      expect(within(panel()).getByRole("button", { name: "Archive conversation" })).toBeEnabled();
+    });
+
+    it("a failed archive of a conversation without turns still says why", async () => {
+      const archive = vi.fn(async () => {
+        throw new Error("409");
+      });
+      renderConversation({ loadConversation: loader({ t1: "active" }, []), archive });
+      await screen.findByRole("button", { name: "What is attention?. Edit title" });
+      await userEvent.click(within(panel()).getByRole("button", { name: "Archive conversation" }));
+      expect(await screen.findByText("Couldn't archive this conversation. Try again.", { ignore: "script, style, [role=status]" })).toBeInTheDocument();
+      expect(screen.getByRole("status")).toHaveTextContent("Couldn't archive this conversation. Try again.");
+    });
+
+    it("an archived conversation's decline buttons are disabled", async () => {
+      const declined: TurnResponse = { ...kept, answer: "", citations: [], decline: { code: "limited", message: "These documents don't cover this." } };
+      renderConversation({ loadConversation: loader({ t1: "archived" }, [kept, declined]) });
+      const card = (await screen.findByText("These documents don't cover this.")).parentElement!;
+      expect(within(card).getByRole("button", { name: "Add documents" })).toBeDisabled();
+      expect(within(card).getByRole("button", { name: "Search all my documents" })).toBeDisabled();
+    });
+
+    it("an archived limited conversation offers no Change under the composer", async () => {
+      renderConversation({ loadConversation: loader({ t1: "archived" }, [kept], "listed") });
+      const form = (await question()).closest("form")!;
+      expect(await within(form).findByText(/Searching 1 document/)).toBeInTheDocument();
+      expect(within(form).queryByRole("button", { name: "Change" })).not.toBeInTheDocument();
+    });
+
+    it("opening another conversation clears the archived state", async () => {
+      renderConversation({ loadConversation: loader({ t1: "archived", t2: "active" }) });
+      expect(await screen.findByText("This conversation is archived.")).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("link", { name: "Other" }));
+      await waitFor(() => expect(banner()).not.toBeInTheDocument());
+      await screen.findByText("It weighs tokens [1].");
+      expect(banner()).not.toBeInTheDocument();
+      expect(await question()).toBeEnabled();
     });
   });
 });
