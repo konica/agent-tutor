@@ -34,7 +34,7 @@ from smart_tutor.apps.agent.tracing import AskRun, AskTracing
 from smart_tutor.shared.adapters.auth.bearer import BearerToken, CurrentPrincipal
 from smart_tutor.shared.adapters.auth.keycloak_introspection import keycloak_verifier
 from smart_tutor.shared.adapters.model_factory import ChatRole, ModelFactory
-from smart_tutor.shared.adapters.tracing import LearnerHasher, run_metadata, start_tracing
+from smart_tutor.shared.adapters.tracing import LearnerHasher, run_metadata, start_langsmith_tracing
 from smart_tutor.shared.config import MAX_HISTORY_ANSWER_CHARS, MAX_HISTORY_TURNS, Settings
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.ports.token_verifier import TokenVerifier
@@ -141,7 +141,8 @@ def create_app(
         if verifier is not None:
             yield
             return
-        hasher = start_tracing(settings)  # tracing on without a key, or with bad LangSmith settings: refuse to start
+        # Tracing on without a key, or with bad LangSmith settings: refuse to start.
+        hasher = start_langsmith_tracing(settings)
         if tracing is None:
             app.state.tracing = AskTracing(run_metadata(settings), hasher)
         if not settings.keycloak_client_secret.get_secret_value():

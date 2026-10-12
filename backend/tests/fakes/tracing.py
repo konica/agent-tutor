@@ -3,17 +3,45 @@
 import uuid
 from collections.abc import Callable, Iterator, Mapping
 from concurrent.futures import Executor, Future
-from contextlib import AbstractContextManager, nullcontext
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from types import SimpleNamespace
 from typing import Any, TypeVar
 
 import langsmith
 from langsmith.utils import LangSmithNotFoundError
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExporter
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
+from smart_tutor.shared.adapters.tracing import LearnerHasher, PhoenixTraces, phoenix_traces
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.ports.run_tracing import RunTracing
 
 T = TypeVar("T")
+
+META = {"deployment": "local", "chat_model": "chat-x", "embedding_model": "embed-y"}
+
+
+@contextmanager
+def recorded_traces(
+    sampling_rate: float = 1.0,
+    exporter: SpanExporter | None = None,
+    metadata: Mapping[str, str] = META,
+    hasher: LearnerHasher | None = None,
+) -> Iterator[tuple[PhoenixTraces, InMemorySpanExporter]]:
+    """Phoenix tracing as the agent and worker set it up, but each span is kept in memory (or given to `exporter`) the
+    moment it ends, instead of being sent. LangChain is instrumented only inside the block."""
+    memory = InMemorySpanExporter()
+    traces = phoenix_traces(
+        "smart-tutor-test",
+        sampling_rate,
+        SimpleSpanProcessor(exporter or memory),
+        hasher or LearnerHasher("k"),
+        metadata,
+    )
+    try:
+        yield traces, memory
+    finally:
+        traces.shutdown()
 
 
 class RecordingClient(langsmith.Client):

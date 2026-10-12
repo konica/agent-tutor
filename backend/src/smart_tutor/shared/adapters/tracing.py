@@ -1,23 +1,191 @@
-"""LangSmith tracing (PRD §10.4): who a run is for appears only as a keyed hash of the learner's user id, so usage can
-be grouped per learner without the trace naming them. Tokens, user ids, and emails never reach a trace (ADR 0007)."""
+"""Runtime traces into the environment's own Phoenix (PRD §10.4, ADR 0017), through OpenTelemetry: a batched OTLP/HTTP
+exporter, a parent-based trace-id ratio sampler, and OpenInference's LangChain instrumentation for the LangGraph and
+model spans under our own root spans. Who a run is for appears only as a keyed hash of the learner's user id. Tokens,
+user ids, and emails never reach a span (ADR 0007). Exporting runs on the SDK's own thread: a failed export is logged
+by the SDK and dropped, and never fails the work it traces (#229)."""
 
 import hashlib
 import hmac
+import json
 import logging
+import uuid
 from collections.abc import Iterator, Mapping
 from contextlib import AbstractContextManager, contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass
 
 import langsmith
-from langsmith import run_helpers, run_trees
+from langsmith import run_helpers
 from langsmith import utils as ls_utils
+from openinference.instrumentation.langchain import LangChainInstrumentor
+from openinference.semconv.resource import ResourceAttributes
+from openinference.semconv.trace import OpenInferenceMimeTypeValues, OpenInferenceSpanKindValues, SpanAttributes
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import SpanProcessor, TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.trace.id_generator import IdGenerator, RandomIdGenerator
+from opentelemetry.sdk.trace.sampling import ParentBased, TraceIdRatioBased
+from opentelemetry.trace import Tracer
 
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.ports.run_tracing import RunTracing
 
 KEY_SETTING = "SMART_TUTOR_LEARNER_HASH_KEY"
+EXPORT_TIMEOUT_SECONDS = 10.0
+_LOW_64_BITS = 0xFFFF_FFFF_FFFF_FFFF
+_root_run: ContextVar[uuid.UUID | None] = ContextVar("root_run", default=None)
 
 logger = logging.getLogger(__name__)
+
+
+def root_span_id(run_id: uuid.UUID) -> int:
+    """An ask's root span id: the low 64 bits of its run id, so the API can address the span from the stored run id."""
+    return run_id.int & _LOW_64_BITS
+
+
+@contextmanager
+def root_ids(run_id: uuid.UUID) -> Iterator[None]:
+    """Spans started inside take `run_id` as their trace id and `root_span_id(run_id)` as their span id."""
+    token = _root_run.set(run_id)
+    try:
+        yield
+    finally:
+        _root_run.reset(token)
+
+
+class RunIds(IdGenerator):
+    """Random ids, except inside `root_ids`."""
+
+    def __init__(self) -> None:
+        self._random = RandomIdGenerator()
+
+    def generate_trace_id(self) -> int:
+        run_id = _root_run.get()
+        return run_id.int if run_id else self._random.generate_trace_id()
+
+    def generate_span_id(self) -> int:
+        run_id = _root_run.get()
+        return (root_span_id(run_id) if run_id else 0) or self._random.generate_span_id()
+
+
+class LearnerHasher:
+    """HMAC-SHA256 of a user id: stable per learner and key, different between learners, changed with the key."""
+
+    def __init__(self, key: str) -> None:
+        if not key:
+            raise ValueError(f"{KEY_SETTING} is empty")
+        self._key = key.encode()
+
+    def __call__(self, user_id: UserId) -> str:
+        return hmac.new(self._key, user_id.encode(), hashlib.sha256).hexdigest()
+
+
+def tracing_enabled(settings: Settings) -> bool:
+    """Traced with a Phoenix URL; a deployed process also needs its key (the local Phoenix has no sign-in)."""
+    if not settings.phoenix_url:
+        return False
+    return settings.deployment == "local" or bool(settings.phoenix_api_key.get_secret_value())
+
+
+def learner_hasher(settings: Settings) -> LearnerHasher | None:
+    """The configured hasher; None when no key is set and tracing is off. Refuses to start without a key while
+    tracing is on, so a span never goes out without its learner hash."""
+    key = settings.learner_hash_key.get_secret_value()
+    if key:
+        return LearnerHasher(key)
+    if tracing_enabled(settings):
+        raise RuntimeError(f"{KEY_SETTING} is not set, but tracing is on")
+    return None
+
+
+def run_metadata(settings: Settings) -> dict[str, str]:
+    """What every traced run says about where it ran and with which models."""
+    return {
+        "deployment": settings.deployment,
+        "chat_model": settings.models.agent.model_id,
+        "embedding_model": settings.models.embedding.model_id,
+    }
+
+
+def ingestion_project(settings: Settings) -> str:
+    """The worker's own project, beside the ask project, so ask traces stay readable."""
+    return f"{settings.phoenix_project}-ingestion"
+
+
+def otlp_exporter(settings: Settings, timeout: float = EXPORT_TIMEOUT_SECONDS) -> OTLPSpanExporter:
+    key = settings.phoenix_api_key.get_secret_value()
+    return OTLPSpanExporter(
+        endpoint=settings.phoenix_url.rstrip("/") + "/v1/traces",  # the bare base URL answers 405
+        headers={"authorization": f"Bearer {key}"} if key else None,
+        timeout=timeout,
+    )
+
+
+@dataclass(frozen=True)
+class PhoenixTraces:
+    """Where this process's spans go, and what every root span says about the run."""
+
+    provider: TracerProvider
+    hasher: LearnerHasher
+    metadata: dict[str, str]
+
+    def tracer(self) -> Tracer:
+        return self.provider.get_tracer("smart_tutor")
+
+    def shutdown(self) -> None:
+        """Send what is left and stop instrumenting LangChain (process exit)."""
+        LangChainInstrumentor().uninstrument()
+        self.provider.shutdown()
+
+
+def phoenix_traces(
+    project: str, sampling_rate: float, processor: SpanProcessor, hasher: LearnerHasher, metadata: Mapping[str, str]
+) -> PhoenixTraces:
+    provider = TracerProvider(
+        resource=Resource({ResourceAttributes.PROJECT_NAME: project}),
+        sampler=ParentBased(TraceIdRatioBased(sampling_rate)),
+        id_generator=RunIds(),
+    )
+    provider.add_span_processor(processor)
+    LangChainInstrumentor().instrument(tracer_provider=provider)
+    return PhoenixTraces(provider, hasher, dict(metadata))
+
+
+def start_tracing(settings: Settings, project: str) -> PhoenixTraces | None:
+    """Startup for a process that traces: refuses tracing without a learner-hash key (see `learner_hasher`); None
+    leaves the process untraced."""
+    hasher = learner_hasher(settings)
+    if not tracing_enabled(settings):
+        if settings.phoenix_url:
+            logger.warning("SMART_TUTOR_PHOENIX_API_KEY is not set; running untraced")
+        else:
+            logger.info("SMART_TUTOR_PHOENIX_URL is not set; running untraced")
+        return None
+    assert hasher is not None  # learner_hasher refuses tracing without a key
+    exporter = otlp_exporter(settings)
+    traces = phoenix_traces(
+        project, settings.trace_sampling_rate, BatchSpanProcessor(exporter), hasher, run_metadata(settings)
+    )
+    logger.info("tracing into Phoenix project %s at %s", project, settings.phoenix_url)
+    return traces
+
+
+def span_attributes(inputs: Mapping[str, object] | None, metadata: Mapping[str, object]) -> dict[str, str]:
+    """A root span's OpenInference attributes: a CHAIN, its inputs, and its metadata (Phoenix shows each key as
+    `metadata.<key>`)."""
+    attributes = {
+        SpanAttributes.OPENINFERENCE_SPAN_KIND: OpenInferenceSpanKindValues.CHAIN.value,
+        SpanAttributes.METADATA: json.dumps(metadata),
+    }
+    if inputs is not None:
+        attributes[SpanAttributes.INPUT_VALUE] = json.dumps(inputs)
+        attributes[SpanAttributes.INPUT_MIME_TYPE] = OpenInferenceMimeTypeValues.JSON.value
+    return attributes
+
+
+# --- LangSmith, until the worker (Task 2) and the agent (Task 3) move to Phoenix and these are deleted ---
 
 
 @contextmanager
@@ -51,49 +219,18 @@ def never_raising[T](cm: AbstractContextManager[T], fallback: T) -> Iterator[T]:
     end(None, None)
 
 
-class LearnerHasher:
-    """HMAC-SHA256 of a user id: stable per learner and key, different between learners, changed with the key."""
-
-    def __init__(self, key: str) -> None:
-        if not key:
-            raise ValueError(f"{KEY_SETTING} is empty")
-        self._key = key.encode()
-
-    def __call__(self, user_id: UserId) -> str:
-        return hmac.new(self._key, user_id.encode(), hashlib.sha256).hexdigest()
-
-
-def learner_hasher(settings: Settings) -> LearnerHasher | None:
-    """The configured hasher; None when no key is set and tracing is off. Refuses to start without a key while
-    tracing is on, so a trace never goes out without its learner hash."""
-    key = settings.learner_hash_key.get_secret_value()
-    if key:
-        return LearnerHasher(key)
-    if ls_utils.tracing_is_enabled():
-        raise RuntimeError(f"{KEY_SETTING} is not set, but LangSmith tracing is on")
-    return None
-
-
-def start_tracing(settings: Settings) -> LearnerHasher | None:
+def start_langsmith_tracing(settings: Settings) -> LearnerHasher | None:
     """Startup check for a process that traces: the learner-hash key (see `learner_hasher`), and, while tracing is
-    on, LangSmith's own settings, by building the default client now. A sampling rate outside 0–1 then stops startup
-    instead of failing every trace."""
+    on, LangSmith's own settings, by building the default client now."""
+    from langsmith import run_trees
+
     hasher = learner_hasher(settings)
     if ls_utils.tracing_is_enabled():
         run_trees.get_cached_client()
     return hasher
 
 
-def run_metadata(settings: Settings) -> dict[str, str]:
-    """What every traced run says about where it ran and with which models."""
-    return {
-        "deployment": settings.deployment,
-        "chat_model": settings.models.agent.model_id,
-        "embedding_model": settings.models.embedding.model_id,
-    }
-
-
-def ingestion_project() -> str:
+def langsmith_ingestion_project() -> str:
     """The worker's own project, beside the ask project, so ask traces stay readable."""
     return f"{ls_utils.get_tracer_project()}-ingestion"
 

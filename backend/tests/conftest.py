@@ -1,15 +1,36 @@
 """Shared fixtures. Unit tests use fakes; integration tests (marker `integration`) need `make up`.
 
 No test sends a trace, whatever environment is loaded (ADR 0017): tracing is off for the whole session, and LangSmith's
-default client records instead of sending. A test that needs a trace turns it on with its own recording client."""
+default client records instead of sending. A test that needs a trace turns it on with its own recording client. No test
+reaches a Phoenix either: `SMART_TUTOR_PHOENIX_URL` is blank for the session, so every `Settings()` is untraced, and a
+test that leaves LangChain instrumented fails."""
 
 from collections.abc import Iterator
 
 import langsmith
 import pytest
 from langchain_core.embeddings import DeterministicFakeEmbedding
+from openinference.instrumentation.langchain import LangChainInstrumentor
 
 from fakes import RecordingClient, fake_embeddings
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _phoenix_off() -> Iterator[None]:
+    # The environment beats `.env` files in pydantic-settings, so a blank value wins over a developer's URL.
+    patch = pytest.MonkeyPatch()
+    patch.setenv("SMART_TUTOR_PHOENIX_URL", "")
+    yield
+    patch.undo()
+
+
+@pytest.fixture(autouse=True)
+def _no_instrumentation_left() -> Iterator[None]:
+    yield
+    instrumentor = LangChainInstrumentor()
+    if instrumentor.is_instrumented_by_opentelemetry:
+        instrumentor.uninstrument()
+        pytest.fail("this test left LangChain instrumented; trace inside fakes.recorded_traces()")
 
 
 @pytest.fixture(autouse=True, scope="session")

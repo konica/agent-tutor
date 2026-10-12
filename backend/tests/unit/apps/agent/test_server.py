@@ -212,12 +212,9 @@ def test_more_than_200_document_ids_are_refused() -> None:
     assert c.post("/ask", json={"question": "q", "document_ids": ids}, headers=AUTH).status_code == 422
 
 
-def test_startup_refuses_tracing_without_a_learner_hash_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("smart_tutor.shared.adapters.tracing.ls_utils.tracing_is_enabled", lambda *a: True)
-    with (
-        pytest.raises(RuntimeError, match="SMART_TUTOR_LEARNER_HASH_KEY"),
-        TestClient(create_app(Settings(keycloak_client_secret="s", learner_hash_key=""))),
-    ):
+def test_startup_refuses_tracing_without_a_learner_hash_key() -> None:
+    settings = Settings(keycloak_client_secret="s", learner_hash_key="", phoenix_url="http://127.0.0.1:9")
+    with pytest.raises(RuntimeError, match="SMART_TUTOR_LEARNER_HASH_KEY"), TestClient(create_app(settings)):
         pass
 
 

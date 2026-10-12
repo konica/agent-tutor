@@ -1,6 +1,10 @@
-"""Keyed learner hash and LangSmith run tracing (PRD §10.4): the learner appears only as an HMAC of their user id."""
+"""Keyed learner hash, LangSmith run tracing (until Task 2 replaces it), and Phoenix tracing setup (PRD §10.4, ADR
+0017): where spans go, with which key, how many, and the learner only as an HMAC of their user id."""
 
+import http.server
 import json
+import threading
+import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
@@ -8,20 +12,28 @@ from typing import Any
 import langsmith
 import pytest
 from langchain_core.messages import AIMessage
-from langsmith import run_trees
-from langsmith import utils as ls_utils
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from pydantic import ValidationError
 
-from fakes import RecordingClient, fake_chat_model
+from fakes import RecordingClient, fake_chat_model, recorded_traces
 from smart_tutor.shared.adapters.tracing import (
     LangSmithRunTracing,
     LearnerHasher,
+    ingestion_project,
     learner_hasher,
     never_raising,
+    otlp_exporter,
+    phoenix_traces,
+    root_ids,
+    root_span_id,
     run_metadata,
     start_tracing,
+    tracing_enabled,
 )
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
+
+URL = "http://127.0.0.1:9"  # nothing listens
 
 
 def test_the_hash_is_stable_for_one_learner_and_differs_between_learners() -> None:
@@ -44,16 +56,6 @@ def test_the_key_comes_from_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SMART_TUTOR_LEARNER_HASH_KEY", "from-env")
     hasher = learner_hasher(Settings())
     assert hasher is not None and hasher(UserId("ada")) == LearnerHasher("from-env")(UserId("ada"))
-
-
-def test_no_key_is_fine_while_tracing_is_off() -> None:
-    with langsmith.tracing_context(enabled=False):
-        assert learner_hasher(Settings(learner_hash_key="")) is None
-
-
-def test_no_key_refuses_to_start_while_tracing_is_on() -> None:
-    with langsmith.tracing_context(enabled=True), pytest.raises(RuntimeError, match="SMART_TUTOR_LEARNER_HASH_KEY"):
-        learner_hasher(Settings(learner_hash_key=""))
 
 
 def test_run_metadata_names_the_deployment_and_models() -> None:
@@ -147,28 +149,104 @@ def test_a_trace_that_cannot_end_leaves_no_context_for_the_next_run() -> None:
     assert created["extra"]["metadata"]["learner_hash"] == hasher(UserId("b"))
 
 
+def test_without_a_phoenix_url_the_process_is_untraced() -> None:
+    assert not tracing_enabled(Settings(phoenix_url="", learner_hash_key="k"))
+    assert start_tracing(Settings(phoenix_url="", learner_hash_key="k"), "p") is None
+
+
+def test_locally_a_url_without_a_key_traces() -> None:
+    assert tracing_enabled(Settings(deployment="local", phoenix_url=URL))
+
+
+def test_a_deployed_process_without_its_key_runs_untraced() -> None:
+    settings = Settings(deployment="on-premise", phoenix_url=URL, learner_hash_key="k")
+    assert not tracing_enabled(settings) and start_tracing(settings, "p") is None
+
+
+def test_a_deployed_process_with_its_key_traces() -> None:
+    assert tracing_enabled(Settings(deployment="on-premise", phoenix_url=URL, phoenix_api_key="key"))
+
+
+def test_no_learner_hash_key_is_fine_while_untraced() -> None:
+    assert learner_hasher(Settings(phoenix_url="", learner_hash_key="")) is None
+
+
+def test_no_learner_hash_key_refuses_to_start_while_tracing_is_on() -> None:
+    with pytest.raises(RuntimeError, match="SMART_TUTOR_LEARNER_HASH_KEY"):
+        start_tracing(Settings(phoenix_url=URL, learner_hash_key=""), "p")
+
+
+@pytest.mark.parametrize("rate", [-0.1, 1.5, 2])
+def test_a_sampling_rate_outside_zero_to_one_refuses_to_start(rate: float) -> None:
+    with pytest.raises(ValidationError, match="trace_sampling_rate"):
+        Settings(trace_sampling_rate=rate)
+
+
+def test_the_ingestion_project_sits_beside_the_ask_project() -> None:
+    assert ingestion_project(Settings(phoenix_project="smart-tutor-on-premise")) == "smart-tutor-on-premise-ingestion"
+
+
+def test_a_span_started_in_root_ids_takes_the_run_id() -> None:
+    run_id = uuid.uuid4()
+    with recorded_traces() as (traces, spans):
+        with root_ids(run_id):
+            span = traces.tracer().start_span("ask")
+        child = traces.tracer().start_span("child")  # outside: random ids
+        span.end()
+        child.end()
+    ask, other = spans.get_finished_spans()
+    assert ask.context.trace_id == run_id.int and ask.context.span_id == root_span_id(run_id)
+    assert root_span_id(run_id) == run_id.int & 0xFFFF_FFFF_FFFF_FFFF
+    assert other.context.trace_id != run_id.int
+
+
+def test_the_sampling_rate_keeps_that_share_of_traces() -> None:
+    for rate, kept in ((0.0, 0), (1.0, 20)):
+        with recorded_traces(sampling_rate=rate) as (traces, spans):
+            for _ in range(20):
+                traces.tracer().start_span("ask").end()
+        assert len(spans.get_finished_spans()) == kept
+
+
+class _Collector(http.server.BaseHTTPRequestHandler):
+    seen: list[tuple[str, dict[str, str]]] = []
+
+    def do_POST(self) -> None:  # noqa: N802 (http.server's name)
+        self.rfile.read(int(self.headers["Content-Length"]))
+        _Collector.seen.append((self.path, {k.lower(): v for k, v in self.headers.items()}))
+        self.send_response(200)
+        self.end_headers()
+
+    def log_message(self, *args: object) -> None:
+        pass
+
+
 @pytest.fixture
-def fresh_langsmith_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """LangSmith caches its env vars and default client; start and end each test without them."""
-    monkeypatch.setattr(run_trees, "_CLIENT", None)
-    ls_utils.get_env_var.cache_clear()
-    yield
-    ls_utils.get_env_var.cache_clear()
+def collector() -> Iterator[str]:
+    _Collector.seen = []
+    server = http.server.HTTPServer(("127.0.0.1", 0), _Collector)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield f"http://127.0.0.1:{server.server_port}"
+    server.shutdown()
 
 
-@pytest.mark.usefixtures("fresh_langsmith_settings")
-def test_a_sampling_rate_outside_zero_to_one_refuses_to_start(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("LANGSMITH_TRACING_SAMPLING_RATE", "2")
-    monkeypatch.setenv("LANGSMITH_API_KEY", "test-not-a-key")
-    with langsmith.tracing_context(enabled=True), pytest.raises(ls_utils.LangSmithUserError, match="SAMPLING_RATE"):
-        start_tracing(Settings(learner_hash_key="k"))
+def _send_one_span(settings: Settings) -> None:
+    traces = phoenix_traces("p", 1.0, SimpleSpanProcessor(otlp_exporter(settings)), LearnerHasher("k"), {})
+    try:
+        traces.tracer().start_span("ask").end()
+    finally:
+        traces.shutdown()
 
 
-@pytest.mark.usefixtures("fresh_langsmith_settings")
-def test_start_tracing_gives_the_hasher_and_builds_no_client_while_tracing_is_off(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("LANGSMITH_TRACING_SAMPLING_RATE", "2")  # not read while tracing is off
-    with langsmith.tracing_context(enabled=False):
-        hasher = start_tracing(Settings(learner_hash_key="k"))
-    assert hasher is not None and run_trees._CLIENT is None
+def test_spans_go_to_the_traces_endpoint_with_the_key_as_a_bearer_token(collector: str) -> None:
+    _send_one_span(Settings(phoenix_url=collector + "/", phoenix_api_key="phoenix-key-under-test"))
+    [(path, headers)] = _Collector.seen
+    assert path == "/v1/traces"  # the bare base URL answers 405
+    assert headers["authorization"] == "Bearer phoenix-key-under-test"
+
+
+def test_without_a_key_no_authorization_header_is_sent(collector: str) -> None:
+    _send_one_span(Settings(phoenix_url=collector))
+    [(_, headers)] = _Collector.seen
+    assert "authorization" not in headers

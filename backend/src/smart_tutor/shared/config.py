@@ -60,8 +60,18 @@ class Settings(BaseSettings):
     keycloak_client_id: str = "smart-tutor-api"
     keycloak_client_secret: SecretStr = SecretStr("")
     # HMAC key for the learner hash in traces (PRD §10.4). A secret: <mode prefix>/langsmith/learner-hash-key in Secrets
-    # Manager when deployed; required only while LangSmith tracing is on.
+    # Manager when deployed (the name predates Phoenix); required only while tracing is on.
     learner_hash_key: SecretStr = SecretStr("")
+    # Runtime traces (PRD §10.4, ADR 0017): the environment's own Phoenix. Spans go to <phoenix_url>/v1/traces; empty
+    # leaves the process untraced. http://localhost:10404 on the host, http://phoenix:6006 inside Compose.
+    phoenix_url: str = ""
+    # Phoenix system key, sent as `authorization: Bearer`: <prefix>/phoenix/api-key when deployed. The local Phoenix
+    # has no sign-in, so none locally; a deployed process without it runs untraced.
+    phoenix_api_key: SecretStr = SecretStr("")
+    # The agent's project; the worker traces into <phoenix_project>-ingestion.
+    phoenix_project: str = "smart-tutor-local"
+    # Share of traces kept, 0–1 (the SSM parameter trace-sampling-rate when deployed). Outside 0–1 stops startup.
+    trace_sampling_rate: float = Field(default=1.0, ge=0, le=1)
     cors_origins: list[str] = ["http://localhost:10453"]
     # Path prefix the API is served under: /api behind CloudFront (ADR 0009). Routes match with and without it.
     root_path: str = ""
