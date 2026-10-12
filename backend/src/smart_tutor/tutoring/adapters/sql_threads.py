@@ -205,6 +205,10 @@ class SqlThreadRepository(ThreadRepository):
         with self._engine.begin() as conn:
             conn.execute(threads.update().where(threads.c.thread_id == thread_id).values(title=title))
 
+    def set_status(self, thread_id: ThreadId, status: ThreadStatus) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(threads.update().where(threads.c.thread_id == thread_id).values(status=status.value))
+
     def set_search_scope(self, thread_id: ThreadId, scope: SearchScope) -> None:
         with self._engine.begin() as conn:
             conn.execute(threads.update().where(threads.c.thread_id == thread_id).values(search_scope=scope.value))

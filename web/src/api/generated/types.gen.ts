@@ -446,6 +446,10 @@ export type ThreadResponse = {
      */
     search_scope: 'library' | 'listed';
     /**
+     * Status
+     */
+    status: 'active' | 'archived';
+    /**
      * Thread Id
      */
     thread_id: string;
@@ -1156,6 +1160,10 @@ export type ListThreadsData = {
     path?: never;
     query?: {
         /**
+         * Archived
+         */
+        archived?: boolean;
+        /**
          * Subject Id
          */
         subject_id?: Array<string>;
@@ -1294,6 +1302,40 @@ export type UpdateThreadResponses = {
 
 export type UpdateThreadResponse = UpdateThreadResponses[keyof UpdateThreadResponses];
 
+export type ArchiveThreadData = {
+    body?: never;
+    path: {
+        /**
+         * Thread Id
+         */
+        thread_id: string;
+    };
+    query?: never;
+    url: '/threads/{thread_id}/archive';
+};
+
+export type ArchiveThreadErrors = {
+    /**
+     * Not the caller's conversation.
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ArchiveThreadError = ArchiveThreadErrors[keyof ArchiveThreadErrors];
+
+export type ArchiveThreadResponses = {
+    /**
+     * Successful Response
+     */
+    200: ThreadResponse;
+};
+
+export type ArchiveThreadResponse = ArchiveThreadResponses[keyof ArchiveThreadResponses];
+
 export type ListThreadDocumentsData = {
     body?: never;
     path: {
@@ -1348,6 +1390,10 @@ export type AddThreadDocumentsErrors = {
      */
     404: unknown;
     /**
+     * The conversation is archived.
+     */
+    409: unknown;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
@@ -1387,6 +1433,10 @@ export type RemoveThreadDocumentErrors = {
      * Not the caller's conversation.
      */
     404: unknown;
+    /**
+     * The conversation is archived.
+     */
+    409: unknown;
     /**
      * Validation Error
      */
@@ -1441,6 +1491,40 @@ export type AskInThreadResponses = {
 };
 
 export type AskInThreadResponse = AskInThreadResponses[keyof AskInThreadResponses];
+
+export type RestoreThreadData = {
+    body?: never;
+    path: {
+        /**
+         * Thread Id
+         */
+        thread_id: string;
+    };
+    query?: never;
+    url: '/threads/{thread_id}/restore';
+};
+
+export type RestoreThreadErrors = {
+    /**
+     * Not the caller's conversation.
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RestoreThreadError = RestoreThreadErrors[keyof RestoreThreadErrors];
+
+export type RestoreThreadResponses = {
+    /**
+     * Successful Response
+     */
+    200: ThreadResponse;
+};
+
+export type RestoreThreadResponse = RestoreThreadResponses[keyof RestoreThreadResponses];
 
 export type ListThreadTurnsData = {
     body?: never;

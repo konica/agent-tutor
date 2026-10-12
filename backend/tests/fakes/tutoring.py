@@ -52,6 +52,9 @@ class InMemoryThreads(ThreadRepository):
     def set_title(self, thread_id: ThreadId, title: str) -> None:
         self.threads[thread_id].title = title
 
+    def set_status(self, thread_id: ThreadId, status: ThreadStatus) -> None:
+        self.threads[thread_id].status = status
+
     def set_search_scope(self, thread_id: ThreadId, scope: SearchScope) -> None:
         self.threads[thread_id].search_scope = scope
 

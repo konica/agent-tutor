@@ -13,11 +13,11 @@ flowchart TB
   subgraph GH["GitHub — konica/agent-tutor"]
     PR["Pull request"] -->|merge| MAIN["main branch"]
     MAIN -->|push event| WF["Actions workflow<br/>deploy (#59)"]
-    WF -.->|"job runs in"| ENV["Environment native-cloud<br/>branches: main only<br/>vars: AWS_ROLE_ARN, AWS_REGION, AWS_ACCOUNT_ID"]
+    WF -.->|"job runs in"| ENV["Environment native-cloud<br/>branches: main only<br/>secret: AWS_ROLE_ARN<br/>var: AWS_REGION"]
     WF -->|"id-token: write"| TOK["OIDC token<br/>sub = repo:konica@1114311/agent-tutor@1399048529:environment:native-cloud"]
   end
 
-  subgraph AWS["AWS account 685394474162 — us-east-1"]
+  subgraph AWS["AWS account ACCOUNT_ID — us-east-1"]
     subgraph IAM["IAM — stack SmartTutor-prod-GitHubDeploy + CDK bootstrap (#55)"]
       OIDC["OIDC provider<br/>token.actions.githubusercontent.com"]
       ROLE["Role smart-tutor-github-deploy<br/>trusts only that sub"]
@@ -48,7 +48,7 @@ The only real dependency is that GitHub stores the role's ARN, so the role has t
 | 1 | AWS | `cdk bootstrap` (`CDKToolkit` stack) | Admin credentials |
 | 2 | AWS | Deploy `SmartTutor-prod-GitHubDeploy`: the OIDC provider, then the role that trusts `…:environment:native-cloud` | Step 1, and the prefix from step 0 |
 | 3 | GitHub | Create the environment `native-cloud`, limited to `main` | Nothing (it can run before step 2) |
-| 4 | GitHub | Set the variables `AWS_ROLE_ARN`, `AWS_REGION`, `AWS_ACCOUNT_ID` in `native-cloud` | The role ARN from step 2 |
+| 4 | GitHub | Set the secret `AWS_ROLE_ARN` and the variable `AWS_REGION` in `native-cloud` | The role ARN from step 2 |
 | 5 | Both, from #59 on | A deploy job sends its token; AWS STS checks it against the role's trust and returns 1-hour credentials | Steps 2–4 |
 
 ```mermaid
@@ -63,7 +63,7 @@ sequenceDiagram
   A->>AWS: cdk deploy SmartTutor-prod-GitHubDeploy (step 2)
   AWS-->>A: role ARN (trusts ...:environment:native-cloud)
   A->>GH: create environment native-cloud, main only (step 3)
-  A->>GH: set AWS_ROLE_ARN, AWS_REGION, AWS_ACCOUNT_ID (step 4)
+  A->>GH: set secret AWS_ROLE_ARN, var AWS_REGION (step 4)
   Note over GH,AWS: Later, on every merge to main (issue 59)
   GH->>AWS: deploy job in native-cloud sends its OIDC token (step 5)
   AWS-->>GH: token matches the role's trust, so 1-hour credentials

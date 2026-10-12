@@ -239,8 +239,50 @@ describe("ConversationPanel", () => {
     expect(screen.getByRole("button", { name: "Summarize lesson" })).toBeDisabled();
   });
 
-  it("offers a disabled Archive conversation once the conversation exists, even before its answer", () => {
-    renderPanel({ threadId: "t1", answered: false });
+  it("offers Archive conversation once the conversation exists, even before its answer", () => {
+    renderPanel({ threadId: "t1", answered: false, onArchive: vi.fn() });
+    expect(screen.getByRole("button", { name: "Archive conversation" })).toBeEnabled();
+  });
+
+  it("an active conversation offers Archive conversation", async () => {
+    const onArchive = vi.fn();
+    renderPanel({ threadId: "t1", documents: [used("ReAct")], onArchive, onRestore: vi.fn() });
+    const archive = screen.getByRole("button", { name: "Archive conversation" });
+    expect(archive).toBeEnabled();
+    await userEvent.click(archive);
+    expect(onArchive).toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Restore conversation" })).not.toBeInTheDocument();
+  });
+
+  it("an archived conversation is read-only and offers Restore conversation", async () => {
+    const onRestore = vi.fn();
+    const onOpen = vi.fn();
+    renderPanel({
+      threadId: "t1",
+      answered: true,
+      archived: true,
+      documents: [used("ReAct")],
+      searchListed: false,
+      onAddDocuments: vi.fn(),
+      onRemoveDocument: vi.fn(),
+      onSearchListedChange: vi.fn(),
+      onOpen,
+      onArchive: vi.fn(),
+      onRestore,
+    });
+    expect(screen.queryByRole("button", { name: "Remove ReAct from this conversation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add documents" })).not.toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Only search these documents" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Archive conversation" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Restore conversation" }));
+    expect(onRestore).toHaveBeenCalled();
+    const row = within(documentsSection()).getByRole("button", { name: "ReAct" });
+    await userEvent.click(row);
+    expect(onOpen).toHaveBeenCalledWith("ReAct", row);
+  });
+
+  it("actions are disabled while busy", () => {
+    renderPanel({ threadId: "t1", onArchive: vi.fn(), actionsDisabled: true });
     expect(screen.getByRole("button", { name: "Archive conversation" })).toBeDisabled();
   });
 

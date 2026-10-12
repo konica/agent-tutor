@@ -106,13 +106,17 @@ def test_only_main_and_rollback_reach_the_deploy_environments() -> None:
             if job.get("uses", "").removeprefix("./.github/workflows/") in ENVIRONMENT_WORKFLOWS:
                 callers += 1
                 assert job["permissions"] == {"contents": "read", "id-token": "write"}, (name, job_name)
+                # A called workflow sees no secret the caller doesn't pass, not even its environment's own
+                # AWS_ROLE_ARN: without this the role is an empty string and the sign-in fails.
+                assert job["secrets"] == "inherit", (name, job_name)
             else:
                 assert job["permissions"] == {"contents": "read"}, (name, job_name)
+                assert "secrets" not in job, (name, job_name)
     assert callers == 6  # deploy: images per mode, on-premise, native-cloud; rollback: on-premise, native-cloud
     # Only the environment workflows name a deploy role (openwiki-update.yml has its own Bedrock-only role).
     for path in WORKFLOWS.glob("*.yml"):
         if path.name not in ENVIRONMENT_WORKFLOWS:
-            assert "vars.AWS_ROLE_ARN" not in path.read_text(encoding="utf-8"), path.name
+            assert "secrets.AWS_ROLE_ARN" not in path.read_text(encoding="utf-8"), path.name
     assert "id-token" not in (WORKFLOWS / "ci.yml").read_text(encoding="utf-8")
 
 
@@ -127,12 +131,42 @@ def test_no_long_lived_aws_keys() -> None:
     for path in WORKFLOWS.glob("*.yml"):
         text = path.read_text(encoding="utf-8")
         assert "AWS_ACCESS_KEY_ID" not in text and "AWS_SECRET_ACCESS_KEY" not in text, path.name
-    for name in ("ci.yml", "deploy.yml", "rollback.yml", *ENVIRONMENT_WORKFLOWS):
+    for name in ("ci.yml", "deploy.yml", "rollback.yml"):
         assert "${{ secrets." not in (WORKFLOWS / name).read_text(encoding="utf-8"), name
+    # The only secret a deploy workflow reads is the role ARN, never a key.
+    for name in ENVIRONMENT_WORKFLOWS:
+        assert set(re.findall(r"\$\{\{\s*secrets\.(\w+)",(WORKFLOWS / name).read_text(encoding="utf-8"))) == {"AWS_ROLE_ARN"}
     for job in (images_job(), on_premise_job(), native_cloud_job()):
         creds = next(s for s in job["steps"] if "configure-aws-credentials" in str(s.get("uses")))
-        assert creds["with"]["role-to-assume"] == "${{ vars.AWS_ROLE_ARN }}"
+        assert creds["with"]["role-to-assume"] == "${{ secrets.AWS_ROLE_ARN }}"
         assert creds["with"]["aws-region"] == "${{ vars.AWS_REGION }}"
+
+
+def test_public_logs_never_show_the_aws_account_id() -> None:
+    # The repository is public, so anyone can read Actions logs. GitHub prints a step's inputs before the step runs,
+    # so a role ARN in a variable shows the account id; a secret is masked. mask-aws-account-id then masks the bare id
+    # in later output (ECR registry names, cdk deploy outputs).
+    sign_ins = 0
+    for path in WORKFLOWS.glob("*.yml"):
+        text = path.read_text(encoding="utf-8")
+        assert not re.search(r"vars\.\w*ROLE_ARN", text), path.name
+        for job in yaml.safe_load(text)["jobs"].values():
+            for s in job.get("steps", []):
+                if "configure-aws-credentials" not in str(s.get("uses")):
+                    continue
+                sign_ins += 1
+                assert re.fullmatch(r"aws-actions/configure-aws-credentials@[0-9a-f]{40}", s["uses"]), path.name
+                assert s["with"]["mask-aws-account-id"] is True, path.name
+                assert re.fullmatch(r"\$\{\{ secrets\.\w*ROLE_ARN \}\}", s["with"]["role-to-assume"]), path.name
+    assert sign_ins == 5  # build-images, both deploys, evals-smoke, openwiki-update
+
+
+def test_openwiki_skips_until_its_role_secret_exists() -> None:
+    # A job-level `if` can't read secrets, so a check job reports whether the role is set and the update waits on it.
+    jobs = workflow("openwiki-update.yml")["jobs"]
+    assert "secrets.OPENWIKI_AWS_ROLE_ARN != ''" in str(jobs["check"]["steps"])
+    assert jobs["update"]["needs"] == "check"
+    assert jobs["update"]["if"] == "needs.check.outputs.ready == 'true'"
 
 
 def test_third_party_actions_are_pinned_and_set_up_before_credentials() -> None:
@@ -610,7 +644,11 @@ def test_smoke_evals_sign_in_with_the_bedrock_only_role() -> None:
     assert wf["permissions"] == {"contents": "read"}
     assert job["permissions"] == {"contents": "read", "id-token": "write"}
     creds = step(job, "Sign in to AWS (Bedrock only)")
-    assert creds["with"] == {"role-to-assume": "${{ vars.EVALS_AWS_ROLE_ARN }}", "aws-region": "us-east-1"}
+    assert creds["with"] == {
+        "role-to-assume": "${{ secrets.EVALS_AWS_ROLE_ARN }}",
+        "aws-region": "us-east-1",
+        "mask-aws-account-id": True,
+    }
     assert job["timeout-minutes"] <= 60  # the role's session lasts 1 hour
     for ref in (str(s["uses"]) for s in job["steps"] if "uses" in s):
         assert re.fullmatch(r"[\w./-]+@[0-9a-f]{40}", ref), ref
@@ -647,13 +685,13 @@ def test_smoke_evals_skip_script_decides_correctly(tmp_path: Path) -> None:
         )
         return out.read_text() + summary.read_text(), result.stdout
 
-    files, stdout = run(HEAD_REPO="someone/agent-tutor", REPO="konica/agent-tutor", ROLE="", HAS_KEY="false")
+    files, stdout = run(HEAD_REPO="someone/agent-tutor", REPO="konica/agent-tutor", HAS_ROLE="false", HAS_KEY="false")
     assert "run=false" in files and "fork" in files and "::notice" in stdout
-    files, stdout = run(HEAD_REPO="konica/agent-tutor", REPO="konica/agent-tutor", ROLE="", HAS_KEY="true")
+    files, stdout = run(HEAD_REPO="konica/agent-tutor", REPO="konica/agent-tutor", HAS_ROLE="false", HAS_KEY="true")
     assert "run=false" in files and "EVALS_AWS_ROLE_ARN" in files and "::warning" in stdout
-    files, stdout = run(HEAD_REPO="konica/agent-tutor", REPO="konica/agent-tutor", ROLE="arn:x", HAS_KEY="false")
+    files, stdout = run(HEAD_REPO="konica/agent-tutor", REPO="konica/agent-tutor", HAS_ROLE="true", HAS_KEY="false")
     assert "run=false" in files and "LANGSMITH_API_KEY" in files
-    files, _ = run(HEAD_REPO="", REPO="konica/agent-tutor", ROLE="arn:x", HAS_KEY="true")  # workflow_dispatch
+    files, _ = run(HEAD_REPO="", REPO="konica/agent-tutor", HAS_ROLE="true", HAS_KEY="true")  # workflow_dispatch
     assert "run=true" in files
 
 

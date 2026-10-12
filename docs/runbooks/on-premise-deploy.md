@@ -78,11 +78,11 @@ aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$Instanc
 
    The role trusts only jobs in this environment (subject `...:environment:on-premise`), and the environment accepts only `main`, so a pull request can't deploy.
 
-2. Set the two variables. Read the role ARN from the existing stack output; this deploys nothing:
+2. Set the role secret and the region variable. The role ARN is a secret so the public Actions log masks the account id in it. Read the role ARN from the existing stack output; this deploys nothing:
 
    ```powershell
    $RoleArn = aws cloudformation describe-stacks --stack-name SmartTutor-OnPremise-prod-GitHubDeploy --query "Stacks[0].Outputs[?OutputKey=='DeployRoleArn'].OutputValue" --output text
-   gh variable set AWS_ROLE_ARN --env on-premise --repo $Repo --body $RoleArn
+   gh secret set AWS_ROLE_ARN --env on-premise --repo $Repo --body $RoleArn
    gh variable set AWS_REGION --env on-premise --repo $Repo --body us-east-1
    ```
 

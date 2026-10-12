@@ -2,5 +2,12 @@
   margin: 0 0 var(--sp-2); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md);
   background: var(--danger-soft); color: var(--danger); font-size: var(--fs-13);
 }
-
-.toolbar { display: flex; align-items: center; gap: var(--sp-2); min-height: 36px; margin: 0 0 var(--sp-2); }
+.toolbar {
+  display: flex; align-items: center; gap: var(--sp-2); min-height: 36px; margin: 0 0 var(--sp-2);
+  border-bottom: 1px solid var(--border);
+}
+.notice {
+  display: flex; align-items: center; gap: var(--sp-2); min-height: 32px; margin: 0 0 var(--sp-2); padding: 0 var(--sp-3);
+  border-radius: var(--r-md); background: var(--surface-2); color: var(--text-2); font-size: var(--fs-13);
+}
+.notice svg { flex: none; width: 16px; height: 16px; color: var(--info); }

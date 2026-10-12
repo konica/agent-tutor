@@ -143,10 +143,10 @@ try {
                 -f name=main -f type=branch | Out-Null
         }
     }
-    Invoke-Step "Set environment variables AWS_ROLE_ARN=$RoleArn, AWS_REGION, AWS_ACCOUNT_ID" {
-        gh variable set AWS_ROLE_ARN --repo $Repo --env $Environment --body $RoleArn
+    # The role ARN is a secret: the repository is public, and GitHub prints a variable in the log, account id included.
+    Invoke-Step "Set the environment secret AWS_ROLE_ARN and variable AWS_REGION" {
+        gh secret set AWS_ROLE_ARN --repo $Repo --env $Environment --body $RoleArn
         gh variable set AWS_REGION --repo $Repo --env $Environment --body $Region
-        gh variable set AWS_ACCOUNT_ID --repo $Repo --env $Environment --body $AccountId
     }
 
     # --- Step 5: remove a hand-made budget -----------------------------------------------------------------------

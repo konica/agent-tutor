@@ -24,7 +24,7 @@ vi.mock("../api/documents", async (importOriginal) => ({
 vi.mock("../api/chat", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api/chat")>()),
   loadConversation: vi.fn(async (threadId: string) => ({
-    thread: { thread_id: threadId, title: "Attention basics", search_scope: "library" as const },
+    thread: { thread_id: threadId, title: "Attention basics", search_scope: "library" as const, status: "active" as const },
     turns: [],
   })),
   loadDocumentsUsed: vi.fn(async () => []),
