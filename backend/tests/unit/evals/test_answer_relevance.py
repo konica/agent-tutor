@@ -32,6 +32,16 @@ async def test_the_judge_sees_the_question_the_answer_and_whether_the_library_co
     ]
 
 
+async def test_a_follow_up_is_judged_with_its_conversations_earlier_questions() -> None:
+    judge = FakeJudge()
+    await judged_by(lambda: judge)(
+        inputs={"question": "And its main limitation?", "history": ["What is ReAct?"]},
+        outputs={"answer": "It can loop [1]."},
+        reference_outputs={"covered": True},
+    )
+    assert judge.calls[0]["inputs"] == {"earlier_questions": ["What is ReAct?"], "question": "And its main limitation?"}
+
+
 async def test_a_failed_run_scores_zero_without_calling_the_judge() -> None:
     judge = FakeJudge()
     result = await judged_by(lambda: judge)(inputs={"question": "q"}, outputs={}, reference_outputs={"covered": True})
