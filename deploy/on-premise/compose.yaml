@@ -3,9 +3,10 @@
 #   docker compose -f /opt/smart-tutor/on-premise/compose.yaml --env-file /etc/smart-tutor/smart-tutor.env ps
 # Our images come from on-premise's ECR repositories (`smart-tutor-on-premise/<service>`) by commit tag. Caddy is the
 # only service with public ports. Data lives on the data volume (/data). The worker, agent, and MCP server (#149) run
-# as the image's non-root user on a read-only root filesystem, like the Helm charts. The worker reaches only Postgres
-# and, through the egress proxy, its AWS endpoints and LangSmith (#153, #229); deploy.sh checks the running worker's isolation and egress
-# after every deploy.
+# as the image's non-root user on a read-only root filesystem, like the Helm charts. The worker reaches Postgres and
+# Phoenix directly and, through the egress proxy, its AWS endpoints and LangSmith (#153, #229); deploy.sh checks the running worker's isolation and egress
+# after every deploy. Phoenix keeps the production traces (#288, ADR 0017): people reach it at /phoenix through Caddy, and
+# services reach it at http://phoenix:6006 inside Compose, the worker too (it shares the worker network).
 
 name: smart-tutor
 
@@ -14,7 +15,7 @@ x-logging: &logging
   options: {max-size: 10m, max-file: "5"}
 
 networks:
-  # The worker parses untrusted PDFs (PRD §9.10). On this network it reaches Postgres and the egress proxy only:
+  # The worker parses untrusted PDFs (PRD §9.10). On this network it reaches Postgres, Phoenix, and the egress proxy only:
   # an internal network has no route out of the VM and no external DNS.
   worker:
     internal: true
@@ -29,6 +30,7 @@ services:
       # Read only by deploy.sh's role bootstrap (psql \getenv), so the passwords never appear on a command line.
       APP_DB_PASSWORD: ${APP_DB_PASSWORD:?}
       KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
+      PHOENIX_DB_PASSWORD: ${PHOENIX_DB_PASSWORD:?}
     networks: [default, worker]
     volumes:
       - /data/postgres:/var/lib/postgresql/data
@@ -37,6 +39,55 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+
+  # Runtime traces (#288, ADR 0017): Arize Phoenix. People sign in at https://<domain>/phoenix (Caddy strips the prefix;
+  # PHOENIX_HOST_ROOT_PATH puts it back into the pages' links). The production services will send OTLP/HTTP to
+  # http://phoenix:6006/v1/traces with the system key <prefix>/phoenix/api-key (runbook); on the worker's network so the
+  # worker reaches it without the egress proxy. Its traces live in the `phoenix` database, which the backup leaves out.
+  phoenix:
+    image: arizephoenix/phoenix:version-20.16.0-nonroot
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      PHOENIX_HOST_ROOT_PATH: /phoenix
+      PHOENIX_ROOT_URL: https://${DOMAIN:?}/phoenix
+      PHOENIX_POSTGRES_HOST: postgres
+      PHOENIX_POSTGRES_PORT: "5432"
+      PHOENIX_POSTGRES_USER: phoenix
+      PHOENIX_POSTGRES_PASSWORD: ${PHOENIX_DB_PASSWORD:?}
+      PHOENIX_POSTGRES_DB: phoenix
+      PHOENIX_WORKING_DIR: /tmp/phoenix  # exports only; the traces are in Postgres
+      PHOENIX_ENABLE_AUTH: "true"
+      PHOENIX_ENABLE_STRONG_PASSWORD_POLICY: "true"
+      PHOENIX_USE_SECURE_COOKIES: "true"  # TLS ends at Caddy
+      PHOENIX_SECRET: ${PHOENIX_SECRET:?}
+      # Read only when the admin account is created (the first start); Phoenix makes the admin change it.
+      PHOENIX_DEFAULT_ADMIN_INITIAL_PASSWORD: ${PHOENIX_ADMIN_PASSWORD:?}
+      # D25. Read only when the default retention policy is created (the first start); later, change it in the UI.
+      PHOENIX_DEFAULT_RETENTION_POLICY_DAYS: "180"
+      # The traces hold learners' questions and answers: no analytics pixels in the UI, no assistant that sends them
+      # to an LLM provider, and no MCP server (/mcp) or code sandbox providers, which would give tools and third
+      # parties another way to read or send them.
+      PHOENIX_TELEMETRY_ENABLED: "false"
+      PHOENIX_DISABLE_AGENT_ASSISTANT: "true"
+      PHOENIX_ENABLE_MCP_SERVER: "false"
+      PHOENIX_ALLOWED_SANDBOX_PROVIDERS: NONE
+    networks: [default, worker]
+    user: "65532:65532"  # the image's nonroot user
+    read_only: true
+    tmpfs: [/tmp:size=64m]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 1g
+    healthcheck:
+      # The image has Python but no shell or curl.
+      test: ["CMD", "/usr/bin/python3.13", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:6006/healthz', timeout=5)"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s  # the first start migrates the phoenix database
+    depends_on:
+      postgres: {condition: service_healthy}
 
   keycloak:
     image: ${REGISTRY:?}/${REPOSITORY_PREFIX:?}/keycloak:${IMAGE_TAG:?}
@@ -337,7 +388,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # One origin: `/` → web, `/api/*` → API, `/auth/*` → Keycloak; a Let's Encrypt certificate for DOMAIN (ADR 0012).
+  # One origin: `/` → web, `/api/*` → API, `/auth/*` → Keycloak, `/phoenix/*` → Phoenix; a Let's Encrypt certificate for DOMAIN (ADR 0012).
   caddy:
     image: caddy:2.11-alpine
     restart: unless-stopped
@@ -361,3 +412,4 @@ services:
       web: {condition: service_started}
       api: {condition: service_started}
       keycloak: {condition: service_started}
+      phoenix: {condition: service_started}

@@ -1,7 +1,8 @@
 # On-premise edge (#148, ADR 0012): HTTPS for SMART_TUTOR_DOMAIN with a Let's Encrypt certificate (HTTP redirects to
 # it), and one origin with path routing, as CloudFront does in native-cloud mode. Caddy sets X-Forwarded-Proto and
 # X-Forwarded-Host itself and ignores ones a client sends, so Keycloak can trust them (KC_PROXY_HEADERS=xforwarded).
-# The API is served under /api and Keycloak under /auth, so neither path is stripped.
+# The API is served under /api and Keycloak under /auth, so neither path is stripped. Phoenix is served under /phoenix
+# with the prefix stripped.
 {
 	servers {
 		# The security group opens TCP 80 and 443 only: no HTTP/3 over UDP.
@@ -16,6 +17,12 @@
 	}
 	handle /auth/* {
 		reverse_proxy keycloak:8080
+	}
+	# Phoenix (ADR 0017): its sign-in, UI, and OTLP/HTTP (/phoenix/v1/traces). It expects the prefix stripped
+	# (PHOENIX_HOST_ROOT_PATH adds it back to its links). gRPC isn't served.
+	redir /phoenix /phoenix/
+	handle_path /phoenix/* {
+		reverse_proxy phoenix:6006
 	}
 	handle {
 		reverse_proxy web:8080

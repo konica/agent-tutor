@@ -175,3 +175,16 @@ aws cloudwatch set-alarm-state --alarm-name smart-tutor-on-premise-prod-uptime -
 ```
 
 Each recipient gets an ALARM email. The alarm returns to its real state within a few minutes and sends an OK email. Don't test the **recovery** alarm this way: setting its state by hand also runs its recover action. It shares the topic, so the uptime test proves its emails arrive too.
+
+## Phoenix's memory and database size (#288)
+
+Phoenix itself is capped at 1 GB (`mem_limit`; it idles at about 450 MiB) and is restarted if it goes over. ADR 0017's estimate of 1 to 2 GB includes the database's growth in Postgres, which has no limit. Container limits now total about 5.75 GiB of the t3.large's ~7.6 GiB, with Postgres and Caddy unlimited and no swap, so watch available memory. Check monthly, and after a traffic jump. From a Session Manager shell (`on-premise-deploy.md` §7):
+
+```bash
+free -m
+docker stats --no-stream
+df -h /data
+dc exec postgres psql -U postgres -c "SELECT pg_size_pretty(pg_database_size('phoenix'));"
+```
+
+When it grows, lower `trace-sampling-rate` (`on-premise-deploy.md` §10) or shorten retention in Phoenix's *Settings, Data Retention*, never above 180 days. If the host's available memory stays under about 1 GB, move to a larger instance (`smart-tutor:on-premise-instance-type`).

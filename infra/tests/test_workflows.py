@@ -685,7 +685,7 @@ def test_the_production_deploy_switch_is_documented() -> None:
         "not a security boundary",
     ):
         assert phrase in section, phrase
-    assert "Draft v2.54" in (root / "sdd/prd.md").read_text(encoding="utf-8")
+    assert "Draft v2.55" in (root / "sdd/prd.md").read_text(encoding="utf-8")
 
 
 def test_on_premise_runbook_tears_down_the_whole_mode_without_naming_native_cloud() -> None:
