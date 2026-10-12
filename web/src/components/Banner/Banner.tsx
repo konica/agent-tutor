@@ -3,9 +3,9 @@ import type { ReactNode } from "react";
 
 import styles from "./Banner.module.css";
 
-type Variant = "success" | "info" | "attn" | "danger";
+type Variant = "success" | "info" | "attn" | "danger" | "neutral";
 
-const ICONS = { success: CircleCheck, info: Info, attn: CircleAlert, danger: CircleAlert } as const;
+const ICONS = { success: CircleCheck, info: Info, attn: CircleAlert, danger: CircleAlert, neutral: Info } as const;
 
 type Props = {
   variant: Variant;

@@ -151,3 +151,6 @@ button.source:focus-visible { outline: 2px solid var(--focus); outline-offset: 2
 }
 .hint { display: flex; align-items: center; gap: var(--sp-1); }
 .hintIcon { width: 14px; height: 14px; flex: none; }
+
+/* An archived conversation's composer is the disabled grey: flat, no shadow. */
+.composer.composerArchived { background: var(--surface-2); box-shadow: none; }

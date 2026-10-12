@@ -1834,6 +1834,76 @@ describe("ChatPage", () => {
       expect(within(panel()).getByRole("button", { name: "Archive conversation" })).toBeEnabled();
     });
 
+    it("a failed archive from the panel leaves focus on Archive conversation", async () => {
+      const archive = vi.fn(async () => {
+        throw new Error("409");
+      });
+      renderConversation({ loadConversation: loader({ t1: "active" }), archive });
+      await screen.findByText("It weighs tokens [1].");
+      await userEvent.click(within(panel()).getByRole("button", { name: "Archive conversation" }));
+      await screen.findByText("Couldn't archive this conversation. Try again.", { ignore: "script, style, [role=status]" });
+      await waitFor(() => expect(document.activeElement).toBe(within(panel()).getByRole("button", { name: "Archive conversation" })));
+    });
+
+    it("a failed restore from the banner says why and leaves focus on the banner's Restore", async () => {
+      const restore = vi.fn(async () => {
+        throw new Error("409");
+      });
+      renderConversation({ loadConversation: loader({ t1: "archived" }), restore });
+      await userEvent.click(await screen.findByRole("button", { name: "Restore" }));
+      await screen.findByText("Couldn't restore this conversation. Try again.", { ignore: "script, style, [role=status]" });
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Restore" })));
+    });
+
+    it("a failed restore from the panel leaves focus on Restore conversation", async () => {
+      const restore = vi.fn(async () => {
+        throw new Error("409");
+      });
+      renderConversation({ loadConversation: loader({ t1: "archived" }), restore });
+      await screen.findByText("This conversation is archived.");
+      await userEvent.click(within(panel()).getByRole("button", { name: "Restore conversation" }));
+      await screen.findByText("Couldn't restore this conversation. Try again.", { ignore: "script, style, [role=status]" });
+      await waitFor(() => expect(document.activeElement).toBe(within(panel()).getByRole("button", { name: "Restore conversation" })));
+    });
+
+    it("no question is sent while an archive is in flight", async () => {
+      const archive = vi.fn(() => new Promise<unknown>(() => {}));
+      const ask = vi.fn(() => events({ type: "done" }));
+      renderConversation({ loadConversation: loader({ t1: "active" }), archive, ask });
+      await screen.findByText("It weighs tokens [1].");
+      await userEvent.type(await question(), "Next?");
+      expect(askButton()).toBeEnabled();
+      await userEvent.click(within(panel()).getByRole("button", { name: "Archive conversation" }));
+      await waitFor(() => expect(askButton()).toBeDisabled());
+      await userEvent.type(await question(), "{Enter}");
+      expect(ask).not.toHaveBeenCalled();
+    });
+
+    it("a successful archive keeps an unrelated failed-ask problem", async () => {
+      const archive = vi.fn(async () => ({}));
+      const ask = vi.fn(() =>
+        events({ type: "thread", thread_id: "t1", run_id: "r2" }, { type: "error", code: "unavailable", message: "The tutor is unavailable. Try again in a moment." }),
+      );
+      renderConversation({ loadConversation: loader({ t1: "active" }), archive, ask });
+      await screen.findByText("It weighs tokens [1].");
+      await userEvent.type(await question(), "Next?");
+      await userEvent.click(askButton());
+      expect(await screen.findByText("The tutor is unavailable. Try again in a moment.")).toBeInTheDocument();
+      await userEvent.click(within(panel()).getByRole("button", { name: "Archive conversation" }));
+      expect(await screen.findByText("This conversation is archived.")).toBeInTheDocument();
+      expect(screen.getByText("The tutor is unavailable. Try again in a moment.")).toBeInTheDocument();
+    });
+
+    it("a successful restore clears the failed-restore problem", async () => {
+      const restore = vi.fn().mockRejectedValueOnce(new Error("409")).mockResolvedValue({});
+      renderConversation({ loadConversation: loader({ t1: "archived" }), restore });
+      await userEvent.click(await screen.findByRole("button", { name: "Restore" }));
+      await screen.findByText("Couldn't restore this conversation. Try again.", { ignore: "script, style, [role=status]" });
+      await userEvent.click(screen.getByRole("button", { name: "Restore" }));
+      await waitFor(() => expect(banner()).not.toBeInTheDocument());
+      expect(screen.queryByText("Couldn't restore this conversation. Try again.", { ignore: "script, style, [role=status]" })).not.toBeInTheDocument();
+    });
+
     it("a failed archive of a conversation without turns still says why", async () => {
       const archive = vi.fn(async () => {
         throw new Error("409");

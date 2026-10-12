@@ -120,6 +120,9 @@ export function ConversationsPage({ loadArchived = defaultLoadArchived, archive 
           {ARCHIVED_NOTICE}
         </p>
       )}
+      {list && archivedView && archived === null && archivedFailed && !bothEmpty && (
+        <p className={styles.error}>Can't load your archived conversations. Reload the page to try again.</p>
+      )}
       {bothEmpty && (
         <EmptyState icon={MessageSquare} title="No conversations yet" actions={<Button variant="primary" icon={Plus} onClick={start}>Start a conversation</Button>}>
           <p>Ask a question about your documents. Every conversation is saved here so you can come back to it.</p>

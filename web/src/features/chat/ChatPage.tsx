@@ -195,9 +195,10 @@ export function ChatPage({
   const [archived, setArchived] = useState(false);
   // Set while an archive or restore request is in flight: the Actions and the banner's Restore are off meanwhile.
   const [changingStatus, setChangingStatus] = useState(false);
+  const statusProblem = useRef<string | null>(null); // the message changeArchived last showed, to clear only that one
   // Where focus goes once an archive or restore has rendered: the panel's action that replaced the one clicked, or the
   // composer that came back.
-  const [focusAfterStatus, setFocusAfterStatus] = useState<"action" | "composer" | null>(null);
+  const [focusAfterStatus, setFocusAfterStatus] = useState<"action" | "composer" | "banner" | null>(null);
   const [storedOpen, togglePanel] = usePanelOpen();
   // A starting document opens the panel once without saving it, so the learner's remembered choice stays as it was.
   const [forceOpen, setForceOpen] = useState(false);
@@ -262,7 +263,9 @@ export function ChatPage({
     if (focusAfterStatus === null) return;
     setFocusAfterStatus(null);
     if (focusAfterStatus === "composer") input.current?.focus();
-    else (pageRef.current?.querySelector<HTMLElement>("[data-thread-action]") ?? toggleRef.current)?.focus();
+    else if (focusAfterStatus === "banner") {
+      (pageRef.current?.querySelector<HTMLElement>("[data-banner-restore]") ?? pageRef.current?.querySelector<HTMLElement>("[data-thread-action]") ?? toggleRef.current)?.focus();
+    } else (pageRef.current?.querySelector<HTMLElement>("[data-thread-action]") ?? toggleRef.current)?.focus();
   }, [focusAfterStatus]);
 
   // The documents decide what a new conversation is: none ready → upload first; still processing → a hint. A
@@ -358,7 +361,7 @@ export function ChatPage({
 
   const trimmed = question.trim();
   // An archived conversation takes no questions until it is restored; the server refuses them too.
-  const canAsk = !answering && !archived && trimmed.length > 0;
+  const canAsk = !answering && !archived && !changingStatus && trimmed.length > 0;
 
   function submit() {
     // The ref also stops a second Enter that lands before the disabled state renders.
@@ -654,7 +657,7 @@ export function ChatPage({
 
   // Archive or restore the conversation (US-13). Only its status changes; the history stays where it is. A failure keeps
   // the status and says why; a SessionExpiredError was already reported by the API client.
-  async function changeArchived(archiving: boolean) {
+  async function changeArchived(archiving: boolean, from: "panel" | "banner" = "panel") {
     if (threadId === null) return;
     const forTurn = turn.current;
     setChangingStatus(true);
@@ -662,14 +665,20 @@ export function ChatPage({
       await (archiving ? archive : restore)(threadId);
       if (!alive.current || turn.current !== forTurn) return;
       setArchived(archiving);
-      setProblem(null);
+      // Only this action's own failure is cleared; a failed question's problem stays.
+      const own = statusProblem.current; // read now: the updater runs at the next render
+      setProblem((p) => (p !== null && p.message === own ? null : p));
+      statusProblem.current = null;
       setAnnouncement(archiving ? "Conversation archived." : "Conversation restored.");
       setFocusAfterStatus(archiving ? "action" : "composer");
     } catch (error) {
       if (!alive.current || turn.current !== forTurn || error instanceof SessionExpiredError) return;
       const message = `Couldn't ${archiving ? "archive" : "restore"} this conversation. Try again.`;
+      statusProblem.current = message;
       setProblem({ message });
       setAnnouncement(message);
+      // The clicked button was disabled while the request ran, so focus fell away; give it back once it is enabled.
+      setFocusAfterStatus(from === "banner" && !archiving ? "banner" : "action");
     } finally {
       // Another conversation opened meanwhile has its own status to change.
       if (alive.current && turn.current === forTurn) setChangingStatus(false);
@@ -1028,11 +1037,11 @@ export function ChatPage({
             {archived && (
               <div className={styles.archivedBanner}>
                 <Banner
-                  variant="info"
+                  variant="neutral"
                   icon={Archive}
                   title="This conversation is archived."
                   action={
-                    <Button variant="primary" size="sm" icon={ArchiveRestore} disabled={changingStatus} onClick={() => void changeArchived(false)}>
+                    <Button variant="primary" size="sm" icon={ArchiveRestore} data-banner-restore disabled={changingStatus} onClick={() => void changeArchived(false, "banner")}>
                       Restore
                     </Button>
                   }
@@ -1041,7 +1050,7 @@ export function ChatPage({
                 </Banner>
               </div>
             )}
-            <div className={styles.composer}>
+            <div className={`${styles.composer} ${archived ? styles.composerArchived : ""}`}>
               <textarea
                 ref={input}
                 id="chat-question"

@@ -28,4 +28,11 @@ describe("Banner", () => {
     const { container } = render(<Banner variant="info" icon={Archive} title="t" />);
     expect(container.querySelector("svg")).toHaveClass("lucide-archive");
   });
+
+  it("renders the neutral variant", () => {
+    const { container } = render(<Banner variant="neutral" title="Archived" />);
+    expect(screen.getByText("Archived")).toBeVisible();
+    expect((container.firstChild as HTMLElement).className).toMatch(/neutral/);
+    expect(container.querySelector("svg")).toHaveClass("lucide-info");
+  });
 });

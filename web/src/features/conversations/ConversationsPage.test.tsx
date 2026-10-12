@@ -167,6 +167,12 @@ describe("ConversationsPage", () => {
       expect(screen.getByRole("button", { name: "Start a conversation" })).toBeInTheDocument();
     });
 
+    it("the Archived tab says so when the archived list can't load", async () => {
+      render(page({ list: [thread("a", "First")] }, { loadArchived: vi.fn().mockRejectedValue(new Error("x")) }));
+      await userEvent.click(await screen.findByRole("tab", { name: /^Archived/ }));
+      expect(await screen.findByText("Can't load your archived conversations. Reload the page to try again.")).toBeInTheDocument();
+    });
+
     it("an expired session says nothing", async () => {
       const archive = vi.fn().mockRejectedValue(new SessionExpiredError());
       const loadArchived = vi.fn().mockResolvedValue([]);
