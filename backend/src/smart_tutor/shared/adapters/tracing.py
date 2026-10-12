@@ -14,7 +14,6 @@ from contextlib import AbstractContextManager, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 
-from langsmith import utils as ls_utils
 from openinference.instrumentation.langchain import LangChainInstrumentor
 from openinference.semconv.resource import ResourceAttributes
 from openinference.semconv.trace import OpenInferenceMimeTypeValues, OpenInferenceSpanKindValues, SpanAttributes
@@ -261,17 +260,3 @@ class PhoenixRunTracing(RunTracing):
         span = self._traces.tracer().start_as_current_span(name, context=Context(), attributes=attributes)
         with never_raising(span, None):
             yield
-
-
-# --- LangSmith, until the agent (Task 3) moves to Phoenix and this is deleted ---
-
-
-def start_langsmith_tracing(settings: Settings) -> LearnerHasher | None:
-    """Startup check for a process that traces: the learner-hash key (see `learner_hasher`), and, while tracing is
-    on, LangSmith's own settings, by building the default client now."""
-    from langsmith import run_trees
-
-    hasher = learner_hasher(settings)
-    if ls_utils.tracing_is_enabled():
-        run_trees.get_cached_client()
-    return hasher

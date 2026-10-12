@@ -13,11 +13,11 @@ from langchain_core.messages import AIMessage
 from fakes import FakeRetriever, FakeTokenVerifier, fake_chat_model
 from smart_tutor.apps.agent.graph import build_graph
 from smart_tutor.apps.agent.server import create_app
-from smart_tutor.apps.agent.tracing import AskRun, AskTrace, AskTracing
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.domain.principal import Principal
+from smart_tutor.shared.ports.ask_tracing import AskRun, AskTrace, AskTracing, NoAskTrace, NoAskTracing
 from smart_tutor.tutoring.domain.errors import RetrievalError
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 
@@ -218,23 +218,22 @@ def test_startup_refuses_tracing_without_a_learner_hash_key() -> None:
         pass
 
 
+def test_without_a_phoenix_url_the_agent_starts_untraced(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("smart_tutor.apps.agent.server.keycloak_verifier", lambda settings, http: FakeTokenVerifier())
+    graph = build_graph(lambda token: FakeRetriever([CHUNK]), fake_chat_model(AIMessage("x")))
+    app = create_app(Settings(keycloak_client_secret="s"), graph=graph)
+    with TestClient(app):
+        assert isinstance(app.state.tracing, NoAskTracing)
+
+
 class _RecordingTracing(AskTracing):
     def __init__(self) -> None:
-        super().__init__({}, None)
         self.runs: list[AskRun] = []
 
     @contextmanager
     def trace(self, run: AskRun) -> Iterator[AskTrace]:
         self.runs.append(run)
-
-        class _Noop:
-            def finish(self, answer: str, decline: str | None, chunks: int) -> None:
-                pass
-
-            def fail(self, code: str) -> None:
-                pass
-
-        yield _Noop()  # type: ignore[misc]
+        yield NoAskTrace()
 
 
 def traced_client() -> tuple[TestClient, _RecordingTracing]:

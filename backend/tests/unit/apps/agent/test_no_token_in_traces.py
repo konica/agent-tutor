@@ -1,24 +1,24 @@
-"""ADR 0007: the learner's token rides in runtime context only, so LangSmith never receives it.
+"""ADR 0007: the learner's token rides in runtime context only, so Phoenix never receives it.
 
-The real LangChainTracer sends to a client that records payloads instead of the network. A positive control puts
-the token in the question, so the check is proven able to fire.
+The real OpenInference instrumentation exports to an in-memory exporter instead of the network. A positive control
+puts the token in the question, so the check is proven able to fire.
 """
 
 import json
 import uuid
+from collections.abc import Sequence
 from typing import Any
 
-import langsmith
 from langchain_core.messages import AIMessage
-from langchain_core.tracers import LangChainTracer
+from opentelemetry.sdk.trace import ReadableSpan
 
-from fakes import FakeRetriever, RecordingClient, fake_chat_model
+from fakes import FakeRetriever, fake_chat_model, recorded_traces
 from smart_tutor.apps.agent.graph import build_graph
 from smart_tutor.apps.agent.server import AskRequest, answer_events
 from smart_tutor.apps.agent.state import AgentContext
-from smart_tutor.apps.agent.tracing import AskRun, AskTracing
-from smart_tutor.shared.adapters.tracing import LearnerHasher
+from smart_tutor.shared.adapters.ask_tracing import PhoenixAskTracing
 from smart_tutor.shared.domain.ids import UserId
+from smart_tutor.shared.ports.ask_tracing import AskRun
 from smart_tutor.tutoring.application import HistoryTurn
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 
@@ -27,17 +27,19 @@ INPUT = {"question": "What is attention?"}
 CHUNKS = [RetrievedChunk("c1", "d1", "a.pdf", 3, "Attention weighs tokens.", 0.9)]
 
 
+def dumped(spans: Sequence[ReadableSpan]) -> str:
+    """Every attribute and event of every span, with its resource."""
+    return json.dumps([json.loads(s.to_json()) for s in spans])
+
+
 async def traced_run(state: dict[str, Any], retriever: FakeRetriever | None = None) -> tuple[str, str]:
-    """Run the graph with the token in context; return (dumped trace payloads, dumped output state)."""
-    recorder = RecordingClient()
-    tracer = LangChainTracer(client=recorder, project_name="test")
+    """Run the graph, instrumented, with the token in context; return (dumped spans, dumped output state)."""
     retriever = retriever or FakeRetriever(CHUNKS)
     graph = build_graph(lambda token: retriever, fake_chat_model(AIMessage("It weighs tokens [1].")))
-    with langsmith.tracing_context(enabled=True):
-        out = await graph.ainvoke(state, context=AgentContext(access_token=TOKEN), config={"callbacks": [tracer]})
-    tracer.wait_for_futures()
-    assert recorder.payloads, "the tracer recorded nothing, so the check below would pass vacuously"
-    return json.dumps(recorder.payloads, default=str), json.dumps(out, default=str)
+    with recorded_traces() as (_, spans):
+        out = await graph.ainvoke(state, context=AgentContext(access_token=TOKEN))
+    assert spans.get_finished_spans(), "nothing was traced, so the check below would pass vacuously"
+    return dumped(spans.get_finished_spans()), json.dumps(out, default=str)
 
 
 async def test_the_token_never_reaches_traces_or_state() -> None:
@@ -68,25 +70,23 @@ USER_ID = "user-id-under-test-42"
 EMAIL = "ada.lovelace@example.com"
 
 
-async def ask_payloads(question: str) -> str:
-    recorder = RecordingClient()
-    tracing = AskTracing({"deployment": "local"}, LearnerHasher("k"), client=recorder)
+async def ask_spans(question: str) -> str:
     graph = build_graph(lambda token: FakeRetriever(CHUNKS), fake_chat_model(AIMessage("It weighs tokens [1].")))
     body = AskRequest(question=question)
     run = AskRun(uuid.uuid4(), None, UserId(USER_ID), body.question, None)
-    with langsmith.tracing_context(enabled=True):
-        async for _ in answer_events(graph, body, TOKEN, run, tracing):
+    with recorded_traces() as (traces, spans):
+        async for _ in answer_events(graph, body, TOKEN, run, PhoenixAskTracing(traces)):
             pass
-    assert recorder.payloads
-    return json.dumps(recorder.payloads, default=str)
+    assert spans.get_finished_spans()
+    return dumped(spans.get_finished_spans())
 
 
 async def test_the_ask_trace_holds_no_token_user_id_or_email() -> None:
-    traces = await ask_payloads("What is attention?")
+    traces = await ask_spans("What is attention?")
     assert "What is attention?" in traces
     for secret in (TOKEN, USER_ID, EMAIL):
         assert secret not in traces
 
 
 async def test_positive_control_a_user_id_in_the_question_is_caught() -> None:
-    assert USER_ID in await ask_payloads(f"What is attention? {USER_ID} {EMAIL}")
+    assert USER_ID in await ask_spans(f"What is attention? {USER_ID} {EMAIL}")
