@@ -637,6 +637,16 @@ def test_native_cloud_teardown_runbook_leaves_on_premise_alone() -> None:
     assert "ECR" not in leftovers and "image" not in leftovers.lower()
 
 
+def test_native_cloud_teardown_stops_only_when_a_merge_would_redeploy() -> None:
+    # A merge redeploys native-cloud only while both the production switch and the native-cloud variable are `true`.
+    script = (RUNBOOKS / "pilot-teardown.ps1").read_text(encoding="utf-8")
+    assert "$ProductionDeploy = gh variable get PRODUCTION_DEPLOY --repo $Repo 2>$null" in script
+    assert 'if ($AutoDeploy -eq "true" -and $ProductionDeploy -eq "true") {' in script
+    assert "PRODUCTION_DEPLOY isn't 'true'" in script  # says why it's safe when only the mode variable is on
+    runbook = (RUNBOOKS / "pilot-teardown.md").read_text(encoding="utf-8")
+    assert "PRODUCTION_DEPLOY" in runbook.split("## 3.")[1].split("## 4.")[0]
+
+
 def test_the_on_premise_auto_deploy_switch_is_documented() -> None:
     for path in (RUNBOOKS / "on-premise-deploy.md", WORKFLOWS.parents[1] / "sdd/prd.md"):
         assert "ON_PREMISE_AUTO_DEPLOY" in path.read_text(encoding="utf-8"), path.name

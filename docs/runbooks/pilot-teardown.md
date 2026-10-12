@@ -25,7 +25,7 @@ It runs one `cdk destroy --exclusively <stack>` per stack. Every native-cloud st
 
 ## 3. Stop auto-deploys first
 
-Since #150 native-cloud deploys on a merge only while `NATIVE_CLOUD_AUTO_DEPLOY` is `true`. Make sure it isn't (the script checks it and stops if it is `true`; it never changes it itself):
+Since #150 native-cloud deploys on a merge only while `NATIVE_CLOUD_AUTO_DEPLOY` is `true`, and since #282 only while the production switch `PRODUCTION_DEPLOY` is `true` too. Make sure `NATIVE_CLOUD_AUTO_DEPLOY` isn't `true`. The script checks both and stops only if both are `true`; it never changes either itself:
 
 ```powershell
 gh variable delete NATIVE_CLOUD_AUTO_DEPLOY --repo konica/agent-tutor   # or set it to false
