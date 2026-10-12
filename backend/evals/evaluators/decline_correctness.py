@@ -1,7 +1,9 @@
 """Decline correctness (PRD §10.1, code): a limited conversation declines a question its listed documents don't cover
-(`correctly_declined`) and answers one they do (`wrongly_declined`, a miss when it declines). Two evaluators, one key
-each, so the runner never fills the metric a given example doesn't cover. Scored 1 or 0 from the ask target's
-`decline` code; an unlimited conversation has no relevance gate yet (US-5, #14)."""
+and answers one they do. `correctly_declined` scores the limited, uncovered examples: 1 when the run gave the `limited`
+decline. `wrongly_declined` scores every covered example, limited or not: 1 when the run declined at all (a miss).
+Two evaluators, one key each, so the runner never fills the metric a given example doesn't cover. Scored from the ask
+target's `decline` code; an unlimited conversation has no relevance gate yet (US-5, #14). The `"key"` strings are
+literals in the returned dicts: langsmith reads an evaluator's feedback keys from the source, not by running it."""
 
 from typing import Any
 
@@ -21,12 +23,18 @@ def correctly_declined(
     if inputs["documents"] is None:  # the example's limit: a failed run's outputs have none
         return not_applicable(CORRECTLY_DECLINED, "an unlimited conversation has no relevance gate until US-5 (#14)")
     if "decline" not in outputs:
-        return {"key": CORRECTLY_DECLINED, "score": 0, "comment": FAILED}
+        return {"key": "decline_correctness.correctly_declined", "score": 0, "comment": FAILED}
+    if outputs["decline"] == "limited":
+        return {"key": "decline_correctness.correctly_declined", "score": 1, "comment": "declined (limited)"}
     if outputs["decline"]:
-        return {"key": CORRECTLY_DECLINED, "score": 1, "comment": f"declined ({outputs['decline']})"}
+        return {
+            "key": "decline_correctness.correctly_declined",
+            "score": 0,
+            "comment": f"declined ({outputs['decline']}), not the limited decline of the listed documents",
+        }
     answer = outputs.get("answer") or ""
     return {
-        "key": CORRECTLY_DECLINED,
+        "key": "decline_correctness.correctly_declined",
         "score": 0,
         "comment": f"answered a question the listed documents don't cover: {answer[:120]}",
     }
@@ -38,10 +46,14 @@ def wrongly_declined(
     if not reference_outputs["covered"]:
         return not_applicable(WRONGLY_DECLINED, "the library doesn't cover the question: correctly_declined scores it")
     if "decline" not in outputs:
-        return {"key": WRONGLY_DECLINED, "score": 1, "comment": FAILED}
+        return {"key": "decline_correctness.wrongly_declined", "score": 1, "comment": FAILED}
     if outputs["decline"]:
-        return {"key": WRONGLY_DECLINED, "score": 1, "comment": f"declined ({outputs['decline']}) a covered question"}
-    return {"key": WRONGLY_DECLINED, "score": 0, "comment": "answered"}
+        return {
+            "key": "decline_correctness.wrongly_declined",
+            "score": 1,
+            "comment": f"declined ({outputs['decline']}) a covered question",
+        }
+    return {"key": "decline_correctness.wrongly_declined", "score": 0, "comment": "answered"}
 
 
 SUITE = Suite(dataset="ask", target=ask_target, evaluators=(correctly_declined, wrongly_declined))

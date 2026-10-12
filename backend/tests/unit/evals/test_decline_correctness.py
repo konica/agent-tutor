@@ -70,3 +70,19 @@ def test_a_failed_run_counts_against_the_metric_that_applies() -> None:
 def test_a_failed_run_of_an_unlimited_example_is_not_applicable_to_correctly_declined() -> None:
     result = correctly_declined(UNLIMITED, {}, UNCOVERED)
     assert _not_applicable(result, "decline_correctness.correctly_declined")
+
+
+def test_only_the_limited_decline_scores_correctly_declined() -> None:
+    other = correctly_declined(LIMITED, _outputs("something_else"), UNCOVERED)
+    assert other["score"] == 0 and "something_else" in other["comment"]
+
+
+def test_wrongly_declined_counts_any_decline_of_a_covered_question() -> None:
+    assert wrongly_declined(UNLIMITED, _outputs("something_else", limited=False), COVERED)["score"] == 1
+
+
+def test_langsmith_reads_the_dotted_feedback_key_of_each_evaluator() -> None:
+    from langsmith.evaluation._key_extraction import _safe_extract_feedback_keys
+
+    assert set(_safe_extract_feedback_keys(correctly_declined)) == {"decline_correctness.correctly_declined"}
+    assert set(_safe_extract_feedback_keys(wrongly_declined)) == {"decline_correctness.wrongly_declined"}

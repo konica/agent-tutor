@@ -16,6 +16,24 @@ from smart_tutor.shared.config import Settings
 KEY = "retrieval_relevance"
 RUBRIC = Path(__file__).parent / "rubrics" / "retrieval_relevance.md"
 Judge = Callable[..., Awaitable[dict[str, Any]]]
+MAX_CONCURRENT_JUDGE_CALLS = 4  # the runner has several examples in flight, each with a call per chunk
+_gates: dict[asyncio.AbstractEventLoop, asyncio.Semaphore] = {}
+
+
+def _gate() -> asyncio.Semaphore:
+    """The semaphore of the running event loop (a semaphore made in another loop would not work here)."""
+    loop = asyncio.get_running_loop()
+    if loop not in _gates:
+        _gates.clear()  # only the running loop matters; drop closed ones
+        _gates[loop] = asyncio.Semaphore(MAX_CONCURRENT_JUDGE_CALLS)
+    return _gates[loop]
+
+
+async def _judge_chunk(judge: Judge, judged: dict[str, Any], chunk: dict[str, Any]) -> dict[str, Any]:
+    async with _gate():
+        return await judge(
+            inputs=judged, outputs={"chunk": {"document": chunk["document_title"], "text": chunk["text"]}}
+        )
 
 
 @cache
@@ -45,12 +63,7 @@ def judged_by(judge: Callable[[], Judge]) -> Evaluator:
         judged = {"question": inputs["question"]}
         if inputs.get("history"):
             judged = {"earlier_questions": inputs["history"], **judged}
-        results = await asyncio.gather(
-            *(
-                judge()(inputs=judged, outputs={"chunk": {"document": c["document_title"], "text": c["text"]}})
-                for c in chunks
-            )
-        )
+        results = await asyncio.gather(*(_judge_chunk(judge(), judged, c) for c in chunks))
         scores = [float(r["score"]) for r in results]
         lowest = min(results, key=lambda r: float(r["score"]))
         comment = f"chunk scores {', '.join(f'{s:.2f}' for s in scores)}; lowest: {lowest.get('comment')}"

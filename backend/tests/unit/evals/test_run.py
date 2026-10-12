@@ -92,6 +92,18 @@ async def test_a_not_applicable_result_is_left_out_of_its_metric() -> None:
     assert scores == {"decline_correctness.correctly_declined": [1]}
 
 
+def _declines_or_raises(inputs: dict[str, Any]) -> dict[str, Any]:
+    if inputs["question"] == "a":
+        return not_applicable("decline_correctness.correctly_declined", "covered")
+    raise RuntimeError("evaluator failed")
+
+
+async def test_a_raise_beside_a_not_applicable_result_leaves_one_unscored_example() -> None:
+    group = DatasetSuites("ask", make_target, (_declines_or_raises,))
+    scores, _ = await run_split(published(), [group], "smoke", load=lambda key: ASK)
+    assert scores == {"decline_correctness.correctly_declined": [None]}
+
+
 async def test_a_metric_that_applied_to_no_example_is_not_run() -> None:
     group = DatasetSuites("ask", make_target, (lambda inputs: not_applicable("answer_relevance", "n/a"),))
     scores, _ = await run_split(published(), [group], "smoke", load=lambda key: ASK)

@@ -87,3 +87,26 @@ def test_the_rubric_formats_with_the_judge_inputs_only() -> None:
     formatted = text.format(inputs="<Q>", outputs="<C>", reference_outputs="<R>")  # stray braces would raise
     assert "<Q>" in formatted and "<C>" in formatted
     assert "{reference_outputs}" not in text  # the judge gets no reference
+
+
+async def test_concurrent_judge_calls_are_bounded() -> None:
+    import asyncio
+
+    from evals.evaluators.retrieval_relevance import MAX_CONCURRENT_JUDGE_CALLS
+
+    running = peak = 0
+
+    async def judge(**kwargs: Any) -> dict[str, Any]:
+        nonlocal running, peak
+        running += 1
+        peak = max(peak, running)
+        await asyncio.sleep(0.01)
+        running -= 1
+        return {"key": "retrieval_relevance", "score": 1.0, "comment": ""}
+
+    evaluate = judged_by(lambda: judge)
+    chunks = [_chunk(str(i)) for i in range(6)]
+    await asyncio.gather(
+        *(evaluate(inputs=INPUTS, outputs={"chunks": chunks}, reference_outputs=COVERED) for _ in range(3))
+    )
+    assert peak == MAX_CONCURRENT_JUDGE_CALLS

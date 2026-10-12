@@ -42,7 +42,7 @@ Prerequisites:
 
     make evals-smoke     # or: cd backend && uv run --env-file ../.env --extra eval python -m evals.run --split smoke
 
-It runs every suite whose dataset has the split, one LangSmith experiment per dataset, then prints each `release_1` metric of `thresholds.yaml` as PASS, FAIL, or "not run" (no suite scores it yet) with the experiment links, and exits 1 when a metric fails or nothing ran. `--release` picks another table. `--summary PATH` appends the table as Markdown to a file (CI passes `$GITHUB_STEP_SUMMARY`); CI runs the smoke split on PRs that change the agent (`.github/workflows/evals-smoke.yml`, see `docs/runbooks/evals-ci.md`).
+It runs every suite whose dataset has the split, one LangSmith experiment per dataset, then prints each `release_1` metric of `thresholds.yaml` as PASS, FAIL, or "not run" (no suite scores it yet) with the experiment links, and exits 1 when a metric fails or nothing ran. An example whose evaluator raised counts as a failure in the gate: a score of 0 for a `min` metric, 1 for a `max` metric, and a failing example for `max_failures`. `--release` picks another table. `--summary PATH` appends the table as Markdown to a file (CI passes `$GITHUB_STEP_SUMMARY`); CI runs the smoke split on PRs that change the agent (`.github/workflows/evals-smoke.yml`, see `docs/runbooks/evals-ci.md`).
 
 Prerequisites: the app stack and the eval learners' libraries (`make evals-learners`, above); your AWS profile (the agent and the Qwen judge run on Bedrock); `LANGSMITH_API_KEY` in your shell or `.env`.
 
@@ -68,7 +68,7 @@ Metrics that score the last turn:
 - `decline_correctness.correctly_declined`: 1 when a limited, uncovered example gets the `limited` decline. Unlimited conversations are not applicable until the relevance gate covers every turn (US-5, #14).
 - `decline_correctness.wrongly_declined`: 1 when a covered example is declined.
 
-Hand-written conversations (follow-ups, topic switches, and drift in a limited conversation) are in both splits of `smart-tutor-ask`, along with accepted `follow_up`, `topic_switch`, and `drift` candidates. There is no separate command: run `make evals-publish` once to publish new examples, then `make evals-smoke`. In the LangSmith experiment, filter on examples whose inputs have `history`.
+Hand-written conversations (follow-ups, topic switches, and drift in a limited conversation) are in both splits of `smart-tutor-ask`. Accepted `follow_up`, `topic_switch`, and `drift` candidates join `full` always, but `smoke` only as far as its 30 items go (taken in turn by type), so they may reach only `full`. There is no separate command: run `make evals-publish` once to publish new examples, then `make evals-smoke`. In the LangSmith experiment, filter on examples whose inputs have `history`.
 
 ## Grow a dataset: generate, review, publish
 

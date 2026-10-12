@@ -62,7 +62,9 @@ def test_drift_drafts_limit_the_conversation_to_one_held_document_and_end_on_ano
 
 
 def test_follow_up_drafts_continue_on_a_held_document_from_a_different_passage() -> None:
-    for draft in (d for d in plan() if d.type == "follow_up"):
+    drafts = [d for d in plan() if d.type == "follow_up"]
+    assert drafts
+    for draft in drafts:
         [seed] = draft.sources
         assert seed in HOLDINGS[draft.learner] and draft.covered and draft.documents is None
         [earlier], [last] = draft.history, draft.chunks
