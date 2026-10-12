@@ -3,6 +3,9 @@
 # ON_PREMISE_AUTO_DEPLOY is `false`, which an operator sets while on-premise is torn down (#207).
 # Native-cloud is opt-in: run this workflow by hand with mode native-cloud, or set the repository variable
 # NATIVE_CLOUD_AUTO_DEPLOY to `true` to deploy it on every push as well (unset or anything else keeps it off).
+# Nothing deploys unless the repository variable PRODUCTION_DEPLOY is `true` (#282): build-images.yml and both deploy
+# workflows skip their job otherwise, and the production-switch job reports it (a notice on a push, an error on a run by
+# hand). The per-mode variables above choose what deploys only while it is on.
 # Runbooks: docs/runbooks/on-premise-deploy.md, docs/runbooks/pilot-deploy.md (native-cloud).
 # Jobs that call an environment workflow pass `secrets: inherit`: a called workflow sees no secret the caller doesn't
 # pass, not even its environment's own AWS_ROLE_ARN (it would be an empty string, with no error).
@@ -24,6 +27,27 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/ci.yml
+
+  # Reports the production deploy switch (#282). The environment workflows enforce it; this job only makes it visible.
+  production-switch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Report the production deploy switch
+        env:
+          SWITCH: ${{ vars.PRODUCTION_DEPLOY }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "${SWITCH,,}" = true ]; then
+            echo "Production deploys are ON (PRODUCTION_DEPLOY=true)." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          msg="Production deploys are OFF (PRODUCTION_DEPLOY is not true). Nothing was deployed."
+          echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$EVENT" = push ]; then echo "::notice title=Production deploys off::$msg"; exit 0; fi
+          echo "::error title=Production deploys off::$msg"
+          exit 1
 
   # Each mode's images go to its own repositories with its own deploy role (#206), so a push that deploys both modes
   # builds twice.

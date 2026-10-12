@@ -238,8 +238,85 @@ def test_rollback_redeploys_the_chosen_mode_without_infrastructure() -> None:
     assert jobs["on-premise"]["uses"] == "./.github/workflows/deploy-on-premise.yml"
     assert jobs["native-cloud"]["if"] == "inputs.mode == 'native-cloud'"
     assert jobs["native-cloud"]["uses"] == "./.github/workflows/deploy-native-cloud.yml"
-    for job in jobs.values():
+    for name, job in jobs.items():
+        if name == "production-switch":  # reports the switch (#282); calls nothing
+            continue
         assert job["with"] == {"image_tag": "${{ inputs.image_tag }}", "infrastructure": False}
+
+
+# --- The production deploy switch (#282) -----------------------------------------------------------------------
+
+# Only `true` deploys (case-insensitive in expressions); unset or anything else stops every production deploy.
+PRODUCTION_SWITCH_IF = "vars.PRODUCTION_DEPLOY == 'true'"
+SWITCH_STEP = "Report the production deploy switch"
+
+
+def test_every_job_that_enters_a_production_environment_needs_the_switch() -> None:
+    for name in ENVIRONMENT_WORKFLOWS:
+        job = only_job(name)
+        assert job["if"] == PRODUCTION_SWITCH_IF, name
+        assert "!=" not in job["if"], name  # fail closed: unset must not deploy
+
+
+def test_the_switch_leaves_the_per_mode_conditions_alone() -> None:
+    jobs = workflow("deploy.yml")["jobs"]
+    for mode, condition in (("on-premise", ON_PREMISE_IF), ("native-cloud", NATIVE_CLOUD_IF)):
+        assert jobs[f"images-{mode}"]["if"] == condition
+        assert jobs[mode]["if"] == condition
+    assert "PRODUCTION_DEPLOY" not in str(workflow("ci.yml"))
+
+
+def test_every_caller_of_a_production_workflow_reports_the_switch() -> None:
+    # A new workflow that calls an environment workflow fails here until it reports the switch too.
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        jobs = workflow(path.name)["jobs"]
+        calls = [j for j in jobs.values() if j.get("uses", "").removeprefix("./.github/workflows/") in ENVIRONMENT_WORKFLOWS]
+        if not calls:
+            continue
+        report = jobs["production-switch"]
+        assert report["permissions"] == {"contents": "read"}, path.name
+        assert "needs" not in report and "uses" not in report, path.name
+        assert step(report, SWITCH_STEP)["env"] == {
+            "SWITCH": "${{ vars.PRODUCTION_DEPLOY }}",
+            "EVENT": "${{ github.event_name }}",
+        }, path.name
+    assert step(workflow("deploy.yml")["jobs"]["production-switch"], SWITCH_STEP)["run"] == step(
+        workflow("rollback.yml")["jobs"]["production-switch"], SWITCH_STEP
+    )["run"]
+
+
+def test_the_switch_is_named_in_the_workflow_headers() -> None:
+    for name in ("deploy.yml", "rollback.yml", *ENVIRONMENT_WORKFLOWS):
+        header = (WORKFLOWS / name).read_text(encoding="utf-8").split("\nname: ")[0]
+        assert "PRODUCTION_DEPLOY" in header, name
+
+
+def test_the_switch_report_decides_correctly(tmp_path: Path) -> None:
+    bash = shutil.which("bash")  # the full path: on Windows a bare "bash" can reach the WSL launcher in System32
+    if bash is None:
+        pytest.skip("bash is not installed")
+    script = step(workflow("deploy.yml")["jobs"]["production-switch"], SWITCH_STEP)["run"]
+
+    def run(switch: str, event: str) -> tuple[int, str, str]:
+        summary = tmp_path / "summary"
+        summary.write_text("")
+        result = subprocess.run(
+            [bash, "-c", script],
+            env={"PATH": os.environ["PATH"], "GITHUB_STEP_SUMMARY": str(summary), "SWITCH": switch, "EVENT": event},
+            capture_output=True, text=True, check=False,
+        )
+        return result.returncode, result.stdout, summary.read_text()
+
+    for on in ("true", "True", "TRUE"):
+        code, stdout, summary = run(on, "workflow_dispatch")
+        assert code == 0 and "Production deploys are ON (PRODUCTION_DEPLOY=true)." in summary, on
+        assert "::" not in stdout, on
+    off = "Production deploys are OFF (PRODUCTION_DEPLOY is not true). Nothing was deployed."
+    for value in ("", "false", " true", "yes"):
+        code, stdout, summary = run(value, "push")
+        assert code == 0 and "::notice" in stdout and off in summary, repr(value)
+        code, stdout, summary = run(value, "workflow_dispatch")  # a manual deploy or any rollback
+        assert code == 1 and "::error" in stdout and off in summary, repr(value)
 
 
 # --- build-images.yml ------------------------------------------------------------------------------------------
