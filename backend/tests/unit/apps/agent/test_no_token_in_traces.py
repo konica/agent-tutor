@@ -44,6 +44,7 @@ from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 TOKEN = "eyJhbGciOi.token-under-test.signature-xyz"
 INPUT = {"question": "What is attention?"}
 CHUNKS = [RetrievedChunk("c1", "d1", "a.pdf", 3, "Attention weighs tokens.", 0.9)]
+AGENT_SSE = b'event: delta\ndata: {"text": "It weighs tokens [1]."}\n\nevent: done\ndata: {}\n\n'
 
 
 def dumped(spans: Sequence[ReadableSpan]) -> str:
@@ -109,11 +110,6 @@ async def test_the_ask_trace_holds_no_token_user_id_or_email() -> None:
 
 async def test_positive_control_a_user_id_in_the_question_is_caught() -> None:
     assert USER_ID in await ask_spans(f"What is attention? {USER_ID} {EMAIL}")
-
-
-AGENT_SSE = b'event: delta\ndata: {"text": "It weighs tokens [1]."}\n\nevent: done\ndata: {}\n\n'
-USER_ID = "00000000-0000-0000-0000-0000000000ad"
-EMAIL = "ada@example.com"
 
 
 def rated_requests(question: str) -> str:
