@@ -19,7 +19,7 @@ An AI tutor for your own documents: learners upload PDFs, the system suggests su
 Requirements: Docker, [uv](https://docs.astral.sh/uv/), Node 22+, an AWS profile allowed to invoke the Bedrock models (PRD Appendix A).
 
 ```bash
-cp .env.example .env          # fill in AWS_PROFILE and LANGSMITH_API_KEY
+cp .env.example .env          # fill in AWS_PROFILE (and LANGSMITH_API_KEY for evals)
 make up                       # pgvector, Keycloak (realm imported), LocalStack, Mailpit, Phoenix
 make sync                     # backend dependencies
 make lint test                # ruff, mypy, import contracts, unit tests
@@ -28,7 +28,7 @@ make web                      # http://localhost:10453
 
 Keycloak admin console: http://localhost:10401 (admin / admin). Test users: `learner@example.com` / `learner`, `learner2@example.com` / `learner2`, `admin@example.com` / `admin`.
 Sign up from the app's sign-in page: Keycloak sends the verification email to Mailpit, http://localhost:10403. After pulling a realm change, run `docker compose down -v` so the realm re-imports.
-Phoenix (traces from local runs): http://localhost:10404, no sign-in; `docker compose down -v` clears it.
+Phoenix (traces from local runs): http://localhost:10404, no sign-in; `docker compose down -v` clears it. Local runs trace into it: project `smart-tutor-local` (asks) and `smart-tutor-local-ingestion` (uploads). An `.env` from before #289 may still have `LANGSMITH_TRACING=true`; remove it.
 LocalStack (Community) keeps S3 in memory: restarting its container empties the bucket while Postgres keeps the documents, so earlier documents still look ready but can't be opened ("We couldn't open this document"). Delete and re-upload them, or reset both with `docker compose down -v`.
 Keycloak's sign-in, sign-up, and email pages use the `smart-tutor` login theme in `local/keycloak/themes/` (stock `keycloak.v2` layout, our logo, colors, and font; no template overrides). Its `css/tokens.css` is a copy of `web/src/styles/tokens.css`: after changing tokens, run `npm run keycloak:tokens` in `web/` (CI fails when the copy is stale). Keycloak in Compose reads theme edits on reload.
 

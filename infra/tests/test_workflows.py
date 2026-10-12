@@ -838,6 +838,23 @@ def test_ci_compose_override_passes_the_oidc_session_not_a_profile() -> None:
     assert "grep -v '^AWS_PROFILE='" in step(evals_job(), "Prepare .env")["run"]  # removed, so botocore uses the session
 
 
+def local_compose() -> dict[str, Any]:
+    return yaml.safe_load((WORKFLOWS.parents[1] / "compose.yaml").read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize("service", ["agent", "worker"])
+def test_app_services_trace_into_the_compose_phoenix_and_not_langsmith(service: str) -> None:
+    env = local_compose()["services"][service]["environment"]
+    assert env["SMART_TUTOR_PHOENIX_URL"] == "http://phoenix:6006"
+    assert env["LANGSMITH_TRACING"] == "false"  # an old .env must not trace into LangSmith
+
+
+def test_ci_app_services_run_untraced() -> None:  # CI starts no Phoenix; .env.example points at localhost:10404
+    override = yaml.safe_load((WORKFLOWS.parents[1] / "compose.ci.yaml").read_text(encoding="utf-8"))
+    for service in ("api", "agent", "mcp", "worker"):
+        assert "SMART_TUTOR_PHOENIX_URL=" in override["services"][service]["environment"], service
+
+
 def test_smoke_evals_logs_cover_cancelled_runs_and_every_service() -> None:
     logs = step(evals_job(), "Service logs")
     # a 60-minute timeout cancels the job, which is when the logs matter most
