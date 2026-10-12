@@ -277,6 +277,12 @@ class FakePilot:
         self.trace_spans: list[dict] | None = None  # default: just the ask span
         self.trace_after_polls = 1  # the ask span appears on the 2nd poll
         self.trace_poll_status = 404  # what the polls before that answer
+        self.rating_put_status = 200
+        self.rating_label = "down"  # what Phoenix holds for the rating
+        self.rating_after_polls = 1  # the annotation appears on the 2nd poll
+        self.rating_phoenix_status = 200  # 401 = Phoenix refuses the key
+        self.rating_puts: list[object] = []  # bodies; handle() already requires the learner's bearer
+        self.rating_polls = 0
         # What happened
         self.trace_polls = 0
         self.phoenix_auth: list[str | None] = []
@@ -320,6 +326,31 @@ class FakePilot:
                 else [_ask_span(self.trace_run_id, THREAD)]
             )
             return self._json(200, {"data": spans, "next_cursor": None})
+        annotations_path = (
+            "/phoenix/v1/projects/smart-tutor-on-premise/span_annotations"
+        )
+        if method == "GET" and path == annotations_path:
+            run_id = self.trace_run_id
+            assert query["span_ids"] == f"{uuid.UUID(run_id).int & 0xFFFF_FFFF_FFFF_FFFF:016x}"
+            assert query["include_annotation_names"] == "learner_rating"
+            self.rating_polls += 1
+            if self.rating_phoenix_status != 200:
+                return self._json(self.rating_phoenix_status, {"detail": "no"})
+            if self.rating_polls <= self.rating_after_polls or not self.rating_puts:
+                return self._json(200, {"data": [], "next_cursor": None})
+            annotation = {
+                "id": "QW5ub3RhdGlvbjox",
+                "span_id": query["span_ids"],
+                "name": "learner_rating",
+                "annotator_kind": "HUMAN",
+                "identifier": run_id,
+                "result": {
+                    "label": self.rating_label,
+                    "score": 0.0 if self.rating_label == "down" else 1.0,
+                    "explanation": None,
+                },
+            }
+            return self._json(200, {"data": [annotation], "next_cursor": None})
         return self._json(404, {"detail": "project not found"})
 
     def _login_form(self, message: str = "") -> Route:
@@ -476,6 +507,9 @@ class FakePilot:
                 "run_id": self.trace_run_id,
             }
             return self._json(200, [turn])
+        if method == "PUT" and path == f"/api/threads/{THREAD}/turns/{self.trace_run_id}/rating":
+            self.rating_puts.append(json.loads(body))
+            return self._json(self.rating_put_status, {})
         if method == "DELETE" and path == f"/api/documents/{DOC}":
             if self.delete_status == 204:
                 self.deleted.append(DOC)
@@ -762,3 +796,46 @@ def test_trace_project_needs_the_api_key_and_end_to_end(
     monkeypatch.setenv("PHOENIX_API_KEY", PHOENIX_KEY)
     assert smoke.main([pilot.base, "--trace-project", "p"]) == 1
     assert "--trace-project needs --end-to-end" in capsys.readouterr().out
+
+
+# --- The ask's rating in Phoenix (#290) ---------------------------------------------------------------------------
+
+
+def test_rating_check_finds_the_annotation_after_rating_the_turn_down(
+    pilot, monkeypatch, capsys
+) -> None:
+    assert run_with_trace(pilot, monkeypatch) == 0
+    out = output_without_secrets(capsys)
+    assert f"rating of {pilot.trace_run_id} is in smart-tutor-on-premise" in out
+    assert pilot.rating_puts == [{"rating": "down"}]
+    assert pilot.rating_polls >= 2  # it waited for the annotation to arrive
+    assert pilot.api_without_token == []  # the PUT carried the learner's bearer
+    assert set(pilot.phoenix_auth) == {f"Bearer {PHOENIX_KEY}"}
+
+
+def test_rating_that_never_arrives_fails_saying_so(pilot, monkeypatch, capsys) -> None:
+    pilot.rating_after_polls = 10**6
+    assert run_with_trace(pilot, monkeypatch) == 1
+    out = output_without_secrets(capsys)
+    assert f"run {pilot.trace_run_id}'s rating never reached Phoenix" in out
+    assert pilot.deleted == [DOC]  # cleanup still ran
+
+
+def test_rating_with_the_wrong_label_fails(pilot, monkeypatch, capsys) -> None:
+    pilot.rating_label = "up"
+    assert run_with_trace(pilot, monkeypatch) == 1
+    assert "not a HUMAN 'down' with score 0" in output_without_secrets(capsys)
+
+
+def test_rating_put_refused_fails_with_its_status(pilot, monkeypatch, capsys) -> None:
+    pilot.rating_put_status = 404
+    assert run_with_trace(pilot, monkeypatch) == 1
+    assert "PUT the turn's rating gave 404, expected 200" in output_without_secrets(
+        capsys
+    )
+
+
+def test_rating_phoenix_refusing_the_key_fails(pilot, monkeypatch, capsys) -> None:
+    pilot.rating_phoenix_status = 401
+    assert run_with_trace(pilot, monkeypatch) == 1
+    assert "rating: Phoenix refused the API key" in output_without_secrets(capsys)

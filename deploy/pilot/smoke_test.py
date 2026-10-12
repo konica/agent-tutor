@@ -21,6 +21,8 @@ environment and are never printed.
 --trace-project then reads the ask's run id from the conversation's turns and waits for its trace in that Phoenix
 project (#289): a root span named `ask` whose trace id is the run id and whose span id is its low 64 bits, with the
 run metadata of PRD §10.4, and holding neither the access token, the username, nor the learner's user id.
+It then rates that turn thumbs-down and waits for the `learner_rating` annotation on the ask span (#290): HUMAN,
+label `down`, score 0. That proves the API has the Phoenix settings.
 PHOENIX_URL defaults to `<url>/phoenix`. The key is never printed.
 
 Exit 0 when everything passes, 1 otherwise. Standard library only.
@@ -397,6 +399,7 @@ class _Run:
     run_id: str
     document_id: str | None = None
     thread_id: str | None = None
+    ask_run_id: str | None = None  # the ask's run id, read from the thread's turns (check_trace)
 
 
 def upload(s: _Session, run: _Run) -> str:
@@ -597,6 +600,7 @@ def check_trace(
     run_id = last.get("run_id") if isinstance(last, dict) else None
     if not isinstance(run_id, str) or not run_id:
         raise SmokeTestError("trace: the turn has no run id")
+    run.ask_run_id = run_id
 
     trace_id = uuid.UUID(run_id).hex
     path = (
@@ -671,6 +675,66 @@ def check_trace(
     return f"ask trace {run_id} is in {project}"
 
 
+def check_rating(
+    s: _Session, run: _Run, project: str, phoenix_url: str, api_key: str
+) -> str:
+    """Rate the ask thumbs-down and wait for its learner_rating annotation on the ask span in Phoenix (#290)."""
+    ask_run_id = run.ask_run_id
+    if ask_run_id is None:
+        raise SmokeTestError("rating: the ask's run id is unknown (the trace check comes first)")
+    r = s.api(
+        "PUT",
+        f"/api/threads/{run.thread_id}/turns/{ask_run_id}/rating",
+        {"rating": "down"},
+    )
+    if r.status != 200:
+        raise SmokeTestError(
+            f"rating: PUT the turn's rating gave {r.status}, expected 200"
+        )
+    span_id = f"{uuid.UUID(ask_run_id).int & 0xFFFF_FFFF_FFFF_FFFF:016x}"
+    path = (
+        f"/v1/projects/{urllib.parse.quote(project, safe='')}/span_annotations"
+        f"?span_ids={span_id}&include_annotation_names=learner_rating"
+    )
+    try:
+        while True:
+            r = _phoenix(s, path, api_key, phoenix_url)
+            if r.status in (401, 403):
+                raise SmokeTestError("rating: Phoenix refused the API key")
+            found = _json(r, "rating") if r.status == 200 else {}
+            data = found.get("data") if isinstance(found, dict) else None
+            mine = [
+                a
+                for a in data or []
+                if isinstance(a, dict) and a.get("identifier") == ask_run_id
+            ]
+            if mine:
+                break
+            s.wait("the rating's annotation")
+    except SmokeTestError as e:
+        if "the deadline passed" not in str(e):
+            raise
+        raise SmokeTestError(
+            f"rating: run {ask_run_id}'s rating never reached Phoenix "
+            "(does the API have the Phoenix settings?)"
+        ) from None
+    result = mine[0].get("result")
+    result = result if isinstance(result, dict) else {}
+    # Phoenix returns the score as a float, so compare numerically.
+    score = result.get("score")
+    if (
+        mine[0].get("annotator_kind") != "HUMAN"
+        or result.get("label") != "down"
+        or isinstance(score, bool)
+        or not isinstance(score, (int, float))
+        or score != 0
+    ):
+        raise SmokeTestError(
+            f"rating: the annotation is not a HUMAN 'down' with score 0: {mine[0]!r}"
+        )
+    return f"rating of {ask_run_id} is in {project}"
+
+
 def clean_up(s: _Session, run: _Run) -> str | None:
     """Delete the run's document; a failure message, or None. Threads are kept, so the thread stays."""
     if run.document_id is None or s.token is None:
@@ -710,6 +774,7 @@ def run_end_to_end(
         print("cited answer received")
         if trace:
             print(check_trace(s, run, *trace, username))
+            print(check_rating(s, run, *trace))
     except SmokeTestError as e:
         failure = str(e)
     except (http.client.HTTPException, OSError, KeyError, TypeError, ValueError) as e:
