@@ -123,11 +123,11 @@ If #59 finds a missing permission, add it to `github_deploy.py` with a specific 
 ### 4. Creates the GitHub environment `native-cloud`
 
 - **Deployment branches:** `main` only (custom branch policy).
-- **Variables:** `AWS_ROLE_ARN`, `AWS_REGION`, `AWS_ACCOUNT_ID`. There are no AWS keys to store, because OIDC replaces them.
+- **Secret:** `AWS_ROLE_ARN` (a secret, not a variable, so the public Actions log masks the account id in it). **Variable:** `AWS_REGION`. There are no AWS keys to store, because OIDC replaces them.
 
 Optional: in **Settings → Environments → native-cloud**, add **Required reviewers** if every deploy should wait for an approval.
 
-The deploy workflow in #59 declares `environment: native-cloud`, `permissions: id-token: write`, and calls `aws-actions/configure-aws-credentials` with `role-to-assume: ${{ vars.AWS_ROLE_ARN }}`. Nothing here can be tested end to end before #59, but a wrong `sub` or a missing environment shows up there as `Not authorized to perform sts:AssumeRoleWithWebIdentity`.
+The deploy workflow in #59 declares `environment: native-cloud`, `permissions: id-token: write`, and calls `aws-actions/configure-aws-credentials` with `role-to-assume: ${{ secrets.AWS_ROLE_ARN }}`. Nothing here can be tested end to end before #59, but a wrong `sub` or a missing environment shows up there as `Not authorized to perform sts:AssumeRoleWithWebIdentity`.
 
 **Moving from `pilot` (#150).** Before #150 the environment was named `pilot`. Run the script again: it redeploys `SmartTutor-prod-GitHubDeploy` (the role now trusts `native-cloud`) and creates the `native-cloud` environment with the variables. Then delete the old environment:
 
@@ -214,7 +214,7 @@ $Record = @'
 | CDK bootstrap | CDKToolkit stack, bootstrap version <N>, done <date> |
 | Admin principal for EKS access (#56) | <admin role or user ARN from step 1> |
 | GitHub deploy role | arn:aws:iam::<ACCOUNT_ID>:role/smart-tutor-github-deploy (trusts repo:konica@1114311/agent-tutor@1399048529:environment:native-cloud) |
-| GitHub environment | native-cloud, deployment branches: main; required reviewers: <yes/no>; vars AWS_ROLE_ARN, AWS_REGION, AWS_ACCOUNT_ID |
+| GitHub environment | native-cloud, deployment branches: main; required reviewers: <yes/no>; secret AWS_ROLE_ARN; var AWS_REGION |
 | Monthly budget | $<amount> |
 | Budget alert email(s) | <address(es)> |
 | Budget thresholds | 80% actual, 100% forecasted |

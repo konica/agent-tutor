@@ -27,7 +27,7 @@ sed "s/ACCOUNT_ID/$ACCOUNT_ID/g" docs/runbooks/evals-ci-bedrock-policy.json > /t
 aws iam create-role --role-name smart-tutor-evals-ci --max-session-duration 3600 \
   --assume-role-policy-document file:///tmp/trust.json --description "GitHub Actions smoke evals: Bedrock invoke only (#226)"
 aws iam put-role-policy --role-name smart-tutor-evals-ci --policy-name bedrock-invoke --policy-document file:///tmp/bedrock.json
-gh variable set EVALS_AWS_ROLE_ARN --repo konica/agent-tutor --body "arn:aws:iam::$ACCOUNT_ID:role/smart-tutor-evals-ci"
+gh secret set EVALS_AWS_ROLE_ARN --repo konica/agent-tutor --body "arn:aws:iam::$ACCOUNT_ID:role/smart-tutor-evals-ci"
 gh secret set LANGSMITH_API_KEY --repo konica/agent-tutor   # paste a key for the smart-tutor-ci project's workspace
 ```
 
@@ -39,7 +39,7 @@ Runs trace to the project `smart-tutor-ci`, which LangSmith creates on the first
 
 ## Pull requests from forks
 
-GitHub issues no OIDC token and no secrets to workflows on fork PRs, so the job can't sign in. It skips with a notice. A missing variable or secret (including Dependabot PRs, which don't get repository secrets) skips with a warning. A maintainer who wants the evals on a fork's change pushes the branch to this repository, or runs the workflow from the Actions tab on a branch.
+GitHub issues no OIDC token and no secrets to workflows on fork PRs, so the job can't sign in. It skips with a notice. A missing secret (including Dependabot PRs, which don't get repository secrets) skips with a warning. A maintainer who wants the evals on a fork's change pushes the branch to this repository, or runs the workflow from the Actions tab on a branch.
 
 Don't make `evals-smoke` a required status check: it is path-filtered, so PRs outside its paths would wait forever on "Expected".
 
