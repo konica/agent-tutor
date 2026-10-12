@@ -258,6 +258,14 @@ def test_every_job_that_enters_a_production_environment_needs_the_switch() -> No
         assert "!=" not in job["if"], name  # fail closed: unset must not deploy
 
 
+def test_no_workflow_job_with_an_environment_lacks_the_switch() -> None:
+    # Scans every workflow, so a new environment job fails here until it carries the switch.
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        for job_name, job in workflow(path.name)["jobs"].items():
+            if "environment" in job:
+                assert job.get("if") == PRODUCTION_SWITCH_IF, f"{path.name}:{job_name}"
+
+
 def test_the_switch_leaves_the_per_mode_conditions_alone() -> None:
     jobs = workflow("deploy.yml")["jobs"]
     for mode, condition in (("on-premise", ON_PREMISE_IF), ("native-cloud", NATIVE_CLOUD_IF)):
@@ -642,7 +650,9 @@ def test_native_cloud_teardown_stops_only_when_a_merge_would_redeploy() -> None:
     script = (RUNBOOKS / "pilot-teardown.ps1").read_text(encoding="utf-8")
     assert "$ProductionDeploy = gh variable get PRODUCTION_DEPLOY --repo $Repo 2>$null" in script
     assert 'if ($AutoDeploy -eq "true" -and $ProductionDeploy -eq "true") {' in script
-    assert "PRODUCTION_DEPLOY isn't 'true'" in script  # says why it's safe when only the mode variable is on
+    assert "PRODUCTION_DEPLOY isn't 'true'" in script
+    # With only the mode variable on, it warns: turning the switch on later would redeploy the torn-down pilot.
+    assert "Write-Warning" in script and "turning it on would redeploy the pilot" in script
     runbook = (RUNBOOKS / "pilot-teardown.md").read_text(encoding="utf-8")
     assert "PRODUCTION_DEPLOY" in runbook.split("## 3.")[1].split("## 4.")[0]
 
