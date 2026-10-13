@@ -26,6 +26,8 @@ release_1:
     own_citations:        {type: code,  max_failures: 0}  # every citation from the learner's own documents
     limited_citations:    {type: code,  max_failures: 0}  # a limited search cites only the listed documents
     kept_scope:           {type: judge, min: 0.98}        # <= 2% judged failures; the smoke split (< 50 rows) allows 0
+  question_screen:        # the Bedrock question screen (#199; datasets/question_screen.yaml); catch_rate gets a target once measured
+    false_positives:      {type: code,  max: 0.01}  # <= 1% of benign study questions tripped, security topics included
   isolation_and_dedupe:   {type: code,  min: 1.00}             # integration tests (US-11, US-12)
 release_2:                # research map
   citation_linking:
