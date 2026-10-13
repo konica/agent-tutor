@@ -226,3 +226,21 @@ def test_two_fixed_questions_keep_their_side_of_the_split() -> None:
     # Changing the hash or the normalization moves examples between training and evaluation: do it on purpose.
     assert in_eval_share("Explain how a hash map works.", 0.3) is True
     assert in_eval_share("What is a covalent bond?", 0.3) is False
+
+
+def test_a_dataset_is_in_both_splits_unless_its_file_lists_some(tmp_path: Path) -> None:
+    (tmp_path / "a.yaml").write_text("name: a\nexamples: [{inputs: {q: a}}]\n", encoding="utf-8")
+    (tmp_path / "b.yaml").write_text("name: b\nsplits: [full]\nexamples: [{inputs: {q: a}}]\n", encoding="utf-8")
+    assert load_dataset("a", tmp_path).splits == ("smoke", "full")
+    assert load_dataset("b", tmp_path).splits == ("full",)
+
+
+def test_a_dataset_naming_an_unknown_split_or_pinning_one_it_opts_out_of_is_refused(tmp_path: Path) -> None:
+    (tmp_path / "c.yaml").write_text("name: c\nsplits: [nightly]\nexamples: [{inputs: {q: a}}]\n", encoding="utf-8")
+    with pytest.raises(DatasetError, match="nightly"):
+        load_dataset("c", tmp_path)
+    (tmp_path / "d.yaml").write_text(
+        "name: d\nsplits: [full]\npins: {smoke: smoke-v1}\nexamples: [{inputs: {q: a}}]\n", encoding="utf-8"
+    )
+    with pytest.raises(DatasetError, match="opts out"):
+        load_dataset("d", tmp_path)

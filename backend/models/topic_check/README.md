@@ -1,6 +1,6 @@
 # Topic-check model
 
-The SetFit model the agent's topic check runs (spec `sdd/specs/2026-10-13-off-topic-questions-design.md`, ADR 0019).
+The SetFit model the agent's topic check runs (spec `sdd/specs/2026-10-13-off-topic-questions-design.md`, ADR 0020).
 `make topic-check-train` writes it here:
 
 | File | What |

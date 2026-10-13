@@ -77,6 +77,7 @@ def test_deploy_role_gets_only_the_deployment_permissions() -> None:
         "EcrPushAppImages",
         "EksKubeconfig",
         "ReadTraceSamplingRate",
+        "ReadQuestionGuardSettings",
         "ReadStackOutputs",
     ]
     # Only the ECR login, which has no resource, may use "*".
@@ -87,14 +88,22 @@ def test_deploy_role_gets_only_the_deployment_permissions() -> None:
     assert ":repository/smart-tutor/*" in json.dumps(push["Resource"])
 
 
-def test_deploy_role_reads_only_the_trace_sampling_rate_parameter() -> None:
+def test_deploy_role_reads_only_the_trace_sampling_rate_and_question_guard_parameters() -> None:
     t = template(make_app(), "GitHubDeploy")
 
     statements = next(iter(t.find_resources("AWS::IAM::Policy").values()))["Properties"]["PolicyDocument"]["Statement"]
     (read,) = (s for s in statements if s["Sid"] == "ReadTraceSamplingRate")
     assert read["Action"] == "ssm:GetParameter"
     assert "parameter/smart-tutor/trace-sampling-rate" in json.dumps(read["Resource"])
-    assert [s["Sid"] for s in statements if "ssm:GetParameter" in str(s["Action"])] == ["ReadTraceSamplingRate"]
+    (guard,) = (s for s in statements if s["Sid"] == "ReadQuestionGuardSettings")
+    assert guard["Action"] == "ssm:GetParameter"
+    assert [r["Fn::Join"][1][-1] for r in guard["Resource"]] == [
+        f":parameter/smart-tutor/{name}" for name in ("question-guard", "question-guardrail-id", "question-guardrail-version")
+    ]
+    assert [s["Sid"] for s in statements if "ssm:GetParameter" in str(s["Action"])] == [
+        "ReadTraceSamplingRate",
+        "ReadQuestionGuardSettings",
+    ]
 
 
 def test_an_existing_oidc_provider_is_imported_instead_of_created() -> None:
@@ -589,10 +598,40 @@ def test_each_service_gets_only_its_own_s3_sqs_and_bedrock_access() -> None:
     assert set(mcp) == {"bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"}
     assert "nova-2-lite" not in mcp["bedrock:InvokeModel"]
 
-    # No wildcard actions or resources on any service.
+    # No wildcard actions or resources on any service; the one exception is the agent's PutMetricData, which has no
+    # resource-level permissions and is limited to its namespace by a condition (below).
     for grants in (api, worker, agent, mcp):
         assert not any(a.endswith(":*") or a == "*" for a in grants)
-        assert not any(r == '"*"' for r in grants.values())
+        assert not any(r == '"*"' for a, r in grants.items() if a != "cloudwatch:PutMetricData")
+
+
+def test_only_the_agent_applies_the_question_screen_guardrail_and_counts_its_failures() -> None:
+    t = template(make_app(), "Cluster")
+    grants = {sa: _grants(_policy_for(t, sa)) for sa in ("api", "worker", "agent", "mcp-server")}
+
+    resources = json.loads(grants["agent"]["bedrock:ApplyGuardrail"])
+    # The guardrail's id comes from the SSM parameter ConfigStack writes, as a deploy-time CloudFormation parameter.
+    assert "guardrail/" in json.dumps(resources[0]) and "Ref" in json.dumps(resources[0])
+    assert resources[1:] == [
+        {"Fn::Join": ["", [f"arn:aws:bedrock:{region}:", {"Ref": "AWS::AccountId"}, ":guardrail-profile/us.guardrail.v1:0"]]}
+        for region in ("us-east-1", "us-east-2", "us-west-2")
+    ]
+    (parameter,) = (p for p in t.to_json()["Parameters"].values() if p["Default"].endswith("question-guardrail-id"))
+    assert parameter["Type"] == "AWS::SSM::Parameter::Value<String>"
+    assert parameter["Default"] == "/smart-tutor/question-guardrail-id"
+    policy = _policy_for(t, "agent")
+    (metrics,) = (s for s in policy if s["Action"] == "cloudwatch:PutMetricData")
+    assert metrics["Resource"] == "*"
+    assert metrics["Condition"] == {"StringEquals": {"cloudwatch:namespace": "SmartTutor/Agent"}}
+    for service in ("api", "worker", "mcp-server"):
+        assert not {"bedrock:ApplyGuardrail", "cloudwatch:PutMetricData"} & set(grants[service])
+
+
+def test_cluster_deploys_after_config_whose_guardrail_id_its_agent_role_reads() -> None:
+    app = make_app()
+    stacks = {s.stack_name: s for s in build_app(app)}
+
+    assert stacks["SmartTutor-prod-Config"] in stacks["SmartTutor-prod-Cluster"].dependencies
 
 
 def test_only_the_worker_can_list_the_bucket() -> None:

@@ -280,6 +280,22 @@ def service_env(docs: list[dict], name: str) -> dict[str, dict]:
     return {e["name"]: e for e in container["env"]}
 
 
+def test_agent_gets_the_question_screen_settings_and_defaults_to_off() -> None:
+    env = service_env(render(*PROD, *DEPLOY), "agent")
+    assert env["SMART_TUTOR_QUESTION_GUARD"]["value"] == "off"
+    assert env["SMART_TUTOR_QUESTION_GUARDRAIL_ID"]["value"] == ""
+    docs = render(
+        *PROD, *DEPLOY, "--set-string", "global.questionGuard.mode=bedrock",
+        "--set-string", "global.questionGuard.guardrailId=abc123", "--set-string", "global.questionGuard.guardrailVersion=2",
+    )
+    env = service_env(docs, "agent")
+    assert env["SMART_TUTOR_QUESTION_GUARD"]["value"] == "bedrock"
+    assert env["SMART_TUTOR_QUESTION_GUARDRAIL_ID"]["value"] == "abc123"
+    assert env["SMART_TUTOR_QUESTION_GUARDRAIL_VERSION"]["value"] == "2"
+    for other in ("api", "worker", "mcp-server"):
+        assert not [k for k in service_env(docs, other) if k.startswith("SMART_TUTOR_QUESTION_")], other
+
+
 @pytest.mark.parametrize("service", ["agent", "worker"])
 def test_agent_and_worker_trace_into_the_native_cloud_project_with_keys_from_secrets_manager(service: str) -> None:
     docs = render(*PROD, *DEPLOY, "--set-string", "global.langsmith.samplingRate=0.5")

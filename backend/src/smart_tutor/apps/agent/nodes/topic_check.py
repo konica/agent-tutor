@@ -39,5 +39,5 @@ def topic_check_node(classifier: TopicClassifier | None, threshold: float, timeo
     return topic_check
 
 
-def after_topic_check(state: AskState) -> Literal["search", "declined"]:
-    return "declined" if state.get("decline") == "off_topic" else "search"
+def after_topic_check(state: AskState) -> Literal["on_topic", "declined"]:
+    return "declined" if state.get("decline") == "off_topic" else "on_topic"

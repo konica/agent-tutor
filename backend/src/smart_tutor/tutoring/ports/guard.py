@@ -9,7 +9,11 @@ from smart_tutor.tutoring.domain.guard import GuardTrip
 class Guard(ABC):
     @abstractmethod
     async def check_question(self, question: str) -> GuardTrip | None:
-        """A trip when the question must not reach search or the model (a question screen, #199/#200)."""
+        """A trip when the question must not reach search or the model (a question screen, #199/#200).
+
+        A screen that cannot reach its service fails open and counts the failure; a check that raises still ends the
+        turn with `unavailable`.
+        """
 
     @abstractmethod
     async def check_answer(self, text: str) -> GuardTrip | None:

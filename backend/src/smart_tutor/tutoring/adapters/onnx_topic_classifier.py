@@ -1,4 +1,4 @@
-"""TopicClassifier on a SetFit model exported to ONNX (spec 2026-10-13 §5.2, ADR 0019): onnxruntime, tokenizers, and
+"""TopicClassifier on a SetFit model exported to ONNX (spec 2026-10-13 §5.2, ADR 0020): onnxruntime, tokenizers, and
 numpy, no torch. The model directory, made by `python -m evals.topic_check.train`, holds body.onnx (the
 sentence-transformer body), tokenizer.json, head.npz (the logistic head: `coef` (1, dim), `intercept` (1,)), and
 manifest.json (version, pooling, normalize, max_tokens, threshold)."""

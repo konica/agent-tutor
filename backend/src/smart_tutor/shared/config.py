@@ -5,8 +5,11 @@ Secrets come from Secrets Manager (via External Secrets) in prod.
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, PositiveInt, SecretStr
+from pydantic import BaseModel, Field, PositiveInt, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# CloudWatch namespace of the agent's content-free counters (#199); the agent's IAM grant names it (infra).
+AGENT_METRICS_NAMESPACE = "SmartTutor/Agent"
 
 
 class ModelConfig(BaseModel):
@@ -126,9 +129,23 @@ class Settings(BaseSettings):
     # last `history_turns` turns (0 sends none), each earlier answer cut to `history_answer_chars` characters.
     history_turns: int = Field(default=5, ge=0, le=MAX_HISTORY_TURNS)
     history_answer_chars: int = Field(default=2000, gt=0, le=MAX_HISTORY_ANSWER_CHARS)
+    # Question screen (US-6, #199, PRD D30): "bedrock" sends the learner's question to a Bedrock guardrail before
+    # search; a screen that fails or is slower than the timeout lets the question through and is counted.
+    question_guard: Literal["off", "bedrock"] = "off"
+    question_guardrail_id: str = ""
+    question_guardrail_version: str = ""
+    question_guard_timeout_seconds: float = Field(default=1.0, gt=0)
     models: ModelsConfig = ModelsConfig()
     chunking: ChunkingConfig = ChunkingConfig()
     topic_check: TopicCheckConfig = TopicCheckConfig()
+
+    @model_validator(mode="after")
+    def _question_guard_has_a_guardrail(self) -> "Settings":
+        if self.question_guard == "bedrock" and not (self.question_guardrail_id and self.question_guardrail_version):
+            raise ValueError(
+                "question_guard is bedrock but question_guardrail_id or question_guardrail_version is not set"
+            )
+        return self
 
     @property
     def keycloak_introspection_url(self) -> str:

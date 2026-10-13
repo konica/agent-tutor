@@ -264,3 +264,14 @@ async def test_a_suite_that_is_not_ready_is_skipped_and_its_metrics_stay_not_run
     scores, links = await run_split(client, [group], "smoke", load=lambda key: ASK)
     assert scores == {} and links == {} and client.experiments == []
     assert "no model yet" in capsys.readouterr().err
+
+
+async def test_a_dataset_that_opts_out_of_a_split_is_skipped_without_asking_to_publish(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    full_only = Dataset("ask", "smart-tutor-ask", "", ASK.examples, splits=("full",))
+    group = DatasetSuites("ask", make_target, (scored("search_step_ran", 1.0),))
+    scores, links = await run_split(published(), [group], "smoke", load=lambda key: full_only)
+    assert scores == {} and links == {}
+    err = capsys.readouterr().err
+    assert "opts out" in err and "publish" not in err

@@ -54,6 +54,9 @@ async def run_split(
     links: dict[str, str] = {}
     for group in groups:
         dataset = load(group.dataset)
+        if split not in dataset.splits:
+            print(f"{dataset.name} has no {split} split (its file opts out)", file=sys.stderr)
+            continue
         if group.skip is not None and (why := group.skip()) is not None:  # its metrics stay "not run"
             print(f"{dataset.name} skipped: {why}", file=sys.stderr)
             continue

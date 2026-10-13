@@ -46,6 +46,13 @@ spec:
             - name: SMART_TUTOR_LEARNER_HASH_KEY
               valueFrom: {secretKeyRef: {name: agent-langsmith, key: learner-hash-key}}
             {{- end }}
+            # Question screen (#199)
+            - name: SMART_TUTOR_QUESTION_GUARD
+              value: {{ .Values.global.questionGuard.mode | quote }}
+            - name: SMART_TUTOR_QUESTION_GUARDRAIL_ID
+              value: {{ .Values.global.questionGuard.guardrailId | quote }}
+            - name: SMART_TUTOR_QUESTION_GUARDRAIL_VERSION
+              value: {{ .Values.global.questionGuard.guardrailVersion | quote }}
             - name: SMART_TUTOR_AWS_REGION
               value: {{ .Values.awsRegion | quote }}
             - name: SMART_TUTOR_KEYCLOAK_ISSUER

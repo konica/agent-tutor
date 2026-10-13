@@ -1,4 +1,4 @@
-# 0019. Off-topic questions are screened by a local SetFit classifier behind a swappable port
+# 0020. Off-topic questions are screened by a local SetFit classifier behind a swappable port
 
 - Status: accepted
 - Date: 2026-10-13
@@ -13,8 +13,9 @@ option to switch to TypeSafe's Jev later. The default on-premise host is one t3.
 agent container is capped at 512 MiB (ADR 0012).
 
 The topic check is a fixed pre-search step that decides scope. It is separate from ADR 0018's guard layers, which check
-the answer and, via #199, screen the question for prompt attacks. It reuses the same pattern: a `tutoring` port, an
-agent-only extra, and an import-linter contract.
+the answer and, with ADR 0019's optional question screen (#199), screen the question for prompt attacks. It runs
+before that question screen: the local check takes milliseconds, so an off-topic question never costs a Bedrock call.
+It reuses the same pattern: a `tutoring` port, an agent-only extra, and an import-linter contract.
 
 ## Decision
 

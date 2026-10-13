@@ -2,7 +2,7 @@
 #   docker build --target api|agent|mcp|worker -t smart-tutor-<target> backend/
 # CronJobs reuse the api image. Only the worker installs the `ingest` extra (pypdf and LangChain text splitters, ADR 0005);
 # only the agent installs the `guard` extra (Guardrails AI, ADR 0018) and the `topic` extra (onnxruntime and
-# tokenizers) and carries the topic-check model (ADR 0019).
+# tokenizers) and carries the topic-check model (ADR 0020).
 
 FROM python:3.12-slim AS base
 COPY --from=ghcr.io/astral-sh/uv:0.8 /uv /bin/uv

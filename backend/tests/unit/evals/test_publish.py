@@ -167,3 +167,17 @@ def test_a_dataset_with_an_eval_share_publishes_only_its_held_out_questions() ->
     full = {e.inputs["question"] for e in examples_at(client, shared, "full", "full-v1")}
     assert full == {"hand"} | {q for q in questions if in_eval_share(q, 0.3)}
     assert 1 < len(full) < 41
+
+
+FULL_ONLY = Dataset("full-only", "smart-tutor-full-only", "", HAND, splits=("full",))
+
+
+def test_a_dataset_that_opts_out_of_smoke_is_split_and_published_to_full_only(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert set(split_examples(FULL_ONLY, [])) == {"full"}
+    client = FakeLangSmith()
+    assert main([], client=client, load=lambda key: FULL_ONLY, keys=["full-only"]) == 0
+    out = capsys.readouterr().out
+    assert "full-v1" in out and "smoke" not in out
+    assert client.datasets["smart-tutor-full-only"].tags.keys() == {"full-v1"}
