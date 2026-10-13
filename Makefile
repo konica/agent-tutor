@@ -1,6 +1,6 @@
 # One entry point for local work. On Windows, run from Git Bash/WSL with `make` installed,
 # or run the commands below directly.
-.PHONY: help up down up-app api agent mcp worker api-debug agent-debug mcp-debug worker-debug sync migrate lint test test-integration bedrock-check sweep retention evals-smoke evals-learners evals-generate evals-publish web api-client infra-synth helm-lint
+.PHONY: help up down up-app api agent mcp worker api-debug agent-debug mcp-debug worker-debug sync migrate lint test test-integration bedrock-check sweep retention evals-smoke evals-learners evals-generate evals-publish topic-check-train web api-client infra-synth helm-lint
 .PHONY: design-states design-accept design-shots design-diff
 
 BACKEND := cd backend &&
@@ -73,6 +73,8 @@ evals-generate: ## propose dataset candidates (DATASET=ask, the default, injecti
 	$(HOST) --extra eval --extra ingest --extra guard --extra topic python -m evals.generate $(or $(DATASET),ask)
 evals-publish: ## publish accepted annotation-queue candidates as the next smoke and full versions in LangSmith (LANGSMITH_API_KEY)
 	$(HOST) --extra eval python -m evals.publish
+topic-check-train: ## train the topic-check model from accepted topic_check candidates into backend/models/topic_check (LANGSMITH_API_KEY; --dry-run counts them)
+	$(HOST) --extra eval --extra train python -m evals.topic_check.train
 
 api-client:    ## regenerate web/src/api from the API's OpenAPI schema
 	$(BACKEND) uv run python -m smart_tutor.apps.api.openapi_export ../web/src/api/openapi.json && cd ../web && npm --prefix tools/api-gen ci && npm run api:generate
