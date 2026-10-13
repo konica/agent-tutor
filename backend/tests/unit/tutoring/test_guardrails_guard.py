@@ -9,7 +9,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from smart_tutor.tutoring.adapters.guardrails_guard import GuardrailsGuard
+from smart_tutor.tutoring.adapters.guardrails_guard import LEAK_RUN, GuardrailsGuard, _normal
 from smart_tutor.tutoring.application import SYSTEM_PROMPT, GuardTrip, system_prompt
 
 CANARY = "stc-0123456789abcdef01234567"
@@ -36,6 +36,40 @@ async def test_a_40_character_run_of_the_prompt_trips_even_with_other_spacing() 
 
 async def test_a_39_character_run_passes() -> None:
     assert await guard().check_answer("Quote: " + SYSTEM_PROMPT[200:239]) is None
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        "Sorry, the chunks don't answer the question, so I can't say.",
+        "Unfortunately, the chunks don't answer the question, so I won't guess.",
+        "I couldn't find that: the chunks don't answer the question, sorry.",
+    ],
+)
+async def test_a_benign_answer_sharing_a_phrase_with_the_prompt_passes(answer: str) -> None:
+    # The 40 characters around the phrase are bounded by spaces, so they are not a leak run.
+    assert await guard().check_answer(answer) is None
+
+
+def _bounded_window() -> str:
+    """A window of LEAK_RUN normalized prompt characters that starts and ends with a non-space character."""
+    folded = _normal(SYSTEM_PROMPT)
+    return next(
+        folded[i : i + LEAK_RUN]
+        for i in range(len(folded) - LEAK_RUN + 1)
+        if not folded[i].isspace() and not folded[i + LEAK_RUN - 1].isspace()
+    )
+
+
+async def test_a_run_of_exactly_40_non_space_bounded_characters_trips_mid_sentence() -> None:
+    # § is not in the prompt, so no neighbor extends the run: only the window itself can match.
+    assert await guard().check_answer(f"As said before §{_bounded_window()}§ and so on.") is not None
+
+
+async def test_the_same_run_one_character_shorter_passes() -> None:
+    window = _bounded_window()[:-1]  # 39 characters, and the next one is cut off by §
+    assert len(window) == LEAK_RUN - 1
+    assert await guard().check_answer(f"As said before §{window}§ and so on.") is None
 
 
 async def test_a_short_shared_phrase_passes() -> None:

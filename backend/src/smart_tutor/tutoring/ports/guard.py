@@ -13,4 +13,7 @@ class Guard(ABC):
 
     @abstractmethod
     async def check_answer(self, text: str) -> GuardTrip | None:
-        """A trip when the answer so far (all of it, not the newest piece) must not reach the learner."""
+        """A trip when the answer so far (all of it, not the newest piece) must not reach the learner.
+
+        A check that raises fails closed: the turn ends with the unavailable error and is not kept.
+        """

@@ -22,6 +22,16 @@ def _normal(text: str) -> str:
     return " ".join(text.casefold().split())
 
 
+def _runs(text: str) -> set[str]:
+    """Windows of `LEAK_RUN` characters that start and end with a non-space: a window edged by a space is a phrase
+    boundary ("..., s"), not a quote, and would flag benign answers that share a clause with the prompt."""
+    return {
+        text[i : i + LEAK_RUN]
+        for i in range(len(text) - LEAK_RUN + 1)
+        if not text[i].isspace() and not text[i + LEAK_RUN - 1].isspace()
+    }
+
+
 def _in_process() -> None:
     settings.disable_tracing = True
     HubTelemetry()._tracer = None  # private, pinned by a test against the pinned version; nothing else is durable
@@ -29,18 +39,17 @@ def _in_process() -> None:
 
 @register_validator(name="smart-tutor/system-prompt-leak", data_type="string")
 class SystemPromptLeak(Validator):
-    """Fails when the text holds the prompt's canary or a run of `LEAK_RUN` characters of the prompt, case and
-    whitespace folded."""
+    """Fails when the text holds the prompt's canary or a run of `LEAK_RUN` characters of the prompt that starts
+    and ends with a non-space, case and whitespace folded."""
 
     def __init__(self, prompt: str, canary: str) -> None:
         super().__init__(on_fail=OnFailAction.NOOP)  # no kwargs: the guard records them, and these are the prompt
         self._canary = canary.casefold()
-        folded = _normal(prompt)
-        self._runs = {folded[i : i + LEAK_RUN] for i in range(len(folded) - LEAK_RUN + 1)}
+        self._runs = _runs(_normal(prompt))
 
     def _validate(self, value: Any, metadata: dict[str, Any]) -> ValidationResult:
         text = _normal(str(value))
-        if self._canary in text or any(text[i : i + LEAK_RUN] in self._runs for i in range(len(text) - LEAK_RUN + 1)):
+        if self._canary in text or not self._runs.isdisjoint(_runs(text)):
             return FailResult(error_message="system_prompt_leak")
         return PassResult()
 

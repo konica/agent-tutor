@@ -35,8 +35,9 @@ A trip on any guard has one behavior (PRD D29): the stream ends with a `replace`
 
 ## Consequences
 
-- The `guard` extra (+54 packages, about 270 MB, including litellm, openai, and grpc) is installed only in the agent image, and in the `dev` group so tests import it. Guardrails AI is imported only in `tutoring` adapters.
-- A check costs about 0.4 ms per streamed piece.
+- The `guard` extra (+54 packages, about 270 MB in site-packages, including litellm, openai, and grpc) is installed only in the agent image, and in the `dev` group so tests import it. Measured, the agent image grows from 581 MB to 1.03 GB with the extra. Guardrails AI is imported only in `tutoring` adapters.
+- A check costs about 0.56 ms fixed per call plus work that grows with the answer's length (Guardrails' own per-call handling, not just our scan), and the port checks all of the answer so far on every streamed piece. One maximum-length answer (about 6,000 characters in about 500 pieces) costs about 1.2 s of guard time over the stream; a typical answer (1,000 to 2,000 characters) about 0.1 to 0.2 s. Checks are CPU-bound, so one agent process saturates a core at roughly 15 to 20 long answers in flight.
+- Follow-up option, not taken: check only a tail window (the newest piece plus about 2 x `LEAK_RUN` plus the canary length) or reduce Guardrails' per-call work. That changes the port's "all of the answer so far" contract and needs its own decision.
 - Up to 39 characters of a leak can show before the replace, since a shorter run is not a leak. The web replaces the partial answer when the event arrives.
 - A guard failure makes the turn fail with `unavailable`. The learner can ask again.
 - The tripped turn counts toward the chat rate limits, adds no documents used, is never sent as history, and is not used for the learning record. `last_turns` and `history` skip `guard` turns.

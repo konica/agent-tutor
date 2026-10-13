@@ -231,7 +231,7 @@ async def _relay(answer: AgentAnswer, start: StartThread, record: RecordAnswer) 
 
     The agent's `sources` event is kept back; on `done`, if the thread started, the turn and its documents are kept
     before `done` is forwarded. A `replace` (a guard trip) empties what was kept: the turn is the guard message, with
-    no answer, citations, or documents used, whatever came before or comes after it.
+    no answer, citations, or documents used; a `sources` or `citations` event after it is ignored.
 
     A stream that ends without `done` or `error` ends with an unavailable error event.
     """

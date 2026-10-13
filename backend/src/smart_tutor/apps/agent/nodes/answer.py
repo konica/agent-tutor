@@ -38,7 +38,7 @@ def answer_node(model: BaseChatModel, answer_floor: float, max_tokens: int, guar
         stream = cast(
             "AsyncGenerator[BaseMessageChunk, None]", capped.astream(messages)
         )  # astream is an async generator
-        async with aclosing(stream):  # a trip closes the model's stream at once
+        async with aclosing(stream):  # a trip stops reading the model's stream
             async for piece in stream:
                 if not piece.text:
                     continue
