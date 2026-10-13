@@ -90,8 +90,8 @@ type Exchange = {
   question: string;
   answer: string;
   citations: ChatCitation[];
-  /** A turn the tutor didn't answer: "limited" (the conversation's documents don't cover it) or "no_documents" (nothing
-   * can be read: the request to upload a document). */
+  /** A turn the tutor didn't answer: "limited" (the conversation's documents don't cover it), "no_documents" (nothing
+   * can be read: the request to upload a document), or "off_topic" (not a study question: the message alone). */
   decline: { code: string; message: string } | null;
   /** The turn's run, which a rating names; null until the server has started it, and for turns saved before ratings. */
   runId: string | null;
