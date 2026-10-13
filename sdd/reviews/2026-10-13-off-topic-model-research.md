@@ -105,6 +105,16 @@ With the short scope, **3 of 15 study questions were rejected**: photosynthesis 
 
 A SetFit logistic head adds negligible time. Even at 2–3× slower on a shared t3.large, either fits the 300 ms budget.
 
+**Serving SetFit without torch (spike).** A toy SetFit model (bge-small body, 20 examples, 1 epoch) was exported as follows: the body went to ONNX with dynamic shapes via `torch.onnx.export`, and the logistic head was saved as `coef` and `intercept`. It then ran with onnxruntime, `tokenizers`, and numpy only: CLS pooling, L2 normalization, and a sigmoid.
+
+| Variant | Size | Process RSS | p50 | P(off) on 3 test questions |
+|---|---|---|---|---|
+| SetFit `predict_proba` (torch) | — | — | — | 0.3797, 0.5949, 0.4142 |
+| fp32 ONNX | 127 MB | 205 MiB | 9.5 ms | 0.3797, 0.5949, 0.4142 (identical) |
+| int8 dynamic-quantized ONNX | 32 MB | 108 MiB | 4.7 ms | 0.3904, 0.5917, 0.4199 (within 0.011) |
+
+The agent image therefore needs no torch, and the int8 model fits the agent's 512 MiB container limit. The toy model's probabilities only show that the export matches; they say nothing about accuracy.
+
 ## Recommendation
 
 ### Our own small decision model, trained with GovTech's method
