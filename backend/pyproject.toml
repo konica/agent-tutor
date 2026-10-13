@@ -38,7 +38,7 @@ topic = ["numpy>=2.0", "onnxruntime>=1.20", "tokenizers>=0.20"]
 # Evaluation runs (backend/evals) and CI eval gates.
 eval = ["langsmith>=0.4", "openevals>=0.1", "pyyaml>=6.0"]
 # Training the topic-check model only (evals.topic_check.train): never in an image or a CI install.
-train = ["onnx>=1.17", "onnxscript>=0.2", "setfit>=1.1", "torch>=2.5"]
+train = ["onnx>=1.17", "onnxruntime>=1.20", "onnxscript>=0.2", "setfit>=1.1", "torch>=2.5"]
 
 [dependency-groups]
 dev = [

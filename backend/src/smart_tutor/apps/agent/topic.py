@@ -3,7 +3,6 @@
 from pathlib import Path
 
 from smart_tutor.shared.config import TopicCheckConfig
-from smart_tutor.tutoring.adapters.onnx_topic_classifier import OnnxSetFitTopicClassifier
 from smart_tutor.tutoring.application import TopicClassifier
 
 
@@ -11,6 +10,9 @@ def topic_classifier(config: TopicCheckConfig) -> TopicClassifier | None:
     """The configured classifier, or None when the check is off. A missing or broken model raises: startup stops."""
     if config.provider == "off":
         return None
+    # Imported here so the agent doesn't load onnxruntime while the check is off.
+    from smart_tutor.tutoring.adapters.onnx_topic_classifier import OnnxSetFitTopicClassifier
+
     classifier = OnnxSetFitTopicClassifier(Path(config.model_dir))
     # Score one text now: a model whose parts don't fit (a head of the wrong width, say) stops startup here rather
     # than failing open on every question.

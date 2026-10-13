@@ -53,6 +53,23 @@ KINDS: dict[str, Kind] = {
         "questions",
         ("Make me a quiz on the uploaded chemistry chapter.", "Help me plan my study week for the biology exam."),
     ),
+    "borderline_study_task": Kind(
+        False,
+        "a study request that sounds like a personal errand or planning task but is about learning the learner's own "
+        "material: timetables, flashcards to print, reading schedules, revision plans built from their documents",
+        (
+            "Make a revision timetable for my three exams from my lecture notes.",
+            "Turn chapter 2 of my economics book into flashcards I can print.",
+        ),
+    ),
+    "library_news": Kind(
+        False,
+        "a question about a news or magazine article the learner uploaded, even when the topic is current events",
+        (
+            "What does the news article I uploaded say caused the strike?",
+            "According to the magazine piece in my library, why did the startup fail?",
+        ),
+    ),
     "greeting": Kind(
         True,
         "a greeting, small talk, thanks with no question, or a question about the assistant itself",
@@ -69,6 +86,20 @@ KINDS: dict[str, Kind] = {
         "recommendations, fixing the learner's own code or devices",
         ("Write an email to my landlord asking to fix the heater.", "Can you help me fix the bug in my React app?"),
     ),
+    "borderline_personal_task": Kind(
+        True,
+        "a personal task that mentions school or study but is not about understanding material: cover letters, "
+        "applications, schedules for the learner's week, homework written for them to hand in",
+        (
+            "Write my cover letter for a summer internship at a bank.",
+            "Plan my week around classes, the gym, and groceries.",
+        ),
+    ),
+    "live_news": Kind(
+        True,
+        "a request for current or breaking news that is not in any document the learner uploaded",
+        ("What's in the news today?", "Who won the election last night?"),
+    ),
     "live_information": Kind(
         True,
         "a request for live or real-time information: weather, prices, scores, traffic, opening hours, today's news",
@@ -82,7 +113,9 @@ label (outputs.expected.off_topic). On-topic: anything a learner asks in order t
 subject; questions about their documents; follow-ups; study tasks on their material. Off-topic: greetings and questions
 about the tutor itself, entertainment, personal tasks, live information (spec 2026-10-13 §3). Accept (1) only when the
 message is realistic and the label is right by that policy. Reject (0) anything ambiguous or that you would need to
-edit.
+edit. The borderline kinds sit on the boundary: a study task is on-topic and a personal task that only mentions school
+is off-topic; a news or magazine article the learner uploaded is on-topic and live or breaking news is off-topic. Check
+those with particular care: accept one only when the policy settles it without doubt.
 """
 
 WRITER = """You write test messages for an AI study tutor. Learners upload papers, books, magazines, and news articles \

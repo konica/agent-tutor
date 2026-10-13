@@ -1,11 +1,14 @@
 """Training data for the topic-check model (spec 2026-10-13 §6.2): pure helpers, no torch."""
 
+from pathlib import Path
+
 from evals.dataset import Example, in_eval_share
 from evals.topic_check.data import (
     Labeled,
     holdout,
     labeled,
     pick_threshold,
+    publish_model,
     rates,
     split_train_eval,
     training_rows,
@@ -58,3 +61,24 @@ def test_no_threshold_meeting_the_target_gives_0_99() -> None:
 def test_rates_count_false_rejections_and_caught() -> None:
     scored = [(0.7, False), (0.2, False), (0.9, True), (0.4, True)]
     assert rates(scored, 0.5) == (0.5, 0.5)
+
+
+def test_publishing_a_model_replaces_its_files_and_leaves_other_files_alone(tmp_path: Path) -> None:
+    source, out = tmp_path / "checked", tmp_path / "models" / "topic_check"
+    source.mkdir()
+    (source / "manifest.json").write_text("new", encoding="utf-8")
+    (source / "body.onnx").write_bytes(b"new body")
+    out.mkdir(parents=True)
+    (out / "manifest.json").write_text("old", encoding="utf-8")
+    (out / "README.md").write_text("kept", encoding="utf-8")
+    publish_model(source, out)
+    assert (out / "manifest.json").read_text(encoding="utf-8") == "new"
+    assert (out / "body.onnx").read_bytes() == b"new body"
+    assert (out / "README.md").read_text(encoding="utf-8") == "kept"
+
+
+def test_publishing_creates_the_output_folder(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "head.npz").write_bytes(b"h")
+    publish_model(tmp_path / "src", tmp_path / "a" / "b")
+    assert (tmp_path / "a" / "b" / "head.npz").read_bytes() == b"h"

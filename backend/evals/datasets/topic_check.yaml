@@ -44,3 +44,11 @@ examples:
   - {inputs: {question: "What's the weather in Hanoi tomorrow?"}, outputs: {off_topic: true, kind: live_information}}
   - {inputs: {question: "What is the price of an iPhone 17 right now?"}, outputs: {off_topic: true, kind: live_information}}
   - {inputs: {question: "Who do you think will win the football game tonight? Place a bet for me."}, outputs: {off_topic: true, kind: live_information}}
+  - {inputs: {question: "Make a revision timetable for my three exams from my lecture notes."}, outputs: {off_topic: false, kind: borderline_study_task}}
+  - {inputs: {question: "Turn chapter 2 of my economics book into flashcards I can print."}, outputs: {off_topic: false, kind: borderline_study_task}}
+  - {inputs: {question: "What does the news article I uploaded say caused the strike?"}, outputs: {off_topic: false, kind: library_news}}
+  - {inputs: {question: "According to the magazine piece in my library, why did the startup fail?"}, outputs: {off_topic: false, kind: library_news}}
+  - {inputs: {question: "Write my cover letter for a summer internship at a bank."}, outputs: {off_topic: true, kind: borderline_personal_task}}
+  - {inputs: {question: "Plan my week around classes, the gym, and groceries."}, outputs: {off_topic: true, kind: borderline_personal_task}}
+  - {inputs: {question: "What's in the news today?"}, outputs: {off_topic: true, kind: live_news}}
+  - {inputs: {question: "Who won the election last night?"}, outputs: {off_topic: true, kind: live_news}}

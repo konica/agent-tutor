@@ -8,9 +8,10 @@ Usage: uv run --env-file ../.env --extra eval --extra train python -m evals.topi
 2. Holds out 15% of the training share, trains SetFit on the rest, and picks the threshold on the held-out slice
    (false rejections <= 0.5%).
 3. Exports the body to ONNX (dynamic shapes), quantizes it to int8, and writes tokenizer.json, head.npz, and
-   manifest.json.
+   manifest.json, all in a temporary folder.
 4. Checks the exported model against SetFit on the held-out slice (within 0.02) and reports false rejections and
-   off-topic caught on the eval share. Exits 1 if the export drifts or the targets (<= 1%, >= 95%) are missed.
+   off-topic caught on the eval share. Exits 1 if the export drifts or the targets (<= 1%, >= 95%) are missed, and
+   leaves --out untouched; only a passing model is copied there.
 
 --dry-run prints how many on- and off-topic messages each share holds and trains nothing.
 """
@@ -30,7 +31,16 @@ from langsmith.utils import LangSmithError
 
 from evals.dataset import load_dataset
 from evals.publish import generated_examples
-from evals.topic_check.data import Labeled, holdout, labeled, pick_threshold, rates, split_train_eval, training_rows
+from evals.topic_check.data import (
+    Labeled,
+    holdout,
+    labeled,
+    pick_threshold,
+    publish_model,
+    rates,
+    split_train_eval,
+    training_rows,
+)
 from smart_tutor.tutoring.adapters.onnx_topic_classifier import OnnxSetFitTopicClassifier
 
 OUT = Path(__file__).parents[2] / "models" / "topic_check"
@@ -90,7 +100,6 @@ def _export(model: Any, out: Path, manifest: dict[str, Any]) -> None:
             return self.transformer(**dict(zip(names, inputs, strict=True))).last_hidden_state
 
     transformer.eval()
-    out.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
         fp32 = Path(tmp) / "body.fp32.onnx"
         torch.onnx.export(
@@ -152,18 +161,24 @@ def main(argv: Sequence[str] | None = None, *, client: Any = None) -> int:
         "trained_on": {"dataset": dataset.name, "messages": len(fit), "held_out": len(held)},
         "created_at": now.isoformat(timespec="seconds"),
     }
-    _export(model, args.out, manifest)
-    exported = OnnxSetFitTopicClassifier(args.out)
-    drift = max(abs(min(exported.p_off_topic(r.texts)) - p) for r, (p, _) in zip(held, held_scores, strict=True))
-    rejected, caught = rates([(min(exported.p_off_topic(r.texts)), r.off_topic) for r in evaluation], threshold)
-    print(f"{manifest['version']}: threshold {threshold:.2f}, export drift {drift:.4f}")
-    print(f"eval share: false rejections {rejected:.2%} (<= 1%), off-topic caught {caught:.2%} (>= 95%)")
-    if drift > MAX_DRIFT:
-        print(f"The int8 export drifts {drift:.3f} from SetFit (> {MAX_DRIFT}).", file=sys.stderr)
-        return 1
-    if rejected > TARGET_FALSE_REJECTIONS or caught < TARGET_CAUGHT:
-        print("The model misses the topic_check targets: review more data or try another --base.", file=sys.stderr)
-        return 1
+    # Export and check in a temporary folder; --out changes only when the model passes both checks.
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        staged = Path(tmp)
+        _export(model, staged, manifest)
+        exported = OnnxSetFitTopicClassifier(staged)
+        drift = max(abs(min(exported.p_off_topic(r.texts)) - p) for r, (p, _) in zip(held, held_scores, strict=True))
+        rejected, caught = rates([(min(exported.p_off_topic(r.texts)), r.off_topic) for r in evaluation], threshold)
+        print(f"{manifest['version']}: threshold {threshold:.2f}, export drift {drift:.4f}")
+        print(f"eval share: false rejections {rejected:.2%} (<= 1%), off-topic caught {caught:.2%} (>= 95%)")
+        if drift > MAX_DRIFT:
+            print(f"The int8 export drifts {drift:.3f} from SetFit (> {MAX_DRIFT}).", file=sys.stderr)
+            return 1
+        if rejected > TARGET_FALSE_REJECTIONS or caught < TARGET_CAUGHT:
+            print("The model misses the topic_check targets: review more data or try another --base.", file=sys.stderr)
+            return 1
+        del exported  # release the model files before they are copied and the folder is removed
+        publish_model(staged, args.out)
+    print(f"Wrote {args.out}")
     return 0
 
 

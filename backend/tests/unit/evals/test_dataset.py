@@ -192,6 +192,10 @@ KINDS = {
     "entertainment",
     "personal_task",
     "live_information",
+    "borderline_study_task",
+    "borderline_personal_task",
+    "library_news",
+    "live_news",
 }
 
 
@@ -216,3 +220,9 @@ def test_the_held_out_share_is_stable_ignores_case_and_spacing_and_is_about_its_
     assert in_eval_share("What is attention?", 0.3) == in_eval_share("what is   ATTENTION?", 0.3)
     held = sum(in_eval_share(f"question number {i}", 0.3) for i in range(4000))
     assert 0.27 < held / 4000 < 0.33
+
+
+def test_two_fixed_questions_keep_their_side_of_the_split() -> None:
+    # Changing the hash or the normalization moves examples between training and evaluation: do it on purpose.
+    assert in_eval_share("Explain how a hash map works.", 0.3) is True
+    assert in_eval_share("What is a covalent bond?", 0.3) is False

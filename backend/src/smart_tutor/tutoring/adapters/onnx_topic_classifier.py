@@ -56,7 +56,10 @@ class OnnxSetFitTopicClassifier(TopicClassifier):
         head = np.load(model_dir / "head.npz")
         self._coef, self._intercept = head["coef"].astype(np.float32), head["intercept"].astype(np.float32)
         if self._coef.shape[0] != 1 or self._intercept.shape != (1,):
-            raise ValueError(f"{model_dir / 'head.npz'}: a binary logistic head has one row, not {self._coef.shape[0]}")
+            raise ValueError(
+                f"{model_dir / 'head.npz'}: a binary logistic head has coef (1, dim) and intercept (1,), "
+                f"not {self._coef.shape} and {self._intercept.shape}"
+            )
 
     @property
     def default_threshold(self) -> float:

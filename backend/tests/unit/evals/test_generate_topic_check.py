@@ -32,12 +32,16 @@ def test_the_kinds_cover_both_sides_of_the_policy() -> None:
         "document_question",
         "follow_up",
         "study_task",
+        "borderline_study_task",
+        "library_news",
     }
     assert {k for k, v in KINDS.items() if v.off_topic} == {
         "greeting",
         "entertainment",
         "personal_task",
         "live_information",
+        "borderline_personal_task",
+        "live_news",
     }
 
 

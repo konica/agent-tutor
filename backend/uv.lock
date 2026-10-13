@@ -3108,6 +3108,7 @@ topic = [
 ]
 train = [
     { name = "onnx" },
+    { name = "onnxruntime" },
     { name = "onnxscript" },
     { name = "setfit" },
     { name = "torch", version = "2.14.1", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
@@ -3149,6 +3150,7 @@ requires-dist = [
     { name = "numpy", marker = "extra == 'topic'", specifier = ">=2.0" },
     { name = "onnx", marker = "extra == 'train'", specifier = ">=1.17" },
     { name = "onnxruntime", marker = "extra == 'topic'", specifier = ">=1.20" },
+    { name = "onnxruntime", marker = "extra == 'train'", specifier = ">=1.20" },
     { name = "onnxscript", marker = "extra == 'train'", specifier = ">=0.2" },
     { name = "openevals", marker = "extra == 'eval'", specifier = ">=0.1" },
     { name = "openinference-instrumentation-langchain", specifier = ">=0.1.79" },

@@ -2,8 +2,10 @@
 threshold choice. Pure Python, so it is unit-tested without torch."""
 
 import random
+import shutil
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 from evals.dataset import Example, in_eval_share, normalized
 from smart_tutor.tutoring.application import topic_texts
@@ -79,3 +81,12 @@ def pick_threshold(scored: Sequence[tuple[float, bool]], max_false_rejections: f
         if rates(scored, threshold)[0] <= max_false_rejections + 1e-12:
             return threshold
     return STEPS[-1]
+
+
+def publish_model(source: Path, out: Path) -> None:
+    """Copy a checked model's files from `source` into `out`, replacing files of the same name; `out` is created if
+    needed and nothing else in it is touched."""
+    out.mkdir(parents=True, exist_ok=True)
+    for file in source.iterdir():
+        if file.is_file():
+            shutil.copy2(file, out / file.name)
