@@ -12,6 +12,7 @@ import pytest
 import yaml
 from aws_cdk.assertions import Match, Template
 
+from smart_tutor_infra.app_stacks import build_app
 from smart_tutor_infra.names import ON_PREMISE
 from smart_tutor_infra.stacks.host import COMPOSE_SHA256, COMPOSE_VERSION
 from tests.test_synth import make_app, template
@@ -172,7 +173,11 @@ def test_instance_role_pulls_images_reads_its_own_settings_and_secrets_and_is_ma
     assert "parameter/smart-tutor/" not in json.dumps(every)
     assert "secret:smart-tutor/" not in json.dumps(every)
     # Only the ECR login and metrics, which have no resource, may use "*".
-    assert sorted(s.get("Sid", "<unnamed>") for s in every if s["Resource"] == "*") == ["EcrLogin", "PublishJobMetrics"]
+    assert sorted(s.get("Sid", "<unnamed>") for s in every if s["Resource"] == "*") == [
+        "EcrLogin",
+        "PublishAgentMetrics",
+        "PublishJobMetrics",
+    ]
 
 
 def test_instance_role_writes_the_on_premise_bucket_only_where_a_service_or_the_backup_does(t: Template) -> None:
@@ -203,6 +208,30 @@ def test_instance_role_publishes_metrics_only_to_its_own_namespace(t: Template) 
     statement = _statements(t)["PublishJobMetrics"]
     assert statement["Action"] == "cloudwatch:PutMetricData"
     assert statement["Condition"] == {"StringEquals": {"cloudwatch:namespace": "SmartTutor/OnPremise"}}
+
+
+def test_instance_role_applies_the_question_screen_guardrail_and_counts_its_failures(t: Template) -> None:
+    statements = _statements(t)
+    resources = statements["ApplyQuestionScreen"]["Resource"]
+    assert statements["ApplyQuestionScreen"]["Action"] == "bedrock:ApplyGuardrail"
+    # The guardrail's id is the SSM parameter ConfigStack writes, read when the stack deploys.
+    assert "guardrail/" in json.dumps(resources[0]) and "Ref" in json.dumps(resources[0])
+    assert [r["Fn::Join"][1][-1] for r in resources[1:]] == [":guardrail-profile/us.guardrail.v1:0"] * 3
+    assert [r["Fn::Join"][1][0] for r in resources[1:]] == [
+        f"arn:aws:bedrock:{region}:" for region in ("us-east-1", "us-east-2", "us-west-2")
+    ]
+    (parameter,) = (p for p in t.to_json()["Parameters"].values() if p["Default"].endswith("question-guardrail-id"))
+    assert parameter["Default"] == "/smart-tutor-on-premise/question-guardrail-id"
+    metrics = statements["PublishAgentMetrics"]
+    assert metrics["Action"] == "cloudwatch:PutMetricData"
+    assert metrics["Condition"] == {"StringEquals": {"cloudwatch:namespace": "SmartTutor/Agent"}}
+
+
+def test_host_deploys_after_config_whose_guardrail_id_its_instance_role_reads() -> None:
+    app = make_app(**{"smart-tutor:mode": ON_PREMISE})
+    stacks = {s.stack_name: s for s in build_app(app)}
+
+    assert stacks["SmartTutor-OnPremise-prod-Config"] in stacks["SmartTutor-OnPremise-prod-Host"].dependencies
 
 
 def _actions(statement: dict[str, Any]) -> list[str]:
@@ -1140,7 +1169,30 @@ def test_deploy_script_renders_the_tracing_settings_and_leaves_the_key_empty_wit
     assert "LANGSMITH" not in script
 
 
-PHOENIX_IMAGE = "arizephoenix/phoenix:version-20.16.0-nonroot"
+def test_deploy_script_renders_the_question_screen_settings_from_ssm() -> None:
+    script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
+    for line in (
+        "question_guard=$(param question-guard)",
+        "question_guardrail_id=$(param question-guardrail-id)",
+        "question_guardrail_version=$(param question-guardrail-version)",
+        "QUESTION_GUARD=$question_guard",
+        "QUESTION_GUARDRAIL_ID=$question_guardrail_id",
+        "QUESTION_GUARDRAIL_VERSION=$question_guardrail_version",
+    ):
+        assert line in script
+
+
+def test_only_the_agent_gets_the_question_screen_settings(compose: dict[str, Any]) -> None:
+    env = compose["services"]["agent"]["environment"]
+    assert env["SMART_TUTOR_QUESTION_GUARD"] == "${QUESTION_GUARD:?}"
+    assert env["SMART_TUTOR_QUESTION_GUARDRAIL_ID"] == "${QUESTION_GUARDRAIL_ID:?}"
+    assert env["SMART_TUTOR_QUESTION_GUARDRAIL_VERSION"] == "${QUESTION_GUARDRAIL_VERSION:?}"
+    for name, service in compose["services"].items():
+        if name != "agent":
+            assert not [k for k in service.get("environment", {}) if k.startswith("SMART_TUTOR_QUESTION_")], name
+
+
+PHOENIX_IMAGE ="arizephoenix/phoenix:version-20.16.0-nonroot"
 
 
 def test_phoenix_runs_unprivileged_on_a_read_only_root_with_its_traces_in_postgres(compose: dict[str, Any]) -> None:

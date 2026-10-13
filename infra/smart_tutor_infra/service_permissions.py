@@ -7,14 +7,20 @@ references Storage.
 
 import aws_cdk as cdk
 from aws_cdk import aws_iam as iam
+from aws_cdk import aws_ssm as ssm
 
 from smart_tutor_infra.models import (
     AGENT_MODEL,
     AGENT_MODEL_REGIONS,
     AGENT_PROFILE,
     EMBEDDING_MODEL,
+    GUARDRAIL_PROFILE,
+    GUARDRAIL_PROFILE_REGIONS,
 )
 from smart_tutor_infra.names import ModeNames
+
+# The agent's CloudWatch namespace (backend constant AGENT_METRICS_NAMESPACE); PutMetricData is granted for it only.
+AGENT_METRICS_NAMESPACE = "SmartTutor/Agent"
 
 
 class ServicePermissions:
@@ -35,6 +41,27 @@ class ServicePermissions:
         )
         self.embed = iam.PolicyStatement(
             actions=invoke, resources=[f"arn:aws:bedrock:{stack.region}::foundation-model/{EMBEDDING_MODEL}"]
+        )
+        # The question screen (#199). ConfigStack writes the guardrail's id to SSM; reading it at deploy time needs no
+        # cross-stack export, only that the stack deploys after ConfigStack (app_stacks).
+        guardrail_id = ssm.StringParameter.value_for_string_parameter(stack, f"{names.ssm_path}/question-guardrail-id")
+        self.apply_guardrail = iam.PolicyStatement(
+            sid="ApplyQuestionScreen",
+            actions=["bedrock:ApplyGuardrail"],
+            resources=[
+                f"arn:aws:bedrock:{stack.region}:{stack.account}:guardrail/{guardrail_id}",
+                *(
+                    f"arn:aws:bedrock:{r}:{stack.account}:guardrail-profile/{GUARDRAIL_PROFILE}"
+                    for r in GUARDRAIL_PROFILE_REGIONS
+                ),
+            ],
+        )
+        # PutMetricData has no resource-level permissions; the namespace condition limits it.
+        self.put_agent_metrics = iam.PolicyStatement(
+            sid="PublishAgentMetrics",
+            actions=["cloudwatch:PutMetricData"],
+            resources=["*"],
+            conditions={"StringEquals": {"cloudwatch:namespace": AGENT_METRICS_NAMESPACE}},
         )
 
     def api(self) -> list[iam.PolicyStatement]:
@@ -85,7 +112,8 @@ class ServicePermissions:
         ]
 
     def agent(self) -> list[iam.PolicyStatement]:
-        return [self.chat]
+        """The agent chats, applies the question screen's guardrail, and counts the screen's failures (#199)."""
+        return [self.chat, self.apply_guardrail, self.put_agent_metrics]
 
     def mcp(self) -> list[iam.PolicyStatement]:
         return [self.embed]

@@ -56,6 +56,23 @@ def _on_premise(app: cdk.App, env: cdk.Environment, names: ModeNames) -> list[cd
         or f"arn:aws:iam::{cdk.Aws.ACCOUNT_ID}:oidc-provider/{GITHUB_OIDC_HOST}",
     )
     domain = app.node.try_get_context("smart-tutor:on-premise-domain") or None
+    config = ConfigStack(app, f"{prefix}-Config", env=env, names=names)
+    host = HostStack(
+        app,
+        f"{prefix}-Host",
+        env=env,
+        names=names,
+        instance_type=app.node.get_context("smart-tutor:on-premise-instance-type"),
+        # The DuckDNS name (#154); empty: <Elastic IP>.sslip.io.
+        domain=domain,
+        # Empty: a blank data volume. Set only to restore one (docs/runbooks/on-premise-backups.md); clearing it
+        # again replaces the restored volume with a blank one.
+        data_snapshot_id=app.node.try_get_context("smart-tutor:on-premise-data-snapshot-id") or None,
+        # The backup, recovery, uptime, and patching alarms email the budget's recipients (#151, #152).
+        alert_emails=app.node.get_context("smart-tutor:budget-alert-emails"),
+    )
+    # The instance role's grant reads the guardrail id from SSM at deploy time (#199), so the parameter must exist.
+    host.add_stack_dependency(config)
     return [
         StorageStack(
             app,
@@ -68,24 +85,11 @@ def _on_premise(app: cdk.App, env: cdk.Environment, names: ModeNames) -> list[cd
             web_origin=f"https://{domain}" if domain else "https://*.sslip.io",
             backups_retention=cdk.Duration.days(30),
         ),
-        ConfigStack(app, f"{prefix}-Config", env=env, names=names),
+        config,
         _budgets(app, env, names),
         deploy,
         RegistryStack(app, f"{prefix}-Registry", env=env, names=names),
-        HostStack(
-            app,
-            f"{prefix}-Host",
-            env=env,
-            names=names,
-            instance_type=app.node.get_context("smart-tutor:on-premise-instance-type"),
-            # The DuckDNS name (#154); empty: <Elastic IP>.sslip.io.
-            domain=domain,
-            # Empty: a blank data volume. Set only to restore one (docs/runbooks/on-premise-backups.md); clearing it
-            # again replaces the restored volume with a blank one.
-            data_snapshot_id=app.node.try_get_context("smart-tutor:on-premise-data-snapshot-id") or None,
-            # The backup, recovery, uptime, and patching alarms email the budget's recipients (#151, #152).
-            alert_emails=app.node.get_context("smart-tutor:budget-alert-emails"),
-        ),
+        host,
     ]
 
 
@@ -112,6 +116,9 @@ def _native_cloud(app: cdk.App, env: cdk.Environment, names: ModeNames) -> list[
     )
     # The cluster's access entry names the deploy role by ARN string, so CloudFormation cannot infer the order.
     cluster.add_stack_dependency(deploy)
+    # The agent's role reads the guardrail id from SSM at deploy time (#199), so the parameter must exist.
+    config = ConfigStack(app, f"{prefix}-Config", env=env, names=names)
+    cluster.add_stack_dependency(config)
     # The cluster security group id makes Data deploy after Cluster; only pods reach the database.
     data = DataStack(
         app,
@@ -136,7 +143,7 @@ def _native_cloud(app: cdk.App, env: cdk.Environment, names: ModeNames) -> list[
         StorageStack(app, f"{prefix}-Storage", env=env, names=names, web_origin=edge.public_url),
         cluster,
         RegistryStack(app, f"{prefix}-Registry", env=env, names=names),
-        ConfigStack(app, f"{prefix}-Config", env=env, names=names),
+        config,
         _budgets(app, env, names),
     ]
     for stack in stacks[1:]:
