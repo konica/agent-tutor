@@ -7,7 +7,7 @@ from dataclasses import replace
 from datetime import datetime
 
 from smart_tutor.shared.domain.ids import DocumentId, RunId, ThreadId, UserId
-from smart_tutor.tutoring.domain.guard import GuardTrip
+from smart_tutor.tutoring.domain.guard import GUARD_DECLINE, GuardTrip
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 from smart_tutor.tutoring.domain.thread import NO_THREAD_FILTER, SearchScope, Thread, ThreadFilter, ThreadStatus
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
@@ -98,7 +98,8 @@ class InMemoryThreads(ThreadRepository):
         return [t for t in self.turn_rows if t.thread_id == thread_id and t.user_id == user_id]
 
     def last_turns(self, thread_id: ThreadId, user_id: UserId, limit: int) -> list[Turn]:
-        return self.turns(thread_id, user_id)[-limit:] if limit > 0 else []
+        kept = [t for t in self.turns(thread_id, user_id) if not (t.decline and t.decline.code == GUARD_DECLINE)]
+        return kept[-limit:] if limit > 0 else []
 
     def set_rating(self, thread_id: ThreadId, user_id: UserId, run_id: RunId, rating: Rating) -> bool:
         for i, t in enumerate(self.turn_rows):

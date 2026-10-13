@@ -82,7 +82,7 @@ class ThreadRepository(ABC):
     @abstractmethod
     def last_turns(self, thread_id: ThreadId, user_id: UserId, limit: int) -> list[Turn]:
         """The thread's newest `limit` kept turns, oldest first; empty unless the thread is this learner's (scoped by
-        owner)."""
+        owner). A turn a guard tripped is never history (D29): it is skipped and the next older one takes its place."""
 
     @abstractmethod
     def turns(self, thread_id: ThreadId, user_id: UserId) -> list[Turn]:

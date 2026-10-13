@@ -31,7 +31,15 @@ from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import DocumentId, RunId, SubjectId, ThreadId, UserId
 from smart_tutor.shared.domain.principal import Principal
 from smart_tutor.subjects.application import SubjectNames
-from smart_tutor.tutoring.application import AnsweredTurn, ConversationService, Rating, Thread, Turn
+from smart_tutor.tutoring.application import (
+    GUARD_MESSAGE,
+    AnsweredTurn,
+    ConversationService,
+    Decline,
+    Rating,
+    Thread,
+    Turn,
+)
 from smart_tutor.tutoring.domain.thread import ThreadStatus
 
 AUTH = {"Authorization": "Bearer t-ada"}
@@ -1360,3 +1368,44 @@ def test_an_archived_thread_cant_add_or_remove_documents() -> None:
     removed = client.delete(f"{url}/{listed}", headers=AUTH)
     assert removed.status_code == 409
     assert [d["document_id"] for d in client.get(url, headers=AUTH).json()] == [listed]
+
+
+# A guard trip (US-6, D29): `replace` swaps the partial answer for the guard message; no documents are used.
+
+PARTIAL = b'event: delta\ndata: {"text": "Fine start"}\n\n'
+REPLACE = f"event: replace\ndata: {json.dumps({'code': 'guard', 'text': GUARD_MESSAGE})}\n\n".encode()
+
+
+def test_a_guard_trip_is_relayed_and_kept_as_the_guard_message_with_no_documents() -> None:
+    client, _, threads, _ = ask_with(lambda ids: PARTIAL + REPLACE + DONE)
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    events = [part.split("\n", 1)[0] for part in response.text.split("\n\n") if part]
+    assert events == ["event: thread", "event: delta", "event: replace", "event: done"]
+    assert response.text.split("\n\n", 1)[1] == (PARTIAL + REPLACE + DONE).decode()
+    [turn] = threads.turn_rows
+    assert turn.answer == "" and turn.citations == () and turn.decline == Decline("guard", GUARD_MESSAGE)
+    assert documents_of(client, threads) == []
+
+
+def test_sources_seen_before_a_trip_add_no_documents_used() -> None:
+    client, _, threads, ids = ask_with(lambda ids: PARTIAL + sources(ids[0]) + REPLACE + DONE)
+
+    client.post("/threads", json=QUESTION, headers=AUTH)
+
+    [turn] = threads.turn_rows
+    assert turn.decline == Decline("guard", GUARD_MESSAGE) and turn.answer == ""
+    assert documents_of(client, threads) == []
+
+
+def test_a_malformed_replace_keeps_an_empty_turn_without_a_decline(caplog: pytest.LogCaptureFixture) -> None:
+    bad = b'event: replace\ndata: {"text": 3}\n\n'
+    client, _, threads, ids = ask_with(lambda ids: PARTIAL + sources(ids[0]) + bad + DONE)
+
+    client.post("/threads", json=QUESTION, headers=AUTH)
+
+    [turn] = threads.turn_rows
+    assert turn.answer == "" and turn.decline is None and turn.citations == ()
+    assert documents_of(client, threads) == []
+    assert "the agent's replace event was malformed" in caplog.text

@@ -22,6 +22,8 @@ from smart_tutor.knowledge.application import DocumentService, UploadService
 from smart_tutor.shared.domain.ids import DocumentId, RunId, SubjectId, ThreadId, UserId
 from smart_tutor.tutoring.application import (
     DELETED_DOCUMENT,
+    GUARD_DECLINE,
+    GUARD_MESSAGE,
     AnsweredTurn,
     CitationView,
     ConversationService,
@@ -700,6 +702,27 @@ def test_a_declined_turn_is_its_question_and_the_decline_message() -> None:
     assert conversations.history(tid, UserId("ada")) == [
         HistoryTurn("Explain transformers", "These documents don't cover this.")
     ]
+
+
+def test_a_guard_tripped_turn_is_never_history() -> None:
+    conversations, tid = _history_service()
+    guard = Decline(GUARD_DECLINE, GUARD_MESSAGE)
+    conversations.record_turn(tid, UserId("ada"), AnsweredTurn("q1", "a1"))
+    conversations.record_turn(tid, UserId("ada"), AnsweredTurn("q2", decline=guard))
+    conversations.record_turn(tid, UserId("ada"), AnsweredTurn("q3", "a3"))
+
+    assert conversations.history(tid, UserId("ada")) == [HistoryTurn("q1", "a1"), HistoryTurn("q3", "a3")]
+
+
+def test_history_still_holds_the_limit_of_other_turns_around_a_guard_turn() -> None:
+    conversations, tid = _history_service(history_turns=2)
+    guard = Decline(GUARD_DECLINE, GUARD_MESSAGE)
+    conversations.record_turn(tid, UserId("ada"), AnsweredTurn("q1", "a1"))
+    conversations.record_turn(tid, UserId("ada"), AnsweredTurn("q2", "a2"))
+    conversations.record_turn(tid, UserId("ada"), AnsweredTurn("q3", decline=guard))
+    conversations.record_turn(tid, UserId("ada"), AnsweredTurn("q4", "a4"))
+
+    assert conversations.history(tid, UserId("ada")) == [HistoryTurn("q2", "a2"), HistoryTurn("q4", "a4")]
 
 
 def test_a_long_earlier_answer_is_cut() -> None:

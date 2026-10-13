@@ -9,7 +9,8 @@ to upload a document (a "no_documents" decline), kept as a turn like any decline
 id that names its trace and is kept with the turn. The learner lists their active conversations, newest activity
 first (US-13); the learner archives and restores a conversation, and an archived one is read-only (US-13). The
 learner rates a kept answer or decline 👍/👎 (PRD §10.2); the rating is saved with the turn,
-then sent to Phoenix as a `learner_rating` span annotation on the ask's trace."""
+then sent to Phoenix as a `learner_rating` span annotation on the ask's trace. A guard trip's `replace` event keeps
+the turn as the guard message, with no documents used."""
 
 import json
 import logging
@@ -58,7 +59,9 @@ SSE_RESPONSE: dict[int | str, dict[str, object]] = {
     200: {
         "description": (
             "Server-sent events: thread, then delta*, citations, done; or decline then done "
-            "(no_documents: nothing readable, upload first; limited: the listed documents don't cover it); or error."
+            "(no_documents: nothing readable, upload first; limited: the listed documents don't cover it); "
+            "or delta*, replace, done when a guard trips (the learner sees replace's text instead of the partial "
+            "answer); or error."
         ),
         "content": {"text/event-stream": {"schema": {"type": "string"}}},
     },
@@ -102,6 +105,7 @@ class _Seen:
     citations: tuple[TurnCitation, ...] = ()
     decline: Decline | None = None
     document_ids: tuple[DocumentId, ...] = ()
+    tripped: bool = False  # a guard's `replace` came: no documents used, no citations kept
 
 
 # Keeps the answer as a turn of the thread that started, with its documents used; never raises.
@@ -203,6 +207,16 @@ def _decline(data: object) -> Decline | None:
     return Decline(code, message)
 
 
+def _replace(data: object) -> Decline | None:
+    """A guard trip's `replace` event (US-6, D29): the learner sees `text` in place of the partial answer."""
+    code = data.get("code") if isinstance(data, dict) else None
+    text = data.get("text") if isinstance(data, dict) else None
+    if not isinstance(code, str) or not isinstance(text, str):
+        logger.warning("the agent's replace event was malformed")
+        return None
+    return Decline(code, text)
+
+
 def _delta(data: object) -> str:
     text = data.get("text") if isinstance(data, dict) else None
     return text if isinstance(text, str) else ""
@@ -216,7 +230,10 @@ async def _relay(answer: AgentAnswer, start: StartThread, record: RecordAnswer) 
     well-formed event of its own.
 
     The agent's `sources` event is kept back; on `done`, if the thread started, the turn and its documents are kept
-    before `done` is forwarded. A stream that ends without `done` or `error` ends with an unavailable error event.
+    before `done` is forwarded. A `replace` (a guard trip) empties what was kept: the turn is the guard message, with
+    no answer, citations, or documents used, whatever came before or comes after it.
+
+    A stream that ends without `done` or `error` ends with an unavailable error event.
     """
     events = _events(answer)
     try:
@@ -235,12 +252,16 @@ async def _relay(answer: AgentAnswer, start: StartThread, record: RecordAnswer) 
             parsed = _event(event)
             name = parsed[0] if parsed else None
             if parsed and name == "sources":
-                seen.document_ids = _document_ids(parsed[1])
+                if not seen.tripped:
+                    seen.document_ids = _document_ids(parsed[1])
             else:
                 if parsed and name == "delta":
                     seen.answer += _delta(parsed[1])
+                elif parsed and name == "replace":
+                    seen = _Seen(decline=_replace(parsed[1]), tripped=True)
                 elif parsed and name == "citations":
-                    seen.citations = _citations(parsed[1])
+                    if not seen.tripped:
+                        seen.citations = _citations(parsed[1])
                 elif parsed and name == "decline":
                     seen.decline = _decline(parsed[1])
                 if name == "done" and started:
