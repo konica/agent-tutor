@@ -296,7 +296,7 @@ def test_agent_and_worker_trace_into_the_native_cloud_project_with_keys_from_sec
     refs = {d["secretKey"]: d["remoteRef"]["key"] for d in external["spec"]["data"]}
     assert refs == {
         "api-key": "smart-tutor/langsmith/api-key",
-        "learner-hash-key": "smart-tutor/langsmith/learner-hash-key",
+        "learner-hash-key": "smart-tutor/phoenix/learner-hash-key",
     }
 
 

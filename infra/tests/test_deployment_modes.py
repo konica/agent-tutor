@@ -105,7 +105,7 @@ def test_on_premise_has_its_own_parameters_and_secrets() -> None:
         "smart-tutor-on-premise/keycloak/admin",
         "smart-tutor-on-premise/keycloak/api-client",
         "smart-tutor-on-premise/keycloak/mcp-client",
-        "smart-tutor-on-premise/langsmith/learner-hash-key",
+        "smart-tutor-on-premise/phoenix/learner-hash-key",
     }
 
 
