@@ -254,3 +254,13 @@ def test_a_run_where_nothing_ran_says_so_in_the_summary(tmp_path: Path) -> None:
     )
     assert code == 1
     assert "Nothing ran" in summary.read_text(encoding="utf-8")
+
+
+async def test_a_suite_that_is_not_ready_is_skipped_and_its_metrics_stay_not_run(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    client = published()
+    group = DatasetSuites("ask", make_target, (scored("search_step_ran", 1.0),), skip=lambda: "no model yet")
+    scores, links = await run_split(client, [group], "smoke", load=lambda key: ASK)
+    assert scores == {} and links == {} and client.experiments == []
+    assert "no model yet" in capsys.readouterr().err

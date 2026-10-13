@@ -13,6 +13,7 @@ that spans turns). Each ask gets the turns before it capped like the API caps th
 """
 
 from collections.abc import Awaitable, Callable, Mapping, Sequence
+from pathlib import Path
 from typing import Any, Protocol
 
 import httpx
@@ -28,6 +29,7 @@ from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.tutoring.adapters.guardrails_guard import GuardrailsGuard
 from smart_tutor.tutoring.adapters.mcp_retriever import McpRetriever
+from smart_tutor.tutoring.adapters.onnx_topic_classifier import OnnxSetFitTopicClassifier
 from smart_tutor.tutoring.application import (
     HistoryTurn,
     RetrievedChunk,
@@ -246,3 +248,28 @@ def ask_target() -> AskTarget:
         topic_threshold=topic_threshold(settings.topic_check, classifier),
         topic_timeout_ms=settings.topic_check.timeout_ms,
     )
+
+
+TOPIC_MODEL = Path(__file__).parents[1] / "models" / "topic_check"  # backend/models/topic_check
+
+
+class TopicCheckTarget:
+    """The topic check alone (spec 2026-10-13 §6.3): no Bedrock, no MCP."""
+
+    def __init__(self, classifier: TopicClassifier, threshold: float) -> None:
+        self._classifier, self._threshold = classifier, threshold
+
+    async def __call__(self, inputs: dict[str, Any]) -> dict[str, Any]:
+        history = [HistoryTurn(t["question"], t.get("answer", "")) for t in inputs.get("history") or []]
+        verdict = await self._classifier.classify(inputs["question"], history)
+        return {
+            "off_topic": verdict.is_off_topic(self._threshold),
+            "p_off_topic": verdict.p_off_topic,
+            "model": verdict.model,
+        }
+
+
+def topic_check_target() -> TopicCheckTarget:
+    """The committed model in backend/models/topic_check, at the configured threshold or its own."""
+    classifier = OnnxSetFitTopicClassifier(TOPIC_MODEL)
+    return TopicCheckTarget(classifier, topic_threshold(Settings().topic_check, classifier))
