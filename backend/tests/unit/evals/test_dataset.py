@@ -179,3 +179,21 @@ def test_tags_of_other_shapes_are_not_versions() -> None:
     client.update_dataset_tag(dataset_name="smart-tutor-ask", as_of=as_of, tag="smoke-v10-draft")
     client.update_dataset_tag(dataset_name="smart-tutor-ask", as_of=as_of, tag="smokey-v99")
     assert newest_version(client, "smart-tutor-ask", "smoke") == "smoke-v1"
+
+
+def test_a_dataset_is_in_both_splits_unless_its_file_lists_some(tmp_path: Path) -> None:
+    (tmp_path / "a.yaml").write_text("name: a\nexamples: [{inputs: {q: a}}]\n", encoding="utf-8")
+    (tmp_path / "b.yaml").write_text("name: b\nsplits: [full]\nexamples: [{inputs: {q: a}}]\n", encoding="utf-8")
+    assert load_dataset("a", tmp_path).splits == ("smoke", "full")
+    assert load_dataset("b", tmp_path).splits == ("full",)
+
+
+def test_a_dataset_naming_an_unknown_split_or_pinning_one_it_opts_out_of_is_refused(tmp_path: Path) -> None:
+    (tmp_path / "c.yaml").write_text("name: c\nsplits: [nightly]\nexamples: [{inputs: {q: a}}]\n", encoding="utf-8")
+    with pytest.raises(DatasetError, match="nightly"):
+        load_dataset("c", tmp_path)
+    (tmp_path / "d.yaml").write_text(
+        "name: d\nsplits: [full]\npins: {smoke: smoke-v1}\nexamples: [{inputs: {q: a}}]\n", encoding="utf-8"
+    )
+    with pytest.raises(DatasetError, match="opts out"):
+        load_dataset("d", tmp_path)

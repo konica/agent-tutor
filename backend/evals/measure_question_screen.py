@@ -101,7 +101,10 @@ def cost_share(mean_text_units: float, input_tokens: int, output_tokens: int) ->
 
 def question_screen_definition(strength: str, region: str) -> dict[str, Any]:
     """`create_guardrail` arguments of the production question screen at `strength`: the prompt-attack filter on
-    input only, Standard tier through the US cross-region profile. The profile is named without an account id."""
+    input only, Standard tier through the US cross-region profile. The profile is named without an account id.
+
+    Must stay identical to the CloudFormation guardrail in infra/smart_tutor_infra/stacks/config.py (a separate uv
+    project, so no shared import): the measurements are valid only for the production definition."""
     return {
         "name": f"smart-tutor-measure-{strength.lower()}-{uuid.uuid4().hex[:6]}",
         "description": f"Temporary question-screen measurement ({region}); deleted when the run ends.",

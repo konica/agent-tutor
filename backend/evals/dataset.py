@@ -1,10 +1,10 @@
 """Eval datasets, versioned in LangSmith (PRD §10.3 item 6).
 
 Each `datasets/<key>.yaml` is one LangSmith dataset (`name`): its hand-written `examples`, which are in every version of
-both splits, and optional `pins` naming the version the runner must use for a split. A split's versions are made only
-by publishing (evals.publish): when a split's examples differ from its newest version, they replace the split and the
-result is tagged `<split>-v<N+1>`. Tags are never moved, so a version a run was gated on is never edited. The runner
-uses a split's newest version unless one is pinned.
+both splits (unless a top-level `splits` lists only some), and optional `pins` naming the version the runner must use
+for a split. A split's versions are made only by publishing (evals.publish): when a split's examples differ from its
+newest version, they replace the split and the result is tagged `<split>-v<N+1>`. Tags are never moved,
+so a version a run was gated on is never edited. The runner uses a split's newest version unless one is pinned.
 """
 
 import json
@@ -42,6 +42,7 @@ class Dataset:
     description: str
     examples: tuple[Example, ...]  # hand-written: in every version of every split
     pins: dict[str, str] = field(default_factory=dict)  # split -> the version tag the runner must use
+    splits: tuple[str, ...] = SPLITS  # the splits the dataset is published to (`splits:` in its file)
 
 
 def load_dataset(key: str, folder: Path = DATASETS) -> Dataset:
@@ -56,7 +57,12 @@ def load_dataset(key: str, folder: Path = DATASETS) -> Dataset:
     for split, tag in pins.items():
         if _number(tag, split) is None:
             raise DatasetError(f"{path.name}: pin {split}: {tag} is not a {split}-v<N> version")
-    return Dataset(key, raw["name"], raw.get("description", ""), examples, pins)
+    splits = tuple(str(split) for split in raw.get("splits") or SPLITS)
+    if unknown := set(splits) - set(SPLITS):
+        raise DatasetError(f"{path.name}: splits names unknown splits {sorted(unknown)} (splits: {', '.join(SPLITS)})")
+    if outside := set(pins) - set(splits):
+        raise DatasetError(f"{path.name}: pins name splits the dataset opts out of: {sorted(outside)}")
+    return Dataset(key, raw["name"], raw.get("description", ""), examples, pins, splits)
 
 
 def _number(tag: str, split: str) -> int | None:

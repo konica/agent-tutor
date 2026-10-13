@@ -49,14 +49,14 @@ A new cross-module dependency means moving a module in the order on purpose and 
 
 - Core dependencies in `[project.dependencies]`; heavy single-service ones behind an extra: `ingest` (PDF loader and text splitter, worker only), `guard` (Guardrails AI output guard, agent only; ADR 0018), or `eval`. Dev tools in the `dev` dependency group. Run `uv lock` and commit `uv.lock` after editing.
 - `mcp` is 2.x: the server class is `mcp.server.MCPServer`, and host/port go to `run()`.
-- Models are LangChain's: services take a `BaseChatModel` or `Embeddings` from `ModelFactory` (`init_chat_model`; ADR 0006). Don't hand-write model wrappers or call `bedrock-runtime` with boto3.
+- Models are LangChain's: services take a `BaseChatModel` or `Embeddings` from `ModelFactory` (`init_chat_model`; ADR 0006). Don't hand-write model wrappers or call `bedrock-runtime` with boto3. The one exception is ApplyGuardrail, which LangChain doesn't wrap: it goes through `shared.adapters.aws.clients.bedrock_runtime_client` in an adapter (ADR 0019).
 
 ## Tests
 
 - `tests/unit/<module>/` — domain and application with fakes from `tests/fakes/` (`from fakes import fake_chat_model, fake_embeddings`); the default `pytest` run. Async tests need no decorator.
 - `tests/integration/<module>/` — adapters against the Compose stack, marked `@pytest.mark.integration`.
 - `tests/isolation/` — cross-user access, per-learner contents, and delete guarantees (PRD US-10c, US-11, US-12).
-- `tests/bedrock/` — real Bedrock calls through `ModelFactory`, marked `@pytest.mark.bedrock` (`make bedrock-check`). Run it after changing a model ID, an adapter, or boto3.
+- `tests/bedrock/` — real Bedrock calls through `ModelFactory` (`test_question_screen.py` calls ApplyGuardrail directly and skips without a guardrail id and version), marked `@pytest.mark.bedrock` (`make bedrock-check`). Run it after changing a model ID, an adapter, or boto3.
 - No test traces, whatever environment is loaded (ADR 0017): `tests/conftest.py` blanks `SMART_TUTOR_PHOENIX_URL` for the session and fails a test that leaves LangChain instrumented; it also turns LangSmith tracing off (evals use LangSmith) and makes its default client a `RecordingClient`. A test that checks spans traces inside `fakes.recorded_traces()` (in-memory exporter).
 
 ## Images

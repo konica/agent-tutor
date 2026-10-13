@@ -1389,6 +1389,18 @@ def test_a_guard_trip_is_relayed_and_kept_as_the_guard_message_with_no_documents
     assert documents_of(client, threads) == []
 
 
+def test_a_question_screen_trip_streams_replace_then_done_with_no_delta_and_is_kept() -> None:
+    client, _, threads, _ = ask_with(lambda ids: REPLACE + DONE)
+
+    response = client.post("/threads", json=QUESTION, headers=AUTH)
+
+    events = [part.split("\n", 1)[0] for part in response.text.split("\n\n") if part]
+    assert events == ["event: thread", "event: replace", "event: done"]
+    [turn] = threads.turn_rows
+    assert turn.answer == "" and turn.citations == () and turn.decline == Decline("guard", GUARD_MESSAGE)
+    assert documents_of(client, threads) == []
+
+
 def test_sources_seen_before_a_trip_add_no_documents_used() -> None:
     client, _, threads, ids = ask_with(lambda ids: PARTIAL + sources(ids[0]) + REPLACE + DONE)
 

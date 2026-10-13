@@ -63,6 +63,8 @@ def render_dataset(benign: Mapping[str, Sequence[str]], taxonomy: Mapping[str, A
     body = {
         "name": DATASET_NAME,
         "description": "Benign study questions and prompt attacks for the Bedrock question screen (generated).",
+        # full only: a 1% false-positive gate means nothing on a 30-row subset, and CI has no guardrail to call
+        "splits": ["full"],
         "examples": rows(benign, taxonomy),
     }
     return HEADER + _dump(body)

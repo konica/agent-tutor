@@ -51,7 +51,7 @@ Prerequisites: the app stack and the eval learners' libraries (`make evals-learn
 
 ## Datasets
 
-Each `datasets/<key>.yaml` is one LangSmith dataset (`name`) and its hand-written `examples`, which are in every version of both splits. Generated examples join them only after a human accepts them (below). A split's versions are tagged `smoke-v1`, `smoke-v2`, … and `full-v1`, …; only `make evals-publish` makes one, and only when the split's examples changed. Tags are never moved, so a version a run was gated on is never edited. Examples name seed documents by manifest id; the target finds each learner's own copy.
+Each `datasets/<key>.yaml` is one LangSmith dataset (`name`) and its hand-written `examples`, which are in every version of both splits. A top-level `splits: [full]` opts the dataset out of `smoke`: publishing makes no smoke version for it and `make evals-smoke` skips it (default: both splits; a pin may name only a split the dataset keeps). Generated examples join them only after a human accepts them (below). A split's versions are tagged `smoke-v1`, `smoke-v2`, … and `full-v1`, …; only `make evals-publish` makes one, and only when the split's examples changed. Tags are never moved, so a version a run was gated on is never edited. Examples name seed documents by manifest id; the target finds each learner's own copy.
 
 `make evals-smoke` runs each split's **newest** version. The gate table names the version each experiment ran on (`smart-tutor-ask (smoke smoke-v3)`).
 
@@ -121,6 +121,8 @@ and publish (`make evals-publish`). To grow it, generate variants of each seed (
 
 - `question_screen.false_positives`: benign rows only; 1 = the screen tripped. Target `max: 0.01`.
 - `question_screen.catch_rate`: attack rows only; 1 = the screen tripped. Target `min: 0.30` (LOW caught 6 of the 18 seeds; several seeds are not prompt attacks).
+
+The dataset is in the `full` split only (`splits: [full]`, set by the generator): a 1% false-positive gate means nothing on a 30-row subset, and CI has no guardrail to call, so hundreds of smoke rows would all be "not run". Run it with `--split full` after `make evals-publish`.
 
 The target reads `question_guardrail_id` and `question_guardrail_version` (`question_guard` itself may be `off`: measure before turning the screen on). With either empty, the run reports `screened: False` and both metrics are `n/a`. Rebuild the dataset after editing either source:
 

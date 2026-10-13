@@ -19,6 +19,8 @@ APP_TIME_ZONE = "Asia/Ho_Chi_Minh"
 # The question screen (#199, PRD D30): Bedrock Guardrails' prompt-attack filter on the learner's question only.
 # Measured on 2026-10-13 with the benign study-question set: LOW tripped 0 of 364 benign questions, MEDIUM 1.1%, HIGH
 # 1.6% (PRD §10.1 allows 1%). Re-measure with backend/evals/measure_question_screen.py before changing it.
+# The guardrail below is defined twice: `question_screen_definition` in that file (boto3) must stay identical to this
+# CloudFormation definition, or its measurements say nothing about production. The two are separate uv projects.
 QUESTION_SCREEN_STRENGTH = "LOW"
 # The guard message of PRD D29, also the guardrail's blocked message.
 GUARD_MESSAGE = "I can only answer questions about your documents. Rephrase it to ask about their content."

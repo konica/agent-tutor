@@ -165,13 +165,13 @@ aws cloudwatch get-metric-statistics --namespace SmartTutor/Agent --metric-name 
     --query "sort_by(Datapoints,&Timestamp)[].[Timestamp, Sum]" --output table
 ```
 
-No data points means no failures (or the screen is off). A failure is not an outage: the code checks and the output guard still apply, and the turn is answered.
+No data points means no failures (or the screen is off). The first question after an agent restart may count one failure: the TLS handshake and credential fetch can exceed the 1 second timeout. A failure is not an outage: the code checks and the output guard still apply, and the turn is answered.
 
 **What to do when it climbs.**
 
 1. Compare it with the turns asked. A few a day is noise. A steady share means learners are asking unscreened questions.
 2. Read the agent's log for the cause (`dc logs --tail 200 agent` in a shell, `on-premise-deploy.md` section 7): each failure logs `question screen unavailable, letting the question through` and the exception's type only. `TimeoutError` means Bedrock Guardrails was slower than 1 second (a latency regression, or a cold cross-region route). `ClientError` types such as access denied, validation, or throttling point at the agent's IAM (`bedrock:ApplyGuardrail` on the guardrail and the `us.guardrail.v1:0` profile), a guardrail version that no longer exists, or the guardrail's quota.
-3. If the cause is not fixed quickly and the unscreened share matters, turn the screen off (`on-premise-deploy.md` section 12). No metric at all while the screen is `bedrock` means the agent's `cloudwatch:PutMetricData` grant is missing: the agent logs a warning for the failed put and the turn is not affected.
+3. If the cause is not fixed quickly and the unscreened share matters, turn the screen off (`on-premise-deploy.md` section 12). A missing `cloudwatch:PutMetricData` grant on the agent shows as `could not count QuestionScreenFailures` warnings in the agent's log (the turn is not affected); no data points alone means no failures.
 
 ## Bring the services back
 

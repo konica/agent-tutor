@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from fakes import CountingCounter
+from smart_tutor.apps.agent import guards
 from smart_tutor.apps.agent.guards import build_guard
 from smart_tutor.shared.config import Settings
 from smart_tutor.tutoring.adapters.bedrock_question_screen import BedrockQuestionScreen
@@ -12,7 +13,10 @@ def test_off_by_default_builds_only_the_output_guard() -> None:
     assert isinstance(build_guard(Settings(_env_file=None), "prompt", "stc-x"), GuardrailsGuard)
 
 
-def test_bedrock_wraps_the_output_guard_in_the_question_screen() -> None:
+def test_bedrock_wraps_the_output_guard_in_the_question_screen(monkeypatch: pytest.MonkeyPatch) -> None:
+    # a real boto3 client would load and cache the developer's credentials in boto3's default session
+    monkeypatch.setattr(guards, "bedrock_runtime_client", lambda *args, **kwargs: object())
+    monkeypatch.setattr(guards, "cloudwatch_client", lambda *args, **kwargs: object())
     settings = Settings(
         _env_file=None, question_guard="bedrock", question_guardrail_id="gr", question_guardrail_version="1"
     )
