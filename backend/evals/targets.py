@@ -25,8 +25,16 @@ from smart_tutor.apps.agent.state import DECLINE_MESSAGES, AgentContext
 from smart_tutor.shared.adapters.model_factory import ChatRole, ModelFactory
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.errors import UnauthenticatedError
+from smart_tutor.tutoring.adapters.guardrails_guard import GuardrailsGuard
 from smart_tutor.tutoring.adapters.mcp_retriever import McpRetriever
-from smart_tutor.tutoring.application import HistoryTurn, RetrievedChunk, Retriever, history_turn
+from smart_tutor.tutoring.application import (
+    HistoryTurn,
+    RetrievedChunk,
+    Retriever,
+    history_turn,
+    new_canary,
+    system_prompt,
+)
 
 Target = Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
 
@@ -119,6 +127,9 @@ class AskTarget:
         self._learners, self._retriever_for = learners, retriever_for
         self._model, self._answer_floor, self._answer_max_tokens = model, answer_floor, answer_max_tokens
         self._history_turns, self._history_answer_chars = history_turns, history_answer_chars
+        canary = new_canary()  # one per target, as the agent makes one per process
+        self._prompt = system_prompt(canary)
+        self._guard = GuardrailsGuard(self._prompt, canary)
 
     async def __call__(self, inputs: dict[str, Any]) -> dict[str, Any]:
         username, seeds = inputs["learner"], inputs.get("documents")
@@ -140,7 +151,8 @@ class AskTarget:
                 turns.append(history_turn(past["question"], past["answer"], self._history_answer_chars))
                 continue
             state = await self._ask(past, limit, turns, token, [])
-            turns.append(history_turn(past, self._answer(state), self._history_answer_chars))
+            if state.get("decline") != "guard":  # a tripped turn is never history, as in the API
+                turns.append(history_turn(past, self._answer(state), self._history_answer_chars))
         calls: list[dict[str, Any]] = []
         state = await self._ask(question, limit, turns, token, calls)
         return {
@@ -185,6 +197,8 @@ class AskTarget:
             self._model,
             self._answer_floor,
             self._answer_max_tokens,
+            guard=self._guard,
+            system_prompt=self._prompt,
         )
         return await graph.ainvoke(
             {"question": question, "document_ids": limit, "history": self._capped(turns)},

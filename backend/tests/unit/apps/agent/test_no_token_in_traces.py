@@ -21,6 +21,7 @@ from fakes import (
     InlineExecutor,
     InMemoryLibrary,
     InMemoryThreads,
+    PassingGuard,
     api_services,
     fake_agent,
     fake_chat_model,
@@ -55,7 +56,9 @@ def dumped(spans: Sequence[ReadableSpan]) -> str:
 async def traced_run(state: dict[str, Any], retriever: FakeRetriever | None = None) -> tuple[str, str]:
     """Run the graph, instrumented, with the token in context; return (dumped spans, dumped output state)."""
     retriever = retriever or FakeRetriever(CHUNKS)
-    graph = build_graph(lambda token: retriever, fake_chat_model(AIMessage("It weighs tokens [1].")))
+    graph = build_graph(
+        lambda token: retriever, fake_chat_model(AIMessage("It weighs tokens [1].")), guard=PassingGuard()
+    )
     with recorded_traces() as (_, spans):
         out = await graph.ainvoke(state, context=AgentContext(access_token=TOKEN))
     assert spans.get_finished_spans(), "nothing was traced, so the check below would pass vacuously"
@@ -91,7 +94,9 @@ EMAIL = "ada.lovelace@example.com"
 
 
 async def ask_spans(question: str) -> str:
-    graph = build_graph(lambda token: FakeRetriever(CHUNKS), fake_chat_model(AIMessage("It weighs tokens [1].")))
+    graph = build_graph(
+        lambda token: FakeRetriever(CHUNKS), fake_chat_model(AIMessage("It weighs tokens [1].")), guard=PassingGuard()
+    )
     body = AskRequest(question=question)
     run = AskRun(uuid.uuid4(), None, UserId(USER_ID), body.question, None)
     with recorded_traces() as (traces, spans):
