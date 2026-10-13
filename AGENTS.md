@@ -10,7 +10,7 @@ Sources of truth — read the relevant one before changing behavior or structure
 
 | Need | Read |
 |---|---|
-| Product behavior, user stories, data model, flows, evals, roadmap | `sdd/prd.md` (v2.60) |
+| Product behavior, user stories, data model, flows, evals, roadmap | `sdd/prd.md` (v2.61) |
 | Folder structure, module boundaries, import rules | `sdd/specs/2026-10-02-project-structure-design.md` |
 | Why an architecture choice was made | `sdd/adr/` (0001–0018) |
 | Why the PRD changed in v2.1 | `sdd/reviews/2026-10-03-prd-v2.0-review.md` |
