@@ -20,7 +20,13 @@ export const fakeFile = (extra: Partial<DocumentResponse> = {}, url = "u1", expi
 export const fakePdf = (numPages = 3, items: TextItem[] = []): PdfDoc => ({
   numPages,
   destroy: vi.fn(),
-  page: vi.fn(async () => ({ width: 600, height: 800, render: vi.fn(async () => {}), textItems: vi.fn(async () => items) })),
+  page: vi.fn(async () => ({
+    width: 600,
+    height: 800,
+    render: vi.fn(async () => {}),
+    textItems: vi.fn(async () => items),
+    renderText: vi.fn(async () => {}),
+  })),
 });
 
 const titles: Record<string, string> = { d1: "ReAct", d2: "PPO" };

@@ -234,6 +234,29 @@ describe("DocumentViewer", () => {
     }
   });
 
+  it("lays the page's text over the canvas at the current zoom, so it can be selected and copied", async () => {
+    const page: PdfPage = { width: 600, height: 800, render: vi.fn(async () => {}), textItems: vi.fn(async () => []), renderText: vi.fn(async () => {}) };
+    const loaded: PdfDoc = { numPages: 3, destroy: vi.fn(), page: vi.fn(async () => page) };
+    const { container } = renderViewer({ loadPdfDoc: vi.fn().mockResolvedValue(loaded) });
+    await ready();
+    const layer = container.querySelector("[data-text-layer]");
+    expect(layer).not.toBeNull();
+    await waitFor(() => expect(page.renderText).toHaveBeenCalledWith(layer, 1));
+    await userEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    await waitFor(() => expect(page.renderText).toHaveBeenLastCalledWith(layer, 1.25));
+  });
+
+  it("marks the text layer as selecting from a press on it until the pointer is released anywhere", async () => {
+    const { container } = renderViewer();
+    await ready();
+    const layer = container.querySelector("[data-text-layer]")!;
+    expect(layer).not.toHaveAttribute("data-selecting");
+    fireEvent.pointerDown(layer);
+    expect(layer).toHaveAttribute("data-selecting");
+    fireEvent.pointerUp(document.body);
+    expect(layer).not.toHaveAttribute("data-selecting");
+  });
+
   it("destroys the PDF when it closes", async () => {
     const loaded = pdf();
     const { unmount } = renderViewer({ loadPdfDoc: vi.fn().mockResolvedValue(loaded) });
