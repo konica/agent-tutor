@@ -1556,6 +1556,17 @@ describe("ChatPage", () => {
         expect(toggles()[0]).toHaveTextContent("Show less");
       });
 
+      it("returns focus to Show N more when the chip that opened the pane was hidden again", async () => {
+        renderChat({ loadConversation: conversation([fiveCited()]), viewerDeps: fakeViewerDeps() }, "/chat/t1");
+        await userEvent.click(await screen.findByRole("button", { name: "Show 2 more" }));
+        await userEvent.click(screen.getByRole("button", { name: "Doc 4, p. 2. Open beside the conversation" }));
+        await screen.findByText("p. 2 / 3", {}, { timeout: 3000 });
+        await userEvent.click(toggles()[0]!);
+        expect(toggles()[0]).toHaveTextContent("Show 2 more");
+        await userEvent.click(within(screen.getByRole("region", { name: "ReAct" })).getByRole("button", { name: "Close" }));
+        await waitFor(() => expect(toggles()[0]).toHaveFocus());
+      });
+
       it("another conversation's answers start collapsed", async () => {
         const loadConversation = vi.fn(async (id: string) => ({
           thread: { thread_id: id, title: id, search_scope: "library" as const, status: "active" as const },
