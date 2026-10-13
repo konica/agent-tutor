@@ -28,7 +28,14 @@ from fakes.tracing import (
     RecordingClient,
     recorded_traces,
 )
-from fakes.tutoring import FakeAnswerFeedback, FakeRetriever, InMemoryThreads, PassingGuard, TrippingGuard
+from fakes.tutoring import (
+    FakeAnswerFeedback,
+    FakeRetriever,
+    FakeTopicClassifier,
+    InMemoryThreads,
+    PassingGuard,
+    TrippingGuard,
+)
 
 __all__ = [
     "api_services",
@@ -39,6 +46,7 @@ __all__ = [
     "FakeChatModel",
     "FakeAnswerFeedback",
     "FakeRetriever",
+    "FakeTopicClassifier",
     "PassingGuard",
     "TrippingGuard",
     "FakePhoenix",

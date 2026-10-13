@@ -26,6 +26,7 @@ from smart_tutor.tutoring.domain.guard import GUARD_DECLINE, GUARD_MESSAGE, Guar
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 from smart_tutor.tutoring.domain.thread import SearchScope, Thread
 from smart_tutor.tutoring.domain.thread_summary import ThreadSummary
+from smart_tutor.tutoring.domain.topic import TopicVerdict, previous_question, topic_texts
 from smart_tutor.tutoring.domain.turn import (
     AnsweredTurn,
     CitationView,
@@ -41,6 +42,7 @@ from smart_tutor.tutoring.ports.answer_feedback import AnswerFeedback, NoAnswerF
 from smart_tutor.tutoring.ports.guard import Guard
 from smart_tutor.tutoring.ports.retriever import Retriever
 from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
+from smart_tutor.tutoring.ports.topic_classifier import TopicClassifier
 
 __all__ = [
     "DELETED_DOCUMENT",
@@ -73,6 +75,8 @@ __all__ = [
     "ThreadNotFoundError",
     "ThreadRepository",
     "ThreadSummary",
+    "TopicClassifier",
+    "TopicVerdict",
     "Turn",
     "TurnCitation",
     "TurnNotFoundError",
@@ -82,6 +86,8 @@ __all__ = [
     "covers",
     "history_turn",
     "new_canary",
+    "previous_question",
     "search_query",
     "system_prompt",
+    "topic_texts",
 ]
