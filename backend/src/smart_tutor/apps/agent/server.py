@@ -7,9 +7,10 @@ which records them and never forwards the event), then ``citations`` once ({"cit
 {"code": "unauthenticated" | "unavailable", "message"}, which ends the stream and may come first.
 
 A turn the model doesn't answer is ``decline`` {"code", "message"} then ``done``, with no ``delta``, ``sources``, or
-``citations``: ``no_documents`` when the learner has nothing readable (no ready, non-archived document; US-3), or,
-for a request with ``document_ids`` (only those documents are searched), ``limited`` when none of the chunks found
-scores at least ``answer_floor`` (US-4c).
+``citations``: ``off_topic`` when the topic check finds the question off-topic (no search runs; spec 2026-10-13);
+``no_documents`` when the learner has nothing readable (no ready, non-archived document; US-3), or, for a request
+with ``document_ids`` (only those documents are searched), ``limited`` when none of the chunks found scores at least
+``answer_floor`` (US-4c).
 
 When a guard trips while the answer streams, the stream ends with ``replace`` {"code": "guard", "text"} then ``done``:
 the learner sees ``text`` in place of the partial answer, and no ``sources`` or ``citations`` follow (US-6, D29).
@@ -98,32 +99,32 @@ async def answer_events(
                     text = part["data"]["delta"]
                     answer += text
                     yield sse("delta", {"text": text})
-                elif part["type"] == "updates" and "search" in part["data"]:
-                    chunks = part["data"]["search"].get("chunks", [])
-                elif part["type"] == "updates" and "answer" in part["data"]:
-                    update = part["data"]["answer"]
-                    if update.get("decline") == "guard":
-                        decline = update["guard"]  # the reason, for the trace; the learner reads only the message
-                        answer = ""
-                        logger.info("a guard tripped: %s", decline)  # content-free: no question, answer, or user
-                        yield sse("replace", {"code": "guard", "text": DECLINE_MESSAGES["guard"]})
-                        continue
-                    if (code := update.get("decline")) is not None:
-                        decline = code
-                        yield sse("decline", {"code": code, "message": DECLINE_MESSAGES[code]})
-                        continue
-                    yield sse("sources", {"document_ids": list(dict.fromkeys(c.document_id for c in chunks))})
-                    citations = [
-                        {
-                            "n": c.n,
-                            "chunk_id": c.chunk_id,
-                            "document_id": c.document_id,
-                            "document_title": c.document_title,
-                            "page": c.page,
-                        }
-                        for c in update["citations"]
-                    ]
-                    yield sse("citations", {"citations": citations})
+                elif part["type"] == "updates":
+                    for node, raw in part["data"].items():
+                        update = raw or {}
+                        if node == "search":
+                            chunks = update.get("chunks", [])
+                        elif node == "answer" and update.get("decline") == "guard":
+                            decline = update["guard"]  # the reason, for the trace; the learner reads only the message
+                            answer = ""
+                            logger.info("a guard tripped: %s", decline)  # content-free: no question, answer, or user
+                            yield sse("replace", {"code": "guard", "text": DECLINE_MESSAGES["guard"]})
+                        elif (code := update.get("decline")) is not None:  # from topic_check or answer
+                            decline = code
+                            yield sse("decline", {"code": code, "message": DECLINE_MESSAGES[code]})
+                        elif node == "answer":
+                            yield sse("sources", {"document_ids": list(dict.fromkeys(c.document_id for c in chunks))})
+                            citations = [
+                                {
+                                    "n": c.n,
+                                    "chunk_id": c.chunk_id,
+                                    "document_id": c.document_id,
+                                    "document_title": c.document_title,
+                                    "page": c.page,
+                                }
+                                for c in update["citations"]
+                            ]
+                            yield sse("citations", {"citations": citations})
             trace.finish(answer, decline, len(chunks))
             yield sse("done", {})
         except UnauthenticatedError as e:
