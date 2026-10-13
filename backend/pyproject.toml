@@ -33,6 +33,8 @@ dependencies = [
 ingest = ["langchain-text-splitters>=1.1", "pypdf>=6.0"]
 # Installed only in the agent image: the output guard (US-6, ADR 0018). Heavy (litellm, openai, grpc): never core.
 guard = ["guardrails-ai==0.11.0"]
+# Installed only in the agent image: the topic check's SetFit model on onnxruntime (spec 2026-10-13, ADR 0019).
+topic = ["numpy>=2.0", "onnxruntime>=1.20", "tokenizers>=0.20"]
 # Evaluation runs (backend/evals) and CI eval gates.
 eval = ["langsmith>=0.4", "openevals>=0.1", "pyyaml>=6.0"]
 
@@ -44,10 +46,14 @@ dev = [
     "import-linter>=2.3",
     "langchain-text-splitters>=1.1",
     "mypy>=1.17",
+    "numpy>=2.0",
+    "onnx>=1.17",
+    "onnxruntime>=1.20",
     "pypdf>=6.0",
     "pytest>=8.4",
     "pytest-asyncio>=1.1",
     "ruff>=0.12",
+    "tokenizers>=0.20",
 ]
 
 [build-system]
@@ -91,6 +97,10 @@ exclude = ["shared/adapters/postgres/migrations/versions/"]
 [[tool.mypy.overrides]]
 module = ["guardrails", "guardrails.*"]
 ignore_missing_imports = true  # guardrails-ai ships no py.typed marker
+
+[[tool.mypy.overrides]]
+module = ["onnxruntime", "onnxruntime.*"]
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "smart_tutor.tutoring.adapters.guardrails_guard"
@@ -463,9 +473,11 @@ forbidden_modules = [
     "langchain_aws",
     "langgraph",
     "mcp",
+    "onnxruntime",
     "psycopg",
     "pypdf",
     "sqlalchemy",
+    "tokenizers",
 ]
 
 [[tool.importlinter.contracts]]
