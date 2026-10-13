@@ -533,6 +533,9 @@ def test_native_cloud_release_waits_with_the_legacy_strategy() -> None:
     assert lines
     for line in lines:
         assert "--wait=legacy --timeout 15m" in line, line
+        # A hand release must pass the question screen's settings too, or it silently turns the screen off (#199).
+        for key in ("mode", "guardrailId", "guardrailVersion"):
+            assert f"--set-string global.questionGuard.{key}=" in line, line
 
 
 def test_native_cloud_stack_outputs_fail_loudly_when_missing() -> None:

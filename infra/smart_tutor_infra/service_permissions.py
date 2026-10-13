@@ -42,20 +42,9 @@ class ServicePermissions:
         self.embed = iam.PolicyStatement(
             actions=invoke, resources=[f"arn:aws:bedrock:{stack.region}::foundation-model/{EMBEDDING_MODEL}"]
         )
-        # The question screen (#199). ConfigStack writes the guardrail's id to SSM; reading it at deploy time needs no
-        # cross-stack export, only that the stack deploys after ConfigStack (app_stacks).
-        guardrail_id = ssm.StringParameter.value_for_string_parameter(stack, f"{names.ssm_path}/question-guardrail-id")
-        self.apply_guardrail = iam.PolicyStatement(
-            sid="ApplyQuestionScreen",
-            actions=["bedrock:ApplyGuardrail"],
-            resources=[
-                f"arn:aws:bedrock:{stack.region}:{stack.account}:guardrail/{guardrail_id}",
-                *(
-                    f"arn:aws:bedrock:{r}:{stack.account}:guardrail-profile/{GUARDRAIL_PROFILE}"
-                    for r in GUARDRAIL_PROFILE_REGIONS
-                ),
-            ],
-        )
+        self._stack = stack
+        self._names = names
+        self._apply_guardrail: iam.PolicyStatement | None = None
         # PutMetricData has no resource-level permissions; the namespace condition limits it.
         self.put_agent_metrics = iam.PolicyStatement(
             sid="PublishAgentMetrics",
@@ -113,7 +102,29 @@ class ServicePermissions:
 
     def agent(self) -> list[iam.PolicyStatement]:
         """The agent chats, applies the question screen's guardrail, and counts the screen's failures (#199)."""
-        return [self.chat, self.apply_guardrail, self.put_agent_metrics]
+        return [self.chat, self.apply_guardrail(), self.put_agent_metrics]
+
+    def apply_guardrail(self) -> iam.PolicyStatement:
+        """The question screen's guardrail (#199), built once so a stack that lists it twice adds it once. ConfigStack
+        writes the guardrail's id to SSM; reading it at deploy time needs no cross-stack export, only that the stack
+        deploys after ConfigStack (app_stacks). Only a stack that grants the agent gets that CloudFormation parameter."""
+        if self._apply_guardrail is None:
+            stack = self._stack
+            guardrail_id = ssm.StringParameter.value_for_string_parameter(
+                stack, f"{self._names.ssm_path}/question-guardrail-id"
+            )
+            self._apply_guardrail = iam.PolicyStatement(
+                sid="ApplyQuestionScreen",
+                actions=["bedrock:ApplyGuardrail"],
+                resources=[
+                    f"arn:aws:bedrock:{stack.region}:{stack.account}:guardrail/{guardrail_id}",
+                    *(
+                        f"arn:aws:bedrock:{r}:{stack.account}:guardrail-profile/{GUARDRAIL_PROFILE}"
+                        for r in GUARDRAIL_PROFILE_REGIONS
+                    ),
+                ],
+            )
+        return self._apply_guardrail
 
     def mcp(self) -> list[iam.PolicyStatement]:
         return [self.embed]

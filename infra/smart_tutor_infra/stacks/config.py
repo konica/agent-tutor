@@ -24,6 +24,39 @@ QUESTION_SCREEN_STRENGTH = "LOW"
 GUARD_MESSAGE = "I can only answer questions about your documents. Rephrase it to ask about their content."
 
 
+def question_screen_definition(
+    stack: cdk.Stack, *, input_strength: str = QUESTION_SCREEN_STRENGTH, input_action: str = "BLOCK"
+) -> dict[str, Any]:
+    """The guardrail's definition (everything but its name and description): what the version's hash covers."""
+    return {
+        "blocked_input_messaging": GUARD_MESSAGE,
+        "blocked_outputs_messaging": GUARD_MESSAGE,
+        "content_policy_config": bedrock.CfnGuardrail.ContentPolicyConfigProperty(
+            filters_config=[
+                bedrock.CfnGuardrail.ContentFilterConfigProperty(
+                    type="PROMPT_ATTACK",
+                    input_strength=input_strength,
+                    output_strength="NONE",
+                    input_action=input_action,
+                    input_enabled=True,
+                    output_enabled=False,
+                )
+            ],
+            content_filters_tier_config=bedrock.CfnGuardrail.ContentFiltersTierConfigProperty(tier_name="STANDARD"),
+        ),
+        # The Standard tier runs through a cross-region guardrail profile.
+        "cross_region_config": bedrock.CfnGuardrail.GuardrailCrossRegionConfigProperty(
+            guardrail_profile_arn=f"arn:aws:bedrock:{stack.region}:{stack.account}:guardrail-profile/{GUARDRAIL_PROFILE}"
+        ),
+    }
+
+
+def definition_digest(stack: cdk.Stack, definition: dict[str, Any]) -> str:
+    """A short hash of the resolved definition, so any field that changes the draft changes the version."""
+    resolved = json.dumps(stack.resolve(definition), sort_keys=True)
+    return hashlib.sha256(resolved.encode()).hexdigest()[:12]
+
+
 class ConfigStack(cdk.Stack):
     def __init__(self, scope: Construct, construct_id: str, *, names: ModeNames, **kwargs: Any) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -45,40 +78,22 @@ class ConfigStack(cdk.Stack):
         ):
             ssm.StringParameter(self, f"Param-{name}", parameter_name=f"{names.ssm_path}/{name}", string_value=value)
 
+        definition = question_screen_definition(self)
         guardrail = bedrock.CfnGuardrail(
             self,
             "QuestionScreen",
             name=f"{names.data_prefix}-question-screen",
             description="Screens the learner's question for prompt attacks before search (#199)",
-            blocked_input_messaging=GUARD_MESSAGE,
-            blocked_outputs_messaging=GUARD_MESSAGE,
-            content_policy_config=bedrock.CfnGuardrail.ContentPolicyConfigProperty(
-                filters_config=[
-                    bedrock.CfnGuardrail.ContentFilterConfigProperty(
-                        type="PROMPT_ATTACK",
-                        input_strength=QUESTION_SCREEN_STRENGTH,
-                        output_strength="NONE",
-                        input_action="BLOCK",
-                        input_enabled=True,
-                        output_enabled=False,
-                    )
-                ],
-                content_filters_tier_config=bedrock.CfnGuardrail.ContentFiltersTierConfigProperty(tier_name="STANDARD"),
-            ),
-            # The Standard tier runs through a cross-region guardrail profile.
-            cross_region_config=bedrock.CfnGuardrail.GuardrailCrossRegionConfigProperty(
-                guardrail_profile_arn=f"arn:aws:bedrock:{self.region}:{self.account}:guardrail-profile/{GUARDRAIL_PROFILE}"
-            ),
+            **definition,
         )
-        # A version snapshots the draft when it is created, so its description carries a hash of the definition: a
-        # changed definition replaces the version and publishes a new one. Retaining the old one keeps it for agents
+        # A version snapshots the draft when it is created, so its description carries a hash of the whole definition:
+        # a changed definition replaces the version and publishes a new one. Retaining the old one keeps it for agents
         # still running with it until the next app deploy points them at the new one.
-        definition = json.dumps([QUESTION_SCREEN_STRENGTH, GUARD_MESSAGE, GUARDRAIL_PROFILE, "STANDARD"])
         version = bedrock.CfnGuardrailVersion(
             self,
             "QuestionScreenVersion",
             guardrail_identifier=guardrail.attr_guardrail_id,
-            description=f"definition {hashlib.sha256(definition.encode()).hexdigest()[:12]}",
+            description=f"definition {definition_digest(self, definition)}",
         )
         version.apply_removal_policy(cdk.RemovalPolicy.RETAIN)
         for name, value in (

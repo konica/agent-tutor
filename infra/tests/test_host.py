@@ -1192,7 +1192,7 @@ def test_only_the_agent_gets_the_question_screen_settings(compose: dict[str, Any
             assert not [k for k in service.get("environment", {}) if k.startswith("SMART_TUTOR_QUESTION_")], name
 
 
-PHOENIX_IMAGE ="arizephoenix/phoenix:version-20.16.0-nonroot"
+PHOENIX_IMAGE = "arizephoenix/phoenix:version-20.16.0-nonroot"
 
 
 def test_phoenix_runs_unprivileged_on_a_read_only_root_with_its_traces_in_postgres(compose: dict[str, Any]) -> None:

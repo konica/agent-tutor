@@ -6,7 +6,13 @@ import pytest
 from aws_cdk.assertions import Template
 
 from smart_tutor_infra.names import NATIVE_CLOUD, ON_PREMISE, mode_names
-from smart_tutor_infra.stacks.config import GUARD_MESSAGE, QUESTION_SCREEN_STRENGTH, ConfigStack
+from smart_tutor_infra.stacks.config import (
+    GUARD_MESSAGE,
+    QUESTION_SCREEN_STRENGTH,
+    ConfigStack,
+    definition_digest,
+    question_screen_definition,
+)
 
 
 def test_file_limits_are_ssm_parameters() -> None:
@@ -119,6 +125,16 @@ def test_question_screen_version_is_retained_and_named_for_its_definition() -> N
     assert version["DeletionPolicy"] == "Retain" and version["UpdateReplacePolicy"] == "Retain"
     assert re.fullmatch(r"definition [0-9a-f]{12}", version["Properties"]["Description"])
     assert "QuestionScreen" in json.dumps(version["Properties"]["GuardrailIdentifier"])
+
+
+def test_question_screen_version_description_changes_with_any_filter_setting() -> None:
+    stack = cdk.Stack(cdk.App(), "Digest")
+
+    def digest(**changes: str) -> str:
+        return definition_digest(stack, question_screen_definition(stack, **changes))
+
+    assert digest() == digest(input_strength=QUESTION_SCREEN_STRENGTH, input_action="BLOCK")
+    assert len({digest(), digest(input_strength="HIGH"), digest(input_action="NONE")}) == 3
 
 
 @pytest.mark.parametrize(("mode", "path"), [(NATIVE_CLOUD, "/smart-tutor"), (ON_PREMISE, "/smart-tutor-on-premise")])
