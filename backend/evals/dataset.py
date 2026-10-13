@@ -7,6 +7,7 @@ result is tagged `<split>-v<N+1>`. Tags are never moved, so a version a run was 
 uses a split's newest version unless one is pinned.
 """
 
+import hashlib
 import json
 import re
 from collections.abc import Iterable, Sequence
@@ -42,6 +43,8 @@ class Dataset:
     description: str
     examples: tuple[Example, ...]  # hand-written: in every version of every split
     pins: dict[str, str] = field(default_factory=dict)  # split -> the version tag the runner must use
+    # a share of generated examples held out for evaluation; the rest train a model (topic_check)
+    eval_share: float | None = None
 
 
 def load_dataset(key: str, folder: Path = DATASETS) -> Dataset:
@@ -56,7 +59,12 @@ def load_dataset(key: str, folder: Path = DATASETS) -> Dataset:
     for split, tag in pins.items():
         if _number(tag, split) is None:
             raise DatasetError(f"{path.name}: pin {split}: {tag} is not a {split}-v<N> version")
-    return Dataset(key, raw["name"], raw.get("description", ""), examples, pins)
+    share = raw.get("eval_share")
+    if share is not None and not 0 < float(share) < 1:
+        raise DatasetError(f"{path.name}: eval_share must be between 0 and 1, not {share}")
+    return Dataset(
+        key, raw["name"], raw.get("description", ""), examples, pins, None if share is None else float(share)
+    )
 
 
 def _number(tag: str, split: str) -> int | None:
@@ -143,3 +151,14 @@ def _push(client: langsmith.Client, dataset: Dataset, split: str, examples: Sequ
     latest = max(e.modified_at or e.created_at for e in pushed)
     version = client.read_dataset_version(dataset_name=dataset.name, as_of=latest)
     client.update_dataset_tag(dataset_name=dataset.name, as_of=version.as_of, tag=tag)
+
+
+def normalized(question: str) -> str:
+    return " ".join(question.lower().split())
+
+
+def in_eval_share(question: str, share: float) -> bool:
+    """Whether a generated example is held out for evaluation: a stable hash of its normalized question, so it never
+    moves between training and evaluation (spec 2026-10-13 §6.1)."""
+    digest = hashlib.sha256(normalized(question).encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big") / 2**64 < share

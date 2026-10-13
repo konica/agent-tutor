@@ -25,6 +25,7 @@ from evals.dataset import (
     Dataset,
     DatasetError,
     Example,
+    in_eval_share,
     load_dataset,
     newest_examples,
     publish_split,
@@ -104,7 +105,10 @@ def main(
     try:
         for key in keys:
             dataset = load(key)
-            splits = split_examples(dataset, generated_examples(client, dataset))
+            accepted = generated_examples(client, dataset)
+            if dataset.eval_share is not None:  # the rest trains a model (evals.topic_check.train), never evaluates it
+                accepted = [e for e in accepted if in_eval_share(str(e.inputs["question"]), dataset.eval_share)]
+            splits = split_examples(dataset, accepted)
             for split in SPLITS:
                 examples = splits[split]
                 if args.dry_run:

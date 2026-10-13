@@ -1,0 +1,46 @@
+# The topic check (spec 2026-10-13 §3, §6): learner messages labeled on-topic (study, understand, research) or
+# off-topic. LangSmith dataset `name`. These hand-written examples are in every version of both splits and never train
+# the model; generated examples join after a human accepts them (make evals-generate DATASET=topic_check), split by a
+# stable hash of the question: `eval_share` of them are published here, the rest train the model
+# (make topic-check-train).
+#
+# inputs:  question; history (follow-ups): the earlier turn, [{question, answer}].
+# outputs: off_topic: whether the tutor must decline it before search; kind: one of generators/topic_check.py KINDS.
+name: smart-tutor-topic-check
+description: Learner messages labeled on-topic or off-topic for the Smart Tutor topic check (backend/evals/datasets/topic_check.yaml).
+eval_share: 0.3
+examples:
+  - {inputs: {question: "What problem does the transformer architecture solve compared with RNNs?"}, outputs: {off_topic: false, kind: subject_concept}}
+  - {inputs: {question: "Explain photosynthesis in simple terms."}, outputs: {off_topic: false, kind: subject_concept}}
+  - {inputs: {question: "Explain the difference between mitosis and meiosis."}, outputs: {off_topic: false, kind: subject_concept}}
+  - {inputs: {question: "How do I calculate the derivative of x squared times sine x?"}, outputs: {off_topic: false, kind: subject_concept}}
+  - {inputs: {question: "Can you give me an example of a Bayesian prior?"}, outputs: {off_topic: false, kind: subject_concept}}
+  - {inputs: {question: "Summarize the main findings of the paper I uploaded on retrieval-augmented generation."}, outputs: {off_topic: false, kind: document_question}}
+  - {inputs: {question: "What caused the fall of the Western Roman Empire according to this book?"}, outputs: {off_topic: false, kind: document_question}}
+  - {inputs: {question: "How long should I rest a steak after grilling, according to the cookbook?"}, outputs: {off_topic: false, kind: document_question}}
+  - {inputs: {question: "Which team won the match described in the sports article and why?"}, outputs: {off_topic: false, kind: document_question}}
+  - {inputs: {question: "What is a SQL injection attack and how does the paper suggest preventing it?"}, outputs: {off_topic: false, kind: document_question}}
+  - {inputs: {question: "How does the author define inflation in chapter 3?"}, outputs: {off_topic: false, kind: document_question}}
+  - {inputs: {question: "Compare the two studies on intermittent fasting in my library."}, outputs: {off_topic: false, kind: document_question}}
+  - {inputs: {question: "What are the limitations of the proposed method?"}, outputs: {off_topic: false, kind: document_question}}
+  - {inputs: {question: "What does the magazine article say about electric car battery recycling?"}, outputs: {off_topic: false, kind: document_question}}
+  - {inputs: {question: "Who wrote the news story about the election and what were its key claims?"}, outputs: {off_topic: false, kind: document_question}}
+  - {inputs: {question: "Explain that more simply.", history: [{question: "What is gradient descent?", answer: ""}]}, outputs: {off_topic: false, kind: follow_up}}
+  - {inputs: {question: "And what are its limitations?", history: [{question: "What are the main results of the BERT paper?", answer: ""}]}, outputs: {off_topic: false, kind: follow_up}}
+  - {inputs: {question: "Why does it need to be fed every day?", history: [{question: "How does the cookbook make sourdough starter?", answer: ""}]}, outputs: {off_topic: false, kind: follow_up}}
+  - {inputs: {question: "Thanks! Can you give me an example?", history: [{question: "What does chapter 2 say about the French Revolution?", answer: ""}]}, outputs: {off_topic: false, kind: follow_up}}
+  - {inputs: {question: "Help me plan my study week for the biology exam."}, outputs: {off_topic: false, kind: study_task}}
+  - {inputs: {question: "Make me a quiz on the uploaded chemistry chapter."}, outputs: {off_topic: false, kind: study_task}}
+  - {inputs: {question: "hi, how are you today?"}, outputs: {off_topic: true, kind: greeting}}
+  - {inputs: {question: "What can you do?"}, outputs: {off_topic: true, kind: greeting}}
+  - {inputs: {question: "Tell me a joke about cats."}, outputs: {off_topic: true, kind: entertainment}}
+  - {inputs: {question: "Let's role-play: you are a pirate captain."}, outputs: {off_topic: true, kind: entertainment}}
+  - {inputs: {question: "Write me a love poem for my girlfriend."}, outputs: {off_topic: true, kind: entertainment}}
+  - {inputs: {question: "Write an email to my landlord asking to fix the heater."}, outputs: {off_topic: true, kind: personal_task}}
+  - {inputs: {question: "Plan a 5-day trip to Japan for me."}, outputs: {off_topic: true, kind: personal_task}}
+  - {inputs: {question: "Book a flight to Paris."}, outputs: {off_topic: true, kind: personal_task}}
+  - {inputs: {question: "Recommend a good restaurant near me."}, outputs: {off_topic: true, kind: personal_task}}
+  - {inputs: {question: "Can you help me fix the bug in my React app's login page?"}, outputs: {off_topic: true, kind: personal_task}}
+  - {inputs: {question: "What's the weather in Hanoi tomorrow?"}, outputs: {off_topic: true, kind: live_information}}
+  - {inputs: {question: "What is the price of an iPhone 17 right now?"}, outputs: {off_topic: true, kind: live_information}}
+  - {inputs: {question: "Who do you think will win the football game tonight? Place a bet for me."}, outputs: {off_topic: true, kind: live_information}}
