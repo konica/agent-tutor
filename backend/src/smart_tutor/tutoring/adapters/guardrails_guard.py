@@ -1,7 +1,8 @@
 """Output guard (US-6, ADR 0018): a Guardrails AI `AsyncGuard` of our own validators, fully in process.
 
 Guardrails AI would otherwise send anonymous usage metrics to its own endpoint (on by default, re-enabled by every
-`Guard()` from `~/.guardrailsrc`) and trace each validation, with the text, through our tracer provider. Both are off
+`Guard()` from `~/.guardrailsrc`) and trace each validation, with the text, through the process's global OpenTelemetry
+tracer provider (whatever an app or library installs there, such as Phoenix in the agent). Both are off
 before the first guard is built; our validators call no remote inference and nothing is installed from the hub.
 """
 
