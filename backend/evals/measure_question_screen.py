@@ -158,7 +158,7 @@ def summarize(label: str, measurement: Measurement, turn_input: int = 0, turn_ou
         by_category[o.topic].append(o.tripped)
     client = [o.client_ms for o in measurement.outcomes]
     processing = [float(o.processing_ms) for o in measurement.outcomes if o.processing_ms is not None]
-    units = [o.text_units for o in measurement.outcomes]
+    units = [o.text_units for o in benign]  # cost is about real study questions: attacks (padded ones) don't move it
     return Summary(
         label,
         (sum(o.tripped for o in benign), len(benign)),
@@ -184,16 +184,22 @@ class Control(Protocol):
 
 
 async def _await_ready(
-    control: Control, guardrail_id: str, sleep: Callable[[float], Awaitable[None]], attempts: int
+    control: Control,
+    guardrail_id: str,
+    sleep: Callable[[float], Awaitable[None]],
+    attempts: int,
+    version: str | None = None,
 ) -> None:
+    """Poll until the guardrail (or, with `version`, that version) is READY; a version stays VERSIONING a while."""
+    which = {"guardrailVersion": version} if version else {}
     for _ in range(attempts):
-        status = (await asyncio.to_thread(control.get_guardrail, guardrailIdentifier=guardrail_id))["status"]
+        status = (await asyncio.to_thread(control.get_guardrail, guardrailIdentifier=guardrail_id, **which))["status"]
         if status == "READY":
             return
         if status == "FAILED":
-            raise RuntimeError(f"guardrail {guardrail_id} is FAILED")
+            raise RuntimeError(f"guardrail {guardrail_id} {version or ''} is FAILED")
         await sleep(2)
-    raise TimeoutError(f"guardrail {guardrail_id} did not become READY after {attempts} polls")
+    raise TimeoutError(f"guardrail {guardrail_id} {version or ''} did not become READY after {attempts} polls")
 
 
 async def measure_strengths[T](
@@ -205,8 +211,9 @@ async def measure_strengths[T](
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ready_attempts: int = READY_ATTEMPTS,
 ) -> list[tuple[str, T]]:
-    """For each strength: create a temporary guardrail, wait until READY, version it, `measure(id, version)`, and
-    delete it, whatever happens (an error or Ctrl-C included)."""
+    """For each strength: create a temporary guardrail, wait until READY, version it and wait
+    until the version is READY, `measure(id, version)`, and delete it,
+    whatever happens (an error or Ctrl-C included)."""
     results: list[tuple[str, T]] = []
     for strength in strengths:
         created = await asyncio.to_thread(control.create_guardrail, **question_screen_definition(strength, region))
@@ -216,6 +223,7 @@ async def measure_strengths[T](
             version = (await asyncio.to_thread(control.create_guardrail_version, guardrailIdentifier=guardrail_id))[
                 "version"
             ]
+            await _await_ready(control, guardrail_id, sleep, ready_attempts, version)
             results.append((strength, await measure(guardrail_id, version)))
         finally:
             await asyncio.shield(asyncio.to_thread(control.delete_guardrail, guardrailIdentifier=guardrail_id))
@@ -305,6 +313,13 @@ async def run(args: argparse.Namespace) -> int:
     return 1 if any(s.failures for s in summaries) else 0
 
 
+def _positive(text: str) -> int:
+    value = int(text)
+    if value < 1:
+        raise argparse.ArgumentTypeError("must be at least 1")
+    return value
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--guardrail", action="append", metavar="ID:VERSION", help="an existing guardrail to measure")
@@ -323,7 +338,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=297,
         help="output tokens of an average ask turn (default 297: mean of the same 16 traces)",
     )
-    parser.add_argument("--concurrency", type=int, default=4, help="screen calls in flight at once (default 4)")
+    parser.add_argument("--concurrency", type=_positive, default=4, help="screen calls in flight at once (default 4)")
     args = parser.parse_args(argv)
     if not (args.guardrail or args.strength):
         parser.error("name a guardrail (--guardrail ID:VERSION) or a strength (--strength LOW|MEDIUM|HIGH)")

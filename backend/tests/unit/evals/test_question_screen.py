@@ -15,6 +15,7 @@ from evals.measure_question_screen import (
     Measurement,
     Outcome,
     cost_share,
+    main,
     measure_guardrail,
     measure_strengths,
     percentile,
@@ -43,6 +44,11 @@ def test_the_benign_set_has_enough_questions_in_each_hard_topic() -> None:
     assert sum(len(q) for q in topics.values()) >= 300
     assert len(topics["llm_security"]) >= 40 and len(topics["ml_safety"]) >= 40
     assert len(topics["computer_security"]) >= 30 and len(topics["vietnamese"]) >= 20
+
+
+def test_the_benign_set_has_long_pasted_excerpts() -> None:
+    long = [q for qs in load_benign().values() for q in qs if len(q) >= 300]
+    assert len(long) >= 10 and all(len(q) <= 1500 for q in long)
 
 
 def test_no_question_appears_twice_in_the_dataset() -> None:
@@ -210,6 +216,7 @@ class FakeControl:
 
     def __init__(self, statuses: list[str] | None = None) -> None:
         self.statuses = statuses or ["CREATING", "READY"]
+        self.version_statuses = ["VERSIONING", "READY"]
         self.calls: list[tuple[str, dict[str, Any]]] = []
 
     def create_guardrail(self, **kw: Any) -> dict[str, Any]:
@@ -218,7 +225,8 @@ class FakeControl:
 
     def get_guardrail(self, **kw: Any) -> dict[str, Any]:
         self.calls.append(("get_guardrail", kw))
-        return {"status": self.statuses.pop(0) if len(self.statuses) > 1 else self.statuses[0]}
+        statuses = self.version_statuses if "guardrailVersion" in kw else self.statuses
+        return {"status": statuses.pop(0) if len(statuses) > 1 else statuses[0]}
 
     def create_guardrail_version(self, **kw: Any) -> dict[str, Any]:
         self.calls.append(("create_guardrail_version", kw))
@@ -249,9 +257,39 @@ async def test_measuring_a_strength_waits_for_ready_versions_measures_and_delete
         "get_guardrail",
         "get_guardrail",
         "create_guardrail_version",
+        "get_guardrail",
+        "get_guardrail",
         "delete_guardrail",
     ]
     assert control.calls[-1][1] == {"guardrailIdentifier": "gr-1"}
+
+
+async def test_measuring_starts_only_after_the_version_is_ready() -> None:
+    control, at_measure = FakeControl(), []
+
+    async def measure(guardrail_id: str, version: str) -> None:
+        at_measure.append(control.version_statuses[0])
+        at_measure.append(control.calls[-1][1].get("guardrailVersion"))
+
+    await measure_strengths(control, ["LOW"], "us-east-1", measure, sleep=_no_wait)
+    assert at_measure == ["READY", "1"]  # the last poll asked for version 1 and saw READY
+
+
+async def test_a_version_that_never_gets_ready_is_deleted_and_not_measured() -> None:
+    control = FakeControl()
+    control.version_statuses = ["VERSIONING"]
+
+    async def measure(guardrail_id: str, version: str) -> None:
+        raise AssertionError("must not measure")
+
+    with pytest.raises(TimeoutError, match="READY"):
+        await measure_strengths(control, ["LOW"], "us-east-1", measure, sleep=_no_wait, ready_attempts=3)
+    assert control.names()[-1] == "delete_guardrail"
+
+
+def test_concurrency_below_one_is_refused_at_parsing() -> None:
+    with pytest.raises(SystemExit):
+        main(["--strength", "LOW", "--concurrency", "0"])
 
 
 async def test_the_temporary_guardrail_is_deleted_when_measuring_raises() -> None:
@@ -326,6 +364,7 @@ async def test_measuring_a_guardrail_scores_each_example_and_counts_failures() -
 
 def test_the_summary_reports_latency_units_and_cost() -> None:
     outcomes = [Outcome(f"q{i}", "benign", "t", False, float(i), 10 + i, 1 + i % 2) for i in range(1, 101)]
+    outcomes.append(Outcome("padded attack", "attack", "denial_of_wallet", True, 5.0, 12, 4))
     summary = summarize("LOW", Measurement(outcomes, 0))
     assert summary.client_p50 == 50 and summary.client_p95 == 95 and summary.processing_p95 == 105
-    assert summary.mean_text_units == pytest.approx(1.5)
+    assert summary.mean_text_units == pytest.approx(1.5)  # benign rows only: the 4-unit attack doesn't count
