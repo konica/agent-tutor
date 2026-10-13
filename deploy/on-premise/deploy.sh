@@ -58,9 +58,10 @@ phoenix_db_password=$(secret db/phoenix)
 phoenix_secret=$(secret phoenix/secret)
 phoenix_admin_password=$(secret phoenix/admin-password)
 trace_sampling_rate=$(param trace-sampling-rate)
-# Traces go to the on-premise Phoenix, projects smart-tutor-on-premise and -ingestion (ADR 0017). The operator creates
-# the system key's secret in Phoenix (docs/runbooks/on-premise-deploy.md); until then the services run untraced rather
-# than failing the deploy.
+# Traces go to the on-premise Phoenix, projects smart-tutor-on-premise and -ingestion (ADR 0017); the API sends
+# learner ratings there too (#290). The operator creates the system key's secret in Phoenix
+# (docs/runbooks/on-premise-deploy.md); until then the agent and worker run untraced and the API sends no ratings,
+# rather than failing the deploy.
 phoenix_api_key=
 if ! phoenix_api_key=$(secret phoenix/api-key 2>/dev/null) || [[ -z $phoenix_api_key ]]; then
   phoenix_api_key=

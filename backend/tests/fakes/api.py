@@ -11,7 +11,7 @@ from fakes.models import fake_embeddings
 from fakes.parameters import APP_TZ, TEST_LIMITS, TEST_UPLOAD_LIMITS
 from fakes.queue import FakeQueue
 from fakes.subjects import InMemorySubjects
-from fakes.tutoring import FakeAnswerFeedback, InMemoryThreads
+from fakes.tutoring import InMemoryThreads
 from smart_tutor.apps.api.agent_client import AgentClient
 from smart_tutor.apps.api.services import ApiServices
 from smart_tutor.insights.application import HighlightMissService
@@ -25,7 +25,7 @@ from smart_tutor.knowledge.application import (
     ViewerService,
 )
 from smart_tutor.subjects.application import SubjectCatalogService, SubjectNames, SubjectSearch, SubjectSuggester
-from smart_tutor.tutoring.application import ConversationService
+from smart_tutor.tutoring.application import AnswerFeedback, ConversationService
 
 
 def _agent_not_expected(request: httpx.Request) -> httpx.Response:
@@ -45,7 +45,7 @@ def api_services(
     clock: FixedClock | None = None,
     queue: FakeQueue | None = None,
     names: SubjectNames | None = None,
-    feedback: FakeAnswerFeedback | None = None,
+    feedback: AnswerFeedback | None = None,
     **overrides: Any,
 ) -> ApiServices:
     """ApiServices from fakes sharing `library`, `objects`, `threads`, `catalog`, `queue`, `names`, `feedback`;

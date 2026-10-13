@@ -1104,11 +1104,20 @@ def test_the_worker_reaches_phoenix_without_the_egress_proxy(compose: dict[str, 
     assert "phoenix" in env["NO_PROXY"].split(",") and env["no_proxy"] == env["NO_PROXY"]
 
 
-@pytest.mark.parametrize("service", ["api", "mcp"])
-def test_services_that_make_no_model_calls_of_their_own_do_not_trace(compose: dict[str, Any], service: str) -> None:
-    env = compose["services"][service]["environment"]
+def test_the_mcp_server_does_not_trace(compose: dict[str, Any]) -> None:
+    env = compose["services"]["mcp"]["environment"]
     assert not [k for k in env if k.startswith("LANGSMITH_")]
-    assert not [k for k in env if k.startswith("SMART_TUTOR_PHOENIX_")]  # the API gets them in #290
+    assert not [k for k in env if k.startswith("SMART_TUTOR_PHOENIX_")]
+
+
+def test_the_api_sends_ratings_to_the_on_premise_phoenix(compose: dict[str, Any]) -> None:
+    env = compose["services"]["api"]["environment"]
+    assert env["SMART_TUTOR_DEPLOYMENT"] == "on-premise"  # without the key it sends nothing (not unauthenticated)
+    assert env["SMART_TUTOR_PHOENIX_URL"] == "http://phoenix:6006"
+    assert env["SMART_TUTOR_PHOENIX_API_KEY"] == "${PHOENIX_API_KEY}"
+    agent_env = compose["services"]["agent"]["environment"]
+    assert env["SMART_TUTOR_PHOENIX_PROJECT"] == agent_env["SMART_TUTOR_PHOENIX_PROJECT"]
+    assert not [k for k in env if k.startswith("LANGSMITH_")]
 
 
 def test_egress_proxy_no_longer_allows_langsmith(compose: dict[str, Any]) -> None:

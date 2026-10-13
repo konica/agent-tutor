@@ -158,6 +158,11 @@ services:
     logging: *logging
     environment:
       SMART_TUTOR_ENVIRONMENT: prod
+      SMART_TUTOR_DEPLOYMENT: on-premise
+      # Ratings go to Phoenix as annotations on the agent's ask traces (#290); none until the key's secret exists.
+      SMART_TUTOR_PHOENIX_URL: http://phoenix:6006
+      SMART_TUTOR_PHOENIX_API_KEY: ${PHOENIX_API_KEY}
+      SMART_TUTOR_PHOENIX_PROJECT: smart-tutor-on-premise
       SMART_TUTOR_ROOT_PATH: /api
       SMART_TUTOR_AWS_REGION: ${AWS_REGION:?}
       AWS_REGION: ${AWS_REGION:?}
