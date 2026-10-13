@@ -69,7 +69,7 @@ evals-smoke:   ## smoke split as a LangSmith experiment, gated on thresholds.yam
 	$(HOST) --extra eval --extra guard --extra topic python -m evals.run --split smoke
 evals-learners: ## load the eval learners' libraries from the seed corpus (needs the app stack and your AWS profile)
 	$(BACKEND) uv run --extra eval python -m evals.learners
-evals-generate: ## propose dataset candidates (DATASET=ask, the default, or injection) into the LangSmith annotation queue (AWS profile, LANGSMITH_API_KEY)
+evals-generate: ## propose dataset candidates (DATASET=ask, the default, injection, or topic_check) into the LangSmith annotation queue (AWS profile, LANGSMITH_API_KEY)
 	$(HOST) --extra eval --extra ingest --extra guard --extra topic python -m evals.generate $(or $(DATASET),ask)
 evals-publish: ## publish accepted annotation-queue candidates as the next smoke and full versions in LangSmith (LANGSMITH_API_KEY)
 	$(HOST) --extra eval python -m evals.publish
