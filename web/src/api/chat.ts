@@ -41,13 +41,15 @@ export type ChatCitation = {
 
 export type Rating = "up" | "down";
 
-export type DeclineCode = "limited" | "no_documents";
+export type DeclineCode = "limited" | "no_documents" | "guard";
 
 export type ChatEvent =
   | { type: "thread"; thread_id: string; run_id: string | null }
   | { type: "delta"; text: string }
   | { type: "citations"; citations: ChatCitation[] }
   | { type: "decline"; code: DeclineCode; message: string }
+  // A guard tripped: show `text` in place of the partial answer; nothing else follows but done.
+  | { type: "replace"; code: string; text: string }
   | { type: "error"; code: "unauthenticated" | "unavailable"; message: string }
   | { type: "done" };
 
@@ -88,6 +90,8 @@ function toEvent(event: string, data: string): ChatEvent | null {
       return { type: "citations", citations: payload().citations as ChatCitation[] };
     case "decline":
       return { type: "decline", ...(payload() as { code: DeclineCode; message: string }) };
+    case "replace":
+      return { type: "replace", ...(payload() as { code: string; text: string }) };
     case "error":
       return { type: "error", ...(payload() as { code: "unauthenticated" | "unavailable"; message: string }) };
     case "done":

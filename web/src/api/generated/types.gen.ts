@@ -1225,7 +1225,7 @@ export type AskInNewThreadError = AskInNewThreadErrors[keyof AskInNewThreadError
 
 export type AskInNewThreadResponses = {
     /**
-     * Server-sent events: thread, then delta*, citations, done; or decline then done (no_documents: nothing readable, upload first; limited: the listed documents don't cover it); or error.
+     * Server-sent events: thread, then delta*, citations, done; or decline then done (no_documents: nothing readable, upload first; limited: the listed documents don't cover it); or delta*, replace, done when a guard trips (the learner sees replace's text instead of the partial answer); or error.
      */
     200: string;
 };
@@ -1485,7 +1485,7 @@ export type AskInThreadError = AskInThreadErrors[keyof AskInThreadErrors];
 
 export type AskInThreadResponses = {
     /**
-     * Server-sent events: thread, then delta*, citations, done; or decline then done (no_documents: nothing readable, upload first; limited: the listed documents don't cover it); or error.
+     * Server-sent events: thread, then delta*, citations, done; or decline then done (no_documents: nothing readable, upload first; limited: the listed documents don't cover it); or delta*, replace, done when a guard trips (the learner sees replace's text instead of the partial answer); or error.
      */
     200: string;
 };

@@ -31,6 +31,8 @@ dependencies = [
 [project.optional-dependencies]
 # Installed only in the worker image: PDF page text and chunking (ADR 0005).
 ingest = ["langchain-text-splitters>=1.1", "pypdf>=6.0"]
+# Installed only in the agent image: the output guard (US-6, ADR 0018). Heavy (litellm, openai, grpc): never core.
+guard = ["guardrails-ai==0.11.0"]
 # Evaluation runs (backend/evals) and CI eval gates.
 eval = ["langsmith>=0.4", "openevals>=0.1", "pyyaml>=6.0"]
 
@@ -38,6 +40,7 @@ eval = ["langsmith>=0.4", "openevals>=0.1", "pyyaml>=6.0"]
 dev = [
     "boto3-stubs[s3,sqs,ssm]>=1.40",
     "debugpy>=1.8",
+    "guardrails-ai==0.11.0",
     "import-linter>=2.3",
     "langchain-text-splitters>=1.1",
     "mypy>=1.17",
@@ -84,6 +87,14 @@ python_version = "3.12"
 strict = true
 files = ["src"]
 exclude = ["shared/adapters/postgres/migrations/versions/"]
+
+[[tool.mypy.overrides]]
+module = ["guardrails", "guardrails.*"]
+ignore_missing_imports = true  # guardrails-ai ships no py.typed marker
+
+[[tool.mypy.overrides]]
+module = "smart_tutor.tutoring.adapters.guardrails_guard"
+disallow_subclassing_any = false  # our validator subclasses guardrails' untyped Validator
 
 # ---------------------------------------------------------------------------
 # Import rules (sdd/specs/2026-10-02-project-structure-design.md §6). Run: lint-imports
@@ -446,6 +457,7 @@ forbidden_modules = [
     "boto3",
     "botocore",
     "fastapi",
+    "guardrails",
     "langchain",  # init_chat_model lives here; services see only langchain_core interfaces (ADR 0006)
     "langchain_text_splitters",
     "langchain_aws",
@@ -479,6 +491,27 @@ source_modules = [
     "smart_tutor.graph",
 ]
 forbidden_modules = ["langchain_text_splitters", "pypdf"]
+
+[[tool.importlinter.contracts]]
+name = "Guardrails AI only in tutoring.adapters (keeps the guard extra in the agent image)"
+type = "forbidden"
+# Only the agent image installs the guard extra, so only its composition root may build the adapter.
+ignore_imports = ["smart_tutor.apps.agent.server -> smart_tutor.tutoring.adapters.guardrails_guard"]
+source_modules = [
+    "smart_tutor.shared",
+    "smart_tutor.apps",
+    "smart_tutor.knowledge",
+    "smart_tutor.subjects",
+    "smart_tutor.learning",
+    "smart_tutor.accounts",
+    "smart_tutor.insights",
+    "smart_tutor.catalog",
+    "smart_tutor.quizzes",
+    "smart_tutor.recommendations",
+    "smart_tutor.reports",
+    "smart_tutor.graph",
+]
+forbidden_modules = ["guardrails"]
 
 # ADR 0017: runtime traces go to Phoenix; only backend/evals (outside smart_tutor) uses LangSmith.
 [[tool.importlinter.contracts]]

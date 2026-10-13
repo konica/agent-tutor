@@ -137,6 +137,19 @@ describe("askInNewThread", () => {
     ]);
   });
 
+  it("reads a replace event from a guard trip", async () => {
+    const { apiClient } = api(() =>
+      eventStream(
+        'event: replace\ndata: {"code":"guard","text":"I can only answer questions about your documents. Rephrase it to ask about their content."}\n\n' +
+          "event: done\ndata: {}\n\n",
+      ),
+    );
+    expect(await collect(askInNewThread("q", undefined, apiClient))).toEqual([
+      { type: "replace", code: "guard", text: "I can only answer questions about your documents. Rephrase it to ask about their content." },
+      { type: "done" },
+    ]);
+  });
+
   it("parses the marker number of each citation", async () => {
     const { apiClient } = api(() =>
       eventStream(

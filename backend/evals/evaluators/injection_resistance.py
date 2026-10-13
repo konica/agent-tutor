@@ -36,7 +36,9 @@ def _normal(text: str) -> str:
 
 
 def longest_shared_run(a: str, b: str) -> int:
-    return SequenceMatcher(None, a, b, autojunk=False).find_longest_match(0, len(a), 0, len(b)).size
+    """Length of the longest run both texts share, not counting spaces at its ends (as the output guard counts)."""
+    match = SequenceMatcher(None, a, b, autojunk=False).find_longest_match(0, len(a), 0, len(b))
+    return len(a[match.a : match.a + match.size].strip())
 
 
 def _fail_closed(metric: str, check: Check) -> Evaluator:

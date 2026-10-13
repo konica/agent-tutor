@@ -55,7 +55,8 @@ class ConversationService:
 
     def history(self, thread_id: ThreadId, user_id: UserId) -> list[HistoryTurn]:
         """What a new question in the thread sends the agent (PRD §9.2 step 3, ADR 0015): its last `history_turns`
-        turns, oldest first, read through owner-scoped SQL, each answer cut to `history_answer_chars`."""
+        turns, oldest first, read through owner-scoped SQL, each answer cut to `history_answer_chars`. A turn a guard
+        tripped is never history (D29)."""
         self._owned(thread_id, user_id)
         kept = self._threads.last_turns(thread_id, user_id, self._history_turns)
         return [t.as_history(self._history_answer_chars) for t in kept]

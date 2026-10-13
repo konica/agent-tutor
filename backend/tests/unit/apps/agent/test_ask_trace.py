@@ -10,7 +10,15 @@ from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import StatusCode
 
-from fakes import TRACE_META, FailingExporter, FakeRetriever, fake_chat_model, recorded_traces
+from fakes import (
+    TRACE_META,
+    FailingExporter,
+    FakeRetriever,
+    PassingGuard,
+    TrippingGuard,
+    fake_chat_model,
+    recorded_traces,
+)
 from smart_tutor.apps.agent.graph import build_graph
 from smart_tutor.apps.agent.server import AskRequest, answer_events
 from smart_tutor.shared.adapters.ask_tracing import PhoenixAskTracing
@@ -18,6 +26,7 @@ from smart_tutor.shared.adapters.tracing import LearnerHasher, otlp_exporter, ph
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.ports.ask_tracing import AskRun
+from smart_tutor.tutoring.application import Guard
 from smart_tutor.tutoring.domain.errors import RetrievalError
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 
@@ -36,9 +45,13 @@ async def traced(
     close_after: int | None = None,
     error: Exception | None = None,
     sampling_rate: float = 1.0,
+    guard: Guard | None = None,
+    reply: str = "It weighs tokens [1].",
 ) -> tuple[list[ReadableSpan], list[str]]:
     graph = build_graph(
-        lambda token: FakeRetriever(chunks, error=error), fake_chat_model(AIMessage("It weighs tokens [1]."))
+        lambda token: FakeRetriever(chunks, error=error),
+        fake_chat_model(AIMessage(reply)),
+        guard=guard or PassingGuard(),
     )
     run = AskRun(RUN_ID, body.thread_id and str(body.thread_id), USER, body.question, body.document_ids)
     got: list[str] = []
@@ -88,6 +101,16 @@ async def test_a_decline_traces_with_its_code_and_no_chunks_given_to_the_model()
     assert meta["limited"] is True and meta["decline"] == "limited" and meta["chunks"] == 0
 
 
+async def test_a_guard_trip_traces_an_empty_answer_and_the_reason() -> None:
+    spans, got = await traced(
+        AskRequest(question="Q?"), guard=TrippingGuard("SECRET"), reply="Fine start then SECRET tail"
+    )
+    span, meta = ask_span(spans)
+    assert json.loads(span.attributes["output.value"]) == {"answer": "", "decline": "guard_answer"}
+    assert meta["decline"] == "guard_answer" and meta["chunks"] == 0
+    assert "SECRET" not in "".join(got)
+
+
 async def test_a_no_documents_decline_traces_its_code() -> None:
     spans, _ = await traced(AskRequest(question="Q?"), chunks=[])
     assert ask_span(spans)[1]["decline"] == "no_documents"
@@ -120,7 +143,9 @@ async def test_a_sampled_out_ask_exports_no_span_at_all() -> None:
 
 
 async def test_a_failing_exporter_never_fails_the_ask() -> None:
-    graph = build_graph(lambda token: FakeRetriever(CHUNKS), fake_chat_model(AIMessage("It weighs tokens [1].")))
+    graph = build_graph(
+        lambda token: FakeRetriever(CHUNKS), fake_chat_model(AIMessage("It weighs tokens [1].")), guard=PassingGuard()
+    )
     run = AskRun(RUN_ID, None, USER, "What is attention?", None)
     with recorded_traces(exporter=FailingExporter()) as (traces, _):
         tracing = PhoenixAskTracing(traces)
@@ -129,7 +154,9 @@ async def test_a_failing_exporter_never_fails_the_ask() -> None:
 
 
 async def test_a_collector_that_is_down_never_fails_the_ask() -> None:
-    graph = build_graph(lambda token: FakeRetriever(CHUNKS), fake_chat_model(AIMessage("It weighs tokens [1].")))
+    graph = build_graph(
+        lambda token: FakeRetriever(CHUNKS), fake_chat_model(AIMessage("It weighs tokens [1].")), guard=PassingGuard()
+    )
     run = AskRun(RUN_ID, None, USER, "What is attention?", None)
     exporter = otlp_exporter(Settings(phoenix_url="http://127.0.0.1:9"), timeout=1)  # nothing listens
     traces = phoenix_traces("p", 1.0, BatchSpanProcessor(exporter), LearnerHasher("k"), {})

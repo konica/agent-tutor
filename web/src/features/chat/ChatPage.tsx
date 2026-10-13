@@ -534,6 +534,10 @@ export function ChatPage({
           updateLast((e) => ({ ...e, decline: { code: event.code, message: event.message } }));
           if (event.code === "no_documents") setNoDocuments(true);
         }
+        // A guard tripped (US-6): its message takes the partial answer's place, as a plain decline with no way out.
+        else if (event.type === "replace") {
+          updateLast((e) => ({ ...e, answer: "", citations: [], decline: { code: event.code, message: event.text } }));
+        }
         else if (event.type === "error") {
           // The token stopped working mid-answer: the session screen asks the learner to sign in again.
           if (event.code === "unauthenticated") sessionExpiry.notify();

@@ -24,6 +24,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, insert
 
 from smart_tutor.shared.domain.ids import DocumentId, RunId, ThreadId, UserId
+from smart_tutor.tutoring.domain.guard import GUARD_DECLINE
 from smart_tutor.tutoring.domain.thread import NO_THREAD_FILTER, SearchScope, Thread, ThreadFilter, ThreadStatus
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
 from smart_tutor.tutoring.domain.turn import Decline, Rating, Turn, TurnCitation
@@ -282,7 +283,11 @@ class SqlThreadRepository(ThreadRepository):
         with self._engine.connect() as conn:
             rows = conn.execute(
                 select(thread_turns)
-                .where(thread_turns.c.thread_id == thread_id, thread_turns.c.user_id == user_id)
+                .where(
+                    thread_turns.c.thread_id == thread_id,
+                    thread_turns.c.user_id == user_id,
+                    thread_turns.c.decline_code.is_distinct_from(GUARD_DECLINE),
+                )
                 .order_by(thread_turns.c.turn_id.desc())
                 .limit(limit)
             ).all()

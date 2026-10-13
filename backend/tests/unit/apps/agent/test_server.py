@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
 from openinference.instrumentation.langchain import LangChainInstrumentor
 
-from fakes import FakeRetriever, FakeTokenVerifier, fake_chat_model
+from fakes import FakeRetriever, FakeTokenVerifier, PassingGuard, TrippingGuard, fake_chat_model
 from smart_tutor.apps.agent.graph import build_graph
 from smart_tutor.apps.agent.server import create_app
 from smart_tutor.shared.adapters.ask_tracing import PhoenixAskTracing
@@ -20,6 +20,7 @@ from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.domain.principal import Principal
 from smart_tutor.shared.ports.ask_tracing import AskRun, AskTrace, AskTracing, NoAskTrace, NoAskTracing
+from smart_tutor.tutoring.application import GUARD_MESSAGE, Guard, GuardTrip
 from smart_tutor.tutoring.domain.errors import RetrievalError
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 
@@ -30,11 +31,16 @@ NO_DOCUMENTS = "None of your documents can be used right now: they are all archi
 
 
 def client(
-    retriever: FakeRetriever, reply: str = "It weighs tokens [1].", answer_floor: float = 0.3
+    retriever: FakeRetriever,
+    reply: str = "It weighs tokens [1].",
+    answer_floor: float = 0.3,
+    guard: Guard | None = None,
 ) -> tuple[TestClient, FakeTokenVerifier]:
     verifier = FakeTokenVerifier()
     verifier.add("t-ada", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
-    graph = build_graph(lambda token: retriever, fake_chat_model(AIMessage(reply)), answer_floor)
+    graph = build_graph(
+        lambda token: retriever, fake_chat_model(AIMessage(reply)), answer_floor, guard=guard or PassingGuard()
+    )
     return TestClient(create_app(Settings(), verifier=verifier, graph=graph)), verifier
 
 
@@ -106,7 +112,9 @@ def test_citations_carry_the_marker_number_the_answer_uses() -> None:
 def test_an_empty_readable_set_streams_the_upload_request_without_calling_the_model() -> None:
     verifier = FakeTokenVerifier()
     verifier.add("t-ada", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
-    graph = build_graph(lambda token: FakeRetriever([]), fake_chat_model(), 0.3)  # no replies: any model call fails
+    graph = build_graph(
+        lambda token: FakeRetriever([]), fake_chat_model(), 0.3, guard=PassingGuard()
+    )  # no replies: any model call fails
     c = TestClient(create_app(Settings(), verifier=verifier, graph=graph))
     got = events(c.post("/ask", json=BODY, headers=AUTH).text)
     assert got == [("decline", {"code": "no_documents", "message": NO_DOCUMENTS}), ("done", {})]
@@ -195,7 +203,9 @@ def test_a_limited_search_below_the_floor_declines_without_calling_the_model() -
     retriever = FakeRetriever([weak])
     verifier = FakeTokenVerifier()
     verifier.add("t-ada", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
-    graph = build_graph(lambda token: retriever, fake_chat_model(), 0.3)  # no replies: any model call fails
+    graph = build_graph(
+        lambda token: retriever, fake_chat_model(), 0.3, guard=PassingGuard()
+    )  # no replies: any model call fails
     c = TestClient(create_app(Settings(), verifier=verifier, graph=graph))
     body = c.post("/ask", json={"question": "q", "document_ids": ["d1"]}, headers=AUTH).text
     assert [name for name, _ in events(body)] == ["decline", "done"]
@@ -222,7 +232,7 @@ def test_startup_refuses_tracing_without_a_learner_hash_key() -> None:
 
 def test_without_a_phoenix_url_the_agent_starts_untraced(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("smart_tutor.apps.agent.server.keycloak_verifier", lambda settings, http: FakeTokenVerifier())
-    graph = build_graph(lambda token: FakeRetriever([CHUNK]), fake_chat_model(AIMessage("x")))
+    graph = build_graph(lambda token: FakeRetriever([CHUNK]), fake_chat_model(AIMessage("x")), guard=PassingGuard())
     app = create_app(Settings(keycloak_client_secret="s"), graph=graph)
     with TestClient(app):
         assert isinstance(app.state.tracing, NoAskTracing)
@@ -232,7 +242,7 @@ def test_with_a_phoenix_url_the_agent_starts_traced_and_stops_instrumenting_on_e
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr("smart_tutor.apps.agent.server.keycloak_verifier", lambda settings, http: FakeTokenVerifier())
-    graph = build_graph(lambda token: FakeRetriever([CHUNK]), fake_chat_model(AIMessage("x")))
+    graph = build_graph(lambda token: FakeRetriever([CHUNK]), fake_chat_model(AIMessage("x")), guard=PassingGuard())
     settings = Settings(
         keycloak_client_secret="s", learner_hash_key="k", phoenix_url="http://127.0.0.1:9"
     )  # nothing listens on :9, and no ask is made
@@ -263,7 +273,9 @@ class _RecordingTracing(AskTracing):
 def traced_client() -> tuple[TestClient, _RecordingTracing]:
     verifier = FakeTokenVerifier()
     verifier.add("t-ada", Principal(UserId("ada"), "Ada", frozenset({"learner"})))
-    graph = build_graph(lambda token: FakeRetriever([CHUNK]), fake_chat_model(AIMessage("It weighs tokens [1].")))
+    graph = build_graph(
+        lambda token: FakeRetriever([CHUNK]), fake_chat_model(AIMessage("It weighs tokens [1].")), guard=PassingGuard()
+    )
     tracing = _RecordingTracing()
     return TestClient(create_app(Settings(), verifier=verifier, graph=graph, tracing=tracing)), tracing
 
@@ -314,3 +326,37 @@ def test_oversized_or_malformed_history_is_refused(history: list[dict[str, str]]
     c, _ = client(FakeRetriever([CHUNK]))
     response = c.post("/ask", json={"question": "Q", "history": history}, headers=AUTH)
     assert response.status_code == 422
+
+
+def test_a_tripped_answer_ends_with_replace_then_done_and_no_sources_or_citations() -> None:
+    c, _ = client(
+        FakeRetriever([CHUNK]), reply="Fine start then SECRET-CANARY tail", guard=TrippingGuard("SECRET-CANARY")
+    )
+    got = events(c.post("/ask", json=BODY, headers=AUTH).text)
+    names = [e for e, _ in got]
+    assert names[-2:] == ["replace", "done"]
+    assert got[-2][1] == {
+        "code": "guard",
+        "text": "I can only answer questions about your documents. Rephrase it to ask about their content.",
+    }
+    assert got[-2][1]["text"] == GUARD_MESSAGE
+    assert "sources" not in names and "citations" not in names and "decline" not in names
+    assert "SECRET-CANARY" not in "".join(d.get("text", "") for e, d in got if e == "delta")  # cut before it left
+
+
+def test_a_trip_on_the_first_piece_sends_no_delta() -> None:
+    c, _ = client(FakeRetriever([CHUNK]), reply="SECRET-CANARY first", guard=TrippingGuard("SECRET-CANARY"))
+    assert [e for e, _ in events(c.post("/ask", json=BODY, headers=AUTH).text)] == ["replace", "done"]
+
+
+class _BrokenGuard(PassingGuard):
+    async def check_answer(self, text: str) -> GuardTrip | None:
+        raise RuntimeError("guard down")
+
+
+def test_a_guard_that_fails_fails_closed_with_an_unavailable_error() -> None:
+    c, _ = client(FakeRetriever([CHUNK]), guard=_BrokenGuard())
+    got = events(c.post("/ask", json=BODY, headers=AUTH).text)
+    names = [e for e, _ in got]
+    assert got[-1][0] == "error" and got[-1][1]["code"] == "unavailable"
+    assert "replace" not in names and "done" not in names and "delta" not in names

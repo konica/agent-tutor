@@ -1,8 +1,9 @@
-"""Answer step (PRD §9.2 step 5): chunks and the question as quoted data under a fixed system prompt (D7), and
+"""Answer step (PRD §9.2 step 3): chunks and the question as quoted data under a fixed system prompt (D7), and
 citations."""
 
 import html
 import re
+import secrets
 from collections.abc import Sequence
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
@@ -46,8 +47,23 @@ def _page(chunk: RetrievedChunk) -> str:
     return str(chunk.page) if chunk.page is not None else "unavailable"
 
 
+def new_canary() -> str:
+    """A random marker for the system prompt: an answer holding it is leaking the prompt (US-6). One per process, so
+    the prompt stays cacheable."""
+    return f"stc-{secrets.token_hex(12)}"
+
+
+def system_prompt(canary: str) -> str:
+    """The answer model's instructions with the canary; still no document text or question (prompt caching)."""
+    return f"{SYSTEM_PROMPT}\n\nConfidential reference: {canary}"
+
+
 def answer_messages(
-    question: str, chunks: Sequence[RetrievedChunk], history: Sequence[HistoryTurn] = ()
+    question: str,
+    chunks: Sequence[RetrievedChunk],
+    history: Sequence[HistoryTurn] = (),
+    *,
+    system: str = SYSTEM_PROMPT,
 ) -> list[BaseMessage]:
     """System prompt, then the capped history as earlier messages (without citation markers), then the chunks as
     quoted data and the question (PRD §9.2 step 3, D7)."""
@@ -60,7 +76,7 @@ def answer_messages(
         text = _OLD_MARKER.sub("", turn.answer).strip()
         earlier += [HumanMessage(turn.question), AIMessage(text or "(no answer)")]
     return [
-        SystemMessage(SYSTEM_PROMPT),
+        SystemMessage(system),
         *earlier,
         HumanMessage(f"{blocks}\n\n<question>\n{_quote(question)}\n</question>"),
     ]

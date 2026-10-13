@@ -11,6 +11,9 @@ A turn the model doesn't answer is ``decline`` {"code", "message"} then ``done``
 for a request with ``document_ids`` (only those documents are searched), ``limited`` when none of the chunks found
 scores at least ``answer_floor`` (US-4c).
 
+When a guard trips while the answer streams, the stream ends with ``replace`` {"code": "guard", "text"} then ``done``:
+the learner sees ``text`` in place of the partial answer, and no ``sources`` or ``citations`` follow (US-6, D29).
+
 The request may carry ``thread_id`` and ``run_id`` (set by the API); each ask is one ``ask`` trace in Phoenix whose
 trace id is ``run_id`` (PRD §10.4). It may also carry ``history``, the conversation's last turns (``question``,
 ``answer``), oldest first: the answer model reads them before the chunks, and the search adds the previous question
@@ -40,8 +43,9 @@ from smart_tutor.shared.config import MAX_HISTORY_ANSWER_CHARS, MAX_HISTORY_TURN
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.ports.ask_tracing import AskRun, AskTracing, NoAskTracing
 from smart_tutor.shared.ports.token_verifier import TokenVerifier
+from smart_tutor.tutoring.adapters.guardrails_guard import GuardrailsGuard
 from smart_tutor.tutoring.adapters.mcp_retriever import McpRetriever
-from smart_tutor.tutoring.application import HistoryTurn, RetrievedChunk
+from smart_tutor.tutoring.application import HistoryTurn, RetrievedChunk, new_canary, system_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +53,7 @@ SIGN_IN_AGAIN = "Please sign in again"
 UNAVAILABLE = "The tutor couldn't answer right now. Try again in a moment."
 # Proxies must pass each event on as it comes, and nothing may cache the answer.
 SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
-STREAM_MODES: list[Literal["messages", "updates"]] = ["messages", "updates"]
+STREAM_MODES: list[Literal["custom", "updates"]] = ["custom", "updates"]
 
 
 class HistoryTurnBody(BaseModel):
@@ -90,15 +94,20 @@ async def answer_events(
             async for part in graph.astream(
                 state, context=AgentContext(access_token=token), stream_mode=STREAM_MODES, version="v2"
             ):
-                if part["type"] == "messages":
-                    chunk, meta = part["data"]
-                    if meta.get("langgraph_node") == "answer" and chunk.text:
-                        answer += chunk.text
-                        yield sse("delta", {"text": chunk.text})
+                if part["type"] == "custom":
+                    text = part["data"]["delta"]
+                    answer += text
+                    yield sse("delta", {"text": text})
                 elif part["type"] == "updates" and "search" in part["data"]:
                     chunks = part["data"]["search"].get("chunks", [])
                 elif part["type"] == "updates" and "answer" in part["data"]:
                     update = part["data"]["answer"]
+                    if update.get("decline") == "guard":
+                        decline = update["guard"]  # the reason, for the trace; the learner reads only the message
+                        answer = ""
+                        logger.info("a guard tripped: %s", decline)  # content-free: no question, answer, or user
+                        yield sse("replace", {"code": "guard", "text": DECLINE_MESSAGES["guard"]})
+                        continue
                     if (code := update.get("decline")) is not None:
                         decline = code
                         yield sse("decline", {"code": code, "message": DECLINE_MESSAGES[code]})
@@ -148,11 +157,15 @@ def create_app(
             app.state.tracing = PhoenixAskTracing(traces) if traces else NoAskTracing()
         if graph is None:
             model = ModelFactory(settings).chat(ChatRole.AGENT)
+            canary = new_canary()
+            prompt = system_prompt(canary)
             app.state.graph = build_graph(
                 lambda token: McpRetriever(settings.mcp_url, token),
                 model,
                 settings.answer_floor,
                 settings.answer_max_tokens,
+                guard=GuardrailsGuard(prompt, canary),
+                system_prompt=prompt,
             )
         async with httpx.AsyncClient(timeout=5) as http:
             app.state.verifier = keycloak_verifier(settings, http)

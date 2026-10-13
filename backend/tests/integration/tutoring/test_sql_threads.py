@@ -11,6 +11,7 @@ from smart_tutor.shared.adapters.postgres.migrate import upgrade_to_head
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import DocumentId, RunId, ThreadId, UserId
 from smart_tutor.tutoring.adapters.sql_threads import SqlThreadRepository, thread_documents, thread_turns
+from smart_tutor.tutoring.domain.guard import GUARD_DECLINE, GUARD_MESSAGE
 from smart_tutor.tutoring.domain.thread import SearchScope, Thread, ThreadFilter, ThreadStatus
 from smart_tutor.tutoring.domain.turn import Decline, Rating, Turn, TurnCitation
 
@@ -298,6 +299,22 @@ def test_last_turns_are_the_newest_n_oldest_first_for_the_owner_only(engine: Eng
     assert [t.question for t in repo.last_turns(thread.thread_id, owner, 5)] == ["Q3", "Q4", "Q5", "Q6", "Q7"]
     assert repo.last_turns(thread.thread_id, owner, 0) == []
     assert repo.last_turns(thread.thread_id, UserId("bob"), 5) == []
+
+
+def test_last_turns_leave_out_a_guard_tripped_turn_and_still_fill_the_limit(engine: Engine) -> None:
+    repo = SqlThreadRepository(engine)
+    owner = UserId(f"ada-{uuid.uuid4()}")
+    thread = Thread.start(ThreadId(str(uuid.uuid4())), owner, datetime.now(UTC), title="Q1")
+    repo.add(thread)
+    at = datetime(2026, 10, 11, 9, 0, tzinfo=UTC)
+    guard = Decline(GUARD_DECLINE, GUARD_MESSAGE)
+    repo.add_turn(Turn(thread.thread_id, owner, "Q1", "A1", (), None, at), [])
+    repo.add_turn(Turn(thread.thread_id, owner, "Q2", "A2", (), None, at), [])
+    repo.add_turn(Turn(thread.thread_id, owner, "Q3", "", (), guard, at), [])
+    repo.add_turn(Turn(thread.thread_id, owner, "Q4", "A4", (), None, at), [])
+
+    assert [t.question for t in repo.last_turns(thread.thread_id, owner, 2)] == ["Q2", "Q4"]
+    assert [t.question for t in repo.turns(thread.thread_id, owner)] == ["Q1", "Q2", "Q3", "Q4"]
 
 
 def test_set_status_archives_and_the_lists_follow(engine: Engine) -> None:
