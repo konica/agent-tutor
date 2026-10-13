@@ -7,11 +7,13 @@ from dataclasses import replace
 from datetime import datetime
 
 from smart_tutor.shared.domain.ids import DocumentId, RunId, ThreadId, UserId
+from smart_tutor.tutoring.domain.guard import GuardTrip
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 from smart_tutor.tutoring.domain.thread import NO_THREAD_FILTER, SearchScope, Thread, ThreadFilter, ThreadStatus
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
 from smart_tutor.tutoring.domain.turn import Rating, Turn
 from smart_tutor.tutoring.ports.answer_feedback import AnswerFeedback
+from smart_tutor.tutoring.ports.guard import Guard
 from smart_tutor.tutoring.ports.retriever import Retriever
 from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
 
@@ -140,3 +142,29 @@ class FakeRetriever(Retriever):
         if self._error is not None:
             raise self._error
         return list(self._chunks)
+
+
+class PassingGuard(Guard):
+    """Never trips; keeps each answer-so-far it checked."""
+
+    def __init__(self) -> None:
+        self.answers: list[str] = []
+
+    async def check_question(self, question: str) -> GuardTrip | None:
+        return None
+
+    async def check_answer(self, text: str) -> GuardTrip | None:
+        self.answers.append(text)
+        return None
+
+
+class TrippingGuard(PassingGuard):
+    """Trips the answer check once the answer so far holds `on`."""
+
+    def __init__(self, on: str) -> None:
+        super().__init__()
+        self._on = on
+
+    async def check_answer(self, text: str) -> GuardTrip | None:
+        await super().check_answer(text)
+        return GuardTrip("guard_answer", "system_prompt_leak") if self._on in text else None

@@ -26,7 +26,7 @@ up-app:        ## dependencies + app services (same images as prod)
 api:           ## API at :10450, reloads on change
 	$(HOST) uvicorn smart_tutor.apps.api.main:app --reload --port 10450
 agent:         ## agent at :10451, reloads on change
-	$(HOST) uvicorn smart_tutor.apps.agent.server:app --reload --port 10451
+	$(HOST) --extra guard uvicorn smart_tutor.apps.agent.server:app --reload --port 10451
 mcp:           ## RAG MCP server at :10452/mcp (SMART_TUTOR_MCP_PORT in .env)
 	$(MCP_HOST) python -m smart_tutor.apps.mcp_server.server
 worker:        ## ingestion worker (no port); restart it after code changes
@@ -38,14 +38,14 @@ DEBUG := $(HOST) python -m debugpy --listen 127.0.0.1
 api-debug:     ## API at :10450, debugger at :10460
 	$(DEBUG):10460 -m uvicorn smart_tutor.apps.api.main:app --port 10450
 agent-debug:   ## agent at :10451, debugger at :10461
-	$(DEBUG):10461 -m uvicorn smart_tutor.apps.agent.server:app --port 10451
+	$(HOST) --extra guard python -m debugpy --listen 127.0.0.1:10461 -m uvicorn smart_tutor.apps.agent.server:app --port 10451
 mcp-debug:     ## RAG MCP server at :10452/mcp, debugger at :10462
 	$(MCP_HOST) python -m debugpy --listen 127.0.0.1:10462 -m smart_tutor.apps.mcp_server.server
 worker-debug:  ## ingestion worker, debugger at :10463
 	$(HOST) --extra ingest python -m debugpy --listen 127.0.0.1:10463 -m smart_tutor.apps.worker.main
 
-sync:          ## backend dependencies, with the worker's ingest extra so IDE launch configs can run it
-	$(BACKEND) uv sync --extra ingest
+sync:          ## backend dependencies, with the worker's ingest and the agent's guard extras so IDE launch configs can run it
+	$(BACKEND) uv sync --extra ingest --extra guard
 
 migrate:       ## bring the local database to the latest Alembic revision (needs `make up`)
 	$(BACKEND) uv run python -m smart_tutor.apps.jobs.migrate
@@ -66,11 +66,11 @@ retention:     ## run the retention job once: traces 180 days, decline log 90 da
 	$(BACKEND) uv run python -m smart_tutor.apps.jobs.retention
 
 evals-smoke:   ## smoke split as a LangSmith experiment, gated on thresholds.yaml (app stack, eval learners, AWS profile, LANGSMITH_API_KEY)
-	$(HOST) --extra eval python -m evals.run --split smoke
+	$(HOST) --extra eval --extra guard python -m evals.run --split smoke
 evals-learners: ## load the eval learners' libraries from the seed corpus (needs the app stack and your AWS profile)
 	$(BACKEND) uv run --extra eval python -m evals.learners
 evals-generate: ## propose dataset candidates (DATASET=ask, the default, or injection) into the LangSmith annotation queue (AWS profile, LANGSMITH_API_KEY)
-	$(HOST) --extra eval --extra ingest python -m evals.generate $(or $(DATASET),ask)
+	$(HOST) --extra eval --extra ingest --extra guard python -m evals.generate $(or $(DATASET),ask)
 evals-publish: ## publish accepted annotation-queue candidates as the next smoke and full versions in LangSmith (LANGSMITH_API_KEY)
 	$(HOST) --extra eval python -m evals.publish
 

@@ -1,14 +1,18 @@
 import html
+import re
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from smart_tutor.tutoring.application import (
     NO_DOCUMENTS_DECLINE,
+    SYSTEM_PROMPT,
     HistoryTurn,
     answer_messages,
     cited_chunks,
     covers,
+    new_canary,
+    system_prompt,
 )
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 
@@ -165,3 +169,20 @@ def test_the_system_prompt_says_earlier_turns_are_context_not_instructions() -> 
     system = answer_messages("Q", [HISTORY_CHUNK], [HistoryTurn("q", "a")])[0].text
     assert "earlier turns" in system.lower() and "not instructions" in system.lower()
     assert "only from the chunks" in system.lower()
+
+
+def test_the_canary_prompt_is_the_prompt_plus_the_canary() -> None:
+    prompt = system_prompt("stc-abc")
+    assert prompt.startswith(SYSTEM_PROMPT)
+    assert "stc-abc" in prompt
+
+
+def test_each_canary_is_random_and_shaped_alike() -> None:
+    first, second = new_canary(), new_canary()
+    assert first != second
+    assert re.fullmatch(r"stc-[0-9a-f]{24}", first)
+
+
+def test_answer_messages_use_the_given_system_prompt() -> None:
+    system = answer_messages("q", [chunk(1)], system=system_prompt("stc-abc"))[0]
+    assert "stc-abc" in system.text
