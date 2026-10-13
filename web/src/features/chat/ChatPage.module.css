@@ -25,8 +25,9 @@
 
 /* The conversation pane: the messages scroll, the composer row stays at the bottom. */
 .conversation { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-/* Compact page padding, the same as AppShell's .page (DESIGN.md → Density). */
-.messages { flex: 1; min-height: 0; overflow-y: auto; padding: var(--sp-3) var(--sp-4) var(--sp-6); }
+/* Compact page padding, the same as AppShell's .page (DESIGN.md → Density). Positioned, so its visually hidden text
+   (position: absolute) is clipped and scrolls here; otherwise it lays out against <main> and stretches the page. */
+.messages { position: relative; flex: 1; min-height: 0; overflow-y: auto; padding: var(--sp-3) var(--sp-4) var(--sp-6); }
 /* Chrome makes a scroller without focusable children keyboard-focusable; the ring sits inside the pane so it isn't clipped. */
 .messages:focus-visible { outline-offset: -2px; }
 .column { max-width: var(--chat-w); margin: 0 auto; }

@@ -4,6 +4,7 @@
 # repositories). Skips the build when all six images are already there; otherwise it first deploys the mode's
 # GitHubDeploy and Registry stacks, so the repositories and the role's push permission exist before the push (the
 # first merge after #206 needed both; later runs find nothing to change), then rebuilds and pushes all six.
+# Skipped unless the repository variable PRODUCTION_DEPLOY is `true` (#282).
 name: build-images
 
 on:
@@ -20,6 +21,8 @@ on:
 
 jobs:
   build:
+    # The production deploy switch (#282): only `true` builds and pushes; this job also deploys the Registry stack.
+    if: vars.PRODUCTION_DEPLOY == 'true'
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     timeout-minutes: 30

@@ -573,7 +573,7 @@ export type TurnResponse = {
     /**
      * Run Id
      *
-     * The ask's LangSmith run id, for attaching a rating (#227); null for turns kept before it was recorded.
+     * The ask's trace id in Phoenix, for attaching a rating (#227); null for turns kept before it was recorded.
      */
     run_id: string | null;
 };

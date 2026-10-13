@@ -992,7 +992,7 @@
                 "type": "null"
               }
             ],
-            "description": "The ask's LangSmith run id, for attaching a rating (#227); null for turns kept before it was recorded.",
+            "description": "The ask's trace id in Phoenix, for attaching a rating (#227); null for turns kept before it was recorded.",
             "title": "Run Id"
           }
         },
@@ -2707,7 +2707,7 @@
     },
     "/threads/{thread_id}/turns/{run_id}/rating": {
       "put": {
-        "description": "Rate an answer or decline of the learner's conversation helpful (\"up\") or not (\"down\"); a new rating replaces\nthe last (PRD \u00a710.2). Saved with the turn and sent to LangSmith as feedback on its run; an outage there doesn't fail\nthe rating.",
+        "description": "Rate an answer or decline of the learner's conversation helpful (\"up\") or not (\"down\"); a new rating replaces\nthe last (PRD \u00a710.2). Saved with the turn, then sent to Phoenix as a `learner_rating` span annotation on the ask's\ntrace.",
         "operationId": "rate_turn",
         "parameters": [
           {

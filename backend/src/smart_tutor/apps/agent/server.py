@@ -11,9 +11,10 @@ A turn the model doesn't answer is ``decline`` {"code", "message"} then ``done``
 for a request with ``document_ids`` (only those documents are searched), ``limited`` when none of the chunks found
 scores at least ``answer_floor`` (US-4c).
 
-The request may carry ``thread_id`` and ``run_id`` (set by the API); each ask is traced as one ``ask`` run (PRD §10.4).
-It may also carry ``history``, the conversation's last turns (``question``, ``answer``), oldest first: the answer
-model reads them before the chunks, and the search adds the previous question (PRD §9.2, ADR 0015).
+The request may carry ``thread_id`` and ``run_id`` (set by the API); each ask is one ``ask`` trace in Phoenix whose
+trace id is ``run_id`` (PRD §10.4). It may also carry ``history``, the conversation's last turns (``question``,
+``answer``), oldest first: the answer model reads them before the chunks, and the search adds the previous question
+(PRD §9.2, ADR 0015).
 """
 
 import json
@@ -30,13 +31,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from smart_tutor.apps.agent.graph import AskGraph, build_graph
 from smart_tutor.apps.agent.state import DECLINE_MESSAGES, AgentContext, AskState
-from smart_tutor.apps.agent.tracing import AskRun, AskTracing
+from smart_tutor.shared.adapters.ask_tracing import PhoenixAskTracing
 from smart_tutor.shared.adapters.auth.bearer import BearerToken, CurrentPrincipal
 from smart_tutor.shared.adapters.auth.keycloak_introspection import keycloak_verifier
 from smart_tutor.shared.adapters.model_factory import ChatRole, ModelFactory
-from smart_tutor.shared.adapters.tracing import LearnerHasher, run_metadata, start_tracing
+from smart_tutor.shared.adapters.tracing import start_tracing
 from smart_tutor.shared.config import MAX_HISTORY_ANSWER_CHARS, MAX_HISTORY_TURNS, Settings
 from smart_tutor.shared.domain.errors import UnauthenticatedError
+from smart_tutor.shared.ports.ask_tracing import AskRun, AskTracing, NoAskTracing
 from smart_tutor.shared.ports.token_verifier import TokenVerifier
 from smart_tutor.tutoring.adapters.mcp_retriever import McpRetriever
 from smart_tutor.tutoring.application import HistoryTurn, RetrievedChunk
@@ -133,19 +135,17 @@ def create_app(
     tracing: AskTracing | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
-    key = settings.learner_hash_key.get_secret_value()
-    default_hasher = LearnerHasher(key) if key else None
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if verifier is not None:
             yield
             return
-        hasher = start_tracing(settings)  # tracing on without a key, or with bad LangSmith settings: refuse to start
-        if tracing is None:
-            app.state.tracing = AskTracing(run_metadata(settings), hasher)
         if not settings.keycloak_client_secret.get_secret_value():
-            raise RuntimeError("SMART_TUTOR_KEYCLOAK_CLIENT_SECRET is not set")
+            raise RuntimeError("SMART_TUTOR_KEYCLOAK_CLIENT_SECRET is not set")  # before tracing instruments LangChain
+        traces = start_tracing(settings, settings.phoenix_project)  # tracing on without a learner-hash key: refuse
+        if tracing is None:
+            app.state.tracing = PhoenixAskTracing(traces) if traces else NoAskTracing()
         if graph is None:
             model = ModelFactory(settings).chat(ChatRole.AGENT)
             app.state.graph = build_graph(
@@ -156,10 +156,14 @@ def create_app(
             )
         async with httpx.AsyncClient(timeout=5) as http:
             app.state.verifier = keycloak_verifier(settings, http)
-            yield
+            try:
+                yield
+            finally:
+                if traces:
+                    traces.shutdown()  # send what is left
 
     app = FastAPI(title="Smart Tutor Agent", lifespan=lifespan)
-    app.state.tracing = tracing or AskTracing(run_metadata(settings), default_hasher)
+    app.state.tracing = tracing or NoAskTracing()
     if verifier is not None:
         app.state.verifier = verifier
     if graph is not None:

@@ -50,7 +50,7 @@ _Avoid_: Chat, session, conversation (in code; "conversation" is fine in UI copy
 One question and its answer (or decline) in a thread, kept when the answer ends with `done`. A thread's turns, oldest first, are its history; a reopened conversation shows them.
 
 **Rating**:
-A learner's 👍/👎 (Helpful / Not helpful) on a kept turn: one per turn, a new one replaces it. Saved with the turn, then sent to LangSmith as `learner_rating` feedback on the turn's run; 👎 extends the trace's retention.
+A learner's 👍/👎 (Helpful / Not helpful) on a kept turn: one per turn, a new one replaces it. Saved with the turn and sent to Phoenix as a `learner_rating` span annotation on the turn's ask span.
 _Avoid_: Vote, like, review
 
 **Documents used**:
@@ -91,7 +91,7 @@ How one installation of Smart Tutor is hosted: **on-premise** (the default) or *
 _Avoid_: Environment, flavor, target
 
 **On-premise mode**:
-Smart Tutor's own services (web, API, agent, MCP server, worker, sign-in) run on a virtual machine we operate instead of managed Kubernetes. File storage, the ingest queue, settings, and its own image registry stay on the cloud provider's managed services; the model provider and the tracing service are external. It is the default and is deployed on every merge to `main`, unless `ON_PREMISE_AUTO_DEPLOY` is `false`.
+Smart Tutor's own services (web, API, agent, MCP server, worker, sign-in) run on a virtual machine we operate instead of managed Kubernetes. File storage, the ingest queue, settings, and its own image registry stay on the cloud provider's managed services; the model provider and the tracing service are external. It is the default and is deployed on every merge to `main` while `PRODUCTION_DEPLOY` is `true`, unless `ON_PREMISE_AUTO_DEPLOY` is `false`.
 _Avoid_: Self-host, local, EC2 mode
 
 **Native-cloud mode**:

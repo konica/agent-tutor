@@ -408,7 +408,7 @@ def test_deploy_settings_name_on_premise_resources(t: Template) -> None:
     assert "s3://" in json.dumps(_parameter(t, "bundle"))
 
 
-def test_database_and_test_learner_secrets_are_generated(t: Template) -> None:
+def test_database_test_learner_and_phoenix_secrets_are_generated(t: Template) -> None:
     secrets = {
         s["Properties"]["Name"]: s["Properties"] for s in t.find_resources("AWS::SecretsManager::Secret").values()
     }
@@ -416,12 +416,20 @@ def test_database_and_test_learner_secrets_are_generated(t: Template) -> None:
         "smart-tutor-on-premise/db/postgres",
         "smart-tutor-on-premise/db/app",
         "smart-tutor-on-premise/db/keycloak",
+        "smart-tutor-on-premise/db/phoenix",
         "smart-tutor-on-premise/keycloak/test-learner",
+        "smart-tutor-on-premise/phoenix/secret",
+        "smart-tutor-on-premise/phoenix/admin-password",
     }
     assert all("SecretString" not in s and s["GenerateSecretString"]["ExcludePunctuation"] for s in secrets.values())
     learner = secrets["smart-tutor-on-premise/keycloak/test-learner"]["GenerateSecretString"]
     assert learner["GenerateStringKey"] == "password"
     assert json.loads(learner["SecretStringTemplate"])["username"] == "test-learner@example.com"
+    # Phoenix refuses a PHOENIX_SECRET shorter than 32 characters or without a digit and a lowercase letter.
+    phoenix_secret = secrets["smart-tutor-on-premise/phoenix/secret"]["GenerateSecretString"]
+    assert phoenix_secret["PasswordLength"] >= 32 and phoenix_secret["RequireEachIncludedType"] is True
+    admin = secrets["smart-tutor-on-premise/phoenix/admin-password"]["GenerateSecretString"]
+    assert admin["PasswordLength"] >= 12 and admin["RequireEachIncludedType"] is True
 
 
 def test_deploy_document_takes_only_a_commit_sha_and_runs_the_bundled_script(t: Template) -> None:
@@ -472,7 +480,7 @@ def compose() -> dict[str, Any]:
     return yaml.safe_load((ON_PREMISE_DIR / "compose.yaml").read_text(encoding="utf-8"))
 
 
-LONG_RUNNING = {"postgres", "keycloak", "api", "web", "caddy", "agent", "mcp", "worker", "egress-proxy"}
+LONG_RUNNING = {"postgres", "keycloak", "api", "web", "caddy", "agent", "mcp", "worker", "egress-proxy", "phoenix"}
 
 
 def test_compose_runs_the_production_services_and_no_local_emulators(compose: dict[str, Any]) -> None:
@@ -597,14 +605,15 @@ def _squid_conf(compose: dict[str, Any]) -> list[str]:
     return [line.strip() for line in conf.splitlines() if line.strip() and not line.strip().startswith("#")]
 
 
-def test_worker_reaches_only_postgres_and_the_egress_proxy(compose: dict[str, Any]) -> None:
+def test_worker_reaches_only_postgres_phoenix_and_the_egress_proxy(compose: dict[str, Any]) -> None:
     assert compose["networks"]["worker"] == {"internal": True}  # no route out of the VM, no external DNS
     assert compose["services"]["worker"]["networks"] == ["worker"]
     on_worker_network = {n for n, s in compose["services"].items() if "worker" in s.get("networks", [])}
-    assert on_worker_network == {"worker", "postgres", "egress-proxy"}
+    assert on_worker_network == {"worker", "postgres", "egress-proxy", "phoenix"}
     # Every other service keeps the default network only.
     assert compose["services"]["postgres"]["networks"] == ["default", "worker"]
     assert compose["services"]["egress-proxy"]["networks"] == ["default", "worker"]
+    assert compose["services"]["phoenix"]["networks"] == ["default", "worker"]
     for name, service in compose["services"].items():
         if name not in on_worker_network:
             assert "networks" not in service, name
@@ -632,7 +641,6 @@ def test_egress_proxy_allows_only_the_workers_aws_endpoints_and_imds(compose: di
     rules = [line for line in lines if line.startswith("http_access ")]
     assert rules == [
         "http_access allow CONNECT aws tls",
-        "http_access allow CONNECT langsmith tls",
         "http_access allow !CONNECT imds http",
         "http_access deny all",
     ]
@@ -670,8 +678,14 @@ def test_agent_and_mcp_run_on_a_read_only_root_without_capabilities(compose: dic
 def test_caddy_routes_one_origin_by_path() -> None:
     caddyfile = (ON_PREMISE_DIR / "Caddyfile").read_text(encoding="utf-8")
     assert "{$SMART_TUTOR_DOMAIN} {" in caddyfile
-    routes = re.findall(r"handle( /\S+)? \{(?:\s+#.*)*\s+reverse_proxy (\S+)", caddyfile)
-    assert routes == [(" /api/*", "api:8080"), (" /auth/*", "keycloak:8080"), ("", "web:8080")]
+    routes = re.findall(r"(handle(?:_path)?)( /\S+)? \{(?:\s+#.*)*\s+reverse_proxy (\S+)", caddyfile)
+    assert routes == [
+        ("handle", " /api/*", "api:8080"),
+        ("handle", " /auth/*", "keycloak:8080"),
+        ("handle_path", " /phoenix/*", "phoenix:6006"),
+        ("handle", "", "web:8080"),
+    ]
+    assert "redir /phoenix /phoenix/" in caddyfile
     assert "protocols h1 h2" in caddyfile  # no HTTP/3: UDP 443 is closed
 
 
@@ -1074,41 +1088,128 @@ def test_deploy_installs_and_enables_every_timer() -> None:
     assert script.index("up -d --wait --wait-timeout") < script.index("systemctl daemon-reload")
 
 
-LANGSMITH_HOST = "api.smith.langchain.com"
-
-
 @pytest.mark.parametrize("service", ["agent", "worker"])
-def test_agent_and_worker_trace_into_the_on_premise_project(compose: dict[str, Any], service: str) -> None:
+def test_agent_and_worker_trace_into_the_on_premise_phoenix(compose: dict[str, Any], service: str) -> None:
     env = compose["services"][service]["environment"]
-    assert env["LANGSMITH_TRACING"] == "${LANGSMITH_TRACING:?}"
-    assert env["LANGSMITH_API_KEY"] == "${LANGSMITH_API_KEY}"  # empty while tracing is off
-    assert env["LANGSMITH_PROJECT"] == "smart-tutor-on-premise"  # the worker adds -ingestion
-    assert env["LANGSMITH_TRACING_SAMPLING_RATE"] == "${TRACE_SAMPLING_RATE:?}"
+    assert env["SMART_TUTOR_PHOENIX_URL"] == "http://phoenix:6006"
+    assert env["SMART_TUTOR_PHOENIX_API_KEY"] == "${PHOENIX_API_KEY}"  # empty: untraced
+    assert env["SMART_TUTOR_PHOENIX_PROJECT"] == "smart-tutor-on-premise"  # the worker adds -ingestion
+    assert env["SMART_TUTOR_TRACE_SAMPLING_RATE"] == "${TRACE_SAMPLING_RATE:?}"
     assert env["SMART_TUTOR_LEARNER_HASH_KEY"] == "${LEARNER_HASH_KEY:?}"
+    assert not [k for k in env if k.startswith("LANGSMITH_")]
 
 
-@pytest.mark.parametrize("service", ["api", "mcp"])
-def test_services_that_make_no_model_calls_of_their_own_do_not_trace(compose: dict[str, Any], service: str) -> None:
-    assert not [k for k in compose["services"][service]["environment"] if k.startswith("LANGSMITH_")]
+def test_the_worker_reaches_phoenix_without_the_egress_proxy(compose: dict[str, Any]) -> None:
+    env = compose["services"]["worker"]["environment"]
+    assert "phoenix" in env["NO_PROXY"].split(",") and env["no_proxy"] == env["NO_PROXY"]
 
 
-def test_egress_proxy_allows_langsmith_by_exact_name_on_443_only(compose: dict[str, Any]) -> None:
+def test_the_mcp_server_does_not_trace(compose: dict[str, Any]) -> None:
+    env = compose["services"]["mcp"]["environment"]
+    assert not [k for k in env if k.startswith("LANGSMITH_")]
+    assert not [k for k in env if k.startswith("SMART_TUTOR_PHOENIX_")]
+
+
+def test_the_api_sends_ratings_to_the_on_premise_phoenix(compose: dict[str, Any]) -> None:
+    env = compose["services"]["api"]["environment"]
+    assert env["SMART_TUTOR_DEPLOYMENT"] == "on-premise"  # without the key it sends nothing (not unauthenticated)
+    assert env["SMART_TUTOR_PHOENIX_URL"] == "http://phoenix:6006"
+    assert env["SMART_TUTOR_PHOENIX_API_KEY"] == "${PHOENIX_API_KEY}"
+    agent_env = compose["services"]["agent"]["environment"]
+    assert env["SMART_TUTOR_PHOENIX_PROJECT"] == agent_env["SMART_TUTOR_PHOENIX_PROJECT"]
+    assert not [k for k in env if k.startswith("LANGSMITH_")]
+
+
+def test_egress_proxy_no_longer_allows_langsmith(compose: dict[str, Any]) -> None:
     lines = _squid_conf(compose)
     acls = {line.split()[1]: line.split()[2:] for line in lines if line.startswith("acl ")}
-    assert acls["langsmith"] == ["dstdomain", "-n", LANGSMITH_HOST]
-    allows = [line for line in lines if line.startswith("http_access allow")]
-    assert allows == ["http_access allow CONNECT aws tls", "http_access allow CONNECT langsmith tls",
-                      "http_access allow !CONNECT imds http"]
+    assert "langsmith" not in acls
+    assert "api.smith.langchain.com" not in compose["services"]["egress-proxy"]["environment"]["SQUID_CONF"]
 
 
-def test_deploy_script_renders_the_tracing_settings_and_turns_tracing_off_without_the_api_key() -> None:
+def test_deploy_script_renders_the_tracing_settings_and_leaves_the_key_empty_without_its_secret() -> None:
     script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
-    assert "learner_hash_key=$(secret langsmith/learner-hash-key)" in script
+    assert "learner_hash_key=$(secret phoenix/learner-hash-key)" in script
     assert "trace_sampling_rate=$(param trace-sampling-rate)" in script
-    tracing = script[script.index("langsmith_api_key="):script.index("umask 077")]
-    assert "secret langsmith/api-key 2>/dev/null" in tracing
-    assert "langsmith_tracing=false" in tracing and "langsmith_tracing=true" in tracing
-    assert "$prefix/langsmith/api-key" in tracing and ">&2" in tracing  # the warning names the secret
-    for line in ("LANGSMITH_TRACING=$langsmith_tracing", "LANGSMITH_API_KEY=$langsmith_api_key",
-                 "TRACE_SAMPLING_RATE=$trace_sampling_rate", "LEARNER_HASH_KEY=$learner_hash_key"):
+    tracing = script[script.index("phoenix_api_key="):script.index("umask 077")]
+    assert "secret phoenix/api-key 2>/dev/null" in tracing
+    assert "$prefix/phoenix/api-key" in tracing and ">&2" in tracing  # the warning names the secret
+    for line in ("PHOENIX_API_KEY=$phoenix_api_key", "TRACE_SAMPLING_RATE=$trace_sampling_rate",
+                 "LEARNER_HASH_KEY=$learner_hash_key"):
         assert line in script
+    assert "LANGSMITH" not in script
+
+
+PHOENIX_IMAGE = "arizephoenix/phoenix:version-20.16.0-nonroot"
+
+
+def test_phoenix_runs_unprivileged_on_a_read_only_root_with_its_traces_in_postgres(compose: dict[str, Any]) -> None:
+    phoenix = compose["services"]["phoenix"]
+    assert phoenix["image"] == PHOENIX_IMAGE
+    assert phoenix["user"] == "65532:65532"
+    assert phoenix["read_only"] is True
+    assert phoenix["cap_drop"] == ["ALL"]
+    assert phoenix["security_opt"] == ["no-new-privileges:true"]
+    assert "ports" not in phoenix
+    env = phoenix["environment"]
+    assert (env["PHOENIX_POSTGRES_HOST"], env["PHOENIX_POSTGRES_USER"], env["PHOENIX_POSTGRES_DB"]) == (
+        "postgres",
+        "phoenix",
+        "phoenix",
+    )
+    assert env["PHOENIX_POSTGRES_PASSWORD"] == "${PHOENIX_DB_PASSWORD:?}"
+    assert "PHOENIX_SQL_DATABASE_URL" not in env
+    assert env["PHOENIX_WORKING_DIR"].startswith("/tmp/")  # the only writable place
+    assert phoenix["depends_on"]["postgres"] == {"condition": "service_healthy"}
+    assert "/healthz" in " ".join(phoenix["healthcheck"]["test"])
+
+
+def test_phoenix_is_served_at_slash_phoenix_with_sign_in_and_180_day_retention(compose: dict[str, Any]) -> None:
+    env = compose["services"]["phoenix"]["environment"]
+    assert env["PHOENIX_HOST_ROOT_PATH"] == "/phoenix"
+    assert env["PHOENIX_ROOT_URL"] == "https://${DOMAIN:?}/phoenix"
+    assert env["PHOENIX_ENABLE_AUTH"] == "true"
+    assert env["PHOENIX_ENABLE_STRONG_PASSWORD_POLICY"] == "true"
+    assert env["PHOENIX_USE_SECURE_COOKIES"] == "true"
+    assert env["PHOENIX_SECRET"] == "${PHOENIX_SECRET:?}"
+    assert env["PHOENIX_DEFAULT_ADMIN_INITIAL_PASSWORD"] == "${PHOENIX_ADMIN_PASSWORD:?}"
+    assert env["PHOENIX_DEFAULT_RETENTION_POLICY_DAYS"] == "180"  # D25
+    # Production traces hold learners' questions: no analytics pixels, no assistant sending them to an LLM provider.
+    assert env["PHOENIX_TELEMETRY_ENABLED"] == "false"
+    assert env["PHOENIX_DISABLE_AGENT_ASSISTANT"] == "true"
+    assert env["PHOENIX_ENABLE_MCP_SERVER"] == "false"  # no /mcp mount
+    assert env["PHOENIX_ALLOWED_SANDBOX_PROVIDERS"] == "NONE"  # Phoenix's kill switch: no sandbox provider
+
+
+def test_deploy_script_bootstraps_the_phoenix_role_and_renders_its_secrets() -> None:
+    script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
+    for read in ("secret db/phoenix", "secret phoenix/secret", "secret phoenix/admin-password"):
+        assert read in script and script.index(read) < script.index('cat > "$rendered"'), read
+    for line in (
+        "PHOENIX_DB_PASSWORD=$phoenix_db_password",
+        "PHOENIX_SECRET=$phoenix_secret",
+        "PHOENIX_ADMIN_PASSWORD=$phoenix_admin_password",
+    ):
+        assert f"\n{line}\n" in script, line
+    assert "\\\\getenv phoenix_password PHOENIX_DB_PASSWORD" in script  # never on a command line
+    assert 'cat "$here/phoenix-db-bootstrap.sql"' in script
+    assert "-v phoenix_user=phoenix -v phoenix_db=phoenix" in script
+    postgres = yaml.safe_load((ON_PREMISE_DIR / "compose.yaml").read_text(encoding="utf-8"))["services"]["postgres"]
+    assert postgres["environment"]["PHOENIX_DB_PASSWORD"] == "${PHOENIX_DB_PASSWORD:?}"
+
+
+def test_phoenix_bootstrap_is_idempotent_and_on_premise_only() -> None:
+    sql = (ON_PREMISE_DIR / "phoenix-db-bootstrap.sql").read_text(encoding="utf-8")
+    assert "\\set ON_ERROR_STOP on" in sql
+    assert "WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'phoenix_user') \\gexec" in sql
+    assert "WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = :'phoenix_db') \\gexec" in sql
+    assert "ALTER ROLE :\"phoenix_user\" WITH LOGIN PASSWORD :'phoenix_password';" in sql
+    assert "REVOKE CONNECT ON DATABASE :\"phoenix_db\" FROM PUBLIC;" in sql
+    helm = (ON_PREMISE_DIR.parent / "helm/smart-tutor/files/db-bootstrap.sql").read_text(encoding="utf-8")
+    assert "phoenix" not in helm  # native-cloud is out of scope (ADR 0017)
+
+
+def test_nightly_backup_leaves_the_phoenix_database_out() -> None:
+    script = (ON_PREMISE_DIR / "backup.sh").read_text(encoding="utf-8")
+    assert re.findall(r"for db in ([^;]+);", script) == ["smart_tutor keycloak", "smart_tutor keycloak"]
+    assert "phoenix" not in _commands(script)

@@ -108,7 +108,7 @@ An **instance** status check failure (the VM's own OS, such as memory exhaustion
 
 **What happened.** Spend this month passed 80% of `smart-tutor:budget-monthly-usd`, or AWS forecasts it will pass 100%. The usual causes are Bedrock use, a VM larger than `t3.large`, or the native-cloud stacks running beside on-premise.
 
-**What to do.** In **Billing → Cost Explorer**, group this month's cost by service. Check Bedrock usage in LangSmith traces, and check that no native-cloud stack (`SmartTutor-prod-*`) is running when it shouldn't be. Tell the product owner if the budget is too low for the pilot. The amount is `smart-tutor:budget-monthly-usd` in `infra/cdk.json`.
+**What to do.** In **Billing → Cost Explorer**, group this month's cost by service. Check Bedrock usage in Phoenix traces (LLM spans' token counts), and check that no native-cloud stack (`SmartTutor-prod-*`) is running when it shouldn't be. Tell the product owner if the budget is too low for the pilot. The amount is `smart-tutor:budget-monthly-usd` in `infra/cdk.json`.
 
 ## Weekly patching
 
@@ -175,3 +175,16 @@ aws cloudwatch set-alarm-state --alarm-name smart-tutor-on-premise-prod-uptime -
 ```
 
 Each recipient gets an ALARM email. The alarm returns to its real state within a few minutes and sends an OK email. Don't test the **recovery** alarm this way: setting its state by hand also runs its recover action. It shares the topic, so the uptime test proves its emails arrive too.
+
+## Phoenix's memory and database size (#288)
+
+Phoenix itself is capped at 1 GB (`mem_limit`; it idles at about 450 MiB) and is restarted if it goes over. ADR 0017's estimate of 1 to 2 GB includes the database's growth in Postgres, which has no limit. Container limits now total about 5.75 GiB of the t3.large's ~7.6 GiB, with Postgres and Caddy unlimited and no swap, so watch available memory. Check monthly, and after a traffic jump. From a Session Manager shell (`on-premise-deploy.md` §7):
+
+```bash
+free -m
+docker stats --no-stream
+df -h /data
+dc exec postgres psql -U postgres -c "SELECT pg_size_pretty(pg_database_size('phoenix'));"
+```
+
+When it grows, lower `trace-sampling-rate` (`on-premise-deploy.md` §10) or shorten retention in Phoenix's *Settings, Data Retention*, never above 180 days. If the host's available memory stays under about 1 GB, move to a larger instance (`smart-tutor:on-premise-instance-type`).

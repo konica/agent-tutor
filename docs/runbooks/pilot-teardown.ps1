@@ -4,8 +4,9 @@
     See pilot-teardown.md.
 
 .DESCRIPTION
-    1. Preflight: checks the tools, the caller and the repository variable NATIVE_CLOUD_AUTO_DEPLOY (it must not be
-       `true`, or the next merge to main redeploys the pilot), and lists the stacks it will delete and keep.
+    1. Preflight: checks the tools, the caller and the repository variables NATIVE_CLOUD_AUTO_DEPLOY and PRODUCTION_DEPLOY
+       (a merge redeploys native-cloud only when both are `true`: the preflight stops then, and only warns when just
+       NATIVE_CLOUD_AUTO_DEPLOY is `true`, so delete it anyway), and lists the stacks it will delete and keep.
     2. Asks you to type the account id (skipped with -Force and in -DryRun).
     3. Removes what Kubernetes created outside CloudFormation (the smart-tutor release, TargetGroupBindings, the
        add-ons), so no security-group rules or ENIs block the Edge and Network deletes.
@@ -155,10 +156,15 @@ try {
             "will say Unauthorized, and the Kubernetes cleanup will fail.")
     }
 
-    # Since #150 deploy.yml deploys native-cloud on a merge only while NATIVE_CLOUD_AUTO_DEPLOY is `true`. The script
-    # never changes it: that is a repository setting, so you do it.
+    # Since #150 deploy.yml deploys native-cloud on a merge only while NATIVE_CLOUD_AUTO_DEPLOY is `true`, and since #282
+    # only while the production switch PRODUCTION_DEPLOY is `true` as well. The script never changes either: they are
+    # repository settings, so you do it.
     $AutoDeploy = gh variable get NATIVE_CLOUD_AUTO_DEPLOY --repo $Repo 2>$null
-    if ($AutoDeploy -eq "true") {
+    $ProductionDeploy = gh variable get PRODUCTION_DEPLOY --repo $Repo 2>$null
+    if ($AutoDeploy -eq "true" -and -not ($ProductionDeploy -eq "true")) {
+        Write-Warning "NATIVE_CLOUD_AUTO_DEPLOY is 'true'. PRODUCTION_DEPLOY isn't 'true', so no merge deploys now, but turning it on would redeploy the pilot on the next merge. Run: gh variable delete NATIVE_CLOUD_AUTO_DEPLOY --repo $Repo"
+    }
+    if ($AutoDeploy -eq "true" -and $ProductionDeploy -eq "true") {
         $SetCommand = "gh variable delete NATIVE_CLOUD_AUTO_DEPLOY --repo $Repo"
         if ($DryRun) {
             Write-Warning "NATIVE_CLOUD_AUTO_DEPLOY is 'true'; a real run would stop. Run first: $SetCommand"

@@ -13,8 +13,11 @@ dependencies = [
     "langchain-aws>=1.8,<2",
     "langgraph>=0.6",
     "langgraph-checkpoint-postgres>=2.0",
-    "langsmith>=0.4",
     "mcp>=2.2",
+    "openinference-instrumentation-langchain>=0.1.79",
+    "openinference-semantic-conventions>=0.1",
+    "opentelemetry-exporter-otlp-proto-http>=1.45",
+    "opentelemetry-sdk>=1.45",
     "pgvector>=0.4",
     "psycopg[binary,pool]>=3.2",
     "pydantic>=2.11",
@@ -29,7 +32,7 @@ dependencies = [
 # Installed only in the worker image: PDF page text and chunking (ADR 0005).
 ingest = ["langchain-text-splitters>=1.1", "pypdf>=6.0"]
 # Evaluation runs (backend/evals) and CI eval gates.
-eval = ["openevals>=0.1", "pyyaml>=6.0"]
+eval = ["langsmith>=0.4", "openevals>=0.1", "pyyaml>=6.0"]
 
 [dependency-groups]
 dev = [
@@ -476,6 +479,14 @@ source_modules = [
     "smart_tutor.graph",
 ]
 forbidden_modules = ["langchain_text_splitters", "pypdf"]
+
+# ADR 0017: runtime traces go to Phoenix; only backend/evals (outside smart_tutor) uses LangSmith.
+[[tool.importlinter.contracts]]
+name = "Runtime code never imports LangSmith"
+type = "forbidden"
+source_modules = ["smart_tutor"]
+forbidden_modules = ["langsmith"]
+allow_indirect_imports = true  # langchain_core imports it itself
 
 # Rule 5: the module dependency graph, top to bottom. Higher modules may use lower ones (application only);
 # "|" marks independent siblings. Lower never imports higher, so there are no cycles.

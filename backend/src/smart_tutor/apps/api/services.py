@@ -31,7 +31,7 @@ from smart_tutor.shared.adapters.postgres.engine import create_db_engine
 from smart_tutor.shared.config import Settings
 from smart_tutor.subjects.adapters.sql_subjects import SqlSubjectRepository
 from smart_tutor.subjects.application import SubjectCatalogService, SubjectNames, SubjectSearch, SubjectSuggester
-from smart_tutor.tutoring.adapters.langsmith_feedback import answer_feedback
+from smart_tutor.tutoring.adapters.phoenix_feedback import answer_feedback
 from smart_tutor.tutoring.adapters.sql_threads import SqlThreadRepository
 from smart_tutor.tutoring.application import ConversationService
 
@@ -49,6 +49,10 @@ class ApiServices:
     conversations: ConversationService
     highlight_misses: HighlightMissService
     agent: AgentClient
+
+    def close(self) -> None:
+        """Process shutdown: stop the background work the services started."""
+        self.conversations.close()
 
 
 def build_services(settings: Settings) -> ApiServices:
@@ -70,7 +74,7 @@ def build_services(settings: Settings) -> ApiServices:
         SqlThreadRepository(engine),
         documents,
         SystemClock(),
-        feedback=answer_feedback(),
+        feedback=answer_feedback(settings),
         history_turns=settings.history_turns,
         history_answer_chars=settings.history_answer_chars,
         time_zone=time_zone,

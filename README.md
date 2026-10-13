@@ -19,8 +19,8 @@ An AI tutor for your own documents: learners upload PDFs, the system suggests su
 Requirements: Docker, [uv](https://docs.astral.sh/uv/), Node 22+, an AWS profile allowed to invoke the Bedrock models (PRD Appendix A).
 
 ```bash
-cp .env.example .env          # fill in AWS_PROFILE and LANGSMITH_API_KEY
-make up                       # pgvector, Keycloak (realm imported), LocalStack, Mailpit
+cp .env.example .env          # fill in AWS_PROFILE (and LANGSMITH_API_KEY for evals)
+make up                       # pgvector, Keycloak (realm imported), LocalStack, Mailpit, Phoenix
 make sync                     # backend dependencies
 make lint test                # ruff, mypy, import contracts, unit tests
 make web                      # http://localhost:10453
@@ -28,6 +28,7 @@ make web                      # http://localhost:10453
 
 Keycloak admin console: http://localhost:10401 (admin / admin). Test users: `learner@example.com` / `learner`, `learner2@example.com` / `learner2`, `admin@example.com` / `admin`.
 Sign up from the app's sign-in page: Keycloak sends the verification email to Mailpit, http://localhost:10403. After pulling a realm change, run `docker compose down -v` so the realm re-imports.
+Phoenix (traces from local runs): http://localhost:10404, no sign-in; `docker compose down -v` clears it. Local runs trace into it: project `smart-tutor-local` (asks) and `smart-tutor-local-ingestion` (uploads). The agent and worker turn LangSmith tracing off at startup, whatever `LANGSMITH_TRACING` says; only evals use LangSmith.
 LocalStack (Community) keeps S3 in memory: restarting its container empties the bucket while Postgres keeps the documents, so earlier documents still look ready but can't be opened ("We couldn't open this document"). Delete and re-upload them, or reset both with `docker compose down -v`.
 Keycloak's sign-in, sign-up, and email pages use the `smart-tutor` login theme in `local/keycloak/themes/` (stock `keycloak.v2` layout, our logo, colors, and font; no template overrides). Its `css/tokens.css` is a copy of `web/src/styles/tokens.css`: after changing tokens, run `npm run keycloak:tokens` in `web/` (CI fails when the copy is stale). Keycloak in Compose reads theme edits on reload.
 
@@ -43,6 +44,7 @@ Two ways, on the same ports: dependency services count up from 10400, app servic
 | Keycloak | 10401 | Docker | Docker |
 | LocalStack (S3, SQS, SSM) | 10402 | Docker | Docker |
 | Mailpit (email UI) | 10403 | Docker | Docker |
+| Phoenix (traces) | 10404 | Docker | Docker |
 | API | 10450 | Docker | `make api` (reloads on change) |
 | Agent | 10451 | Docker | `make agent` |
 | RAG MCP server | 10452 | Docker | `make mcp` |
@@ -50,12 +52,16 @@ Two ways, on the same ports: dependency services count up from 10400, app servic
 | Web | 10453 | Docker (nginx build) | `make web` (Vite, hot reload) |
 
 **Option A** (same images as production): `make up-app`, then open http://localhost:10453.
+Or use
+```bash
+docker compose --profile app up -d --build 
+```
 
 **Option B** (faster to iterate): dependencies in Docker, app processes on your machine.
 
 ```bash
 docker compose --profile app stop     # only if Option A is running: it holds 10450–10453
-make up                               # pgvector, Keycloak, LocalStack, Mailpit
+make up                               # pgvector, Keycloak, LocalStack, Mailpit, Phoenix
 make sync migrate                     # backend dependencies, database schema
 cd web && npm ci && cd ..             # web dependencies (first time)
 # then one terminal each:
@@ -136,9 +142,11 @@ Notes:
 
 ## Deploy
 
-**On-premise (default).** Every merge to `main` (unless the repository variable `ON_PREMISE_AUTO_DEPLOY` is `false`) runs the checks, builds the images into on-premise's own ECR repositories, and deploys them to the on-premise VM (`cdk deploy`, then SSM Run Command, then a smoke test): `.github/workflows/deploy.yml`. Setup, a deploy by hand, rollback, and operations: [`docs/runbooks/on-premise-deploy.md`](docs/runbooks/on-premise-deploy.md); backups and monitoring: `on-premise-backups.md`, `on-premise-monitoring.md`.
+**On-premise (default).** While the repository variable `PRODUCTION_DEPLOY` is `true`, every merge to `main` (unless `ON_PREMISE_AUTO_DEPLOY` is `false`) runs the checks, builds the images into on-premise's own ECR repositories, and deploys them to the on-premise VM (`cdk deploy`, then SSM Run Command, then a smoke test): `.github/workflows/deploy.yml`. Setup, a deploy by hand, rollback, and operations: [`docs/runbooks/on-premise-deploy.md`](docs/runbooks/on-premise-deploy.md); backups and monitoring: `on-premise-backups.md`, `on-premise-monitoring.md`.
 
 **Native-cloud (optional).** EKS, RDS, and CloudFront. It deploys only when you run **deploy** by hand with mode `native-cloud`, or on every merge while the repository variable `NATIVE_CLOUD_AUTO_DEPLOY` is `true`: [`docs/runbooks/pilot-deploy.md`](docs/runbooks/pilot-deploy.md), teardown in `pilot-teardown.md`.
+
+**Production switch.** The repository variable `PRODUCTION_DEPLOY` turns every production deploy on or off (merges, deploys by hand, rollbacks, image builds). Only `true` deploys: [`docs/runbooks/on-premise-deploy.md`](docs/runbooks/on-premise-deploy.md), "Turn all production deploys off or on".
 
 ## Architecture rules
 

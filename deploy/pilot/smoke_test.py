@@ -4,7 +4,7 @@
 Usage:
   python3 deploy/pilot/smoke_test.py <url> [--deadline-seconds 600] [--interval-seconds 15]
   SMOKE_TEST_USERNAME=... SMOKE_TEST_PASSWORD=... python3 deploy/pilot/smoke_test.py <url> --end-to-end
-  LANGSMITH_API_KEY=... SMOKE_TEST_USERNAME=... SMOKE_TEST_PASSWORD=... python3 deploy/pilot/smoke_test.py <url> --end-to-end --trace-project smart-tutor-on-premise
+  PHOENIX_API_KEY=... SMOKE_TEST_USERNAME=... SMOKE_TEST_PASSWORD=... python3 deploy/pilot/smoke_test.py <url> --end-to-end --trace-project smart-tutor-on-premise
 
 <url> is the public address, e.g. https://<id>.cloudfront.net or the on-premise https://<host>.
 
@@ -18,9 +18,12 @@ the thread is kept, as every thread is. The same deadline covers the whole run. 
 document's subject may add one subject, "Smoke testing", to the shared catalog. Credentials come from the
 environment and are never printed.
 
---trace-project then reads the ask's run id from the conversation's turns and waits for its trace in that LangSmith
-project (#229): named `ask`, with the run metadata of PRD §10.4, and holding neither the access token nor the
-username. LANGSMITH_ENDPOINT defaults to https://api.smith.langchain.com. The key is never printed.
+--trace-project then reads the ask's run id from the conversation's turns and waits for its trace in that Phoenix
+project (#289): a root span named `ask` whose trace id is the run id and whose span id is its low 64 bits, with the
+run metadata of PRD §10.4, and holding neither the access token, the username, nor the learner's user id.
+It then rates that turn thumbs-up (the answer was just checked) and waits for the `learner_rating` annotation on the
+ask span (#290): HUMAN, label `up`, score 1. That proves the API has the Phoenix settings.
+PHOENIX_URL defaults to `<url>/phoenix`. The key is never printed.
 
 Exit 0 when everything passes, 1 otherwise. Standard library only.
 """
@@ -40,6 +43,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 
@@ -59,20 +63,6 @@ TRACE_METADATA = (
     "decline",
     "chunks",
 )
-QUERY_SELECT = [
-    "id",
-    "name",
-    "run_type",
-    "inputs",
-    "outputs",
-    "extra",
-    "events",
-    "error",
-    "tags",
-    "parent_run_id",
-    "trace_id",
-]
-DEFAULT_LANGSMITH_ENDPOINT = "https://api.smith.langchain.com"
 
 
 @dataclass(frozen=True)
@@ -409,6 +399,7 @@ class _Run:
     run_id: str
     document_id: str | None = None
     thread_id: str | None = None
+    ask_run_id: str | None = None  # the ask's run id, read from the thread's turns (check_trace)
 
 
 def upload(s: _Session, run: _Run) -> str:
@@ -568,32 +559,37 @@ def ask(s: _Session, run: _Run) -> None:
         )
 
 
-def _langsmith(
-    s: _Session,
-    method: str,
-    endpoint: str,
-    path: str,
-    api_key: str,
-    body: object | None = None,
-) -> Response:
-    """A LangSmith REST call: the API key only, never the learner's bearer token."""
+def _phoenix(s: _Session, path: str, api_key: str, phoenix_url: str) -> Response:
+    """A Phoenix REST call: the API key only, never the learner's bearer token."""
     return s.request(
-        method,
-        endpoint.rstrip("/") + path,
-        data=json.dumps(body).encode() if body is not None else None,
-        headers={"x-api-key": api_key, "Content-Type": "application/json"},
+        "GET",
+        phoenix_url.rstrip("/") + path,
+        headers={"authorization": f"Bearer {api_key}"},
     )
+
+
+def _token_subject(token: str | None) -> str | None:
+    """The `sub` claim of a JWT access token; None when the token is not a JWT."""
+    try:
+        payload = (token or "").split(".")[1]
+        claims = json.loads(
+            base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4))
+        )
+        sub = claims.get("sub")
+    except (IndexError, ValueError, AttributeError):
+        return None
+    return sub if isinstance(sub, str) and sub else None
 
 
 def check_trace(
     s: _Session,
     run: _Run,
     project: str,
-    endpoint: str,
+    phoenix_url: str,
     api_key: str,
     username: str,
 ) -> str:
-    """Wait for the ask's trace in the LangSmith project; require its name, metadata, and no leaked secrets."""
+    """Wait for the ask's trace in the Phoenix project; require its root span, metadata, and no leaked secrets."""
     r = s.api("GET", f"/api/threads/{run.thread_id}/turns")
     if r.status != 200:
         raise SmokeTestError(
@@ -604,103 +600,139 @@ def check_trace(
     run_id = last.get("run_id") if isinstance(last, dict) else None
     if not isinstance(run_id, str) or not run_id:
         raise SmokeTestError("trace: the turn has no run id")
+    run.ask_run_id = run_id
 
-    def refused(r: Response) -> bool:
-        return r.status in (401, 403)
-
-    quoted = urllib.parse.quote(project, safe="")
-    r = _langsmith(s, "GET", endpoint, f"/sessions?name={quoted}", api_key)
-    if refused(r):
-        raise SmokeTestError("trace: LangSmith refused the API key")
-    if r.status != 200:
-        raise SmokeTestError(f"trace: LangSmith projects gave {r.status}, expected 200")
-    sessions = _json(r, "trace")
-    project_id = next(
-        (
-            x.get("id")
-            for x in (sessions if isinstance(sessions, list) else [])
-            if isinstance(x, dict) and x.get("name") == project
-        ),
-        None,
+    trace_id = uuid.UUID(run_id).hex
+    path = (
+        f"/v1/projects/{urllib.parse.quote(project, safe='')}/spans"
+        f"?trace_id={trace_id}&limit=100"
     )
-    if not project_id:
-        raise SmokeTestError(f"trace: no LangSmith project {project}")
-
+    spans: list[object] = []
     root: dict[str, object] = {}
-    seen = False  # the run exists in LangSmith, finished or not
+    seen = False  # spans of the trace exist in Phoenix, the ask span or not
     last_other: int | None = None  # the last answer that was not 200, 404, 401, 403
     try:
         while True:
-            r = _langsmith(s, "GET", endpoint, f"/runs/{run_id}", api_key)
-            if refused(r):
-                raise SmokeTestError("trace: LangSmith refused the API key")
+            r = _phoenix(s, path, api_key, phoenix_url)
+            if r.status in (401, 403):
+                raise SmokeTestError("trace: Phoenix refused the API key")
             if r.status == 200:
-                seen = True
                 found = _json(r, "trace")
-                if isinstance(found, dict):
-                    extra = found.get("extra")
-                    meta = extra.get("metadata") if isinstance(extra, dict) else None
-                    if (
-                        found.get("end_time")
-                        and isinstance(meta, dict)
-                        and "decline" in meta
-                    ):
-                        root = found
-                        break
-            elif r.status != 404:
+                data = found.get("data") if isinstance(found, dict) else None
+                spans = data if isinstance(data, list) else []
+                seen = seen or bool(spans)
+                root = next(
+                    (
+                        x
+                        for x in spans
+                        if isinstance(x, dict)
+                        and x.get("name") == "ask"
+                        and x.get("parent_id") is None
+                    ),
+                    {},
+                )
+                if root:
+                    break
+            elif r.status != 404:  # 404: the project appears with its first span
                 last_other = r.status
             s.wait("the ask's trace")
     except SmokeTestError as e:
         if "the deadline passed" not in str(e):
             raise
-        last = f"; last answer {last_other}" if last_other else ""
+        tail = f"; last answer {last_other}" if last_other else ""
         if seen:
             raise SmokeTestError(
-                f"trace: run {run_id} reached LangSmith but never finished with its metadata{last}"
+                f"trace: run {run_id} reached Phoenix but its ask span never arrived{tail}"
             ) from None
         raise SmokeTestError(
-            f"trace: run {run_id} never reached LangSmith "
-            f"(is tracing on, and the sampling rate trace-sampling-rate 1?){last}"
+            f"trace: run {run_id} never reached Phoenix (is tracing on, with the key "
+            f"<prefix>/phoenix/api-key, and the sampling rate trace-sampling-rate 1?){tail}"
         ) from None
 
-    if root.get("name") != "ask":
+    context = root.get("context")
+    span_id = context.get("span_id") if isinstance(context, dict) else None
+    low_bits = f"{uuid.UUID(run_id).int & 0xFFFF_FFFF_FFFF_FFFF:016x}"
+    if span_id != low_bits:
         raise SmokeTestError(
-            f"trace: run {run_id} is named {root.get('name')!r}, expected 'ask'"
+            f"trace: the root span's id {span_id!r} is not the run id's low 64 bits ({low_bits})"
         )
-    if root.get("session_id") != project_id:
-        raise SmokeTestError(f"trace: run {run_id} is not in the project {project}")
-    extra = root.get("extra")
-    metadata = extra.get("metadata", {}) if isinstance(extra, dict) else {}
-    missing = [k for k in TRACE_METADATA if k not in metadata]
+    attributes = root.get("attributes")
+    attributes = attributes if isinstance(attributes, dict) else {}
+    missing = [k for k in TRACE_METADATA if f"metadata.{k}" not in attributes]
     if missing:
-        raise SmokeTestError(f"trace: the ask run lacks metadata {', '.join(missing)}")
-    if metadata["thread_id"] != run.thread_id:
-        raise SmokeTestError("trace: the ask run belongs to another thread")
+        raise SmokeTestError(f"trace: the ask span lacks metadata {', '.join(missing)}")
+    if attributes["metadata.thread_id"] != run.thread_id:
+        raise SmokeTestError("trace: the ask span belongs to another thread")
 
-    # The server returns some fields only when selected (as the LangSmith SDK always does),
-    # so ask for the ones a secret could hide in; otherwise the scan could pass over trimmed runs.
-    r = _langsmith(
-        s,
-        "POST",
-        endpoint,
-        "/runs/query",
-        api_key,
-        {"trace": run_id, "limit": 100, "select": QUERY_SELECT},
-    )
-    if refused(r):
-        raise SmokeTestError("trace: LangSmith refused the API key")
-    if r.status != 200:
-        raise SmokeTestError(
-            f"trace: LangSmith run query gave {r.status}, expected 200"
-        )
-    queried = _json(r, "trace")
-    runs = queried.get("runs", []) if isinstance(queried, dict) else []
-    blob = json.dumps([root, *runs])
+    blob = json.dumps(spans)
     if s.token and s.token in blob:
         raise SmokeTestError("trace: the trace holds the learner's access token")
     if username and username in blob:
         raise SmokeTestError("trace: the trace names the learner (username found)")
+    user_id = _token_subject(s.token)
+    if user_id and user_id in blob:
+        raise SmokeTestError("trace: the trace holds the learner's user id")
     return f"ask trace {run_id} is in {project}"
+
+
+def check_rating(
+    s: _Session, run: _Run, project: str, phoenix_url: str, api_key: str
+) -> str:
+    """Rate the ask thumbs-up and wait for its learner_rating annotation on the ask span in Phoenix (#290)."""
+    ask_run_id = run.ask_run_id
+    if ask_run_id is None:
+        raise SmokeTestError("rating: the ask's run id is unknown (the trace check comes first)")
+    r = s.api(
+        "PUT",
+        f"/api/threads/{run.thread_id}/turns/{ask_run_id}/rating",
+        {"rating": "up"},
+    )
+    if r.status != 200:
+        raise SmokeTestError(
+            f"rating: PUT the turn's rating gave {r.status}, expected 200"
+        )
+    span_id = f"{uuid.UUID(ask_run_id).int & 0xFFFF_FFFF_FFFF_FFFF:016x}"
+    path = (
+        f"/v1/projects/{urllib.parse.quote(project, safe='')}/span_annotations"
+        f"?span_ids={span_id}&include_annotation_names=learner_rating"
+    )
+    try:
+        while True:
+            r = _phoenix(s, path, api_key, phoenix_url)
+            if r.status in (401, 403):
+                raise SmokeTestError("rating: Phoenix refused the API key")
+            found = _json(r, "rating") if r.status == 200 else {}
+            data = found.get("data") if isinstance(found, dict) else None
+            mine = [
+                a
+                for a in data or []
+                if isinstance(a, dict) and a.get("identifier") == ask_run_id
+            ]
+            if mine:
+                break
+            s.wait("the rating's annotation")
+    except SmokeTestError as e:
+        if "the deadline passed" not in str(e):
+            raise
+        raise SmokeTestError(
+            f"rating: run {ask_run_id}'s rating never reached Phoenix "
+            "(does the API have the Phoenix settings?)"
+        ) from None
+    result = mine[0].get("result")
+    result = result if isinstance(result, dict) else {}
+    # Phoenix returns the score as a float, so compare numerically.
+    score = result.get("score")
+    if (
+        mine[0].get("annotator_kind") != "HUMAN"
+        or result.get("label") != "up"
+        or isinstance(score, bool)
+        or not isinstance(score, (int, float))
+        or score != 1
+    ):
+        raise SmokeTestError(
+            f"rating: the annotation is not a HUMAN 'up' with score 1: {mine[0]!r}"
+        )
+    return f"rating of {ask_run_id} is in {project}"
 
 
 def clean_up(s: _Session, run: _Run) -> str | None:
@@ -742,6 +774,7 @@ def run_end_to_end(
         print("cited answer received")
         if trace:
             print(check_trace(s, run, *trace, username))
+            print(check_rating(s, run, *trace))
     except SmokeTestError as e:
         failure = str(e)
     except (http.client.HTTPException, OSError, KeyError, TypeError, ValueError) as e:
@@ -770,7 +803,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument(
         "--trace-project",
-        help="also require the ask's trace in this LangSmith project (needs LANGSMITH_API_KEY)",
+        help="also require the ask's trace in this Phoenix project (needs PHOENIX_API_KEY)",
     )
     args = parser.parse_args(argv)
 
@@ -779,12 +812,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not args.end_to_end:
             print("--trace-project needs --end-to-end")
             return 1
-        langsmith_key = os.environ.get("LANGSMITH_API_KEY", "")
-        if not langsmith_key:
-            print("--trace-project needs LANGSMITH_API_KEY in the environment")
+        phoenix_key = os.environ.get("PHOENIX_API_KEY", "")
+        if not phoenix_key:
+            print("--trace-project needs PHOENIX_API_KEY in the environment")
             return 1
-        endpoint = os.environ.get("LANGSMITH_ENDPOINT", DEFAULT_LANGSMITH_ENDPOINT)
-        trace = (args.trace_project, endpoint, langsmith_key)
+        phoenix_url = os.environ.get("PHOENIX_URL") or args.url.rstrip("/") + "/phoenix"
+        trace = (args.trace_project, phoenix_url, phoenix_key)
 
     username = os.environ.get("SMOKE_TEST_USERNAME", "")
     password = os.environ.get("SMOKE_TEST_PASSWORD", "")
