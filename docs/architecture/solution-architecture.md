@@ -5,7 +5,7 @@
 **Where the facts come from:** the infrastructure code (`infra/`), Helm charts (`deploy/helm/`), application code (`backend/`), GitHub workflows (`.github/workflows/`), and the engineer runbooks (`docs/runbooks/`; "runbook §N" means a section of [`pilot-deploy.md`](../runbooks/pilot-deploy.md)). Where the code and the PRD (`sdd/prd.md`) differ, this document describes the code that runs today.
 
 **As of:** commit `4623ea8` on `main` (issue #139 "Upload and ask on the AWS pilot" merged, 2026-10-09).
-**Status:** this pilot was torn down on 2026-10-11, with its data (#156). The app now runs in on-premise mode (`docs/runbooks/on-premise-deploy.md`). This document still describes what a native-cloud deploy creates.
+**Status:** this pilot was torn down on 2026-10-11, with its data (#156). The app now runs in on-premise mode, described for stakeholders in [`on-premise-solution-architecture.md`](on-premise-solution-architecture.md) (deploy runbook: `docs/runbooks/on-premise-deploy.md`). This document still describes what a native-cloud deploy creates.
 
 ## At a glance
 
