@@ -103,6 +103,98 @@ describe("Answer", () => {
     expect(screen.queryByRole("list", { name: "Sources" })).not.toBeInTheDocument();
   });
 
+  describe("Sources line", () => {
+    const five = [cite(2), cite(1), cite(3), cite(5), cite(4)];
+    const chips = () => screen.getAllByRole("button", { name: /Open beside the conversation$|Shown beside the conversation$/ });
+    const chipNumbers = () => chips().map((c) => c.querySelector("span")?.textContent);
+    const toggle = () => screen.getByRole("button", { name: /^Show (\d+ more|less)$/ });
+
+    it("shows the first three sources in the answer's order and Show N more", () => {
+      renderAnswer({ text: "A [2] B [1] C [3] D [5] E [4].", citations: five });
+      expect(chipNumbers()).toEqual(["[2]", "[1]", "[3]"]);
+      expect(toggle()).toHaveTextContent("Show 2 more");
+      expect(toggle()).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("has no button with three sources or fewer", () => {
+      renderAnswer({ citations: [cite(1), cite(2), cite(3)] });
+      expect(chipNumbers()).toEqual(["[1]", "[2]", "[3]"]);
+      expect(screen.queryByRole("button", { name: /^Show / })).not.toBeInTheDocument();
+    });
+
+    it("counts deleted and archived sources like any other", () => {
+      renderAnswer({ citations: [cite(1, { deleted: true }), cite(2, { archived: true }), cite(3), cite(4)], deletedIds: new Set(["d3"]) });
+      expect(chipNumbers()).toEqual(["[2]"]);
+      expect(toggle()).toHaveTextContent("Show 1 more");
+    });
+
+    it("Show N more reveals the rest after the button and becomes Show less, keeping focus", async () => {
+      renderAnswer({ citations: five });
+      const button = toggle();
+      const list = document.getElementById(button.getAttribute("aria-controls")!)!;
+      expect(list).not.toBeVisible();
+      await userEvent.click(button);
+      expect(chipNumbers()).toEqual(["[2]", "[1]", "[3]", "[5]", "[4]"]);
+      expect(button).toHaveTextContent("Show less");
+      expect(button).toHaveAttribute("aria-expanded", "true");
+      expect(list).toBeVisible();
+      expect(within(list).getAllByRole("listitem")).toHaveLength(2);
+      expect(button).toHaveFocus();
+      // The newly shown chips follow the button in tab order.
+      await userEvent.tab();
+      expect(chips()[3]).toHaveFocus();
+    });
+
+    it("Show less hides them again", async () => {
+      renderAnswer({ citations: five });
+      await userEvent.click(toggle());
+      await userEvent.click(toggle());
+      expect(chipNumbers()).toEqual(["[2]", "[1]", "[3]"]);
+      expect(toggle()).toHaveTextContent("Show 2 more");
+      expect(toggle()).toHaveFocus();
+    });
+
+    it("toggles by keyboard", async () => {
+      renderAnswer({ text: "No markers.", citations: five });
+      for (let i = 0; i < 4; i++) await userEvent.tab();
+      expect(toggle()).toHaveFocus();
+      await userEvent.keyboard("{Enter}");
+      expect(toggle()).toHaveTextContent("Show less");
+      await userEvent.keyboard(" ");
+      expect(toggle()).toHaveTextContent("Show 2 more");
+    });
+
+    it("a hidden source's marker expands the line and opens it", async () => {
+      const onOpen = renderAnswer({ text: "A [2] B [4].", citations: five });
+      const marker = within(paragraph()).getByRole("button", { name: "Source 4: Doc 4, p. 5" });
+      await userEvent.click(marker);
+      expect(onOpen).toHaveBeenCalledWith(cite(4), marker);
+      expect(toggle()).toHaveTextContent("Show less");
+      expect(chipNumbers()).toEqual(["[2]", "[1]", "[3]", "[5]", "[4]"]);
+    });
+
+    it("a shown source's marker leaves the line collapsed", async () => {
+      renderAnswer({ text: "A [2] B [4].", citations: five });
+      await userEvent.click(within(paragraph()).getByRole("button", { name: "Source 2: Doc 2, p. 3" }));
+      expect(toggle()).toHaveTextContent("Show 2 more");
+    });
+
+    it("starts collapsed again for another answer's sources", async () => {
+      const { rerender } = render(
+        <Answer text="" citations={five} showCitations deletedIds={new Set()} shownChunkId={null} onOpenCitation={vi.fn()} />,
+      );
+      await userEvent.click(toggle());
+      rerender(<Answer text="" citations={[...five]} showCitations deletedIds={new Set()} shownChunkId={null} onOpenCitation={vi.fn()} />);
+      expect(toggle()).toHaveTextContent("Show 2 more");
+    });
+
+    it("hides the whole line, button included, with Show citations off", () => {
+      renderAnswer({ citations: five, showCitations: false });
+      expect(screen.queryByText("Sources")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^Show / })).not.toBeInTheDocument();
+    });
+  });
+
   it("never renders the answer as HTML", () => {
     const text = "<b>bold</b> [1] <img src=x onerror=alert(1)>";
     renderAnswer({ text });

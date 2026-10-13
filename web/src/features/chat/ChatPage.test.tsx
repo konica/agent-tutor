@@ -1006,6 +1006,17 @@ describe("ChatPage", () => {
         expect(sources.getByText(/Deleted document/)).toBeInTheDocument();
       });
 
+      it("shows a new answer's first three sources, with Show 2 more", async () => {
+        const five = [1, 2, 3, 4, 5].map((n) => ({ n, chunk_id: `c${n}`, document_id: "d1", document_title: `Doc ${n}`, page: 2 }));
+        const ask = vi.fn(() =>
+          events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "delta", text: "All [1-5]." }, { type: "citations", citations: five }, { type: "done" }),
+        );
+        await answer({ ask, viewerDeps: fakeViewerDeps() });
+        const sources = await screen.findByRole("list", { name: "Sources" });
+        expect(within(sources).getAllByRole("listitem")).toHaveLength(3);
+        expect(screen.getByRole("button", { name: "Show 2 more" })).toHaveAttribute("aria-expanded", "false");
+      });
+
       it("opens the document at page 1 for a citation without a page", async () => {
         const deps = await cite({ ask: vi.fn().mockImplementation(() => cited(null)) });
         await userEvent.click(await chip(/^PPO, page unavailable\. Open/));
@@ -1511,6 +1522,60 @@ describe("ChatPage", () => {
       expect(await screen.findByText("p. 2 / 3", {}, { timeout: 3000 })).toBeInTheDocument();
       expect(deps.loadChunk).toHaveBeenCalledWith("c1");
       expect(marker).toHaveAttribute("aria-current", "true");
+    });
+
+    describe("a Sources line with more than three sources", () => {
+      const fiveCited = (answer = "A [1] B [5].") =>
+        turn({
+          answer,
+          citations: [1, 2, 3, 4, 5].map((n) => ({ n, chunk_id: `c${n}`, document_id: "d1", document_title: `Doc ${n}`, page: 2, archived: false, deleted: false })),
+        });
+      const toggles = () => screen.queryAllByRole("button", { name: /^Show (\d+ more|less)$/ });
+
+      it("starts collapsed, and each answer toggles on its own", async () => {
+        renderChat({ loadConversation: conversation([fiveCited(), fiveCited()]) }, "/chat/t1");
+        await screen.findAllByRole("list", { name: "Sources" });
+        expect(toggles().map((b) => b.textContent)).toEqual(["Show 2 more", "Show 2 more"]);
+        expect(screen.queryByRole("button", { name: /^Doc 4, / })).not.toBeInTheDocument();
+        await userEvent.click(toggles()[1]!);
+        expect(toggles().map((b) => b.textContent)).toEqual(["Show 2 more", "Show less"]);
+        expect(screen.getAllByRole("button", { name: /^Doc 4, / })).toHaveLength(1);
+      });
+
+      it("a hidden source's marker opens its passage and expands the line, which stays expanded when it closes", async () => {
+        const deps = fakeViewerDeps();
+        renderChat({ loadConversation: conversation([fiveCited()]), viewerDeps: deps }, "/chat/t1");
+        await userEvent.click(await screen.findByRole("button", { name: "Source 5: Doc 5, p. 2" }));
+        expect(await screen.findByText("p. 2 / 3", {}, { timeout: 3000 })).toBeInTheDocument();
+        expect(deps.loadChunk).toHaveBeenCalledWith("c5");
+        const chip = screen.getByRole("button", { name: "Doc 5, p. 2. Shown beside the conversation" });
+        expect(chip).toBeVisible();
+        expect(chip).toHaveAttribute("aria-current", "true");
+        expect(toggles()[0]).toHaveTextContent("Show less");
+        await userEvent.click(within(screen.getByRole("region", { name: "ReAct" })).getByRole("button", { name: "Close" }));
+        expect(toggles()[0]).toHaveTextContent("Show less");
+      });
+
+      it("another conversation's answers start collapsed", async () => {
+        const loadConversation = vi.fn(async (id: string) => ({
+          thread: { thread_id: id, title: id, search_scope: "library" as const, status: "active" as const },
+          turns: [fiveCited(id === "t1" ? "First [1]." : "Second [1].")],
+        }));
+        render(
+          <MemoryRouter initialEntries={["/chat/t1"]}>
+            <Routes>
+              <Route path="/chat/:threadId?" element={<ChatPage loadDocs={async () => [doc("ready")]} loadUsed={async () => []} loadConversation={loadConversation} />} />
+            </Routes>
+            <Link to="/chat/t2">Other</Link>
+          </MemoryRouter>,
+        );
+        await screen.findByText(answerText("First [1]."));
+        await userEvent.click(toggles()[0]!);
+        expect(toggles()[0]).toHaveTextContent("Show less");
+        await userEvent.click(screen.getByRole("link", { name: "Other" }));
+        await screen.findByText(answerText("Second [1]."));
+        expect(toggles()[0]).toHaveTextContent("Show 2 more");
+      });
     });
 
     it("marks only the clicked turn's marker when two turns cite the same passage", async () => {
