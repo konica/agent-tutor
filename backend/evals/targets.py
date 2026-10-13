@@ -22,6 +22,7 @@ from evals.corpus import SeedDocument, load_manifest
 from evals.learners import LEARNERS, LoadError, Tutor, load_learners
 from smart_tutor.apps.agent.graph import build_graph
 from smart_tutor.apps.agent.state import DECLINE_MESSAGES, AgentContext
+from smart_tutor.apps.agent.topic import topic_classifier, topic_threshold
 from smart_tutor.shared.adapters.model_factory import ChatRole, ModelFactory
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.errors import UnauthenticatedError
@@ -31,6 +32,7 @@ from smart_tutor.tutoring.application import (
     HistoryTurn,
     RetrievedChunk,
     Retriever,
+    TopicClassifier,
     history_turn,
     new_canary,
     system_prompt,
@@ -123,10 +125,14 @@ class AskTarget:
         answer_max_tokens: int = 1500,
         history_turns: int = 5,
         history_answer_chars: int = 2000,
+        topic_classifier: TopicClassifier | None = None,
+        topic_threshold: float = 1.0,
+        topic_timeout_ms: int = 250,
     ) -> None:
         self._learners, self._retriever_for = learners, retriever_for
         self._model, self._answer_floor, self._answer_max_tokens = model, answer_floor, answer_max_tokens
         self._history_turns, self._history_answer_chars = history_turns, history_answer_chars
+        self._topic = (topic_classifier, topic_threshold, topic_timeout_ms)
         canary = new_canary()  # one per target, as the agent makes one per process
         self._prompt = system_prompt(canary)
         self._guard = GuardrailsGuard(self._prompt, canary)
@@ -192,6 +198,7 @@ class AskTarget:
         token: str,
         calls: list[dict[str, Any]],
     ) -> dict[str, Any]:
+        classifier, threshold, timeout_ms = self._topic
         graph = build_graph(
             lambda t: RecordingRetriever(self._retriever_for(t), calls),
             self._model,
@@ -199,6 +206,9 @@ class AskTarget:
             self._answer_max_tokens,
             guard=self._guard,
             system_prompt=self._prompt,
+            topic_classifier=classifier,
+            topic_threshold=threshold,
+            topic_timeout_ms=timeout_ms,
         )
         return await graph.ainvoke(
             {"question": question, "document_ids": limit, "history": self._capped(turns)},
@@ -223,6 +233,7 @@ def ask_target() -> AskTarget:
     }
     eval_learners = EvalLearners(tutors, seeds)
     eval_learners.check_libraries({learner.username: learner.documents for learner in learners})
+    classifier = topic_classifier(settings.topic_check)  # off until .env turns it on
     return AskTarget(
         eval_learners,
         lambda token: McpRetriever(settings.mcp_url, token),
@@ -231,4 +242,7 @@ def ask_target() -> AskTarget:
         settings.answer_max_tokens,
         settings.history_turns,
         settings.history_answer_chars,
+        topic_classifier=classifier,
+        topic_threshold=topic_threshold(settings.topic_check, classifier),
+        topic_timeout_ms=settings.topic_check.timeout_ms,
     )

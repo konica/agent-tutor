@@ -86,3 +86,11 @@ def test_langsmith_reads_the_dotted_feedback_key_of_each_evaluator() -> None:
 
     assert set(_safe_extract_feedback_keys(correctly_declined)) == {"decline_correctness.correctly_declined"}
     assert set(_safe_extract_feedback_keys(wrongly_declined)) == {"decline_correctness.wrongly_declined"}
+
+
+def test_an_off_topic_example_is_correctly_declined_only_as_off_topic() -> None:
+    inputs = {"question": "Tell me a joke.", "learner": "l", "documents": None}
+    reference = {"covered": False, "sources": [], "off_topic": True}
+    assert correctly_declined(inputs, {"decline": "off_topic"}, reference)["score"] == 1
+    assert correctly_declined(inputs, {"decline": None, "answer": "Ha"}, reference)["score"] == 0
+    assert correctly_declined(inputs, {"decline": "no_documents"}, reference)["score"] == 0
