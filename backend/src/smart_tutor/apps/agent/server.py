@@ -11,8 +11,9 @@ A turn the model doesn't answer is ``decline`` {"code", "message"} then ``done``
 for a request with ``document_ids`` (only those documents are searched), ``limited`` when none of the chunks found
 scores at least ``answer_floor`` (US-4c).
 
-When a guard trips while the answer streams, the stream ends with ``replace`` {"code": "guard", "text"} then ``done``:
-the learner sees ``text`` in place of the partial answer, and no ``sources`` or ``citations`` follow (US-6, D29).
+When a guard trips (on the question before search, or while the answer streams) the stream ends with ``replace``
+{"code": "guard", "text"} then ``done``: the learner sees ``text`` in place of the partial answer, and no ``sources``
+or ``citations`` follow (US-6, D29).
 
 The request may carry ``thread_id`` and ``run_id`` (set by the API); each ask is one ``ask`` trace in Phoenix whose
 trace id is ``run_id`` (PRD §10.4). It may also carry ``history``, the conversation's last turns (``question``,
@@ -33,6 +34,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from smart_tutor.apps.agent.graph import AskGraph, build_graph
+from smart_tutor.apps.agent.guards import build_guard
 from smart_tutor.apps.agent.state import DECLINE_MESSAGES, AgentContext, AskState
 from smart_tutor.shared.adapters.ask_tracing import PhoenixAskTracing
 from smart_tutor.shared.adapters.auth.bearer import BearerToken, CurrentPrincipal
@@ -43,7 +45,6 @@ from smart_tutor.shared.config import MAX_HISTORY_ANSWER_CHARS, MAX_HISTORY_TURN
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.ports.ask_tracing import AskRun, AskTracing, NoAskTracing
 from smart_tutor.shared.ports.token_verifier import TokenVerifier
-from smart_tutor.tutoring.adapters.guardrails_guard import GuardrailsGuard
 from smart_tutor.tutoring.adapters.mcp_retriever import McpRetriever
 from smart_tutor.tutoring.application import HistoryTurn, RetrievedChunk, new_canary, system_prompt
 
@@ -100,8 +101,9 @@ async def answer_events(
                     yield sse("delta", {"text": text})
                 elif part["type"] == "updates" and "search" in part["data"]:
                     chunks = part["data"]["search"].get("chunks", [])
-                elif part["type"] == "updates" and "answer" in part["data"]:
-                    update = part["data"]["answer"]
+                elif part["type"] == "updates" and ("screen" in part["data"] or "answer" in part["data"]):
+                    node = "screen" if "screen" in part["data"] else "answer"
+                    update = part["data"][node] or {}  # a node that returns nothing may stream as None
                     if update.get("decline") == "guard":
                         decline = update["guard"]  # the reason, for the trace; the learner reads only the message
                         answer = ""
@@ -111,6 +113,8 @@ async def answer_events(
                     if (code := update.get("decline")) is not None:
                         decline = code
                         yield sse("decline", {"code": code, "message": DECLINE_MESSAGES[code]})
+                        continue
+                    if node == "screen":
                         continue
                     yield sse("sources", {"document_ids": list(dict.fromkeys(c.document_id for c in chunks))})
                     citations = [
@@ -164,7 +168,7 @@ def create_app(
                 model,
                 settings.answer_floor,
                 settings.answer_max_tokens,
-                guard=GuardrailsGuard(prompt, canary),
+                guard=build_guard(settings, prompt, canary),
                 system_prompt=prompt,
             )
         async with httpx.AsyncClient(timeout=5) as http:
