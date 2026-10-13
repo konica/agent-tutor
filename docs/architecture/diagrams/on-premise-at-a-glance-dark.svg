@@ -103,24 +103,26 @@
         <text x="356" y="182" fill="#b3bfc9" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">50 GB encrypted data volume</text>
         <line x1="272" y1="200" x2="440" y2="200" stroke="#e8eef2" stroke-opacity="0.14" stroke-width="0.8"/>
         <text x="272" y="220" fill="#a0adb8" font-size="8" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">DOCKER COMPOSE</text>
-        <text x="272" y="244" fill="#e8eef2" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">caddy</text>
-        <text x="440" y="244" fill="#b3bfc9" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">HTTPS, routing</text>
-        <text x="272" y="268" fill="#e8eef2" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">web</text>
-        <text x="440" y="268" fill="#b3bfc9" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">React app</text>
-        <text x="272" y="292" fill="#e8eef2" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">api</text>
-        <text x="440" y="292" fill="#b3bfc9" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">app API</text>
-        <text x="272" y="316" fill="#e8eef2" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">keycloak</text>
-        <text x="440" y="316" fill="#b3bfc9" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">sign-in</text>
-        <text x="272" y="340" fill="#e8eef2" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">agent</text>
-        <text x="440" y="340" fill="#b3bfc9" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">the tutor</text>
-        <text x="272" y="364" fill="#e8eef2" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">mcp</text>
-        <text x="440" y="364" fill="#b3bfc9" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">document search</text>
-        <text x="272" y="388" fill="#e8eef2" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">worker</text>
-        <text x="440" y="388" fill="#b3bfc9" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">PDF processing</text>
-        <text x="272" y="412" fill="#e8eef2" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">postgres</text>
-        <text x="440" y="412" fill="#b3bfc9" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">data, pgvector</text>
-        <text x="272" y="436" fill="#e8eef2" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">egress-proxy</text>
-        <text x="440" y="436" fill="#b3bfc9" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">worker allowlist</text>
+        <text x="272" y="242" fill="#e8eef2" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">caddy</text>
+        <text x="440" y="242" fill="#b3bfc9" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">HTTPS, routing</text>
+        <text x="272" y="264" fill="#e8eef2" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">web</text>
+        <text x="440" y="264" fill="#b3bfc9" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">React app</text>
+        <text x="272" y="286" fill="#e8eef2" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">api</text>
+        <text x="440" y="286" fill="#b3bfc9" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">app API</text>
+        <text x="272" y="308" fill="#e8eef2" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">keycloak</text>
+        <text x="440" y="308" fill="#b3bfc9" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">sign-in</text>
+        <text x="272" y="330" fill="#e8eef2" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">agent</text>
+        <text x="440" y="330" fill="#b3bfc9" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">the tutor</text>
+        <text x="272" y="352" fill="#e8eef2" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">mcp</text>
+        <text x="440" y="352" fill="#b3bfc9" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">document search</text>
+        <text x="272" y="374" fill="#e8eef2" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">worker</text>
+        <text x="440" y="374" fill="#b3bfc9" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">PDF processing</text>
+        <text x="272" y="396" fill="#e8eef2" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">postgres</text>
+        <text x="440" y="396" fill="#b3bfc9" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">data, pgvector</text>
+        <text x="272" y="418" fill="#e8eef2" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">phoenix</text>
+        <text x="440" y="418" fill="#b3bfc9" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">traces</text>
+        <text x="272" y="440" fill="#e8eef2" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">egress-proxy</text>
+        <text x="440" y="440" fill="#b3bfc9" font-size="9" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="end">worker allowlist</text>
         <line x1="272" y1="472" x2="440" y2="472" stroke="#e8eef2" stroke-opacity="0.14" stroke-width="0.8"/>
         <text x="356" y="496" fill="#b3bfc9" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">inbound: TCP 80 and 443 only</text>
         <text x="356" y="512" fill="#b3bfc9" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">no SSH · Session Manager</text>

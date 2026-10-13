@@ -7,7 +7,7 @@
 **How to read it:** start with "At a glance", then read the "What this shows" paragraph under each diagram. The tables add detail, and the glossary at the end explains every technical term. Each diagram is shown inline; the link under it opens the full-size page (light or dark).
 **Where the facts come from:** the infrastructure code (`infra/`, the Host stack in `infra/smart_tutor_infra/stacks/host.py`), the files deployed to the VM (`deploy/on-premise/`), application code (`backend/`), GitHub workflows (`.github/workflows/`), and the engineer runbooks ([`on-premise-deploy.md`](../runbooks/on-premise-deploy.md), [`on-premise-backups.md`](../runbooks/on-premise-backups.md), [`on-premise-monitoring.md`](../runbooks/on-premise-monitoring.md)). Where the code and the PRD (`sdd/prd.md`) differ, this document describes the code that runs today.
 
-**As of:** commit `1e3bf5e` on `main` (2026-10-12).
+**As of:** commit `e69c04c` on `main` (2026-10-13).
 **Status:** draft. This first version has the framing and "At a glance"; the numbered sections are filled in by the follow-up issues named in each one (parent #145). How the diagrams are drawn: [`diagrams/README.md`](diagrams/README.md).
 
 ## At a glance
@@ -23,7 +23,8 @@
 - **One public address.** Learners reach it at `https://smart-tutor.duckdns.org`, a free DuckDNS name pointed at the server's fixed address (Elastic IP). Caddy, the web server on the VM, gets the HTTPS certificate from Let's Encrypt. The server accepts only web traffic (ports 80 and 443) and has no SSH; engineers reach it through AWS Session Manager.
 - **Each learner sees only their own documents.** The app code is the same as in native-cloud: one access rule, "owner only", is built into the code and into the database query.
 - **The PDF processor is fenced in.** The worker, which reads uploaded PDFs, can reach the internet only through an allowlist proxy (ADR 0014).
-- **Every merge deploys itself.** A merge to `main` is checked, built, deployed to the VM and smoke-tested automatically, unless the repository variable `ON_PREMISE_AUTO_DEPLOY` is `false`.
+- **Every merge deploys itself.** While the production switch (the repository variable `PRODUCTION_DEPLOY`) is `true`, a merge to `main` is checked, built, deployed to the VM and smoke-tested automatically, unless `ON_PREMISE_AUTO_DEPLOY` is `false`. With the switch off, nothing deploys to production, not even by hand.
+- **Traces stay on our server.** The record of each question and each processed upload (a trace) goes to Phoenix, a trace viewer running on the same VM behind its own sign-in, and is kept 180 days (ADR 0017).
 - **Backed up and watched.** A snapshot of the data volume every day (kept 7 days) and a database copy to S3 every night (kept 30 days). Alarms email the team when the server fails its health check, the app stops answering, or a backup fails.
 - **Cost:** see section 6 (to come).
 

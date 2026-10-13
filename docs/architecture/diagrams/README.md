@@ -1,6 +1,6 @@
 # Architecture diagrams
 
-Diagrams for the documents in `docs/architecture/`, drawn with the **diagram-design** agent skill (`cathrynlavery/diagram-design`, pinned in `skills-lock.json`) in the **Smart Tutor skin**: the web app's own colours, light and dark, with system fonts so a diagram renders offline and inside Markdown.
+Diagrams for the documents in `docs/architecture/`, drawn with the **diagram-design** agent skill (`cathrynlavery/diagram-design`, checked in at `.claude/skills/diagram-design/` and `.agents/skills/diagram-design/`, pinned in `skills-lock.json`) in the **Smart Tutor skin**: the web app's own colours, light and dark, with system fonts so a diagram renders offline and inside Markdown.
 
 ## Files
 
@@ -48,7 +48,7 @@ The skill's series palette (radar charts) and terminal skin are left at the skil
 
 ## Set up the skin on a new machine
 
-The skill reads profiles from your home folder, and the `.diagram-design` marker at the repository root points it at `smart-tutor`. Copy the profile there once:
+The skill is in the repository, but it reads profiles from your home folder; the `.diagram-design` marker at the repository root points it at `smart-tutor`. Copy the profile there once:
 
 ```bash
 mkdir -p ~/.diagram-design/profiles
@@ -60,19 +60,19 @@ After changing a token in `web/src/styles/tokens.css`, update the tables above a
 ## Make a diagram
 
 1. Ask the agent to draw it with the diagram-design skill. With the marker in place it uses the Smart Tutor skin; it renders a light and a dark HTML file here. In the skin, the HTML has no font `<link>`.
-2. Run the checks from the repository root (`<skill>` is the installed skill folder, such as `.claude/skills/diagram-design`):
+2. Run the checks from the repository root:
 
    ```bash
    python docs/architecture/diagrams/check_skin_contrast.py
-   python <skill>/scripts/self_check.py --offline docs/architecture/diagrams/<name>.html docs/architecture/diagrams/<name>-dark.html
+   python .claude/skills/diagram-design/scripts/self_check.py --offline docs/architecture/diagrams/<name>.html docs/architecture/diagrams/<name>-dark.html
    ```
 
-   The connector rules are checked by `scripts/verify-geometry.py` in the skill's source repository (`cathrynlavery/diagram-design`), which is not part of the installed skill; it takes the same file arguments.
+   The connector rules are checked by `scripts/verify-geometry.py` in the skill's source repository (`cathrynlavery/diagram-design`), which is not part of the checked-in skill; it takes the same file arguments.
 3. Export both to SVG with system fonts:
 
    ```bash
-   python <skill>/scripts/export_svg.py docs/architecture/diagrams/<name>.html --system-fonts
-   python <skill>/scripts/export_svg.py docs/architecture/diagrams/<name>-dark.html --system-fonts
+   python .claude/skills/diagram-design/scripts/export_svg.py docs/architecture/diagrams/<name>.html --system-fonts
+   python .claude/skills/diagram-design/scripts/export_svg.py docs/architecture/diagrams/<name>-dark.html --system-fonts
    ```
 
 ## Show a diagram in Markdown
