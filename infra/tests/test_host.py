@@ -1129,7 +1129,7 @@ def test_egress_proxy_no_longer_allows_langsmith(compose: dict[str, Any]) -> Non
 
 def test_deploy_script_renders_the_tracing_settings_and_leaves_the_key_empty_without_its_secret() -> None:
     script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
-    assert "learner_hash_key=$(secret langsmith/learner-hash-key)" in script
+    assert "learner_hash_key=$(secret phoenix/learner-hash-key)" in script
     assert "trace_sampling_rate=$(param trace-sampling-rate)" in script
     tracing = script[script.index("phoenix_api_key="):script.index("umask 077")]
     assert "secret phoenix/api-key 2>/dev/null" in tracing

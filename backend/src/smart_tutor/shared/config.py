@@ -59,8 +59,8 @@ class Settings(BaseSettings):
     # This service's confidential client for token introspection: smart-tutor-api (API, agent) or rag-mcp (MCP).
     keycloak_client_id: str = "smart-tutor-api"
     keycloak_client_secret: SecretStr = SecretStr("")
-    # HMAC key for the learner hash in traces (PRD §10.4). A secret: <mode prefix>/langsmith/learner-hash-key in Secrets
-    # Manager when deployed (the name predates Phoenix); required only while tracing is on.
+    # HMAC key for the learner hash in traces (PRD §10.4). A secret: <mode prefix>/phoenix/learner-hash-key in Secrets
+    # Manager when deployed; required only while tracing is on.
     learner_hash_key: SecretStr = SecretStr("")
     # Runtime traces (PRD §10.4, ADR 0017): the environment's own Phoenix. Spans go to <phoenix_url>/v1/traces; empty
     # leaves the process untraced. http://localhost:10404 on the host, http://phoenix:6006 inside Compose.
