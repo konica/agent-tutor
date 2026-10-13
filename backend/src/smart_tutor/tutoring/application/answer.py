@@ -1,4 +1,4 @@
-"""Answer step (PRD §9.2 step 5): chunks and the question as quoted data under a fixed system prompt (D7), and
+"""Answer step (PRD §9.2 step 3): chunks and the question as quoted data under a fixed system prompt (D7), and
 citations."""
 
 import html

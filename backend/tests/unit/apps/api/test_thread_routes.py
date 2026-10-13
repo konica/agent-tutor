@@ -384,7 +384,7 @@ def test_openapi_names_the_operation_and_declares_the_event_stream() -> None:
     assert "text/event-stream" in operation["responses"]["200"]["content"]
 
 
-# Documents used (PRD §9.2 step 4): recorded on `done` from the agent's `sources` event, which stays internal.
+# Documents used (PRD §9.2 step 5): recorded on `done` from the agent's `sources` event, which stays internal.
 
 DELTA = b'event: delta\ndata: {"text": "It weighs tokens [1]."}\n\n'
 NO_CITATIONS = b'event: citations\ndata: {"citations": []}\n\n'
