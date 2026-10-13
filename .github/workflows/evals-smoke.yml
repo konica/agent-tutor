@@ -78,7 +78,7 @@ jobs:
       - name: Install the eval dependencies
         if: steps.access.outputs.run == 'true'
         working-directory: backend
-        run: uv sync --frozen --extra eval --extra guard
+        run: uv sync --frozen --extra eval --extra guard --extra topic
 
       - name: Build the app images
         if: steps.access.outputs.run == 'true'
@@ -121,7 +121,7 @@ jobs:
         working-directory: backend
         env:
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
-        run: uv run --env-file ../.env --extra eval --extra guard python -m evals.run --split smoke --summary "$GITHUB_STEP_SUMMARY"
+        run: uv run --env-file ../.env --extra eval --extra guard --extra topic python -m evals.run --split smoke --summary "$GITHUB_STEP_SUMMARY"
 
       - name: Service logs
         if: (failure() || cancelled()) && steps.access.outputs.run == 'true'

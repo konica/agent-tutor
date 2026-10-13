@@ -525,6 +525,27 @@ source_modules = [
 ]
 forbidden_modules = ["guardrails"]
 
+[[tool.importlinter.contracts]]
+name = "ONNX topic classifier only in tutoring.adapters (keeps the topic extra in the agent image)"
+type = "forbidden"
+# Only the agent image installs the topic extra, so only the agent's composition may build this adapter.
+ignore_imports = ["smart_tutor.apps.agent.topic -> smart_tutor.tutoring.adapters.onnx_topic_classifier"]
+source_modules = [
+    "smart_tutor.shared",
+    "smart_tutor.apps",
+    "smart_tutor.knowledge",
+    "smart_tutor.subjects",
+    "smart_tutor.learning",
+    "smart_tutor.accounts",
+    "smart_tutor.insights",
+    "smart_tutor.catalog",
+    "smart_tutor.quizzes",
+    "smart_tutor.recommendations",
+    "smart_tutor.reports",
+    "smart_tutor.graph",
+]
+forbidden_modules = ["onnxruntime", "tokenizers"]
+
 # ADR 0017: runtime traces go to Phoenix; only backend/evals (outside smart_tutor) uses LangSmith.
 [[tool.importlinter.contracts]]
 name = "Runtime code never imports LangSmith"

@@ -35,6 +35,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from smart_tutor.apps.agent.graph import AskGraph, build_graph
 from smart_tutor.apps.agent.state import DECLINE_MESSAGES, AgentContext, AskState
+from smart_tutor.apps.agent.topic import topic_classifier, topic_threshold
 from smart_tutor.shared.adapters.ask_tracing import PhoenixAskTracing
 from smart_tutor.shared.adapters.auth.bearer import BearerToken, CurrentPrincipal
 from smart_tutor.shared.adapters.auth.keycloak_introspection import keycloak_verifier
@@ -160,6 +161,7 @@ def create_app(
             model = ModelFactory(settings).chat(ChatRole.AGENT)
             canary = new_canary()
             prompt = system_prompt(canary)
+            classifier = topic_classifier(settings.topic_check)  # a missing or broken model stops startup
             app.state.graph = build_graph(
                 lambda token: McpRetriever(settings.mcp_url, token),
                 model,
@@ -167,6 +169,9 @@ def create_app(
                 settings.answer_max_tokens,
                 guard=GuardrailsGuard(prompt, canary),
                 system_prompt=prompt,
+                topic_classifier=classifier,
+                topic_threshold=topic_threshold(settings.topic_check, classifier),
+                topic_timeout_ms=settings.topic_check.timeout_ms,
             )
         async with httpx.AsyncClient(timeout=5) as http:
             app.state.verifier = keycloak_verifier(settings, http)

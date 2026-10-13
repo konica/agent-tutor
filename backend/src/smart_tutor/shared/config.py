@@ -39,6 +39,20 @@ class ChunkingConfig(BaseModel):
     params: dict[str, Any] = {"chunk_size": 1000, "chunk_overlap": 200}
 
 
+class TopicCheckConfig(BaseModel):
+    """The topic check before search (PRD §9.2 step 0, spec 2026-10-13). Off until a model passes the topic_check eval;
+    another decision model joins as a new provider (§5.4)."""
+
+    provider: Literal["off", "setfit"] = "off"
+    # The SetFit model directory, relative to the working directory: /app/models/topic_check in the agent image,
+    # backend/models/topic_check on the host and in CI.
+    model_dir: str = "models/topic_check"
+    # None: the threshold tuned with the model (its manifest). A number overrides it.
+    threshold: float | None = Field(default=None, ge=0, le=1)
+    # A slower check fails open: the question goes on to search.
+    timeout_ms: PositiveInt = 250
+
+
 # The agent refuses more than this in an ask request (apps/agent/server.py), so settings may not exceed it.
 MAX_HISTORY_TURNS = 20
 MAX_HISTORY_ANSWER_CHARS = 8000
@@ -114,6 +128,7 @@ class Settings(BaseSettings):
     history_answer_chars: int = Field(default=2000, gt=0, le=MAX_HISTORY_ANSWER_CHARS)
     models: ModelsConfig = ModelsConfig()
     chunking: ChunkingConfig = ChunkingConfig()
+    topic_check: TopicCheckConfig = TopicCheckConfig()
 
     @property
     def keycloak_introspection_url(self) -> str:
