@@ -150,7 +150,7 @@ Why the minimum:
 | Field | Default | Meaning |
 |---|---|---|
 | `provider` | `"off"` | `"off"` or `"setfit"`. Later `"jev"`. |
-| `model_dir` | `/app/models/topic_check` | SetFit model directory |
+| `model_dir` | `models/topic_check` | SetFit model directory, relative to the working directory: `/app/models/topic_check` in the image, `backend/models/topic_check` on the host and in CI |
 | `threshold` | `None` | `None` means the manifest's tuned threshold. A number overrides it. |
 | `timeout_ms` | `250` | Fail-open timeout |
 
