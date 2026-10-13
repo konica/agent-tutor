@@ -38,7 +38,7 @@ eval = ["langsmith>=0.4", "openevals>=0.1", "pyyaml>=6.0"]
 
 [dependency-groups]
 dev = [
-    "boto3-stubs[s3,sqs,ssm]>=1.40",
+    "boto3-stubs[s3,sqs,ssm,bedrock-runtime,cloudwatch]>=1.40",
     "debugpy>=1.8",
     "guardrails-ai==0.11.0",
     "import-linter>=2.3",

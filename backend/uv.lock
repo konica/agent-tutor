@@ -231,6 +231,12 @@ wheels = [
 ]
 
 [package.optional-dependencies]
+bedrock-runtime = [
+    { name = "mypy-boto3-bedrock-runtime" },
+]
+cloudwatch = [
+    { name = "mypy-boto3-cloudwatch" },
+]
 s3 = [
     { name = "mypy-boto3-s3" },
 ]
@@ -1626,6 +1632,24 @@ wheels = [
 ]
 
 [[package]]
+name = "mypy-boto3-bedrock-runtime"
+version = "1.43.62"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/26/78/542f5804cf0f9e3c1ccbf30917eaa3b4b6002b91965de02d065d7441fc93/mypy_boto3_bedrock_runtime-1.43.62.tar.gz", hash = "sha256:beb70b08ef72cdfd5036bcd3270f2fbac0a2ce5e40f70dfc1d87c4f139d4d7ff", size = 31492, upload-time = "2026-07-31T19:54:15.291Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d9/b2/e3bff20acd290b909f1c28856d6d8d7984f7f7d5bda299d5957f64e97bb3/mypy_boto3_bedrock_runtime-1.43.62-py3-none-any.whl", hash = "sha256:603d9df54da5029fc0d0e3c09b6db33733af53182bee030c0c7af99e88ed3b39", size = 37865, upload-time = "2026-07-31T19:54:13.959Z" },
+]
+
+[[package]]
+name = "mypy-boto3-cloudwatch"
+version = "1.43.102"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a0/cf/ec449a3d3accf306697d85bad16bf9b4f865fe2a4aeff56320df1f8817f4/mypy_boto3_cloudwatch-1.43.102.tar.gz", hash = "sha256:7984a4c80434e8c414941087cf2adb4ce6b1b0422837f9253e55f4e4fec69494", size = 41102, upload-time = "2026-09-24T20:44:15.961Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/24/df/90f22f575226ff23c5d9c1375368db65349092a4348cd9d40b066c994f9a/mypy_boto3_cloudwatch-1.43.102-py3-none-any.whl", hash = "sha256:59d2b6dbf97c65529d35ed45cd7e6f1164cc4819517c8f0d12c1feff16738ae9", size = 50600, upload-time = "2026-09-24T20:44:14.587Z" },
+]
+
+[[package]]
 name = "mypy-boto3-s3"
 version = "1.43.106"
 source = { registry = "https://pypi.org/simple" }
@@ -2642,7 +2666,7 @@ ingest = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "boto3-stubs", extra = ["s3", "sqs", "ssm"] },
+    { name = "boto3-stubs", extra = ["bedrock-runtime", "cloudwatch", "s3", "sqs", "ssm"] },
     { name = "debugpy" },
     { name = "guardrails-ai" },
     { name = "import-linter" },
@@ -2688,7 +2712,7 @@ provides-extras = ["ingest", "guard", "eval"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "boto3-stubs", extras = ["s3", "sqs", "ssm"], specifier = ">=1.40" },
+    { name = "boto3-stubs", extras = ["s3", "sqs", "ssm", "bedrock-runtime", "cloudwatch"], specifier = ">=1.40" },
     { name = "debugpy", specifier = ">=1.8" },
     { name = "guardrails-ai", specifier = "==0.11.0" },
     { name = "import-linter", specifier = ">=2.3" },

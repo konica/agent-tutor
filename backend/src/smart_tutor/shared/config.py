@@ -8,6 +8,9 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, PositiveInt, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# CloudWatch namespace of the agent's content-free counters (#199); the agent's IAM grant names it (infra).
+AGENT_METRICS_NAMESPACE = "SmartTutor/Agent"
+
 
 class ModelConfig(BaseModel):
     # Chat: an `init_chat_model` provider. Embedding: "bedrock" (NovaEmbeddings).
