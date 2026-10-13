@@ -1,10 +1,12 @@
+import logging
 from collections.abc import Sequence
 from typing import Any
 
+import pytest
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
-from fakes import FakeChatModel, FakeRetriever, PassingGuard, TrippingGuard, fake_chat_model
+from fakes import FakeChatModel, FakeRetriever, FakeTopicClassifier, PassingGuard, TrippingGuard, fake_chat_model
 from smart_tutor.apps.agent.graph import build_graph
 from smart_tutor.apps.agent.state import AgentContext
 from smart_tutor.tutoring.adapters.guardrails_guard import GuardrailsGuard
@@ -117,9 +119,128 @@ async def test_the_answer_call_is_capped_and_has_no_tools() -> None:
     assert not {"tools", "toolConfig", "tool_choice", "functions"} & params.keys()
 
 
-def test_the_graph_is_search_then_answer() -> None:
+def test_the_graph_is_topic_check_then_search_then_answer() -> None:
     graph = build_graph(lambda token: FakeRetriever(CHUNKS), fake_chat_model(), guard=PassingGuard())
-    assert set(graph.get_graph().nodes) == {"__start__", "search", "answer", "__end__"}
+    assert set(graph.get_graph().nodes) == {"__start__", "topic_check", "search", "answer", "__end__"}
+
+
+OFF = "Tell me a joke about cats."
+
+
+async def test_an_off_topic_question_is_declined_without_a_search_or_a_model_call() -> None:
+    retriever = FakeRetriever(CHUNKS)
+    graph = build_graph(
+        lambda token: retriever,
+        fake_chat_model(),
+        guard=PassingGuard(),
+        topic_classifier=FakeTopicClassifier({OFF: 0.97}),
+    )  # no scripted reply: a model call would fail
+    out = await graph.ainvoke({"question": OFF}, context=AgentContext(access_token="t"))
+    assert out["decline"] == "off_topic" and out["answer"] == "" and out["citations"] == []
+    assert out["topic_check"] == {"verdict": "off_topic", "p_off_topic": 0.97, "model": "fake@1"}
+    assert retriever.calls == []
+
+
+async def test_an_on_topic_question_searches_and_answers_as_before() -> None:
+    retriever, classifier = FakeRetriever(CHUNKS), FakeTopicClassifier({"What is attention?": 0.1})
+    graph = build_graph(
+        lambda token: retriever,
+        fake_chat_model(AIMessage("It weighs tokens [1].")),
+        guard=PassingGuard(),
+        topic_classifier=classifier,
+    )
+    out = await graph.ainvoke(INPUT, context=AgentContext(access_token="t"))
+    assert "decline" not in out and out["answer"] == "It weighs tokens [1]."
+    assert out["topic_check"]["verdict"] == "on_topic"
+    assert retriever.calls == [("What is attention?", 5, None)]
+
+
+async def test_the_classifier_gets_the_question_and_the_history() -> None:
+    classifier = FakeTopicClassifier()
+    graph = build_graph(
+        lambda token: FakeRetriever(CHUNKS),
+        fake_chat_model(AIMessage("ok [1]")),
+        guard=PassingGuard(),
+        topic_classifier=classifier,
+    )
+    history = [HistoryTurn("What is attention?", "It weighs tokens [1].")]
+    await graph.ainvoke({"question": "Why?", "history": history}, context=AgentContext(access_token="t"))
+    assert classifier.calls == [("Why?", history)]
+
+
+async def test_the_graphs_threshold_decides_not_the_classifiers_default() -> None:
+    classifier = FakeTopicClassifier({OFF: 0.6}, threshold=0.5)
+    graph = build_graph(
+        lambda token: FakeRetriever(CHUNKS),
+        fake_chat_model(AIMessage("ok [1]")),
+        guard=PassingGuard(),
+        topic_classifier=classifier,
+        topic_threshold=0.7,
+    )
+    out = await graph.ainvoke({"question": OFF}, context=AgentContext(access_token="t"))
+    assert "decline" not in out and out["topic_check"]["verdict"] == "on_topic"
+
+
+async def test_a_classifier_error_fails_open_and_logs_no_question(caplog: pytest.LogCaptureFixture) -> None:
+    retriever = FakeRetriever(CHUNKS)
+    classifier = FakeTopicClassifier(error=RuntimeError(f"model broke on {OFF}"))
+    graph = build_graph(
+        lambda token: retriever,
+        fake_chat_model(AIMessage("ok [1]")),
+        guard=PassingGuard(),
+        topic_classifier=classifier,
+    )
+    with caplog.at_level(logging.WARNING):
+        out = await graph.ainvoke({"question": OFF}, context=AgentContext(access_token="t"))
+    assert "decline" not in out and out["topic_check"] == {"verdict": "error"}
+    assert retriever.calls == [(OFF, 5, None)]
+    assert "RuntimeError" in caplog.text and "joke" not in caplog.text
+
+
+async def test_a_slow_classifier_times_out_and_fails_open() -> None:
+    retriever = FakeRetriever(CHUNKS)
+    classifier = FakeTopicClassifier({OFF: 0.99}, delay=1.0)
+    graph = build_graph(
+        lambda token: retriever,
+        fake_chat_model(AIMessage("ok [1]")),
+        guard=PassingGuard(),
+        topic_classifier=classifier,
+        topic_timeout_ms=50,
+    )
+    out = await graph.ainvoke({"question": OFF}, context=AgentContext(access_token="t"))
+    assert "decline" not in out and out["topic_check"] == {"verdict": "error"}
+    assert retriever.calls == [(OFF, 5, None)]
+
+
+async def test_without_a_classifier_every_question_searches() -> None:
+    retriever = FakeRetriever(CHUNKS)
+    graph = build_graph(lambda token: retriever, fake_chat_model(AIMessage("ok [1]")), guard=PassingGuard())
+    out = await graph.ainvoke({"question": OFF}, context=AgentContext(access_token="t"))
+    assert out["topic_check"] == {"verdict": "off"} and retriever.calls == [(OFF, 5, None)]
+
+
+async def test_an_off_topic_question_in_a_limited_conversation_is_off_topic_not_limited() -> None:
+    retriever = FakeRetriever(CHUNKS)
+    graph = build_graph(
+        lambda token: retriever,
+        fake_chat_model(),
+        guard=PassingGuard(),
+        topic_classifier=FakeTopicClassifier({OFF: 0.9}),
+    )
+    out = await graph.ainvoke({"question": OFF, "document_ids": ["d1"]}, context=AgentContext(access_token="t"))
+    assert out["decline"] == "off_topic" and retriever.calls == []
+
+
+async def test_an_off_topic_question_with_nothing_readable_is_off_topic_not_no_documents() -> None:
+    retriever = FakeRetriever([])
+    graph = build_graph(
+        lambda token: retriever,
+        fake_chat_model(),
+        guard=PassingGuard(),
+        topic_classifier=FakeTopicClassifier({OFF: 0.9}),
+    )
+    out = await graph.ainvoke({"question": OFF}, context=AgentContext(access_token="t"))
+    assert out["decline"] == "off_topic" and retriever.calls == []
 
 
 class KeywordRetriever(FakeRetriever):

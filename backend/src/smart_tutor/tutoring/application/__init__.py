@@ -3,6 +3,7 @@
 from smart_tutor.tutoring.application.answer import (
     LIMITED_DECLINE,
     NO_DOCUMENTS_DECLINE,
+    OFF_TOPIC_DECLINE,
     SYSTEM_PROMPT,
     answer_messages,
     cited_chunks,
@@ -50,6 +51,7 @@ __all__ = [
     "GUARD_MESSAGE",
     "LIMITED_DECLINE",
     "NO_DOCUMENTS_DECLINE",
+    "OFF_TOPIC_DECLINE",
     "SYSTEM_PROMPT",
     "AnswerFeedback",
     "AnsweredTurn",
