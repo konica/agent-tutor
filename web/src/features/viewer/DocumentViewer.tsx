@@ -80,6 +80,7 @@ function Viewer({
   const [zoom, setZoom] = useState(100);
   const [rendered, setRendered] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const textLayerRef = useRef<HTMLDivElement>(null);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const renderChain = useRef<Promise<void>>(Promise.resolve());
@@ -136,6 +137,8 @@ function Viewer({
       const pdfPage = await doc.page(page);
       if (!live || !canvasRef.current) return;
       const drawn = pdfPage.render(canvasRef.current, zoom / 100);
+      // The text layer only makes the page selectable: if it fails, the page still shows.
+      const text = textLayerRef.current ? pdfPage.renderText(textLayerRef.current, zoom / 100).catch(() => {}) : null;
       // A flipped-to page lands once the canvas has its size, which render sets before it draws.
       const land = landAt.current;
       const area = canvasAreaRef.current;
@@ -145,6 +148,7 @@ function Viewer({
       }
       await drawn;
       if (live) setRendered(true);
+      await text;
     });
     renderChain.current = run.catch(() => {});
     run.catch(() => {
@@ -156,6 +160,20 @@ function Viewer({
   }, [doc, page, zoom]);
 
   const numPages = doc?.numPages ?? null;
+
+  // From a press on the text layer until the pointer is released anywhere, the layer's backstop covers the page, so a
+  // drag over the gap between lines doesn't jump the selection (pdf.js's viewer does the same).
+  const [selecting, setSelecting] = useState(false);
+  useEffect(() => {
+    if (!selecting) return;
+    const end = () => setSelecting(false);
+    window.document.addEventListener("pointerup", end);
+    window.addEventListener("blur", end);
+    return () => {
+      window.document.removeEventListener("pointerup", end);
+      window.removeEventListener("blur", end);
+    };
+  }, [selecting]);
 
   // Whether the page changed since the passage opened; then the status goes back to "Page n of N".
   const [moved, setMoved] = useState(false);
@@ -295,6 +313,14 @@ function Viewer({
             )}
             <div ref={pageRef} className={styles.page}>
               <canvas ref={canvasRef} role="img" aria-label={`Page ${page} of ${doc.numPages}`} />
+              {/* pdf.js fills it (renderText); it has no React children, so React never touches what pdf.js puts there. */}
+              <div
+                ref={textLayerRef}
+                className={styles.textLayer}
+                data-text-layer
+                data-selecting={selecting || undefined}
+                onPointerDown={() => setSelecting(true)}
+              />
               {boxes && chunk.status === "ready" && <PassageHighlight boxes={boxes} scale={scale} text={chunk.chunk.text} />}
             </div>
           </>

@@ -35,6 +35,38 @@
 .page { position: relative; width: fit-content; margin: var(--sp-4) auto; background: #fff; box-shadow: var(--shadow-sm); }
 .page canvas { display: block; }
 
+/* The page's text, transparent over the canvas, so it can be selected and copied. pdf.js's TextLayer fills it; the rules
+   are pdf.js's own (pdfjs-dist/web/pdf_viewer.css, .textLayer), cut to what this viewer uses. */
+.textLayer {
+  --scale-round-x: 1px; --scale-round-y: 1px;
+  --min-font-size: 1; /* pdf.js sets these two inline */
+  --total-scale-factor: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+  position: absolute; inset: 0; z-index: 0; overflow: clip; transform-origin: 0 0;
+  line-height: 1; text-align: initial; letter-spacing: normal; word-spacing: normal; text-size-adjust: none;
+  forced-color-adjust: none; color-scheme: only light; caret-color: CanvasText;
+}
+.textLayer :is(span, br) { position: absolute; color: transparent; white-space: pre; cursor: text; transform-origin: 0% 0%; user-select: text; }
+.textLayer > :not(:global(.markedContent)),
+.textLayer :global(.markedContent) span:not(:global(.markedContent)) {
+  --font-height: 0; --scale-x: 1; --rotate: 0deg; /* pdf.js sets these inline per span */
+  z-index: 1;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+.textLayer :global(.markedContent) { display: contents; }
+/* pdf.js's fixed blue (the page is white in both themes), unlike the teal cited passage. Once ::selection is styled, a
+   background the browser can't parse is transparent, so the learner wouldn't see the selection: keep this plain. */
+.textLayer ::selection { background: rgb(0 0 255 / 0.25); color: transparent; }
+.textLayer br::selection { background: transparent; }
+/* The backstop below the spans: while selecting it covers the page, so a drag over a gap between lines hits it rather
+   than the layer, and the selection doesn't jump to the page's start or end. */
+.textLayer :global(.endOfContent) {
+  display: block; position: absolute; inset: 100% 0 0; z-index: 0; cursor: default; user-select: none;
+}
+.textLayer[data-selecting] :global(.endOfContent) { top: 0; }
+
 /* The cited passage over the page: a fill per line, a marker beside them, a label above (fixed colors: the page is white). */
 .hlBox { position: absolute; background: var(--cite-fill); border-radius: 2px; pointer-events: none; }
 .hlMarker { position: absolute; width: 2px; background: var(--cite-mark); border-radius: 1px; pointer-events: none; }
