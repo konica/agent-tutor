@@ -352,9 +352,12 @@ export function ChatPage({
     const id = from?.dataset.documentId;
     const rows = Array.from(document.querySelectorAll<HTMLElement>(`#${PANEL_ID} [data-document-id]`));
     const live = from?.isConnected ? from : rows.find((row) => row.dataset.documentId === id);
+    // A Sources chip hidden again by Show less can't take focus: its answer's Show N more button does.
+    const hiddenList = live?.closest<HTMLElement>("ul[hidden]");
+    const more = hiddenList ? document.querySelector<HTMLElement>(`[aria-controls="${hiddenList.id}"]`) : null;
     // Sources chips and answer markers stay mounted while the pane is open, so they take focus back directly. The toggle
     // is the fallback for a row that is no longer shown.
-    (live ?? toggleRef.current)?.focus();
+    ((hiddenList ? more : live) ?? toggleRef.current)?.focus();
   }, [viewer]);
 
   // Another row swaps the document in place; the pane moves focus to the new title.
