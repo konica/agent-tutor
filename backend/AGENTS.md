@@ -34,7 +34,7 @@ Each module has `domain/` (entities and rules, no I/O), `application/` (one serv
 
 ## Architecture rules
 
-Enforced by `PYTHONUTF8=1 uv run lint-imports` (20 contracts in `pyproject.toml` under `[tool.importlinter]`, generated from one module list):
+Enforced by `PYTHONUTF8=1 uv run lint-imports` (21 contracts in `pyproject.toml` under `[tool.importlinter]`, generated from one module list):
 
 1. Inside a module: `adapters | application` → `ports` → `domain`.
 2. Another module is used only through its `application` package; `shared` is open to all and imports no module.
@@ -47,7 +47,7 @@ A new cross-module dependency means moving a module in the order on purpose and 
 
 ## Dependencies
 
-- Core dependencies in `[project.dependencies]`; heavy single-service ones behind an extra: `ingest` (PDF loader and text splitter, worker only), `guard` (Guardrails AI output guard, agent only; ADR 0018), or `eval`. Dev tools in the `dev` dependency group. Run `uv lock` and commit `uv.lock` after editing.
+- Core dependencies in `[project.dependencies]`; heavy single-service ones behind an extra: `ingest` (PDF loader and text splitter, worker only), `guard` (Guardrails AI output guard, agent only; ADR 0018), `topic` (onnxruntime and tokenizers for the topic check, agent only; ADR 0019), or `eval`. Dev tools in the `dev` dependency group. Run `uv lock` and commit `uv.lock` after editing.
 - `mcp` is 2.x: the server class is `mcp.server.MCPServer`, and host/port go to `run()`.
 - Models are LangChain's: services take a `BaseChatModel` or `Embeddings` from `ModelFactory` (`init_chat_model`; ADR 0006). Don't hand-write model wrappers or call `bedrock-runtime` with boto3.
 
@@ -61,4 +61,4 @@ A new cross-module dependency means moving a module in the order on purpose and 
 
 ## Images
 
-`Dockerfile` targets `api`, `agent`, `mcp`, `worker` (CronJobs reuse `api`), running as uid 10001. Only `worker` installs the `ingest` extra and only `agent` the `guard` extra.
+`Dockerfile` targets `api`, `agent`, `mcp`, `worker` (CronJobs reuse `api`), running as uid 10001. Only `worker` installs the `ingest` extra and only `agent` the `guard` and `topic` extras and the topic-check model folder (`models/topic_check/`).

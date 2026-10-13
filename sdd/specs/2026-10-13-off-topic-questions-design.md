@@ -6,7 +6,7 @@
 | **Date** | 2026-10-13 |
 | **Owner** | Thao Dinh (PO) |
 | **Research** | `sdd/reviews/2026-10-13-off-topic-model-research.md` (model choice, CPU probe, ONNX spike) |
-| **Applies to** | `backend/src/smart_tutor/apps/agent/` (graph, new node, server), `tutoring` (new port, adapter, decline message), `shared/config.py`, `backend/Dockerfile` (agent target), `backend/pyproject.toml` (extras, import contracts), `backend/models/topic_check/`, `backend/evals/` (dataset, generator, training, evaluators), `web/src/api/chat.ts` and the chat page tests, `deploy/` (enable flag), `sdd/prd.md` (D5, US-5, §9.2, §9.6, §10.1, glossary), `CONTEXT.md`, new ADR 0018 |
+| **Applies to** | `backend/src/smart_tutor/apps/agent/` (graph, new node, server), `tutoring` (new port, adapter, decline message), `shared/config.py`, `backend/Dockerfile` (agent target), `backend/pyproject.toml` (extras, import contracts), `backend/models/topic_check/`, `backend/evals/` (dataset, generator, training, evaluators), `web/src/api/chat.ts` and the chat page tests, `deploy/` (enable flag), `sdd/prd.md` (D5, US-5, §9.2, §9.6, §10.1, glossary), `CONTEXT.md`, new ADR 0019 |
 
 ## 1. Problem
 
@@ -246,8 +246,8 @@ When #14 builds the decline log, an off-topic decline writes a row with reason `
 
 | Document | Change |
 |---|---|
-| `sdd/prd.md` | D5 becomes "A topic check runs first; on-topic questions always search; off-topic questions get the off-topic decline without a search." §9.2 gains step 0 "Topic check". US-5 gains an off-topic criterion (message, no action). §9.6 lists reason `off_topic`. §10.1 gains "Topic check: ≤1% false rejections / ≥95% off-topic caught". The glossary gains **Off-topic question** and **Topic check**. Version → v2.59. |
-| ADR 0018 | "Off-topic questions are screened by a local SetFit classifier behind a swappable port". Covers why a trained classifier and not an LLM call, Jev, or GovTech's model (research note); ONNX without torch in the agent; the model committed to git; and the Jev privacy precondition. |
+| `sdd/prd.md` | D5 becomes "A topic check runs first; on-topic questions always search; off-topic questions get the off-topic decline without a search." §9.2 gains step 0 "Topic check". US-5 gains an off-topic criterion (message, no action). §9.6 lists reason `off_topic`. §10.1 gains "Topic check: ≤1% false rejections / ≥95% off-topic caught". The glossary gains **Off-topic question** and **Topic check**. Version → v2.61. |
+| ADR 0019 | "Off-topic questions are screened by a local SetFit classifier behind a swappable port". Covers why a trained classifier and not an LLM call, Jev, or GovTech's model (research note); ONNX without torch in the agent; the model committed to git; and the Jev privacy precondition. |
 | `CONTEXT.md` | **Decline** widens to "a question the documents don't support, or an off-topic question". Adds **Off-topic question** and **Topic check**. |
 | `backend/src/smart_tutor/tutoring/README.md` | The port and adapter. |
 | `backend/evals/README.md` | The `topic_check` dataset, training command, and suite. |

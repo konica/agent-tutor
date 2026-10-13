@@ -113,6 +113,19 @@ and publish (`make evals-publish`). To grow it, generate variants of each seed (
 
     make evals-generate DATASET=injection     # or: ... python -m evals.generate injection [--per-type 3]
 
+## Topic check
+
+`datasets/topic_check.yaml` labels learner messages on-topic or off-topic (spec 2026-10-13 §3).
+
+1. `make evals-generate DATASET=topic_check` has the judge write messages of each kind (`generators/topic_check.py`)
+   into the `smart-tutor-topic-check-candidates` queue. Review them as for `ask`.
+2. Accepted messages are split by a stable hash of the question: `eval_share` (30%) of them are published as the
+   dataset (`make evals-publish`), and the rest train the model.
+3. `make topic-check-train` (or `python -m evals.topic_check.train --dry-run` to count) trains SetFit, picks the
+   threshold, writes `backend/models/topic_check/`, and reports the eval share's false rejections and off-topic caught.
+4. The `topic_check` suite (classifier only, no Bedrock) gates `topic_check.false_rejections` ≤ 0.01 and
+   `topic_check.off_topic_caught` ≥ 0.95. It is skipped until the model is committed.
+
 ## Add a suite
 
 1. Write `evaluators/<metric>.py`: evaluator functions taking any of `inputs`, `outputs`, `reference_outputs` and returning `{"key": "<thresholds.yaml metric>", "score": ..., "comment": ...}` (a nested metric is its dotted path, e.g. `decline_correctness.correctly_declined`), and a `SUITE = Suite(dataset=..., target=..., evaluators=(...))`. A judge's prompt goes in `evaluators/rubrics/`.
