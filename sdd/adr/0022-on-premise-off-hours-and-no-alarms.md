@@ -8,8 +8,8 @@
 
 The on-premise host runs around the clock, but learners use the pilot during the day. The product owner wants it off
 00:00–07:00 and 18:00–24:00 in Asia/Ho_Chi_Minh (GMT+7), every day, to save cost, and no CloudWatch alarms: they cost
-money, and with a daily stop the uptime alarm would email twice a day. The same will apply to the shared Langfuse host
-(ADR 0021, when that host lands). Spec: `sdd/specs/2026-10-14-off-hours-and-langfuse-host-design.md`.
+money, and with a daily stop the uptime alarm would email twice a day. The same applies to the shared Langfuse host
+(ADR 0021). Spec: `sdd/specs/2026-10-14-off-hours-and-langfuse-host-design.md`.
 
 ## Decision
 

@@ -5,6 +5,7 @@
     "langfuse:instance-type": "t3.xlarge",
     "langfuse:domain": "",
     "langfuse:admin-email": "dtrungthao@gmail.com",
+    "langfuse:alert-emails": ["dtrungthao@gmail.com"],
     "langfuse:data-snapshot-id": ""
   }
 }
