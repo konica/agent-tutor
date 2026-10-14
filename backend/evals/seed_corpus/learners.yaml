@@ -1,5 +1,5 @@
 # Synthetic learners for evals (PRD §10.3): the Compose realm's learners and the seed documents in their libraries
-# (ids from manifest.yaml). Load them with `uv run --extra eval python -m evals.learners` (../README.md).
+# (ids from manifest.yaml). Load them with `uv run --extra eval --extra ingest python -m evals.learners` (../README.md).
 # Learner 2 holds documents learner 1 must never see, so isolation and injection evals have a second library to probe.
 # Learner 2 also holds the canary documents: generated notes whose unique strings must never reach learner 1
 # (injection eval, #194).
