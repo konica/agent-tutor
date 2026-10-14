@@ -202,4 +202,62 @@ describe("Answer", () => {
     expect(paragraph()).toHaveTextContent(text);
     expect(markers()).toHaveLength(1);
   });
+
+  describe("Markdown", () => {
+    const answer = () => paragraph().parentElement!;
+
+    it("renders emphasis, lists, code, quotes, strikethrough, and links", () => {
+      renderAnswer({
+        text: "**Bold** and *italic* and ~~old~~ and `code` and [site](https://example.com).\n\n- one\n- two\n\n1. first\n\n> quoted\n\n```\nconst x = 1;\n```",
+      });
+      const root = answer();
+      expect(root.querySelector("strong")).toHaveTextContent("Bold");
+      expect(root.querySelector("em")).toHaveTextContent("italic");
+      expect(root.querySelector("del")).toHaveTextContent("old");
+      expect(root.querySelector("p code")).toHaveTextContent("code");
+      expect(root.querySelector("a")).toHaveAttribute("href", "https://example.com");
+      expect(within(root).getAllByRole("list")).toHaveLength(2);
+      expect(root.querySelector("blockquote")).toHaveTextContent("quoted");
+      expect(root.querySelector("pre code")).toHaveTextContent("const x = 1;");
+    });
+
+    it("renders the model's headings below the page's", () => {
+      renderAnswer({ text: "# One\n\n## Two\n\n### Three\n\n#### Four\n\nBody [1]." });
+      expect(screen.getAllByRole("heading").map((h) => [h.tagName, h.textContent])).toEqual([
+        ["H3", "One"],
+        ["H4", "Two"],
+        ["H5", "Three"],
+        ["H6", "Four"],
+      ]);
+    });
+
+    it("puts a table in a scroll box and links its markers", () => {
+      renderAnswer({ text: "| Term | Meaning |\n|---|---|\n| Attention | Weighs tokens [1] |" });
+      const table = screen.getByRole("table");
+      expect(table.parentElement).toHaveClass(/tableScroll/);
+      expect(within(table).getByRole("button", { name: "Source 1: Doc 1, p. 2" })).toBeInTheDocument();
+    });
+
+    it("links markers in list items and headings, not in code", () => {
+      renderAnswer({ text: "## Why [1]\n\n- because [1]\n\nSee `x[1]`.", citations: [cite(1)] });
+      expect(screen.getAllByRole("button", { name: "Source 1: Doc 1, p. 2" })).toHaveLength(2);
+      expect(screen.getByText("x[1]").tagName).toBe("CODE");
+    });
+
+    it("renders a partial answer mid-stream", () => {
+      renderAnswer({ text: "It **weighs\n\n```\nconst x", citations: [] });
+      expect(answer()).toHaveTextContent("It **weighs");
+      expect(document.querySelector("pre")).toHaveTextContent("const x");
+    });
+
+    it("keeps the same marker button after it expands the line", async () => {
+      const five = [cite(2), cite(1), cite(3), cite(5), cite(4)];
+      renderAnswer({ text: "A [2] B [4].", citations: five });
+      const marker = screen.getByRole("button", { name: "Source 4: Doc 4, p. 5" });
+      await userEvent.click(marker);
+      expect(screen.getByRole("button", { name: /^Show less$/ })).toBeInTheDocument();
+      // ChatPage gives focus back to this node when the document closes, so it must not be remounted.
+      expect(marker.isConnected).toBe(true);
+    });
+  });
 });
