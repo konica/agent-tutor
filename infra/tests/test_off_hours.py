@@ -7,6 +7,7 @@ import aws_cdk as cdk
 import pytest
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk.assertions import Template
+
 from smart_tutor_infra.off_hours import OffHours
 
 ACCOUNT = "123456789012"
