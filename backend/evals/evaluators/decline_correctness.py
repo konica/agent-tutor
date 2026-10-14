@@ -3,8 +3,7 @@ and answers one they do. An example marked `off_topic` must get the `off_topic` 
 `correctly_declined` scores the limited, uncovered examples: 1 when the run gave the `limited` decline.
 `wrongly_declined` scores every covered example, limited or not: 1 when the run declined at all (a miss).
 Two evaluators, one key each, so the runner never fills the metric a given example doesn't cover. Scored from the ask
-target's `decline` code; an unlimited conversation has no relevance gate yet (US-5, #14). The `"key"` strings are
-literals in the returned dicts: langsmith reads an evaluator's feedback keys from the source, not by running it."""
+target's `decline` code; an unlimited conversation has no relevance gate yet (US-5, #14)."""
 
 from typing import Any
 

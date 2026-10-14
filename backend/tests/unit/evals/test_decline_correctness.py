@@ -81,13 +81,6 @@ def test_wrongly_declined_counts_any_decline_of_a_covered_question() -> None:
     assert wrongly_declined(UNLIMITED, _outputs("something_else", limited=False), COVERED)["score"] == 1
 
 
-def test_langsmith_reads_the_dotted_feedback_key_of_each_evaluator() -> None:
-    from langsmith.evaluation._key_extraction import _safe_extract_feedback_keys
-
-    assert set(_safe_extract_feedback_keys(correctly_declined)) == {"decline_correctness.correctly_declined"}
-    assert set(_safe_extract_feedback_keys(wrongly_declined)) == {"decline_correctness.wrongly_declined"}
-
-
 def test_an_off_topic_example_is_correctly_declined_only_as_off_topic() -> None:
     inputs = {"question": "Tell me a joke.", "learner": "l", "documents": None}
     reference = {"covered": False, "sources": [], "off_topic": True}

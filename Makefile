@@ -65,7 +65,7 @@ sweep:         ## run the learning-record sweeper once (PRD §9.2)
 retention:     ## run the retention job once: traces 180 days, decline log 90 days (PRD D25, §9.6)
 	$(BACKEND) uv run python -m smart_tutor.apps.jobs.retention
 
-evals-smoke:   ## smoke split as a LangSmith experiment, gated on thresholds.yaml (app stack, eval learners, AWS profile, LANGSMITH_API_KEY)
+evals-smoke:   ## smoke split as Langfuse experiments, gated on thresholds.yaml (app stack, eval learners, AWS profile, LANGFUSE_* keys of smart-tutor-evals)
 	$(HOST) --extra eval --extra guard --extra topic python -m evals.run --split smoke
 evals-learners: ## load the eval learners' libraries from the seed corpus (needs the app stack and your AWS profile)
 	$(BACKEND) uv run --extra eval python -m evals.learners

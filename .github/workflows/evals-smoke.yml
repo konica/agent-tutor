@@ -1,9 +1,12 @@
-# Runs the smoke split (PRD §10.3, #226) on pull requests that change the agent, and by hand from the Actions tab:
-# starts the Compose app stack, loads the eval learners' libraries, and gates on thresholds.yaml. The gate table and
-# the experiment link go to the job summary; a breached threshold fails the check.
-# Needs the repository secret EVALS_AWS_ROLE_ARN (a Bedrock-only role trusted through GitHub OIDC) and the secret
-# LANGSMITH_API_KEY (docs/runbooks/evals-ci.md). Without them (a fork, Dependabot, or before they exist) the job skips
-# and says why.
+# Runs the smoke split (PRD §10.3, #226, #320) on pull requests that change the agent, and by hand from the Actions
+# tab: starts the Compose app stack, loads the eval learners' libraries, runs the split as Langfuse experiments in the
+# smart-tutor-evals project, and gates on thresholds.yaml. The gate table and the experiment links go to the job
+# summary; a breached threshold fails the check.
+# Needs the repository secret EVALS_AWS_ROLE_ARN (a Bedrock-only role trusted through GitHub OIDC), the secrets
+# LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY (a key pair of smart-tutor-evals), and the repository variable
+# LANGFUSE_BASE_URL (docs/runbooks/evals-ci.md). Without them (a fork, Dependabot, or before they exist) the job skips
+# and says why. While the Langfuse host is off (18:00-07:00 Asia/Ho_Chi_Minh) the job fails within a minute, before
+# any Bedrock spend (ADR 0023).
 name: evals-smoke
 
 on:
@@ -51,7 +54,8 @@ jobs:
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           REPO: ${{ github.repository }}
           HAS_ROLE: ${{ secrets.EVALS_AWS_ROLE_ARN != '' }}
-          HAS_KEY: ${{ secrets.LANGSMITH_API_KEY != '' }}
+          HAS_KEYS: ${{ secrets.LANGFUSE_PUBLIC_KEY != '' && secrets.LANGFUSE_SECRET_KEY != '' }}
+          HAS_URL: ${{ vars.LANGFUSE_BASE_URL != '' }}
         run: |
           skip() {
             echo "$1 title=Smoke evals skipped::$2"
@@ -60,20 +64,38 @@ jobs:
             exit 0
           }
           if [[ -n "$HEAD_REPO" && "$HEAD_REPO" != "$REPO" ]]; then
-            skip ::notice "This pull request comes from a fork, which can't use the eval role or the LangSmith key. A maintainer can push its branch to $REPO, or run evals-smoke on such a branch from the Actions tab."
+            skip ::notice "This pull request comes from a fork, which can't use the eval role or the Langfuse keys. A maintainer can push its branch to $REPO, or run evals-smoke on such a branch from the Actions tab."
           fi
           [[ "$HAS_ROLE" == true ]] || skip ::warning "The secret EVALS_AWS_ROLE_ARN isn't set (docs/runbooks/evals-ci.md)."
-          [[ "$HAS_KEY" == true ]] || skip ::warning "The secret LANGSMITH_API_KEY isn't available to this run (not set, or a Dependabot pull request; docs/runbooks/evals-ci.md)."
+          [[ "$HAS_KEYS" == true ]] || skip ::warning "The secrets LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY aren't available to this run (not set, or a Dependabot pull request; docs/runbooks/evals-ci.md)."
+          [[ "$HAS_URL" == true ]] || skip ::warning "The repository variable LANGFUSE_BASE_URL isn't set (docs/runbooks/evals-ci.md)."
           echo "run=true" >> "$GITHUB_OUTPUT"
+
+      # The Langfuse host is off 18:00-07:00 (ADR 0022). Fail now, before building or calling Bedrock, rather than skip:
+      # an agent change merged at night must not pass the gate unseen (ADR 0023). CI doesn't start the host.
+      - name: Check that Langfuse is up
+        if: steps.access.outputs.run == 'true'
+        env:
+          LANGFUSE_BASE_URL: ${{ vars.LANGFUSE_BASE_URL }}
+        run: |
+          for attempt in 1 2 3; do
+            curl -fsS -o /dev/null --max-time 10 "${LANGFUSE_BASE_URL%/}/api/public/health" && exit 0
+            [[ $attempt == 3 ]] || sleep 5
+          done
+          message="Langfuse is off 18:00–07:00 Asia/Ho_Chi_Minh: re-run this job after 07:00, or start the host (\`docs/runbooks/langfuse-host.md\`)"
+          echo "::error title=Langfuse is not answering::$message"
+          printf '### Smoke evals: Langfuse is not answering\n\n%s\n' "$message" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
 
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         if: steps.access.outputs.run == 'true'
 
-      # The local defaults, minus the developer profile: botocore then uses the OIDC session from the environment.
+      # The local defaults, minus the developer profile (botocore then uses the OIDC session from the environment) and
+      # the developer's Langfuse lines (the run step sets them from the secrets and the variable).
       - name: Prepare .env
         if: steps.access.outputs.run == 'true'
         run: |
-          grep -v '^AWS_PROFILE=' .env.example | sed 's/^LANGSMITH_PROJECT=.*/LANGSMITH_PROJECT=smart-tutor-ci/' > .env
+          grep -v -e '^AWS_PROFILE=' -e '^LANGFUSE_' .env.example > .env
           mkdir -p ~/.aws  # compose.yaml mounts it; an empty folder, not one Docker creates as root
 
       - name: Install the eval dependencies
@@ -95,8 +117,6 @@ jobs:
 
       - name: Start the stack
         if: steps.access.outputs.run == 'true'
-        env:
-          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
         run: |
           docker compose -f compose.yaml -f compose.ci.yaml --profile app up -d api worker mcp
           wait_for() {
@@ -121,8 +141,10 @@ jobs:
         if: steps.access.outputs.run == 'true'
         working-directory: backend
         env:
-          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
-        run: uv run --env-file ../.env --extra eval --extra guard --extra topic python -m evals.run --split smoke --summary "$GITHUB_STEP_SUMMARY"
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          LANGFUSE_BASE_URL: ${{ vars.LANGFUSE_BASE_URL }}
+        run: uv run --env-file ../.env --extra eval --extra guard --extra topic python -m evals.run --split smoke --environment ci --summary "$GITHUB_STEP_SUMMARY"
 
       - name: Service logs
         if: (failure() || cancelled()) && steps.access.outputs.run == 'true'

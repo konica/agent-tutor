@@ -1,7 +1,6 @@
 """Topic check (PRD §10.1, spec 2026-10-13 §6.3, code): the classifier alone on the topic_check dataset's held-out
 messages. `false_rejections` scores the on-topic examples (1 = declined, a miss); `off_topic_caught` scores the
-off-topic ones (1 = declined). The suite is skipped until backend/models/topic_check holds a model. The `"key"` strings
-are literals in the returned dicts: langsmith reads an evaluator's feedback keys from the source, not by running it."""
+off-topic ones (1 = declined). The suite is skipped until backend/models/topic_check holds a model."""
 
 from typing import Any
 

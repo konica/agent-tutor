@@ -1,4 +1,4 @@
-# Questions to the ask graph (PRD §9.2), asked as an eval learner (seed_corpus/learners.yaml). LangSmith dataset
+# Questions to the ask graph (PRD §9.2), asked as an eval learner (seed_corpus/learners.yaml). Langfuse folder
 # `name`. These hand-written examples are in every version of both splits; generated examples join them after a human
 # accepts them in the annotation queue. Versions are made only by `make evals-publish` (README "Datasets"); the runner
 # uses each split's newest version unless `pins` names one (e.g. `pins: {full: full-v1}`).

@@ -44,7 +44,7 @@ def longest_shared_run(a: str, b: str) -> int:
 def _fail_closed(metric: str, check: Check) -> Evaluator:
     key = PREFIX + metric
 
-    # No functools.wraps: LangSmith binds arguments by the parameter names of this signature.
+    # No functools.wraps: the runner binds arguments by the parameter names of this signature.
     async def evaluate(
         inputs: dict[str, Any], outputs: dict[str, Any], reference_outputs: dict[str, Any]
     ) -> dict[str, Any]:
@@ -56,7 +56,7 @@ def _fail_closed(metric: str, check: Check) -> Evaluator:
             return {"key": key, "score": 0, "comment": f"the check failed: {type(e).__name__}: {e}"}
         return {"key": key, "score": score, "comment": comment}
 
-    evaluate.__name__ = evaluate.__qualname__ = metric  # LangSmith names the evaluator after the function
+    evaluate.__name__ = evaluate.__qualname__ = metric  # Langfuse names the evaluator's observation after the function
     return evaluate
 
 

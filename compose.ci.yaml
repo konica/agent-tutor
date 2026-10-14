@@ -1,14 +1,13 @@
 # CI override for the smoke evals (.github/workflows/evals-smoke.yml, #226):
 #   docker compose -f compose.yaml -f compose.ci.yaml --profile app up -d
 # GitHub signs in to AWS with OIDC, which puts a short-lived session in the runner's environment instead of a profile
-# in ~/.aws. Pass it, and the LangSmith key, through to the services that call Bedrock; a name without a value takes
-# the runner's variable. The api and worker still sign LocalStack calls with its dummy keys (SMART_TUTOR_LOCALSTACK).
+# in ~/.aws. Pass it through to the services that call Bedrock; a name without a value takes the runner's variable.
+# The api and worker still sign LocalStack calls with its dummy keys (SMART_TUTOR_LOCALSTACK).
 # CI starts no Phoenix: an empty SMART_TUTOR_PHOENIX_URL keeps the services untraced (.env.example points at localhost).
 x-ci-env: &ci-env
   - AWS_ACCESS_KEY_ID
   - AWS_SECRET_ACCESS_KEY
   - AWS_SESSION_TOKEN
-  - LANGSMITH_API_KEY
   - SMART_TUTOR_PHOENIX_URL=
 
 services:
