@@ -61,7 +61,7 @@ Each `datasets/<key>.yaml` is one eval dataset (`name`, e.g. `smart-tutor-ask`) 
 | `smart-tutor-ask/smoke-v3` | Version 3 of the ask dataset's smoke split; items are its examples: `input` = the example's inputs, `expected output` = its reference outputs, `metadata` = type, `candidate_run`, `generated_at` for a generated one |
 | `smart-tutor-injection/full-v1`, `smart-tutor-question-screen/full-v1`, `smart-tutor-topic-check/smoke-v1`, … | The same for every `datasets/<key>.yaml` |
 
-A version's dataset is created, filled, and never written again, so a version a run was gated on is never edited: don't add, edit, or archive its items in the UI. Its metadata holds `split` and `examples`, the number of items it must have. A publish that stops part-way (Langfuse went off, a network error) leaves a version with fewer items; it is incomplete, is never the newest, and can't be pinned, and the next publish makes the version after it. Langfuse can't delete a dataset through its API; delete an incomplete one in the UI if it bothers you. (Langfuse also versions each dataset's items by timestamp, but those versions can't be named, so a pin would be a timestamp: one dataset per version keeps `smoke-v3` a name you can read, pin, and open.)
+A version's dataset is created, filled, and never written again, so a version a run was gated on is never edited: don't add, edit, or archive its items in the UI. Its metadata holds `split` and `examples`, the number of items it must have. A publish that stops part-way (Langfuse went off, a network error) leaves a version with fewer items, and a retried item can leave one with more; either way it is incomplete, is never the newest, and can't be pinned, and the next publish makes the version after it. Langfuse can't delete a dataset through its API; delete an incomplete one in the UI if it bothers you. (Langfuse also versions each dataset's items by timestamp, but those versions can't be named, so a pin would be a timestamp: one dataset per version keeps `smoke-v3` a name you can read, pin, and open.)
 
 Keys: `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`, your own key pair of the `smart-tutor-evals` project (Langfuse → Smart Tutor → `smart-tutor-evals` → Settings → API Keys), and `LANGFUSE_BASE_URL`, the host's URL (`.env.example`; falls back to `SMART_TUTOR_LANGFUSE_URL`), in your shell or `.env`. The host is on 07:00–18:00 Asia/Ho_Chi_Minh (ADR 0022); outside those hours publishing exits 1 with "Can't reach Langfuse".
 
@@ -71,7 +71,7 @@ Keys: `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`, your own key pair of the 
 
     pins: {smoke: smoke-v3, full: full-v2}
 
-The runner then uses the pinned version for that split (and stops if it doesn't exist or is incomplete), so the release gate can be rerun on exactly the examples it passed. Record the pinned versions in the release PR.
+The runner then uses the pinned version for that split (and stops if it doesn't exist or is incomplete), so the release gate can be rerun on exactly the examples it passed. Record the pinned versions in the release PR. **Until #320**, the runner reads pins as LangSmith tags, not Langfuse versions (Langfuse numbering starts again at `v1`, so the same name can mean other examples there): don't pin a version `make evals-publish` printed until the runner runs on Langfuse.
 
 ## Multi-turn conversations
 

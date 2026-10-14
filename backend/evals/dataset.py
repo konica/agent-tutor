@@ -7,8 +7,9 @@ newest version, they become the next version, `<split>-v<N+1>`.
 
 Each version is a Langfuse dataset of its own, `<name>/<split>-v<N>` (`smart-tutor-ask/smoke-v3`; Langfuse shows
 `smart-tutor-ask/` as a folder). It is created, filled, and never written again, so a version a run was gated on is
-never edited. Its metadata records its split and how many examples it holds: a version with fewer items (a publish
-that stopped part-way) is incomplete, is never the newest, and its number is not reused. The runner uses a split's
+never edited. Its metadata records its split and how many examples it holds: a version with another number of items (a
+publish that stopped part-way, or an item the SDK retried) is incomplete, is never the newest, and its number is not
+reused. The runner uses a split's
 newest version unless one is pinned.
 """
 
