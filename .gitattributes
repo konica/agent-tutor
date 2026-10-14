@@ -6,6 +6,8 @@ Dockerfile text eol=lf
 # Files the on-premise VM runs (the CDK asset bundles the working copy), including the database bootstrap and realm it
 # shares with the Helm chart: psql reads `\set ON_ERROR_STOP on\r` from a CRLF checkout as a different value (#155).
 deploy/** text eol=lf
+# Files the Langfuse VM runs (its CDK asset bundles the working copy).
+platform/langfuse/deploy/** text eol=lf
 *.pdf binary
 # Open Design project: keep bytes as Open Design wrote them (its version manifests store SHA-256 digests).
 sdd/design/prototype/** -text

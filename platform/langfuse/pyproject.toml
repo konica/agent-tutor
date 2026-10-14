@@ -1,0 +1,19 @@
+[project]
+name = "langfuse-platform"
+version = "0.1.0"
+description = "AWS CDK app for a shared, self-hosted Langfuse host (us-east-1)"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "aws-cdk-lib>=2.200",
+    "constructs>=10.4",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.4", "pyyaml>=6"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

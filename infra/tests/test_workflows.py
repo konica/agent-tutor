@@ -74,7 +74,10 @@ def test_ci_is_reusable_and_runs_infra_tests() -> None:
     assert "uv run pytest" in text
     # the production lint, as the runbook deploys it
     assert "values-prod.yaml" in steps_text(ci["jobs"]["helm"])
-    assert {"backend", "web", "design", "helm", "infra"} <= set(ci["jobs"])
+    assert {"backend", "web", "design", "helm", "infra", "langfuse"} <= set(ci["jobs"])
+    langfuse = ci["jobs"]["langfuse"]
+    assert langfuse["defaults"]["run"]["working-directory"] == "platform/langfuse"
+    assert "uv sync --frozen" in steps_text(langfuse) and "uv run pytest" in steps_text(langfuse)
 
 
 def test_deploy_runs_on_push_to_main_or_by_hand_with_a_mode() -> None:
