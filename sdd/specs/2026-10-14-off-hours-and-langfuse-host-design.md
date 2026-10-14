@@ -93,6 +93,7 @@ Not in scope:
 | `langfuse:region` | `us-east-1` | Region of the stack |
 | `langfuse:instance-type` | `t3.xlarge` | 4 vCPU, 16 GiB (Langfuse's Compose minimum) |
 | `langfuse:domain` | empty | Its DuckDNS name; empty means `<eip>.sslip.io` |
+| `langfuse:admin-email` | required | The first admin's email (headless initialization) |
 | `langfuse:alert-emails` | `[]` | Who gets the patch-failure email |
 | `langfuse:data-snapshot-id` | empty | Restore the data volume from a snapshot (as the app host) |
 
@@ -128,13 +129,14 @@ About 11.6 GiB of the 16 GiB; the rest is the OS, Docker, and the page cache Cli
 
 Langfuse settings:
 - `NEXTAUTH_URL=https://<domain>`, `NEXTAUTH_SECRET`, `SALT`, `ENCRYPTION_KEY` (64 hex characters), `DATABASE_URL`, `CLICKHOUSE_*`, `REDIS_*` from the secrets below.
-- S3: `LANGFUSE_S3_EVENT_UPLOAD_*` and `LANGFUSE_S3_MEDIA_UPLOAD_*` point at the bucket with region set, `FORCE_PATH_STYLE=false`, and **no access keys**: the AWS SDK falls back to the instance role (Langfuse's docs recommend an IAM role on AWS). The plan's first task checks this on a real instance before the rest is built; if it fails, an IAM user's keys in Secrets Manager are the fallback.
+- S3: `LANGFUSE_S3_EVENT_UPLOAD_*` and `LANGFUSE_S3_MEDIA_UPLOAD_*` point at the bucket with region set, `FORCE_PATH_STYLE=false`, and **no access keys**: Langfuse's `S3StorageService` uses the keys "if provided or fallback to default credentials" (its source, v4), so the instance role applies, as Langfuse's docs recommend on AWS. The by-hand check after deploying confirms an upload lands in the bucket.
 - `AUTH_DISABLE_SIGNUP=true` and `TELEMETRY_ENABLED=false`.
 - Headless initialization creates one organization, one project, and its admin user: `LANGFUSE_INIT_ORG_ID`, `LANGFUSE_INIT_PROJECT_ID`, `LANGFUSE_INIT_PROJECT_PUBLIC_KEY`/`SECRET_KEY`, `LANGFUSE_INIT_USER_EMAIL`/`PASSWORD`. Other people: the admin invites them, and because sign-up is off, the runbook turns `AUTH_DISABLE_SIGNUP` off for one deploy while they create their account, then back on.
 
 ### 6.5 Secrets and deploy
 
-- Generated in Secrets Manager under `langfuse/`: `nextauth-secret`, `salt`, `encryption-key` (operator-set to `openssl rand -hex 32` at first deploy, because Secrets Manager can't generate hex), `db/postgres`, `clickhouse`, `valkey`, `admin` (email and password), `init-project-keys`. The operator stores the DuckDNS token as `langfuse/duckdns-token`.
+- Generated in Secrets Manager under `langfuse/`: `nextauth-secret`, `salt`, `encryption-seed`, `db/postgres`, `clickhouse`, `valkey`, `admin` (email from `langfuse:admin-email`, generated password), `init-project-keys`. Secrets Manager can't generate hex, so `deploy.sh` derives `ENCRYPTION_KEY` as the SHA-256 (64 hex characters) of `encryption-seed`, and the init project's `pk-lf-…`/`sk-lf-…` keys from `init-project-keys`; the same secrets always give the same values, and `encryption-seed` is never rotated. The operator stores the DuckDNS token as `langfuse/duckdns-token`.
+- Sign-up: SSM `/langfuse/host/allow-signup` (`false`; the stack creates it) sets `AUTH_DISABLE_SIGNUP`; the runbook sets it to `true` for one deploy while an invited person signs up.
 - `cdk deploy` uploads `platform/langfuse/deploy/` as an asset. An SSM Command document `langfuse-deploy` downloads it and runs `deploy.sh`, which:
   - waits for first boot (`cloud-init status --wait`);
   - renders the secrets into a root-only env file (never on a command line or in the template);
@@ -159,7 +161,7 @@ Langfuse settings:
 - **Runbooks:**
   - `docs/runbooks/on-premise-monitoring.md`: alarms removed; the schedule; starting by hand; keeping the host up overnight; reading a failed dump from `journalctl`; the scheduler's metrics.
   - `docs/runbooks/on-premise-backups.md`: alarm references removed.
-  - `docs/runbooks/on-premise-deploy.md` and `pilot-deploy.md`: deploy before 17:30, or start the host first.
+  - `docs/runbooks/on-premise-deploy.md`: deploy before 17:30, or start the host first.
   - **New** `docs/runbooks/langfuse-host.md`: first deploy (secrets, encryption key, DuckDNS token), first admin sign-in, adding a person, deploy and upgrade, starting by hand, patching, restoring from a snapshot.
 - **`AGENTS.md`**: a `platform/` row in the repository map and the `platform/langfuse` test command in Checks. **Structure spec** (`sdd/specs/2026-10-02-project-structure-design.md`): the `platform/` folder.
 
@@ -201,9 +203,8 @@ The account budget (`smart-tutor:budget-monthly-usd`, $20) is below this, so its
 
 ## 10. Order of work
 
-1. **Spike (throwaway):** Langfuse v4 on a t3.xlarge with the instance role and no S3 keys. Confirms the S3 credential fallback and that headless init works with sign-up off.
-2. **App host:** `OffHours`, alarms removed, patch window moved, Postgres grace period, runbooks, PRD, ADR 0022.
-3. **Langfuse project:** scaffolding, CI, the stack, the Compose bundle, `deploy.sh`, `OffHours` copy, runbook, ADR 0021, AGENTS.md and the structure spec.
-4. **Deploy and check by hand** (§8).
+1. **App host:** `OffHours`, alarms removed, patch window moved, Postgres grace period, runbooks, PRD, ADR 0022.
+2. **Langfuse project:** scaffolding, CI, the stack, the Compose bundle, `deploy.sh`, `OffHours` copy, runbook, ADR 0021, AGENTS.md and the structure spec.
+3. **Deploy and check by hand** (§8).
 
-Steps 2 and 3 are separate PRs; step 2 can merge first and starts saving money at once.
+Steps 1 and 2 are separate PRs; step 1 can merge first and starts saving money at once. No spike is needed: Langfuse's source confirms the S3 credential fallback (§6.4). Plan: `sdd/plans/2026-10-14-off-hours-and-langfuse-host.md`.
