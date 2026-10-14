@@ -192,12 +192,12 @@ def langfuse(check: ModuleType, monkeypatch) -> list[tuple[str, int]]:
     monkeypatch.setattr(check.urllib.request, "urlopen", lambda url, timeout: None)
     monkeypatch.setattr(check, "_connects", lambda host, port: True)
     monkeypatch.setattr(check, "_aws_problems", lambda region: [])
-    monkeypatch.setattr(check, "_tunnel_status", lambda host, port=443: sent.append((host, port)) or 200)
+    monkeypatch.setattr(check, "_tunnel_status", lambda host, port=443, timeout=10: sent.append((host, port)) or 200)
     return sent
 
 
 def _answer(check: ModuleType, monkeypatch, status: int) -> None:
-    monkeypatch.setattr(check, "_tunnel_status", lambda host, port=443: status)
+    monkeypatch.setattr(check, "_tunnel_status", lambda host, port=443, timeout=10: status)
 
 
 def test_unreachable_reports_a_proxy_that_refuses_langfuse(check, langfuse, monkeypatch) -> None:
@@ -236,3 +236,15 @@ def test_the_success_message_names_langfuse_when_it_is_on(check, monkeypatch, ca
     monkeypatch.setenv("SMART_TUTOR_LANGFUSE_SECRET_KEY", "sk")
     assert check.main() == 0
     assert "Langfuse (through the proxy)" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("error", [TimeoutError("timed out"), ConnectionResetError("reset")])
+def test_unreachable_only_notes_a_langfuse_tunnel_that_raises(check, langfuse, monkeypatch, capsys, error) -> None:
+    # Off at night, Squid's connect timeout can race the client's socket timeout: the probe raises, the check goes on.
+    def raises(host: str, port: int = 443, timeout: float = 10) -> int:
+        raise error
+
+    monkeypatch.setattr(check, "_tunnel_status", raises)
+    assert check.unreachable() == []
+    out = capsys.readouterr().out
+    assert "Langfuse at lf.example" in out and type(error).__name__ in out

@@ -19,6 +19,7 @@ import urllib.request
 ARBITRARY_HOST = "example.com"
 ARBITRARY_IP = "1.1.1.1"
 TIMEOUT = 10
+LANGFUSE_TIMEOUT = 20
 
 
 def _connects(host: str, port: int) -> bool:
@@ -37,14 +38,14 @@ def _resolves(name: str) -> bool:
     return True
 
 
-def _proxy() -> http.client.HTTPConnection:
+def _proxy(timeout: float = TIMEOUT) -> http.client.HTTPConnection:
     proxy = urllib.parse.urlsplit(os.environ["HTTPS_PROXY"])
-    return http.client.HTTPConnection(proxy.hostname, proxy.port or 3128, timeout=TIMEOUT)
+    return http.client.HTTPConnection(proxy.hostname, proxy.port or 3128, timeout=timeout)
 
 
-def _tunnel_status(host: str, port: int = 443) -> int:
+def _tunnel_status(host: str, port: int = 443, timeout: float = TIMEOUT) -> int:
     """The proxy's answer to CONNECT host:port (200 when it opens the tunnel, 403 when it refuses)."""
-    conn = _proxy()
+    conn = _proxy(timeout)
     try:
         conn.request("CONNECT", f"{host}:{port}", headers={"Host": f"{host}:{port}"})
         return conn.getresponse().status
@@ -148,7 +149,11 @@ def unreachable() -> list[str]:
     # 18:00-07:00 (ADR 0022), when Squid answers 502/503; tracing is non-critical (ADR 0023), so that only gets a notice.
     if _langfuse():
         host = urllib.parse.urlsplit(os.environ["SMART_TUTOR_LANGFUSE_URL"]).hostname or ""
-        status = _tunnel_status(host, 443)
+        # Longer than Squid's connect_timeout (10 s), so Squid's own 503 normally wins the race when Langfuse is off.
+        try:
+            status: int | str = _tunnel_status(host, 443, LANGFUSE_TIMEOUT)
+        except (OSError, http.client.HTTPException) as error:
+            status = type(error).__name__
         if status == 403:
             problems.append(f"Langfuse: the egress proxy refuses {host}")
         elif status != 200:
