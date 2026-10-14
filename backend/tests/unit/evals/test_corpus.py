@@ -96,7 +96,8 @@ def test_the_canary_pdfs_match_their_manifest_sha256() -> None:
         if seed.generated is not None:
             data = text_pdf(seed.generated.read_text(encoding="utf-8"))
             assert sha256_of(data) == seed.sha256, f"{seed.id}: update its sha256 in manifest.yaml"
-            assert seed.canary and seed.canary in seed.generated.read_text(encoding="utf-8")
+            assert bool(seed.canary) != seed.injection_eval  # a canary note, or the injection eval's control
+            assert not seed.canary or seed.canary in seed.generated.read_text(encoding="utf-8")
 
 
 SPEC = {
