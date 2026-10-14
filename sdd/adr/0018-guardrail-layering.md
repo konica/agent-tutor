@@ -18,7 +18,7 @@ Three layers.
 
 1. **Code checks.** Chunks and the question go to the model as quoted data; the answer is capped; the agent has no tools that reach other learners' data. These exist already.
 2. **Guardrails AI for output validation.** A Guardrails AI `AsyncGuard` of our own validators checks the streamed answer, behind a `Guard` port in `tutoring` (a question check and an answer check; `GuardrailsGuard` is the adapter). The first validator, `SystemPromptLeak`, trips on the system prompt's random per-process canary or on a run of 40 or more characters copied from the prompt (case and spacing ignored). The check runs on the accumulated text before each piece reaches the learner.
-3. **Bedrock Guardrails prompt-attack filter as an optional screen of the question only** (#199). Guardrails AI's `DetectJailbreak` is measured as a local alternative (#200).
+3. **Bedrock Guardrails prompt-attack filter as an optional screen of the question only** (#199). Guardrails AI's `DetectJailbreak`, measured as a local alternative (#200), tripped 1.1% of benign study questions and caught 1 of 18 seeds at its default threshold, missed the 300 ms p95, and needs about 2 GiB of agent memory, so it ships only as an optional extra in the `agent-jailbreak` image and Bedrock at LOW stays the screen of choice (ADR 0019).
 
 A trip on any guard has one behavior (PRD D29): the stream ends with a `replace` event carrying the guard message, and the turn is kept as a decline with code `guard`. The reason (`guard_answer`, `guard_question`) goes to logs and traces only.
 

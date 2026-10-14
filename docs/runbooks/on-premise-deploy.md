@@ -472,7 +472,7 @@ The agent can screen each learner's question with a Bedrock Guardrails prompt-at
 
 | Parameter | Value |
 |---|---|
-| `question-guard` | `off` (set in `infra/smart_tutor_infra/stacks/config.py`) or `bedrock` |
+| `question-guard` | `off` (set in `infra/smart_tutor_infra/stacks/config.py`), `bedrock`, or `guardrails_ai` (the local screen, below) |
 | `question-guardrail-id` | The guardrail's id (CDK writes it) |
 | `question-guardrail-version` | The retained version (CDK writes it; a changed definition publishes a new one) |
 
@@ -495,6 +495,16 @@ Each deploy (section 4) reads all three and passes them to the agent as `QUESTIO
 **Turn it off.** Set `question-guard` back to `off`, then repeat steps 3 and 4. The guardrail stays; nothing else changes.
 
 **If the screen fails,** the question goes on unscreened and `QuestionScreenFailures` counts it (`on-premise-monitoring.md`, "Question screen failures").
+
+### The local screen (`guardrails_ai`, #200)
+
+`guardrails_ai` screens the question with Guardrails AI's DetectJailbreak on the VM's CPU instead of calling Bedrock: same timeout, fail-open behavior, and counter. It is **not recommended**: at its default threshold (0.81) it tripped 1.1% of study questions and caught 1 of 18 prompt seeds, and its p95 of 424–789 ms misses 300 ms (ADR 0019, `sdd/reviews/2026-10-14-question-screen-comparison.md`). If you turn it on anyway, it needs three changes, reviewed like any other:
+
+- **Image.** Only the `agent-jailbreak` target (header of `backend/Dockerfile`) has the `jailbreak` extra and the baked models; it is 5.36 GB. CI builds and deploys only the plain `agent`, so the deploy must build `--target agent-jailbreak` into the agent repository. In the plain image, `guardrails_ai` stops the agent at startup with a message naming `agent-jailbreak`.
+- **Memory.** Raise the agent's `mem_limit` in `deploy/on-premise/compose.yaml` from `512m` to `2g` (the agent with the screen peaked at 1,842 MiB RSS). That leaves about 0.7 GB of the t3.large's 8 GB for the OS and Docker.
+- **Value.** Set `question-guard` to `guardrails_ai` as in steps 2 to 4 above. The threshold is the default 0.81 unless the agent gets `SMART_TUTOR_QUESTION_JAILBREAK_THRESHOLD`; re-measure first with `--local` (`backend/evals/README.md`, "Question screen").
+
+The agent loads the models (5–6 s) and runs one warm-up validation at startup, so it takes longer to become healthy.
 
 ## Troubleshooting
 

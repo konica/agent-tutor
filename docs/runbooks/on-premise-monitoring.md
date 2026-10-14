@@ -151,7 +151,7 @@ If the nulls are recent, the ingestion's chunking changed or the worker failed t
 
 ## Question screen failures
 
-**What it counts.** The optional question screen (PRD D30, `on-premise-deploy.md` section 12) calls Bedrock Guardrails before search. When that call fails or takes longer than 1 second, the question goes on unscreened and the agent adds one to the CloudWatch metric **`QuestionScreenFailures`** (namespace `SmartTutor/Agent`, dimension `Deployment` = `on-premise`). The metric is a bare count: no user, question, or error text. It sends no email. While the screen is `off` (the default) nothing is called and the count stays empty.
+**What it counts.** The optional question screen (PRD D30, `on-premise-deploy.md` section 12) calls Bedrock Guardrails, or runs DetectJailbreak in the agent (`guardrails_ai`), before search. When that call fails or takes longer than 1 second, the question goes on unscreened and the agent adds one to the CloudWatch metric **`QuestionScreenFailures`** (namespace `SmartTutor/Agent`, dimension `Deployment` = `on-premise`). The metric is a bare count: no user, question, or error text. It sends no email. While the screen is `off` (the default) nothing is called and the count stays empty.
 
 **How to read it.** In the CloudWatch console open **Metrics → All metrics → SmartTutor/Agent → Deployment**, and graph `QuestionScreenFailures` with the statistic **Sum** over 5 minutes. From the shell:
 
@@ -167,7 +167,7 @@ No data points means no failures (or the screen is off). The first question afte
 **What to do when it climbs.**
 
 1. Compare it with the turns asked. A few a day is noise. A steady share means learners are asking unscreened questions.
-2. Read the agent's log for the cause (`dc logs --tail 200 agent` in a shell, `on-premise-deploy.md` section 7): each failure logs `question screen unavailable, letting the question through` and the exception's type only. `TimeoutError` means Bedrock Guardrails was slower than 1 second (a latency regression, or a cold cross-region route). `ClientError` types such as access denied, validation, or throttling point at the agent's IAM (`bedrock:ApplyGuardrail` on the guardrail and the `us.guardrail.v1:0` profile), a guardrail version that no longer exists, or the guardrail's quota.
+2. Read the agent's log for the cause (`dc logs --tail 200 agent` in a shell, `on-premise-deploy.md` section 7): each failure logs `question screen unavailable, letting the question through` and the exception's type only. `TimeoutError` means Bedrock Guardrails was slower than 1 second (a latency regression, or a cold cross-region route). `ClientError` types such as access denied, validation, or throttling point at the agent's IAM (`bedrock:ApplyGuardrail` on the guardrail and the `us.guardrail.v1:0` profile), a guardrail version that no longer exists, or the guardrail's quota. With the local screen (`guardrails_ai`), a rising count while turn latency stays constant can mean a stuck model thread: one hung run holds the screen, so every later question waits out the 1 second and goes on unscreened; restart the agent.
 3. If the cause is not fixed quickly and the unscreened share matters, turn the screen off (`on-premise-deploy.md` section 12). A missing `cloudwatch:PutMetricData` grant on the agent shows as `could not count QuestionScreenFailures` warnings in the agent's log (the turn is not affected); no data points alone means no failures.
 
 ## Bring the services back
