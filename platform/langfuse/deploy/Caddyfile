@@ -1,0 +1,12 @@
+# Langfuse host edge (spec 2026-10-14 §6.4): HTTPS for LANGFUSE_DOMAIN with a Let's Encrypt certificate (HTTP
+# redirects to it), proxied to Langfuse web. Its UI, public API, and OTLP endpoint (/api/public/otel) are all there.
+{
+	servers {
+		# The security group opens TCP 80 and 443 only: no HTTP/3 over UDP.
+		protocols h1 h2
+	}
+}
+
+{$LANGFUSE_DOMAIN} {
+	reverse_proxy langfuse-web:3000
+}
