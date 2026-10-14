@@ -11,10 +11,45 @@ function Get-LangfuseOutput($Key) {
 }
 ```
 
+Warnings about `VIRTUAL_ENV` (another project's activated venv) and an untested Node version are harmless. Run `deactivate`, and set `$env:JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION = 1`, to silence them.
+
+## CDK bootstrap (check before any deploy)
+
+`cdk deploy` needs the account's CDK bootstrap in us-east-1: the `CDKToolkit` stack, the version parameter `/cdk-bootstrap/hnb659fds/version`, and the assets bucket `cdk-hnb659fds-assets-<account>-us-east-1`. Every CDK app in the account shares it. Check it:
+
+```powershell
+$Account = aws sts get-caller-identity --query Account --output text
+aws cloudformation describe-stacks --stack-name CDKToolkit --query "Stacks[0].StackStatus" --output text
+aws ssm get-parameter --name /cdk-bootstrap/hnb659fds/version --query Parameter.Value --output text
+aws s3api head-bucket --bucket "cdk-hnb659fds-assets-$Account-us-east-1"
+```
+
+- **No `CDKToolkit` stack:** run `npx aws-cdk@latest bootstrap "aws://$Account/us-east-1"` once.
+- **The stack exists, but the parameter or the bucket is missing** (`cdk deploy` says "SSM parameter /cdk-bootstrap/hnb659fds/version not found ... Has the environment been bootstrapped?"): they were deleted outside CloudFormation. `cdk bootstrap` won't bring them back, because the template hasn't changed. A drift-aware change set recreates them. It needs an AWS CLI from November 2025 or later: `aws cloudformation create-change-set help` must list `--deployment-mode`.
+
+  ```powershell
+  $Keep = (aws cloudformation describe-stacks --stack-name CDKToolkit --query "Stacks[0].Parameters[].ParameterKey" --output text) -split '\s+' |
+      ForEach-Object { "ParameterKey=$_,UsePreviousValue=true" }
+  aws cloudformation create-change-set --stack-name CDKToolkit --change-set-name restore-bootstrap `
+      --use-previous-template --deployment-mode REVERT_DRIFT --capabilities CAPABILITY_NAMED_IAM --parameters $Keep
+  aws cloudformation wait change-set-create-complete --stack-name CDKToolkit --change-set-name restore-bootstrap
+  aws cloudformation describe-change-set --stack-name CDKToolkit --change-set-name restore-bootstrap `
+      --query "Changes[].ResourceChange.[Action,LogicalResourceId]" --output table
+  ```
+
+  Read the table before you go on. It should recreate only what is missing: `CdkBootstrapVersion` for the parameter, and `StagingBucket` and `StagingBucketPolicy` for the bucket. If it touches anything else, delete it (`aws cloudformation delete-change-set --stack-name CDKToolkit --change-set-name restore-bootstrap`) and ask before changing the bootstrap. Otherwise:
+
+  ```powershell
+  aws cloudformation execute-change-set --stack-name CDKToolkit --change-set-name restore-bootstrap
+  aws cloudformation wait stack-update-complete --stack-name CDKToolkit
+  ```
+
+  Then run the check again. The new bucket is empty: a later `cdk deploy` of any app uploads its assets again.
+
 ## 1. First deploy
 
 1. Optional, a DuckDNS name: create one on duckdns.org (for example `<team>-langfuse`), set `langfuse:domain` in `platform/langfuse/cdk.json` to `<name>.duckdns.org`, and store your DuckDNS account token after step 2: `aws secretsmanager create-secret --name langfuse/duckdns-token --secret-string <token>`. Without a domain, the URL is `https://<Elastic IP>.sslip.io`.
-2. Deploy the stack:
+2. Deploy the stack, after the CDK bootstrap check above:
 
    ```powershell
    Push-Location platform/langfuse
