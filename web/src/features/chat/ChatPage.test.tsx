@@ -231,6 +231,16 @@ describe("ChatPage", () => {
     expect(screen.getByText("It weighs")).toBeInTheDocument();
   });
 
+  it("renders the streamed answer as Markdown", async () => {
+    const ask = vi.fn(() =>
+      events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "delta", text: "It **weighs** tokens" }),
+    );
+    renderChat({ ask });
+    await userEvent.type(await question(), "What is attention?");
+    await userEvent.click(askButton());
+    expect((await screen.findByText("weighs")).tagName).toBe("STRONG");
+  });
+
   it("shows a generic message when asking fails", async () => {
     const ask = vi.fn(async function* (): AsyncGenerator<ChatEvent> {
       throw new Error("POST /threads failed (500)");

@@ -1,13 +1,16 @@
 import { FileText } from "lucide-react";
-import { useId, useState, type ReactNode } from "react";
+import { createContext, type ComponentPropsWithoutRef, useContext, useId, useMemo, useState, type ReactNode } from "react";
+import Markdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import { formatCitation, type ChatCitation } from "../../api/chat";
 import { Button } from "../../components/Button/Button";
 import styles from "./Answer.module.css";
-import { splitMarkers, type Piece } from "./citationMarkers";
+import type { Piece } from "./citationMarkers";
+import { remarkCitationMarkers } from "./remarkCitationMarkers";
 
 type Props = {
-  /** The answer as the model wrote it: always rendered as text. */
+  /** The answer as the model wrote it, rendered as Markdown. */
   text: string;
   citations: ChatCitation[];
   /** The panel's Show citations switch. */
@@ -25,10 +28,69 @@ type Props = {
 // The Sources line shows this many chips until the learner asks for the rest.
 const COLLAPSED = 3;
 
+// Renders one marker piece; each Answer provides its own. Read through context so the Markdown components below keep
+// one identity: new component functions on every render would remount the answer, and a marker that opened the viewer
+// would lose the focus ChatPage gives back to it.
+const MarkerContext = createContext<(p: Piece) => ReactNode>((p) => p.text);
+
+function Marker({ n, children }: { n: number; children: ReactNode }) {
+  return useContext(MarkerContext)({ text: String(children), n });
+}
+
+const IdPrefixContext = createContext("");
+
+function FootnoteScoped({
+  as: Tag,
+  id,
+  "aria-labelledby": labelledBy,
+  ...props
+}: { as: "h4" | "section" } & ComponentPropsWithoutRef<"section">) {
+  const prefix = useContext(IdPrefixContext);
+  const scope = (v: string | undefined) => (v === "footnote-label" ? `${prefix}${v}` : v);
+  return <Tag {...props} id={scope(id)} aria-labelledby={scope(labelledBy)} />;
+}
+
+const remarkPlugins = [remarkGfm, remarkCitationMarkers];
+
+// The model's headings sit under the page's h1 (title) and h2 (panel headings).
+const components: Components = {
+  h1: ({ node: _node, ...props }) => <h3 {...props} />,
+  h2: ({ node: _node, ...props }) => <FootnoteScoped as="h4" {...props} />,
+  // The footnotes section and its label carry a fixed id; scoped to this answer like the other footnote ids.
+  section: ({ node: _node, ...props }) => <FootnoteScoped as="section" {...props} />,
+  h3: ({ node: _node, ...props }) => <h5 {...props} />,
+  h4: ({ node: _node, ...props }) => <h6 {...props} />,
+  h5: ({ node: _node, ...props }) => <h6 {...props} />,
+  h6: ({ node: _node, ...props }) => <h6 {...props} />,
+  // A wide table scrolls inside the answer, not the page.
+  table: ({ node: _node, ...props }) => (
+    <div className={styles.tableScroll}>
+      <table {...props} />
+    </div>
+  ),
+  // remarkCitationMarkers' spans; the answer's own HTML never reaches here (react-markdown shows it as text).
+  span: ({ node, ...props }) => {
+    const n = node?.properties?.dataMarker;
+    return typeof n === "number" ? <Marker n={n}>{props.children}</Marker> : <span {...props} />;
+  },
+};
+
 // A turn's answer and its Sources line (DESIGN.md → Chat). A declined turn has neither.
 export function Answer({ text, citations, showCitations, deletedIds, shownChunkId, onOpenCitation, rating }: Props) {
   const listId = useId();
   const moreId = useId();
+  // Footnote ids are made unique per answer: several answers share the page.
+  const rehypeOptions = useMemo(() => ({ clobberPrefix: `${listId}-` }), [listId]);
+  // Parsed once per text change: every streamed delta re-renders every turn's Answer, and re-parsing them all stutters.
+  // Marker changes still reach the Marker components below through MarkerContext.
+  const body = useMemo(
+    () => (
+      <Markdown remarkPlugins={remarkPlugins} remarkRehypeOptions={rehypeOptions} components={components}>
+        {text}
+      </Markdown>
+    ),
+    [text, rehypeOptions],
+  );
   // Expanded only for the citations it was expanded for: another conversation's turn at this index brings new ones, so
   // it starts collapsed, as a new answer and a reload do.
   const [expandedFor, setExpandedFor] = useState<ChatCitation[] | null>(null);
@@ -37,22 +99,15 @@ export function Answer({ text, citations, showCitations, deletedIds, shownChunkI
   const linked = showCitations && citations.length > 0;
   const byNumber = new Map(citations.map((c) => [c.n, c]));
 
-  // A marker number with a source in this answer opens it, as its Sources chip does; any other piece stays text.
-  // The pieces render even while markers stay text, so toggling citations keeps the live answer's text nodes.
-  function piece(p: Piece, index: number) {
+  // A marker number with a source in this answer opens it, as its Sources chip does; any other marker stays text.
+  // Markers render even while they stay text, so toggling citations keeps the live answer's text nodes.
+  function marker(p: Piece): ReactNode {
     const c = !linked || p.n === undefined ? undefined : byNumber.get(p.n);
     if (!c) return p.text;
-    if (c.deleted || deletedIds.has(c.document_id)) {
-      return (
-        <span key={index} title="Deleted document">
-          {p.text}
-        </span>
-      );
-    }
+    if (c.deleted || deletedIds.has(c.document_id)) return <span title="Deleted document">{p.text}</span>;
     const name = `Source ${c.n}: ${formatCitation(c)}${c.archived ? ", archived" : ""}`;
     return (
       <button
-        key={index}
         type="button"
         className={styles.marker}
         title={name}
@@ -110,8 +165,14 @@ export function Answer({ text, citations, showCitations, deletedIds, shownChunkI
 
   return (
     <>
-      {/* Text nodes only: the model's words are never read as HTML. */}
-      {text && <p className={styles.answer}>{splitMarkers(text).map(piece)}</p>}
+      {/* Markdown (DESIGN.md → Chat); react-markdown shows any HTML in the model's words as text. */}
+      {text && (
+        <div className={styles.answer}>
+          <IdPrefixContext.Provider value={`${listId}-`}>
+            <MarkerContext.Provider value={marker}>{body}</MarkerContext.Provider>
+          </IdPrefixContext.Provider>
+        </div>
+      )}
       {showCitations && citations.length > 0 && (
         <div className={styles.sources}>
           <span className={styles.sourcesLabel} id={listId}>

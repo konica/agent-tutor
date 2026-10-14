@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -201,5 +201,108 @@ describe("Answer", () => {
     expect(paragraph().querySelector("b, img")).toBeNull();
     expect(paragraph()).toHaveTextContent(text);
     expect(markers()).toHaveLength(1);
+  });
+
+  describe("Markdown", () => {
+    const answer = () => paragraph().parentElement!;
+
+    it("renders emphasis, lists, code, quotes, strikethrough, and links", () => {
+      renderAnswer({
+        text: "**Bold** and *italic* and ~~old~~ and `code` and [site](https://example.com).\n\n- one\n- two\n\n1. first\n\n> quoted\n\n```\nconst x = 1;\n```",
+      });
+      const root = answer();
+      expect(root.querySelector("strong")).toHaveTextContent("Bold");
+      expect(root.querySelector("em")).toHaveTextContent("italic");
+      expect(root.querySelector("del")).toHaveTextContent("old");
+      expect(root.querySelector("p code")).toHaveTextContent("code");
+      expect(root.querySelector("a")).toHaveAttribute("href", "https://example.com");
+      expect(within(root).getAllByRole("list")).toHaveLength(2);
+      expect(root.querySelector("blockquote")).toHaveTextContent("quoted");
+      expect(root.querySelector("pre code")).toHaveTextContent("const x = 1;");
+    });
+
+    it("renders the model's headings below the page's", () => {
+      renderAnswer({ text: "# One\n\n## Two\n\n### Three\n\n#### Four\n\n##### Five\n\n###### Six\n\nBody [1]." });
+      expect(screen.getAllByRole("heading").map((h) => [h.tagName, h.textContent])).toEqual([
+        ["H3", "One"],
+        ["H4", "Two"],
+        ["H5", "Three"],
+        ["H6", "Four"],
+        ["H6", "Five"],
+        ["H6", "Six"],
+      ]);
+    });
+
+    it("keeps markers live while the parsed answer is reused", () => {
+      const base = {
+        text: "A [1] B [2].",
+        citations: [cite(1), cite(2)],
+        showCitations: true,
+        deletedIds: new Set<string>(),
+        shownChunkId: null as string | null,
+        onOpenCitation: vi.fn(),
+      };
+      const { rerender } = render(<Answer {...base} />);
+      const first = () => screen.getByRole("button", { name: "Source 1: Doc 1, p. 2" });
+      expect(first()).not.toHaveAttribute("aria-current");
+      rerender(<Answer {...base} shownChunkId="c1" />);
+      expect(first()).toHaveAttribute("aria-current", "true");
+      rerender(<Answer {...base} showCitations={false} />);
+      expect(within(paragraph()).queryAllByRole("button")).toHaveLength(0);
+      rerender(<Answer {...base} />);
+      expect(within(paragraph()).queryAllByRole("button")).toHaveLength(2);
+    });
+
+    it("keeps footnote ids unique across answers and hides the footnotes label", () => {
+      const text = "Claim[^1].\n\n[^1]: Note.";
+      renderAnswer({ text, citations: [] });
+      renderAnswer({ text, citations: [] });
+      const ids = [...document.querySelectorAll("[id]")].map((e) => e.id);
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(screen.getAllByText("Footnotes")[0]).toHaveClass("sr-only");
+    });
+
+    it("keeps the marker rules inside list items", () => {
+      const props = { text: "- gone [1]\n- open [2]\n- none [7]", citations: [cite(1, { deleted: true }), cite(2)] };
+      renderAnswer(props);
+      const [gone, open, none] = within(document.querySelector("ul")!).getAllByRole("listitem");
+      expect(within(gone!).queryByRole("button")).toBeNull();
+      expect(within(gone!).getByText("[1]")).toHaveAttribute("title", "Deleted document");
+      expect(within(open!).getByRole("button", { name: "Source 2: Doc 2, p. 3" })).toBeInTheDocument();
+      expect(within(none!).queryByRole("button")).toBeNull();
+      expect(none).toHaveTextContent("none [7]");
+      cleanup();
+      renderAnswer({ ...props, showCitations: false });
+      expect(within(document.querySelector("ul")!).queryAllByRole("button")).toHaveLength(0);
+    });
+
+    it("puts a table in a scroll box and links its markers", () => {
+      renderAnswer({ text: "| Term | Meaning |\n|---|---|\n| Attention | Weighs tokens [1] |" });
+      const table = screen.getByRole("table");
+      expect(table.parentElement).toHaveClass(/tableScroll/);
+      expect(within(table).getByRole("button", { name: "Source 1: Doc 1, p. 2" })).toBeInTheDocument();
+    });
+
+    it("links markers in list items and headings, not in code", () => {
+      renderAnswer({ text: "## Why [1]\n\n- because [1]\n\nSee `x[1]`.", citations: [cite(1)] });
+      expect(screen.getAllByRole("button", { name: "Source 1: Doc 1, p. 2" })).toHaveLength(2);
+      expect(screen.getByText("x[1]").tagName).toBe("CODE");
+    });
+
+    it("renders a partial answer mid-stream", () => {
+      renderAnswer({ text: "It **weighs\n\n```\nconst x", citations: [] });
+      expect(answer()).toHaveTextContent("It **weighs");
+      expect(document.querySelector("pre")).toHaveTextContent("const x");
+    });
+
+    it("keeps the same marker button after it expands the line", async () => {
+      const five = [cite(2), cite(1), cite(3), cite(5), cite(4)];
+      renderAnswer({ text: "A [2] B [4].", citations: five });
+      const marker = screen.getByRole("button", { name: "Source 4: Doc 4, p. 5" });
+      await userEvent.click(marker);
+      expect(screen.getByRole("button", { name: /^Show less$/ })).toBeInTheDocument();
+      // ChatPage gives focus back to this node when the document closes, so it must not be remounted.
+      expect(marker.isConnected).toBe(true);
+    });
   });
 });
