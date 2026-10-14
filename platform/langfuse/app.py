@@ -2,5 +2,8 @@
 
 import aws_cdk as cdk
 
+from langfuse_platform.app import build_app
+
 app = cdk.App()
+build_app(app)
 app.synth()
