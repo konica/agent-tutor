@@ -32,7 +32,7 @@ def _runs(text: str) -> set[str]:
     }
 
 
-def _in_process() -> None:
+def in_process() -> None:
     settings.disable_tracing = True
     HubTelemetry()._tracer = None  # private, pinned by a test against the pinned version; nothing else is durable
 
@@ -56,7 +56,7 @@ class SystemPromptLeak(Validator):
 
 class GuardrailsGuard(Guard):
     def __init__(self, prompt: str, canary: str) -> None:
-        _in_process()
+        in_process()
         self._guard = AsyncGuard(history_max_length=1).use(SystemPromptLeak(prompt, canary))
         self._guard.configure(allow_metrics_collection=False)
 
