@@ -436,3 +436,46 @@ Update the docstrings of both modules (Langfuse first; "Phoenix" only where it i
 
 - All checks from `AGENTS.md` for backend and infra (no `web/` or Helm change).
 - If `.env` in the main checkout has Langfuse keys and the host answers `https://sec-dog.duckdns.org/api/public/health`, run the agent on the host and ask one question, then confirm an `ask` trace with child spans in `smart-tutor-local`. Otherwise list this, the on-premise chat, and the upload check as manual steps in the PR.
+
+---
+
+## Follow-up after PR #333 review (2026-10-14): Langfuse only
+
+The product owner decided: **switch off Phoenix**, so runtime traces go to Langfuse only. One learner-hash key is fine; `langfuse.environment` = deployment is fine; native-cloud's unused secret stays; fix the deferred review minors. Phoenix the *service* (Compose, the on-premise container, the Caddy route, its secrets, `send-test-span.py`) stays until #322 removes it. Ratings stop going to Phoenix (they are still saved with the turn); #318 sends them to Langfuse. The pilot smoke test's `--trace-project` check reads Phoenix and moves to Langfuse in #318.
+
+Pydantic-settings rejects unknown `SMART_TUTOR_*` keys in a `.env` file read from the working directory (environment variables are ignored), so removing the Phoenix settings is safe for Compose `env_file` and `uv run --env-file`; docs tell developers to delete `SMART_TUTOR_PHOENIX_*` from their `.env`.
+
+### Task 5: Backend traces and ratings without Phoenix
+
+**Files:** `backend/src/smart_tutor/shared/config.py`, `shared/adapters/tracing.py`, `shared/adapters/ask_tracing.py`, `apps/agent/server.py`, `apps/worker/main.py`, `apps/api/services.py`, `apps/api/main.py`, `apps/api/routes/threads.py`, `tutoring/README.md`; delete `tutoring/adapters/phoenix_feedback.py`, `tests/unit/tutoring/test_phoenix_feedback.py`, `tests/fakes/phoenix.py` (and its exports in `tests/fakes/__init__.py`); tests in `tests/unit/shared/test_tracing.py`, `tests/unit/apps/agent/*`, `tests/test_tests_never_trace.py`, `tests/conftest.py`; `backend/AGENTS.md`; regenerate `web/src/api/` (the Makefile's `api-client` one-liner).
+
+- Settings: remove `phoenix_url`, `phoenix_api_key`, `phoenix_project`.
+- `tracing.py`: remove `phoenix_enabled`, `phoenix_exporter`, `ingestion_project`, the Phoenix project resource attribute, and the OpenInference `metadata` JSON attribute (Langfuse reads `langfuse.trace.metadata.*`; keep `input.value`/`output.value` and the span kind). `tracing_enabled(settings)` is true with the URL and both Langfuse keys (one public name: fold `langfuse_enabled` into it). `start_tracing(settings) -> OtelTraces | None` (no project argument); `otel_traces(environment, sampling_rate, processors, hasher, metadata)`. Log lines: untraced → `"SMART_TUTOR_LANGFUSE_URL or its keys are not set; running untraced"` (info locally; warning when deployed with a URL but without keys); traced → `"tracing into Langfuse at %s"`. `stop_langsmith_tracing` docstring: runtime traces go to Langfuse only. `root_span_id`/`RunIds` stay.
+- Ratings: the API wires `NoAnswerFeedback()` (comment: ratings are saved with the turn; #318 sends them to Langfuse as `learner_rating` scores). Delete the Phoenix adapter, its tests and fake. Update `api/main.py`'s shutdown docstring and the rating route's docstrings; the `trace_id` field description becomes "The ask's trace id (its run id), for attaching a rating (#227); null for turns kept before it was recorded." Regenerate the web API client (CI fails when stale) and run `cd web && npm ci && npm run build`.
+- Test guard: conftest blanks only the Langfuse URL and keys; `test_tests_never_trace.py` keeps the Langfuse guard and positive control and drops the Phoenix ones.
+- Deferred minors: (a) `OtelAskTracing.trace` ends the root span when anything after `start_span` fails (no unended span), with a test that makes the context step raise and asserts the ask still runs untraced and the span ended; (b) `learner_attributes` and the ask metadata agree on "a thread is present" (`is not None` in both); (c) `_text` JSON-encodes every non-`str` value except bools/ints, which keep today's text (`"true"`/`"false"`, decimal) — with a test for a list value; (d) the `start_tracing` processor-count test captures processors robustly (e.g. bind the spy's call with `inspect.signature(otel_traces)`), not `args[3]`.
+- Tests: Langfuse-only processor count (0 or 1), untraced without keys, every ask/ingest/privacy test on Langfuse attributes only.
+- Checks: full backend check; `cd web && npm ci && npm run build`. Commit: `Trace into Langfuse only and stop rating Phoenix spans (#316)`.
+
+### Task 6: App deploy and config without Phoenix
+
+**Files:** `compose.yaml`, `compose.ci.yaml`, `.env.example`, `deploy/on-premise/compose.yaml`, `deploy/on-premise/deploy.sh`, `deploy/on-premise/check-egress.py`, `deploy/on-premise/check-worker.sh`, `infra/tests/test_host.py`, `infra/tests/test_check_egress.py`, `infra/tests/test_workflows.py`.
+
+- Local `compose.yaml`: api/agent/worker lose `SMART_TUTOR_PHOENIX_URL` and the api's `depends_on: phoenix`; the `phoenix` service stays (comment: unused since #316, #322 removes it). `compose.ci.yaml`: drop the `SMART_TUTOR_PHOENIX_URL=` line and its comment. `.env.example`: drop `SMART_TUTOR_PHOENIX_URL`/`PROJECT` and the Phoenix comment block; say to delete any `SMART_TUTOR_PHOENIX_*` left in an old `.env`.
+- On-premise `compose.yaml`: api/agent/worker lose `SMART_TUTOR_PHOENIX_URL/_API_KEY/_PROJECT`; the worker's `NO_PROXY`/`no_proxy: phoenix` go; the `phoenix` service leaves the `worker` network (`networks: [default]`), so the worker reaches only Postgres and the egress proxy. Comments updated.
+- `deploy.sh`: stop reading `phoenix/api-key` and rendering `PHOENIX_API_KEY` (the Phoenix service's own secrets stay until #322).
+- `check-egress.py`: drop the Phoenix probe and `_tracing()`; add `phoenix:6006` to the direct connections that must fail. Docstring and success message no longer name Phoenix. `check-worker.sh` comment likewise.
+- Deferred minor: `host_of` in `deploy.sh` also strips userinfo (`https://u:p@h.example/x` → `h.example`), with a test case.
+- Tests: update every infra assertion about the app's Phoenix wiring (worker network members, NO_PROXY, api/agent/worker env, deploy.sh `PHOENIX_API_KEY` lines, the CI override, compose app services); keep the Phoenix *service* tests (#322 removes them).
+- Checks: `cd infra && uv run pytest -q`; `bash -n deploy/on-premise/deploy.sh`. Commit: `Stop wiring the app to Phoenix on-premise and locally (#316)`.
+
+### Task 7: Docs for Langfuse-only tracing
+
+**Files:** `README.md`, `AGENTS.md`, `docs/runbooks/on-premise-deploy.md`, `docs/runbooks/on-premise-monitoring.md`, `docs/runbooks/langfuse-host.md`, `sdd/prd.md`.
+
+- Everywhere: runtime traces go to Langfuse only; Phoenix still runs (local Compose, on-premise) but receives nothing, and #322 removes it; ratings are saved with the turn and reach Langfuse with #318; the smoke test's `--trace-project` check waits for #318.
+- README: the Phoenix row and lines and the `make up` comment; tell developers to drop `SMART_TUTOR_PHOENIX_*` from `.env`. AGENTS.md local-dev lines.
+- On-premise runbook §10 ("Tracing (Langfuse)"): drop the Phoenix copy, ratings-to-Phoenix, and Phoenix-key steps; mark §11 Phoenix "unused since #316, removed by #322"; egress-check and worker-egress paragraphs (the worker no longer reaches Phoenix); teardown row for `phoenix/api-key` (no longer read). Monitoring runbook: Bedrock usage in Langfuse traces.
+- Deferred minor: in `langfuse-host.md`, move the Smart Tutor organization section in with the other admin sections (before patching/restore/teardown), renumbering.
+- PRD v2.69: reword the "Changes from v2.68" row (Langfuse only; Phoenix receives nothing until #322 removes it; ratings reach Langfuse with #318) and §9.1, §9.10, §9.12, §10.4, Appendix A (no Phoenix key).
+- Checks: `cd infra && uv run pytest -q`. Commit: `Document Langfuse-only tracing (#316)`.
