@@ -15,7 +15,7 @@ No. DetectJailbreak is not eligible in either mode:
 - Its p95 run time on 2 CPUs is 424–789 ms, over the 300 ms target.
 - It needs about 2 GiB of agent memory, against the agent's 512 MiB today.
 
-`question_guard` stays `off` in both modes. If a mode turns a screen on later, it is `bedrock` at LOW, which beats DetectJailbreak on every measured axis except the per-call fee and data locality. Bedrock LOW still misses the latency target (ADR 0019), so it stays off too.
+`question_guard` stays `off` in both modes. If a mode turns a screen on later, it is `bedrock` at LOW. Bedrock LOW wins on false positives, on catch rate at 1% false positives or fewer, on image size, and on memory. Latency is comparable: the local p50 is lower, and both miss the 300 ms p95 target. The local screen wins on the per-call fee and keeps the question in process. Bedrock LOW still misses the latency target (ADR 0019), so it stays off too.
 
 ## What was built
 
@@ -32,19 +32,20 @@ No. DetectJailbreak is not eligible in either mode:
 | | |
 |---|---|
 | Container | `python:3.12-slim`, `--cpuset-cpus 0,1` (torch sees 2 threads, like a t3.large's 2 vCPU), `--memory 8g`, `--network none` (the models are baked or cached; nothing is downloaded) |
-| Host | Windows 11 dev machine, Intel Core Ultra (20 logical CPUs), Docker 29.5. Its cores are faster than a t3.large's, and a t3 is burstable (30% baseline per vCPU), so latency on the real host is at least as high as here. |
+| Host | Windows 11 dev machine, Intel Core Ultra (20 logical CPUs), Docker 29.5. Its cores are faster than a t3.large's, and a t3 is burstable (30% baseline per vCPU), so latency on the real host is expected to be at least as high as here. |
 | Versions | guardrails-ai 0.11.0, guardrails-ai-detect-jailbreak 0.1.6, torch 2.14.1+cpu, transformers 5.19.0 |
 | Models | `GuardrailsAI/prompt-saturation-attack-detector` @ `6e8dbe4acfa5d699a1512f07885874260e8ae4ca`; `google-bert/bert-base-cased` @ `cd5ef92a9fb2f889e972770a36d4ed042daf221e` (tokenizer only); `sentence-transformers/all-MiniLM-L6-v2` @ `1110a243fdf4706b3f48f1d95db1a4f5529b4d41`; `zhx123/ftrobertallm` @ `edf8a6fa8e51a5e06b0139cc5c7d3358eeb79cf3` (1.42 GB RoBERTa-large, the largest) |
 | Dataset | `backend/evals/datasets/question_screen.yaml`, unchanged since ADR 0019's Bedrock run: 364 benign study questions and the 18 prompt seeds of the injection taxonomy (#194) |
 | Bedrock | Not re-run; the rows below are ADR 0019's (2026-10-13, same dataset) |
+| Proxy | Latency and memory were measured in this 2-CPU (cpuset), 8 GB container on the dev machine, not on the t3.large itself. The on-premise memory headroom below is arithmetic from the compose limits and the measured RSS, not a host measurement. |
 
 ## Comparison
 
-Added latency is the time the screen adds before search: for Bedrock, its own processing time (client time from GMT+7 in brackets); for DetectJailbreak, the validator's run time on 2 CPUs. The threshold only changes the cut, not the work, so the local latency is the range over four full-dataset runs.
+Added latency is the time the screen adds before search: for Bedrock, its own processing time (client time from GMT+7 in brackets); for DetectJailbreak, the validator's run time on 2 CPUs. Bedrock's processing time is server-side only; its client time includes the network, so it is the closer match to the local end-to-end run time. The threshold only changes the cut, not the work, so the local latency is the range of five measurements across four full-dataset runs.
 
 | Screen | False positives | Catch rate (18 seeds) | Added latency p50/p95 | Cost per question (share of a turn) | Agent image | Agent memory |
 |---|---|---|---|---|---|---|
-| Bedrock LOW | 0/364 (0.0%) | 6/18 | 335/424 ms (663/773 ms) | $0.000150 (8.9%) | `agent` 1.12 GB | No change: peak RSS 193 MiB with the screen off, fits 512 MiB |
+| Bedrock LOW | 0/364 (0.0%) | 6/18 | 335/424 ms (663/773 ms) | $0.000150 (8.9%) | `agent` 1.12 GB | No change expected (a boto3 call): the agent peaked at 193 MiB RSS with the screen off; not measured with it on |
 | Bedrock MEDIUM | 4/364 (1.1%) | 10/18 | 323/412 ms (650/755 ms) | $0.000150 (8.9%) | `agent` 1.12 GB | No change |
 | Bedrock HIGH | 6/364 (1.6%) | 11/18 | 334/450 ms (657/786 ms) | $0.000150 (8.9%) | `agent` 1.12 GB | No change |
 | DetectJailbreak 0.78 | 20/364 (5.5%) | 6/18 | 187–258 / 424–789 ms | ~$0.000005 compute (~0.3%), no fee | `agent-jailbreak` 5.36 GB | Peak RSS 1,842 MiB; about 2 GiB limit |
@@ -89,21 +90,21 @@ At 0.78 the 20 false positives also hit ML safety, computer security (botnets), 
 
 ### Latency
 
-- p50 187–258 ms and p95 424–789 ms over four full-dataset runs (a scoring spike 187/430; the Task 4 CLI run at 0.81, 188/471; a three-threshold CLI run, 196/424, 222/789, 258/584). The spread is load from other work on the dev machine. Every run misses the 300 ms p95 target.
+- p50 187–258 ms and p95 424–789 ms: five measurements across four full-dataset runs (a scoring spike, 187/430; the Task 4 CLI run at 0.81, 188/471; a three-threshold CLI run, 196/424 at 0.78, 222/789 at 0.81, 258/584 at 0.85). The spread is load from other work on the dev machine. Every run misses the 300 ms p95 target.
 - Long questions take longer: pasted excerpts of 540–740 characters take 0.8–2.3 s, and the padded 4,000-character seed 2.9 s. The validator truncates at 512 tokens per model.
 - The first run after loading took 18.2 s, so the loader runs one warm-up validation at startup. Loading the models takes 5–6 s.
 
 ### Memory and image size
 
-- An agent-like probe imports the agent server, builds the guard as the lifespan does, and screens 20 questions. The plain `agent` image with `question_guard=off` peaks at 193 MiB RSS in the process and 238 MiB in the container. `agent-jailbreak` with `guardrails_ai` peaks at 1,842 MiB RSS in the process, about 1.65 GB more. The measurement CLI's process peaks at 1,956–2,038 MiB.
+- An agent-like probe imports the agent server, builds the guard as the lifespan does, and screens 20 questions. The plain `agent` image with `question_guard=off` peaks at 193 MiB RSS in the process and 238 MiB in the container. `agent-jailbreak` with `guardrails_ai` peaks at 1,842 MiB RSS in the process, about +1.6 GiB (193 → 1,842 MiB). The measurement CLI's process peaks at 1,956–2,038 MiB.
 - The weights are memory-mapped safetensors (file-backed). Under the agent's 512 MiB compose limit the probe still ran (166 ms mean on the dev machine's NVMe), with the container pinned at exactly 512 MiB, by evicting and re-reading model pages. That leaves no room for the agent's own work, and on the t3.large's EBS volume every re-read costs disk I/O. A safe limit is about 2 GiB.
-- On-premise compose limits sum to about 5.8 GB of the t3.large's 8 GB (phoenix 1g, keycloak 1536m, api, agent, and mcp 512m each, worker 1536m, web 128m, egress-proxy 128m). Raising the agent to 2 GiB leaves about 0.7 GB for the OS and Docker.
+- On-premise compose limits sum to about 5.8 GB of the t3.large's 8 GB (phoenix 1g, keycloak 1536m, api, agent, and mcp 512m each, worker 1536m, web 128m, egress-proxy 128m). Raising the agent to 2 GiB leaves about 0.7 GB for the OS and Docker. That is arithmetic from the limits and the RSS measured in the dev container, not a measurement on the host.
 - `docker image ls`: `agent` 1.12 GB, `agent-jailbreak` 5.36 GB. Unpacked layers (`docker history`): `agent` about 0.86 GB (venv 729 MB), `agent-jailbreak` about 3.45 GB (venv 1.79 GB, of which 1.06 GB is torch and transformers; models 1.53 GB).
 
 ### Cost per turn
 
 - Bedrock: $0.00015 per question, 8.9% of an average turn ($0.00169; ADR 0019).
-- Local: no per-call fee. About 0.2 s on 2 vCPU per question on a t3.large at $0.0832/h (AWS Pricing API, us-east-1 on-demand Linux, 2026-10-14) is 0.4 vCPU-s × $0.0000116, about $0.000005 per question (about 0.3% of a turn) at the marginal rate. The real cost is capacity: about 1.65 GB more memory on an 8 GB host, and CPU bursts on a burstable instance (30% baseline) that the agent, API, MCP server, and worker share. In native-cloud (EKS) it is a pod memory request of about 2 GiB instead of 256Mi–512Mi.
+- Local: no per-call fee. About 0.2 s on 2 vCPU per question on a t3.large at $0.0832/h (AWS Pricing API, us-east-1 on-demand Linux, 2026-10-14) is 0.4 vCPU-s × $0.0000116, about $0.000005 per question (about 0.3% of a turn) at the marginal rate. The real cost is capacity: about 1.6 GiB more memory on an 8 GB host, and CPU bursts on a burstable instance (30% baseline) that the agent, API, MCP server, and worker share. In native-cloud (EKS) it is a pod memory request of about 2 GiB instead of 256Mi–512Mi.
 
 ## Decision per mode
 
@@ -111,10 +112,10 @@ A screen is eligible when false positives are at most 1% and the p95 added laten
 
 | Mode | `question_guard` | Why |
 |---|---|---|
-| On-premise | `off` | DetectJailbreak fails all three limits: at 0.81 it trips 1.1% and catches 1 of 18; at 0.85 and above it catches nothing; its p95 is over 300 ms; and 2 GiB for the agent leaves about 0.7 GB on the host. Bedrock LOW passes false positives and cost but misses latency (ADR 0019). |
+| On-premise | `off` | DetectJailbreak fails all three limits: at 0.81 it trips 1.1% and catches 1 of 18; at 0.85 and above it catches nothing; its p95 is over 300 ms; and 2 GiB for the agent leaves about 0.7 GB on the host (by arithmetic from the compose limits and the RSS measured in a 2-CPU, 8 GB dev container, not on the t3.large). Bedrock LOW passes false positives and cost but misses latency (ADR 0019). |
 | Native-cloud | `off` | Memory is easier on EKS, but accuracy and latency fail the same way. Bedrock LOW misses latency here too. |
 
-If a mode turns a screen on later (after the latency target is relaxed or met), it is `bedrock` at LOW: 0% false positives and 6 of 18 caught, against DetectJailbreak's best eligible-FP result of 0 of 18. DetectJailbreak wins only on the per-call fee and on keeping the question in the process.
+If a mode turns a screen on later (after the latency target is relaxed or met), it is `bedrock` at LOW: 0% false positives and 6 of 18 caught, against DetectJailbreak's best eligible-FP result of 0 of 18. Bedrock LOW also needs no larger image or more memory. Latency is comparable: the local p50 (187–258 ms) is below Bedrock's processing p50 (335 ms) and client p50 (663 ms), and both miss the 300 ms p95 target. DetectJailbreak wins on the per-call fee and keeps the question in process.
 
 ## The adapter ships as an optional extra
 

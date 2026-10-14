@@ -39,22 +39,22 @@ ADR 0018 left the question check on the `Guard` port returning no trip, and name
 
 `question_guard=guardrails_ai` screens the question with Guardrails AI's `DetectJailbreak` (0.1.6) on CPU, in process, at `question_jailbreak_threshold` (default 0.81, the validator's own). `DetectJailbreakScreen` has the same timeout, fail-open behavior, counter, and trip (`guard_question`) as the Bedrock screen. It runs one validation at a time; a run that times out keeps the lock until it ends, so later questions fail open, each counted. The models load offline at startup with one warm-up run (the first run takes about 18 s). Torch and about 1.5 GB of models do not fit the default image or the 512 MiB agent, so the adapter's dependencies are the optional `jailbreak` extra and its models are baked into a separate `agent-jailbreak` image that CI neither builds nor deploys. Setting `guardrails_ai` in the plain `agent` image stops the agent at startup with a message naming that image.
 
-Measured 2026-10-14 on the same dataset, in a 2-CPU, 8 GB container with no network (`sdd/reviews/2026-10-14-question-screen-comparison.md`). Added latency is Bedrock's own processing time and the validator's run time; the local range covers four runs, since the threshold changes the cut, not the work.
+Measured 2026-10-14 on the same dataset, in a 2-CPU, 8 GB container with no network (`sdd/reviews/2026-10-14-question-screen-comparison.md`). Bedrock's added latency is shown as its server-side processing time and, in brackets, its client time from GMT+7 (the closer match to the local end-to-end run time). The local range covers five measurements across four runs, since the threshold changes the cut, not the work. Latency and memory come from the dev container, not the t3.large.
 
 | Screen | False positives | Catch rate (18 seeds) | Added latency p50/p95 | Cost per question (share of a turn) | Agent image | Agent memory |
 |---|---|---|---|---|---|---|
-| Bedrock LOW | 0/364 (0.0%) | 6/18 | 335/424 ms | $0.000150 (8.9%) | `agent` 1.12 GB | No change (512 MiB limit) |
-| Bedrock MEDIUM | 4/364 (1.1%) | 10/18 | 323/412 ms | $0.000150 (8.9%) | `agent` 1.12 GB | No change |
-| Bedrock HIGH | 6/364 (1.6%) | 11/18 | 334/450 ms | $0.000150 (8.9%) | `agent` 1.12 GB | No change |
+| Bedrock LOW | 0/364 (0.0%) | 6/18 | 335/424 ms (663/773 ms) | $0.000150 (8.9%) | `agent` 1.12 GB | No change expected (193 MiB RSS measured with the screen off) |
+| Bedrock MEDIUM | 4/364 (1.1%) | 10/18 | 323/412 ms (650/755 ms) | $0.000150 (8.9%) | `agent` 1.12 GB | No change expected |
+| Bedrock HIGH | 6/364 (1.6%) | 11/18 | 334/450 ms (657/786 ms) | $0.000150 (8.9%) | `agent` 1.12 GB | No change expected |
 | DetectJailbreak 0.78 | 20/364 (5.5%) | 6/18 | 187–258 / 424–789 ms | ~$0.000005 compute (~0.3%) | `agent-jailbreak` 5.36 GB | Peak RSS 1,842 MiB; about 2 GiB limit |
 | DetectJailbreak 0.81 | 4/364 (1.1%) | 1/18 | 187–258 / 424–789 ms | ~$0.000005 compute (~0.3%) | `agent-jailbreak` 5.36 GB | Peak RSS 1,842 MiB; about 2 GiB limit |
 | DetectJailbreak 0.85 | 1/364 (0.3%) | 0/18 | 187–258 / 424–789 ms | ~$0.000005 compute (~0.3%) | `agent-jailbreak` 5.36 GB | Peak RSS 1,842 MiB; about 2 GiB limit |
 
 - The scores barely separate benign questions (median 0.739, max 0.857) from attacks (median 0.757, max 0.828). Every trip came from the validator's match against known DAN-style jailbreaks; our seeds are short, targeted injections. At 0.81 it tripped on questions such as "Compare the instruction hierarchy approach with simple delimiters around untrusted text."
 - At the only thresholds with at most 1% false positives (0.85 and above) it catches nothing. Its p95 misses 300 ms in every run, pasted excerpts of 540 to 740 characters take 0.8 to 2.3 s, and a 4,000-character question 2.9 s.
-- It needs about 2 GiB of agent memory (the plain agent peaks at 193 MiB). On-premise that leaves about 0.7 GB of the t3.large's 8 GB for the OS and Docker.
+- It needs about 2 GiB of agent memory (the plain agent peaks at 193 MiB). On-premise that would leave about 0.7 GB of the t3.large's 8 GB for the OS and Docker, by arithmetic from the compose limits and the RSS measured in the dev container (not measured on the host).
 
-**Default per mode: `off` for on-premise and for native-cloud.** DetectJailbreak is not eligible in either mode: at every threshold it either trips more than 1% of study questions or catches at most 1 of 18 seeds, its p95 latency misses 300 ms, and it needs four times the agent's memory. Bedrock LOW stays the screen of choice if a mode turns one on later; it beats the local screen on every measured axis except the per-call fee and keeping the question in process, but it still misses the latency target, so it stays off as well. Document-embedded attacks (#196) never reach a question screen, so they add no rows.
+**Default per mode: `off` for on-premise and for native-cloud.** DetectJailbreak is not eligible in either mode: at every threshold it either trips more than 1% of study questions or catches at most 1 of 18 seeds, its p95 latency misses 300 ms, and it needs four times the agent's memory. Bedrock LOW stays the screen of choice if a mode turns one on later; it wins on false positives, on catch rate at 1% false positives or fewer, on image size, and on memory. Latency is comparable (the local p50 is lower; both miss the 300 ms p95), and the local screen wins on the per-call fee and keeps the question in process. Bedrock LOW still misses the latency target, so it stays off as well. Document-embedded attacks (#196) never reach a question screen, so they add no rows.
 
 ## Why it fails open when the output guard fails closed
 
