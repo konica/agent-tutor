@@ -62,9 +62,17 @@ def test_langfuse_settings(compose: dict[str, Any]) -> None:
         # Real S3, not MinIO: virtual-hosted-style addressing.
         assert env["LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE"] == "false"
         assert env["LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE"] == "false"
-    assert web["HOSTNAME"] == "0.0.0.0"  # Caddy reaches it by service name, not the container's hostname
+        # Docker sets HOSTNAME to the container id; web and worker bind to it, so without this the worker's
+        # 127.0.0.1 health check is refused and Caddy could not reach web by service name.
+        assert env["HOSTNAME"] == "0.0.0.0"
     assert web["AUTH_DISABLE_SIGNUP"] == "${AUTH_DISABLE_SIGNUP:?}"
     assert web["NEXTAUTH_URL"] == "https://${LANGFUSE_DOMAIN:?}"
+
+
+def test_valkey_health_check_authenticates_and_expects_pong(compose: dict[str, Any]) -> None:
+    valkey = compose["services"]["valkey"]
+    assert valkey["environment"]["REDISCLI_AUTH"] == "${REDIS_AUTH:?}"
+    assert valkey["healthcheck"]["test"] == ["CMD-SHELL", "valkey-cli ping | grep -q PONG"]
 
 
 def test_data_lives_on_the_data_volume(compose: dict[str, Any]) -> None:

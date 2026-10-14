@@ -41,8 +41,10 @@ HOST_TAG = "langfuse:host"
 SNAPSHOT_TAG = "langfuse:snapshots"
 SNAPSHOT_TIME_UTC = "19:00"  # 02:00 Asia/Ho_Chi_Minh
 SNAPSHOT_RETENTION_DAYS = 7
-# Generated secrets deploy.sh reads: (construct id, name under langfuse/, length). Never rotate encryption-seed: deploy.sh
-# derives Langfuse's ENCRYPTION_KEY from it, and data encrypted with the old key can't be read with a new one.
+# Generated secrets deploy.sh reads: (construct id, name under langfuse/, length). Changing a secret's settings (name,
+# length, punctuation) makes CloudFormation generate a new value. A new db/postgres breaks the existing database
+# (POSTGRES_PASSWORD applies only at first init); a new encryption-seed makes encrypted data unreadable, because deploy.sh
+# derives Langfuse's ENCRYPTION_KEY from it. tests/test_host_stack.py pins this tuple so a change is deliberate.
 GENERATED_SECRETS = (
     ("NextAuthSecret", "nextauth-secret", 64),
     ("SaltSecret", "salt", 64),
@@ -145,7 +147,14 @@ class LangfuseHostStack(cdk.Stack):
                 conditions={"StringEquals": {f"aws:ResourceTag/{HOST_TAG}": PREFIX}},
             )
         )
-        bundle.grant_read(role)
+        # Only this bundle: the CDK assets bucket is shared with every other stack in the account and region.
+        role.add_to_policy(
+            iam.PolicyStatement(
+                sid="ReadBundle",
+                actions=["s3:GetObject"],
+                resources=[bundle.bucket.arn_for_objects(bundle.s3_object_key)],
+            )
+        )
 
         instance = ec2.Instance(
             self,

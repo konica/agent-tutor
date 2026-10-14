@@ -8,6 +8,7 @@ import pytest
 from aws_cdk.assertions import Template
 
 from langfuse_platform.app import build_app
+from langfuse_platform.host_stack import GENERATED_SECRETS
 
 CONTEXT = {
     "langfuse:region": "us-east-1",
@@ -78,6 +79,15 @@ def test_data_volume_is_100_gib_encrypted_and_snapshotted_daily_for_7_days(t: Te
     assert schedule["RetainRule"] == {"Interval": 7, "IntervalUnit": "DAYS"}
 
 
+def test_data_volume_is_snapshotted_by_tag_and_kept_as_a_snapshot_when_removed(t: Template) -> None:
+    (volume,) = t.find_resources("AWS::EC2::Volume").values()
+    assert volume["DeletionPolicy"] == "Snapshot"
+    tags = {tag["Key"]: tag["Value"] for tag in volume["Properties"]["Tags"]}
+    assert tags["langfuse:snapshots"] == "langfuse"
+    (policy,) = t.find_resources("AWS::DLM::LifecyclePolicy").values()
+    assert policy["Properties"]["PolicyDetails"]["TargetTags"] == [{"Key": "langfuse:snapshots", "Value": "langfuse"}]
+
+
 def test_bucket_is_private_encrypted_tls_only_and_kept(t: Template) -> None:
     (bucket_id, bucket) = next(iter(t.find_resources("AWS::S3::Bucket").items()))
     props = bucket["Properties"]
@@ -104,6 +114,26 @@ def test_instance_role_reads_only_its_own_settings_and_secrets_and_uses_its_buck
     assert "secret:langfuse/*" in json.dumps(statements["ReadSecrets"]["Resource"])
     every = json.dumps([p["Properties"] for p in t.find_resources("AWS::IAM::Policy").values()])
     assert "s3:PutObject" in every and "s3:DeleteObject" in every
+
+
+def test_instance_role_reads_only_the_bundle_object_from_the_shared_assets_bucket(t: Template) -> None:
+    read_bundle = _statements(t)["ReadBundle"]
+    assert read_bundle["Action"] == "s3:GetObject"
+    assert "cdk-hnb659fds-assets" in json.dumps(read_bundle["Resource"])
+    # Nothing else touches the assets bucket, and only our own bucket may be listed or have its settings read.
+    for policy in t.find_resources("AWS::IAM::Policy").values():
+        for statement in policy["Properties"]["PolicyDocument"]["Statement"]:
+            if statement.get("Sid") == "ReadBundle":
+                continue
+            actions = statement["Action"] if isinstance(statement["Action"], list) else [statement["Action"]]
+            if "cdk-" in json.dumps(statement["Resource"]) or "hnb659fds" in json.dumps(statement["Resource"]):
+                raise AssertionError(statement)
+            if any(a in ("s3:List*", "s3:GetBucket*") for a in actions):
+                assert all("Bucket83908E77" in json.dumps(r) for r in _as_list(statement["Resource"])), statement
+
+
+def _as_list(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else [value]
 
 
 def test_settings_for_deploy_sh(t: Template) -> None:
@@ -143,6 +173,18 @@ def test_secrets_are_generated_under_langfuse(t: Template) -> None:
     )
     assert json.loads(admin["GenerateSecretString"]["SecretStringTemplate"]) == {"email": "admin@example.com"}
     assert admin["GenerateSecretString"]["GenerateStringKey"] == "password"
+
+
+def test_generated_secrets_are_pinned_because_changing_one_generates_a_new_value() -> None:
+    assert GENERATED_SECRETS == (
+        ("NextAuthSecret", "nextauth-secret", 64),
+        ("SaltSecret", "salt", 64),
+        ("EncryptionSeedSecret", "encryption-seed", 64),
+        ("PostgresSecret", "db/postgres", 32),
+        ("ClickHouseSecret", "clickhouse", 32),
+        ("ValkeySecret", "valkey", 32),
+        ("InitProjectKeysSecret", "init-project-keys", 48),
+    )
 
 
 def test_deploy_document_takes_no_parameter_and_runs_the_bundled_script(t: Template) -> None:
