@@ -1,9 +1,12 @@
 import builtins
 import os
+import sys
+import types
 from pathlib import Path
 from typing import Any
 
 import pytest
+from guardrails import OnFailAction
 
 from smart_tutor.tutoring.adapters.detect_jailbreak import (
     MODELS,
@@ -38,6 +41,8 @@ def test_fetch_downloads_each_pinned_commit_and_points_main_at_it(tmp_path: Path
 
 
 def test_loading_without_the_extra_names_the_image(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("HF_HUB_OFFLINE", raising=False)
+    monkeypatch.delenv("TRANSFORMERS_OFFLINE", raising=False)
     real_import = builtins.__import__
 
     def no_extra(name: str, *args: Any, **kwargs: Any) -> Any:
@@ -66,3 +71,29 @@ def test_loading_forces_the_hub_offline_first(monkeypatch: pytest.MonkeyPatch) -
     with pytest.raises(JailbreakExtraMissing):
         load_detect_jailbreak(0.81)
     assert seen == {"hub": "1", "transformers": "1"}
+
+
+def test_loading_warms_the_validator_with_one_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("HF_HUB_OFFLINE", raising=False)
+    monkeypatch.delenv("TRANSFORMERS_OFFLINE", raising=False)
+    built: list[dict[str, Any]] = []
+    validated: list[str] = []
+
+    class FakeDetectJailbreak:
+        def __init__(self, **kwargs: Any) -> None:
+            built.append(kwargs)
+
+        def validate(self, value: str, metadata: dict[str, Any]) -> None:
+            validated.append(value)
+
+    parent = types.ModuleType("guardrails_ai")
+    child = types.ModuleType("guardrails_ai.detect_jailbreak")
+    child.DetectJailbreak = FakeDetectJailbreak  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "guardrails_ai", parent)
+    monkeypatch.setitem(sys.modules, "guardrails_ai.detect_jailbreak", child)
+
+    validator = load_detect_jailbreak(0.7)
+
+    assert isinstance(validator, FakeDetectJailbreak)
+    assert built == [{"threshold": 0.7, "device": "cpu", "use_local": True, "on_fail": OnFailAction.NOOP}]
+    assert len(validated) == 1

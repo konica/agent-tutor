@@ -53,7 +53,11 @@ def load_detect_jailbreak(threshold: float) -> Any:
             "build the agent-jailbreak image (docker build --target agent-jailbreak)"
         ) from e
     in_process()
-    return DetectJailbreak(threshold=threshold, device="cpu", use_local=True, on_fail=OnFailAction.NOOP)
+    validator = DetectJailbreak(threshold=threshold, device="cpu", use_local=True, on_fail=OnFailAction.NOOP)
+    validator.validate(
+        "What does the paper say about attention heads?", {}
+    )  # first run is cold (~18 s): not in a learner's 1 s
+    return validator
 
 
 if __name__ == "__main__":
