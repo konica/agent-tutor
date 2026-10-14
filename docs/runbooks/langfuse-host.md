@@ -55,13 +55,11 @@ aws ssm get-command-invocation --command-id $Command --instance-id $InstanceId -
 
 Don't send the document again while one is running: two `deploy.sh` runs would race. The first run takes several minutes (image pulls, migrations), which is why this loops instead of using `aws ssm wait command-executed`, which gives up after about 100 seconds.
 
-After every `cdk deploy`, re-read `$InstanceId = Get-LangfuseOutput InstanceId`, wait until SSM lists it `Online` (section 1, step 3), then run the document. The AMI is the latest Amazon Linux 2023, resolved on every deploy, so a deploy after Amazon publishes a new one replaces the instance: it gets a new id and Langfuse is down until the document runs.
+After every `cdk deploy`, re-read `$InstanceId = Get-LangfuseOutput InstanceId`, wait until SSM lists it `Online` (section 1, step 3), then run the document. The AMI is the latest Amazon Linux 2023, resolved on every deploy, so a deploy after Amazon publishes a new one replaces the instance: it gets a new id and Langfuse is down until the document runs. The document also copies `ensure-healthy.sh` to the VM, which the patching window's health check needs: until it has run, the window fails with "ensure-healthy.sh is missing".
 
 To upgrade Langfuse, change the two `langfuse/*:4.x.y` tags in `deploy/compose.yaml` (read Langfuse's release notes first; both must match), run the tests, `cdk deploy`, then run the document.
 
 Deploy between 07:00 and 17:30, or start the host first (section 4): the 18:00 stop cuts off a deploy that is still running.
-
-After the `cdk deploy` that added the hours and patching, run the deploy document once: the patching window's health check needs `ensure-healthy.sh` on the VM, and until the document has copied it the window fails with "ensure-healthy.sh is missing: run the deploy document".
 
 Stopping and starting the instance needs no deploy: every service has `restart: unless-stopped`.
 
@@ -113,7 +111,7 @@ Next morning, run the same commands with `--state ENABLED`.
 | Window | `langfuse-patching`, targeting the instance |
 | Patches | The baseline `langfuse-security`: Amazon Linux 2023 updates classified **Security**. The instance's `PatchGroup` tag (`langfuse`) selects it. |
 | Task 1, `PatchTask` | `AWS-RunPatchBaseline` with `Install` and `RebootIfNeeded`. It reboots only when an installed patch needs it (a kernel, for example). |
-| Task 2, `HealthTask` | `bash /opt/langfuse/ensure-healthy.sh`: starts Docker and any service that isn't running, with the last deploy's settings, and waits up to 15 minutes until every service is healthy. It never pulls images. If the file is missing it fails with "ensure-healthy.sh is missing: run the deploy document". |
+| Task 2, `HealthTask` | `bash /opt/langfuse/ensure-healthy.sh`: starts Docker and any service that isn't running, with the last deploy's settings, and waits up to 15 minutes until every service is healthy. It never pulls images. If the file is missing it fails with "ensure-healthy.sh is missing: run the deploy document". It runs even if task 1 failed. |
 | On failure | An email to the `langfuse-alerts` topic (EventBridge rule on the window's `FAILED` or `TIMED_OUT` state) |
 
 A reboot takes Langfuse down for a few minutes. Patching doesn't touch the Langfuse images: they change only with a deploy.
@@ -125,7 +123,12 @@ aws ssm describe-instance-patch-states --instance-ids $InstanceId `
     --query "InstancePatchStates[0].{Installed: InstalledCount, Missing: MissingCount, Failed: FailedCount, RebootPending: InstalledPendingRebootCount, Last: OperationEndTime}"
 ```
 
-To move the window, change `PATCH_SCHEDULE` in `platform/langfuse/langfuse_platform/host_stack.py` (a cron expression in Asia/Ho_Chi_Minh) and `cdk deploy`. To pause patching, disable the window in the console (**Maintenance Windows → Edit → Enabled**), and enable it again afterwards.
+To move the window, change `PATCH_SCHEDULE` in `platform/langfuse/langfuse_platform/host_stack.py` (a cron expression in Asia/Ho_Chi_Minh) and `cdk deploy`. To pause patching, disable the window in the console (**Maintenance Windows → Edit → Enabled**) or from the shell, and enable it again afterwards:
+
+```powershell
+$Window = aws ssm describe-maintenance-windows --filters "Key=Name,Values=langfuse-patching" --query "WindowIdentities[0].WindowId" --output text
+aws ssm update-maintenance-window --window-id $Window --no-enabled   # --enabled to resume
+```
 
 **Bring the services back by hand** (after a failed window, or when `$Url` doesn't answer while the host runs). Poll it like section 3:
 
@@ -137,6 +140,25 @@ aws ssm get-command-invocation --command-id $Command --instance-id $InstanceId -
 ```
 
 No alarm watches Langfuse (ADR 0022): open `$Url` when in doubt. A failed patching window emails the addresses in `langfuse:alert-emails` (`platform/langfuse/cdk.json`); each address confirms the SNS subscription email once.
+
+**When the patching window fails.** You get the email, or Langfuse doesn't answer on a Sunday. Either the patching failed, so the VM may be missing security updates, or the health check after it found a service that didn't come back.
+
+1. Find the failed task. In the Systems Manager console, open **Maintenance Windows → langfuse-patching → History**, open the execution, then each task's output. From the shell:
+
+   ```powershell
+   $Window = aws ssm describe-maintenance-windows --filters "Key=Name,Values=langfuse-patching" --query "WindowIdentities[0].WindowId" --output text
+   aws ssm describe-maintenance-window-executions --window-id $Window --max-results 3 --query "WindowExecutions[].[WindowExecutionId, Status, StartTime]" --output table
+   ```
+
+2. If **`HealthTask`** failed, Langfuse may be down: bring the services back (the command above) now.
+3. If **`PatchTask`** failed, the output names the package or repository problem. Fix it, then patch now instead of waiting a week:
+
+   ```powershell
+   $Command = aws ssm send-command --document-name AWS-RunPatchBaseline --instance-ids $InstanceId `
+       --parameters "Operation=Install,RebootOption=RebootIfNeeded" --query Command.CommandId --output text
+   ```
+
+   When it has finished (and the VM has rebooted, if it needed to), bring the services back (the command above) as the health check.
 
 ## 6. Restore from a snapshot
 

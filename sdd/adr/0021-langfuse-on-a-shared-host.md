@@ -43,7 +43,7 @@ owner wants other apps to use the same Langfuse later.
 
 ## Consequences
 
-- A second host (about $55 a month on demand at 11 hours a day (about $121 around the clock), plus its volume and
+- A second host (about $55 a month on demand at 11 hours a day, or $121 around the clock, plus its volume and
   Elastic IP) and a second deploy to run by hand (`docs/runbooks/langfuse-host.md`).
 - Traces, scores, and datasets live on that host; a lost volume loses up to a day (snapshots), and there is no
   database dump.
