@@ -20,9 +20,11 @@
 - Deploy: `cdk deploy` uploads `deploy/` as an asset; the SSM document `<prefix>-deploy` downloads it and runs
   `deploy/on-premise/deploy.sh <image tag>`, which renders settings and secrets into a root-only env file on the VM.
   No secret is in the template, the outputs, or the user data.
-- Monitoring (#152): the backups' topic `<prefix>-alerts` emails the budget recipients. An alarm on the EC2 system status check
-  recovers the instance; a Route 53 health check on `https://<domain>/api/healthz` alarms when the product is down; a
-  failed patching window emails too. Runbook: docs/runbooks/on-premise-monitoring.md.
+- Off-hours (ADR 0022): EventBridge Scheduler stops the instance at 18:00 and 00:00 and starts it at 07:00 in the app
+  time zone (OffHours). A person may start it at any hour; Docker brings every service back.
+- No CloudWatch alarms (ADR 0022). The topic `<prefix>-alerts` emails the budget recipients when the weekly patching
+  fails. EC2's default automatic recovery moves the instance off failed hardware. Runbook:
+  docs/runbooks/on-premise-monitoring.md.
 - Patching (#152): a weekly maintenance window installs security patches (rebooting if needed), then runs
   `deploy/on-premise/ensure-healthy.sh` so every service is back and healthy.
 
@@ -35,15 +37,12 @@ from pathlib import Path
 from typing import Any
 
 import aws_cdk as cdk
-from aws_cdk import aws_cloudwatch as cloudwatch
-from aws_cdk import aws_cloudwatch_actions as cloudwatch_actions
 from aws_cdk import aws_dlm as dlm
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_ecr as ecr
 from aws_cdk import aws_events as events
 from aws_cdk import aws_events_targets as events_targets
 from aws_cdk import aws_iam as iam
-from aws_cdk import aws_route53 as route53
 from aws_cdk import aws_s3_assets as s3_assets
 from aws_cdk import aws_secretsmanager as secretsmanager
 from aws_cdk import aws_sns as sns
@@ -52,6 +51,7 @@ from aws_cdk import aws_ssm as ssm
 from constructs import Construct
 
 from smart_tutor_infra.names import ModeNames
+from smart_tutor_infra.off_hours import OffHours
 from smart_tutor_infra.service_permissions import ServicePermissions
 from smart_tutor_infra.stacks.config import APP_TIME_ZONE
 from smart_tutor_infra.stacks.registry import SERVICES
@@ -69,11 +69,9 @@ COMPOSE_SHA256 = "db1889184726840f75c4f9c001048430d4f25b3be3cb084d3ddd762bc0aed5
 BUNDLE_DIR = Path(__file__).parents[3] / "deploy"
 # Only the instance with this tag may attach the volume with this tag.
 HOST_TAG = "smart-tutor:host"
-# The API's health route as the public sees it (Caddy forwards /api/* unchanged); the uptime check probes it.
-HEALTH_PATH = "/api/healthz"
-# Weekly patching: Sunday 04:00 in the app time zone, when learners are least likely to be studying, and an hour after
-# the nightly dump starts (03:00), so a reboot doesn't cut it off.
-PATCH_SCHEDULE = "cron(0 4 ? * SUN *)"
+# Weekly patching: Sunday 07:20 in the app time zone, twenty minutes after the off-hours start (07:00), so Docker has the
+# services up; it reboots only when a patch needs it.
+PATCH_SCHEDULE = "cron(20 7 ? * SUN *)"
 # Run after the patching. The script reaches the VM with the bundle, i.e. with a deploy, not with `cdk deploy`.
 ENSURE_HEALTHY = "/opt/smart-tutor/on-premise/ensure-healthy.sh"
 ENSURE_HEALTHY_COMMAND = (
@@ -85,9 +83,6 @@ ENSURE_HEALTHY_COMMAND = (
 SNAPSHOT_TAG = "smart-tutor:snapshots"
 SNAPSHOT_TIME_UTC = "19:00"
 SNAPSHOT_RETENTION_DAYS = 7
-# Scheduled jobs on the VM report a failure here (deploy/on-premise/report-failure.sh).
-JOB_METRICS_NAMESPACE = "SmartTutor/OnPremise"
-BACKUP_JOB = "smart-tutor-backup"  # the systemd unit's name without .service
 
 
 class HostStack(cdk.Stack):
@@ -237,14 +232,6 @@ class HostStack(cdk.Stack):
                 conditions={"StringLike": {"s3:prefix": [f"{BACKUPS_PREFIX}*"]}},
             )
         )
-        role.add_to_policy(
-            iam.PolicyStatement(
-                sid="PublishJobMetrics",
-                actions=["cloudwatch:PutMetricData"],
-                resources=["*"],  # PutMetricData has no resource; the namespace condition scopes it
-                conditions={"StringEquals": {"cloudwatch:namespace": JOB_METRICS_NAMESPACE}},
-            )
-        )
 
         instance = ec2.Instance(
             self,
@@ -273,6 +260,7 @@ class HostStack(cdk.Stack):
         cdk.Tags.of(instance).add("Name", names.resource_prefix)
         # Selects the patch baseline below (the tag key without a space also works with instance metadata tags).
         cdk.Tags.of(instance).add("PatchGroup", names.resource_prefix)
+        OffHours(self, "OffHours", instance=instance, name_prefix=names.resource_prefix, time_zone=APP_TIME_ZONE)
 
         address = ec2.CfnEIP(self, "Address", domain="vpc")
         ec2.CfnEIPAssociation(
@@ -373,7 +361,6 @@ class HostStack(cdk.Stack):
         )
 
         alerts = self._backups(names, alert_emails)
-        _alarms(self, names, instance, domain, alerts)
         _patching(self, names, instance, alerts)
 
         cdk.CfnOutput(self, "InstanceId", value=instance.instance_id)
@@ -383,8 +370,7 @@ class HostStack(cdk.Stack):
         cdk.CfnOutput(self, "DeployDocumentName", value=document.ref)
 
     def _backups(self, names: ModeNames, alert_emails: Sequence[str]) -> sns.Topic:
-        """Daily snapshots of the data volume, and alarms for a failed snapshot or nightly dump (#151). Returns the
-        alerts topic, which the monitoring and patching alarms (#152) share."""
+        """Daily snapshots of the data volume (#151). Returns the alerts topic, which the patching rule (#152) emails."""
         snapshot_role = iam.Role(
             self,
             "SnapshotRole",
@@ -394,7 +380,7 @@ class HostStack(cdk.Stack):
                 iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWSDataLifecycleManagerServiceRole")
             ],
         )
-        policy = dlm.CfnLifecyclePolicy(
+        dlm.CfnLifecyclePolicy(
             self,
             "DataVolumeSnapshots",
             # DLM accepts only letters, digits, spaces, "_" and "-" here.
@@ -420,48 +406,10 @@ class HostStack(cdk.Stack):
             ),
         )
 
-        # Monitoring (#152) adds its alarms to the same topic. Each address confirms its subscription once.
+        # The patching rule emails this topic. Each address confirms its subscription once.
         topic = sns.Topic(self, "Alerts", topic_name=f"{names.resource_prefix}-alerts")
         for address in alert_emails:
             topic.add_subscription(sns_subscriptions.EmailSubscription(address))
-        alarm_action = cloudwatch_actions.SnsAction(topic)
-
-        for construct_name, description, metric in (
-            (
-                "BackupFailedAlarm",
-                "The nightly pg_dump on the on-premise host failed (journalctl -u smart-tutor-backup)",
-                cloudwatch.Metric(
-                    namespace=JOB_METRICS_NAMESPACE,
-                    metric_name="JobFailed",
-                    dimensions_map={"Job": BACKUP_JOB},
-                    statistic="Sum",
-                    period=cdk.Duration.hours(1),
-                ),
-            ),
-            (
-                "SnapshotFailedAlarm",
-                "Data Lifecycle Manager could not snapshot the on-premise data volume",
-                cloudwatch.Metric(
-                    namespace="AWS/EBS",
-                    metric_name="SnapshotsCreateFailed",
-                    dimensions_map={"DLMPolicyId": policy.ref},
-                    statistic="Sum",
-                    period=cdk.Duration.hours(1),
-                ),
-            ),
-        ):
-            alarm = cloudwatch.Alarm(
-                self,
-                construct_name,
-                alarm_description=f"{description}. Runbook: docs/runbooks/on-premise-backups.md",
-                metric=metric,
-                threshold=1,
-                comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-                evaluation_periods=1,
-                # No data is the normal case: only a failure reports.
-                treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
-            )
-            alarm.add_alarm_action(alarm_action)
         return topic
 
 
@@ -525,69 +473,6 @@ def _deploy_commands(names: ModeNames, region: str) -> list[str]:
         "mv /opt/smart-tutor.new /opt/smart-tutor",
         f"SMART_TUTOR_PREFIX={names.data_prefix} bash /opt/smart-tutor/on-premise/deploy.sh '{{{{ ImageTag }}}}'",
     ]
-
-
-def _alarms(scope: Construct, names: ModeNames, instance: ec2.Instance, domain: str, topic: sns.ITopic) -> None:
-    """The recovery alarm and the uptime check; both email the alarm topic when they fire and when they clear."""
-    notify = cloudwatch_actions.SnsAction(topic)
-
-    # A failed system status check means AWS hardware or networking: recovery moves the instance to a healthy host,
-    # keeping its id, Elastic IP, and data volume. Docker then starts the services (restart: unless-stopped).
-    recovery = cloudwatch.Alarm(
-        scope,
-        "RecoveryAlarm",
-        alarm_name=f"{names.resource_prefix}-recover",
-        alarm_description="The EC2 system status check failed: the instance is being recovered"
-        " (docs/runbooks/on-premise-monitoring.md)",
-        metric=cloudwatch.Metric(
-            namespace="AWS/EC2",
-            metric_name="StatusCheckFailed_System",
-            dimensions_map={"InstanceId": instance.instance_id},
-            statistic="Maximum",
-            period=cdk.Duration.minutes(1),
-        ),
-        comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-        threshold=1,
-        evaluation_periods=2,
-    )
-    recovery.add_alarm_action(cloudwatch_actions.Ec2Action(cloudwatch_actions.Ec2InstanceAction.RECOVER), notify)
-    recovery.add_ok_action(notify)
-
-    # Through DNS and Caddy, as a learner reaches the API. Route 53 publishes its metric in us-east-1 only, which is
-    # where the stacks deploy (smart-tutor:region).
-    check = route53.CfnHealthCheck(
-        scope,
-        "UptimeCheck",
-        health_check_config=route53.CfnHealthCheck.HealthCheckConfigProperty(
-            type="HTTPS",
-            fully_qualified_domain_name=domain,
-            port=443,
-            resource_path=HEALTH_PATH,
-            enable_sni=True,
-            request_interval=30,
-            failure_threshold=3,
-        ),
-        health_check_tags=[route53.CfnHealthCheck.HealthCheckTagProperty(key="Name", value=names.resource_prefix)],
-    )
-    # Three minutes down before an email, so a deploy's restart of the API (seconds) doesn't page anyone.
-    uptime = cloudwatch.Alarm(
-        scope,
-        "UptimeAlarm",
-        alarm_name=f"{names.resource_prefix}-uptime",
-        alarm_description=f"https://<domain>{HEALTH_PATH} is failing (docs/runbooks/on-premise-monitoring.md)",
-        metric=cloudwatch.Metric(
-            namespace="AWS/Route53",
-            metric_name="HealthCheckStatus",
-            dimensions_map={"HealthCheckId": check.ref},
-            statistic="Minimum",
-            period=cdk.Duration.minutes(1),
-        ),
-        comparison_operator=cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
-        threshold=1,
-        evaluation_periods=3,
-    )
-    uptime.add_alarm_action(notify)
-    uptime.add_ok_action(notify)
 
 
 def _patching(scope: Construct, names: ModeNames, instance: ec2.Instance, topic: sns.ITopic) -> None:
