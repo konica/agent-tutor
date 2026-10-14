@@ -61,4 +61,4 @@ A new cross-module dependency means moving a module in the order on purpose and 
 
 ## Images
 
-`Dockerfile` targets `api`, `agent`, `mcp`, `worker` (CronJobs reuse `api`), running as uid 10001. Only `worker` installs the `ingest` extra and only `agent` the `guard` and `topic` extras and the topic-check model folder (`models/topic_check/`).
+`Dockerfile` targets `api`, `agent`, `agent-jailbreak`, `mcp`, `worker` (CronJobs reuse `api`), running as uid 10001. Only `worker` installs the `ingest` extra and only `agent` the `guard` and `topic` extras and the topic-check model folder (`models/topic_check/`). `agent-jailbreak` is the agent plus the `jailbreak` extra and the DetectJailbreak models (#200); CI builds only `agent`.
