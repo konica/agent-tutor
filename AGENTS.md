@@ -10,9 +10,9 @@ Sources of truth — read the relevant one before changing behavior or structure
 
 | Need | Read |
 |---|---|
-| Product behavior, user stories, data model, flows, evals, roadmap | `sdd/prd.md` (v2.64) |
+| Product behavior, user stories, data model, flows, evals, roadmap | `sdd/prd.md` (v2.65) |
 | Folder structure, module boundaries, import rules | `sdd/specs/2026-10-02-project-structure-design.md` |
-| Why an architecture choice was made | `sdd/adr/` (0001–0020, 0022) |
+| Why an architecture choice was made | `sdd/adr/` (0001–0022) |
 | Why the PRD changed in v2.1 | `sdd/reviews/2026-10-03-prd-v2.0-review.md` |
 
 **Release scope:** build **Release 1** (core tutor: modules `knowledge`, `subjects`, `tutoring`, `learning`, `accounts`, `insights`). Later releases already have empty modules and prepared data (R2 research map → `graph`; R3 `catalog`, `quizzes`, `recommendations`, `reports`; R4 sharing and imports; R5 deep graph); build them only when asked.
@@ -24,6 +24,7 @@ Sources of truth — read the relevant one before changing behavior or structure
 | `backend/` | The one Python package `smart_tutor` (API, agent, RAG MCP server, ingestion worker, CronJobs), `tests/`, `evals/` |
 | `web/` | React + TypeScript + Vite; one folder per feature in `src/features/`; API calls only through `src/api/` (generated from the API's OpenAPI schema) |
 | `infra/` | AWS CDK app (Python, separate uv project), one stack per concern |
+| `platform/langfuse/` | Shared, self-hosted Langfuse: its own AWS CDK project (uv), stack `Langfuse-Host`, and the Compose bundle its VM runs (ADR 0021) |
 | `deploy/helm/` | Umbrella chart `smart-tutor` and cluster add-on values |
 | `local/` | Compose-only files: Keycloak realm, LocalStack init, Postgres init |
 | `sdd/` | PRD, specs, plans, ADRs, reviews; `sdd/design/` holds the design brief, the Open Design prototype, and accepted rounds |
@@ -58,6 +59,7 @@ Run before committing; CI (`.github/workflows/ci.yml`) runs the same.
 cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && PYTHONUTF8=1 uv run lint-imports && uv run pytest
 cd web && npm ci && npm run build                 # when web/ changed
 cd infra && uv run pytest                         # when infra/ changed
+cd platform/langfuse && uv run pytest              # when platform/langfuse changed
 helm lint deploy/helm/smart-tutor                 # when deploy/ changed
 ```
 

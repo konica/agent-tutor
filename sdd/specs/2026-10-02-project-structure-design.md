@@ -60,6 +60,7 @@ agent-tutor/
 │
 ├── web/                     # React + TypeScript (Vite); own package.json and Dockerfile (nginx)   §9
 ├── infra/                   # AWS CDK app (Python); own pyproject.toml                            §8
+├── platform/langfuse/       # shared, self-hosted Langfuse (own CDK project and Compose bundle; ADR 0021). Never imported by backend/, web/, or infra/.
 ├── deploy/helm/             # umbrella chart and cluster add-on values                             §8
 │
 └── local/                   # files only Compose uses

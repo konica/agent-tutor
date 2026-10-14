@@ -1,0 +1,10 @@
+{
+  "app": "uv run python app.py",
+  "context": {
+    "langfuse:region": "us-east-1",
+    "langfuse:instance-type": "t3.xlarge",
+    "langfuse:domain": "",
+    "langfuse:admin-email": "dtrungthao@gmail.com",
+    "langfuse:data-snapshot-id": ""
+  }
+}
