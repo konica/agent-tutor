@@ -1,9 +1,10 @@
 """Runtime traces into Langfuse (PRD §10.4, ADR 0023) and, until #322 retires it, a copy in the environment's own
 Phoenix (ADR 0017), through OpenTelemetry: one batched OTLP/HTTP exporter per backend, a parent-based trace-id ratio
 sampler, and OpenInference's LangChain instrumentation for the LangGraph and model spans under our own root spans. Who
-a run is for appears only as a keyed hash of the learner's user id. Tokens, user ids, and emails never reach a span
-(ADR 0007). Exporting runs on the SDK's own thread: a failed export is logged by the SDK and dropped, and never fails
-the work it traces (#229); a host that is off (nights) only logs and drops."""
+a run is for appears only as a keyed hash of the learner's user id, which every span of the run names as its `user.id`
+(with the thread as its `session.id`), so Langfuse can filter any observation by learner and conversation. Tokens,
+user ids, and emails never reach a span (ADR 0007). Exporting runs on the SDK's own thread: a failed export is logged
+by the SDK and dropped, and never fails the work it traces (#229); a host that is off (nights) only logs and drops."""
 
 import base64
 import hashlib
@@ -17,9 +18,11 @@ from contextlib import AbstractContextManager, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 
+from openinference.instrumentation import using_attributes
 from openinference.instrumentation.langchain import LangChainInstrumentor
 from openinference.semconv.resource import ResourceAttributes
 from openinference.semconv.trace import OpenInferenceMimeTypeValues, OpenInferenceSpanKindValues, SpanAttributes
+from opentelemetry import trace
 from opentelemetry.context import Context
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
@@ -39,6 +42,11 @@ KEY_SETTING = "SMART_TUTOR_LEARNER_HASH_KEY"
 EXPORT_TIMEOUT_SECONDS = 10.0
 LANGFUSE_TRACES_PATH = "/api/public/otel/v1/traces"
 LANGFUSE_ENVIRONMENT = "langfuse.environment"
+USER_ID = SpanAttributes.USER_ID
+SESSION_ID = SpanAttributes.SESSION_ID
+LANGFUSE_METADATA_PREFIX = "langfuse.trace.metadata."
+LANGFUSE_INPUT = "langfuse.observation.input"
+LANGFUSE_OUTPUT = "langfuse.observation.output"
 _LOW_64_BITS = 0xFFFF_FFFF_FFFF_FFFF
 # langchain-core traces every run to LangSmith while any is on (ADR 0017: LangSmith is for evals only).
 LANGSMITH_SWITCHES = ("LANGSMITH_TRACING_V2", "LANGSMITH_TRACING", "LANGCHAIN_TRACING_V2")
@@ -267,16 +275,37 @@ def start_tracing(settings: Settings, project: str) -> OtelTraces | None:
 
 
 def span_attributes(inputs: Mapping[str, object] | None, metadata: Mapping[str, object]) -> dict[str, str]:
-    """A root span's OpenInference attributes: a CHAIN, its inputs, and its metadata (Phoenix shows each key as
-    `metadata.<key>`)."""
+    """A root span's attributes: for Langfuse, each metadata key as `langfuse.trace.metadata.<key>` (text; a None
+    value is left out) and the inputs as `langfuse.observation.input`; for Phoenix, OpenInference's CHAIN kind, the
+    metadata as one JSON `metadata` attribute (shown as `metadata.<key>`), and the inputs as `input.value`."""
     attributes = {
         SpanAttributes.OPENINFERENCE_SPAN_KIND: OpenInferenceSpanKindValues.CHAIN.value,
         SpanAttributes.METADATA: json.dumps(metadata),
     }
+    attributes |= {LANGFUSE_METADATA_PREFIX + key: _text(value) for key, value in metadata.items() if value is not None}
     if inputs is not None:
-        attributes[SpanAttributes.INPUT_VALUE] = json.dumps(inputs)
+        attributes[SpanAttributes.INPUT_VALUE] = attributes[LANGFUSE_INPUT] = json.dumps(inputs)
         attributes[SpanAttributes.INPUT_MIME_TYPE] = OpenInferenceMimeTypeValues.JSON.value
     return attributes
+
+
+def _text(value: object) -> str:
+    """A metadata value as Langfuse filters it: booleans as `true`/`false`, everything else as `str` gives it."""
+    return json.dumps(value) if isinstance(value, bool) else str(value)
+
+
+def learner_attributes(user_hash: str, session_id: str | None) -> dict[str, str]:
+    """A root span's learner and thread, set at its start: a root starts from an empty context, so it doesn't inherit
+    them from `run_context`."""
+    return {USER_ID: user_hash} | ({SESSION_ID: session_id} if session_id else {})
+
+
+@contextmanager
+def run_context(user_hash: str, session_id: str | None) -> Iterator[None]:
+    """The run's learner hash and thread on every span started inside, LangChain's included: OpenInference copies
+    them from the context. Langfuse v4 filters per observation, so the root alone isn't enough (ADR 0023)."""
+    with using_attributes(user_id=user_hash, session_id=session_id or ""):  # an empty session id sets none
+        yield
 
 
 @contextmanager
@@ -305,17 +334,25 @@ def _end(cm: AbstractContextManager[object], exc_type: type[BaseException] | Non
 
 
 class OtelRunTracing(RunTracing):
-    """Each run is a root span (its own trace) in this process's project; the model calls inside nest beneath it."""
+    """Each run is a root span (its own trace) in this process's project; the model calls inside nest beneath it, and
+    every span names the learner hash as its user. A run here has no thread, so no session."""
 
     def __init__(self, traces: OtelTraces) -> None:
         self._traces = traces
 
     @contextmanager
     def run(self, name: str, user_id: UserId, metadata: Mapping[str, str]) -> Iterator[None]:
-        attributes = span_attributes(
-            None, {**self._traces.metadata, **metadata, "learner_hash": self._traces.hasher(user_id)}
-        )
-        # An empty context: a root span, whatever span is current.
-        span = self._traces.tracer().start_as_current_span(name, context=Context(), attributes=attributes)
-        with never_raising(span, None):
+        learner = self._traces.hasher(user_id)
+        with never_raising(self._root(name, learner, metadata), None):
             yield
+
+    @contextmanager
+    def _root(self, name: str, learner: str, metadata: Mapping[str, str]) -> Iterator[None]:
+        attributes = span_attributes(None, {**self._traces.metadata, **metadata, "learner_hash": learner})
+        attributes |= learner_attributes(learner, None)
+        with run_context(learner, None):
+            # An empty context: a root span, whatever span is current. `use_span` makes it current on top of the run
+            # context; start_as_current_span would attach a context built from the empty one and lose the learner.
+            span = self._traces.tracer().start_span(name, context=Context(), attributes=attributes)
+            with trace.use_span(span, end_on_exit=True):
+                yield

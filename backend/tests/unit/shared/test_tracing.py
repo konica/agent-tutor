@@ -35,6 +35,7 @@ from smart_tutor.shared.adapters.tracing import (
     root_ids,
     root_span_id,
     run_metadata,
+    span_attributes,
     start_tracing,
     tracing_enabled,
 )
@@ -126,6 +127,41 @@ def test_an_ingest_is_a_root_span_with_its_metadata_and_the_model_call_beneath_i
     children = [s for s in finished if s is not root]
     assert children and all(s.context.trace_id == root.context.trace_id for s in children)
     assert "user-123" not in json.dumps([s.to_json() for s in finished])
+
+
+def test_every_ingest_span_names_the_learner_hash_as_its_user() -> None:
+    with recorded_traces() as (traces, spans):
+        ingest(OtelRunTracing(traces))
+    finished = spans.get_finished_spans()
+    assert len(finished) > 1  # the root and the model call
+    learner = LearnerHasher("k")(UserId("user-123"))
+    assert all(s.attributes is not None and s.attributes["user.id"] == learner for s in finished)
+    assert all(s.attributes is not None and "session.id" not in s.attributes for s in finished)
+
+
+def test_ingest_metadata_is_langfuse_trace_metadata() -> None:
+    with recorded_traces(metadata={"deployment": "local"}) as (traces, spans):
+        ingest(OtelRunTracing(traces))
+    [root] = [s for s in spans.get_finished_spans() if s.name == "ingest"]
+    assert root.attributes is not None
+    assert root.attributes["langfuse.trace.metadata.deployment"] == "local"
+    assert root.attributes["langfuse.trace.metadata.content_id"] == "c-1"
+    assert root.attributes["langfuse.trace.metadata.learner_hash"] == LearnerHasher("k")(UserId("user-123"))
+
+
+def test_span_attributes_give_langfuse_each_metadata_key_as_text_and_the_input() -> None:
+    attributes = span_attributes({"question": "Q?"}, {"limited": False, "chunks": 2, "thread_id": "t-1"})
+    assert attributes["langfuse.trace.metadata.limited"] == "false"
+    assert attributes["langfuse.trace.metadata.chunks"] == "2"
+    assert attributes["langfuse.trace.metadata.thread_id"] == "t-1"
+    assert attributes["langfuse.observation.input"] == attributes["input.value"]
+    assert json.loads(attributes["metadata"]) == {"limited": False, "chunks": 2, "thread_id": "t-1"}  # Phoenix
+
+
+def test_a_metadata_value_of_none_gives_langfuse_no_key() -> None:
+    attributes = span_attributes(None, {"decline": None})
+    assert "langfuse.trace.metadata.decline" not in attributes
+    assert "langfuse.observation.input" not in attributes
 
 
 def test_each_ingest_is_its_own_trace() -> None:

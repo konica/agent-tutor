@@ -85,6 +85,36 @@ async def test_an_answer_traces_as_one_root_ask_span_whose_trace_id_is_the_run_i
     assert span.status.status_code is StatusCode.OK
 
 
+async def test_every_ask_span_carries_the_learner_hash_and_the_thread() -> None:
+    spans, _ = await traced(AskRequest(question="What is attention?", thread_id=uuid.UUID(THREAD_ID)))
+    # every span: the ask root, LangGraph nodes, and the model call
+    assert {"ask", "LangGraph", "search", "answer"} <= {s.name for s in spans}
+    assert any(s.attributes.get("openinference.span.kind") == "LLM" for s in spans)
+    assert all(s.attributes["user.id"] == LearnerHasher("k")(USER) for s in spans)
+    assert all(s.attributes["session.id"] == THREAD_ID for s in spans)
+
+
+async def test_an_ask_without_a_thread_sets_no_session() -> None:
+    spans, _ = await traced(AskRequest(question="What is attention?"))
+    assert len(spans) > 1
+    assert all(s.attributes["user.id"] == LearnerHasher("k")(USER) for s in spans)
+    assert all("session.id" not in s.attributes for s in spans)
+
+
+async def test_the_ask_root_has_langfuse_metadata_input_and_output() -> None:
+    spans, _ = await traced(AskRequest(question="What is attention?", thread_id=uuid.UUID(THREAD_ID)))
+    root, _ = ask_span(spans)
+    assert root.attributes["langfuse.trace.metadata.limited"] == "false"
+    assert root.attributes["langfuse.trace.metadata.decline"] == "none"
+    assert root.attributes["langfuse.trace.metadata.chunks"] == "2"
+    assert root.attributes["langfuse.trace.metadata.thread_id"] == THREAD_ID
+    assert root.attributes["langfuse.trace.metadata.chat_model"] == TRACE_META["chat_model"]
+    assert root.attributes["langfuse.trace.metadata.learner_hash"] == LearnerHasher("k")(USER)
+    assert json.loads(root.attributes["langfuse.observation.input"])["question"] == "What is attention?"
+    assert json.loads(root.attributes["langfuse.observation.output"])["answer"] == "It weighs tokens [1]."
+    assert root.context.trace_id == RUN_ID.int  # still the run id
+
+
 async def test_langgraph_search_and_model_spans_nest_under_the_ask() -> None:
     spans, _ = await traced(AskRequest(question="What is attention?"))
     span, _ = ask_span(spans)
