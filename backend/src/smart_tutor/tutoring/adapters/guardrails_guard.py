@@ -61,7 +61,8 @@ class GuardrailsGuard(Guard):
         self._guard.configure(allow_metrics_collection=False)
 
     async def check_question(self, question: str) -> GuardTrip | None:
-        return None  # the Bedrock question screen (#199) is BedrockQuestionScreen, which wraps this guard; #200 is open
+        # the question screens (#199, #200) are BedrockQuestionScreen and DetectJailbreakScreen, which wrap this guard
+        return None
 
     async def check_answer(self, text: str) -> GuardTrip | None:
         try:

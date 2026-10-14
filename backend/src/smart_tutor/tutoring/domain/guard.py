@@ -14,3 +14,10 @@ GuardReason = Literal["guard_question", "guard_answer"]
 class GuardTrip:
     reason: GuardReason
     check: str  # the check that tripped, e.g. "system_prompt_leak"; logs and traces only
+
+
+@dataclass(frozen=True)
+class Screening:
+    tripped: bool
+    text_units: int  # content-policy text units billed (1 per 1,000 characters); 0 for a local screen
+    processing_ms: int | None  # the screen's own processing time, without the network or any wait

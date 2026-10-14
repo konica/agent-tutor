@@ -9,26 +9,18 @@ turn. The log line names only the exception's type: botocore messages can quote 
 
 import asyncio
 import logging
-from dataclasses import dataclass
 from typing import Any
 
 from botocore.config import Config
 
 from smart_tutor.shared.ports.counter import Counter
-from smart_tutor.tutoring.domain.guard import GuardTrip
+from smart_tutor.tutoring.domain.guard import GuardTrip, Screening
 from smart_tutor.tutoring.ports.guard import Guard
 
 logger = logging.getLogger(__name__)
 
 # One retry, short timeouts: the screen runs before the first token and fails open anyway.
 SCREEN_BOTO_CONFIG = Config(connect_timeout=1, read_timeout=2, retries={"mode": "standard", "max_attempts": 2})
-
-
-@dataclass(frozen=True)
-class Screening:
-    tripped: bool
-    text_units: int  # content-policy text units billed (1 per 1,000 characters)
-    processing_ms: int | None  # the guardrail's own processing time, without the network
 
 
 class BedrockQuestionScreen(Guard):
