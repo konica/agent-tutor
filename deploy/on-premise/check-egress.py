@@ -4,7 +4,7 @@ every patch window:
     docker compose exec -T worker python - <check-egress.py
 
 The worker must not reach the internet, directly, by DNS, or through the proxy (CONNECT to another host or port, or
-plain HTTP), while S3, SQS, SSM, Bedrock, Phoenix (while tracing), and Postgres work. The AWS calls are read-only and use the instance profile, whose credentials come through the proxy too.
+plain HTTP), while S3, SQS, SSM, Bedrock, Phoenix (while tracing), Langfuse (while exporting, through the proxy), and Postgres work. The AWS calls are read-only and use the instance profile, whose credentials come through the proxy too.
 Exit 0: as expected. Exit 2: blocked, but a needed destination is unreachable. Exit 1, or a crash: treat as a leak.
 """
 
@@ -115,6 +115,14 @@ def _tracing() -> bool:
     return bool(os.environ.get("SMART_TUTOR_PHOENIX_URL")) and bool(os.environ.get("SMART_TUTOR_PHOENIX_API_KEY"))
 
 
+def _langfuse() -> bool:
+    """The worker exports to Langfuse when it has the URL and both keys (deploy.sh leaves the keys empty without them)."""
+    return all(
+        os.environ.get(name)
+        for name in ("SMART_TUTOR_LANGFUSE_URL", "SMART_TUTOR_LANGFUSE_PUBLIC_KEY", "SMART_TUTOR_LANGFUSE_SECRET_KEY")
+    )
+
+
 def unreachable() -> list[str]:
     """Destinations the worker needs that don't answer."""
     region = os.environ["AWS_REGION"]
@@ -136,6 +144,18 @@ def unreachable() -> list[str]:
             pass
         except OSError as error:
             problems.append(f"Phoenix: {error}")
+    # Langfuse, through the proxy (its host is on the allowlist): the tunnel opening proves the route. It is off
+    # 18:00-07:00 (ADR 0022), when Squid answers 502/503; tracing is non-critical (ADR 0023), so that only gets a notice.
+    if _langfuse():
+        host = urllib.parse.urlsplit(os.environ["SMART_TUTOR_LANGFUSE_URL"]).hostname or ""
+        status = _tunnel_status(host, 443)
+        if status == 403:
+            problems.append(f"Langfuse: the egress proxy refuses {host}")
+        elif status != 200:
+            print(
+                f"Notice: Langfuse at {host} didn't answer through the proxy ({status}); it is off 18:00-07:00",
+                file=sys.stdout,
+            )
     if not _connects("postgres", 5432):
         problems.append("Postgres: postgres:5432 refused or timed out")
     return problems
@@ -152,7 +172,8 @@ def main() -> int:
     if missing:
         return 2
     phoenix = "Phoenix (tracing on), " if _tracing() else ""
-    print(f"The worker reaches S3, SQS, SSM, Bedrock, {phoenix}and Postgres, and nothing else")
+    langfuse = "Langfuse (through the proxy), " if _langfuse() else ""
+    print(f"The worker reaches S3, SQS, SSM, Bedrock, {phoenix}{langfuse}and Postgres, and nothing else")
     return 0
 
 

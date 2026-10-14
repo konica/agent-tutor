@@ -60,7 +60,9 @@ def definition_digest(stack: cdk.Stack, definition: dict[str, Any]) -> str:
 
 
 class ConfigStack(cdk.Stack):
-    def __init__(self, scope: Construct, construct_id: str, *, names: ModeNames, **kwargs: Any) -> None:
+    def __init__(
+        self, scope: Construct, construct_id: str, *, names: ModeNames, langfuse_url: str | None = None, **kwargs: Any
+    ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         # Per-file limits, processing attempts, and upload rate limits and daily caps (PRD §11, §9.5), read at startup by the API and the worker, and the
@@ -79,6 +81,12 @@ class ConfigStack(cdk.Stack):
             ("question-guard", "bedrock"),
         ):
             ssm.StringParameter(self, f"Param-{name}", parameter_name=f"{names.ssm_path}/{name}", string_value=value)
+
+        # The shared Langfuse host (ADR 0023) that on-premise's agent and worker export traces to; native-cloud has none.
+        if langfuse_url:
+            ssm.StringParameter(
+                self, "Param-langfuse-url", parameter_name=f"{names.ssm_path}/langfuse-url", string_value=langfuse_url
+            )
 
         definition = question_screen_definition(self)
         guardrail = bedrock.CfnGuardrail(
@@ -128,12 +136,22 @@ class ConfigStack(cdk.Stack):
                 ),
             )
 
-        # Traces name a learner only by an HMAC of their user id (PRD §10.4); the agent and worker read this key. The
-        # Phoenix API key is <prefix>/phoenix/api-key, which the operator creates in Phoenix (runbooks).
+        # Traces name a learner only by an HMAC of their user id (PRD §10.4); the agent and worker read the Langfuse key
+        # below (ADR 0023). This Phoenix key stays until #322 removes Phoenix; the Phoenix API key is
+        # <prefix>/phoenix/api-key, which the operator creates in Phoenix (runbooks).
         secretsmanager.Secret(
             self,
             "LearnerHashKeySecret",
             secret_name=f"{names.secret_prefix}/phoenix/learner-hash-key",
             description="HMAC key for the learner hash in Phoenix traces",
+            generate_secret_string=secretsmanager.SecretStringGenerator(exclude_punctuation=True, password_length=64),
+        )
+        # The key the app reads as SMART_TUTOR_LEARNER_HASH_KEY. Langfuse's project keys are <prefix>/langfuse/public-key
+        # and <prefix>/langfuse/secret-key, which the operator creates in Langfuse (runbooks).
+        secretsmanager.Secret(
+            self,
+            "LangfuseLearnerHashKeySecret",
+            secret_name=f"{names.secret_prefix}/langfuse/learner-hash-key",
+            description="HMAC key for the learner hash in Langfuse traces",
             generate_secret_string=secretsmanager.SecretStringGenerator(exclude_punctuation=True, password_length=64),
         )

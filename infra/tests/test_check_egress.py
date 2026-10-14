@@ -179,3 +179,60 @@ def test_unreachable_ignores_phoenix_while_untraced(check: ModuleType, monkeypat
     monkeypatch.setattr(check, "_connects", lambda host, port: True)
     monkeypatch.setattr(check, "_aws_problems", lambda region: [])
     assert check.unreachable() == []
+
+
+@pytest.fixture
+def langfuse(check: ModuleType, monkeypatch) -> list[tuple[str, int]]:
+    """unreachable() with everything else fine and Langfuse configured; the CONNECTs it sends are recorded."""
+    sent: list[tuple[str, int]] = []
+    monkeypatch.setenv("AWS_REGION", "us-east-1")
+    monkeypatch.setenv("SMART_TUTOR_LANGFUSE_URL", "https://lf.example")
+    monkeypatch.setenv("SMART_TUTOR_LANGFUSE_PUBLIC_KEY", "pk")
+    monkeypatch.setenv("SMART_TUTOR_LANGFUSE_SECRET_KEY", "sk")
+    monkeypatch.setattr(check.urllib.request, "urlopen", lambda url, timeout: None)
+    monkeypatch.setattr(check, "_connects", lambda host, port: True)
+    monkeypatch.setattr(check, "_aws_problems", lambda region: [])
+    monkeypatch.setattr(check, "_tunnel_status", lambda host, port=443: sent.append((host, port)) or 200)
+    return sent
+
+
+def _answer(check: ModuleType, monkeypatch, status: int) -> None:
+    monkeypatch.setattr(check, "_tunnel_status", lambda host, port=443: status)
+
+
+def test_unreachable_reports_a_proxy_that_refuses_langfuse(check, langfuse, monkeypatch) -> None:
+    _answer(check, monkeypatch, 403)
+    assert check.unreachable() == ["Langfuse: the egress proxy refuses lf.example"]
+
+
+def test_unreachable_accepts_a_tunnel_to_langfuse(check, langfuse) -> None:
+    assert check.unreachable() == []
+    assert langfuse == [("lf.example", 443)]
+
+
+@pytest.mark.parametrize("status", [502, 503])
+def test_unreachable_only_notes_a_langfuse_that_does_not_answer(check, langfuse, monkeypatch, capsys, status) -> None:
+    # Langfuse is off 18:00-07:00 (ADR 0022): Squid allows the host but cannot connect. Tracing is non-critical.
+    _answer(check, monkeypatch, status)
+    assert check.unreachable() == []
+    out = capsys.readouterr().out
+    assert "Langfuse at lf.example" in out and str(status) in out
+
+
+@pytest.mark.parametrize(
+    "missing", ["SMART_TUTOR_LANGFUSE_URL", "SMART_TUTOR_LANGFUSE_PUBLIC_KEY", "SMART_TUTOR_LANGFUSE_SECRET_KEY"]
+)
+def test_unreachable_ignores_langfuse_without_its_settings(check, langfuse, monkeypatch, missing) -> None:
+    monkeypatch.setenv(missing, "")
+    assert check.unreachable() == []
+    assert langfuse == []
+
+
+def test_the_success_message_names_langfuse_when_it_is_on(check, monkeypatch, capsys) -> None:
+    monkeypatch.setattr(check, "leaks", lambda: [])
+    monkeypatch.setattr(check, "unreachable", lambda: [])
+    monkeypatch.setenv("SMART_TUTOR_LANGFUSE_URL", "https://lf.example")
+    monkeypatch.setenv("SMART_TUTOR_LANGFUSE_PUBLIC_KEY", "pk")
+    monkeypatch.setenv("SMART_TUTOR_LANGFUSE_SECRET_KEY", "sk")
+    assert check.main() == 0
+    assert "Langfuse (through the proxy)" in capsys.readouterr().out
