@@ -205,9 +205,16 @@ def _imported(path: Path) -> set[str]:
     }
 
 
-def test_dataset_code_never_imports_langsmith_and_only_the_seam_imports_the_langfuse_sdk() -> None:
+def test_dataset_and_review_code_never_import_langsmith_and_only_the_seam_imports_the_langfuse_sdk() -> None:
     evals = Path(evals_package.__file__).parent
-    for module in ("dataset.py", "publish.py", "langfuse_client.py", "topic_check/train.py"):
+    for module in (
+        "dataset.py",
+        "publish.py",
+        "review.py",
+        "generate.py",
+        "langfuse_client.py",
+        "topic_check/train.py",
+    ):
         assert "langsmith" not in _imported(evals / module), module
     users = {p.relative_to(evals).as_posix() for p in evals.rglob("*.py") if "langfuse" in _imported(p)}
     assert users == {"langfuse_client.py"}

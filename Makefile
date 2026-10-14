@@ -69,11 +69,11 @@ evals-smoke:   ## smoke split as a LangSmith experiment, gated on thresholds.yam
 	$(HOST) --extra eval --extra guard --extra topic python -m evals.run --split smoke
 evals-learners: ## load the eval learners' libraries from the seed corpus (needs the app stack and your AWS profile)
 	$(BACKEND) uv run --extra eval python -m evals.learners
-evals-generate: ## propose dataset candidates (DATASET=ask, the default, injection, or topic_check) into the LangSmith annotation queue (AWS profile, LANGSMITH_API_KEY)
+evals-generate: ## propose dataset candidates (DATASET=ask, the default, injection, or topic_check) into the Langfuse annotation queue (AWS profile, LANGFUSE_* keys of smart-tutor-evals)
 	$(HOST) --extra eval --extra ingest --extra guard --extra topic python -m evals.generate $(or $(DATASET),ask)
-evals-publish: ## publish hand-written and accepted candidates as the next smoke and full versions in Langfuse (LANGFUSE_* keys of smart-tutor-evals; LANGSMITH_API_KEY for the queue)
+evals-publish: ## publish hand-written and accepted candidates as the next smoke and full versions in Langfuse (LANGFUSE_* keys of smart-tutor-evals)
 	$(HOST) --extra eval python -m evals.publish
-topic-check-train: ## train the topic-check model from accepted topic_check candidates into backend/models/topic_check (LANGFUSE_* keys and LANGSMITH_API_KEY; --dry-run counts them)
+topic-check-train: ## train the topic-check model from accepted topic_check candidates into backend/models/topic_check (LANGFUSE_* keys of smart-tutor-evals; --dry-run counts them)
 	$(HOST) --extra eval --extra train python -m evals.topic_check.train
 
 api-client:    ## regenerate web/src/api from the API's OpenAPI schema
