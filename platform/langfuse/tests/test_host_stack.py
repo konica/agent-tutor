@@ -235,9 +235,9 @@ def test_off_hours_and_patching_without_alarms(t: Template) -> None:
 def test_schedules_target_this_instance_and_the_role_only_starts_and_stops_it(t: Template) -> None:
     schedules = {s["Properties"]["Name"]: s["Properties"] for s in t.find_resources("AWS::Scheduler::Schedule").values()}
     assert {n: (s["ScheduleExpression"], s["ScheduleExpressionTimezone"]) for n, s in schedules.items()} == {
-        "stop": ("cron(0 18 * * ? *)", "Asia/Ho_Chi_Minh"),
-        "stop-late": ("cron(0 0 * * ? *)", "Asia/Ho_Chi_Minh"),
-        "start": ("cron(0 7 * * ? *)", "Asia/Ho_Chi_Minh"),
+        "langfuse-stop": ("cron(0 18 * * ? *)", "Asia/Ho_Chi_Minh"),
+        "langfuse-stop-late": ("cron(0 0 * * ? *)", "Asia/Ho_Chi_Minh"),
+        "langfuse-start": ("cron(0 7 * * ? *)", "Asia/Ho_Chi_Minh"),
     }
     instance_ref = json.dumps({"Ref": _instance_id(t)})
     for schedule in schedules.values():

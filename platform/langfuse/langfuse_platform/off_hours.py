@@ -6,7 +6,8 @@ alarm, no dead-letter queue. Stopping a stopped instance, or starting a running 
 start the host at any hour; it then runs until the next stop.
 
 The app host's CDK project keeps its own copy of this construct; keep the two in step when the schedule's shape
-changes.
+changes. This copy prefixes each schedule's name (`langfuse-stop`): CloudFormation identifies a schedule by its name
+alone, whatever its group, and the app host's stack already owns `stop`, `stop-late`, and `start`.
 """
 
 import aws_cdk as cdk
@@ -52,7 +53,7 @@ class OffHours(Construct):
             scheduler.CfnSchedule(
                 self,
                 name.title().replace("-", ""),  # Stop, StopLate, Start
-                name=name,
+                name=f"{name_prefix}-{name}",  # unique in the account, not just in the group (see the docstring)
                 group_name=group.ref,  # Ref of a schedule group is its name
                 description=f"{action} the {name_prefix} host ({expression}, {time_zone})",
                 schedule_expression=expression,

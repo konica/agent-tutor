@@ -48,6 +48,8 @@ aws s3api head-bucket --bucket "cdk-hnb659fds-assets-$Account-us-east-1"
    $InstanceId = Get-LangfuseOutput InstanceId; $Url = Get-LangfuseOutput PublicUrl
    ```
 
+   If this first deploy fails, CloudFormation rolls the stack back (`ROLLBACK_COMPLETE`), and the next `cdk deploy` deletes and recreates it. The bucket is kept on rollback, though, and its fixed name blocks the retry ("already exists"). Delete it first if it is empty (`aws s3api list-object-versions --bucket "langfuse-$Account-us-east-1"` lists nothing): `aws s3api delete-bucket --bucket "langfuse-$Account-us-east-1"`. The rollback also leaves a snapshot of the blank data volume, which you can delete.
+
 3. Wait until SSM lists the instance `Online` (2–3 minutes): `aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$InstanceId" --query "InstanceInformationList[0].PingStatus" --output text`.
 4. Run the deploy document (section 3). The first start takes a few minutes while Langfuse migrates its databases.
 5. Sign in at `$Url` as the admin: `aws secretsmanager get-secret-value --secret-id langfuse/admin --query SecretString --output text` (email and password; don't paste them anywhere else). Change the password in the UI if you like; the secret is only read for the first start.
@@ -90,13 +92,13 @@ Stopping and starting the instance needs no deploy: every service has `restart: 
 
 | Local time (Asia/Ho_Chi_Minh) | Schedule | What it does |
 |---|---|---|
-| 18:00 | `stop` | Stops the instance |
-| 00:00 | `stop-late` | Stops it again, in case someone started it in the evening |
-| 07:00 | `start` | Starts it; Docker brings every service back within a few minutes |
+| 18:00 | `langfuse-stop` | Stops the instance |
+| 00:00 | `langfuse-stop-late` | Stops it again, in case someone started it in the evening |
+| 07:00 | `langfuse-start` | Starts it; Docker brings every service back within a few minutes |
 
-The schedules are in the group `langfuse-off-hours`. A stop shuts the OS down: ClickHouse and Postgres get 60 s and Docker 120 s to stop. Outside the hours Langfuse doesn't answer, so apps must not depend on it being up. Neither host needs the other: Langfuse runs with the app host stopped, and the app host with Langfuse stopped.
+The schedules are in the group `langfuse-off-hours`. Their names carry the `langfuse-` prefix because CloudFormation identifies a schedule by its name alone, whatever its group, and the app host's stack already owns `stop`, `stop-late`, and `start`. A stop shuts the OS down: ClickHouse and Postgres get 60 s and Docker 120 s to stop. Outside the hours Langfuse doesn't answer, so apps must not depend on it being up. Neither host needs the other: Langfuse runs with the app host stopped, and the app host with Langfuse stopped.
 
-**Start the host by hand** (any hour; it runs until the next `stop` or `stop-late`):
+**Start the host by hand** (any hour; it runs until the next `langfuse-stop` or `langfuse-stop-late`):
 
 ```powershell
 aws ec2 start-instances --instance-ids $InstanceId
@@ -106,16 +108,16 @@ aws ec2 wait instance-running --instance-ids $InstanceId
 
 Nothing else is needed: the data volume mounts, every service has `restart: unless-stopped`, and the Elastic IP, DuckDNS name, and certificates stay.
 
-**Keep it up past midnight:** disable `stop-late`, then enable it again the next morning. `update-schedule` replaces the whole schedule, so read it first and send it back with the new state:
+**Keep it up past midnight:** disable `langfuse-stop-late`, then enable it again the next morning. `update-schedule` replaces the whole schedule, so read it first and send it back with the new state:
 
 ```powershell
 $Group = "langfuse-off-hours"
-$s = aws scheduler get-schedule --group-name $Group --name stop-late | ConvertFrom-Json
+$s = aws scheduler get-schedule --group-name $Group --name langfuse-stop-late | ConvertFrom-Json
 $Target = Join-Path $env:TEMP stop-late-target.json     # files, not inline JSON
 $Window = Join-Path $env:TEMP stop-late-window.json
 $s.Target | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8NoBOM $Target
 $s.FlexibleTimeWindow | ConvertTo-Json | Set-Content -Encoding utf8NoBOM $Window
-aws scheduler update-schedule --group-name $Group --name stop-late --state DISABLED --description $s.Description `
+aws scheduler update-schedule --group-name $Group --name langfuse-stop-late --state DISABLED --description $s.Description `
     --schedule-expression $s.ScheduleExpression --schedule-expression-timezone $s.ScheduleExpressionTimezone `
     --flexible-time-window file://$Window --target file://$Target
 ```
