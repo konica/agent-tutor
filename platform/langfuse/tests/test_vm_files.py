@@ -88,7 +88,8 @@ def test_deploy_script_keeps_secrets_out_of_output_and_files_root_only() -> None
 
 def test_encryption_key_is_derived_from_its_seed_and_never_generated() -> None:
     script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
-    assert 'encryption_key=$(hex64 encryption "$(secret encryption-seed)")' in script
+    # The seed is read on its own line so a failed read stops the script (set -e ignores a failure nested in an argument).
+    assert 'encryption_seed=$(secret encryption-seed)\nencryption_key=$(hex64 encryption "$encryption_seed")' in script
     assert "openssl rand" not in script
 
 
