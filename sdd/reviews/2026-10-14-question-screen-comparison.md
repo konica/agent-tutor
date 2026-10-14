@@ -41,13 +41,13 @@ No. DetectJailbreak is not eligible in either mode:
 
 ## Comparison
 
-Added latency is the time the screen adds before search: for Bedrock, its own processing time (client time from GMT+7 in brackets); for DetectJailbreak, the validator's run time on 2 CPUs. Bedrock's processing time is server-side only; its client time includes the network, so it is the closer match to the local end-to-end run time. The threshold only changes the cut, not the work, so the local latency is the range of five measurements across four full-dataset runs.
+Added latency is the time the screen adds before search: for Bedrock, its own processing time (client time from GMT+7 in brackets); for DetectJailbreak, the validator's run time on 2 CPUs. Bedrock's processing time is server-side only; its client time includes the network, so it is the closer match to the local end-to-end run time. The threshold only changes the cut, not the work, so the local latency is the range of five measurements across three full-dataset runs.
 
 | Screen | False positives | Catch rate (18 seeds) | Added latency p50/p95 | Cost per question (share of a turn) | Agent image | Agent memory |
 |---|---|---|---|---|---|---|
 | Bedrock LOW | 0/364 (0.0%) | 6/18 | 335/424 ms (663/773 ms) | $0.000150 (8.9%) | `agent` 1.12 GB | No change expected (a boto3 call): the agent peaked at 193 MiB RSS with the screen off; not measured with it on |
-| Bedrock MEDIUM | 4/364 (1.1%) | 10/18 | 323/412 ms (650/755 ms) | $0.000150 (8.9%) | `agent` 1.12 GB | No change |
-| Bedrock HIGH | 6/364 (1.6%) | 11/18 | 334/450 ms (657/786 ms) | $0.000150 (8.9%) | `agent` 1.12 GB | No change |
+| Bedrock MEDIUM | 4/364 (1.1%) | 10/18 | 323/412 ms (650/755 ms) | $0.000150 (8.9%) | `agent` 1.12 GB | No change expected (a boto3 call) |
+| Bedrock HIGH | 6/364 (1.6%) | 11/18 | 334/450 ms (657/786 ms) | $0.000150 (8.9%) | `agent` 1.12 GB | No change expected (a boto3 call) |
 | DetectJailbreak 0.78 | 20/364 (5.5%) | 6/18 | 187–258 / 424–789 ms | ~$0.000005 compute (~0.3%), no fee | `agent-jailbreak` 5.36 GB | Peak RSS 1,842 MiB; about 2 GiB limit |
 | DetectJailbreak 0.81 (default) | 4/364 (1.1%) | 1/18 | 187–258 / 424–789 ms | ~$0.000005 compute (~0.3%), no fee | `agent-jailbreak` 5.36 GB | Peak RSS 1,842 MiB; about 2 GiB limit |
 | DetectJailbreak 0.85 | 1/364 (0.3%) | 0/18 | 187–258 / 424–789 ms | ~$0.000005 compute (~0.3%), no fee | `agent-jailbreak` 5.36 GB | Peak RSS 1,842 MiB; about 2 GiB limit |
@@ -90,8 +90,8 @@ At 0.78 the 20 false positives also hit ML safety, computer security (botnets), 
 
 ### Latency
 
-- p50 187–258 ms and p95 424–789 ms: five measurements across four full-dataset runs (a scoring spike, 187/430; the Task 4 CLI run at 0.81, 188/471; a three-threshold CLI run, 196/424 at 0.78, 222/789 at 0.81, 258/584 at 0.85). The spread is load from other work on the dev machine. Every run misses the 300 ms p95 target.
-- Long questions take longer: pasted excerpts of 540–740 characters take 0.8–2.3 s, and the padded 4,000-character seed 2.9 s. The validator truncates at 512 tokens per model.
+- p50 187–258 ms and p95 424–789 ms: five measurements across three full-dataset runs (a scoring spike, 187/430; the Task 4 CLI run at 0.81, 188/471; a three-threshold CLI run, 196/424 at 0.78, 222/789 at 0.81, 258/584 at 0.85). The spread is load from other work on the dev machine. Every run misses the 300 ms p95 target.
+- Long questions take longer: pasted excerpts of 540–740 characters take 0.8–2.3 s, and the padded 4,000-character seed 2.9 s. The validator truncates at 512 tokens per model. With the 1 s timeout and runs of 0.8–2.9 s on long inputs, padding a question past about 600 characters makes the local screen fail open, and concurrent long questions hold the lock so other learners' questions fail open too. That fits "a fail-open screen is not a security boundary", and is one more reason it is not eligible.
 - The first run after loading took 18.2 s, so the loader runs one warm-up validation at startup. Loading the models takes 5–6 s.
 
 ### Memory and image size

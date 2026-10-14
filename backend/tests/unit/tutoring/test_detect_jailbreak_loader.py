@@ -73,6 +73,15 @@ def test_loading_forces_the_hub_offline_first(monkeypatch: pytest.MonkeyPatch) -
     assert seen == {"hub": "1", "transformers": "1"}
 
 
+def _fake_hub(monkeypatch: pytest.MonkeyPatch, *, offline: bool) -> None:
+    hub = types.ModuleType("huggingface_hub")
+    constants = types.ModuleType("huggingface_hub.constants")
+    constants.HF_HUB_OFFLINE = offline  # type: ignore[attr-defined]
+    hub.constants = constants  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "huggingface_hub", hub)
+    monkeypatch.setitem(sys.modules, "huggingface_hub.constants", constants)
+
+
 def test_loading_warms_the_validator_with_one_run(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("HF_HUB_OFFLINE", raising=False)
     monkeypatch.delenv("TRANSFORMERS_OFFLINE", raising=False)
@@ -91,9 +100,24 @@ def test_loading_warms_the_validator_with_one_run(monkeypatch: pytest.MonkeyPatc
     child.DetectJailbreak = FakeDetectJailbreak  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "guardrails_ai", parent)
     monkeypatch.setitem(sys.modules, "guardrails_ai.detect_jailbreak", child)
+    _fake_hub(monkeypatch, offline=True)
 
     validator = load_detect_jailbreak(0.7)
 
     assert isinstance(validator, FakeDetectJailbreak)
     assert built == [{"threshold": 0.7, "device": "cpu", "use_local": True, "on_fail": OnFailAction.NOOP}]
     assert len(validated) == 1
+
+
+def test_loading_refuses_a_hub_that_was_imported_online(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("HF_HUB_OFFLINE", raising=False)
+    monkeypatch.delenv("TRANSFORMERS_OFFLINE", raising=False)
+    parent = types.ModuleType("guardrails_ai")
+    child = types.ModuleType("guardrails_ai.detect_jailbreak")
+    child.DetectJailbreak = object  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "guardrails_ai", parent)
+    monkeypatch.setitem(sys.modules, "guardrails_ai.detect_jailbreak", child)
+    _fake_hub(monkeypatch, offline=False)
+
+    with pytest.raises(RuntimeError, match="HF_HUB_OFFLINE=1"):
+        load_detect_jailbreak(0.7)

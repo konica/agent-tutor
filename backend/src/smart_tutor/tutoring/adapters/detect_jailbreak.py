@@ -47,16 +47,21 @@ def load_detect_jailbreak(threshold: float) -> Any:
     try:
         from guardrails import OnFailAction
         from guardrails_ai.detect_jailbreak import DetectJailbreak
+        from huggingface_hub import constants as hub_constants
     except ModuleNotFoundError as e:
         raise JailbreakExtraMissing(
             "question_guard is guardrails_ai but the jailbreak extra is not installed: "
             "build the agent-jailbreak image (docker build --target agent-jailbreak)"
         ) from e
+    if not hub_constants.HF_HUB_OFFLINE:
+        raise RuntimeError(
+            "huggingface_hub was imported before the DetectJailbreak loader, so the Hub is online and revision "
+            "'main' could resolve past the pinned commits: set HF_HUB_OFFLINE=1 in the environment"
+        )
     in_process()
     validator = DetectJailbreak(threshold=threshold, device="cpu", use_local=True, on_fail=OnFailAction.NOOP)
-    validator.validate(
-        "What does the paper say about attention heads?", {}
-    )  # first run is cold (~18 s): not in a learner's 1 s
+    # The first run is cold (~18 s): keep it out of a learner's 1 s.
+    validator.validate("What does the paper say about attention heads?", {})
     return validator
 
 
