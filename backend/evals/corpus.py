@@ -1,6 +1,6 @@
 """The seed corpus (PRD §10.3): the documents in seed_corpus/manifest.yaml, downloaded into data/seed_corpus/.
 
-Usage: uv run --extra eval python -m evals.corpus [--dest ../data/seed_corpus]
+Usage: uv run --extra eval --extra ingest python -m evals.corpus [--dest ../data/seed_corpus]
 Fetches each PDF that is missing or changed (a generated one is rendered from its text, evals.pdf) and refuses bytes
 whose SHA-256 differs from the manifest's. An adversarial document (#196) is built from its base seed by
 evals.adversarial_pdfs and verified the same way.

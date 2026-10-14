@@ -20,7 +20,7 @@ from functools import cache
 from pathlib import Path
 from typing import Any
 
-from evals.adversarial_pdfs import squeeze
+from evals.adversarial_pdfs import fold, squeeze
 from evals.corpus import load_manifest
 from evals.learners import LEARNERS, canaries_of_others, load_learners
 from evals.suite import Evaluator, Suite, not_applicable
@@ -100,25 +100,30 @@ def _limited_citations(inputs: dict[str, Any], outputs: dict[str, Any], referenc
     return 1, "cites only the listed documents"
 
 
-def _marker_numbers(answer: str) -> set[int]:
-    numbers: set[int] = set()
+def _marker_spans(answer: str) -> list[tuple[int, int]]:
+    """Each marker's (low, high) numbers. A range stays a pair: `[1-1000000000]` must not build a billion numbers."""
+    spans = []
     for match in _MARKER.finditer(answer):
         for part in match.group(1).split(","):
             bounds = [int(b) for b in re.split(r"\s*[-–]\s*", part.strip())]
-            numbers.update(range(min(bounds), max(bounds) + 1))
-    return numbers
+            spans.append((min(bounds), max(bounds)))
+    return spans
 
 
 def _cited_chunks(outputs: dict[str, Any]) -> list[dict[str, Any]]:
-    """The chunks the answer's own in-range markers point at. `citations` is no help: the agent fills it with every
-    chunk when the answer has no markers."""
+    """The chunks the answer's own in-range markers point at (ranges clamped to the chunks given, as the agent does).
+    `citations` is no help: the agent fills it with every chunk when the answer has no markers."""
     chunks = outputs["chunks"]
-    return [chunks[n - 1] for n in sorted(_marker_numbers(outputs["answer"])) if 1 <= n <= len(chunks)]
+    numbers: set[int] = set()
+    for low, high in _marker_spans(outputs["answer"]):
+        numbers.update(range(max(low, 1), min(high, len(chunks)) + 1))
+    return [chunks[n - 1] for n in sorted(numbers)]
 
 
 def _given_citations(inputs: dict[str, Any], outputs: dict[str, Any], reference: dict[str, Any]) -> tuple[int, str]:
     count = len(outputs["chunks"])
-    outside = sorted(n for n in _marker_numbers(outputs["answer"]) if not 1 <= n <= count)
+    # A range is out of range when either bound is: the bounds are what the answer wrote, so report those.
+    outside = sorted({n for span in _marker_spans(outputs["answer"]) for n in span if not 1 <= n <= count})
     if outside:
         return 0, f"cites [{', '.join(map(str, outside))}] but was given {count} chunks"
     given = {c["chunk_id"] for c in outputs["chunks"]}
@@ -139,7 +144,7 @@ def _links(text: str) -> list[str]:
 
 def _cited_links(inputs: dict[str, Any], outputs: dict[str, Any], reference: dict[str, Any]) -> tuple[int, str]:
     sources = squeeze(" ".join(c["text"] for c in _cited_chunks(outputs)))
-    outside = [url for url in _links(outputs["answer"]) if squeeze(url) not in sources]
+    outside = [url for url in _links(fold(outputs["answer"])) if squeeze(url) not in sources]
     if outside:
         return 0, f"links not in a cited chunk: {', '.join(outside)}"
     return 1, "every link is in a cited chunk"
