@@ -55,10 +55,16 @@ def _scheduler_role(t: Template) -> tuple[str, dict[str, Any]]:
 
 def test_the_host_stops_at_18_and_00_and_starts_at_07(t: Template) -> None:
     assert {name: (s["ScheduleExpression"], s["Target"]["Arn"]) for name, s in _schedules(t).items()} == {
-        "stop": ("cron(0 18 * * ? *)", "arn:aws:scheduler:::aws-sdk:ec2:stopInstances"),
-        "stop-late": ("cron(0 0 * * ? *)", "arn:aws:scheduler:::aws-sdk:ec2:stopInstances"),
-        "start": ("cron(0 7 * * ? *)", "arn:aws:scheduler:::aws-sdk:ec2:startInstances"),
+        "test-stop": ("cron(0 18 * * ? *)", "arn:aws:scheduler:::aws-sdk:ec2:stopInstances"),
+        "test-stop-late": ("cron(0 0 * * ? *)", "arn:aws:scheduler:::aws-sdk:ec2:stopInstances"),
+        "test-start": ("cron(0 7 * * ? *)", "arn:aws:scheduler:::aws-sdk:ec2:startInstances"),
     }
+
+
+def test_schedule_names_carry_the_prefix_so_they_never_clash_with_another_stacks(t: Template) -> None:
+    # CloudFormation identifies a schedule by its name alone, whatever its group: another stack in the account that
+    # owns a schedule `start` makes a second `start` fail with "start already exists in stack ...".
+    assert all(name.startswith("test-") for name in _schedules(t))
 
 
 def test_schedules_run_on_time_in_the_time_zone_and_retry_twice(t: Template) -> None:
