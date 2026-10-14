@@ -11,24 +11,33 @@ sends it traces, scores, and datasets (spec sdd/specs/2026-10-14-off-hours-and-l
 - Deploy: `cdk deploy` uploads `deploy/` as an asset; the SSM document `langfuse-deploy` unpacks it to /opt/langfuse and
   runs deploy.sh, which renders settings and secrets into a root-only env file. No secret is in the template, the
   outputs, or the user data.
-- No CloudWatch alarms.
+- Off-hours (ADR 0022): stopped at 18:00 and 00:00, started at 07:00, Asia/Ho_Chi_Minh. No CloudWatch alarms; a failed
+  weekly patching window emails `langfuse-alerts`.
 """
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 import aws_cdk as cdk
 from aws_cdk import aws_dlm as dlm
 from aws_cdk import aws_ec2 as ec2
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as events_targets
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_s3_assets as s3_assets
 from aws_cdk import aws_secretsmanager as secretsmanager
+from aws_cdk import aws_sns as sns
+from aws_cdk import aws_sns_subscriptions as sns_subscriptions
 from aws_cdk import aws_ssm as ssm
 from constructs import Construct
 
+from langfuse_platform.off_hours import OffHours
+
 PREFIX = "langfuse"
+TIME_ZONE = "Asia/Ho_Chi_Minh"
 DEFAULT_INSTANCE_TYPE = "t3.xlarge"
 DATA_VOLUME_GIB = 100
 ROOT_VOLUME_GIB = 30
@@ -39,8 +48,14 @@ BUNDLE_DIR = Path(__file__).parents[1] / "deploy"
 DEPLOY_DOCUMENT = f"{PREFIX}-deploy"
 HOST_TAG = "langfuse:host"
 SNAPSHOT_TAG = "langfuse:snapshots"
-SNAPSHOT_TIME_UTC = "19:00"  # 02:00 Asia/Ho_Chi_Minh
+SNAPSHOT_TIME_UTC = "19:00"  # 02:00 in TIME_ZONE
 SNAPSHOT_RETENTION_DAYS = 7
+PATCH_SCHEDULE = "cron(20 7 ? * SUN *)"  # twenty minutes after the 07:00 start
+ENSURE_HEALTHY = "/opt/langfuse/ensure-healthy.sh"
+ENSURE_HEALTHY_COMMAND = (
+    f"[ -f {ENSURE_HEALTHY} ] || {{ echo 'ensure-healthy.sh is missing: run the deploy document'"
+    f" (docs/runbooks/langfuse-host.md)' >&2; exit 1; }}; bash {ENSURE_HEALTHY}"
+)
 # Generated secrets deploy.sh reads: (construct id, name under langfuse/, length). Changing a secret's settings (name,
 # length, punctuation) makes CloudFormation generate a new value. A new db/postgres breaks the existing database
 # (POSTGRES_PASSWORD applies only at first init); a new encryption-seed makes encrypted data unreadable, because deploy.sh
@@ -66,6 +81,7 @@ class LangfuseHostStack(cdk.Stack):
         domain: str | None = None,
         admin_email: str,
         data_snapshot_id: str | None = None,
+        alert_emails: Sequence[str] = (),
         **kwargs: Any,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -180,6 +196,7 @@ class LangfuseHostStack(cdk.Stack):
         )
         cdk.Tags.of(instance).add(HOST_TAG, PREFIX)
         cdk.Tags.of(instance).add("Name", PREFIX)
+        cdk.Tags.of(instance).add("PatchGroup", PREFIX)
 
         address = ec2.CfnEIP(self, "Address", domain="vpc")
         ec2.CfnEIPAssociation(
@@ -260,7 +277,12 @@ class LangfuseHostStack(cdk.Stack):
             },
         )
 
+        topic = sns.Topic(self, "Alerts", topic_name=f"{PREFIX}-alerts")
+        for email in alert_emails:
+            topic.add_subscription(sns_subscriptions.EmailSubscription(email))
         self._snapshots()
+        _patching(self, instance, topic)
+        OffHours(self, "OffHours", instance=instance, name_prefix=PREFIX, time_zone=TIME_ZONE)
 
         cdk.CfnOutput(self, "InstanceId", value=instance.instance_id)
         cdk.CfnOutput(self, "PublicIp", value=address.attr_public_ip)
@@ -356,3 +378,89 @@ def _deploy_commands(region: str) -> list[str]:
         "mv /opt/langfuse.new /opt/langfuse",
         "bash /opt/langfuse/deploy.sh",
     ]
+
+
+def _patching(scope: Construct, instance: ec2.Instance, topic: sns.ITopic) -> None:
+    """Weekly security patching through SSM Patch Manager, then a check that every service is healthy again."""
+    ssm.CfnPatchBaseline(
+        scope,
+        "PatchBaseline",
+        name=f"{PREFIX}-security",
+        description="Security updates for the Langfuse host",
+        operating_system="AMAZON_LINUX_2023",
+        patch_groups=[PREFIX],
+        approval_rules=ssm.CfnPatchBaseline.RuleGroupProperty(
+            patch_rules=[
+                ssm.CfnPatchBaseline.RuleProperty(
+                    approve_after_days=0,
+                    compliance_level="HIGH",
+                    patch_filter_group=ssm.CfnPatchBaseline.PatchFilterGroupProperty(
+                        patch_filters=[
+                            ssm.CfnPatchBaseline.PatchFilterProperty(key="CLASSIFICATION", values=["Security"])
+                        ]
+                    ),
+                )
+            ]
+        ),
+    )
+    window = ssm.CfnMaintenanceWindow(
+        scope,
+        "PatchWindow",
+        name=f"{PREFIX}-patching",
+        description="Weekly security patching of the Langfuse host (docs/runbooks/langfuse-host.md)",
+        schedule=PATCH_SCHEDULE,
+        schedule_timezone=TIME_ZONE,
+        duration=3,
+        cutoff=1,
+        allow_unassociated_targets=False,
+    )
+    target = ssm.CfnMaintenanceWindowTarget(
+        scope,
+        "PatchWindowTarget",
+        window_id=window.ref,
+        resource_type="INSTANCE",
+        targets=[ssm.CfnMaintenanceWindowTarget.TargetsProperty(key="InstanceIds", values=[instance.instance_id])],
+    )
+
+    def task(construct_id: str, priority: int, document: str, parameters: dict[str, list[str]]) -> None:
+        ssm.CfnMaintenanceWindowTask(
+            scope,
+            construct_id,
+            window_id=window.ref,
+            priority=priority,
+            task_type="RUN_COMMAND",
+            task_arn=document,
+            targets=[ssm.CfnMaintenanceWindowTask.TargetProperty(key="WindowTargetIds", values=[target.ref])],
+            max_concurrency="1",
+            max_errors="1",
+            cutoff_behavior="CONTINUE_TASK",
+            task_invocation_parameters=ssm.CfnMaintenanceWindowTask.TaskInvocationParametersProperty(
+                maintenance_window_run_command_parameters=ssm.CfnMaintenanceWindowTask.MaintenanceWindowRunCommandParametersProperty(
+                    parameters=parameters
+                )
+            ),
+        )
+
+    task("PatchTask", 1, "AWS-RunPatchBaseline", {"Operation": ["Install"], "RebootOption": ["RebootIfNeeded"]})
+    task("HealthTask", 2, "AWS-RunShellScript", {"commands": [ENSURE_HEALTHY_COMMAND], "executionTimeout": ["1200"]})
+
+    events.Rule(
+        scope,
+        "PatchWindowFailedRule",
+        description="Email when the Langfuse patching window fails or times out",
+        event_pattern=events.EventPattern(
+            source=["aws.ssm"],
+            detail_type=["Maintenance Window Execution State-change Notification"],
+            detail={"window-id": [window.ref], "status": ["FAILED", "TIMED_OUT"]},
+        ),
+        targets=[
+            events_targets.SnsTopic(
+                topic,
+                message=events.RuleTargetInput.from_text(
+                    f"The patching window {PREFIX}-patching ended {events.EventField.from_path('$.detail.status')}"
+                    f" (execution {events.EventField.from_path('$.detail.window-execution-id')})."
+                    " See docs/runbooks/langfuse-host.md."
+                ),
+            )
+        ],
+    )
