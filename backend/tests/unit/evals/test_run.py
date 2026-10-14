@@ -6,11 +6,11 @@ from typing import Any
 import pytest
 from langsmith.utils import LangSmithError
 
-from evals.dataset import Dataset, Example, publish_split
+from evals.dataset import Dataset, Example
 from evals.learners import LoadError
 from evals.run import main, run_split
 from evals.suite import DatasetSuites, Suite, not_applicable
-from fakes.langsmith import FakeLangSmith
+from fakes.langsmith import FakeLangSmith, publish
 
 ASK = Dataset(
     "ask",
@@ -23,7 +23,7 @@ ASK = Dataset(
 def published() -> FakeLangSmith:
     """A LangSmith holding smoke-v1 of ASK."""
     client = FakeLangSmith()
-    publish_split(client, ASK, "smoke", ASK.examples)
+    publish(client, ASK.name, "smoke", ASK.examples, "smoke-v1")
     return client
 
 
@@ -119,7 +119,7 @@ async def test_a_dataset_without_the_split_runs_nothing() -> None:
 
 async def test_the_newest_version_runs_and_its_tag_is_recorded() -> None:
     client = published()
-    publish_split(client, ASK, "smoke", (*ASK.examples, Example({"question": "c"}, {"covered": True})))
+    publish(client, ASK.name, "smoke", (*ASK.examples, Example({"question": "c"}, {"covered": True})), "smoke-v2")
     group = DatasetSuites("ask", make_target, (scored("search_step_ran", 1.0),))
     scores, links = await run_split(client, [group], "smoke", load=lambda key: ASK)
     assert scores == {"search_step_ran": [1.0, 1.0, 1.0]}

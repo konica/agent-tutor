@@ -317,3 +317,17 @@ class FakeLangSmith:
             rows.append({"example": example, "outputs": outputs, "evaluation_results": {"results": results}})
         self.experiments.append(Experiment(experiment_prefix, metadata, [e.id for e in examples]))
         return FakeResults(rows, f"https://smith.example/{experiment_prefix}-{len(self.experiments)}")
+
+
+def publish(client: FakeLangSmith, dataset_name: str, split: str, examples: Iterable[Any], tag: str) -> None:
+    """A split version as publishing made it in LangSmith before the datasets moved to Langfuse: the examples replace
+    the split and the result is tagged. The runner reads these versions until it moves to Langfuse (#320)."""
+    if not client.has_dataset(dataset_name=dataset_name):
+        client.create_dataset(dataset_name)
+    if stale := [e.id for e in client.list_examples(dataset_name=dataset_name, splits=[split])]:
+        client.delete_examples(stale)
+    client.create_examples(
+        dataset_name=dataset_name,
+        examples=[{"inputs": e.inputs, "outputs": e.outputs, "split": split} for e in examples],
+    )
+    client.update_dataset_tag(dataset_name=dataset_name, as_of=client.datasets[dataset_name].versions[-1][0], tag=tag)

@@ -15,9 +15,19 @@ from typing import Any
 
 import langsmith
 from langsmith.schemas import RunKey
-from langsmith.utils import LangSmithNotFoundError
+from langsmith.utils import LangSmithError, LangSmithNotFoundError
 
 from evals.dataset import Dataset, Example
+
+# The annotation queue is still LangSmith's (it moves to Langfuse with #319): callers take the client and the error a
+# review call raises from here, so only this module names LangSmith.
+ReviewError = LangSmithError
+REVIEW_KEY = "LANGSMITH_API_KEY"
+
+
+def review_client() -> langsmith.Client:
+    return langsmith.Client()
+
 
 ACCEPTED = "accepted"
 FEEDBACK_BATCH = 100  # run ids per list_feedback call

@@ -1,6 +1,6 @@
 # evals
 
-Datasets live in **LangSmith** (versioned there; never edit a version a release was gated on). This folder holds what builds and runs them (PRD §10).
+Datasets live in **Langfuse**, in the `smart-tutor-evals` project (versioned there; never edit a version a release was gated on; see "Datasets"). This folder holds what builds and runs them (PRD §10). The annotation queue and the experiments are still LangSmith's until they move to Langfuse (#319, #320), so `make evals-smoke` runs the versions published to LangSmith before the move.
 
 | Path | What |
 |---|---|
@@ -12,7 +12,8 @@ Datasets live in **LangSmith** (versioned there; never edit a version a release 
 | `chunks.py` | Seed PDFs cut into the worker's chunks, ids `<seed id>:<seq>` |
 | `generate.py` | `make evals-generate` → candidates in the annotation queue |
 | `review.py` | The annotation queue: candidates as runs, the `accepted` rubric item, accepted items read back |
-| `publish.py` | `make evals-publish` → next `smoke`/`full` versions |
+| `publish.py` | `make evals-publish` → next `smoke`/`full` versions in Langfuse |
+| `langfuse_client.py` | The one seam to Langfuse (`LangfuseClient`, implemented on the Langfuse SDK; tests use `tests/fakes/langfuse.py`): add a call here, never import the SDK elsewhere |
 | `adversarial/taxonomy.yaml` | Injection categories × seeds |
 | `adversarial/benign_questions.yaml` | Benign study questions, including hard security and ML-safety ones, for the question screen |
 | `measure_question_screen.py` | Measures a Bedrock guardrail per strength: false positives, catch rate, latency, cost (see "Question screen") |
@@ -24,7 +25,7 @@ Datasets live in **LangSmith** (versioned there; never edit a version a release 
 | `run.py` | `make evals-smoke` → one LangSmith experiment per dataset, gated on `thresholds.yaml` (see "Run a split") |
 | `gate.py` | Compares scores with `thresholds.yaml`: min, max, max_failures; unscored metrics are "not run" |
 | `suite.py` | A suite: dataset + target + evaluators; discovered in `evaluators/` |
-| `dataset.py`, `datasets/` | Hand-written examples (one YAML per LangSmith dataset) and split versions in LangSmith; `pins` fixes the version a split runs on |
+| `dataset.py`, `datasets/` | Hand-written examples (one YAML per eval dataset) and split versions in Langfuse; `pins` fixes the version a split runs on |
 
 Splits: **smoke** (every PR that changes the agent; about 30 items: the hand-written ones plus accepted candidates of every question type) and **full** (before release: the hand-written ones plus every accepted candidate).
 
@@ -51,15 +52,26 @@ Prerequisites: the app stack and the eval learners' libraries (`make evals-learn
 
 ## Datasets
 
-Each `datasets/<key>.yaml` is one LangSmith dataset (`name`) and its hand-written `examples`, which are in every version of both splits. A top-level `splits: [full]` opts the dataset out of `smoke`: publishing makes no smoke version for it and `make evals-smoke` skips it (default: both splits; a pin may name only a split the dataset keeps). Generated examples join them only after a human accepts them (below). A split's versions are tagged `smoke-v1`, `smoke-v2`, … and `full-v1`, …; only `make evals-publish` makes one, and only when the split's examples changed. Tags are never moved, so a version a run was gated on is never edited. Examples name seed documents by manifest id; the target finds each learner's own copy.
+Each `datasets/<key>.yaml` is one eval dataset (`name`, e.g. `smart-tutor-ask`) and its hand-written `examples`, which are in every version of both splits. A top-level `splits: [full]` opts the dataset out of `smoke`: publishing makes no smoke version for it and `make evals-smoke` skips it (default: both splits; a pin may name only a split the dataset keeps). Generated examples join them only after a human accepts them (below). A split's versions are `smoke-v1`, `smoke-v2`, … and `full-v1`, …; only `make evals-publish` makes one, and only when the split's examples changed. Examples name seed documents by manifest id; the target finds each learner's own copy.
 
-`make evals-smoke` runs each split's **newest** version. The gate table names the version each experiment ran on (`smart-tutor-ask (smoke smoke-v3)`).
+**In Langfuse** (project `smart-tutor-evals`, under the Smart Tutor organization), each version is a dataset of its own named `<name>/<version>`, so the UI shows a folder per eval dataset:
+
+| Langfuse dataset | What |
+|---|---|
+| `smart-tutor-ask/smoke-v3` | Version 3 of the ask dataset's smoke split; items are its examples: `input` = the example's inputs, `expected output` = its reference outputs, `metadata` = type, `candidate_run`, `generated_at` for a generated one |
+| `smart-tutor-injection/full-v1`, `smart-tutor-question-screen/full-v1`, `smart-tutor-topic-check/smoke-v1`, … | The same for every `datasets/<key>.yaml` |
+
+A version's dataset is created, filled, and never written again, so a version a run was gated on is never edited: don't add, edit, or archive its items in the UI. Its metadata holds `split` and `examples`, the number of items it must have. A publish that stops part-way (Langfuse went off, a network error) leaves a version with fewer items, and a retried item can leave one with more; either way it is incomplete, is never the newest, and can't be pinned, and the next publish makes the version after it. Langfuse can't delete a dataset through its API; delete an incomplete one in the UI if it bothers you. (Langfuse also versions each dataset's items by timestamp, but those versions can't be named, so a pin would be a timestamp: one dataset per version keeps `smoke-v3` a name you can read, pin, and open.)
+
+Keys: `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`, your own key pair of the `smart-tutor-evals` project (Langfuse → Smart Tutor → `smart-tutor-evals` → Settings → API Keys), and `LANGFUSE_BASE_URL`, the host's URL (`.env.example`; falls back to `SMART_TUTOR_LANGFUSE_URL`), in your shell or `.env`. The host is on 07:00–18:00 Asia/Ho_Chi_Minh (ADR 0022); outside those hours publishing exits 1 with "Can't reach Langfuse".
+
+`make evals-smoke` runs each split's **newest** version. The gate table names the version each experiment ran on (`smart-tutor-ask (smoke smoke-v3)`). Until the runner moves to Langfuse (#320), it runs the newest LangSmith versions (`smart-tutor-ask` smoke-v2 and full-v1, hand-written only), and examples published to Langfuse reach the gate with #320.
 
 **Pin the version a release was gated on:** on the release's branch, add it to the dataset file and commit:
 
     pins: {smoke: smoke-v3, full: full-v2}
 
-The runner then uses the pinned tag for that split (and stops if LangSmith doesn't have it), so the release gate can be rerun on exactly the examples it passed. Record the pinned versions in the release PR.
+The runner then uses the pinned version for that split (and stops if it doesn't exist or is incomplete), so the release gate can be rerun on exactly the examples it passed. Record the pinned versions in the release PR. **Until #320**, the runner reads pins as LangSmith tags, not Langfuse versions (Langfuse numbering starts again at `v1`, so the same name can mean other examples there): don't pin a version `make evals-publish` printed until the runner runs on Langfuse.
 
 ## Multi-turn conversations
 
@@ -101,7 +113,7 @@ Hand-written conversations (follow-ups, topic switches, and drift in a limited c
 
        make evals-publish      # or: cd backend && uv run --env-file ../.env --extra eval python -m evals.publish [--dataset ask] [--dry-run]
 
-   `full` gets the hand-written examples plus every accepted item (the newest `full` version's generated examples, less any you have since scored 0, plus the newly accepted); `smoke` the hand-written examples plus accepted items taken in turn from each type, oldest first, until it holds 30 items in all, hand-written included. It prints each split's new tag (or "unchanged") with its examples by type, and names the types smoke has no accepted item of yet. `--dry-run` prints the splits without publishing.
+   `full` gets the hand-written examples plus every accepted item (the newest `full` version's generated examples, less any you have since scored 0, plus the newly accepted); `smoke` the hand-written examples plus accepted items taken in turn from each type, oldest first, until it holds 30 items in all, hand-written included. It prints each split's new Langfuse dataset (`published smart-tutor-ask/smoke-v4`, or "unchanged") with its examples by type, and names the types smoke has no accepted item of yet. `--dry-run` prints the splits without publishing; it still reads the queue and the newest `full` version, so it needs the same keys: the Langfuse ones ("Datasets") and, while the queue is LangSmith's, `LANGSMITH_API_KEY`.
 
 ## Injection eval
 
