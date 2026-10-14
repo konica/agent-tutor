@@ -233,6 +233,35 @@ describe("Answer", () => {
       ]);
     });
 
+    it("keeps markers live while the parsed answer is reused", () => {
+      const base = {
+        text: "A [1] B [2].",
+        citations: [cite(1), cite(2)],
+        showCitations: true,
+        deletedIds: new Set<string>(),
+        shownChunkId: null as string | null,
+        onOpenCitation: vi.fn(),
+      };
+      const { rerender } = render(<Answer {...base} />);
+      const first = () => screen.getByRole("button", { name: "Source 1: Doc 1, p. 2" });
+      expect(first()).not.toHaveAttribute("aria-current");
+      rerender(<Answer {...base} shownChunkId="c1" />);
+      expect(first()).toHaveAttribute("aria-current", "true");
+      rerender(<Answer {...base} showCitations={false} />);
+      expect(within(paragraph()).queryAllByRole("button")).toHaveLength(0);
+      rerender(<Answer {...base} />);
+      expect(within(paragraph()).queryAllByRole("button")).toHaveLength(2);
+    });
+
+    it("keeps footnote ids unique across answers and hides the footnotes label", () => {
+      const text = "Claim[^1].\n\n[^1]: Note.";
+      renderAnswer({ text, citations: [] });
+      renderAnswer({ text, citations: [] });
+      const ids = [...document.querySelectorAll("[id]")].map((e) => e.id);
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(screen.getAllByText("Footnotes")[0]).toHaveClass("sr-only");
+    });
+
     it("keeps the marker rules inside list items", () => {
       const props = { text: "- gone [1]\n- open [2]\n- none [7]", citations: [cite(1, { deleted: true }), cite(2)] };
       renderAnswer(props);

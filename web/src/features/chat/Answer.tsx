@@ -1,5 +1,5 @@
 import { FileText } from "lucide-react";
-import { createContext, useContext, useId, useState, type ReactNode } from "react";
+import { createContext, type ComponentPropsWithoutRef, useContext, useId, useMemo, useState, type ReactNode } from "react";
 import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -37,12 +37,27 @@ function Marker({ n, children }: { n: number; children: ReactNode }) {
   return useContext(MarkerContext)({ text: String(children), n });
 }
 
+const IdPrefixContext = createContext("");
+
+function FootnoteScoped({
+  as: Tag,
+  id,
+  "aria-labelledby": labelledBy,
+  ...props
+}: { as: "h4" | "section" } & ComponentPropsWithoutRef<"section">) {
+  const prefix = useContext(IdPrefixContext);
+  const scope = (v: string | undefined) => (v === "footnote-label" ? `${prefix}${v}` : v);
+  return <Tag {...props} id={scope(id)} aria-labelledby={scope(labelledBy)} />;
+}
+
 const remarkPlugins = [remarkGfm, remarkCitationMarkers];
 
 // The model's headings sit under the page's h1 (title) and h2 (panel headings).
 const components: Components = {
   h1: ({ node: _node, ...props }) => <h3 {...props} />,
-  h2: ({ node: _node, ...props }) => <h4 {...props} />,
+  h2: ({ node: _node, ...props }) => <FootnoteScoped as="h4" {...props} />,
+  // The footnotes section and its label carry a fixed id; scoped to this answer like the other footnote ids.
+  section: ({ node: _node, ...props }) => <FootnoteScoped as="section" {...props} />,
   h3: ({ node: _node, ...props }) => <h5 {...props} />,
   h4: ({ node: _node, ...props }) => <h6 {...props} />,
   h5: ({ node: _node, ...props }) => <h6 {...props} />,
@@ -64,6 +79,18 @@ const components: Components = {
 export function Answer({ text, citations, showCitations, deletedIds, shownChunkId, onOpenCitation, rating }: Props) {
   const listId = useId();
   const moreId = useId();
+  // Footnote ids are made unique per answer: several answers share the page.
+  const rehypeOptions = useMemo(() => ({ clobberPrefix: `${listId}-` }), [listId]);
+  // Parsed once per text change: every streamed delta re-renders every turn's Answer, and re-parsing them all stutters.
+  // Marker changes still reach the Marker components below through MarkerContext.
+  const body = useMemo(
+    () => (
+      <Markdown remarkPlugins={remarkPlugins} remarkRehypeOptions={rehypeOptions} components={components}>
+        {text}
+      </Markdown>
+    ),
+    [text, rehypeOptions],
+  );
   // Expanded only for the citations it was expanded for: another conversation's turn at this index brings new ones, so
   // it starts collapsed, as a new answer and a reload do.
   const [expandedFor, setExpandedFor] = useState<ChatCitation[] | null>(null);
@@ -141,11 +168,9 @@ export function Answer({ text, citations, showCitations, deletedIds, shownChunkI
       {/* Markdown (DESIGN.md → Chat); react-markdown shows any HTML in the model's words as text. */}
       {text && (
         <div className={styles.answer}>
-          <MarkerContext.Provider value={marker}>
-            <Markdown remarkPlugins={remarkPlugins} components={components}>
-              {text}
-            </Markdown>
-          </MarkerContext.Provider>
+          <IdPrefixContext.Provider value={`${listId}-`}>
+            <MarkerContext.Provider value={marker}>{body}</MarkerContext.Provider>
+          </IdPrefixContext.Provider>
         </div>
       )}
       {showCitations && citations.length > 0 && (
