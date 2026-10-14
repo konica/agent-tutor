@@ -37,7 +37,7 @@ guard = ["guardrails-ai==0.11.0"]
 topic = ["numpy>=2.0", "onnxruntime>=1.20", "tokenizers>=0.20"]
 # Optional agent image only (`agent-jailbreak`): Guardrails AI's DetectJailbreak question screen (#200) on CPU torch.
 # About 1.5 GB of models plus torch: never in the default agent image (ADR 0019).
-jailbreak = ["guardrails-ai==0.11.0", "guardrails-ai-detect-jailbreak==0.1.6", "torch==2.14.1", "transformers==4.57.6"]
+jailbreak = ["guardrails-ai==0.11.0", "guardrails-ai-detect-jailbreak==0.1.6", "torch==2.14.1", "transformers==5.19.0"]
 # Evaluation runs (backend/evals) and CI eval gates.
 eval = ["langsmith>=0.4", "openevals>=0.1", "pyyaml>=6.0"]
 # Training the topic-check model only (evals.topic_check.train): never in an image or a CI install.
@@ -118,7 +118,7 @@ module = ["guardrails_ai", "guardrails_ai.*"]
 ignore_missing_imports = true  # the jailbreak extra is not in the dev install
 
 [[tool.mypy.overrides]]
-module = ["onnxruntime", "onnxruntime.*", "tokenizers", "tokenizers.*"]  # tokenizers < 0.23 (pinned by transformers 4) has no py.typed
+module = ["onnxruntime", "onnxruntime.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -591,3 +591,7 @@ layers = [
     "subjects",
     "accounts | insights",
 ]
+
+[tool.uv]
+# cached-path (via guardrails-ai-detect-jailbreak) caps rich<14; the dev tools (import-linter) need >=14.2
+override-dependencies = ["rich>=14.2,<15"]
