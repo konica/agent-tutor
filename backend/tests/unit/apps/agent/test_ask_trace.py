@@ -22,8 +22,8 @@ from fakes import (
 )
 from smart_tutor.apps.agent.graph import build_graph
 from smart_tutor.apps.agent.server import AskRequest, answer_events
-from smart_tutor.shared.adapters.ask_tracing import PhoenixAskTracing
-from smart_tutor.shared.adapters.tracing import LearnerHasher, otlp_exporter, phoenix_traces, root_span_id
+from smart_tutor.shared.adapters.ask_tracing import OtelAskTracing
+from smart_tutor.shared.adapters.tracing import LearnerHasher, otel_traces, phoenix_exporter, root_span_id
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.ports.ask_tracing import AskRun
@@ -57,7 +57,7 @@ async def traced(
     run = AskRun(RUN_ID, body.thread_id and str(body.thread_id), USER, body.question, body.document_ids)
     got: list[str] = []
     with recorded_traces(sampling_rate=sampling_rate) as (traces, spans):
-        events = answer_events(graph, body, "tok", run, PhoenixAskTracing(traces))
+        events = answer_events(graph, body, "tok", run, OtelAskTracing(traces))
         async for event in events:
             got.append(event)
             if close_after is not None and len(got) >= close_after:
@@ -157,7 +157,7 @@ async def test_a_failing_exporter_never_fails_the_ask() -> None:
     )
     run = AskRun(RUN_ID, None, USER, "What is attention?", None)
     with recorded_traces(exporter=FailingExporter()) as (traces, _):
-        tracing = PhoenixAskTracing(traces)
+        tracing = OtelAskTracing(traces)
         got = [e async for e in answer_events(graph, AskRequest(question="What is attention?"), "tok", run, tracing)]
     assert any(e.startswith("event: delta") for e in got) and got[-1].startswith("event: done")
 
@@ -167,10 +167,10 @@ async def test_a_collector_that_is_down_never_fails_the_ask() -> None:
         lambda token: FakeRetriever(CHUNKS), fake_chat_model(AIMessage("It weighs tokens [1].")), guard=PassingGuard()
     )
     run = AskRun(RUN_ID, None, USER, "What is attention?", None)
-    exporter = otlp_exporter(Settings(phoenix_url="http://127.0.0.1:9"), timeout=1)  # nothing listens
-    traces = phoenix_traces("p", 1.0, BatchSpanProcessor(exporter), LearnerHasher("k"), {})
+    exporter = phoenix_exporter(Settings(phoenix_url="http://127.0.0.1:9"), timeout=1)  # nothing listens
+    traces = otel_traces("p", "local", 1.0, [BatchSpanProcessor(exporter)], LearnerHasher("k"), {})
     try:
-        tracing = PhoenixAskTracing(traces)
+        tracing = OtelAskTracing(traces)
         got = [e async for e in answer_events(graph, AskRequest(question="What is attention?"), "tok", run, tracing)]
     finally:
         traces.shutdown()

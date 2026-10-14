@@ -1,6 +1,7 @@
 """Keyed learner hash, run tracing, and Phoenix tracing setup (PRD §10.4, ADR 0017): where spans go, with which key,
 how many, and the learner only as an HMAC of their user id."""
 
+import base64
 import http.server
 import json
 import random
@@ -8,22 +9,29 @@ import threading
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import Any
 
 import pytest
 from langchain_core.messages import AIMessage
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import StatusCode
 from pydantic import ValidationError
 
 from fakes import FailingExporter, fake_chat_model, recorded_traces
+from smart_tutor.shared.adapters import tracing as tracing_module
 from smart_tutor.shared.adapters.tracing import (
     LearnerHasher,
-    PhoenixRunTracing,
+    OtelRunTracing,
+    OtelTraces,
     ingestion_project,
+    langfuse_enabled,
+    langfuse_exporter,
     learner_hasher,
     never_raising,
-    otlp_exporter,
-    phoenix_traces,
+    otel_traces,
+    phoenix_enabled,
+    phoenix_exporter,
     root_ids,
     root_span_id,
     run_metadata,
@@ -34,6 +42,7 @@ from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
 
 URL = "http://127.0.0.1:9"  # nothing listens
+LANGFUSE = {"langfuse_public_key": "pk-lf-test", "langfuse_secret_key": "sk-lf-test"}
 
 
 def test_the_hash_is_stable_for_one_learner_and_differs_between_learners() -> None:
@@ -93,7 +102,7 @@ def test_the_works_own_error_still_propagates() -> None:
         raise KeyError("work failed")
 
 
-def ingest(tracing: PhoenixRunTracing, user: str = "user-123", content: str = "c-1", fail: bool = False) -> str:
+def ingest(tracing: OtelRunTracing, user: str = "user-123", content: str = "c-1", fail: bool = False) -> str:
     with tracing.run("ingest", UserId(user), {"content_id": content}):
         reply = fake_chat_model(AIMessage("A summary.")).invoke("Describe these pages.")
         if fail:
@@ -103,7 +112,7 @@ def ingest(tracing: PhoenixRunTracing, user: str = "user-123", content: str = "c
 
 def test_an_ingest_is_a_root_span_with_its_metadata_and_the_model_call_beneath_it() -> None:
     with recorded_traces(metadata={"deployment": "local"}) as (traces, spans):
-        ingest(PhoenixRunTracing(traces))
+        ingest(OtelRunTracing(traces))
     finished = spans.get_finished_spans()
     [root] = [s for s in finished if s.name == "ingest"]
     assert root.parent is None
@@ -121,7 +130,7 @@ def test_an_ingest_is_a_root_span_with_its_metadata_and_the_model_call_beneath_i
 
 def test_each_ingest_is_its_own_trace() -> None:
     with recorded_traces() as (traces, spans):
-        tracing = PhoenixRunTracing(traces)
+        tracing = OtelRunTracing(traces)
         ingest(tracing, content="c-1")
         ingest(tracing, content="c-2")
     roots = [s for s in spans.get_finished_spans() if s.name == "ingest"]
@@ -130,23 +139,109 @@ def test_each_ingest_is_its_own_trace() -> None:
 
 def test_a_failed_ingest_ends_its_span_as_an_error_and_the_error_propagates() -> None:
     with recorded_traces() as (traces, spans), pytest.raises(KeyError):
-        ingest(PhoenixRunTracing(traces), fail=True)
+        ingest(OtelRunTracing(traces), fail=True)
     [root] = [s for s in spans.get_finished_spans() if s.name == "ingest"]
     assert root.status.status_code is StatusCode.ERROR
 
 
 def test_a_failing_exporter_never_fails_the_ingest() -> None:
     with recorded_traces(exporter=FailingExporter()) as (traces, _):
-        assert ingest(PhoenixRunTracing(traces)) == "A summary."
+        assert ingest(OtelRunTracing(traces)) == "A summary."
 
 
 def test_a_collector_that_is_down_never_fails_the_ingest() -> None:
     settings = Settings(phoenix_url=URL)  # nothing listens
-    traces = phoenix_traces("p", 1.0, BatchSpanProcessor(otlp_exporter(settings, timeout=1)), LearnerHasher("k"), {})
+    traces = otel_traces(
+        "p", "local", 1.0, [BatchSpanProcessor(phoenix_exporter(settings, timeout=1))], LearnerHasher("k"), {}
+    )
     try:
-        assert ingest(PhoenixRunTracing(traces)) == "A summary."
+        assert ingest(OtelRunTracing(traces)) == "A summary."
     finally:
         traces.shutdown()  # the failed export is logged, not raised
+
+
+def test_a_collector_that_is_down_never_fails_the_ingest_to_langfuse() -> None:
+    settings = Settings(langfuse_url=URL, **LANGFUSE)  # nothing listens
+    traces = otel_traces(
+        "p", "local", 1.0, [BatchSpanProcessor(langfuse_exporter(settings, timeout=1))], LearnerHasher("k"), {}
+    )
+    try:
+        assert ingest(OtelRunTracing(traces)) == "A summary."
+    finally:
+        traces.shutdown()
+
+
+def test_langfuse_needs_its_url_and_both_keys() -> None:
+    assert langfuse_enabled(Settings(langfuse_url=URL, **LANGFUSE))
+    assert not langfuse_enabled(Settings(langfuse_url="", **LANGFUSE))
+    assert not langfuse_enabled(Settings(langfuse_url=URL, langfuse_public_key="pk-lf-test"))
+    assert not langfuse_enabled(Settings(langfuse_url=URL, langfuse_secret_key="sk-lf-test"))
+
+
+def test_langfuse_alone_turns_tracing_on() -> None:
+    settings = Settings(deployment="on-premise", phoenix_url="", langfuse_url=URL, **LANGFUSE)
+    assert tracing_enabled(settings) and not phoenix_enabled(settings)
+
+
+def test_langfuse_without_a_learner_hash_key_refuses_to_start() -> None:
+    with pytest.raises(RuntimeError, match="SMART_TUTOR_LEARNER_HASH_KEY"):
+        start_tracing(Settings(langfuse_url=URL, learner_hash_key="", **LANGFUSE), "p")
+
+
+def _send_one_span_to_langfuse(settings: Settings) -> None:
+    traces = otel_traces("p", "local", 1.0, [SimpleSpanProcessor(langfuse_exporter(settings))], LearnerHasher("k"), {})
+    try:
+        traces.tracer().start_span("ask").end()
+    finally:
+        traces.shutdown()
+
+
+def test_spans_go_to_langfuse_otlp_endpoint_with_basic_auth_and_ingestion_v4(collector: str) -> None:
+    _send_one_span_to_langfuse(Settings(langfuse_url=collector + "/", **LANGFUSE))
+    [(path, headers)] = _Collector.seen
+    assert path == "/api/public/otel/v1/traces"
+    assert headers["authorization"] == "Basic " + base64.b64encode(b"pk-lf-test:sk-lf-test").decode()
+    assert headers["x-langfuse-ingestion-version"] == "4"
+
+
+def test_the_environment_is_a_resource_attribute() -> None:
+    with recorded_traces() as (traces, spans):
+        traces.tracer().start_span("ask").end()
+    [span] = spans.get_finished_spans()
+    assert span.resource.attributes["langfuse.environment"] == "local"
+
+
+def test_with_phoenix_and_langfuse_on_each_span_reaches_both() -> None:
+    phoenix, langfuse = InMemorySpanExporter(), InMemorySpanExporter()
+    traces = otel_traces(
+        "p", "local", 1.0, [SimpleSpanProcessor(phoenix), SimpleSpanProcessor(langfuse)], LearnerHasher("k"), {}
+    )
+    try:
+        traces.tracer().start_span("ask").end()
+    finally:
+        traces.shutdown()
+    assert [s.name for s in phoenix.get_finished_spans()] == ["ask"]
+    assert [s.name for s in langfuse.get_finished_spans()] == ["ask"]
+
+
+def test_start_tracing_exports_to_each_configured_backend(monkeypatch: pytest.MonkeyPatch) -> None:
+    counts: list[int] = []
+    real = tracing_module.otel_traces
+
+    def spy(*args: Any, **kwargs: Any) -> OtelTraces:
+        counts.append(len(args[3]))
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(tracing_module, "otel_traces", spy)
+    for settings in (
+        Settings(phoenix_url=URL, learner_hash_key="k"),
+        Settings(phoenix_url="", langfuse_url=URL, learner_hash_key="k", **LANGFUSE),
+        Settings(phoenix_url=URL, langfuse_url=URL, learner_hash_key="k", **LANGFUSE),
+    ):
+        traces = start_tracing(settings, "p")
+        assert traces is not None
+        traces.shutdown()
+    assert counts == [1, 1, 2]
 
 
 def test_without_a_phoenix_url_the_process_is_untraced() -> None:
@@ -266,7 +361,7 @@ def collector() -> Iterator[str]:
 
 
 def _send_one_span(settings: Settings) -> None:
-    traces = phoenix_traces("p", 1.0, SimpleSpanProcessor(otlp_exporter(settings)), LearnerHasher("k"), {})
+    traces = otel_traces("p", "local", 1.0, [SimpleSpanProcessor(phoenix_exporter(settings))], LearnerHasher("k"), {})
     try:
         traces.tracer().start_span("ask").end()
     finally:

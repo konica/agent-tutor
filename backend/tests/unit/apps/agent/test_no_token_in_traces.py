@@ -32,7 +32,7 @@ from smart_tutor.apps.agent.graph import build_graph
 from smart_tutor.apps.agent.server import AskRequest, answer_events
 from smart_tutor.apps.agent.state import AgentContext
 from smart_tutor.apps.api.main import create_app
-from smart_tutor.shared.adapters.ask_tracing import PhoenixAskTracing
+from smart_tutor.shared.adapters.ask_tracing import OtelAskTracing
 from smart_tutor.shared.adapters.tracing import root_span_id
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
@@ -100,7 +100,7 @@ async def ask_spans(question: str) -> str:
     body = AskRequest(question=question)
     run = AskRun(uuid.uuid4(), None, UserId(USER_ID), body.question, None)
     with recorded_traces() as (traces, spans):
-        async for _ in answer_events(graph, body, TOKEN, run, PhoenixAskTracing(traces)):
+        async for _ in answer_events(graph, body, TOKEN, run, OtelAskTracing(traces)):
             pass
     assert spans.get_finished_spans()
     return dumped(spans.get_finished_spans())

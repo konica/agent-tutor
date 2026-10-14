@@ -38,7 +38,7 @@ from smart_tutor.apps.agent.graph import AskGraph, build_graph
 from smart_tutor.apps.agent.guards import build_guard
 from smart_tutor.apps.agent.state import DECLINE_MESSAGES, AgentContext, AskState
 from smart_tutor.apps.agent.topic import topic_classifier, topic_threshold
-from smart_tutor.shared.adapters.ask_tracing import PhoenixAskTracing
+from smart_tutor.shared.adapters.ask_tracing import OtelAskTracing
 from smart_tutor.shared.adapters.auth.bearer import BearerToken, CurrentPrincipal
 from smart_tutor.shared.adapters.auth.keycloak_introspection import keycloak_verifier
 from smart_tutor.shared.adapters.model_factory import ChatRole, ModelFactory
@@ -157,7 +157,7 @@ def create_app(
             raise RuntimeError("SMART_TUTOR_KEYCLOAK_CLIENT_SECRET is not set")  # before tracing instruments LangChain
         traces = start_tracing(settings, settings.phoenix_project)  # tracing on without a learner-hash key: refuse
         if tracing is None:
-            app.state.tracing = PhoenixAskTracing(traces) if traces else NoAskTracing()
+            app.state.tracing = OtelAskTracing(traces) if traces else NoAskTracing()
         if graph is None:
             model = ModelFactory(settings).chat(ChatRole.AGENT)
             canary = new_canary()

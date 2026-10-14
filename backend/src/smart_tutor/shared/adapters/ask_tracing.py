@@ -10,7 +10,7 @@ from typing import Any
 from opentelemetry import context, trace
 from opentelemetry.trace import Span, Status, StatusCode
 
-from smart_tutor.shared.adapters.tracing import PhoenixTraces, root_ids, span_attributes
+from smart_tutor.shared.adapters.tracing import OtelTraces, root_ids, span_attributes
 from smart_tutor.shared.ports.ask_tracing import AskRun, AskTrace, AskTracing, NoAskTrace
 
 NO_DECLINE = "none"
@@ -59,8 +59,8 @@ class _PhoenixAskTrace(AskTrace):
             logger.warning("could not end the ask trace", exc_info=True)
 
 
-class PhoenixAskTracing(AskTracing):
-    def __init__(self, traces: PhoenixTraces) -> None:
+class OtelAskTracing(AskTracing):
+    def __init__(self, traces: OtelTraces) -> None:
         self._traces = traces
 
     @contextmanager
