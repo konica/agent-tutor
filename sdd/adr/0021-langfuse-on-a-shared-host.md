@@ -26,7 +26,8 @@ owner wants other apps to use the same Langfuse later.
   stacks, parameters, or secrets, and Smart Tutor never references it: apps reach it over HTTPS with a per-project API
   key. The folder can move to a repository of its own.
 - **Access:** sign-up is off; headless initialization creates the first admin from Secrets Manager, who invites others.
-- **Hours:** it will follow the app host's off-hours schedule once that lands (#311); neither host needs the other to start.
+- **Hours:** it will follow the app host's off-hours schedule (ADR 0022) once #311 adds it to this host; neither host
+  needs the other to start.
 - **Not decided here (the Langfuse migration):** moving Smart Tutor's tracing and ratings from Phoenix and its evals
   from LangSmith; the 180-day trace retention (D25), since Langfuse lists data-retention policies among its Enterprise
   features when self-hosted; and where CI reaches Langfuse at night, when it is off.
@@ -41,8 +42,8 @@ owner wants other apps to use the same Langfuse later.
 
 ## Consequences
 
-- A second host (about $121 a month on demand while it runs around the clock, about $55 once the off-hours schedule
-  lands (#311), plus its volume and Elastic IP) and a second deploy to run by hand (`docs/runbooks/langfuse-host.md`).
+- A second host (about $121 a month on demand while it runs around the clock, about $55 once #311 adds the off-hours
+  schedule, plus its volume and Elastic IP) and a second deploy to run by hand (`docs/runbooks/langfuse-host.md`).
 - Traces, scores, and datasets live on that host; a lost volume loses up to a day (snapshots), and there is no
   database dump.
-- Once the off-hours schedule lands, evals and CI that use Langfuse work only while it runs (07:00–18:00).
+- Once #311 adds the off-hours schedule, evals and CI that use Langfuse work only while it runs (07:00–18:00).

@@ -7,7 +7,7 @@
 # every service is healthy. Then it re-proves the worker's isolation and egress block, as a deploy does
 # (check-worker.sh, #153), so patching never brings back a worker that a deploy stopped, and a Docker upgrade can't
 # open its way out unnoticed. It fails if a service isn't healthy within 15 minutes or the worker check fails, which
-# fails the maintenance window and emails the alarm recipients. It doesn't pull or migrate: that is deploy.sh's job.
+# fails the maintenance window and emails the alert addresses. It doesn't pull or migrate: that is deploy.sh's job.
 # Like deploy.sh, it prints no secret.
 set -euo pipefail
 

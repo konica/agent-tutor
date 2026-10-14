@@ -24,6 +24,7 @@ services:
   postgres:
     image: &postgres-image pgvector/pgvector:0.8.7-pg17
     restart: unless-stopped
+    stop_grace_period: 60s  # a clean shutdown when the instance stops (off-hours, ADR 0022)
     logging: *logging
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}

@@ -172,11 +172,10 @@ def test_instance_role_pulls_images_reads_its_own_settings_and_secrets_and_is_ma
     every = _all_statements(t)
     assert "parameter/smart-tutor/" not in json.dumps(every)
     assert "secret:smart-tutor/" not in json.dumps(every)
-    # Only the ECR login and metrics, which have no resource, may use "*".
+    # Only the ECR login and the agent's metrics, which have no resource, may use "*".
     assert sorted(s.get("Sid", "<unnamed>") for s in every if s["Resource"] == "*") == [
         "EcrLogin",
         "PublishAgentMetrics",
-        "PublishJobMetrics",
     ]
 
 
@@ -202,12 +201,6 @@ def test_instance_role_writes_the_on_premise_bucket_only_where_a_service_or_the_
     # Restore reads the dumps back; listing is limited to the prefix too.
     assert json.dumps(statements["ReadDatabaseBackups"]["Resource"]).endswith('/backups/*"]]}')
     assert statements["ListDatabaseBackups"]["Condition"] == {"StringLike": {"s3:prefix": ["backups/*"]}}
-
-
-def test_instance_role_publishes_metrics_only_to_its_own_namespace(t: Template) -> None:
-    statement = _statements(t)["PublishJobMetrics"]
-    assert statement["Action"] == "cloudwatch:PutMetricData"
-    assert statement["Condition"] == {"StringEquals": {"cloudwatch:namespace": "SmartTutor/OnPremise"}}
 
 
 def test_instance_role_applies_the_question_screen_guardrail_and_counts_its_failures(t: Template) -> None:
@@ -344,7 +337,9 @@ def test_data_volume_can_be_restored_from_a_snapshot() -> None:
     restored = host(**{"smart-tutor:on-premise-data-snapshot-id": "snap-0123456789abcdef0"})
     (volume,) = restored.find_resources("AWS::EC2::Volume").values()
     assert volume["Properties"]["SnapshotId"] == "snap-0123456789abcdef0"
-    (blank_volume,) = host(**{"smart-tutor:on-premise-data-snapshot-id": ""}).find_resources("AWS::EC2::Volume").values()
+    (blank_volume,) = (
+        host(**{"smart-tutor:on-premise-data-snapshot-id": ""}).find_resources("AWS::EC2::Volume").values()
+    )
     assert "SnapshotId" not in blank_volume["Properties"]
 
 
@@ -370,41 +365,6 @@ def test_a_new_data_volume_replaces_the_instance_so_it_attaches_at_first_boot() 
         "AWS::EC2::Instance"
     )
     assert before != after
-
-
-def _alarm(t: Template, metric: str) -> dict[str, Any]:
-    (alarm,) = (
-        a["Properties"]
-        for a in t.find_resources("AWS::CloudWatch::Alarm").values()
-        if a["Properties"].get("MetricName") == metric
-    )
-    alarm_properties: dict[str, Any] = alarm
-    return alarm_properties
-
-
-def test_a_failed_database_backup_raises_an_alarm_that_emails_the_alert_addresses(t: Template) -> None:
-    (topic_id,) = t.find_resources("AWS::SNS::Topic")
-    t.has_resource_properties(
-        "AWS::SNS::Subscription",
-        {"Protocol": "email", "Endpoint": "dtrungthao@gmail.com", "TopicArn": {"Ref": topic_id}},
-    )
-    alarm = _alarm(t, "JobFailed")
-    assert alarm["Namespace"] == "SmartTutor/OnPremise"
-    assert alarm["Dimensions"] == [{"Name": "Job", "Value": "smart-tutor-backup"}]
-    assert alarm["Statistic"] == "Sum" and alarm["Threshold"] == 1
-    assert alarm["ComparisonOperator"] == "GreaterThanOrEqualToThreshold"
-    assert alarm["TreatMissingData"] == "notBreaching"
-    assert alarm["AlarmActions"] == [{"Ref": topic_id}]
-
-
-def test_a_failed_snapshot_raises_an_alarm(t: Template) -> None:
-    (topic_id,) = t.find_resources("AWS::SNS::Topic")
-    (policy_id,) = t.find_resources("AWS::DLM::LifecyclePolicy")
-    alarm = _alarm(t, "SnapshotsCreateFailed")
-    assert alarm["Namespace"] == "AWS/EBS"
-    assert alarm["Dimensions"] == [{"Name": "DLMPolicyId", "Value": {"Ref": policy_id}}]
-    assert alarm["ComparisonOperator"] == "GreaterThanOrEqualToThreshold" and alarm["Threshold"] == 1
-    assert alarm["AlarmActions"] == [{"Ref": topic_id}]
 
 
 # --- settings, secrets, deploy document ----------------------------------------------------------------------------
@@ -886,7 +846,7 @@ SCRIPTS = [
     DEPLOY_SCRIPT,
     ENSURE_HEALTHY,
     CHECK_WORKER,
-    *(ON_PREMISE_DIR / name for name in ("backup.sh", "restore.sh", "report-failure.sh")),
+    *(ON_PREMISE_DIR / name for name in ("backup.sh", "restore.sh")),
 ]
 VM_FILES = [*SCRIPTS, ON_PREMISE_DIR / "check-egress.py"]
 SYSTEMD_DIR = ON_PREMISE_DIR / "systemd"
@@ -904,19 +864,10 @@ def test_files_the_vm_runs_keep_lf_line_endings() -> None:
         assert b"\r\n" not in path.read_bytes(), path
 
 
-# --- monitoring and patching (#152)--------------------------------------------------------------------------------
+# --- off-hours, alerts, and patching (#152, ADR 0022) -------------------------------------------------------------
 
 
-def _alarm(t: Template, metric_name: str) -> dict[str, Any]:
-    (alarm,) = (
-        a["Properties"]
-        for a in t.find_resources("AWS::CloudWatch::Alarm").values()
-        if a["Properties"]["MetricName"] == metric_name
-    )
-    return alarm
-
-
-def test_alarms_email_the_budget_recipients(t: Template) -> None:
+def test_alert_topic_emails_the_budget_recipients(t: Template) -> None:
     (topic_id,) = t.find_resources("AWS::SNS::Topic")
     t.has_resource_properties("AWS::SNS::Topic", {"TopicName": "smart-tutor-on-premise-prod-alerts"})
     subscriptions = [s["Properties"] for s in t.find_resources("AWS::SNS::Subscription").values()]
@@ -924,51 +875,27 @@ def test_alarms_email_the_budget_recipients(t: Template) -> None:
     assert all(s["TopicArn"] == {"Ref": topic_id} for s in subscriptions)
 
 
-def test_system_status_check_alarm_recovers_the_instance_and_emails(t: Template) -> None:
+def test_the_host_stops_at_18_and_00_and_starts_at_07_in_the_app_time_zone(t: Template) -> None:
     (instance_id,) = t.find_resources("AWS::EC2::Instance")
-    (topic_id,) = t.find_resources("AWS::SNS::Topic")
-    alarm = _alarm(t, "StatusCheckFailed_System")
-
-    assert alarm["Namespace"] == "AWS/EC2"
-    assert alarm["Dimensions"] == [{"Name": "InstanceId", "Value": {"Ref": instance_id}}]
-    assert alarm["ComparisonOperator"] == "GreaterThanOrEqualToThreshold" and alarm["Threshold"] == 1
-    actions = json.dumps(alarm["AlarmActions"])
-    assert ":automate:" in actions and ":ec2:recover" in actions
-    assert {"Ref": topic_id} in alarm["AlarmActions"]
-
-
-def test_uptime_check_probes_the_api_health_route_over_https_on_the_domain(t: Template) -> None:
-    (check,) = t.find_resources("AWS::Route53::HealthCheck").values()
-    config = check["Properties"]["HealthCheckConfig"]
-
-    assert config["Type"] == "HTTPS"
-    assert config["Port"] == 443
-    assert config["ResourcePath"] == "/api/healthz"
-    # Through DNS, as a learner reaches it: a lapsed DuckDNS name fails the check too.
-    assert config["FullyQualifiedDomainName"] == "smart-tutor.duckdns.org"
-    assert "IPAddress" not in config
-
-
-def test_uptime_check_follows_the_sslip_io_fallback() -> None:
-    t = host(**{"smart-tutor:on-premise-domain": ""})
-    (check,) = t.find_resources("AWS::Route53::HealthCheck").values()
-    (eip_id,) = t.find_resources("AWS::EC2::EIP")
-    assert check["Properties"]["HealthCheckConfig"]["FullyQualifiedDomainName"] == {
-        "Fn::Join": ["", [{"Fn::GetAtt": [eip_id, "PublicIp"]}, ".sslip.io"]]
+    t.has_resource_properties("AWS::Scheduler::ScheduleGroup", {"Name": "smart-tutor-on-premise-prod-off-hours"})
+    schedules = {
+        s["Properties"]["Name"]: s["Properties"] for s in t.find_resources("AWS::Scheduler::Schedule").values()
     }
+    assert {name: s["ScheduleExpression"] for name, s in schedules.items()} == {
+        "stop": "cron(0 18 * * ? *)",
+        "stop-late": "cron(0 0 * * ? *)",
+        "start": "cron(0 7 * * ? *)",
+    }
+    for schedule in schedules.values():
+        assert schedule["ScheduleExpressionTimezone"] == "Asia/Ho_Chi_Minh"
+        assert json.dumps({"Ref": instance_id}) in json.dumps(schedule["Target"]["Input"])
 
 
-def test_uptime_alarm_emails_when_the_check_fails_and_when_it_recovers(t: Template) -> None:
-    (check_id,) = t.find_resources("AWS::Route53::HealthCheck")
-    (topic_id,) = t.find_resources("AWS::SNS::Topic")
-    alarm = _alarm(t, "HealthCheckStatus")
-
-    assert alarm["Namespace"] == "AWS/Route53"
-    assert alarm["Dimensions"] == [{"Name": "HealthCheckId", "Value": {"Ref": check_id}}]
-    assert alarm["Statistic"] == "Minimum"
-    assert alarm["ComparisonOperator"] == "LessThanThreshold" and alarm["Threshold"] == 1
-    assert alarm["AlarmActions"] == [{"Ref": topic_id}]
-    assert alarm["OKActions"] == [{"Ref": topic_id}]
+def test_no_cloudwatch_alarm_or_route53_health_check(t: Template) -> None:
+    # Alarms cost money and the uptime alarm would email at every stop and start (ADR 0022). EC2's default automatic
+    # recovery still moves the instance off failed hardware.
+    t.resource_count_is("AWS::CloudWatch::Alarm", 0)
+    t.resource_count_is("AWS::Route53::HealthCheck", 0)
 
 
 def test_patch_baseline_approves_security_patches_for_the_tagged_host(t: Template) -> None:
@@ -987,7 +914,7 @@ def test_weekly_maintenance_window_patches_the_host_then_checks_the_services(t: 
     (window_id,) = t.find_resources("AWS::SSM::MaintenanceWindow")
     t.has_resource_properties(
         "AWS::SSM::MaintenanceWindow",
-        {"Schedule": "cron(0 4 ? * SUN *)", "ScheduleTimezone": "Asia/Ho_Chi_Minh", "AllowUnassociatedTargets": False},
+        {"Schedule": "cron(20 7 ? * SUN *)", "ScheduleTimezone": "Asia/Ho_Chi_Minh", "AllowUnassociatedTargets": False},
     )
     (instance_id,) = t.find_resources("AWS::EC2::Instance")
     (target_id,) = t.find_resources("AWS::SSM::MaintenanceWindowTarget")
@@ -1073,7 +1000,7 @@ def test_backup_dumps_both_databases_with_compose_run_and_uploads_them_under_the
     assert "set -euo pipefail" in script
     assert "for db in smart_tutor keycloak" in script
     assert "run --rm -T pg-dump" in script
-    assert 's3://$bucket/backups/postgres/$stamp/$db.dump' in script
+    assert "s3://$bucket/backups/postgres/$stamp/$db.dump" in script
     # Every dump is written before any is uploaded, so a failed night leaves no half backup.
     assert script.index("run --rm -T pg-dump") < script.index("aws s3 cp")
     assert "trap" in script and "rm -rf" in script  # local copies don't pile up on /data
@@ -1093,20 +1020,39 @@ def test_backup_timer_runs_nightly_and_catches_up_after_downtime() -> None:
     assert _unit("smart-tutor-backup.timer")["Install"]["WantedBy"] == "timers.target"
 
 
-def test_backup_service_runs_the_script_and_reports_a_failure() -> None:
+def test_backup_service_runs_the_script_and_leaves_failures_in_its_journal() -> None:
     service = _unit("smart-tutor-backup.service")
     assert service["Service"]["Type"] == "oneshot"
     assert service["Service"]["ExecStart"] == "/usr/bin/bash /opt/smart-tutor/on-premise/backup.sh"
-    assert service["Unit"]["OnFailure"] == "smart-tutor-job-failed@%N.service"
+    assert "OnFailure" not in service["Unit"]  # no CloudWatch metric or alarm (ADR 0022)
     assert "docker.service" in service["Unit"]["Requires"]
+    assert not (ON_PREMISE_DIR / "report-failure.sh").exists()
+    assert not (SYSTEMD_DIR / "smart-tutor-job-failed@.service").exists()
 
 
-def test_a_failed_job_publishes_the_metric_the_alarm_watches() -> None:
-    unit = _unit("smart-tutor-job-failed@.service")
-    assert unit["Service"]["ExecStart"] == "/usr/bin/bash /opt/smart-tutor/on-premise/report-failure.sh %i"
-    script = (ON_PREMISE_DIR / "report-failure.sh").read_text(encoding="utf-8")
-    assert "--namespace SmartTutor/OnPremise --metric-name JobFailed" in script
-    assert '--dimensions "Job=$job"' in script
+def test_deploy_removes_the_retired_failure_unit_from_the_vm() -> None:
+    script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
+    removal = "rm -f /etc/systemd/system/smart-tutor-job-failed@.service"
+    assert removal in script
+    assert script.index(removal) < script.index('install -m 644 "$here"/systemd/* /etc/systemd/system/')
+
+
+def test_deploy_gives_docker_time_to_stop_the_containers_when_the_instance_stops() -> None:
+    script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
+    assert "/etc/systemd/system/docker.service.d/stop-timeout.conf" in script
+    assert "TimeoutStopSec=120" in script  # longer than Postgres's 60 s grace
+
+
+def test_postgres_shuts_down_cleanly_when_the_instance_stops(compose: dict[str, Any]) -> None:
+    assert compose["services"]["postgres"]["stop_grace_period"] == "60s"
+
+
+def test_every_long_running_service_comes_back_after_a_boot(compose: dict[str, Any]) -> None:
+    # A scheduled 07:00 start or a person's start at any hour brings everything back without a deploy.
+    jobs = {name for name, s in compose["services"].items() if "jobs" in s.get("profiles", [])} | {"migrate"}
+    for name, service in compose["services"].items():
+        if name not in jobs:
+            assert service.get("restart") == "unless-stopped", name
 
 
 def test_deploy_installs_and_enables_every_timer() -> None:
@@ -1114,7 +1060,7 @@ def test_deploy_installs_and_enables_every_timer() -> None:
     assert 'install -m 644 "$here"/systemd/* /etc/systemd/system/' in script
     assert "systemctl daemon-reload" in script
     assert 'for timer in "$here"/systemd/*.timer' in script
-    assert script.index("up -d --wait --wait-timeout") < script.index("systemctl daemon-reload")
+    assert script.index("up -d --wait --wait-timeout") < script.rindex("systemctl daemon-reload")
 
 
 @pytest.mark.parametrize("service", ["agent", "worker"])
@@ -1160,11 +1106,14 @@ def test_deploy_script_renders_the_tracing_settings_and_leaves_the_key_empty_wit
     script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
     assert "learner_hash_key=$(secret phoenix/learner-hash-key)" in script
     assert "trace_sampling_rate=$(param trace-sampling-rate)" in script
-    tracing = script[script.index("phoenix_api_key="):script.index("umask 077")]
+    tracing = script[script.index("phoenix_api_key=") : script.index("umask 077")]
     assert "secret phoenix/api-key 2>/dev/null" in tracing
     assert "$prefix/phoenix/api-key" in tracing and ">&2" in tracing  # the warning names the secret
-    for line in ("PHOENIX_API_KEY=$phoenix_api_key", "TRACE_SAMPLING_RATE=$trace_sampling_rate",
-                 "LEARNER_HASH_KEY=$learner_hash_key"):
+    for line in (
+        "PHOENIX_API_KEY=$phoenix_api_key",
+        "TRACE_SAMPLING_RATE=$trace_sampling_rate",
+        "LEARNER_HASH_KEY=$learner_hash_key",
+    ):
         assert line in script
     assert "LANGSMITH" not in script
 
@@ -1256,7 +1205,7 @@ def test_phoenix_bootstrap_is_idempotent_and_on_premise_only() -> None:
     assert "WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'phoenix_user') \\gexec" in sql
     assert "WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = :'phoenix_db') \\gexec" in sql
     assert "ALTER ROLE :\"phoenix_user\" WITH LOGIN PASSWORD :'phoenix_password';" in sql
-    assert "REVOKE CONNECT ON DATABASE :\"phoenix_db\" FROM PUBLIC;" in sql
+    assert 'REVOKE CONNECT ON DATABASE :"phoenix_db" FROM PUBLIC;' in sql
     helm = (ON_PREMISE_DIR.parent / "helm/smart-tutor/files/db-bootstrap.sql").read_text(encoding="utf-8")
     assert "phoenix" not in helm  # native-cloud is out of scope (ADR 0017)
 
