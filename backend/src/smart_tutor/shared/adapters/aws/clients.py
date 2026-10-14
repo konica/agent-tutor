@@ -13,6 +13,8 @@ from botocore.config import Config
 from smart_tutor.shared.config import Settings
 
 if TYPE_CHECKING:
+    from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
+    from mypy_boto3_cloudwatch import CloudWatchClient
     from mypy_boto3_s3 import S3Client
     from mypy_boto3_sqs import SQSClient
     from mypy_boto3_ssm import SSMClient
@@ -47,3 +49,14 @@ def sqs_client(settings: Settings) -> "SQSClient":
 
 def ssm_client(settings: Settings) -> "SSMClient":
     return boto3.client("ssm", region_name=settings.aws_region, **_localstack("ssm", settings))
+
+
+def cloudwatch_client(settings: Settings) -> "CloudWatchClient":
+    """Real CloudWatch, also locally: counters are few and content-free."""
+    config = Config(connect_timeout=2, read_timeout=2, retries={"mode": "standard", "max_attempts": 2})
+    return boto3.client("cloudwatch", region_name=settings.aws_region, config=config)
+
+
+def bedrock_runtime_client(settings: Settings, config: Config) -> "BedrockRuntimeClient":
+    """Real Bedrock (no emulator): for ApplyGuardrail. Model calls go through ModelFactory, never this client."""
+    return boto3.client("bedrock-runtime", region_name=settings.aws_region, config=config)

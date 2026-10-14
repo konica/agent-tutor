@@ -146,12 +146,14 @@ class FakeRetriever(Retriever):
 
 
 class PassingGuard(Guard):
-    """Never trips; keeps each answer-so-far it checked."""
+    """Never trips; keeps each question and each answer-so-far it checked."""
 
     def __init__(self) -> None:
+        self.questions: list[str] = []
         self.answers: list[str] = []
 
     async def check_question(self, question: str) -> GuardTrip | None:
+        self.questions.append(question)
         return None
 
     async def check_answer(self, text: str) -> GuardTrip | None:
@@ -169,3 +171,15 @@ class TrippingGuard(PassingGuard):
     async def check_answer(self, text: str) -> GuardTrip | None:
         await super().check_answer(text)
         return GuardTrip("guard_answer", "system_prompt_leak") if self._on in text else None
+
+
+class QuestionTrippingGuard(PassingGuard):
+    """Trips the question check when the question holds `on`."""
+
+    def __init__(self, on: str) -> None:
+        super().__init__()
+        self._on = on
+
+    async def check_question(self, question: str) -> GuardTrip | None:
+        await super().check_question(question)
+        return GuardTrip("guard_question", "prompt_attack") if self._on in question else None

@@ -533,12 +533,15 @@ def test_native_cloud_release_waits_with_the_legacy_strategy() -> None:
     assert lines
     for line in lines:
         assert "--wait=legacy --timeout 15m" in line, line
+        # A hand release must pass the question screen's settings too, or it silently turns the screen off (#199).
+        for key in ("mode", "guardrailId", "guardrailVersion"):
+            assert f"--set-string global.questionGuard.{key}=" in line, line
 
 
 def test_native_cloud_stack_outputs_fail_loudly_when_missing() -> None:
     run = str(step(native_cloud_job(), "Read the stack outputs")["run"])
-    assert run.count("!= None") == 6
-    assert run.count("::error::") == 6
+    assert run.count("!= None") == 9  # six outputs, the sampling rate, and the three question-screen parameters
+    assert run.count("::error::") == 9
 
 
 def test_native_cloud_release_is_followed_by_an_in_cluster_service_check() -> None:
@@ -711,6 +714,19 @@ def test_native_cloud_release_passes_the_trace_sampling_rate_from_ssm() -> None:
     assert "/smart-tutor/trace-sampling-rate" in text
     release = step(native_cloud_job(), "Release the app (Helm)")["run"]
     assert '--set-string global.langsmith.samplingRate="$TRACE_SAMPLING_RATE"' in release
+
+
+def test_native_cloud_release_passes_the_question_screen_settings_from_ssm() -> None:
+    text = steps_text(native_cloud_job())
+    for name in ("question-guard", "question-guardrail-id", "question-guardrail-version"):
+        assert f"/smart-tutor/{name}" in text
+    release = step(native_cloud_job(), "Release the app (Helm)")["run"]
+    for key, var in (
+        ("mode", "QUESTION_GUARD"),
+        ("guardrailId", "QUESTION_GUARDRAIL_ID"),
+        ("guardrailVersion", "QUESTION_GUARDRAIL_VERSION"),
+    ):
+        assert f'--set-string global.questionGuard.{key}="${var}"' in release
 
 
 def test_every_workflow_run_script_is_valid_bash() -> None:

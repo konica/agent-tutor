@@ -22,7 +22,7 @@ class GitHubDeployStack(cdk.Stack):
 
     It can assume the CDK bootstrap roles (so CloudFormation, not the role, changes infrastructure), push app images
     to its mode's ECR repositories (`<repository prefix>/*`, #206), read its mode's stack outputs, and, with `eks`,
-    describe the EKS cluster and read the trace sampling rate parameter the deploy passes to Helm (#229). With `deploy_document` (on-premise, #150), it runs that one SSM document on the mode's
+    describe the EKS cluster and read the trace sampling rate and question-screen parameters the deploy passes to Helm (#229, #199). With `deploy_document` (on-premise, #150), it runs that one SSM document on the mode's
     instances and reads the result.
     """
 
@@ -100,6 +100,15 @@ class GitHubDeployStack(cdk.Stack):
                         sid="ReadTraceSamplingRate",
                         actions=["ssm:GetParameter"],
                         resources=[f"arn:aws:ssm:{region}:{account}:parameter{names.ssm_path}/trace-sampling-rate"],
+                    ),
+                    # ... and the question screen's settings to the agent (#199).
+                    iam.PolicyStatement(
+                        sid="ReadQuestionGuardSettings",
+                        actions=["ssm:GetParameter"],
+                        resources=[
+                            f"arn:aws:ssm:{region}:{account}:parameter{names.ssm_path}/{name}"
+                            for name in ("question-guard", "question-guardrail-id", "question-guardrail-version")
+                        ],
                     ),
                 ]
                 if eks

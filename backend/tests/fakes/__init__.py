@@ -3,6 +3,7 @@
 from fakes.api import api_services, fake_agent
 from fakes.auth import FakeTokenVerifier
 from fakes.clock import FixedClock
+from fakes.counter import CountingCounter
 from fakes.ingest import ingest_ready
 from fakes.insights import InMemoryHighlightMisses
 from fakes.knowledge import FakeObjectStore, InMemoryLibrary
@@ -28,7 +29,14 @@ from fakes.tracing import (
     RecordingClient,
     recorded_traces,
 )
-from fakes.tutoring import FakeAnswerFeedback, FakeRetriever, InMemoryThreads, PassingGuard, TrippingGuard
+from fakes.tutoring import (
+    FakeAnswerFeedback,
+    FakeRetriever,
+    InMemoryThreads,
+    PassingGuard,
+    QuestionTrippingGuard,
+    TrippingGuard,
+)
 
 __all__ = [
     "api_services",
@@ -40,6 +48,7 @@ __all__ = [
     "FakeAnswerFeedback",
     "FakeRetriever",
     "PassingGuard",
+    "QuestionTrippingGuard",
     "TrippingGuard",
     "FakePhoenix",
     "InlineExecutor",
@@ -52,6 +61,7 @@ __all__ = [
     "fake_embeddings",
     "FakeTokenVerifier",
     "FixedClock",
+    "CountingCounter",
     "InMemoryHighlightMisses",
     "InMemoryLibrary",
     "InMemorySubjects",

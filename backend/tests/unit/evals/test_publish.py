@@ -156,3 +156,17 @@ def test_a_langsmith_error_exits_1_with_a_hint(capsys: pytest.CaptureFixture[str
 
     assert main([], client=NoKey(), load=lambda key: ASK, keys=["ask"]) == 1
     assert "LANGSMITH_API_KEY" in capsys.readouterr().err
+
+
+FULL_ONLY = Dataset("full-only", "smart-tutor-full-only", "", HAND, splits=("full",))
+
+
+def test_a_dataset_that_opts_out_of_smoke_is_split_and_published_to_full_only(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert set(split_examples(FULL_ONLY, [])) == {"full"}
+    client = FakeLangSmith()
+    assert main([], client=client, load=lambda key: FULL_ONLY, keys=["full-only"]) == 0
+    out = capsys.readouterr().out
+    assert "full-v1" in out and "smoke" not in out
+    assert client.datasets["smart-tutor-full-only"].tags.keys() == {"full-v1"}
