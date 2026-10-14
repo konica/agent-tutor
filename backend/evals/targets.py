@@ -32,6 +32,8 @@ from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.ports.counter import NoCounter
 from smart_tutor.tutoring.adapters.bedrock_question_screen import SCREEN_BOTO_CONFIG, BedrockQuestionScreen, Screening
+from smart_tutor.tutoring.adapters.detect_jailbreak import load_detect_jailbreak
+from smart_tutor.tutoring.adapters.detect_jailbreak_screen import DetectJailbreakScreen
 from smart_tutor.tutoring.adapters.guardrails_guard import GuardrailsGuard
 from smart_tutor.tutoring.adapters.mcp_retriever import McpRetriever
 from smart_tutor.tutoring.adapters.onnx_topic_classifier import OnnxSetFitTopicClassifier
@@ -267,8 +269,9 @@ class Screen(Protocol):
 
 
 class QuestionScreenTarget:
-    """The question screen alone (#199): one ApplyGuardrail call on the question. `screen` is None when no guardrail
-    is configured; the run then reports `screened: False`, which the metrics leave out."""
+    """The question screen alone (#199, #200): one ApplyGuardrail call or one DetectJailbreak run on the question.
+    `screen` is None when no guardrail is configured; the run then reports `screened: False`, which the metrics
+    leave out."""
 
     def __init__(self, screen: Screen | None) -> None:
         self._screen = screen
@@ -299,8 +302,18 @@ class _PassThrough(Guard):
 
 def question_screen_target() -> QuestionScreenTarget:
     """The question screen against the configured guardrail (`question_guardrail_id` and `_version`), whether or not
-    `question_guard` is on: the eval measures a guardrail before it is turned on."""
+    `question_guard` is on: the eval measures a guardrail before it is turned on. With `question_guard` set to
+    `guardrails_ai` it is the local DetectJailbreak screen at `question_jailbreak_threshold`."""
     settings = Settings()
+    if settings.question_guard == "guardrails_ai":
+        return QuestionScreenTarget(
+            DetectJailbreakScreen(
+                _PassThrough(),
+                load_detect_jailbreak(settings.question_jailbreak_threshold),
+                timeout=settings.question_guard_timeout_seconds,
+                failures=NoCounter(),
+            )
+        )
     if not (settings.question_guardrail_id and settings.question_guardrail_version):
         return QuestionScreenTarget(None)
     return QuestionScreenTarget(
