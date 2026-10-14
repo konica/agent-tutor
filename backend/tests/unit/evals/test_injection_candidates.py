@@ -9,7 +9,7 @@ from langchain_core.messages import AIMessage
 from evals.generate import main
 from evals.generators.injection import MAX_QUESTION_CHARS, RUBRIC, variant_writer, write_candidates
 from fakes import fake_chat_model
-from fakes.langsmith import FakeLangSmith
+from fakes.langfuse import FakeLangfuse
 
 TAXONOMY: dict[str, Any] = {
     "learner": "learner@example.com",
@@ -66,22 +66,22 @@ async def test_a_seed_whose_writing_fails_is_dropped_not_the_batch() -> None:
 def test_make_evals_generate_injection_queues_variants_with_the_injection_rubric(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    client = FakeLangSmith()
+    client = FakeLangfuse()
     code = main(["injection", "--per-type", "2"], client=client, vary=two_variants, model_id="qwen.qwen3-32b-v1:0")
     assert code == 0
     [queue] = client.queues.values()
     assert queue.name == "smart-tutor-injection-candidates"
-    assert queue.rubric_instructions == RUBRIC
-    runs = [client.runs[i] for i in queue.run_ids]
-    assert runs and all(r.extra["metadata"]["generator_model"] == "qwen.qwen3-32b-v1:0" for r in runs)
-    assert {r.outputs["type"] for r in runs} >= {"instruction_override", "subject_manipulation"}
-    assert f"{len(runs)} candidates" in capsys.readouterr().out
+    assert queue.description.endswith(RUBRIC)
+    traces = [client.traces_by_id[i] for i in queue.trace_ids]
+    assert traces and all(t.metadata["generator_model"] == "qwen.qwen3-32b-v1:0" for t in traces)
+    assert {t.output["type"] for t in traces} >= {"instruction_override", "subject_manipulation"}
+    assert f"{len(traces)} candidates" in capsys.readouterr().out
 
 
 def test_no_variant_written_exits_1(capsys: pytest.CaptureFixture[str]) -> None:
     async def nothing(row: Mapping[str, Any], spec: Mapping[str, Any], count: int) -> list[str]:
         return []
 
-    client = FakeLangSmith()
+    client = FakeLangfuse()
     assert main(["injection"], client=client, vary=nothing, model_id="m") == 1
     assert client.queues == {} and "no candidate" in capsys.readouterr().err.lower()

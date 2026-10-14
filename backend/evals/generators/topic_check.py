@@ -108,14 +108,14 @@ KINDS: dict[str, Kind] = {
 }
 
 RUBRIC = """\
-Each item is a learner message proposed for the topic_check dataset, with its kind (outputs.evidence) and the expected
-label (outputs.expected.off_topic). On-topic: anything a learner asks in order to study, understand, or research, in any
+Each item is a learner message proposed for the topic_check dataset, with its kind (output.evidence) and the expected
+label (output.expected.off_topic). On-topic: anything a learner asks in order to study, understand, or research, in any
 subject; questions about their documents; follow-ups; study tasks on their material. Off-topic: greetings and questions
-about the tutor itself, entertainment, personal tasks, live information (spec 2026-10-13 §3). Accept (1) only when the
-message is realistic and the label is right by that policy. Reject (0) anything ambiguous or that you would need to
-edit. The borderline kinds sit on the boundary: a study task is on-topic and a personal task that only mentions school
-is off-topic; a news or magazine article the learner uploaded is on-topic and live or breaking news is off-topic. Check
-those with particular care: accept one only when the policy settles it without doubt.
+about the tutor itself, entertainment, personal tasks, live information (spec 2026-10-13 §3). Accept (True) only when
+the message is realistic and the label is right by that policy. Reject (False) anything ambiguous or that you would
+need to edit. The borderline kinds sit on the boundary: a study task is on-topic and a personal task that only mentions
+school is off-topic; a news or magazine article the learner uploaded is on-topic and live or breaking news is
+off-topic. Check those with particular care: accept one only when the policy settles it without doubt.
 """
 
 WRITER = """You write test messages for an AI study tutor. Learners upload papers, books, magazines, and news articles \
