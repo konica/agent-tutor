@@ -1,6 +1,6 @@
 # 0017. Self-hosted Arize Phoenix for runtime tracing; evals stay on LangSmith
 
-- Status: accepted
+- Status: accepted; its choice of tool is superseded by 0021 (Phoenix runs until the Langfuse migration lands)
 - Date: 2026-10-12
 - Supersedes: the LangSmith parts of PRD §10.2 and §10.4 (#229) for runtime traces and ratings, and 0014's amendment (the worker no longer reaches `api.smith.langchain.com`)
 
