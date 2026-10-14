@@ -56,7 +56,7 @@ The smoke split runs on the newest published versions unless a dataset file pins
 
 The Langfuse host runs 07:00–18:00 Asia/Ho_Chi_Minh (ADR 0022). The job's first step after the access check calls `<LANGFUSE_BASE_URL>/api/public/health`, three times over about 45 seconds. If Langfuse doesn't answer, the job **fails** before building anything or calling Bedrock, with "Langfuse is off 18:00–07:00 Asia/Ho_Chi_Minh: re-run this job after 07:00, or start the host (`docs/runbooks/langfuse-host.md`)" (ADR 0023 §4). It fails rather than skips, so an agent change merged at night can't pass the gate unseen. Re-run the job from the PR's Checks tab after 07:00, or start the host by hand as `langfuse-host.md` says and re-run it. CI never starts the host itself.
 
-If the host goes off while a run is in progress (a run started just before 18:00), the SDK logs each trace or score it can't send, and the job fails with "Can't reach Langfuse" when it next reads a dataset. Re-run it in the morning.
+If the host goes off while a run is in progress (a run started just before 18:00), the SDK logs each trace, run item, or score it can't send and the run goes on. If another dataset is still to be read, the job fails with "Can't reach Langfuse". Otherwise the gate decides as usual from the scores the runner kept, and the summary shows the run's name instead of its link. Either way the Langfuse run is partial: re-run the job in the morning for a complete record.
 
 ## Pull requests from forks
 

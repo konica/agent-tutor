@@ -7,7 +7,7 @@ target's `decline` code; an unlimited conversation has no relevance gate yet (US
 
 from typing import Any
 
-from evals.suite import Suite, not_applicable
+from evals.suite import Suite, not_applicable, scores
 from evals.targets import ask_target
 
 CORRECTLY_DECLINED = "decline_correctness.correctly_declined"
@@ -15,6 +15,7 @@ WRONGLY_DECLINED = "decline_correctness.wrongly_declined"
 FAILED = "the run failed before it answered"
 
 
+@scores(CORRECTLY_DECLINED)
 def correctly_declined(
     inputs: dict[str, Any], outputs: dict[str, Any], reference_outputs: dict[str, Any]
 ) -> dict[str, Any]:
@@ -50,6 +51,7 @@ def correctly_declined(
     }
 
 
+@scores(WRONGLY_DECLINED)
 def wrongly_declined(
     inputs: dict[str, Any], outputs: dict[str, Any], reference_outputs: dict[str, Any]
 ) -> dict[str, Any]:

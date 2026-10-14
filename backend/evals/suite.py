@@ -9,16 +9,33 @@ import pkgutil
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from types import ModuleType
-from typing import Any
+from typing import Any, TypeVar
 
 from evals.targets import Target
 
 Evaluator = Callable[..., Any]  # takes any of inputs, outputs, reference_outputs; sync or async
+E = TypeVar("E", bound=Evaluator)
 NOT_APPLICABLE = "n/a"  # an evaluator's `value` for an example its metric doesn't cover; the runner leaves it out
 
 
 def not_applicable(key: str, why: str) -> dict[str, Any]:
     return {"key": key, "score": None, "value": NOT_APPLICABLE, "comment": why}
+
+
+def scores(metric: str) -> Callable[[E], E]:
+    """Declare the metric an evaluator scores. The runner counts an example the evaluator raised on as unscored under
+    it, a failure in the gate, even when the evaluator raised on every example and so never returned its key."""
+
+    def declare(evaluator: E) -> E:
+        setattr(evaluator, "metric", metric)  # noqa: B010 (a function has no declared attribute to assign)
+        return evaluator
+
+    return declare
+
+
+def metric_of(evaluator: Evaluator) -> str | None:
+    found = getattr(evaluator, "metric", None)
+    return found if isinstance(found, str) else None
 
 
 @dataclass(frozen=True)

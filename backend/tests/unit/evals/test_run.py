@@ -10,7 +10,7 @@ from evals.dataset import Dataset, Example, publish_split
 from evals.langfuse_client import LangfuseError, Score
 from evals.learners import LoadError
 from evals.run import main, run_split
-from evals.suite import DatasetSuites, Suite, not_applicable
+from evals.suite import DatasetSuites, Suite, not_applicable, scores
 from fakes.langfuse import FakeLangfuse
 
 ASK = Dataset(
@@ -103,6 +103,23 @@ def test_an_example_whose_evaluator_raised_counts_as_unscored() -> None:
     group = DatasetSuites("ask", make_target, (_flaky_relevance,))
     scores, _ = run_split(published(), [group], "smoke", run_name="r", load=lambda key: ASK)
     assert scores == {"answer_relevance": [0.9, None]}
+
+
+@scores("answer_relevance")
+async def _judge_down(inputs: dict[str, Any]) -> dict[str, Any]:
+    raise RuntimeError("AccessDeniedException")
+
+
+def test_a_declared_metric_whose_evaluator_raised_on_every_example_is_unscored_not_absent() -> None:
+    group = DatasetSuites("ask", make_target, (_judge_down,))
+    scores_, _ = run_split(published(), [group], "smoke", run_name="r", load=lambda key: ASK)
+    assert scores_ == {"answer_relevance": [None, None]}
+
+
+def test_a_judge_that_fails_on_every_example_fails_the_gate(capsys: pytest.CaptureFixture[str]) -> None:
+    suites = [Suite("ask", make_target, (scored("search_step_ran", 1.0), _judge_down))]
+    assert main(["--split", "smoke"], client=published(), suites=suites, load=lambda key: ASK) == 1
+    assert "FAIL" in capsys.readouterr().out
 
 
 def test_a_run_where_an_evaluator_raised_fails_the_gate(capsys: pytest.CaptureFixture[str]) -> None:

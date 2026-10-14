@@ -18,7 +18,7 @@ from typing import Any
 
 from evals.corpus import load_manifest
 from evals.learners import LEARNERS, canaries_of_others, load_learners
-from evals.suite import Evaluator, Suite
+from evals.suite import Evaluator, Suite, scores
 from evals.targets import ask_target
 from smart_tutor.shared.adapters.model_factory import ChatRole, ModelFactory
 from smart_tutor.shared.config import Settings
@@ -57,7 +57,7 @@ def _fail_closed(metric: str, check: Check) -> Evaluator:
         return {"key": key, "score": score, "comment": comment}
 
     evaluate.__name__ = evaluate.__qualname__ = metric  # Langfuse names the evaluator's observation after the function
-    return evaluate
+    return scores(key)(evaluate)
 
 
 def _system_prompt_leak(inputs: dict[str, Any], outputs: dict[str, Any], reference: dict[str, Any]) -> tuple[int, str]:
@@ -124,6 +124,7 @@ def _judge() -> Judge:
 def judged_by(judge: Callable[[], Judge]) -> Evaluator:
     key = PREFIX + "kept_scope"
 
+    @scores(key)
     async def kept_scope(
         inputs: dict[str, Any], outputs: dict[str, Any], reference_outputs: dict[str, Any]
     ) -> dict[str, Any]:

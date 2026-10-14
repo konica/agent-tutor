@@ -27,7 +27,7 @@ from evals.dataset import Dataset, DatasetError, load_dataset, version_name, ver
 from evals.gate import check, load_thresholds, passed, ran, render, render_markdown
 from evals.langfuse_client import ItemEvaluator, LangfuseClient, LangfuseError, Score, SdkLangfuse, Task
 from evals.learners import LoadError
-from evals.suite import NOT_APPLICABLE, DatasetSuites, Evaluator, Suite, by_dataset, discover
+from evals.suite import NOT_APPLICABLE, DatasetSuites, Evaluator, Suite, by_dataset, discover, metric_of
 from evals.targets import Target
 from smart_tutor.shared.config import Settings
 
@@ -58,9 +58,11 @@ def _failure_scored(target: Target) -> Task:
 
 def _recorded(evaluator: Evaluator, results: list[_Result | None]) -> ItemEvaluator:
     """The evaluator as Langfuse runs it: called with the arguments its parameters name, its score posted on the
-    example's trace, and every result appended to `results` (None when it raised), because Langfuse keeps neither a
-    not-applicable result nor the key of an evaluator that raised."""
+    example's trace, and every result appended to `results`, because Langfuse keeps neither a not-applicable result
+    nor the key of an evaluator that raised. A raise is recorded as unscored under the evaluator's declared metric
+    (`evals.suite.scores`), else as None."""
     wanted = set(inspect.signature(evaluator).parameters)
+    metric = metric_of(evaluator)
 
     async def evaluate(
         inputs: dict[str, Any], outputs: dict[str, Any], reference_outputs: dict[str, Any]
@@ -74,7 +76,7 @@ def _recorded(evaluator: Evaluator, results: list[_Result | None]) -> ItemEvalua
             score = found.get("score") if applicable else None
             result = _Result(found["key"], None if score is None else float(score), applicable)
         except Exception:
-            results.append(None)
+            results.append(None if metric is None else _Result(metric, None, applicable=True))
             raise
         results.append(result)
         return [] if result.score is None else [Score(result.key, result.score, found.get("comment"))]
@@ -84,9 +86,9 @@ def _recorded(evaluator: Evaluator, results: list[_Result | None]) -> ItemEvalua
 
 
 def _scores(results: Sequence[_Result | None]) -> dict[str, list[float | None]]:
-    """One evaluator's scores by metric. An example it raised on counts as unscored (None) under each metric it
-    scored elsewhere, not as absent, or the gate would average only the survivors. A not-applicable result is left
-    out of its metric."""
+    """One evaluator's scores by metric. An example it raised on counts as unscored (None) under its declared metric,
+    else under each metric it scored elsewhere, not as absent, or the gate would average only the survivors. A
+    not-applicable result is left out of its metric."""
     scores: defaultdict[str, list[float | None]] = defaultdict(list)
     for key in {r.key for r in results if r is not None}:
         for result in results:

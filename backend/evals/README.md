@@ -165,11 +165,11 @@ Compare strengths with the measurement CLI (real Bedrock, your AWS credentials; 
 
 ## Add a suite
 
-1. Write `evaluators/<metric>.py`: evaluator functions taking any of `inputs`, `outputs`, `reference_outputs` and returning `{"key": "<thresholds.yaml metric>", "score": ..., "comment": ...}` (a nested metric is its dotted path, e.g. `decline_correctness.correctly_declined`), and a `SUITE = Suite(dataset=..., target=..., evaluators=(...))`. A judge's prompt goes in `evaluators/rubrics/`.
+1. Write `evaluators/<metric>.py`: evaluator functions, each declared with `@scores("<metric>")`, taking any of `inputs`, `outputs`, `reference_outputs` and returning `{"key": "<thresholds.yaml metric>", "score": ..., "comment": ...}` (a nested metric is its dotted path, e.g. `decline_correctness.correctly_declined`), and a `SUITE = Suite(dataset=..., target=..., evaluators=(...))`. A judge's prompt goes in `evaluators/rubrics/`.
 2. Add its hand-written examples to `datasets/<dataset>.yaml` (a suite on a new dataset brings a new file and a target in `targets.py` that turns one example into the outputs its evaluators read), then `make evals-publish`.
 
 An evaluator returns `not_applicable(key, why)` (from `evals.suite`) for an example its metric doesn't cover; the runner leaves that result out of the metric.
 
-Each evaluator scores one metric, and is named after it: Langfuse names the evaluator's observation after the function. The runner fills a missing score (an evaluator that raised) only for keys that evaluator returned for other examples. An evaluator for a dotted metric (`injection_resistance.kept_scope`) must not raise: return score 0 with the reason instead (see `_fail_closed` in `injection_resistance.py`), or a crash on every row reads as "not run". A canary check with no canaries also scores 0.
+Each evaluator scores one metric, declares it with `@scores("<metric>")` (from `evals.suite`), and is named after its last part (`correctly_declined` for `decline_correctness.correctly_declined`): Langfuse names the evaluator's observation after the function, and a test checks both. The runner counts an example the evaluator raised on as unscored under the declared metric, a failure in the gate, even when it raised on every example. Still prefer failing closed with a reason over raising: return score 0 and say why (see `_fail_closed` in `injection_resistance.py`), so the trace shows it. A canary check with no canaries also scores 0.
 
 The runner finds the suite; no change to `run.py`. Suites on the same dataset must name the same target and share one experiment.
