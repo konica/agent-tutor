@@ -64,11 +64,19 @@ The reference returned with an answer: the document's display title and page, or
 _Avoid_: Source, reference
 
 **Decline**:
-The tutor's refusal to answer a question the learner's documents do not support.
+The tutor's refusal to answer a question the learner's documents do not support, or an off-topic question.
 _Avoid_: Refusal, rejection
 
 **Decline log**:
 Anonymized record of declined questions, with no user id, kept 90 days.
+
+**Off-topic question**:
+A message that isn't about studying, understanding, or researching something: greetings, questions about the tutor, entertainment, personal tasks, live information.
+_Avoid_: Irrelevant question, spam
+
+**Topic check**:
+The first step of every ask: a local classifier decides whether the question is off-topic; it fails open.
+_Avoid_: Guardrail, filter
 
 **Learner hash**:
 A keyed hash (HMAC-SHA256) of a learner's user id, the only way traces name a learner. Stable per learner, different between learners, and changes with the key.

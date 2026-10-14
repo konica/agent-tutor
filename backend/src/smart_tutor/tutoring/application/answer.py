@@ -14,6 +14,11 @@ from smart_tutor.tutoring.domain.turn import HistoryTurn
 # The US-3 request to upload a document: the learner has no ready, non-archived document (PRD §9.2 step 1).
 NO_DOCUMENTS_DECLINE = "None of your documents can be used right now: they are all archived or deleted."
 LIMITED_DECLINE = "These documents don't cover this."
+# An off-topic question (spec 2026-10-13 §4.2): declined before any search, with no action.
+OFF_TOPIC_DECLINE = (
+    "I'm Smart Tutor: I help you study and research the papers, books, magazines, and news articles in your library, "
+    "so I can't help with that. Ask me about your documents or a topic you're learning."
+)
 
 # The answer model's instructions; the injection eval checks no answer quotes them (US-6).
 SYSTEM_PROMPT = """You are Smart Tutor. You answer a learner's question using only chunks of their own documents.

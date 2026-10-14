@@ -1,11 +1,12 @@
 """Search step ran (PRD §10.1, code): every turn calls MCP `search` over the learner's readable documents, limited to
 the conversation's listed documents when its search is limited (US-4c), and a limited search finds only those
-documents' chunks. Scored 1 or 0 from the ask target's trajectory, with the reason."""
+documents' chunks. An off-topic decline makes no search and is not applicable.
+Scored 1 or 0 from the ask target's trajectory, with the reason."""
 
 from collections.abc import Sequence
 from typing import Any
 
-from evals.suite import Suite
+from evals.suite import Suite, not_applicable
 from evals.targets import ask_target
 
 KEY = "search_step_ran"
@@ -22,8 +23,12 @@ def _same(a: Sequence[str] | None, b: Sequence[str] | None) -> bool:
 def search_step_ran(outputs: dict[str, Any]) -> dict[str, Any]:
     if "trajectory" not in outputs:
         return _score(0, "the run failed before it searched")
-    limit = outputs["limit"]
     searches = [c for c in outputs["trajectory"] if c["tool"] == "search"]
+    if outputs.get("decline") == "off_topic":  # declined before search (spec 2026-10-13); PRD §10.1: answered turns
+        if searches:
+            return _score(0, "an off-topic decline still searched")
+        return not_applicable(KEY, "an off-topic question is declined before search")
+    limit = outputs["limit"]
     scope = "the listed documents" if limit is not None else "all the learner's documents"
     if not any(_same(c["document_ids"], limit) for c in searches):
         return _score(0, f"no search over {scope}")

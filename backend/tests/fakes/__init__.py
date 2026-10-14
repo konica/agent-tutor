@@ -22,6 +22,7 @@ from fakes.phoenix import FakePhoenix, InlineExecutor
 from fakes.processing import FakePdfExtractor, PageChunker, fake_tools
 from fakes.queue import FakeQueue
 from fakes.subjects import InMemorySubjects
+from fakes.topic_model import write_topic_model
 from fakes.tracing import META as TRACE_META
 from fakes.tracing import (
     FailingExporter,
@@ -32,6 +33,7 @@ from fakes.tracing import (
 from fakes.tutoring import (
     FakeAnswerFeedback,
     FakeRetriever,
+    FakeTopicClassifier,
     InMemoryThreads,
     PassingGuard,
     QuestionTrippingGuard,
@@ -47,6 +49,7 @@ __all__ = [
     "FakeChatModel",
     "FakeAnswerFeedback",
     "FakeRetriever",
+    "FakeTopicClassifier",
     "PassingGuard",
     "QuestionTrippingGuard",
     "TrippingGuard",
@@ -57,6 +60,7 @@ __all__ = [
     "RecordingClient",
     "recorded_traces",
     "TRACE_META",
+    "write_topic_model",
     "fake_chat_model",
     "fake_embeddings",
     "FakeTokenVerifier",

@@ -1,7 +1,8 @@
 # One image per deployable, all from the smart_tutor package (spec S1).
 #   docker build --target api|agent|mcp|worker -t smart-tutor-<target> backend/
 # CronJobs reuse the api image. Only the worker installs the `ingest` extra (pypdf and LangChain text splitters, ADR 0005);
-# only the agent installs the `guard` extra (Guardrails AI, ADR 0018).
+# only the agent installs the `guard` extra (Guardrails AI, ADR 0018) and the `topic` extra (onnxruntime and
+# tokenizers) and carries the topic-check model (ADR 0020).
 
 FROM python:3.12-slim AS base
 COPY --from=ghcr.io/astral-sh/uv:0.8 /uv /bin/uv
@@ -22,11 +23,11 @@ RUN uv sync --frozen --no-dev --extra ingest --no-install-project
 COPY src ./src
 RUN uv sync --frozen --no-dev --extra ingest --no-editable
 
-FROM base AS deps-guard
+FROM base AS deps-agent
 COPY pyproject.toml uv.lock README.md ./
-RUN uv sync --frozen --no-dev --extra guard --no-install-project
+RUN uv sync --frozen --no-dev --extra guard --extra topic --no-install-project
 COPY src ./src
-RUN uv sync --frozen --no-dev --extra guard --no-editable
+RUN uv sync --frozen --no-dev --extra guard --extra topic --no-editable
 
 FROM python:3.12-slim AS runtime
 RUN useradd --uid 10001 --no-create-home app
@@ -40,7 +41,8 @@ EXPOSE 8080
 CMD ["uvicorn", "smart_tutor.apps.api.main:app", "--host", "0.0.0.0", "--port", "8080"]
 
 FROM runtime AS agent
-COPY --from=deps-guard /app/.venv /app/.venv
+COPY --from=deps-agent /app/.venv /app/.venv
+COPY models/topic_check /app/models/topic_check
 EXPOSE 8080
 CMD ["uvicorn", "smart_tutor.apps.agent.server:app", "--host", "0.0.0.0", "--port", "8080"]
 

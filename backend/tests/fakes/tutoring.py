@@ -1,5 +1,6 @@
 """In-memory threads and a fake retriever."""
 
+import asyncio
 import copy
 import dataclasses
 from collections.abc import Sequence
@@ -11,11 +12,13 @@ from smart_tutor.tutoring.domain.guard import GUARD_DECLINE, GuardTrip
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 from smart_tutor.tutoring.domain.thread import NO_THREAD_FILTER, SearchScope, Thread, ThreadFilter, ThreadStatus
 from smart_tutor.tutoring.domain.thread_document import ThreadDocument
-from smart_tutor.tutoring.domain.turn import Rating, Turn
+from smart_tutor.tutoring.domain.topic import TopicVerdict
+from smart_tutor.tutoring.domain.turn import HistoryTurn, Rating, Turn
 from smart_tutor.tutoring.ports.answer_feedback import AnswerFeedback
 from smart_tutor.tutoring.ports.guard import Guard
 from smart_tutor.tutoring.ports.retriever import Retriever
 from smart_tutor.tutoring.ports.thread_repository import ThreadRepository
+from smart_tutor.tutoring.ports.topic_classifier import TopicClassifier
 
 
 class InMemoryThreads(ThreadRepository):
@@ -171,6 +174,33 @@ class TrippingGuard(PassingGuard):
     async def check_answer(self, text: str) -> GuardTrip | None:
         await super().check_answer(text)
         return GuardTrip("guard_answer", "system_prompt_leak") if self._on in text else None
+
+
+class FakeTopicClassifier(TopicClassifier):
+    """P(off-topic) from `scores` by question (0.0, on-topic, for any other); `error` raises it, `delay` sleeps first
+    (seconds). Records each call."""
+
+    def __init__(
+        self,
+        scores: dict[str, float] | None = None,
+        threshold: float = 0.5,
+        error: Exception | None = None,
+        delay: float = 0.0,
+    ) -> None:
+        self._scores, self._threshold, self._error, self._delay = scores or {}, threshold, error, delay
+        self.calls: list[tuple[str, list[HistoryTurn]]] = []
+
+    @property
+    def default_threshold(self) -> float:
+        return self._threshold
+
+    async def classify(self, question: str, history: Sequence[HistoryTurn]) -> TopicVerdict:
+        self.calls.append((question, list(history)))
+        if self._delay:
+            await asyncio.sleep(self._delay)
+        if self._error is not None:
+            raise self._error
+        return TopicVerdict(self._scores.get(question, 0.0), "fake@1")
 
 
 class QuestionTrippingGuard(PassingGuard):

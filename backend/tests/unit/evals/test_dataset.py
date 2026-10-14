@@ -12,9 +12,11 @@ from evals.dataset import (
     DatasetError,
     Example,
     examples_at,
+    in_eval_share,
     load_dataset,
     newest_examples,
     newest_version,
+    normalized,
     publish_split,
     version_to_run,
 )
@@ -179,6 +181,51 @@ def test_tags_of_other_shapes_are_not_versions() -> None:
     client.update_dataset_tag(dataset_name="smart-tutor-ask", as_of=as_of, tag="smoke-v10-draft")
     client.update_dataset_tag(dataset_name="smart-tutor-ask", as_of=as_of, tag="smokey-v99")
     assert newest_version(client, "smart-tutor-ask", "smoke") == "smoke-v1"
+
+
+KINDS = {
+    "subject_concept",
+    "document_question",
+    "follow_up",
+    "study_task",
+    "greeting",
+    "entertainment",
+    "personal_task",
+    "live_information",
+    "borderline_study_task",
+    "borderline_personal_task",
+    "library_news",
+    "live_news",
+}
+
+
+def test_the_topic_check_dataset_labels_both_sides_and_holds_out_a_share() -> None:
+    dataset = load_dataset("topic_check")
+    assert dataset.name == "smart-tutor-topic-check" and dataset.eval_share == 0.3
+    assert all(isinstance(e.outputs["off_topic"], bool) and e.outputs["kind"] in KINDS for e in dataset.examples)
+    assert sum(not e.outputs["off_topic"] for e in dataset.examples) >= 15
+    assert sum(e.outputs["off_topic"] for e in dataset.examples) >= 12
+    follow_ups = [e for e in dataset.examples if e.outputs["kind"] == "follow_up"]
+    assert follow_ups and all(e.inputs["history"][-1]["question"] for e in follow_ups)
+
+
+def test_an_eval_share_outside_0_and_1_is_refused(tmp_path: Path) -> None:
+    (tmp_path / "s.yaml").write_text("name: s\neval_share: 1.5\nexamples: [{inputs: {q: a}}]\n", encoding="utf-8")
+    with pytest.raises(DatasetError, match="eval_share"):
+        load_dataset("s", tmp_path)
+
+
+def test_the_held_out_share_is_stable_ignores_case_and_spacing_and_is_about_its_size() -> None:
+    assert normalized("  What IS  attention? ") == "what is attention?"
+    assert in_eval_share("What is attention?", 0.3) == in_eval_share("what is   ATTENTION?", 0.3)
+    held = sum(in_eval_share(f"question number {i}", 0.3) for i in range(4000))
+    assert 0.27 < held / 4000 < 0.33
+
+
+def test_two_fixed_questions_keep_their_side_of_the_split() -> None:
+    # Changing the hash or the normalization moves examples between training and evaluation: do it on purpose.
+    assert in_eval_share("Explain how a hash map works.", 0.3) is True
+    assert in_eval_share("What is a covalent bond?", 0.3) is False
 
 
 def test_a_dataset_is_in_both_splits_unless_its_file_lists_some(tmp_path: Path) -> None:

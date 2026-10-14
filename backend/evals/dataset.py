@@ -7,6 +7,7 @@ newest version, they replace the split and the result is tagged `<split>-v<N+1>`
 so a version a run was gated on is never edited. The runner uses a split's newest version unless one is pinned.
 """
 
+import hashlib
 import json
 import re
 from collections.abc import Iterable, Sequence
@@ -43,6 +44,8 @@ class Dataset:
     examples: tuple[Example, ...]  # hand-written: in every version of every split
     pins: dict[str, str] = field(default_factory=dict)  # split -> the version tag the runner must use
     splits: tuple[str, ...] = SPLITS  # the splits the dataset is published to (`splits:` in its file)
+    # a share of generated examples held out for evaluation; the rest train a model (topic_check)
+    eval_share: float | None = None
 
 
 def load_dataset(key: str, folder: Path = DATASETS) -> Dataset:
@@ -62,7 +65,18 @@ def load_dataset(key: str, folder: Path = DATASETS) -> Dataset:
         raise DatasetError(f"{path.name}: splits names unknown splits {sorted(unknown)} (splits: {', '.join(SPLITS)})")
     if outside := set(pins) - set(splits):
         raise DatasetError(f"{path.name}: pins name splits the dataset opts out of: {sorted(outside)}")
-    return Dataset(key, raw["name"], raw.get("description", ""), examples, pins, splits)
+    share = raw.get("eval_share")
+    if share is not None and not 0 < float(share) < 1:
+        raise DatasetError(f"{path.name}: eval_share must be between 0 and 1, not {share}")
+    return Dataset(
+        key,
+        raw["name"],
+        raw.get("description", ""),
+        examples,
+        pins,
+        splits,
+        None if share is None else float(share),
+    )
 
 
 def _number(tag: str, split: str) -> int | None:
@@ -149,3 +163,14 @@ def _push(client: langsmith.Client, dataset: Dataset, split: str, examples: Sequ
     latest = max(e.modified_at or e.created_at for e in pushed)
     version = client.read_dataset_version(dataset_name=dataset.name, as_of=latest)
     client.update_dataset_tag(dataset_name=dataset.name, as_of=version.as_of, tag=tag)
+
+
+def normalized(question: str) -> str:
+    return " ".join(question.lower().split())
+
+
+def in_eval_share(question: str, share: float) -> bool:
+    """Whether a generated example is held out for evaluation: a stable hash of its normalized question, so it never
+    moves between training and evaluation (spec 2026-10-13 §6.1)."""
+    digest = hashlib.sha256(normalized(question).encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big") / 2**64 < share

@@ -6,7 +6,7 @@ from collections import Counter
 import pytest
 from langsmith.utils import LangSmithError
 
-from evals.dataset import Dataset, Example, examples_at
+from evals.dataset import Dataset, Example, examples_at, in_eval_share
 from evals.publish import TYPES, main, oldest_first, split_examples
 from evals.review import ACCEPTED, Candidate, submit
 from fakes.langsmith import FakeLangSmith
@@ -156,6 +156,17 @@ def test_a_langsmith_error_exits_1_with_a_hint(capsys: pytest.CaptureFixture[str
 
     assert main([], client=NoKey(), load=lambda key: ASK, keys=["ask"]) == 1
     assert "LANGSMITH_API_KEY" in capsys.readouterr().err
+
+
+def test_a_dataset_with_an_eval_share_publishes_only_its_held_out_questions() -> None:
+    client = FakeLangSmith()
+    shared = Dataset("ask", "smart-tutor-ask", "", HAND, eval_share=0.3)
+    questions = [f"question {i}" for i in range(40)]
+    _accept(client, *questions)
+    assert main([], client=client, load=lambda key: shared, keys=["ask"]) == 0
+    full = {e.inputs["question"] for e in examples_at(client, shared, "full", "full-v1")}
+    assert full == {"hand"} | {q for q in questions if in_eval_share(q, 0.3)}
+    assert 1 < len(full) < 41
 
 
 FULL_ONLY = Dataset("full-only", "smart-tutor-full-only", "", HAND, splits=("full",))

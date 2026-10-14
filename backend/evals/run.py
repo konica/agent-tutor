@@ -57,6 +57,9 @@ async def run_split(
         if split not in dataset.splits:
             print(f"{dataset.name} has no {split} split (its file opts out)", file=sys.stderr)
             continue
+        if group.skip is not None and (why := group.skip()) is not None:  # its metrics stay "not run"
+            print(f"{dataset.name} skipped: {why}", file=sys.stderr)
+            continue
         version = version_to_run(client, dataset, split)
         if version is None:  # its metrics stay "not run"
             print(f"{dataset.name} has no {split} version yet: publish one (make evals-publish)", file=sys.stderr)

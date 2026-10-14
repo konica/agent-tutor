@@ -41,3 +41,13 @@ def test_a_turn_without_a_search_scores_0() -> None:
 def test_a_failed_run_does_not_count_as_a_search() -> None:
     result = search_step_ran({})
     assert result["score"] == 0 and "failed" in result["comment"]
+
+
+def test_an_off_topic_decline_without_a_search_is_not_applicable() -> None:
+    result = search_step_ran({"limit": None, "trajectory": [], "decline": "off_topic"})
+    assert result["score"] is None and result["value"] == "n/a"
+
+
+def test_an_off_topic_decline_that_still_searched_scores_0() -> None:
+    result = search_step_ran({"limit": None, "trajectory": [_call(None, ["d1"])], "decline": "off_topic"})
+    assert result["score"] == 0 and "off-topic" in result["comment"]

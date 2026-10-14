@@ -758,6 +758,7 @@ EVAL_PATHS = {
     "backend/src/smart_tutor/knowledge/adapters/sql_library.py",
     "backend/src/smart_tutor/knowledge/adapters/chunking.py",
     "backend/evals/**",
+    "backend/models/**",  # a retrain that only replaces the topic-check model still runs the gate
     ".env.example",
     "compose.yaml",
     "compose.ci.yaml",

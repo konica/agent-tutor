@@ -26,6 +26,8 @@ class Suite:
     dataset: str
     target: Callable[[], Target]
     evaluators: tuple[Evaluator, ...]
+    # a reason the suite can't run yet (e.g. no model): its metrics stay "not run"
+    skip: Callable[[], str | None] | None = None
 
 
 @dataclass(frozen=True)
@@ -35,6 +37,8 @@ class DatasetSuites:
     dataset: str
     target: Callable[[], Target]
     evaluators: tuple[Evaluator, ...]
+    # a reason the suite can't run yet (e.g. no model): its metrics stay "not run"
+    skip: Callable[[], str | None] | None = None
 
 
 def discover(package: ModuleType | None = None) -> list[Suite]:
@@ -53,9 +57,11 @@ def by_dataset(suites: Sequence[Suite]) -> list[DatasetSuites]:
     for suite in suites:
         group = groups.get(suite.dataset)
         if group is None:
-            groups[suite.dataset] = DatasetSuites(suite.dataset, suite.target, suite.evaluators)
+            groups[suite.dataset] = DatasetSuites(suite.dataset, suite.target, suite.evaluators, suite.skip)
         elif group.target is not suite.target:
             raise ValueError(f"suites on the {suite.dataset} dataset name different targets")
         else:
-            groups[suite.dataset] = DatasetSuites(suite.dataset, group.target, group.evaluators + suite.evaluators)
+            groups[suite.dataset] = DatasetSuites(
+                suite.dataset, group.target, group.evaluators + suite.evaluators, group.skip or suite.skip
+            )
     return list(groups.values())

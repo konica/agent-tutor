@@ -137,6 +137,24 @@ describe("askInNewThread", () => {
     ]);
   });
 
+  it("reads an off_topic decline", async () => {
+    const message =
+      "I'm Smart Tutor: I help you study and research the papers, books, magazines, and news articles in your library, so I can't help with that. Ask me about your documents or a topic you're learning.";
+    const { apiClient } = api(() =>
+      eventStream(`event: decline
+data: ${JSON.stringify({ code: "off_topic", message })}
+
+event: done
+data: {}
+
+`),
+    );
+    expect(await collect(askInNewThread("q", undefined, apiClient))).toEqual([
+      { type: "decline", code: "off_topic", message },
+      { type: "done" },
+    ]);
+  });
+
   it("reads a replace event from a guard trip", async () => {
     const { apiClient } = api(() =>
       eventStream(
