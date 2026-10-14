@@ -42,6 +42,8 @@ systemctl start smart-tutor-backup               # back up now (waits until done
 journalctl -u smart-tutor-backup -n 20           # ends with "Backed up smart_tutor (…) and keycloak (…) to s3://…"
 ```
 
+Nothing alerts, so check by hand every Monday morning with the commands above. The newest dump in S3 is from the last day the host ran. The newest snapshot is from 02:00 today. If either is older, read "A failed dump" above and the Lifecycle Manager monitoring.
+
 ## Restore from a snapshot
 
 Use this when the volume or the database on it is damaged and a snapshot from before the damage is good enough. You lose the data written since that snapshot. A new volume is created from the snapshot, and the instance is replaced so its first boot attaches it, as in `on-premise-deploy.md` §7 "Replace the instance".

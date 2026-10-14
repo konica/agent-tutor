@@ -1,6 +1,6 @@
 # 0012. On-premise is the default deployment mode; native-cloud is opt-in
 
-- Status: accepted; "ECR is shared" superseded by 0016 (the modes share no stack); delivery amended 2026-10-12 (production deploy switch)
+- Status: accepted; "ECR is shared" superseded by 0016 (the modes share no stack); delivery amended 2026-10-12 (production deploy switch); operations amended 2026-10-14 by 0022 (off-hours 07:00–18:00, no CloudWatch alarms)
 - Date: 2026-10-09
 - Supersedes: the parts of 0009 and 0010 listed under "What still holds from 0009 and 0010", which now apply only to native-cloud mode
 

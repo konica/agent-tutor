@@ -103,7 +103,7 @@ Next morning, run the same commands with `--state ENABLED`.
 
 **Stop it now:** `aws ec2 stop-instances --instance-ids $InstanceId`.
 
-**Did a schedule run?** The instance's state history shows each stop and start: `aws ec2 describe-instances --instance-ids $InstanceId --query "Reservations[0].Instances[0].[State.Name, StateTransitionReason]"`. In CloudWatch, the free `AWS/Scheduler` metrics `InvocationAttemptCount` and `TargetErrorCount` (dimension `ScheduleGroup`) show attempts and failures.
+**Did a schedule run?** `StateTransitionReason` shows the last stop or start only: `aws ec2 describe-instances --instance-ids $InstanceId --query "Reservations[0].Instances[0].[State.Name, StateTransitionReason]"`. For the history, ask CloudTrail: `aws cloudtrail lookup-events --lookup-attributes AttributeKey=ResourceName,AttributeValue=$InstanceId --query "Events[?EventName=='StopInstances' || EventName=='StartInstances'].[EventTime,EventName,Username]" --output table`. In CloudWatch, the free `AWS/Scheduler` metrics `InvocationAttemptCount` and `TargetErrorCount` (dimension `ScheduleGroup`) show attempts and failures.
 
 **Is the product up?** No alarm watches it. Open `$Url`, or `Invoke-WebRequest "$Url/api/healthz"`. If the host is running but the site isn't, [bring the services back](#bring-the-services-back). If AWS reports a hardware problem, EC2's default automatic recovery moves the instance to healthy hardware without an email; the instance keeps its id, address, and volumes.
 

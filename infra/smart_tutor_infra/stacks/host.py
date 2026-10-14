@@ -71,7 +71,8 @@ BUNDLE_DIR = Path(__file__).parents[3] / "deploy"
 # Only the instance with this tag may attach the volume with this tag.
 HOST_TAG = "smart-tutor:host"
 # Weekly patching: Sunday 07:20 in the app time zone, twenty minutes after the off-hours start (07:00), so Docker has the
-# services up; it reboots only when a patch needs it.
+# services up; it reboots only when a patch needs it. A reboot can cut short Sunday's catch-up dump (the 03:00 dump runs
+# at the 07:00 boot after a randomized delay); that day's 02:00 snapshot still covers it.
 PATCH_SCHEDULE = "cron(20 7 ? * SUN *)"
 # Run after the patching. The script reaches the VM with the bundle, i.e. with a deploy, not with `cdk deploy`.
 ENSURE_HEALTHY = "/opt/smart-tutor/on-premise/ensure-healthy.sh"

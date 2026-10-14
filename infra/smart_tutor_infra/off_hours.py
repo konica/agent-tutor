@@ -5,7 +5,7 @@ and starts it at 07:00, in the given time zone, by calling the EC2 API directly 
 alarm, no dead-letter queue. Stopping a stopped instance, or starting a running one, changes nothing, so a person may
 start the host at any hour; it then runs until the next stop.
 
-platform/langfuse keeps its own copy of this file, so that project can move to a repository of its own.
+platform/langfuse (the shared Langfuse host, ADR 0021) will keep its own copy of this file, so that project can move to a repository of its own.
 """
 
 import aws_cdk as cdk
@@ -62,6 +62,7 @@ class OffHours(Construct):
                     arn=f"arn:aws:scheduler:::aws-sdk:ec2:{action}",
                     role_arn=role.role_arn,
                     input=stack.to_json_string({"InstanceIds": [instance.instance_id]}),
+                    # A stop or start more than an hour late is dropped; the next schedule catches up.
                     retry_policy=scheduler.CfnSchedule.RetryPolicyProperty(
                         maximum_retry_attempts=RETRY_ATTEMPTS, maximum_event_age_in_seconds=3600
                     ),
