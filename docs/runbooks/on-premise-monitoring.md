@@ -1,6 +1,6 @@
-# On-premise monitoring and patching (#152)
+# On-premise hours, monitoring, and patching (#152, ADR 0022)
 
-The team learns when the on-premise product is down, and the VM keeps itself patched (PRD §9.12, ADR 0012). All of it is in the Host stack (`infra/smart_tutor_infra/stacks/host.py`) and deploys with it (`on-premise-deploy.md` §2). For deploys, the VM's layout, and Session Manager, see `on-premise-deploy.md`.
+The host runs 07:00–18:00 Asia/Ho_Chi_Minh and patches itself weekly (PRD §9.12, ADR 0012, ADR 0022). There are no CloudWatch alarms: nobody is emailed when the product is down, so check it by hand when in doubt. All of it is in the Host stack (`infra/smart_tutor_infra/stacks/host.py`) and deploys with it (`on-premise-deploy.md` §2). For deploys, the VM's layout, and Session Manager, see `on-premise-deploy.md`.
 
 Commands are for **PowerShell 7**, with the shell set up as in `on-premise-deploy.md` §1 and these names:
 
@@ -17,7 +17,7 @@ $Url = Get-Output PublicUrl
 
 ## Who gets the emails
 
-Every alarm emails the SNS topic **`smart-tutor-on-premise-prod-alerts`**. Its recipients are the budget's, the context `smart-tutor:budget-alert-emails` in `infra/cdk.json`, so native-cloud's budget, on-premise's budget, and these alarms all reach the same people. The same topic carries the backup alarms (a failed snapshot or nightly dump), which `on-premise-backups.md` covers. One confirmation covers both.
+The SNS topic **`smart-tutor-on-premise-prod-alerts`** emails the budget's recipients (`smart-tutor:budget-alert-emails` in `infra/cdk.json`) when the weekly patching fails. It is the only email the Host stack sends.
 
 **After the first deploy of the Host stack, and after adding a recipient, each recipient confirms the subscription.** AWS sends an email titled "AWS Notification - Subscription Confirmation", and nothing reaches an address until its owner chooses **Confirm subscription**. To check:
 
@@ -28,58 +28,12 @@ aws sns list-subscriptions-by-topic --topic-arn $Topic --query "Subscriptions[].
 
 `PendingConfirmation` means the email hasn't been confirmed yet. To change the recipients, edit `smart-tutor:budget-alert-emails` and deploy the stacks; removed addresses are unsubscribed.
 
-## The alarms
+## Emails
 
-| Email | What fired | Section |
+| Email | What happened | Section |
 |---|---|---|
-| ALARM: `smart-tutor-on-premise-prod-recover` | The EC2 **system status check** failed for 2 minutes. AWS is recovering the instance. | [Recovery](#recovery-alarm) |
-| ALARM: `smart-tutor-on-premise-prod-uptime` | `https://<domain>/api/healthz` failed for 3 minutes, measured by Route 53 from several regions. | [Uptime](#uptime-alarm) |
 | "The patching window smart-tutor-on-premise-prod-patching ended FAILED" (or `TIMED_OUT`) | The weekly patching, or the health check after it, failed. | [Patching](#patching-failed) |
 | AWS Budgets: `smart-tutor-on-premise-prod-monthly` | Actual spend passed 80% of the monthly budget, or the forecast passed 100%. | [Budget](#budget-alert) |
-
-The two CloudWatch alarms also email **OK** when they clear. An OK soon after an ALARM, with no action needed, is the usual end of a short outage.
-
-### Recovery alarm
-
-**What happened.** AWS saw a hardware or network problem on the host under the VM. The alarm's action recovers the instance: AWS moves it to healthy hardware. The instance keeps its id, Elastic IP, private address, and EBS volumes, including the data volume. Recovery reboots the VM, then Docker starts every service again (`restart: unless-stopped`, after `/data` is mounted). Expect about 5 to 10 minutes of downtime, so the uptime alarm usually fires too.
-
-**What to do.**
-
-1. Wait for the OK email from `-recover`, and then from `-uptime`. If both clear, nothing else is needed.
-2. If the recovery alarm stays in ALARM for more than 30 minutes, check the instance:
-
-   ```powershell
-   aws ec2 describe-instance-status --instance-ids $InstanceId --include-all-instances `
-       --query "InstanceStatuses[0].{State: InstanceState.Name, System: SystemStatus.Status, Instance: InstanceStatus.Status}"
-   ```
-
-   If recovery failed (AWS also emails the account about it), stop and start the instance. That moves it to new hardware too, and the Elastic IP and data volume stay:
-
-   ```powershell
-   aws ec2 stop-instances --instance-ids $InstanceId; aws ec2 wait instance-stopped --instance-ids $InstanceId
-   aws ec2 start-instances --instance-ids $InstanceId; aws ec2 wait instance-status-ok --instance-ids $InstanceId
-   ```
-
-3. If the services aren't healthy afterwards, see [Bring the services back](#bring-the-services-back).
-
-An **instance** status check failure (the VM's own OS, such as memory exhaustion or a full disk) doesn't trigger this alarm. It shows up as the uptime alarm.
-
-### Uptime alarm
-
-**What happened.** Route 53 health checkers in several regions request `https://<domain>/api/healthz` every 30 seconds, and the check failed for 3 minutes. The request goes through DNS, Caddy, and the API, as a learner's does. So the alarm fires when the VM is down, Caddy or the API is down, or the domain stops resolving to the Elastic IP (DuckDNS, #154). It doesn't catch a bad certificate: Route 53 doesn't validate certificates. If learners see a certificate warning, check `dc logs caddy` (`on-premise-deploy.md`, Troubleshooting). A deploy restarts the API for a few seconds, which is too short to fire it. A deploy that fails half-way can fire it.
-
-**What to do.**
-
-1. Open `$Url` and run the smoke test to see what fails:
-
-   ```powershell
-   python deploy/pilot/smoke_test.py $Url
-   ```
-
-2. Check that a deploy isn't running or failed: in the Systems Manager console, **Run Command → Command history**, look for `smart-tutor-on-premise-deploy`. A failed deploy stops before or during `docker compose up`, so redeploy the last good tag (`on-premise-deploy.md` §4).
-3. Check the instance (the `describe-instance-status` command above). If it is stopped, start it. If its **instance** status check failed, reboot it: `aws ec2 reboot-instances --instance-ids $InstanceId`.
-4. If the instance is running, [bring the services back](#bring-the-services-back) and read the logs of the unhealthy service.
-5. If the services are healthy but the check still fails, check DNS: `Resolve-DnsName smart-tutor.duckdns.org` must return the Elastic IP. If it does not, run a deploy (it points the name at the instance) or update the address on duckdns.org (`on-premise-deploy.md` section 9).
 
 ### Patching failed
 
@@ -94,7 +48,7 @@ An **instance** status check failure (the VM's own OS, such as memory exhaustion
    aws ssm describe-maintenance-window-executions --window-id $Window --max-results 3 --query "WindowExecutions[].[WindowExecutionId, Status, StartTime]" --output table
    ```
 
-2. If **`HealthTask`** failed, the product may be down: [bring the services back](#bring-the-services-back) now. The uptime alarm fires too if the API is down.
+2. If **`HealthTask`** failed, the product may be down: [bring the services back](#bring-the-services-back) now.
 3. If **`PatchTask`** failed, the output names the package or repository problem. Fix it, then patch now instead of waiting a week:
 
    ```powershell
@@ -110,18 +64,61 @@ An **instance** status check failure (the VM's own OS, such as memory exhaustion
 
 **What to do.** In **Billing → Cost Explorer**, group this month's cost by service. Check Bedrock usage in Phoenix traces (LLM spans' token counts), and check that no native-cloud stack (`SmartTutor-prod-*`) is running when it shouldn't be. Tell the product owner if the budget is too low for the pilot. The amount is `smart-tutor:budget-monthly-usd` in `infra/cdk.json`.
 
+## Hours (ADR 0022)
+
+| Local time (Asia/Ho_Chi_Minh) | Schedule | What it does |
+|---|---|---|
+| 18:00 | `stop` | Stops the instance |
+| 00:00 | `stop-late` | Stops it again, in case someone started it in the evening |
+| 07:00 | `start` | Starts it; Docker brings every service back within a few minutes |
+
+The schedules are in the group `smart-tutor-on-premise-prod-off-hours`. A stop shuts the OS down: Postgres gets 60 s and Docker 120 s to stop. Outside the hours the site doesn't answer.
+
+**Start the host by hand** (any hour; it runs until the next `stop` or `stop-late`):
+
+```powershell
+aws ec2 start-instances --instance-ids $InstanceId
+aws ec2 wait instance-running --instance-ids $InstanceId
+# A few minutes later:
+Invoke-WebRequest "$Url/api/healthz" -UseBasicParsing | Select-Object StatusCode
+```
+
+Nothing else is needed: the data volume mounts, Docker starts every service, and the Elastic IP, DuckDNS name, and certificates stay. Uploads queued overnight are processed, and a nightly dump that was missed runs.
+
+**Keep it up past midnight:** disable `stop-late`, then enable it again the next morning. `update-schedule` replaces the whole schedule, so read it first and send it back with the new state:
+
+```powershell
+$Group = "smart-tutor-on-premise-prod-off-hours"
+$s = aws scheduler get-schedule --group-name $Group --name stop-late | ConvertFrom-Json
+$Target = Join-Path $env:TEMP stop-late-target.json     # files, not inline JSON
+$Window = Join-Path $env:TEMP stop-late-window.json
+$s.Target | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8NoBOM $Target
+$s.FlexibleTimeWindow | ConvertTo-Json | Set-Content -Encoding utf8NoBOM $Window
+aws scheduler update-schedule --group-name $Group --name stop-late --state DISABLED --description $s.Description `
+    --schedule-expression $s.ScheduleExpression --schedule-expression-timezone $s.ScheduleExpressionTimezone `
+    --flexible-time-window file://$Window --target file://$Target
+```
+
+Next morning, run the same commands with `--state ENABLED`.
+
+**Stop it now:** `aws ec2 stop-instances --instance-ids $InstanceId`.
+
+**Did a schedule run?** `StateTransitionReason` shows the last stop or start only: `aws ec2 describe-instances --instance-ids $InstanceId --query "Reservations[0].Instances[0].[State.Name, StateTransitionReason]"`. For the history, ask CloudTrail: `aws cloudtrail lookup-events --lookup-attributes AttributeKey=ResourceName,AttributeValue=$InstanceId --query "Events[?EventName=='StopInstances' || EventName=='StartInstances'].[EventTime,EventName,Username]" --output table`. In CloudWatch, the free `AWS/Scheduler` metrics `InvocationAttemptCount` and `TargetErrorCount` (dimension `ScheduleGroup`) show attempts and failures.
+
+**Is the product up?** No alarm watches it. Open `$Url`, or `Invoke-WebRequest "$Url/api/healthz"`. If the host is running but the site isn't, [bring the services back](#bring-the-services-back). If AWS reports a hardware problem, EC2's default automatic recovery moves the instance to healthy hardware without an email; the instance keeps its id, address, and volumes.
+
 ## Weekly patching
 
 | What | Value |
 |---|---|
-| When | Every **Sunday at 04:00 Asia/Ho_Chi_Minh** (the app time zone, an hour after the nightly dump starts), for at most 3 hours; no task starts in the last hour |
+| When | Every **Sunday at 07:20 Asia/Ho_Chi_Minh**, twenty minutes after the 07:00 start, for at most 3 hours; no task starts in the last hour |
 | Window | `smart-tutor-on-premise-prod-patching`, targeting the Host instance by id |
 | Patches | The baseline `smart-tutor-on-premise-prod-security`: Amazon Linux 2023 updates classified **Security**, every severity, approved as soon as they are released. The instance's `PatchGroup` tag selects it. Patch Manager reads the latest AL2023 repository, not the one the image pinned. |
 | Task 1, `PatchTask` | `AWS-RunPatchBaseline` with `Install` and `RebootIfNeeded`. It reboots only when an installed patch needs it (a kernel, for example). |
 | Task 2, `HealthTask` | `bash /opt/smart-tutor/on-premise/ensure-healthy.sh`: starts Docker and any service that isn't running, with the last deploy's images and settings, and waits up to 15 minutes until every service is healthy. Then it re-runs the worker's isolation and egress checks, as a deploy does (`check-worker.sh`), and fails the window (an email) if they fail. It runs even if task 1 failed. |
-| On failure | An email to the alarm topic (EventBridge rule on the window's `FAILED` or `TIMED_OUT` state) |
+| On failure | An email to the alert topic (EventBridge rule on the window's `FAILED` or `TIMED_OUT` state) |
 
-A reboot takes the product down for a few minutes, which the uptime alarm tolerates. Patching doesn't touch our images: they change only with a deploy. A **deploy that replaces the instance** (when CDK reads a newer Amazon Linux 2023 image) also brings the operating system up to date.
+A reboot takes the product down for a few minutes. Patching doesn't touch our images: they change only with a deploy. A **deploy that replaces the instance** (when CDK reads a newer Amazon Linux 2023 image) also brings the operating system up to date.
 
 To see what is installed or missing:
 
@@ -185,17 +182,6 @@ aws ssm get-command-invocation --command-id $Command --instance-id $InstanceId -
 ```
 
 The output lists each service's status. If one stays unhealthy, open a shell (`on-premise-deploy.md` §7) and read its logs with `dc logs --tail 200 <service>`. Common causes: `/data` not mounted (the data volume), the disk full (`df -h / /data`; `docker image prune -af` frees old images), or Keycloak slow to start after a reboot. If a deploy left the services broken, redeploy the last good tag.
-
-## Test the alarms
-
-Do this once after the first deploy of the Host stack, and after changing the recipients:
-
-```powershell
-aws cloudwatch set-alarm-state --alarm-name smart-tutor-on-premise-prod-uptime --state-value ALARM `
-    --state-reason "Testing the email (docs/runbooks/on-premise-monitoring.md)"
-```
-
-Each recipient gets an ALARM email. The alarm returns to its real state within a few minutes and sends an OK email. Don't test the **recovery** alarm this way: setting its state by hand also runs its recover action. It shares the topic, so the uptime test proves its emails arrive too.
 
 ## Phoenix's memory and database size (#288)
 

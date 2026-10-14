@@ -5,8 +5,8 @@
 #
 #   s3://<documents bucket>/backups/postgres/<UTC timestamp>/{smart_tutor,keycloak}.dump   (pg_dump custom format)
 #
-# The bucket expires backups/ after 30 days. A failure exits non-zero, and systemd's OnFailure reports it to CloudWatch
-# (report-failure.sh), which raises the backup alarm. It prints no secret.
+# The bucket expires backups/ after 30 days. A failure exits non-zero and is in journalctl -u smart-tutor-backup (no alarm,
+# ADR 0022). It prints no secret.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)

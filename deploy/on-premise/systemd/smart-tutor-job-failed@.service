@@ -1,8 +1,0 @@
-# Reports a failed scheduled job to CloudWatch (#151). A job's service names it in OnFailure=, with the job's unit name
-# without .service as the instance: OnFailure=smart-tutor-job-failed@%N.service
-[Unit]
-Description=Smart Tutor: report that %i failed
-
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/bash /opt/smart-tutor/on-premise/report-failure.sh %i

@@ -17,14 +17,7 @@ The dumps hold learner data (threads, notes) and Keycloak's users. They are encr
 
 ## Alerts
 
-The Host stack has an SNS topic `smart-tutor-on-premise-prod-alerts` that emails the addresses in `smart-tutor:budget-alert-emails`. **After the first `cdk deploy`, each address gets an "AWS Notification - Subscription Confirmation" email: confirm it, or no alert arrives.**
-
-| Alarm | Fires when | First look |
-|---|---|---|
-| `…-BackupFailedAlarm…` | `backup.sh` failed or timed out (1 h). systemd's `OnFailure=` runs `smart-tutor-job-failed@smart-tutor-backup`, which publishes `SmartTutor/OnPremise JobFailed` | `bash`: `journalctl -u smart-tutor-backup -n 100` |
-| `…-SnapshotFailedAlarm…` | Data Lifecycle Manager couldn't create the daily snapshot (`AWS/EBS SnapshotsCreateFailed`) | EC2 → Lifecycle Manager → the policy → Monitoring; the policy's role is `…-SnapshotRole…` |
-
-Each alarm emails once when it fires and goes back to OK by itself an hour later. Silence doesn't prove that backups ran. If the VM was down at 20:00, the timer runs the backup as soon as the VM is back (`Persistent=true`). Monitoring (#152) covers a VM that is down.
+There is no backup alarm (ADR 0022). Check the backups by hand (next section) after a deploy, a restore, or anything unusual. A failed dump is in the VM's journal: `journalctl -u smart-tutor-backup -n 100`. A failed snapshot shows in **EC2 → Lifecycle Manager → the policy → Monitoring**. The host is off 18:00–07:00, so the 03:00 dump runs at the 07:00 start (`Persistent=true`); the 02:00 snapshot works on the stopped instance.
 
 ## Check the backups
 
@@ -48,6 +41,8 @@ systemctl list-timers smart-tutor-backup.timer   # next and last run
 systemctl start smart-tutor-backup               # back up now (waits until done)
 journalctl -u smart-tutor-backup -n 20           # ends with "Backed up smart_tutor (…) and keycloak (…) to s3://…"
 ```
+
+Nothing alerts, so check by hand every Monday morning with the commands above. The newest dump in S3 is from the last day the host ran. The newest snapshot is from 02:00 today. If either is older, read "A failed dump" above and the Lifecycle Manager monitoring.
 
 ## Restore from a snapshot
 
@@ -125,14 +120,13 @@ On-premise has no Kubernetes CronJobs. A scheduled job is a **systemd timer** on
        postgres: {condition: service_healthy}
    ```
 
-2. **Service unit** `deploy/on-premise/systemd/smart-tutor-<job>.service`. `OnFailure=` reports a failure, and `%N` is the unit's name without `.service`:
+2. **Service unit** `deploy/on-premise/systemd/smart-tutor-<job>.service`. A failure stays in the unit's journal:
 
    ```ini
    [Unit]
    Description=Smart Tutor: <what it does>
    Requires=docker.service
    After=docker.service
-   OnFailure=smart-tutor-job-failed@%N.service
 
    [Service]
    Type=oneshot
@@ -142,13 +136,13 @@ On-premise has no Kubernetes CronJobs. A scheduled job is a **systemd timer** on
 
    A job that needs more than one container, or a step on the host (such as the upload in `backup.sh`), runs a script instead: `ExecStart=/usr/bin/bash /opt/smart-tutor/on-premise/<job>.sh`.
 3. **Timer unit** `smart-tutor-<job>.timer` with `OnCalendar=` in UTC, `Persistent=true`, and `WantedBy=timers.target` (copy `smart-tutor-backup.timer`).
-4. **Alarm** in the Host stack: a `JobFailed` alarm with `Job=smart-tutor-<job>`, like `BackupFailedAlarm`.
-5. **Deploy.** `deploy.sh` installs every unit in `deploy/on-premise/systemd/` and enables every timer. Check on the VM with `systemctl list-timers 'smart-tutor-*'`. Removing a unit file doesn't disable the timer on the VM: run `systemctl disable --now smart-tutor-<job>.timer` there too.
+4. **Deploy.** `deploy.sh` installs every unit in `deploy/on-premise/systemd/` and enables every timer. Check on the VM with `systemctl list-timers 'smart-tutor-*'`. Removing a unit file doesn't disable the timer on the VM: run `systemctl disable --now smart-tutor-<job>.timer` there too.
 
 Keep in mind:
 
 - The job's container gets the same settings and instance-profile credentials as the long-running services. It reads the env file through Compose; never print it.
-- `deploy.sh` replaces `/opt/smart-tutor` on every deploy, so a job that starts during a deploy can fail. The alarm then fires once, and the next run is normal.
+- `deploy.sh` replaces `/opt/smart-tutor` on every deploy, so a job that starts during a deploy can fail. The run then fails once, and the next run is normal.
+- The host is off 18:00–07:00 (ADR 0022). Give the timer `Persistent=true` so a run missed while it was off happens at the next start.
 - systemd times are UTC here. Write the local time (Asia/Ho_Chi_Minh, UTC+7) in a comment.
 
 ## Troubleshooting
@@ -161,4 +155,3 @@ Keep in mind:
 | The timer isn't listed | No deploy has run since #151, or the env file is missing. Run a deploy. |
 | `restore.sh` fails in `pg_restore` | A database may be half restored. Fix the cause (the error is above it) and run it again: it drops and recreates each database. The services stay stopped until a deploy. |
 | The Host stack is `UPDATE_ROLLBACK_FAILED`, and every deploy fails | An update and its rollback both failed on one resource, for example the data volume before #155 (EC2 refuses to change a volume's snapshot in place). Check that the resource itself is unchanged (for the volume: `aws ec2 describe-volumes --volume-ids <DataVolumeId>` shows it still attached to the instance), then skip it in the rollback: `aws cloudformation continue-update-rollback --stack-name SmartTutor-OnPremise-prod-Host --resources-to-skip <logical id>` and `aws cloudformation wait stack-rollback-complete --stack-name SmartTutor-OnPremise-prod-Host`. Re-run the failed deploy (Actions → deploy). |
-| No alert email although the alarm is in ALARM | The subscription is unconfirmed: SNS → Topics → `…-alerts` → Subscriptions. Request the confirmation again there. |
