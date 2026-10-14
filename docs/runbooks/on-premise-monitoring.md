@@ -90,12 +90,16 @@ Nothing else is needed: the data volume mounts, Docker starts every service, and
 ```powershell
 $Group = "smart-tutor-on-premise-prod-off-hours"
 $s = aws scheduler get-schedule --group-name $Group --name stop-late | ConvertFrom-Json
-$s.Target | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8NoBOM stop-late-target.json  # a file, not inline JSON
-aws scheduler update-schedule --group-name $Group --name stop-late --state DISABLED `
+$Target = Join-Path $env:TEMP stop-late-target.json     # files, not inline JSON
+$Window = Join-Path $env:TEMP stop-late-window.json
+$s.Target | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8NoBOM $Target
+$s.FlexibleTimeWindow | ConvertTo-Json | Set-Content -Encoding utf8NoBOM $Window
+aws scheduler update-schedule --group-name $Group --name stop-late --state DISABLED --description $s.Description `
     --schedule-expression $s.ScheduleExpression --schedule-expression-timezone $s.ScheduleExpressionTimezone `
-    --flexible-time-window Mode=OFF --target file://stop-late-target.json
-# Next morning: the same command with --state ENABLED
+    --flexible-time-window file://$Window --target file://$Target
 ```
+
+Next morning, run the same commands with `--state ENABLED`.
 
 **Stop it now:** `aws ec2 stop-instances --instance-ids $InstanceId`.
 
@@ -114,7 +118,7 @@ aws scheduler update-schedule --group-name $Group --name stop-late --state DISAB
 | Task 2, `HealthTask` | `bash /opt/smart-tutor/on-premise/ensure-healthy.sh`: starts Docker and any service that isn't running, with the last deploy's images and settings, and waits up to 15 minutes until every service is healthy. Then it re-runs the worker's isolation and egress checks, as a deploy does (`check-worker.sh`), and fails the window (an email) if they fail. It runs even if task 1 failed. |
 | On failure | An email to the alert topic (EventBridge rule on the window's `FAILED` or `TIMED_OUT` state) |
 
-A reboot takes the product down for a few minutes,. Patching doesn't touch our images: they change only with a deploy. A **deploy that replaces the instance** (when CDK reads a newer Amazon Linux 2023 image) also brings the operating system up to date.
+A reboot takes the product down for a few minutes. Patching doesn't touch our images: they change only with a deploy. A **deploy that replaces the instance** (when CDK reads a newer Amazon Linux 2023 image) also brings the operating system up to date.
 
 To see what is installed or missing:
 
