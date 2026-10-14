@@ -5,7 +5,8 @@ and starts it at 07:00, in the given time zone, by calling the EC2 API directly 
 alarm, no dead-letter queue. Stopping a stopped instance, or starting a running one, changes nothing, so a person may
 start the host at any hour; it then runs until the next stop.
 
-Another CDK project in this repository (infra/) keeps its own copy for its host; change both when the schedule's shape changes.
+The app host's CDK project keeps its own copy of this construct; keep the two in step when the schedule's shape
+changes.
 """
 
 import aws_cdk as cdk

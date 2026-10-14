@@ -1,6 +1,8 @@
 """The Langfuse-Host stack (spec 2026-10-14 §6, ADR 0021)."""
 
 import json
+import shutil
+import subprocess
 from typing import Any
 
 import aws_cdk as cdk
@@ -8,7 +10,7 @@ import pytest
 from aws_cdk.assertions import Template
 
 from langfuse_platform.app import build_app
-from langfuse_platform.host_stack import GENERATED_SECRETS
+from langfuse_platform.host_stack import ENSURE_HEALTHY_COMMAND, GENERATED_SECRETS
 
 CONTEXT = {
     "langfuse:region": "us-east-1",
@@ -268,3 +270,8 @@ def test_a_failed_patching_window_emails_the_alerts_topic(t: Template) -> None:
     (topic_id,) = t.find_resources("AWS::SNS::Topic")
     (target,) = rule["Properties"]["Targets"]
     assert target["Arn"] == {"Ref": topic_id}
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")
+def test_ensure_healthy_command_parses() -> None:
+    subprocess.run(["bash", "-n", "-c", ENSURE_HEALTHY_COMMAND], check=True)

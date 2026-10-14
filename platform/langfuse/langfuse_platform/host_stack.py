@@ -53,7 +53,7 @@ SNAPSHOT_RETENTION_DAYS = 7
 PATCH_SCHEDULE = "cron(20 7 ? * SUN *)"  # twenty minutes after the 07:00 start
 ENSURE_HEALTHY = "/opt/langfuse/ensure-healthy.sh"
 ENSURE_HEALTHY_COMMAND = (
-    f"[ -f {ENSURE_HEALTHY} ] || {{ echo 'ensure-healthy.sh is missing: run the deploy document'"
+    f"[ -f {ENSURE_HEALTHY} ] || {{ echo 'ensure-healthy.sh is missing: run the deploy document"
     f" (docs/runbooks/langfuse-host.md)' >&2; exit 1; }}; bash {ENSURE_HEALTHY}"
 )
 # Generated secrets deploy.sh reads: (construct id, name under langfuse/, length). Changing a secret's settings (name,
