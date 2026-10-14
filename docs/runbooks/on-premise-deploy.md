@@ -1,6 +1,6 @@
 # On-premise deploy (#148, #149, #150, #153, #154, #229, #288)
 
-Deploys on-premise mode (ADR 0012, PRD §9.12): one EC2 VM runs Smart Tutor with Docker Compose, and Caddy serves it over HTTPS at `https://smart-tutor.duckdns.org` (a DuckDNS name pointed at the Elastic IP, section 9) with a Let's Encrypt certificate. Every merge to `main` deploys on-premise automatically while the production switch `PRODUCTION_DEPLOY` is `true`, unless `ON_PREMISE_AUTO_DEPLOY` is `false` (section 3). This runbook also covers the one-time setup, the first deploy, and a deploy by hand. It brings up Postgres, Keycloak, the API, the web app, Caddy, the agent, the MCP server, and the worker, so a learner can sign in, upload a PDF, and ask about it (#149). Backups and restore: `on-premise-backups.md` (#151). Alarms and weekly patching: `on-premise-monitoring.md` (#152); after the first deploy, every alert recipient confirms the subscription email.
+Deploys on-premise mode (ADR 0012, PRD §9.12): one EC2 VM runs Smart Tutor with Docker Compose, and Caddy serves it over HTTPS at `https://smart-tutor.duckdns.org` (a DuckDNS name pointed at the Elastic IP, section 9) with a Let's Encrypt certificate. Every merge to `main` deploys on-premise automatically while the production switch `PRODUCTION_DEPLOY` is `true`, unless `ON_PREMISE_AUTO_DEPLOY` is `false` (section 3). This runbook also covers the one-time setup, the first deploy, and a deploy by hand. It brings up Postgres, Keycloak, the API, the web app, Caddy, the agent, the MCP server, and the worker, so a learner can sign in, upload a PDF, and ask about it (#149). Backups and restore: `on-premise-backups.md` (#151). Hours (07:00–18:00, ADR 0022), starting the host by hand, and weekly patching: `on-premise-monitoring.md` (#152); after the first deploy, every alert recipient confirms the subscription email (the patching alert topic still emails).
 
 Commands are for **PowerShell 7** (`pwsh`). Run them from the repository root with your admin profile. No command here prints a secret. Don't paste the values you read in step 5 anywhere.
 
@@ -64,6 +64,8 @@ aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$Instanc
 
 ## 3. Deploy on merge (#150)
 
+The host is off 18:00–07:00 (ADR 0022). A merge after 17:30 deploys only if the host is running; start it first (`on-premise-monitoring.md`, Hours), or re-run the deploy the next morning.
+
 **What runs.** While `PRODUCTION_DEPLOY` is `true` (see "Turn all production deploys off or on" below), on every push to `main`, `deploy.yml` runs the CI checks, then `build-images.yml` (it builds the six images and pushes them, unless all six are already there), then `deploy-on-premise.yml` in the GitHub environment `on-premise`. That workflow checks the images exist, runs `cdk deploy --all -c smart-tutor:mode=on-premise` (uploading `deploy/` as the bundle), reads the Host outputs, and waits until the VM is `Online` in SSM (a deploy that replaces the instance gives it a new id). It then runs the SSM document with the commit SHA and prints its output, and runs `deploy/pilot/smoke_test.py` against `PublicUrl`. The run fails if any step fails, including the smoke test. One on-premise deploy runs at a time (concurrency group `deploy-on-premise`): a later merge waits. GitHub keeps only the newest waiting run per group, so a waiting run can be replaced by a newer one. Native-cloud doesn't deploy unless chosen (see "Native-cloud is optional" in `pilot-deploy.md`). **Stop deploys on merge** by setting the repository variable `ON_PREMISE_AUTO_DEPLOY` to `false` (in any case), for example while on-premise is torn down (section 8): `gh variable set ON_PREMISE_AUTO_DEPLOY --body false --repo konica/agent-tutor`. Unset or any other value deploys on every merge; `gh variable delete ON_PREMISE_AUTO_DEPLOY --repo konica/agent-tutor` turns it back on. A run by hand (`gh workflow run deploy.yml -f mode=on-premise`) deploys either way, as long as `PRODUCTION_DEPLOY` is `true`.
 
 **One-time setup** (an admin, once). Do these in order, and do step 1 before you merge #150.
@@ -125,6 +127,8 @@ gh variable set PRODUCTION_DEPLOY --body true --repo konica/agent-tutor    # on:
 - It is an operating control, not a security boundary: anyone with admin rights can flip it, and a merged change to the workflows can remove it.
 
 ## 4. Deploy an image tag by hand
+
+The host is off 18:00–07:00 (ADR 0022). Deploy before 17:30, or start the host first (`on-premise-monitoring.md`, Hours): a deploy running at 18:00 is cut off, and the next deploy starts it again from the top.
 
 Use this when GitHub Actions can't deploy (for example before the one-time setup), or to deploy a commit outside `main`'s head.
 
@@ -336,7 +340,7 @@ Deletes every on-premise stack, in this order:
 
 | | What | Notes |
 |---|---|---|
-| Deleted | `Host`: the VM, the Elastic IP, the VPC, the data volume (after a final snapshot), the snapshot policy, the alarms and alert topic, the uptime check, the patching window, the deploy document, and the database, test-learner, and Phoenix secrets (`db/phoenix`, `phoenix/secret`, `phoenix/admin-password`) | |
+| Deleted | `Host`: the VM, the Elastic IP, the VPC, the data volume (after a final snapshot), the snapshot policy, the alert topic, the off-hours schedules, the patching window, the deploy document, and the database, test-learner, and Phoenix secrets (`db/phoenix`, `phoenix/secret`, `phoenix/admin-password`) | |
 | Deleted | `Registry`: the repositories `smart-tutor-on-premise/*` and their images | The next build recreates them, empty. |
 | Deleted | `Config`: the SSM parameters under `/smart-tutor-on-premise/`, the Keycloak secrets, and the learner-hash key for Phoenix traces `smart-tutor-on-premise/phoenix/learner-hash-key` | |
 | Deleted | `Storage`: the queues `smart-tutor-on-premise-ingest` and `smart-tutor-on-premise-ingest-dlq` | The bucket stays (below). |
@@ -398,7 +402,7 @@ Check that the name resolves to the Elastic IP:
 Get-Output PublicIp
 ```
 
-**Switch the domain** (another DuckDNS name, or empty for `<Elastic IP>.sslip.io`): change `smart-tutor:on-premise-domain` in `infra/cdk.json`, deploy the stacks (section 2: the Storage stack's CORS, the Host's `domain` setting, and the uptime check follow it), and deploy an image tag (section 4, or merge to `main`). For another DuckDNS name, store its account's token first. Caddy requests a certificate for the new name. Learners signed in at the old address sign in again, because the token issuer changes with it.
+**Switch the domain** (another DuckDNS name, or empty for `<Elastic IP>.sslip.io`): change `smart-tutor:on-premise-domain` in `infra/cdk.json`, deploy the stacks (section 2: the Storage stack's CORS, and the Host's `domain` setting follow it), and deploy an image tag (section 4, or merge to `main`). For another DuckDNS name, store its account's token first. Caddy requests a certificate for the new name. Learners signed in at the old address sign in again, because the token issuer changes with it.
 
 ## 10. Tracing (Phoenix) (#229, #289, #290)
 
