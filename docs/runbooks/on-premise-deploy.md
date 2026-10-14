@@ -468,11 +468,11 @@ It prints `test-span (...) is in the Phoenix project smart-tutor-on-premise`. De
 
 ## 12. Question screen (#199)
 
-The agent can screen each learner's question with a Bedrock Guardrails prompt-attack filter before it searches (PRD D30, ADR 0019). It is **off** in production: the measured Bedrock processing p95 of about 410 to 450 ms misses the 300 ms latency target. CDK still creates the guardrail and a version, and writes three SSM parameters under `/smart-tutor-on-premise/`:
+The agent can screen each learner's question with a Bedrock Guardrails prompt-attack filter before it searches (PRD D30, ADR 0019). It is **on** in production since 2026-10-14: the product accepts that the measured Bedrock processing p95 of about 410 to 450 ms misses the 300 ms latency target. CDK still creates the guardrail and a version, and writes three SSM parameters under `/smart-tutor-on-premise/`:
 
 | Parameter | Value |
 |---|---|
-| `question-guard` | `off` (set in `infra/smart_tutor_infra/stacks/config.py`) or `bedrock` |
+| `question-guard` | `bedrock` (set in `infra/smart_tutor_infra/stacks/config.py`) or `off` |
 | `question-guardrail-id` | The guardrail's id (CDK writes it) |
 | `question-guardrail-version` | The retained version (CDK writes it; a changed definition publishes a new one) |
 

@@ -1,6 +1,8 @@
 """The Langfuse-Host stack (spec 2026-10-14 §6, ADR 0021)."""
 
 import json
+import shutil
+import subprocess
 from typing import Any
 
 import aws_cdk as cdk
@@ -8,7 +10,7 @@ import pytest
 from aws_cdk.assertions import Template
 
 from langfuse_platform.app import build_app
-from langfuse_platform.host_stack import GENERATED_SECRETS
+from langfuse_platform.host_stack import ENSURE_HEALTHY_COMMAND, GENERATED_SECRETS
 
 CONTEXT = {
     "langfuse:region": "us-east-1",
@@ -16,6 +18,7 @@ CONTEXT = {
     "langfuse:domain": "example-langfuse.duckdns.org",
     "langfuse:admin-email": "admin@example.com",
     "langfuse:data-snapshot-id": "",
+    "langfuse:alert-emails": ["ops@example.com"],
 }
 
 
@@ -209,3 +212,66 @@ def test_no_secret_reaches_the_template_or_the_user_data(t: Template) -> None:
     assert "secretsmanager" not in user_data
     for secret in t.find_resources("AWS::SecretsManager::Secret").values():
         assert "SecretString" not in secret["Properties"]
+
+
+def _instance_id(t: Template) -> str:
+    (instance_id,) = t.find_resources("AWS::EC2::Instance")
+    return instance_id
+
+
+def test_off_hours_and_patching_without_alarms(t: Template) -> None:
+    t.has_resource_properties("AWS::Scheduler::ScheduleGroup", {"Name": "langfuse-off-hours"})
+    t.resource_count_is("AWS::Scheduler::Schedule", 3)
+    t.resource_count_is("AWS::CloudWatch::Alarm", 0)
+    t.resource_count_is("AWS::Route53::HealthCheck", 0)
+    t.has_resource_properties(
+        "AWS::SSM::MaintenanceWindow",
+        {"Schedule": "cron(20 7 ? * SUN *)", "ScheduleTimezone": "Asia/Ho_Chi_Minh"},
+    )
+    t.has_resource_properties("AWS::SNS::Topic", {"TopicName": "langfuse-alerts"})
+    t.has_resource_properties("AWS::SNS::Subscription", {"Protocol": "email", "Endpoint": "ops@example.com"})
+
+
+def test_schedules_target_this_instance_and_the_role_only_starts_and_stops_it(t: Template) -> None:
+    schedules = {s["Properties"]["Name"]: s["Properties"] for s in t.find_resources("AWS::Scheduler::Schedule").values()}
+    assert {n: (s["ScheduleExpression"], s["ScheduleExpressionTimezone"]) for n, s in schedules.items()} == {
+        "langfuse-stop": ("cron(0 18 * * ? *)", "Asia/Ho_Chi_Minh"),
+        "langfuse-stop-late": ("cron(0 0 * * ? *)", "Asia/Ho_Chi_Minh"),
+        "langfuse-start": ("cron(0 7 * * ? *)", "Asia/Ho_Chi_Minh"),
+    }
+    instance_ref = json.dumps({"Ref": _instance_id(t)})
+    for schedule in schedules.values():
+        assert instance_ref in json.dumps(schedule["Target"]["Input"])
+    statement = _statements(t)["StartAndStopTheHost"]
+    assert sorted(statement["Action"]) == ["ec2:StartInstances", "ec2:StopInstances"]
+    assert instance_ref in json.dumps(statement["Resource"])
+
+
+def test_patching_window_runs_the_baseline_then_ensure_healthy(t: Template) -> None:
+    tasks = {
+        task["Properties"]["TaskArn"]: task["Properties"]
+        for task in t.find_resources("AWS::SSM::MaintenanceWindowTask").values()
+    }
+    assert set(tasks) == {"AWS-RunPatchBaseline", "AWS-RunShellScript"}
+    assert tasks["AWS-RunPatchBaseline"]["Priority"] == 1
+    health = tasks["AWS-RunShellScript"]
+    assert health["Priority"] == 2
+    (command,) = health["TaskInvocationParameters"]["MaintenanceWindowRunCommandParameters"]["Parameters"]["commands"]
+    assert command.endswith("bash /opt/langfuse/ensure-healthy.sh")
+
+
+def test_a_failed_patching_window_emails_the_alerts_topic(t: Template) -> None:
+    (rule,) = t.find_resources("AWS::Events::Rule").values()
+    pattern = rule["Properties"]["EventPattern"]
+    assert pattern["source"] == ["aws.ssm"]
+    assert sorted(pattern["detail"]["status"]) == ["FAILED", "TIMED_OUT"]
+    (window_id,) = t.find_resources("AWS::SSM::MaintenanceWindow")
+    assert pattern["detail"]["window-id"] == [{"Ref": window_id}]
+    (topic_id,) = t.find_resources("AWS::SNS::Topic")
+    (target,) = rule["Properties"]["Targets"]
+    assert target["Arn"] == {"Ref": topic_id}
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")
+def test_ensure_healthy_command_parses() -> None:
+    subprocess.run(["bash", "-n", "-c", ENSURE_HEALTHY_COMMAND], check=True)

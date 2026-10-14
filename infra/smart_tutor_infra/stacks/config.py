@@ -74,9 +74,9 @@ class ConfigStack(cdk.Stack):
             ("max-uploads-per-day", "100"),
             ("app-time-zone", APP_TIME_ZONE),
             ("trace-sampling-rate", "1"),
-            # The question screen is off everywhere: the measurement showed Bedrock's own processing p95 (about
-            # 420-450 ms) misses the 300 ms latency target, so no deployment turns it on yet (#199).
-            ("question-guard", "off"),
+            # The question screen is on everywhere (#199, PRD D30): the product accepts that Bedrock's own processing
+            # p95 (about 420-450 ms, measured 2026-10-13) misses the 300 ms latency target; false positives were 0/364.
+            ("question-guard", "bedrock"),
         ):
             ssm.StringParameter(self, f"Param-{name}", parameter_name=f"{names.ssm_path}/{name}", string_value=value)
 

@@ -138,10 +138,10 @@ def test_question_screen_version_description_changes_with_any_filter_setting() -
 
 
 @pytest.mark.parametrize(("mode", "path"), [(NATIVE_CLOUD, "/smart-tutor"), (ON_PREMISE, "/smart-tutor-on-premise")])
-def test_question_screen_is_off_and_its_guardrail_is_in_ssm(mode: str, path: str) -> None:
+def test_question_screen_is_on_and_its_guardrail_is_in_ssm(mode: str, path: str) -> None:
     template = Template.from_stack(ConfigStack(cdk.App(), "Config", names=mode_names(mode)))
 
-    template.has_resource_properties("AWS::SSM::Parameter", {"Name": f"{path}/question-guard", "Value": "off"})
+    template.has_resource_properties("AWS::SSM::Parameter", {"Name": f"{path}/question-guard", "Value": "bedrock"})
     params = template.find_resources("AWS::SSM::Parameter").values()
     value = {p["Properties"]["Name"]: json.dumps(p["Properties"]["Value"]) for p in params}
     assert "QuestionScreen" in value[f"{path}/question-guardrail-id"]

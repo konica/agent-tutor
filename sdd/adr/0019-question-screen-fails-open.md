@@ -18,6 +18,10 @@ ADR 0018 left the question check on the `Guard` port returning no trip, and name
 3. **CDK owns the guardrail.** `<data_prefix>-question-screen`: the prompt-attack filter at strength LOW, input only, action BLOCK, Standard tier on the cross-region profile `us.guardrail.v1:0`. A retained guardrail version is re-published whenever a hash of the whole definition changes, so a changed definition never leaves agents on a stale snapshot. The agent's role may call `bedrock:ApplyGuardrail` on that guardrail and that profile only.
 4. **Strength LOW, and the screen stays off in both modes.** See the measurements. A deployment turns it on by changing `question-guard` in `infra/smart_tutor_infra/stacks/config.py` after re-measuring (`docs/runbooks/on-premise-deploy.md`).
 
+### Update (2026-10-14): on in both modes
+
+The product owner turned the screen on in both modes: `question-guard` is `bedrock` in `infra/smart_tutor_infra/stacks/config.py`. The measurements below still hold, so each on-topic question waits about 0.4 to 0.45 s longer (p95) before the first token, against the 300 ms target. The product accepts that for 0% false positives and the obvious prompt attacks it stops before search. Decision 4's "stays off" and the latency paragraph below record the state on 2026-10-13. The options to revisit at the end can still replace the screen with a faster one.
+
 ### Measurements (2026-10-13)
 
 `backend/evals/measure_question_screen.py` created a temporary Standard-tier guardrail per strength with the production definition, measured it, and deleted it. Data: 364 benign study questions (45 LLM security, 44 ML safety, 36 computer security, 27 Vietnamese, 14 long pasted excerpts of 543 to 737 characters, 7 of which quote attack phrasings) and the 18 prompt seeds of the injection taxonomy (#194). Document-embedded attacks are excluded, because the screen never sees chunks. Concurrency 4; client latency from GMT+7.

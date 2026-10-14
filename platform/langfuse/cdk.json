@@ -3,8 +3,9 @@
   "context": {
     "langfuse:region": "us-east-1",
     "langfuse:instance-type": "t3.xlarge",
-    "langfuse:domain": "",
+    "langfuse:domain": "sec-dog.duckdns.org",
     "langfuse:admin-email": "dtrungthao@gmail.com",
+    "langfuse:alert-emails": ["dtrungthao@gmail.com"],
     "langfuse:data-snapshot-id": ""
   }
 }

@@ -1,4 +1,4 @@
-"""What the Langfuse VM runs: Compose, Caddy, deploy.sh (spec 2026-10-14 §6.4–6.5)."""
+"""What the Langfuse VM runs: Compose, Caddy, deploy.sh, ensure-healthy.sh (spec 2026-10-14 §6.4–6.5)."""
 
 import re
 import shutil
@@ -11,7 +11,8 @@ import yaml
 
 DEPLOY_DIR = Path(__file__).parents[1] / "deploy"
 DEPLOY_SCRIPT = DEPLOY_DIR / "deploy.sh"
-SCRIPTS = [DEPLOY_SCRIPT]
+ENSURE_HEALTHY = DEPLOY_DIR / "ensure-healthy.sh"
+SCRIPTS = [DEPLOY_SCRIPT, ENSURE_HEALTHY]
 PINNED = re.compile(r"^[a-z0-9./-]+:\d+\.\d+(\.\d+)*(-alpine)?$")
 
 
@@ -115,6 +116,19 @@ def test_deploy_gives_docker_time_to_stop_the_containers_when_the_instance_stops
 def test_deploy_waits_for_every_service_to_be_healthy() -> None:
     script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
     assert "up -d --remove-orphans --wait --wait-timeout 900" in script
+
+
+def test_ensure_healthy_starts_docker_and_services_without_pulling_with_the_deploys_env_file() -> None:
+    script = ENSURE_HEALTHY.read_text(encoding="utf-8")
+    deploy = DEPLOY_SCRIPT.read_text(encoding="utf-8")
+    assert "set -x" not in script and "compose config" not in script
+    assert "systemctl is-active --quiet docker || systemctl start docker" in script
+    assert "up -d --wait --wait-timeout 900" in script
+    code = " ".join(line for line in script.splitlines() if not line.startswith("#"))
+    assert "pull" not in code
+    assert "env_file=/etc/langfuse/langfuse.env" in script and "env_file=/etc/langfuse/langfuse.env" in deploy
+    compose_line = 'compose=(docker compose --project-directory "$here" -f "$here/compose.yaml" --env-file "$env_file")'
+    assert compose_line in script and compose_line in deploy
 
 
 @pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")

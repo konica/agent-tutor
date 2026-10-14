@@ -15,4 +15,5 @@ def build_app(app: cdk.App) -> LangfuseHostStack:
         domain=context("langfuse:domain") or None,
         admin_email=app.node.get_context("langfuse:admin-email"),
         data_snapshot_id=context("langfuse:data-snapshot-id") or None,
+        alert_emails=context("langfuse:alert-emails") or [],
     )
