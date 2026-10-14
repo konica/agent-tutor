@@ -6,8 +6,11 @@ Usage: uv run --env-file ../.env --extra eval python -m evals.publish [--dataset
 the newest `full` version's generated examples carry over (their candidate runs expire, the examples don't), less any
 a reviewer has since rejected, plus the newly accepted. `smoke` holds the hand-written examples and accepted candidates
 taken in turn from each question type, oldest generated first, up to SMOKE_SIZE items in all. A split whose examples
-changed gets the next `<split>-vN` tag; an unchanged one gets none. A dataset whose file lists `splits: [full]` gets no
-`smoke` version.
+changed gets the next version, the Langfuse dataset `<name>/<split>-vN` (evals.dataset); an unchanged one gets none. A
+dataset whose file lists `splits: [full]` gets no `smoke` version.
+
+Needs a key pair of the Langfuse project `smart-tutor-evals` (LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY,
+LANGFUSE_BASE_URL) and, while the annotation queue is in LangSmith, LANGSMITH_API_KEY. A dry run reads both.
 """
 
 import argparse
@@ -16,9 +19,6 @@ import sys
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable, Sequence
 from typing import Any
-
-import langsmith
-from langsmith.utils import LangSmithError
 
 from evals.dataset import (
     DATASETS,
@@ -30,8 +30,13 @@ from evals.dataset import (
     load_dataset,
     newest_examples,
     publish_split,
+    version_name,
 )
-from evals.review import reviewed
+from evals.langfuse_client import KEYS, URLS, LangfuseClient, LangfuseError, SdkLangfuse
+from evals.review import REVIEW_KEY, ReviewError, review_client, reviewed
+
+# Printed when Langfuse can't be reached: its keys, and the host's hours (ADR 0022).
+LANGFUSE_HINT = f"check {', '.join(KEYS)} and {URLS[0]}; the host is off 18:00-07:00 Asia/Ho_Chi_Minh"
 
 SMOKE_SIZE = 30
 # Question types of generated ask examples (PRD §10.3 items 1-2), in the order smoke takes them.
@@ -70,16 +75,16 @@ def oldest_first(examples: Iterable[Example]) -> list[Example]:
     return sorted(examples, key=lambda e: (str(e.metadata.get("generated_at") or ""), str(e.metadata["candidate_run"])))
 
 
-def generated_examples(client: langsmith.Client, dataset: Dataset) -> list[Example]:
+def generated_examples(langfuse: LangfuseClient, review_client: Any, dataset: Dataset) -> list[Example]:
     """The generated examples of the next versions, oldest first.
 
-    The newest `full` version's generated examples are the base, so an example outlives its candidate run (runs expire
-    with the candidates project's trace retention): it leaves only when its run still exists and is no longer
-    accepted. Newly accepted candidates join it."""
-    review = reviewed(client, dataset)
+    The newest `full` version's generated examples (in Langfuse) are the base, so an example outlives its candidate
+    run (runs expire with the candidates project's trace retention): it leaves only when its run still exists and is
+    no longer accepted. Newly accepted candidates (in the review queue) join it."""
+    review = reviewed(review_client, dataset)
     examples = {
         str(e.metadata["candidate_run"]): e
-        for e in newest_examples(client, dataset, "full")
+        for e in newest_examples(langfuse, dataset, "full")
         if "candidate_run" in e.metadata and str(e.metadata["candidate_run"]) not in review.withdrawn
     }
     examples.update((str(e.metadata["candidate_run"]), e) for e in review.accepted)
@@ -94,7 +99,8 @@ def _summary(examples: Sequence[Example]) -> str:
 def main(
     argv: Sequence[str] | None = None,
     *,
-    client: Any = None,
+    client: LangfuseClient | None = None,
+    review: Any = None,
     load: Callable[[str], Dataset] = load_dataset,
     keys: Sequence[str] | None = None,
 ) -> int:
@@ -103,11 +109,12 @@ def main(
     parser.add_argument("--dry-run", action="store_true", help="print each split's summary; publish nothing")
     args = parser.parse_args(argv)
     keys = args.dataset or keys or sorted(p.stem for p in DATASETS.glob("*.yaml"))
-    client = client or langsmith.Client()
     try:
+        client = client or SdkLangfuse()
+        review = review or review_client()
         for key in keys:
             dataset = load(key)
-            accepted = generated_examples(client, dataset)
+            accepted = generated_examples(client, review, dataset)
             if dataset.eval_share is not None:  # the rest trains a model (evals.topic_check.train), never evaluates it
                 accepted = [e for e in accepted if in_eval_share(str(e.inputs["question"]), dataset.eval_share)]
             splits = split_examples(dataset, accepted)
@@ -116,7 +123,7 @@ def main(
                     print(f"{dataset.name} {split}: {len(examples)} examples ({_summary(examples)})")
                     continue
                 tag = publish_split(client, dataset, split, examples)
-                state = f"published {tag}" if tag else "unchanged"
+                state = f"published {version_name(dataset, tag)}" if tag else "unchanged"
                 print(f"{dataset.name} {split}: {state}, {len(examples)} examples ({_summary(examples)})")
             generated = {str(e.metadata.get("type")) for e in splits.get("smoke", ()) if e.metadata}
             # only the ask question types are expected in every smoke split (injection examples are typed by category)
@@ -125,8 +132,11 @@ def main(
     except DatasetError as e:
         print(f"Can't publish: {e}", file=sys.stderr)
         return 1
-    except LangSmithError as e:
-        print(f"Can't reach LangSmith: {e} (check LANGSMITH_API_KEY)", file=sys.stderr)
+    except LangfuseError as e:
+        print(f"Can't reach Langfuse: {e} ({LANGFUSE_HINT})", file=sys.stderr)
+        return 1
+    except ReviewError as e:
+        print(f"Can't read the review queue in LangSmith: {e} (check {REVIEW_KEY})", file=sys.stderr)
         return 1
     return 0
 

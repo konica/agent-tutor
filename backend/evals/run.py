@@ -20,15 +20,42 @@ from pathlib import Path
 from typing import Any
 
 import langsmith
-from langsmith.utils import LangSmithError
+from langsmith.utils import LangSmithError, LangSmithNotFoundError
 
-from evals.dataset import Dataset, DatasetError, examples_at, load_dataset, version_to_run
+from evals.dataset import Dataset, DatasetError, load_dataset
 from evals.gate import check, load_thresholds, passed, ran, render, render_markdown
 from evals.learners import LoadError
 from evals.suite import NOT_APPLICABLE, DatasetSuites, Suite, by_dataset, discover
 from smart_tutor.shared.config import Settings
 
 MAX_CONCURRENCY = 4  # examples in flight; Bedrock throttling backs off in the models' boto config
+
+
+# Until the runner moves to Langfuse experiments (#320), it runs the versions published to LangSmith before the
+# datasets moved to Langfuse: a LangSmith experiment needs LangSmith's examples. #320 replaces these two with
+# evals.dataset's version_to_run and examples_at.
+def version_to_run(client: Any, dataset: Dataset, split: str) -> str | None:
+    """The pinned LangSmith tag of the split, else its newest `<split>-vN` tag; None when there is none."""
+    if not client.has_dataset(dataset_name=dataset.name):
+        return None
+    pin = dataset.pins.get(split)
+    if pin is None:
+        numbers = [
+            int(tag.removeprefix(f"{split}-v"))
+            for version in client.list_dataset_versions(dataset_name=dataset.name)
+            for tag in version.tags or []
+            if tag.startswith(f"{split}-v") and tag.removeprefix(f"{split}-v").isdigit()
+        ]
+        return f"{split}-v{max(numbers)}" if numbers else None
+    try:
+        client.read_dataset_version(dataset_name=dataset.name, tag=pin)
+    except LangSmithNotFoundError:
+        raise DatasetError(f"{dataset.key}.yaml pins {split} to {pin}, which {dataset.name} doesn't have") from None
+    return pin
+
+
+def examples_at(client: Any, dataset: Dataset, split: str, version: str) -> list[Any]:
+    return list(client.list_examples(dataset_name=dataset.name, splits=[split], as_of=version))
 
 
 def _coroutine_function(target: Callable[[dict[str, Any]], Any]) -> Callable[[dict[str, Any]], Any]:
