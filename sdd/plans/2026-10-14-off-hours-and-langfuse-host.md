@@ -1620,6 +1620,8 @@ x-langfuse-env: &langfuse-env
   SALT: ${SALT:?}
   ENCRYPTION_KEY: ${ENCRYPTION_KEY:?}
   TELEMETRY_ENABLED: "false"
+  # Next.js (web) and the worker both bind to HOSTNAME, which Docker sets to the container id.
+  HOSTNAME: 0.0.0.0
   CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
   CLICKHOUSE_URL: http://clickhouse:8123
   CLICKHOUSE_USER: clickhouse
@@ -1650,7 +1652,6 @@ services:
     depends_on: *langfuse-depends
     environment:
       <<: *langfuse-env
-      HOSTNAME: 0.0.0.0
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?}
       AUTH_DISABLE_SIGNUP: ${AUTH_DISABLE_SIGNUP:?}
       # Headless initialization: one organization, one project, its API keys, and the first admin (on first start).
@@ -2040,7 +2041,7 @@ aws ssm put-parameter --name /langfuse/host/allow-signup --value false --overwri
 # Run the deploy document again.
 ```
 
-A `cdk deploy` also sets it back to `false`.
+A `cdk deploy` does not change it (CloudFormation compares templates, not live values); only the `put-parameter ... false` and a deploy-document run close sign-up again.
 
 ## 3. Deploy or upgrade
 
