@@ -81,7 +81,9 @@ def main(
         assert write is not None
         if chunks is None or holdings is None:
             seeds = load_manifest()
-            chunks = seed_chunks(download(seeds.values()))
+            # adversarial and control documents belong to the injection eval: their chunks must not seed Q&A,
+            # unanswerable, or drift candidates (#196)
+            chunks = seed_chunks(download(s for s in seeds.values() if not s.injection_eval))
             holdings = {learner.username: learner.documents for learner in load_learners(LEARNERS, seeds)}
         rubric, planned = RUBRIC, "drafts"
         drafts = plan_drafts(chunks, holdings, args.per_type, random.Random(seed))

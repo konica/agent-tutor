@@ -1,12 +1,15 @@
 """make evals-generate: seed chunks → drafts → judge-written questions → the annotation queue."""
 
-from collections.abc import Sequence
+from collections.abc import Collection, Iterable, Sequence
+from pathlib import Path
 
 import pytest
 from langsmith.utils import LangSmithError
 
 from evals.chunks import SeedChunk
+from evals.corpus import SeedDocument
 from evals.generate import main
+from evals.learners import Learner
 from fakes.langsmith import FakeLangSmith
 
 TEXT = "Agents interleave reasoning traces with actions so that plans can be revised. " * 8
@@ -55,3 +58,31 @@ def test_a_langsmith_error_exits_1_with_a_hint(capsys: pytest.CaptureFixture[str
 
     code = main(["ask"], client=NoKey(), chunks=CHUNKS, holdings=HOLDINGS, write=asks, model_id="m")
     assert code == 1 and "LANGSMITH_API_KEY" in capsys.readouterr().err
+
+
+def test_injection_eval_documents_are_not_downloaded_or_chunked_for_ask_candidates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seeds = {
+        "react-2022": SeedDocument("react-2022", "u", "a", ("X",), "r.pdf"),
+        "adv-react": SeedDocument("adv-react", None, "b", ("X",), "a.pdf", adversarial=True, injection_eval=True),
+    }
+    downloaded: list[list[str]] = []
+
+    def fake_download(documents: Iterable[SeedDocument]) -> dict[str, Path]:
+        downloaded.append([d.id for d in documents])
+        return {}
+
+    known: list[Collection[str]] = []
+
+    def fake_load_learners(path: Path, known_ids: Collection[str]) -> list[Learner]:
+        known.append(set(known_ids))
+        return [Learner("learner@example.com", "pw", ("react-2022",))]
+
+    monkeypatch.setattr("evals.generate.load_manifest", lambda: seeds)
+    monkeypatch.setattr("evals.generate.download", fake_download)
+    monkeypatch.setattr("evals.generate.seed_chunks", lambda paths: CHUNKS)
+    monkeypatch.setattr("evals.generate.load_learners", fake_load_learners)
+    main(["ask", "--per-type", "1"], client=FakeLangSmith(), write=asks, model_id="m")
+    assert downloaded == [["react-2022"]]
+    assert known == [{"react-2022", "adv-react"}]

@@ -67,8 +67,8 @@ retention:     ## run the retention job once: traces 180 days, decline log 90 da
 
 evals-smoke:   ## smoke split as a LangSmith experiment, gated on thresholds.yaml (app stack, eval learners, AWS profile, LANGSMITH_API_KEY)
 	$(HOST) --extra eval --extra guard --extra topic python -m evals.run --split smoke
-evals-learners: ## load the eval learners' libraries from the seed corpus (needs the app stack and your AWS profile)
-	$(BACKEND) uv run --extra eval python -m evals.learners
+evals-learners: ## load the eval learners' libraries from the seed corpus; adversarial PDFs are built with pypdf (needs the app stack and your AWS profile)
+	$(BACKEND) uv run --extra eval --extra ingest python -m evals.learners
 evals-generate: ## propose dataset candidates (DATASET=ask, the default, injection, or topic_check) into the LangSmith annotation queue (AWS profile, LANGSMITH_API_KEY)
 	$(HOST) --extra eval --extra ingest --extra guard --extra topic python -m evals.generate $(or $(DATASET),ask)
 evals-publish: ## publish hand-written and accepted candidates as the next smoke and full versions in Langfuse (LANGFUSE_* keys of smart-tutor-evals; LANGSMITH_API_KEY for the queue)
