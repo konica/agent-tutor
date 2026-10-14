@@ -7,12 +7,14 @@ which records them and never forwards the event), then ``citations`` once ({"cit
 {"code": "unauthenticated" | "unavailable", "message"}, which ends the stream and may come first.
 
 A turn the model doesn't answer is ``decline`` {"code", "message"} then ``done``, with no ``delta``, ``sources``, or
-``citations``: ``no_documents`` when the learner has nothing readable (no ready, non-archived document; US-3), or,
-for a request with ``document_ids`` (only those documents are searched), ``limited`` when none of the chunks found
-scores at least ``answer_floor`` (US-4c).
+``citations``: ``off_topic`` when the topic check finds the question off-topic (no search runs; spec 2026-10-13);
+``no_documents`` when the learner has nothing readable (no ready, non-archived document; US-3), or, for a request
+with ``document_ids`` (only those documents are searched), ``limited`` when none of the chunks found scores at least
+``answer_floor`` (US-4c).
 
-When a guard trips while the answer streams, the stream ends with ``replace`` {"code": "guard", "text"} then ``done``:
-the learner sees ``text`` in place of the partial answer, and no ``sources`` or ``citations`` follow (US-6, D29).
+When a guard trips (on the question before search, or while the answer streams) the stream ends with ``replace``
+{"code": "guard", "text"} then ``done``: the learner sees ``text`` in place of the partial answer, and no ``sources``
+or ``citations`` follow (US-6, D29).
 
 The request may carry ``thread_id`` and ``run_id`` (set by the API); each ask is one ``ask`` trace in Phoenix whose
 trace id is ``run_id`` (PRD §10.4). It may also carry ``history``, the conversation's last turns (``question``,
@@ -33,7 +35,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from smart_tutor.apps.agent.graph import AskGraph, build_graph
+from smart_tutor.apps.agent.guards import build_guard
 from smart_tutor.apps.agent.state import DECLINE_MESSAGES, AgentContext, AskState
+from smart_tutor.apps.agent.topic import topic_classifier, topic_threshold
 from smart_tutor.shared.adapters.ask_tracing import PhoenixAskTracing
 from smart_tutor.shared.adapters.auth.bearer import BearerToken, CurrentPrincipal
 from smart_tutor.shared.adapters.auth.keycloak_introspection import keycloak_verifier
@@ -43,7 +47,6 @@ from smart_tutor.shared.config import MAX_HISTORY_ANSWER_CHARS, MAX_HISTORY_TURN
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.ports.ask_tracing import AskRun, AskTracing, NoAskTracing
 from smart_tutor.shared.ports.token_verifier import TokenVerifier
-from smart_tutor.tutoring.adapters.guardrails_guard import GuardrailsGuard
 from smart_tutor.tutoring.adapters.mcp_retriever import McpRetriever
 from smart_tutor.tutoring.application import HistoryTurn, RetrievedChunk, new_canary, system_prompt
 
@@ -98,32 +101,32 @@ async def answer_events(
                     text = part["data"]["delta"]
                     answer += text
                     yield sse("delta", {"text": text})
-                elif part["type"] == "updates" and "search" in part["data"]:
-                    chunks = part["data"]["search"].get("chunks", [])
-                elif part["type"] == "updates" and "answer" in part["data"]:
-                    update = part["data"]["answer"]
-                    if update.get("decline") == "guard":
-                        decline = update["guard"]  # the reason, for the trace; the learner reads only the message
-                        answer = ""
-                        logger.info("a guard tripped: %s", decline)  # content-free: no question, answer, or user
-                        yield sse("replace", {"code": "guard", "text": DECLINE_MESSAGES["guard"]})
-                        continue
-                    if (code := update.get("decline")) is not None:
-                        decline = code
-                        yield sse("decline", {"code": code, "message": DECLINE_MESSAGES[code]})
-                        continue
-                    yield sse("sources", {"document_ids": list(dict.fromkeys(c.document_id for c in chunks))})
-                    citations = [
-                        {
-                            "n": c.n,
-                            "chunk_id": c.chunk_id,
-                            "document_id": c.document_id,
-                            "document_title": c.document_title,
-                            "page": c.page,
-                        }
-                        for c in update["citations"]
-                    ]
-                    yield sse("citations", {"citations": citations})
+                elif part["type"] == "updates":
+                    for node, raw in part["data"].items():
+                        update = raw or {}
+                        if node == "search":
+                            chunks = update.get("chunks", [])
+                        elif node in ("screen", "answer") and update.get("decline") == "guard":  # question or answer
+                            decline = update["guard"]  # the reason, for the trace; the learner reads only the message
+                            answer = ""
+                            logger.info("a guard tripped: %s", decline)  # content-free: no question, answer, or user
+                            yield sse("replace", {"code": "guard", "text": DECLINE_MESSAGES["guard"]})
+                        elif (code := update.get("decline")) is not None:  # from topic_check or answer
+                            decline = code
+                            yield sse("decline", {"code": code, "message": DECLINE_MESSAGES[code]})
+                        elif node == "answer":
+                            yield sse("sources", {"document_ids": list(dict.fromkeys(c.document_id for c in chunks))})
+                            citations = [
+                                {
+                                    "n": c.n,
+                                    "chunk_id": c.chunk_id,
+                                    "document_id": c.document_id,
+                                    "document_title": c.document_title,
+                                    "page": c.page,
+                                }
+                                for c in update["citations"]
+                            ]
+                            yield sse("citations", {"citations": citations})
             trace.finish(answer, decline, len(chunks))
             yield sse("done", {})
         except UnauthenticatedError as e:
@@ -159,13 +162,17 @@ def create_app(
             model = ModelFactory(settings).chat(ChatRole.AGENT)
             canary = new_canary()
             prompt = system_prompt(canary)
+            classifier = topic_classifier(settings.topic_check)  # a missing or broken model stops startup
             app.state.graph = build_graph(
                 lambda token: McpRetriever(settings.mcp_url, token),
                 model,
                 settings.answer_floor,
                 settings.answer_max_tokens,
-                guard=GuardrailsGuard(prompt, canary),
+                guard=build_guard(settings, prompt, canary),
                 system_prompt=prompt,
+                topic_classifier=classifier,
+                topic_threshold=topic_threshold(settings.topic_check, classifier),
+                topic_timeout_ms=settings.topic_check.timeout_ms,
             )
         async with httpx.AsyncClient(timeout=5) as http:
             app.state.verifier = keycloak_verifier(settings, http)

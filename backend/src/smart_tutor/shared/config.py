@@ -5,8 +5,11 @@ Secrets come from Secrets Manager (via External Secrets) in prod.
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, PositiveInt, SecretStr
+from pydantic import BaseModel, Field, PositiveInt, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# CloudWatch namespace of the agent's content-free counters (#199); the agent's IAM grant names it (infra).
+AGENT_METRICS_NAMESPACE = "SmartTutor/Agent"
 
 
 class ModelConfig(BaseModel):
@@ -37,6 +40,20 @@ class ChunkingConfig(BaseModel):
 
     method: str = "recursive_character"
     params: dict[str, Any] = {"chunk_size": 1000, "chunk_overlap": 200}
+
+
+class TopicCheckConfig(BaseModel):
+    """The topic check before search (PRD §9.2 step 0, spec 2026-10-13). Off until a model passes the topic_check eval;
+    another decision model joins as a new provider (§5.4)."""
+
+    provider: Literal["off", "setfit"] = "off"
+    # The SetFit model directory, relative to the working directory: /app/models/topic_check in the agent image,
+    # backend/models/topic_check on the host and in CI.
+    model_dir: str = "models/topic_check"
+    # None: the threshold tuned with the model (its manifest). A number overrides it.
+    threshold: float | None = Field(default=None, ge=0, le=1)
+    # A slower check fails open: the question goes on to search.
+    timeout_ms: PositiveInt = 250
 
 
 # The agent refuses more than this in an ask request (apps/agent/server.py), so settings may not exceed it.
@@ -112,8 +129,23 @@ class Settings(BaseSettings):
     # last `history_turns` turns (0 sends none), each earlier answer cut to `history_answer_chars` characters.
     history_turns: int = Field(default=5, ge=0, le=MAX_HISTORY_TURNS)
     history_answer_chars: int = Field(default=2000, gt=0, le=MAX_HISTORY_ANSWER_CHARS)
+    # Question screen (US-6, #199, PRD D30): "bedrock" sends the learner's question to a Bedrock guardrail before
+    # search; a screen that fails or is slower than the timeout lets the question through and is counted.
+    question_guard: Literal["off", "bedrock"] = "off"
+    question_guardrail_id: str = ""
+    question_guardrail_version: str = ""
+    question_guard_timeout_seconds: float = Field(default=1.0, gt=0)
     models: ModelsConfig = ModelsConfig()
     chunking: ChunkingConfig = ChunkingConfig()
+    topic_check: TopicCheckConfig = TopicCheckConfig()
+
+    @model_validator(mode="after")
+    def _question_guard_has_a_guardrail(self) -> "Settings":
+        if self.question_guard == "bedrock" and not (self.question_guardrail_id and self.question_guardrail_version):
+            raise ValueError(
+                "question_guard is bedrock but question_guardrail_id or question_guardrail_version is not set"
+            )
+        return self
 
     @property
     def keycloak_introspection_url(self) -> str:

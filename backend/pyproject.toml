@@ -33,26 +33,43 @@ dependencies = [
 ingest = ["langchain-text-splitters>=1.1", "pypdf>=6.0"]
 # Installed only in the agent image: the output guard (US-6, ADR 0018). Heavy (litellm, openai, grpc): never core.
 guard = ["guardrails-ai==0.11.0"]
+# Installed only in the agent image: the topic check's SetFit model on onnxruntime (spec 2026-10-13, ADR 0020).
+topic = ["numpy>=2.0", "onnxruntime>=1.20", "tokenizers>=0.20"]
 # Evaluation runs (backend/evals) and CI eval gates.
 eval = ["langsmith>=0.4", "openevals>=0.1", "pyyaml>=6.0"]
+# Training the topic-check model only (evals.topic_check.train): never in an image or a CI install.
+train = ["onnx>=1.17", "onnxruntime>=1.20", "onnxscript>=0.2", "setfit>=1.1", "torch>=2.5"]
 
 [dependency-groups]
 dev = [
-    "boto3-stubs[s3,sqs,ssm]>=1.40",
+    "boto3-stubs[s3,sqs,ssm,bedrock-runtime,cloudwatch]>=1.40",
     "debugpy>=1.8",
     "guardrails-ai==0.11.0",
     "import-linter>=2.3",
     "langchain-text-splitters>=1.1",
     "mypy>=1.17",
+    "numpy>=2.0",
+    "onnx>=1.17",
+    "onnxruntime>=1.20",
     "pypdf>=6.0",
     "pytest>=8.4",
     "pytest-asyncio>=1.1",
     "ruff>=0.12",
+    "tokenizers>=0.20",
 ]
 
 [build-system]
 requires = ["uv_build>=0.8,<0.9"]
 build-backend = "uv_build"
+
+# CPU-only torch, so training needs no CUDA download.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [tool.ruff]
 line-length = 120
@@ -91,6 +108,10 @@ exclude = ["shared/adapters/postgres/migrations/versions/"]
 [[tool.mypy.overrides]]
 module = ["guardrails", "guardrails.*"]
 ignore_missing_imports = true  # guardrails-ai ships no py.typed marker
+
+[[tool.mypy.overrides]]
+module = ["onnxruntime", "onnxruntime.*"]
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "smart_tutor.tutoring.adapters.guardrails_guard"
@@ -463,9 +484,11 @@ forbidden_modules = [
     "langchain_aws",
     "langgraph",
     "mcp",
+    "onnxruntime",
     "psycopg",
     "pypdf",
     "sqlalchemy",
+    "tokenizers",
 ]
 
 [[tool.importlinter.contracts]]
@@ -496,7 +519,7 @@ forbidden_modules = ["langchain_text_splitters", "pypdf"]
 name = "Guardrails AI only in tutoring.adapters (keeps the guard extra in the agent image)"
 type = "forbidden"
 # Only the agent image installs the guard extra, so only its composition root may build the adapter.
-ignore_imports = ["smart_tutor.apps.agent.server -> smart_tutor.tutoring.adapters.guardrails_guard"]
+ignore_imports = ["smart_tutor.apps.agent.guards -> smart_tutor.tutoring.adapters.guardrails_guard"]
 source_modules = [
     "smart_tutor.shared",
     "smart_tutor.apps",
@@ -512,6 +535,27 @@ source_modules = [
     "smart_tutor.graph",
 ]
 forbidden_modules = ["guardrails"]
+
+[[tool.importlinter.contracts]]
+name = "ONNX topic classifier only in tutoring.adapters (keeps the topic extra in the agent image)"
+type = "forbidden"
+# Only the agent image installs the topic extra, so only the agent's composition may build this adapter.
+ignore_imports = ["smart_tutor.apps.agent.topic -> smart_tutor.tutoring.adapters.onnx_topic_classifier"]
+source_modules = [
+    "smart_tutor.shared",
+    "smart_tutor.apps",
+    "smart_tutor.knowledge",
+    "smart_tutor.subjects",
+    "smart_tutor.learning",
+    "smart_tutor.accounts",
+    "smart_tutor.insights",
+    "smart_tutor.catalog",
+    "smart_tutor.quizzes",
+    "smart_tutor.recommendations",
+    "smart_tutor.reports",
+    "smart_tutor.graph",
+]
+forbidden_modules = ["onnxruntime", "tokenizers"]
 
 # ADR 0017: runtime traces go to Phoenix; only backend/evals (outside smart_tutor) uses LangSmith.
 [[tool.importlinter.contracts]]

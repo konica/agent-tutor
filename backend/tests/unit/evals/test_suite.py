@@ -33,3 +33,14 @@ def test_one_dataset_with_two_targets_is_refused() -> None:
 
     with pytest.raises(ValueError, match="ask"):
         by_dataset([search_step_ran.SUITE, Suite("ask", other_target, ())])
+
+
+def test_a_datasets_suites_carry_the_first_skip() -> None:
+    def target():  # pragma: no cover - never called
+        raise AssertionError
+
+    def skip() -> str | None:
+        return "not ready"
+
+    [group] = by_dataset([Suite("d", target, ()), Suite("d", target, (), skip=skip)])
+    assert group.skip is skip

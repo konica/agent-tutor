@@ -12,6 +12,8 @@ import { fakeViewerDeps } from "../viewer/testFakes";
 import { ChatPage } from "./ChatPage";
 
 const NO_DOCUMENTS = "None of your documents can be used right now: they are all archived or deleted.";
+const OFF_TOPIC =
+  "I'm Smart Tutor: I help you study and research the papers, books, magazines, and news articles in your library, so I can't help with that. Ask me about your documents or a topic you're learning.";
 const UPLOAD_HINT = "Upload a document to get an answer. Your earlier answers stay readable.";
 
 async function* events(...list: ChatEvent[]) {
@@ -318,6 +320,21 @@ describe("ChatPage", () => {
     expect(screen.getByText(UPLOAD_HINT)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Upload" })).toHaveAttribute("href", "/library");
     // Not the limited decline's way out, and no error.
+    expect(screen.queryByRole("button", { name: "Search all my documents" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/couldn't answer/)).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /question/i })).toBeInTheDocument();
+  });
+
+  it("shows an off-topic decline as its message alone, with no way out, and keeps the composer", async () => {
+    const ask = vi.fn(() =>
+      events({ type: "thread", thread_id: "t1", run_id: "r1" }, { type: "decline", code: "off_topic", message: OFF_TOPIC }, { type: "done" }),
+    );
+    renderChat({ ask });
+    await userEvent.type(await question(), "Tell me a joke");
+    await userEvent.click(askButton());
+    expect(await screen.findByText(OFF_TOPIC)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Upload" })).not.toBeInTheDocument();
+    expect(screen.queryByText(UPLOAD_HINT)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Search all my documents" })).not.toBeInTheDocument();
     expect(screen.queryByText(/couldn't answer/)).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: /question/i })).toBeInTheDocument();
@@ -1961,6 +1978,14 @@ describe("ChatPage", () => {
       expect(await screen.findByText(NO_DOCUMENTS)).toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "Upload" })).not.toBeInTheDocument();
       expect(screen.queryByText(UPLOAD_HINT)).not.toBeInTheDocument();
+    });
+
+    it("an off_topic decline in the history shows its message with no action", async () => {
+      const off = turn({ question: "Tell me a joke", answer: "", citations: [], decline: { code: "off_topic", message: OFF_TOPIC } });
+      renderChat({ loadConversation: conversation([turn(), off]) }, "/chat/t1");
+      expect(await screen.findByText(OFF_TOPIC)).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Upload" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Search all my documents" })).not.toBeInTheDocument();
     });
 
     it("the same passage cited in two turns highlights only the clicked chip", async () => {

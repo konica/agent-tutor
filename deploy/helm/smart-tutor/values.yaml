@@ -18,6 +18,13 @@ global:
     project: ""
     samplingRate: "1"
 
+  # Question screen (#199) for the agent: mode is "off" or "bedrock"; "bedrock" needs the guardrail id and version. The
+  # deploy passes the SSM parameters question-guard, question-guardrail-id, and question-guardrail-version.
+  questionGuard:
+    mode: "off"
+    guardrailId: ""
+    guardrailVersion: ""
+
 awsRegion: us-east-1
 
 # Creates the app and Keycloak roles and databases on RDS before each install and upgrade (files/db-bootstrap.sql).

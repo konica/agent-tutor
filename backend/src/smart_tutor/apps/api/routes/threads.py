@@ -59,7 +59,8 @@ SSE_RESPONSE: dict[int | str, dict[str, object]] = {
     200: {
         "description": (
             "Server-sent events: thread, then delta*, citations, done; or decline then done "
-            "(no_documents: nothing readable, upload first; limited: the listed documents don't cover it); "
+            "(no_documents: nothing readable, upload first; limited: the listed documents don't cover it; "
+            "off_topic: not a study question, declined before search); "
             "or delta*, replace, done when a guard trips (the learner sees replace's text instead of the partial "
             "answer); or error."
         ),

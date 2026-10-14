@@ -6,7 +6,8 @@ Usage: uv run --env-file ../.env --extra eval python -m evals.publish [--dataset
 the newest `full` version's generated examples carry over (their candidate runs expire, the examples don't), less any
 a reviewer has since rejected, plus the newly accepted. `smoke` holds the hand-written examples and accepted candidates
 taken in turn from each question type, oldest generated first, up to SMOKE_SIZE items in all. A split whose examples
-changed gets the next `<split>-vN` tag; an unchanged one gets none.
+changed gets the next `<split>-vN` tag; an unchanged one gets none. A dataset whose file lists `splits: [full]` gets no
+`smoke` version.
 """
 
 import argparse
@@ -25,6 +26,7 @@ from evals.dataset import (
     Dataset,
     DatasetError,
     Example,
+    in_eval_share,
     load_dataset,
     newest_examples,
     publish_split,
@@ -59,7 +61,8 @@ def split_examples(
             if turn < len(by_type[kind]) and len(smoke) < smoke_size:
                 smoke.append(by_type[kind][turn])
         turn += 1
-    return {"smoke": smoke, "full": [*dataset.examples, *new]}
+    found = {"smoke": smoke, "full": [*dataset.examples, *new]}
+    return {split: found[split] for split in SPLITS if split in dataset.splits}
 
 
 def oldest_first(examples: Iterable[Example]) -> list[Example]:
@@ -104,16 +107,18 @@ def main(
     try:
         for key in keys:
             dataset = load(key)
-            splits = split_examples(dataset, generated_examples(client, dataset))
-            for split in SPLITS:
-                examples = splits[split]
+            accepted = generated_examples(client, dataset)
+            if dataset.eval_share is not None:  # the rest trains a model (evals.topic_check.train), never evaluates it
+                accepted = [e for e in accepted if in_eval_share(str(e.inputs["question"]), dataset.eval_share)]
+            splits = split_examples(dataset, accepted)
+            for split, examples in splits.items():
                 if args.dry_run:
                     print(f"{dataset.name} {split}: {len(examples)} examples ({_summary(examples)})")
                     continue
                 tag = publish_split(client, dataset, split, examples)
                 state = f"published {tag}" if tag else "unchanged"
                 print(f"{dataset.name} {split}: {state}, {len(examples)} examples ({_summary(examples)})")
-            generated = {str(e.metadata.get("type")) for e in splits["smoke"] if e.metadata}
+            generated = {str(e.metadata.get("type")) for e in splits.get("smoke", ()) if e.metadata}
             # only the ask question types are expected in every smoke split (injection examples are typed by category)
             if generated & set(TYPES) and (missing := [t for t in TYPES if t not in generated]):
                 print(f"{dataset.name} smoke: {', '.join(f'no accepted {t}' for t in missing)} (make evals-generate)")

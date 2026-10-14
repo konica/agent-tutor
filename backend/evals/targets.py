@@ -12,7 +12,9 @@ that spans turns). Each ask gets the turns before it capped like the API caps th
 `history_answer_chars`); only the last ask is scored.
 """
 
+import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
+from pathlib import Path
 from typing import Any, Protocol
 
 import httpx
@@ -21,16 +23,24 @@ from langchain_core.language_models import BaseChatModel
 from evals.corpus import SeedDocument, load_manifest
 from evals.learners import LEARNERS, LoadError, Tutor, load_learners
 from smart_tutor.apps.agent.graph import build_graph
+from smart_tutor.apps.agent.guards import build_guard
 from smart_tutor.apps.agent.state import DECLINE_MESSAGES, AgentContext
+from smart_tutor.apps.agent.topic import topic_classifier, topic_threshold
+from smart_tutor.shared.adapters.aws.clients import bedrock_runtime_client
 from smart_tutor.shared.adapters.model_factory import ChatRole, ModelFactory
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.errors import UnauthenticatedError
+from smart_tutor.shared.ports.counter import NoCounter
+from smart_tutor.tutoring.adapters.bedrock_question_screen import SCREEN_BOTO_CONFIG, BedrockQuestionScreen, Screening
 from smart_tutor.tutoring.adapters.guardrails_guard import GuardrailsGuard
 from smart_tutor.tutoring.adapters.mcp_retriever import McpRetriever
+from smart_tutor.tutoring.adapters.onnx_topic_classifier import OnnxSetFitTopicClassifier
 from smart_tutor.tutoring.application import (
+    Guard,
     HistoryTurn,
     RetrievedChunk,
     Retriever,
+    TopicClassifier,
     history_turn,
     new_canary,
     system_prompt,
@@ -123,13 +133,19 @@ class AskTarget:
         answer_max_tokens: int = 1500,
         history_turns: int = 5,
         history_answer_chars: int = 2000,
+        prompt: str | None = None,
+        guard: Guard | None = None,
+        topic_classifier: TopicClassifier | None = None,
+        topic_threshold: float = 1.0,
+        topic_timeout_ms: int = 250,
     ) -> None:
         self._learners, self._retriever_for = learners, retriever_for
         self._model, self._answer_floor, self._answer_max_tokens = model, answer_floor, answer_max_tokens
         self._history_turns, self._history_answer_chars = history_turns, history_answer_chars
+        self._topic = (topic_classifier, topic_threshold, topic_timeout_ms)
         canary = new_canary()  # one per target, as the agent makes one per process
-        self._prompt = system_prompt(canary)
-        self._guard = GuardrailsGuard(self._prompt, canary)
+        self._prompt = prompt or system_prompt(canary)
+        self._guard = guard or GuardrailsGuard(self._prompt, canary)
 
     async def __call__(self, inputs: dict[str, Any]) -> dict[str, Any]:
         username, seeds = inputs["learner"], inputs.get("documents")
@@ -192,6 +208,7 @@ class AskTarget:
         token: str,
         calls: list[dict[str, Any]],
     ) -> dict[str, Any]:
+        classifier, threshold, timeout_ms = self._topic
         graph = build_graph(
             lambda t: RecordingRetriever(self._retriever_for(t), calls),
             self._model,
@@ -199,6 +216,9 @@ class AskTarget:
             self._answer_max_tokens,
             guard=self._guard,
             system_prompt=self._prompt,
+            topic_classifier=classifier,
+            topic_threshold=threshold,
+            topic_timeout_ms=timeout_ms,
         )
         return await graph.ainvoke(
             {"question": question, "document_ids": limit, "history": self._capped(turns)},
@@ -223,6 +243,9 @@ def ask_target() -> AskTarget:
     }
     eval_learners = EvalLearners(tutors, seeds)
     eval_learners.check_libraries({learner.username: learner.documents for learner in learners})
+    canary = new_canary()
+    prompt = system_prompt(canary)
+    classifier = topic_classifier(settings.topic_check)  # off until .env turns it on
     return AskTarget(
         eval_learners,
         lambda token: McpRetriever(settings.mcp_url, token),
@@ -231,4 +254,87 @@ def ask_target() -> AskTarget:
         settings.answer_max_tokens,
         settings.history_turns,
         settings.history_answer_chars,
+        prompt,
+        build_guard(settings, prompt, canary, failures=NoCounter()),  # screened when the question screen is on
+        topic_classifier=classifier,
+        topic_threshold=topic_threshold(settings.topic_check, classifier),
+        topic_timeout_ms=settings.topic_check.timeout_ms,
     )
+
+
+class Screen(Protocol):
+    async def screen(self, question: str) -> Screening: ...
+
+
+class QuestionScreenTarget:
+    """The question screen alone (#199): one ApplyGuardrail call on the question. `screen` is None when no guardrail
+    is configured; the run then reports `screened: False`, which the metrics leave out."""
+
+    def __init__(self, screen: Screen | None) -> None:
+        self._screen = screen
+
+    async def __call__(self, inputs: dict[str, Any]) -> dict[str, Any]:
+        if self._screen is None:
+            return {"screened": False}
+        started = time.perf_counter()
+        found = await self._screen.screen(inputs["question"])
+        return {
+            "screened": True,
+            "tripped": found.tripped,
+            "latency_ms": (time.perf_counter() - started) * 1000,
+            "processing_ms": found.processing_ms,
+            "text_units": found.text_units,
+        }
+
+
+class _PassThrough(Guard):
+    """The screen's inner guard: unused, because the target only calls `screen`."""
+
+    async def check_question(self, question: str) -> None:
+        return None
+
+    async def check_answer(self, text: str) -> None:
+        return None
+
+
+def question_screen_target() -> QuestionScreenTarget:
+    """The question screen against the configured guardrail (`question_guardrail_id` and `_version`), whether or not
+    `question_guard` is on: the eval measures a guardrail before it is turned on."""
+    settings = Settings()
+    if not (settings.question_guardrail_id and settings.question_guardrail_version):
+        return QuestionScreenTarget(None)
+    return QuestionScreenTarget(
+        BedrockQuestionScreen(
+            _PassThrough(),
+            bedrock_runtime_client(settings, SCREEN_BOTO_CONFIG),
+            settings.question_guardrail_id,
+            settings.question_guardrail_version,
+            timeout=settings.question_guard_timeout_seconds,
+            failures=NoCounter(),
+        )
+    )
+
+
+TOPIC_MODEL = Path(__file__).parents[1] / "models" / "topic_check"  # backend/models/topic_check
+
+
+class TopicCheckTarget:
+    """The topic check alone (spec 2026-10-13 §6.3): no Bedrock, no MCP."""
+
+    def __init__(self, classifier: TopicClassifier, threshold: float) -> None:
+        self._classifier, self._threshold = classifier, threshold
+
+    async def __call__(self, inputs: dict[str, Any]) -> dict[str, Any]:
+        history = [HistoryTurn(t["question"], t.get("answer", "")) for t in inputs.get("history") or []]
+        verdict = await self._classifier.classify(inputs["question"], history)
+        return {
+            "off_topic": verdict.is_off_topic(self._threshold),
+            "p_off_topic": verdict.p_off_topic,
+            "model": verdict.model,
+        }
+
+
+def topic_check_target() -> TopicCheckTarget:
+    """The committed model in backend/models/topic_check, at the configured threshold or its own."""
+    classifier = OnnxSetFitTopicClassifier(TOPIC_MODEL)
+    return TopicCheckTarget(classifier, topic_threshold(Settings().topic_check, classifier))

@@ -41,7 +41,7 @@ export type ChatCitation = {
 
 export type Rating = "up" | "down";
 
-export type DeclineCode = "limited" | "no_documents" | "guard";
+export type DeclineCode = "limited" | "no_documents" | "guard" | "off_topic";
 
 export type ChatEvent =
   | { type: "thread"; thread_id: string; run_id: string | null }

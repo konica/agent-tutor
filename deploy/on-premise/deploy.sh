@@ -58,6 +58,10 @@ phoenix_db_password=$(secret db/phoenix)
 phoenix_secret=$(secret phoenix/secret)
 phoenix_admin_password=$(secret phoenix/admin-password)
 trace_sampling_rate=$(param trace-sampling-rate)
+# The question screen (#199): the agent applies the guardrail only when question-guard is "bedrock".
+question_guard=$(param question-guard)
+question_guardrail_id=$(param question-guardrail-id)
+question_guardrail_version=$(param question-guardrail-version)
 # Traces go to the on-premise Phoenix, projects smart-tutor-on-premise and -ingestion (ADR 0017); the API sends
 # learner ratings there too (#290). The operator creates the system key's secret in Phoenix
 # (docs/runbooks/on-premise-deploy.md); until then the agent and worker run untraced and the API sends no ratings,
@@ -92,6 +96,9 @@ API_CLIENT_SECRET=$api_client_secret
 MCP_CLIENT_SECRET=$mcp_client_secret
 PHOENIX_API_KEY=$phoenix_api_key
 TRACE_SAMPLING_RATE=$trace_sampling_rate
+QUESTION_GUARD=$question_guard
+QUESTION_GUARDRAIL_ID=$question_guardrail_id
+QUESTION_GUARDRAIL_VERSION=$question_guardrail_version
 LEARNER_HASH_KEY=$learner_hash_key
 PHOENIX_DB_PASSWORD=$phoenix_db_password
 PHOENIX_SECRET=$phoenix_secret
