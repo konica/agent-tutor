@@ -148,17 +148,19 @@ def unreachable() -> list[str]:
     # Langfuse, through the proxy (its host is on the allowlist): the tunnel opening proves the route. It is off
     # 18:00-07:00 (ADR 0022), when Squid answers 502/503; tracing is non-critical (ADR 0023), so that only gets a notice.
     if _langfuse():
-        host = urllib.parse.urlsplit(os.environ["SMART_TUTOR_LANGFUSE_URL"]).hostname or ""
+        parts = urllib.parse.urlsplit(os.environ["SMART_TUTOR_LANGFUSE_URL"])
+        host, port = parts.hostname or "", parts.port or 443  # the exporter connects to the URL's own port
+        target = host if port == 443 else f"{host}:{port}"
         # Longer than Squid's connect_timeout (10 s), so Squid's own 503 normally wins the race when Langfuse is off.
         try:
-            status: int | str = _tunnel_status(host, 443, LANGFUSE_TIMEOUT)
+            status: int | str = _tunnel_status(host, port, LANGFUSE_TIMEOUT)
         except (OSError, http.client.HTTPException) as error:
             status = type(error).__name__
         if status == 403:
-            problems.append(f"Langfuse: the egress proxy refuses {host}")
+            problems.append(f"Langfuse: the egress proxy refuses {target}")
         elif status != 200:
             print(
-                f"Notice: Langfuse at {host} didn't answer through the proxy ({status}); it is off 18:00-07:00",
+                f"Notice: Langfuse at {target} didn't answer through the proxy ({status}); it is off 18:00-07:00",
                 file=sys.stdout,
             )
     if not _connects("postgres", 5432):

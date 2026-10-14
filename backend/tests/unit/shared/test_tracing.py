@@ -1,5 +1,5 @@
-"""Keyed learner hash, run tracing, and Phoenix tracing setup (PRD §10.4, ADR 0017): where spans go, with which key,
-how many, and the learner only as an HMAC of their user id."""
+"""Keyed learner hash and run tracing setup for Langfuse and Phoenix (PRD §10.4, ADR 0023, ADR 0017): where spans go,
+with which key, how many, and the learner only as an HMAC of their user id."""
 
 import base64
 import http.server

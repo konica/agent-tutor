@@ -18,7 +18,7 @@ from smart_tutor.shared.adapters.tracing import LANGSMITH_SWITCHES
 
 
 @pytest.fixture(autouse=True, scope="session")
-def _phoenix_off() -> Iterator[None]:
+def _tracing_hosts_off() -> Iterator[None]:
     # The environment beats `.env` files in pydantic-settings, so a blank value wins over a developer's URL.
     patch = pytest.MonkeyPatch()
     for name in (

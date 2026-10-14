@@ -205,6 +205,16 @@ def test_unreachable_reports_a_proxy_that_refuses_langfuse(check, langfuse, monk
     assert check.unreachable() == ["Langfuse: the egress proxy refuses lf.example"]
 
 
+def test_unreachable_probes_the_langfuse_urls_own_port(check, langfuse, monkeypatch) -> None:
+    # Squid allows CONNECT only to 443, so a Langfuse URL on another port is refused although the exporter would use it.
+    monkeypatch.setenv("SMART_TUTOR_LANGFUSE_URL", "https://lf.example:8443")
+    monkeypatch.setattr(
+        check, "_tunnel_status", lambda host, port=443, timeout=10: langfuse.append((host, port)) or 403
+    )
+    assert check.unreachable() == ["Langfuse: the egress proxy refuses lf.example:8443"]
+    assert langfuse == [("lf.example", 8443)]
+
+
 def test_unreachable_accepts_a_tunnel_to_langfuse(check, langfuse) -> None:
     assert check.unreachable() == []
     assert langfuse == [("lf.example", 443)]
