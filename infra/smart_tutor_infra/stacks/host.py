@@ -14,7 +14,8 @@
   data survives replacing the instance. Deleting the stack keeps a snapshot.
 - Backups (#151): Data Lifecycle Manager snapshots the data volume daily and keeps 7 days; a systemd timer on the VM
   dumps both databases nightly to the documents bucket's `backups/` (the instance writes only there and where the
-  services do, `uploads/` and `contents/`). A failed snapshot or dump raises an alarm that emails the alert addresses.
+  services do, `uploads/` and `contents/`). A failed dump stays in the VM's journal (`journalctl -u
+  smart-tutor-backup`) and a failed snapshot shows in the Data Lifecycle Manager console; no alarm (ADR 0022).
   A volume restored from a snapshot is the context `smart-tutor:on-premise-data-snapshot-id`; it replaces the
   instance, whose first boot attaches it. Runbook: docs/runbooks/on-premise-backups.md.
 - Deploy: `cdk deploy` uploads `deploy/` as an asset; the SSM document `<prefix>-deploy` downloads it and runs

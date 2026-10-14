@@ -11,6 +11,7 @@
 #    (non-root, read-only root, no capabilities) and egress-limited (check-worker.sh, which ensure-healthy.sh runs
 #    too), and the agent and MCP server answer. A worker that fails either check is stopped.
 #    Installs and enables the scheduled jobs' systemd units (the nightly backup, #151).
+#    Gives Docker two minutes to stop the containers when the instance stops (off-hours, ADR 0022).
 # 4. Points the sign-in client at the domain if it changed, and creates the test learner if it is missing.
 #
 # It prints no secret: never add `set -x`, `docker compose config`, or an echo of the env file.
@@ -120,6 +121,12 @@ if [[ $domain == *.duckdns.org ]]; then
   fi
 fi
 
+# Off-hours (ADR 0022): EC2 stops the instance by shutting the OS down, and systemd stops Docker. Postgres needs up to
+# 60 s (stop_grace_period) to shut down cleanly, so Docker gets longer than systemd's default.
+mkdir -p /etc/systemd/system/docker.service.d
+printf '[Service]\nTimeoutStopSec=120\n' > /etc/systemd/system/docker.service.d/stop-timeout.conf
+systemctl daemon-reload
+
 echo "Pulling $tag from $registry/$repository_prefix"
 aws ecr get-login-password --region "$region" | docker login --username AWS --password-stdin "$registry" >/dev/null
 "${compose[@]}" pull --quiet
@@ -159,6 +166,8 @@ raise SystemExit('MCP answered without a token')"
 # Scheduled jobs are systemd timers that call `docker compose run` (docs/runbooks/on-premise-backups.md). The units
 # read the env file rendered above, so they start only after the first deploy.
 echo "Installing the scheduled jobs"
+# Retired with the CloudWatch alarms (ADR 0022); a VM deployed before keeps the file until this removes it.
+rm -f /etc/systemd/system/smart-tutor-job-failed@.service
 install -m 644 "$here"/systemd/* /etc/systemd/system/
 systemctl daemon-reload
 for timer in "$here"/systemd/*.timer; do

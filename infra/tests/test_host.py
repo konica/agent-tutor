@@ -846,7 +846,7 @@ SCRIPTS = [
     DEPLOY_SCRIPT,
     ENSURE_HEALTHY,
     CHECK_WORKER,
-    *(ON_PREMISE_DIR / name for name in ("backup.sh", "restore.sh", "report-failure.sh")),
+    *(ON_PREMISE_DIR / name for name in ("backup.sh", "restore.sh")),
 ]
 VM_FILES = [*SCRIPTS, ON_PREMISE_DIR / "check-egress.py"]
 SYSTEMD_DIR = ON_PREMISE_DIR / "systemd"
@@ -1020,20 +1020,39 @@ def test_backup_timer_runs_nightly_and_catches_up_after_downtime() -> None:
     assert _unit("smart-tutor-backup.timer")["Install"]["WantedBy"] == "timers.target"
 
 
-def test_backup_service_runs_the_script_and_reports_a_failure() -> None:
+def test_backup_service_runs_the_script_and_leaves_failures_in_its_journal() -> None:
     service = _unit("smart-tutor-backup.service")
     assert service["Service"]["Type"] == "oneshot"
     assert service["Service"]["ExecStart"] == "/usr/bin/bash /opt/smart-tutor/on-premise/backup.sh"
-    assert service["Unit"]["OnFailure"] == "smart-tutor-job-failed@%N.service"
+    assert "OnFailure" not in service["Unit"]  # no CloudWatch metric or alarm (ADR 0022)
     assert "docker.service" in service["Unit"]["Requires"]
+    assert not (ON_PREMISE_DIR / "report-failure.sh").exists()
+    assert not (SYSTEMD_DIR / "smart-tutor-job-failed@.service").exists()
 
 
-def test_a_failed_job_publishes_the_metric_the_alarm_watches() -> None:
-    unit = _unit("smart-tutor-job-failed@.service")
-    assert unit["Service"]["ExecStart"] == "/usr/bin/bash /opt/smart-tutor/on-premise/report-failure.sh %i"
-    script = (ON_PREMISE_DIR / "report-failure.sh").read_text(encoding="utf-8")
-    assert "--namespace SmartTutor/OnPremise --metric-name JobFailed" in script
-    assert '--dimensions "Job=$job"' in script
+def test_deploy_removes_the_retired_failure_unit_from_the_vm() -> None:
+    script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
+    removal = "rm -f /etc/systemd/system/smart-tutor-job-failed@.service"
+    assert removal in script
+    assert script.index(removal) < script.index('install -m 644 "$here"/systemd/* /etc/systemd/system/')
+
+
+def test_deploy_gives_docker_time_to_stop_the_containers_when_the_instance_stops() -> None:
+    script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
+    assert "/etc/systemd/system/docker.service.d/stop-timeout.conf" in script
+    assert "TimeoutStopSec=120" in script  # longer than Postgres's 60 s grace
+
+
+def test_postgres_shuts_down_cleanly_when_the_instance_stops(compose: dict[str, Any]) -> None:
+    assert compose["services"]["postgres"]["stop_grace_period"] == "60s"
+
+
+def test_every_long_running_service_comes_back_after_a_boot(compose: dict[str, Any]) -> None:
+    # A scheduled 07:00 start or a person's start at any hour brings everything back without a deploy.
+    jobs = {name for name, s in compose["services"].items() if "jobs" in s.get("profiles", [])} | {"migrate"}
+    for name, service in compose["services"].items():
+        if name not in jobs:
+            assert service.get("restart") == "unless-stopped", name
 
 
 def test_deploy_installs_and_enables_every_timer() -> None:
@@ -1041,7 +1060,7 @@ def test_deploy_installs_and_enables_every_timer() -> None:
     assert 'install -m 644 "$here"/systemd/* /etc/systemd/system/' in script
     assert "systemctl daemon-reload" in script
     assert 'for timer in "$here"/systemd/*.timer' in script
-    assert script.index("up -d --wait --wait-timeout") < script.index("systemctl daemon-reload")
+    assert script.index("up -d --wait --wait-timeout") < script.rindex("systemctl daemon-reload")
 
 
 @pytest.mark.parametrize("service", ["agent", "worker"])
