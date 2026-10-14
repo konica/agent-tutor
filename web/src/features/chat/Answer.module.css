@@ -5,14 +5,16 @@
   max-width: var(--chat-w); min-width: 0; color: var(--text);
   font-size: var(--fs-16); line-height: var(--lh-read); overflow-wrap: anywhere;
 }
-.answer > :first-child { margin-top: 0; }
-.answer > :last-child { margin-bottom: 0; }
 .answer p, .answer ul, .answer ol, .answer pre, .answer blockquote, .answer .tableScroll { margin: 0 0 var(--sp-3); }
 .answer ul, .answer ol { padding-left: var(--sp-6); }
 .answer li + li { margin-top: var(--sp-1); }
 .answer li > p { margin: 0; }
+.answer li > ul, .answer li > ol { margin: var(--sp-1) 0 0; }
 /* The model's headings: h3 for its top level, the rest at prose size (DESIGN.md → Type). */
 .answer h3, .answer h4, .answer h5, .answer h6 { margin: var(--sp-4) 0 var(--sp-2); font-size: var(--fs-16); font-weight: 650; line-height: var(--lh-head); }
+/* After the block margins above, so the answer's first and last blocks win at equal specificity. */
+.answer > :first-child { margin-top: 0; }
+.answer > :last-child { margin-bottom: 0; }
 .answer h3 { font-size: var(--fs-18); }
 .answer code { padding: 0 var(--sp-1); border-radius: var(--r-sm); background: var(--surface-2); font-family: var(--font-mono); font-size: .875em; }
 .answer pre { overflow-x: auto; padding: var(--sp-3); border-radius: var(--r-md); background: var(--surface-2); line-height: var(--lh-body); }
@@ -22,7 +24,8 @@
 .tableScroll { max-width: 100%; overflow-x: auto; }
 .answer table { border-collapse: collapse; font-size: var(--fs-14); overflow-wrap: normal; }
 .answer th, .answer td { padding: var(--sp-1) var(--sp-2); border: 1px solid var(--border); text-align: left; vertical-align: top; }
-.answer th { background: var(--surface-2); font-weight: 600; }
+/* Headers stay on one line; a narrow pane scrolls the table instead of wrapping them word by word. */
+.answer th { background: var(--surface-2); font-weight: 600; white-space: nowrap; }
 .answer hr { margin: var(--sp-4) 0; border: 0; border-top: 1px solid var(--border); }
 .answer a { color: var(--accent-text); text-underline-offset: 2px; }
 /* An inline citation marker: a link to its source in the answer's text. Inline in a sentence, so the 24px target

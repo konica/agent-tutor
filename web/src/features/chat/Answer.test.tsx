@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -222,13 +222,29 @@ describe("Answer", () => {
     });
 
     it("renders the model's headings below the page's", () => {
-      renderAnswer({ text: "# One\n\n## Two\n\n### Three\n\n#### Four\n\nBody [1]." });
+      renderAnswer({ text: "# One\n\n## Two\n\n### Three\n\n#### Four\n\n##### Five\n\n###### Six\n\nBody [1]." });
       expect(screen.getAllByRole("heading").map((h) => [h.tagName, h.textContent])).toEqual([
         ["H3", "One"],
         ["H4", "Two"],
         ["H5", "Three"],
         ["H6", "Four"],
+        ["H6", "Five"],
+        ["H6", "Six"],
       ]);
+    });
+
+    it("keeps the marker rules inside list items", () => {
+      const props = { text: "- gone [1]\n- open [2]\n- none [7]", citations: [cite(1, { deleted: true }), cite(2)] };
+      renderAnswer(props);
+      const [gone, open, none] = within(document.querySelector("ul")!).getAllByRole("listitem");
+      expect(within(gone!).queryByRole("button")).toBeNull();
+      expect(within(gone!).getByText("[1]")).toHaveAttribute("title", "Deleted document");
+      expect(within(open!).getByRole("button", { name: "Source 2: Doc 2, p. 3" })).toBeInTheDocument();
+      expect(within(none!).queryByRole("button")).toBeNull();
+      expect(none).toHaveTextContent("none [7]");
+      cleanup();
+      renderAnswer({ ...props, showCitations: false });
+      expect(within(document.querySelector("ul")!).queryAllByRole("button")).toHaveLength(0);
     });
 
     it("puts a table in a scroll box and links its markers", () => {
