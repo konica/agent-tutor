@@ -35,6 +35,8 @@ def test_the_stack_and_role_have_their_fixed_names(template: Template) -> None:
     role = _role(template)
     assert role["RoleName"] == ROLE_NAME == "smart-tutor-evals-ci"
     assert role["MaxSessionDuration"] == 3600  # the workflow's 60-minute timeout
+    # the one AWS::IAM::Policy (the default policy) is pinned below; no managed or inline policy may slip past it
+    assert "ManagedPolicyArns" not in role and "Policies" not in role
 
 
 def test_the_role_trusts_only_this_repositorys_pull_requests_and_branches(template: Template) -> None:
@@ -89,6 +91,12 @@ def test_no_deployment_mode_deploys_or_destroys_it(mode: str) -> None:
     for stack in stacks:
         roles = Template.from_stack(stack).find_resources("AWS::IAM::Role").values()
         assert ROLE_NAME not in [r["Properties"].get("RoleName") for r in roles], stack.stack_name
+
+
+def test_the_deploy_workflows_entry_does_not_build_it() -> None:
+    # the workflows run `cdk deploy --all` against infra/app.py
+    text = (Path(__file__).parents[1] / "app.py").read_text(encoding="utf-8")
+    assert "build_evals_ci" not in text and "EvalsCiStack" not in text
 
 
 def test_it_names_no_resource_of_either_mode(template: Template) -> None:

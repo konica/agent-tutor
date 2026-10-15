@@ -18,28 +18,30 @@ The role is the stack `SmartTutor-EvalsCI` (`infra/smart_tutor_infra/stacks/eval
 
 ## Deploy the role
 
-Run once, with your admin profile and real AWS (see `on-premise-deploy.md` §1 for the shell setup: no LocalStack endpoints). It assumes the account's GitHub OIDC provider exists; native-cloud's `GitHubDeploy` stack creates it (ADR 0016). If `aws iam list-open-id-connect-providers` shows no `token.actions.githubusercontent.com`, create it first:
+Run once, with your admin profile and real AWS (see `on-premise-deploy.md` §1 for the shell setup: no LocalStack endpoints). The account must be CDK-bootstrapped in us-east-1 (the `CDKToolkit` stack; any deployed mode has done it, and `pilot-aws-prerequisites.md` §2 shows how). It assumes the account's GitHub OIDC provider exists; native-cloud's `GitHubDeploy` stack creates it (ADR 0016). If `aws iam list-open-id-connect-providers` shows no `token.actions.githubusercontent.com`, create it first:
 
 ```bash
 aws iam create-open-id-connect-provider --url https://token.actions.githubusercontent.com --client-id-list sts.amazonaws.com
 ```
 
-Then, from the repository root (no `make`? run the two lines of the `evals-ci-deploy` target in the `Makefile` by hand):
+Then, from the repository root. `make evals-ci-deploy` runs the command on the second line; without `make`, run that one directly:
 
 ```bash
 make evals-ci-deploy
-ROLE_ARN=$(aws cloudformation describe-stacks --stack-name SmartTutor-EvalsCI --query "Stacks[0].Outputs[?OutputKey=='RoleArn'].OutputValue" --output text)
+(cd infra && npx --yes aws-cdk@2.1145.0 --app "uv run python evals_ci_app.py" deploy SmartTutor-EvalsCI --require-approval broadening)
+ROLE_ARN=$(aws cloudformation describe-stacks --region us-east-1 --stack-name SmartTutor-EvalsCI --query "Stacks[0].Outputs[?OutputKey=='RoleArn'].OutputValue" --output text)
 gh secret set EVALS_AWS_ROLE_ARN --repo konica/agent-tutor --body "$ROLE_ARN"
 ```
 
 The stack makes one role, `smart-tutor-evals-ci`, and its inline Bedrock policy; CDK shows the IAM changes and asks before deploying them. GitHub Actions can't deploy it: no workflow may create the role it signs in with.
 
-On Windows Git Bash, set `MSYS_NO_PATHCONV=1` first.
-
 ## Remove it
+
+Needs the same admin profile and real AWS (no LocalStack endpoints) as "Deploy the role". `make evals-ci-destroy` runs the command on the second line; without `make`, run that one directly:
 
 ```bash
 make evals-ci-destroy
+(cd infra && npx --yes aws-cdk@2.1145.0 --app "uv run python evals_ci_app.py" destroy SmartTutor-EvalsCI)
 gh secret delete EVALS_AWS_ROLE_ARN --repo konica/agent-tutor
 ```
 
@@ -71,11 +73,11 @@ GitHub issues no OIDC token and no secrets to workflows on fork PRs, so the job 
 
 Don't make `evals-smoke` a required status check: it is path-filtered, so PRs outside its paths would wait forever on "Expected".
 
-After deploying the role and setting the secrets, and the variable, start a first `workflow_dispatch` run from a branch between 07:00 and 18:00 to confirm Langfuse, LocalStack, the arXiv downloads, and Bedrock access.
+After deploying the role and setting the secrets and the variable, start a first `workflow_dispatch` run from a branch between 07:00 and 18:00 to confirm Langfuse, LocalStack, the arXiv downloads, and Bedrock access.
 
 ## When a model changes
 
-Change the model in `backend/src/smart_tutor/shared/config.py` and `infra/smart_tutor_infra/models.py`, then run `make evals-ci-deploy` again: the role's policy follows `models.py`.
+Change the model in `backend/src/smart_tutor/shared/config.py` and `infra/smart_tutor_infra/models.py`, then run the deploy command from "Deploy the role" again: the role's policy follows `models.py`. Until an admin redeploys the stack, the smoke job on a PR that changes a model fails with Bedrock `AccessDeniedException`, because the role still allows only the old model. After a model change, that error means "redeploy the role".
 
 ## Cost
 
