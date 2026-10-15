@@ -194,4 +194,4 @@ df -h /data
 dc exec postgres psql -U postgres -c "SELECT pg_size_pretty(pg_database_size('phoenix'));"
 ```
 
-When it grows, lower `trace-sampling-rate` (`on-premise-deploy.md` §10) or shorten retention in Phoenix's *Settings, Data Retention*, never above 180 days (Phoenix no longer receives traces). If the host's available memory stays under about 1 GB, move to a larger instance (`smart-tutor:on-premise-instance-type`).
+Phoenix receives nothing since #316, so its database only shrinks, with its retention policy (180 days) or when #322 removes it. If the host's available memory stays under about 1 GB, move to a larger instance (`smart-tutor:on-premise-instance-type`).

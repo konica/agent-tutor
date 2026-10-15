@@ -367,7 +367,7 @@ aws secretsmanager delete-secret --secret-id smart-tutor-on-premise/phoenix/api-
 
 The bucket is versioned: in the S3 console, **Empty** it (all versions), then **Delete** it. `aws s3 rm --recursive` would leave the old versions behind.
 
-**Redeploy later.** Deploy the stacks from a laptop (section 2), because GitHub can't create the role it signs in with. Deal with the kept bucket first: its name is fixed, so creating `Storage` fails with "already exists" until you bring the bucket into the stack with `cdk import` or delete it. To keep the data, set `smart-tutor:on-premise-data-snapshot-id` to the final snapshot before deploying (`on-premise-backups.md`, "Restore from a snapshot"); the first deploy resets the passwords of the `smart_tutor`, `keycloak`, and `phoenix` roles. Phoenix's admin keeps its old password on a restored volume. Phoenix API keys and sign-ins are signed with `smart-tutor-on-premise/phoenix/secret`, which the teardown deleted and the redeploy generates anew, so every old key and session stops working, with or without a restore. The `smart-tutor-on-premise/phoenix/api-key` secret that the teardown kept is stale either way. After the first deploy, do section 11 again: on a fresh volume the admin's first sign-in; the accounts; a new system key stored with `put-secret-value`; the retention schedule. Keeping the data is manual and outside this runbook, because the teardown deleted every secret and the restored volume still holds the old ones. After the first deploy on the restored volume:
+**Redeploy later.** Deploy the stacks from a laptop (section 2), because GitHub can't create the role it signs in with. Deal with the kept bucket first: its name is fixed, so creating `Storage` fails with "already exists" until you bring the bucket into the stack with `cdk import` or delete it. To keep the data, set `smart-tutor:on-premise-data-snapshot-id` to the final snapshot before deploying (`on-premise-backups.md`, "Restore from a snapshot"); the first deploy resets the passwords of the `smart_tutor`, `keycloak`, and `phoenix` roles. Phoenix's admin keeps its old password on a restored volume. Phoenix API keys and sign-ins are signed with `smart-tutor-on-premise/phoenix/secret`, which the teardown deleted and the redeploy generates anew, so every old key and session stops working, with or without a restore. The `smart-tutor-on-premise/phoenix/api-key` secret that the teardown kept is stale either way. After the first deploy, do section 11 again: on a fresh volume the admin's first sign-in; the accounts; the retention schedule. A new system key is optional (only `send-test-span.py` uses it). Keeping the data is manual and outside this runbook, because the teardown deleted every secret and the restored volume still holds the old ones. After the first deploy on the restored volume:
 
 - Set the secrets of the Keycloak clients `smart-tutor-api` and `rag-mcp` (realm `smart-tutor`) to the new `smart-tutor-on-premise/keycloak/api-client` and `smart-tutor-on-premise/keycloak/mcp-client` values. The realm already exists, so Keycloak doesn't import it again. Until then, sign-in and the smoke test fail.
 - Sign in to the Keycloak console with the old admin password saved in step 2. The bootstrap admin keeps it. It is lost if you didn't save it.
@@ -444,7 +444,7 @@ Production runs its own Arize Phoenix at `https://<domain>/phoenix` (ADR 0017). 
 
 **Accounts.** Create them in *Settings, Users*. The product owner is a **Viewer**, engineers are **Members**, and nobody else is an admin.
 
-**System API key.** Open *Settings, API Keys, System keys* and create a key named `smart-tutor-on-premise` with no expiry. Store it:
+**System API key (optional).** Nothing reads it since #316; only `send-test-span.py` (see Check) uses it. Skip it unless you want that test. Open *Settings, API Keys, System keys* and create a key named `smart-tutor-on-premise` with no expiry. Store it:
 
 ```bash
 MSYS_NO_PATHCONV=1 aws secretsmanager create-secret --name smart-tutor-on-premise/phoenix/api-key --secret-string <key>
@@ -452,9 +452,9 @@ MSYS_NO_PATHCONV=1 aws secretsmanager create-secret --name smart-tutor-on-premis
 
 Nothing reads this key since #316, so you need not make one.
 
-**Rotate the secret.** Rotating `smart-tutor-on-premise/phoenix/secret` invalidates every Phoenix API key and sign-in. Create and store a new system key afterwards (see below).
+**Rotate the secret.** Rotating `smart-tutor-on-premise/phoenix/secret` invalidates every Phoenix API key and sign-in. If you use the optional system key, create and store a new one afterwards (see below).
 
-**Rotate the key.** Create a new system key, run `put-secret-value` on the same secret name, redeploy (section 6), and then delete the old key in Phoenix.
+**Rotate the key (optional).** Create a new system key, run `put-secret-value` on the same secret name, and then delete the old key in Phoenix. No redeploy is needed, because nothing reads it.
 
 **Retention (D25).** In *Settings, Data Retention*, the Default policy shows 180 days. Set its schedule to daily (`0 0 * * *`). The default sweeps weekly, so a trace could otherwise live up to about 187 days (180 plus a full weekly gap). Phoenix creates this policy once, at its first start, from `PHOENIX_DEFAULT_RETENTION_POLICY_DAYS`. Changing that variable later has no effect on a running instance, so edit the policy in the UI.
 

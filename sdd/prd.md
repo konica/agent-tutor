@@ -599,7 +599,7 @@ Bedrock AgentCore Runtime for the agent and MCP server was considered and reject
 | Concern | Choice |
 |---|---|
 | Agent framework | LangChain + LangGraph |
-| Tracing and evaluation | Langfuse, self-hosted on a shared host (traces through OpenTelemetry and OpenInference, ratings, datasets, annotation queues, experiments; ADR 0021, 0023). Runtime traces go to Langfuse only; until the evals move (#319, #320), LangSmith keeps them |
+| Tracing and evaluation | Langfuse, self-hosted on a shared host (traces through OpenTelemetry and OpenInference, ratings, datasets, annotation queues, experiments; ADR 0021, 0023). Runtime traces go to Langfuse only; until #319 and #320 move them, LangSmith keeps the review queue and the experiments (datasets are already in Langfuse, #317) |
 | Document extraction | `pypdf` page text as LangChain `Document`s (also for the first-pages step), chunked with `langchain-text-splitters` (`RecursiveCharacterTextSplitter`, behind a LangChain document transformer; ADR 0008); structured extraction (reference lists, headings) chosen for Release 2 |
 | LLM (agent, document description) | `amazon.nova-2-lite-v1:0` via `us.amazon.nova-2-lite-v1:0` |
 | Embeddings | `amazon.nova-2-multimodal-embeddings-v1:0`, 1024 dimensions |
