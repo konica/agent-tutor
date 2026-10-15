@@ -59,17 +59,11 @@ def test_a_model_call_on_another_thread_sends_no_trace(tracing_env: RecordingCli
     assert tracing_env.payloads == []
 
 
-def test_positive_control_without_the_guard_a_dotenv_langfuse_key_pair_turns_tracing_on(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    (tmp_path / ".env").write_text(
-        "SMART_TUTOR_LANGFUSE_URL=https://langfuse.example\n"
-        "SMART_TUTOR_LANGFUSE_PUBLIC_KEY=pk-lf-x\nSMART_TUTOR_LANGFUSE_SECRET_KEY=sk-lf-x\n"
-    )
-    monkeypatch.chdir(tmp_path)
-    for name in ("URL", "PUBLIC_KEY", "SECRET_KEY"):
-        monkeypatch.delenv(f"SMART_TUTOR_LANGFUSE_{name}", raising=False)
-    assert tracing_enabled(Settings())
+def test_positive_control_without_the_guard_the_environment_turns_tracing_on(tracing_env: RecordingClient) -> None:
+    with without_the_guard():
+        call_a_model()
+    assert any(p["op"] == "create" for p in tracing_env.payloads)
+    tracing_env.payloads.clear()  # sent on purpose; the root conftest fails a test that leaves a trace behind
 
 
 def test_start_tracing_keeps_langsmith_off_whatever_the_environment_says(
@@ -99,10 +93,15 @@ def test_a_langfuse_url_in_the_environment_does_not_reach_settings(
     assert start_tracing(Settings(learner_hash_key="k")) is None
 
 
-def test_positive_control_without_the_guard_a_dotenv_langfuse_url_turns_tracing_on(
+def test_positive_control_without_the_guard_a_dotenv_langfuse_config_turns_tracing_on(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    (tmp_path / ".env").write_text("SMART_TUTOR_LANGFUSE_URL=https://langfuse.example\n")
+    (tmp_path / ".env").write_text(
+        "SMART_TUTOR_LANGFUSE_URL=https://langfuse.example\n"
+        "SMART_TUTOR_LANGFUSE_PUBLIC_KEY=pk-lf-x\nSMART_TUTOR_LANGFUSE_SECRET_KEY=sk-lf-x\n"
+    )
     monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("SMART_TUTOR_LANGFUSE_URL")
+    for name in ("URL", "PUBLIC_KEY", "SECRET_KEY"):
+        monkeypatch.delenv(f"SMART_TUTOR_LANGFUSE_{name}", raising=False)
     assert Settings().langfuse_url == "https://langfuse.example"
+    assert tracing_enabled(Settings())
