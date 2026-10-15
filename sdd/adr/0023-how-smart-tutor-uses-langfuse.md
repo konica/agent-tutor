@@ -140,8 +140,8 @@ Smart Tutor's members out of other apps'.
   re-posted score. If a quick change leaves two scores for a moment, readers take the newest.
 - It goes off the request on one background thread, in the order rated, through the existing `AnswerFeedback` port.
   A Langfuse outage is logged and never fails the rating, which is already saved with the turn.
-- A score may name a trace that hasn't arrived yet: scores are stored on their own. #318 confirms this against the host
-  and keeps a retry only if Langfuse rejects such a score.
+- A score may name a trace that hasn't arrived yet: Langfuse never looks the trace up, so there is no retry (confirmed
+  in #318 against the source of the host's version, 4.47.0).
 
 ### 7. Native-cloud stays out of scope
 
@@ -191,3 +191,7 @@ native-cloud is picked up again.
   organization can read them, as anyone with a Phoenix account could.
 - Langfuse recommends an S3 lifecycle rule on its raw-event prefix (`events/`). That is a host setting for every app
   and is left to the platform: Smart Tutor's deletes remove its raw events either way.
+
+## Notes
+
+- 2026-10-15 (#318): on the host's v4.47.0 in events_only mode the v1/v2 score and trace read APIs answer 404, so the adapter lists scores with `GET /api/public/v3/scores` and the smoke test reads traces with `GET /api/public/v2/observations`. A delete that reaches Langfuse before the score is ingested (about 5–10 s after its POST) removes nothing, so before deleting the score it last posted for a run, the adapter waits until the list shows it (up to about a minute). A score is checked against a config only by `configId`, so the adapter looks up the project's `learner_rating` config by name and sends its id. A rating of an unsampled ask names a trace that never exists; the retention job's trace deletes don't reach it, but it holds only the boolean.

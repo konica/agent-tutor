@@ -416,7 +416,7 @@ MSYS_NO_PATHCONV=1 aws secretsmanager create-secret --name smart-tutor-on-premis
 MSYS_NO_PATHCONV=1 aws secretsmanager create-secret --name smart-tutor-on-premise/langfuse/secret-key --secret-string sk-lf-...
 ```
 
-To rotate a pair, use `put-secret-value` with the same names and redeploy. Until both secrets exist, deploys print `Warning: no Langfuse keys (...); deploying without Langfuse traces`, and Langfuse gets nothing.
+To rotate a pair, use `put-secret-value` with the same names and redeploy. Until both secrets exist, deploys print `Warning: no Langfuse keys (...); deploying without Langfuse traces or ratings`, and Langfuse gets nothing.
 
 **Langfuse URL.** CDK context `smart-tutor:langfuse-url` in `infra/cdk.json` (`https://sec-dog.duckdns.org`) becomes the SSM parameter `/smart-tutor-on-premise/langfuse-url`. To change it, edit the context, deploy the Config stack (section 2), and redeploy the app.
 
@@ -424,7 +424,7 @@ To rotate a pair, use `put-secret-value` with the same names and redeploy. Until
 
 **Egress.** The worker reaches the Langfuse host through `egress-proxy` by its exact name (the `langfuse` acl, `CONNECT` on 443 only). The deploy's egress check fails if Squid refuses the host (403) and only prints a notice when the host doesn't answer (section 7).
 
-**Ratings (#290, Phoenix until #318).** The API sends each learner's rating to Phoenix as a `learner_rating` annotation on that ask's `ask` span (the span's Annotations tab), with the same key. Without the key, no ratings are sent. A rating that arrives before the trace is exported is retried for about 30 seconds.
+**Ratings (#318).** The API sends each learner's rating to Langfuse as a `learner_rating` BOOLEAN score (1 helpful, 0 not) on that ask's trace (the trace's Scores), with the project's key pair and environment `on-premise`. A new rating replaces the earlier score; a quick change waits until Langfuse shows the earlier score, up to about a minute, before deleting it. Without the keys, no ratings are sent. The project needs the `learner_rating` score config (`langfuse-host.md` section 8); without it scores are sent unchecked and the API logs a warning once.
 
 **Turn it on.** Make the Phoenix system key `smart-tutor-on-premise` and store it as `smart-tutor-on-premise/phoenix/api-key` (section 11), then redeploy (section 6). To rotate it, use `put-secret-value` with the same name and redeploy. Until the secret exists, deploys print `Warning: no Phoenix API key (is the secret smart-tutor-on-premise/phoenix/api-key set?); deploying without tracing`, and the agent and worker run untraced.
 
@@ -432,21 +432,24 @@ To rotate a pair, use `put-secret-value` with the same names and redeploy. Until
 
 **Phoenix retention (D25).** Phoenix deletes traces after 180 days: `PHOENIX_DEFAULT_RETENTION_POLICY_DAYS` in `compose.yaml`, so D25 needs no deletion job. That holds once the policy's schedule is set to daily in the Phoenix UI (the retention step in section 11); the default weekly sweep keeps a trace up to about 187 days.
 
-**Sampling.** SSM `/smart-tutor-on-premise/trace-sampling-rate` (default `1`, every run; 0 to 1). Change it in `infra/smart_tutor_infra/stacks/config.py` and deploy with the infrastructure (a hand edit in SSM is overwritten by the next `cdk deploy`), then redeploy. A value outside 0 to 1 stops the agent and worker from starting. Below 1, a rating of an unsampled ask is retried for about 30 s before it is dropped, and it delays the ratings behind it.
+**Sampling.** SSM `/smart-tutor-on-premise/trace-sampling-rate` (default `1`, every run; 0 to 1). Change it in `infra/smart_tutor_infra/stacks/config.py` and deploy with the infrastructure (a hand edit in SSM is overwritten by the next `cdk deploy`), then redeploy. A value outside 0 to 1 stops the agent and worker from starting. Below 1, a rating of an unsampled ask is still stored in Langfuse, as a score on a trace that doesn't exist.
 
 **Phoenix egress.** The worker reaches `phoenix:6006` directly on its internal network (`NO_PROXY=phoenix`), so the egress proxy allows nothing new. The deploy's egress check proves Phoenix answers while tracing, and that LangSmith and every other host stay unreachable (section 7).
 
-**Check (Phoenix, until #318).** Take the credentials from `smart-tutor-on-premise/keycloak/test-learner`:
+**Check (Langfuse).** Take the credentials from `smart-tutor-on-premise/keycloak/test-learner`:
 
 ```bash
-PHOENIX_API_KEY=<key> SMOKE_TEST_USERNAME=... SMOKE_TEST_PASSWORD=... python3 deploy/pilot/smoke_test.py https://<domain> --end-to-end --trace-project smart-tutor-on-premise
+LANGFUSE_BASE_URL=$(aws ssm get-parameter --region us-east-1 --name /smart-tutor-on-premise/langfuse-url --query Parameter.Value --output text) \
+LANGFUSE_PUBLIC_KEY=$(aws secretsmanager get-secret-value --region us-east-1 --secret-id smart-tutor-on-premise/langfuse/public-key --query SecretString --output text) \
+LANGFUSE_SECRET_KEY=$(aws secretsmanager get-secret-value --region us-east-1 --secret-id smart-tutor-on-premise/langfuse/secret-key --query SecretString --output text) \
+SMOKE_TEST_USERNAME=... SMOKE_TEST_PASSWORD=... python3 deploy/pilot/smoke_test.py https://<domain> --end-to-end --trace-project smart-tutor-on-premise
 ```
 
-It ends with `ask trace <run id> is in smart-tutor-on-premise` and `rating of <run id> is in smart-tutor-on-premise`: it rates the turn thumbs-up and requires the annotation, which proves the API has the key.
+(Git Bash on Windows: prefix `MSYS_NO_PATHCONV=1` for the SSM name.) It ends with `ask trace <run id> is in smart-tutor-on-premise` and `rating of <run id> is in smart-tutor-on-premise`: it rates the turn thumbs-up and requires a `learner_rating` score with the project's score config, which proves the API has the Langfuse keys. Run it 07:00–18:00 Asia/Ho_Chi_Minh, the Langfuse host's hours.
 
 ## 11. Phoenix (traces) (#288)
 
-Production runs its own Arize Phoenix at `https://<domain>/phoenix` (ADR 0017). Its traces live in the `phoenix` database on the VM's Postgres, which the nightly dump leaves out. The projects `smart-tutor-on-premise` and `smart-tutor-on-premise-ingestion` appear with their first trace. The agent and the worker send traces with the system key (section 10), and the API sends ratings with it.
+Production runs its own Arize Phoenix at `https://<domain>/phoenix` (ADR 0017). Its traces live in the `phoenix` database on the VM's Postgres, which the nightly dump leaves out. The projects `smart-tutor-on-premise` and `smart-tutor-on-premise-ingestion` appear with their first trace. The agent and the worker send traces with the system key (section 10).
 
 **First sign-in.** Open `$Url/phoenix` and sign in as `admin@localhost` with the password from `smart-tutor-on-premise/phoenix/admin-password`. Phoenix makes you set a new one. It needs 12 or more characters with an upper-case letter, a lower-case letter, a digit, and one of `!@#$%^&*()_+`. Store the new password in your password manager. The secret only seeds the first start.
 
