@@ -18,7 +18,7 @@ The injection eval (#194) attacks the ask graph through the learner's **question
 Not in scope:
 - Changing the agent. Chunk text is already HTML-escaped inside `<chunk>` blocks (`answer.py`, `_quote`), so a planted `</chunk>` cannot close the quote, and `cited_chunks` already drops out-of-range markers from the citation list. If the eval finds failures, fixing the agent is follow-up work, as AGENTS.md says ("fix the agent until a run meets its threshold").
 - Generated variants of the document seeds. `make evals-generate DATASET=injection` keeps writing variants of prompt seeds only.
-- Moving the eval to Langfuse (#320). This slice stays on the current LangSmith runner.
+- Moving the eval to Langfuse (#320), which has since merged: the rows run on the Langfuse runner.
 
 ## 3. The documents
 
