@@ -992,7 +992,7 @@
                 "type": "null"
               }
             ],
-            "description": "The ask's trace id in Phoenix, for attaching a rating (#227); null for turns kept before it was recorded.",
+            "description": "The ask's trace id in Langfuse, for attaching a rating (#227); null for turns kept before it was recorded.",
             "title": "Run Id"
           }
         },

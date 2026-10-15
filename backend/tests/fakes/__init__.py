@@ -4,9 +4,11 @@ from fakes.api import api_services, fake_agent
 from fakes.auth import FakeTokenVerifier
 from fakes.clock import FixedClock
 from fakes.counter import CountingCounter
+from fakes.executor import InlineExecutor
 from fakes.ingest import ingest_ready
 from fakes.insights import InMemoryHighlightMisses
 from fakes.knowledge import FakeObjectStore, InMemoryLibrary
+from fakes.langfuse_scores import FakeLangfuseScores
 from fakes.mcp import in_process_mcp
 from fakes.models import (
     DESCRIPTION_ARGS,
@@ -18,7 +20,6 @@ from fakes.models import (
 )
 from fakes.parameters import APP_TZ, TEST_LIMITS, TEST_UPLOAD_LIMITS, FakeParameterStore
 from fakes.pdfs import make_pdf
-from fakes.phoenix import FakePhoenix, InlineExecutor
 from fakes.processing import FakePdfExtractor, PageChunker, fake_tools
 from fakes.queue import FakeQueue
 from fakes.subjects import InMemorySubjects
@@ -53,7 +54,7 @@ __all__ = [
     "PassingGuard",
     "QuestionTrippingGuard",
     "TrippingGuard",
-    "FakePhoenix",
+    "FakeLangfuseScores",
     "InlineExecutor",
     "FailingExporter",
     "FakeRunTracing",
