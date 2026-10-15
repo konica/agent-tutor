@@ -1,15 +1,15 @@
 # CI override for the smoke evals (.github/workflows/evals-smoke.yml, #226):
 #   docker compose -f compose.yaml -f compose.ci.yaml --profile app up -d
 # GitHub signs in to AWS with OIDC, which puts a short-lived session in the runner's environment instead of a profile
-# in ~/.aws. Pass it, and the LangSmith key, through to the services that call Bedrock; a name without a value takes
-# the runner's variable. The api and worker still sign LocalStack calls with its dummy keys (SMART_TUTOR_LOCALSTACK).
-# CI starts no Phoenix and has no Langfuse project yet (#320): empty SMART_TUTOR_PHOENIX_URL and SMART_TUTOR_LANGFUSE_URL
-# keep the services untraced (.env.example points at localhost and at the shared Langfuse host).
+# in ~/.aws. Pass it through to the services that call Bedrock; a name without a value takes the runner's variable.
+# The api and worker still sign LocalStack calls with its dummy keys (SMART_TUTOR_LOCALSTACK).
+# CI starts no Phoenix, and its services don't trace into Langfuse: the ask graph runs in the eval runner, whose
+# experiment traces in smart-tutor-evals hold each answer (#320). Empty SMART_TUTOR_PHOENIX_URL and
+# SMART_TUTOR_LANGFUSE_URL keep the services untraced (.env.example points at localhost and at the shared host).
 x-ci-env: &ci-env
   - AWS_ACCESS_KEY_ID
   - AWS_SECRET_ACCESS_KEY
   - AWS_SESSION_TOKEN
-  - LANGSMITH_API_KEY
   - SMART_TUTOR_PHOENIX_URL=
   - SMART_TUTOR_LANGFUSE_URL=
 

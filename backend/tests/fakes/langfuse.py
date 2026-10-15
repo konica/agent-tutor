@@ -1,14 +1,16 @@
 """The evals' Langfuse seam (evals.langfuse_client.LangfuseClient), in memory: datasets by unique name, their
 metadata, and their items in the order created; score configs, annotation queues and the traces in them, traces, and
-scores."""
+scores; experiments run the way the SDK runs them (an item whose task raised is dropped, an evaluator that raised
+leaves the item without its scores)."""
 
+import asyncio
 import itertools
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from evals.langfuse_client import Item, LangfuseError, Score, StoredDataset, Trace
+from evals.langfuse_client import Item, ItemEvaluator, ItemScore, LangfuseError, Score, StoredDataset, Task, Trace
 
 START = datetime(2026, 10, 14, tzinfo=UTC)
 
@@ -18,6 +20,16 @@ class _Dataset:
     description: str
     metadata: dict[str, Any]
     items: list[Item] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class ExperimentRun:
+    dataset: str
+    name: str
+    description: str
+    metadata: dict[str, str]
+    outputs: list[dict[str, Any]]  # each run item's, in item order
+    scores: list[list[ItemScore]]  # each run item's
 
 
 @dataclass
@@ -31,6 +43,7 @@ class FakeQueue:
 class FakeLangfuse:
     def __init__(self) -> None:
         self.datasets: dict[str, _Dataset] = {}
+        self.runs: list[ExperimentRun] = []
         self.score_configs: dict[str, tuple[str, str]] = {}  # id -> (name, description), all BOOLEAN
         self.queues: dict[str, FakeQueue] = {}
         self.traces_by_id: dict[str, Trace] = {}
@@ -119,3 +132,41 @@ class FakeLangfuse:
         """Deleting a trace deletes its scores too (its queue item stays)."""
         del self.traces_by_id[trace_id]
         self.scores = [s for s in self.scores if s.trace_id != trace_id]
+
+    def run_experiment(
+        self,
+        dataset_name: str,
+        *,
+        run_name: str,
+        description: str,
+        metadata: dict[str, str],
+        task: Task,
+        evaluators: Sequence[ItemEvaluator],
+        max_concurrency: int,
+    ) -> str:
+        self.calls += 1
+        if dataset_name not in self.datasets:
+            raise LangfuseError(f"404: no dataset {dataset_name}")
+
+        async def one(item: Item) -> tuple[dict[str, Any], list[ItemScore]] | None:
+            try:
+                output = await task(dict(item.input))
+            except Exception:
+                return None  # the SDK logs it and drops the item
+            scores: list[ItemScore] = []
+            for evaluator in evaluators:
+                try:
+                    scores += await evaluator(dict(item.input), output, dict(item.expected_output))
+                except Exception:
+                    continue  # the SDK logs it; the item keeps its other scores
+            return output, scores
+
+        async def every() -> list[tuple[dict[str, Any], list[ItemScore]] | None]:
+            return [await one(item) for item in self.datasets[dataset_name].items]
+
+        ran = [r for r in asyncio.run(every()) if r is not None]
+        run = ExperimentRun(
+            dataset_name, run_name, description, dict(metadata), [r[0] for r in ran], [r[1] for r in ran]
+        )
+        self.runs.append(run)
+        return f"https://langfuse.example/datasets/{dataset_name}/runs/{len(self.runs)}"

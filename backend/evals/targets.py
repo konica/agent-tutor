@@ -117,7 +117,7 @@ class EvalLearners:
 
     def check_libraries(self, holdings: Mapping[str, Sequence[str]]) -> None:
         """Raise LoadError unless each learner holds all of their seed documents. Done before the run: inside the
-        target, LangSmith would only log the error and the run would go on to a misleading gate table."""
+        target, the error would only fail that example and the run would go on to a misleading gate table."""
         for username, seed_ids in holdings.items():
             for seed_id in seed_ids:
                 self.document_id(username, seed_id)

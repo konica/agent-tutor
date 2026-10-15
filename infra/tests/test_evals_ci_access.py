@@ -55,13 +55,16 @@ def test_the_role_trusts_only_this_repositorys_pull_requests_and_branches() -> N
     ) == sorted([f"{prefix}:pull_request", f"{prefix}:ref:refs/heads/*"])
 
 
-def test_the_runbook_names_the_workflow_the_variable_and_the_secret() -> None:
+def test_the_runbook_names_the_workflow_the_variable_and_the_secrets() -> None:
     text = (RUNBOOKS / "evals-ci.md").read_text(encoding="utf-8")
     for name in (
         "evals-smoke.yml",
         "EVALS_AWS_ROLE_ARN",
-        "LANGSMITH_API_KEY",
-        "smart-tutor-ci",
+        "LANGFUSE_PUBLIC_KEY",
+        "LANGFUSE_SECRET_KEY",
+        "LANGFUSE_BASE_URL",
+        "smart-tutor-evals",
+        "langfuse-host.md",
         "evals-ci-bedrock-policy.json",
         "evals-ci-trust-policy.json",
         "smart-tutor-evals-ci",
