@@ -120,14 +120,26 @@ def _marker_numbers(group: str, count: int) -> list[int]:
     return numbers
 
 
-def cited_chunks(answer: str, chunks: Sequence[RetrievedChunk]) -> list[tuple[int, RetrievedChunk]]:
-    """(marker number, chunk) for each chunk the answer cites, in order of first use; every chunk with its own
-    number when the answer cites none it was given. The number is the chunk's 1-based place in the prompt."""
+def _marked(answer: str, chunks: Sequence[RetrievedChunk]) -> list[int]:
+    """The chunk numbers the answer's own markers name, in order of first use."""
     order: list[int] = []
     for match in _MARKER.finditer(answer):
         for n in _marker_numbers(match.group(1), len(chunks)):
             if n not in order:
                 order.append(n)
+    return order
+
+
+def uncited_link(answer: str, chunks: Sequence[RetrievedChunk]) -> bool:
+    """Whether the finished answer holds a link that no chunk its own markers cite holds: a planted link repeated from
+    a chunk the answer does not cite is as unwanted as an invented one (US-6, #196)."""
+    return invented_link(answer, [chunks[n - 1] for n in _marked(answer, chunks)])
+
+
+def cited_chunks(answer: str, chunks: Sequence[RetrievedChunk]) -> list[tuple[int, RetrievedChunk]]:
+    """(marker number, chunk) for each chunk the answer cites, in order of first use; every chunk with its own
+    number when the answer cites none it was given. The number is the chunk's 1-based place in the prompt."""
+    order = _marked(answer, chunks)
     if not order:
         order = list(range(1, len(chunks) + 1))
     return [(n, chunks[n - 1]) for n in order]

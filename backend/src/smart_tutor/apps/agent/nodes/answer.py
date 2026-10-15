@@ -17,7 +17,7 @@ from langchain_core.messages import BaseMessageChunk
 from langgraph.config import get_stream_writer
 
 from smart_tutor.apps.agent.state import AskState
-from smart_tutor.tutoring.application import Guard, answer_messages, cited_chunks, covers, invented_link
+from smart_tutor.tutoring.application import Guard, answer_messages, cited_chunks, covers, invented_link, uncited_link
 
 
 class AnswerNode(Protocol):
@@ -49,6 +49,8 @@ def answer_node(model: BaseChatModel, answer_floor: float, max_tokens: int, guar
                 if invented_link(text, chunks):  # a link no chunk holds can carry data out (US-6)
                     return {"answer": "", "citations": [], "decline": "guard", "guard": "guard_answer"}
                 write({"delta": piece.text})
+        if uncited_link(text, chunks):  # the pieces are out: the server replaces them with the decline (D29)
+            return {"answer": "", "citations": [], "decline": "guard", "guard": "guard_answer"}
         return {"answer": text, "citations": [c.citation(n) for n, c in cited_chunks(text, chunks)]}
 
     return answer

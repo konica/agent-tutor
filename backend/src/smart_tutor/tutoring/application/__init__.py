@@ -11,6 +11,7 @@ from smart_tutor.tutoring.application.answer import (
     invented_link,
     new_canary,
     system_prompt,
+    uncited_link,
 )
 from smart_tutor.tutoring.application.conversation_service import ConversationService
 from smart_tutor.tutoring.application.follow_up import search_query
@@ -93,5 +94,6 @@ __all__ = [
     "previous_question",
     "search_query",
     "system_prompt",
+    "uncited_link",
     "topic_texts",
 ]
