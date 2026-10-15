@@ -8,9 +8,9 @@ read its search scope. A learner with no ready, non-archived document still gets
 to upload a document (a "no_documents" decline), kept as a turn like any decline (US-3, US-10). Each ask gets a run
 id that names its trace and is kept with the turn. The learner lists their active conversations, newest activity
 first (US-13); the learner archives and restores a conversation, and an archived one is read-only (US-13). The
-learner rates a kept answer or decline 👍/👎 (PRD §10.2); the rating is saved with the turn (#318 sends it to
-Langfuse as a `learner_rating` score on the ask's trace). A guard trip's `replace` event keeps the turn as the guard
-message, with no documents used."""
+learner rates a kept answer or decline 👍/👎 (PRD §10.2); the rating is saved with the turn,
+then sent to Langfuse as a `learner_rating` score on the ask's trace. A guard trip's `replace` event keeps
+the turn as the guard message, with no documents used."""
 
 import json
 import logging
@@ -729,7 +729,7 @@ def rate_turn(
     conversations: Conversations,
 ) -> TurnRatingResponse:
     """Rate an answer or decline of the learner's conversation helpful ("up") or not ("down"); a new rating replaces
-    the last (PRD §10.2). Saved with the turn; #318 sends it to Langfuse as a `learner_rating` score on the ask's
+    the last (PRD §10.2). Saved with the turn, then sent to Langfuse as a `learner_rating` score on the ask's
     trace."""
     try:
         conversations.rate_turn(ThreadId(str(thread_id)), principal.user_id, RunId(str(run_id)), Rating(body.rating))

@@ -1090,9 +1090,13 @@ def test_the_mcp_server_does_not_trace(compose: dict[str, Any]) -> None:
     assert not [k for k in env if k.startswith("SMART_TUTOR_PHOENIX_")]
 
 
-def test_the_api_is_on_premise_and_does_not_use_langsmith(compose: dict[str, Any]) -> None:
+def test_the_api_sends_ratings_to_the_on_premise_langfuse_project(compose: dict[str, Any]) -> None:
     env = compose["services"]["api"]["environment"]
-    assert env["SMART_TUTOR_DEPLOYMENT"] == "on-premise"
+    assert env["SMART_TUTOR_DEPLOYMENT"] == "on-premise"  # the scores' environment
+    agent_env = compose["services"]["agent"]["environment"]
+    for name in ("SMART_TUTOR_LANGFUSE_URL", "SMART_TUTOR_LANGFUSE_PUBLIC_KEY", "SMART_TUTOR_LANGFUSE_SECRET_KEY"):
+        assert env[name] == agent_env[name]  # the agent's project: ratings land on its traces
+    assert not [k for k in env if k.startswith("SMART_TUTOR_PHOENIX_")]  # Langfuse only since #316
     assert not [k for k in env if k.startswith("LANGSMITH_")]
 
 
@@ -1224,10 +1228,10 @@ def test_agent_and_worker_export_traces_to_langfuse(compose: dict[str, Any], ser
     assert not [k for k in env if k.startswith("SMART_TUTOR_PHOENIX_")]  # Langfuse only since #316
 
 
-@pytest.mark.parametrize("service", ["mcp", "api"])
-def test_only_the_agent_and_worker_get_langfuse_settings(compose: dict[str, Any], service: str) -> None:
+@pytest.mark.parametrize("service", ["mcp"])
+def test_the_mcp_server_gets_no_langfuse_settings(compose: dict[str, Any], service: str) -> None:
     env = compose["services"][service]["environment"]
-    assert not [k for k in env if k.startswith("SMART_TUTOR_LANGFUSE_")]  # the API gets them in #318
+    assert not [k for k in env if k.startswith("SMART_TUTOR_LANGFUSE_")]
 
 
 def test_the_worker_reaches_langfuse_through_the_egress_proxy(compose: dict[str, Any]) -> None:

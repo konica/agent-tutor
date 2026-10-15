@@ -4,9 +4,11 @@ from fakes.api import api_services, fake_agent
 from fakes.auth import FakeTokenVerifier
 from fakes.clock import FixedClock
 from fakes.counter import CountingCounter
+from fakes.executor import InlineExecutor
 from fakes.ingest import ingest_ready
 from fakes.insights import InMemoryHighlightMisses
 from fakes.knowledge import FakeObjectStore, InMemoryLibrary
+from fakes.langfuse_scores import FakeLangfuseScores
 from fakes.mcp import in_process_mcp
 from fakes.models import (
     DESCRIPTION_ARGS,
@@ -52,6 +54,8 @@ __all__ = [
     "PassingGuard",
     "QuestionTrippingGuard",
     "TrippingGuard",
+    "FakeLangfuseScores",
+    "InlineExecutor",
     "FailingExporter",
     "FakeRunTracing",
     "RecordingClient",

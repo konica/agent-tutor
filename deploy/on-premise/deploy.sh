@@ -65,7 +65,8 @@ question_guardrail_id=$(param question-guardrail-id)
 question_guardrail_version=$(param question-guardrail-version)
 # Traces go to the shared Langfuse (ADR 0023): its address is an SSM parameter, and the worker's egress proxy
 # allows exactly its host name (ADR 0014). The operator creates the project's keys in Langfuse
-# (docs/runbooks/on-premise-deploy.md); until both secrets exist the agent and worker send nothing there.
+# (docs/runbooks/on-premise-deploy.md); until both secrets exist the agent and worker send nothing there and the API
+# sends no learner ratings (#318).
 host_of() { local rest=${1#*://}; rest=${rest%%/*}; rest=${rest##*@}; printf '%s' "${rest%%:*}"; }
 langfuse_url=$(param langfuse-url)
 langfuse_host=$(host_of "$langfuse_url")
@@ -75,7 +76,7 @@ if ! langfuse_public_key=$(secret langfuse/public-key 2>/dev/null) || ! langfuse
   [[ -z $langfuse_public_key || -z $langfuse_secret_key ]]; then
   langfuse_public_key=
   langfuse_secret_key=
-  echo "Warning: no Langfuse keys (are the secrets $prefix/langfuse/public-key and secret-key set?); deploying without Langfuse traces" >&2
+  echo "Warning: no Langfuse keys (are the secrets $prefix/langfuse/public-key and secret-key set?); deploying without Langfuse traces or ratings" >&2
 fi
 caddyfile_sha256=$(sha256sum "$here/Caddyfile" | cut -d' ' -f1)
 

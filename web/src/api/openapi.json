@@ -2707,7 +2707,7 @@
     },
     "/threads/{thread_id}/turns/{run_id}/rating": {
       "put": {
-        "description": "Rate an answer or decline of the learner's conversation helpful (\"up\") or not (\"down\"); a new rating replaces\nthe last (PRD \u00a710.2). Saved with the turn; #318 sends it to Langfuse as a `learner_rating` score on the ask's\ntrace.",
+        "description": "Rate an answer or decline of the learner's conversation helpful (\"up\") or not (\"down\"); a new rating replaces\nthe last (PRD \u00a710.2). Saved with the turn, then sent to Langfuse as a `learner_rating` score on the ask's\ntrace.",
         "operationId": "rate_turn",
         "parameters": [
           {

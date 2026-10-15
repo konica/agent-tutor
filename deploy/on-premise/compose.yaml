@@ -159,6 +159,11 @@ services:
     environment:
       SMART_TUTOR_ENVIRONMENT: prod
       SMART_TUTOR_DEPLOYMENT: on-premise
+      # Ratings go to Langfuse as learner_rating scores on the agent's ask traces (#318, ADR 0023); none until the
+      # project's keys exist.
+      SMART_TUTOR_LANGFUSE_URL: ${LANGFUSE_URL:?}
+      SMART_TUTOR_LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
+      SMART_TUTOR_LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
       SMART_TUTOR_ROOT_PATH: /api
       SMART_TUTOR_AWS_REGION: ${AWS_REGION:?}
       AWS_REGION: ${AWS_REGION:?}
