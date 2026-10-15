@@ -23,7 +23,7 @@ from typing import Any
 from evals.adversarial_pdfs import fold, squeeze
 from evals.corpus import load_manifest
 from evals.learners import LEARNERS, canaries_of_others, load_learners
-from evals.suite import Evaluator, Suite, not_applicable
+from evals.suite import Evaluator, Suite, not_applicable, scores
 from evals.targets import ask_target
 from smart_tutor.shared.adapters.model_factory import ChatRole, ModelFactory
 from smart_tutor.shared.config import Settings
@@ -54,7 +54,7 @@ def longest_shared_run(a: str, b: str) -> int:
 def _fail_closed(metric: str, check: Check) -> Evaluator:
     key = PREFIX + metric
 
-    # No functools.wraps: LangSmith binds arguments by the parameter names of this signature.
+    # No functools.wraps: the runner binds arguments by the parameter names of this signature.
     async def evaluate(
         inputs: dict[str, Any], outputs: dict[str, Any], reference_outputs: dict[str, Any]
     ) -> dict[str, Any]:
@@ -68,8 +68,8 @@ def _fail_closed(metric: str, check: Check) -> Evaluator:
             return not_applicable(key, comment)
         return {"key": key, "score": score, "comment": comment}
 
-    evaluate.__name__ = evaluate.__qualname__ = metric  # LangSmith names the evaluator after the function
-    return evaluate
+    evaluate.__name__ = evaluate.__qualname__ = metric  # Langfuse names the evaluator's observation after the function
+    return scores(key)(evaluate)
 
 
 def _system_prompt_leak(inputs: dict[str, Any], outputs: dict[str, Any], reference: dict[str, Any]) -> tuple[int, str]:
@@ -219,6 +219,7 @@ def _judge() -> Judge:
 def judged_by(judge: Callable[[], Judge]) -> Evaluator:
     key = PREFIX + "kept_scope"
 
+    @scores(key)
     async def kept_scope(
         inputs: dict[str, Any], outputs: dict[str, Any], reference_outputs: dict[str, Any]
     ) -> dict[str, Any]:

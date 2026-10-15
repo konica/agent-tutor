@@ -6,9 +6,10 @@ Usage: uv run --env-file ../.env --extra eval --extra ingest python -m evals.gen
 ask: downloads the seed PDFs if needed, cuts them into the worker's chunks, plans --per-type drafts of each question
 type for the eval learners, and has the judge model (never the tutor's) write each question. injection: has the judge
 model rewrite each prompt seed of adversarial/taxonomy.yaml into --per-type variants of its category. Either way the
-candidates go to the dataset's annotation queue in LangSmith; nothing enters a dataset until a reviewer accepts it
+candidates go to the dataset's annotation queue in Langfuse; nothing enters a dataset until a reviewer accepts it
 (make evals-publish). topic_check: has the judge model write `--per-type` learner messages of each kind
-(generators/topic_check.py). Needs your AWS profile (the judge on Bedrock) and LANGSMITH_API_KEY.
+(generators/topic_check.py). Needs your AWS profile (the judge on Bedrock) and a key pair of the Langfuse project
+smart-tutor-evals (LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_BASE_URL).
 """
 
 import argparse
@@ -17,16 +18,13 @@ import random
 import sys
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
-from typing import Any
-
-import langsmith
-from langsmith.utils import LangSmithError
 
 from evals.chunks import SeedChunk, seed_chunks
 from evals.corpus import download, load_manifest
 from evals.dataset import load_dataset
 from evals.generators import injection, topic_check
 from evals.generators.ask import Write, plan_drafts, question_writer, write_candidates
+from evals.langfuse_client import HINT, LangfuseClient, LangfuseError, SdkLangfuse
 from evals.learners import LEARNERS, load_learners
 from evals.review import RUBRIC, Candidate, candidates_name, submit
 
@@ -34,7 +32,7 @@ from evals.review import RUBRIC, Candidate, candidates_name, submit
 def main(
     argv: Sequence[str] | None = None,
     *,
-    client: Any = None,
+    client: LangfuseClient | None = None,
     chunks: Mapping[str, Sequence[SeedChunk]] | None = None,
     holdings: Mapping[str, Sequence[str]] | None = None,
     write: Write | None = None,
@@ -51,6 +49,11 @@ def main(
     )
     parser.add_argument("--seed", type=int, default=None, help="plan the same ask drafts again (default: random)")
     args = parser.parse_args(argv)
+    try:
+        client = client or SdkLangfuse()  # before the judge runs: missing keys stop it before it costs anything
+    except LangfuseError as e:
+        print(f"Can't reach Langfuse: {e} ({HINT})", file=sys.stderr)
+        return 1
     seed = args.seed if args.seed is not None else random.SystemRandom().randrange(2**31)
     writer = {"ask": write, "injection": vary, "topic_check": write_topic}[args.dataset]
     if writer is None or model_id is None:
@@ -95,18 +98,18 @@ def main(
         return 1
     try:
         submit(
-            client or langsmith.Client(),
+            client,
             dataset,
             candidates,
             {"generator_model": model_id, "batch": batch},
             rubric=rubric,
         )
-    except LangSmithError as e:
-        print(f"Can't reach LangSmith: {e} (check LANGSMITH_API_KEY)", file=sys.stderr)
+    except LangfuseError as e:
+        print(f"Can't reach Langfuse: {e} ({HINT})", file=sys.stderr)
         return 1
     print(
         f"Queued {len(candidates)} candidates{dropped} in the {candidates_name(dataset)} annotation queue, "
-        f"batch {batch}. Review them in LangSmith, then make evals-publish."
+        f"batch {batch}. Review them in Langfuse, then make evals-publish."
     )
     return 0
 

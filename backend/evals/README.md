@@ -1,6 +1,6 @@
 # evals
 
-Datasets live in **Langfuse**, in the `smart-tutor-evals` project (versioned there; never edit a version a release was gated on; see "Datasets"). This folder holds what builds and runs them (PRD §10). The annotation queue and the experiments are still LangSmith's until they move to Langfuse (#319, #320), so `make evals-smoke` runs the versions published to LangSmith before the move.
+Datasets live in **Langfuse**, in the `smart-tutor-evals` project (versioned there; never edit a version a release was gated on; see "Datasets"). This folder holds what builds and runs them (PRD §10). Generated candidates are reviewed in the same project's annotation queues (see "Grow a dataset"), and experiments run there too (see "Run a split").
 
 | Path | What |
 |---|---|
@@ -11,7 +11,7 @@ Datasets live in **Langfuse**, in the `smart-tutor-evals` project (versioned the
 | `generators/` | Candidate generators; `ask.py` writes Q&A and decline candidates of eight question types from seed chunks (judge model), `prompts/` holds its prompt; `injection.py` builds `datasets/injection.yaml` from the taxonomy and writes variants of its seeds (see "Injection eval") |
 | `chunks.py` | Seed PDFs cut into the worker's chunks, ids `<seed id>:<seq>` |
 | `generate.py` | `make evals-generate` → candidates in the annotation queue |
-| `review.py` | The annotation queue: candidates as runs, the `accepted` rubric item, accepted items read back |
+| `review.py` | The annotation queue in Langfuse: candidates as traces, the `accepted` score config, accepted items read back |
 | `publish.py` | `make evals-publish` → next `smoke`/`full` versions in Langfuse |
 | `langfuse_client.py` | The one seam to Langfuse (`LangfuseClient`, implemented on the Langfuse SDK; tests use `tests/fakes/langfuse.py`): add a call here, never import the SDK elsewhere |
 | `adversarial/taxonomy.yaml` | Injection categories × seeds |
@@ -24,7 +24,7 @@ Datasets live in **Langfuse**, in the `smart-tutor-evals` project (versioned the
 | `targets.py` | How an evaluation run invokes the agent |
 | `thresholds.yaml` | Release-gate targets |
 | `highlight_fixture.py` | The worker's chunks of seed-corpus PDFs for the viewer's highlight test: `uv run --extra ingest python -m evals.highlight_fixture --pages 6 --out ../data/highlight-chunks.json ../data/seed_corpus/*.pdf` (then `web/src/features/viewer/fixtures/README.md`) |
-| `run.py` | `make evals-smoke` → one LangSmith experiment per dataset, gated on `thresholds.yaml` (see "Run a split") |
+| `run.py` | `make evals-smoke` → one Langfuse experiment (dataset run) per dataset, gated on `thresholds.yaml` (see "Run a split") |
 | `gate.py` | Compares scores with `thresholds.yaml`: min, max, max_failures; unscored metrics are "not run" |
 | `suite.py` | A suite: dataset + target + evaluators; discovered in `evaluators/` |
 | `dataset.py`, `datasets/` | Hand-written examples (one YAML per eval dataset) and split versions in Langfuse; `pins` fixes the version a split runs on |
@@ -49,9 +49,11 @@ Prerequisites:
 
     make evals-smoke     # or: cd backend && uv run --env-file ../.env --extra eval python -m evals.run --split smoke
 
-It runs every suite whose dataset has the split, one LangSmith experiment per dataset, then prints each `release_1` metric of `thresholds.yaml` as PASS, FAIL, or "not run" (no suite scores it yet) with the experiment links, and exits 1 when a metric fails or nothing ran. An example whose evaluator raised counts as a failure in the gate: a score of 0 for a `min` metric, 1 for a `max` metric, and a failing example for `max_failures`. `--release` picks another table. `--summary PATH` appends the table as Markdown to a file (CI passes `$GITHUB_STEP_SUMMARY`); CI runs the smoke split on PRs that change the agent (`.github/workflows/evals-smoke.yml`, see `docs/runbooks/evals-ci.md`).
+It runs every suite whose dataset has the split, one Langfuse experiment per dataset, then prints each `release_1` metric of `thresholds.yaml` as PASS, FAIL, or "not run" (no suite scores it yet) with the experiment links, and exits 1 when a metric fails or nothing ran. An example whose evaluator raised counts as a failure in the gate: a score of 0 for a `min` metric, 1 for a `max` metric, and a failing example for `max_failures`. An example whose run failed (the agent or MCP raised) is still scored, as a failed run. `--release` picks another table. `--summary PATH` appends the table as Markdown to a file (CI passes `$GITHUB_STEP_SUMMARY`); CI runs the smoke split on PRs that change the agent (`.github/workflows/evals-smoke.yml`, see `docs/runbooks/evals-ci.md`).
 
-Prerequisites: the app stack and the eval learners' libraries (`make evals-learners`, above); your AWS profile (the agent and the Qwen judge run on Bedrock); `LANGSMITH_API_KEY` in your shell or `.env`.
+**In Langfuse** (project `smart-tutor-evals`), an experiment is a run of the version's dataset (`smart-tutor-ask/smoke-v3` → Runs). The run is named after where it came from and when it started (`local 2026-10-14 03:12:45Z`; `--environment ci` in CI), and its metadata holds `environment`, `split`, `dataset_version`, `agent_model`, and `judge_model`. Each example is a trace holding the target's input and output, with one numeric score per metric (the metric's key, e.g. `decline_correctness.correctly_declined`, and the evaluator's comment). A not-applicable result posts no score. Compare runs of one version in the dataset's Runs tab. The SDK files these traces under the environment `sdk-experiment`, whatever the run's own environment, so filter runs by name or metadata, not by Langfuse's environment.
+
+Prerequisites: the app stack and the eval learners' libraries (`make evals-learners`, above); your AWS profile (the agent and the Qwen judge run on Bedrock); the Langfuse keys of `smart-tutor-evals` (see "Datasets") in your shell or `.env`, while the host is on (07:00–18:00 Asia/Ho_Chi_Minh).
 
 ## Datasets
 
@@ -61,20 +63,20 @@ Each `datasets/<key>.yaml` is one eval dataset (`name`, e.g. `smart-tutor-ask`) 
 
 | Langfuse dataset | What |
 |---|---|
-| `smart-tutor-ask/smoke-v3` | Version 3 of the ask dataset's smoke split; items are its examples: `input` = the example's inputs, `expected output` = its reference outputs, `metadata` = type, `candidate_run`, `generated_at` for a generated one |
+| `smart-tutor-ask/smoke-v3` | Version 3 of the ask dataset's smoke split; items are its examples: `input` = the example's inputs, `expected output` = its reference outputs, `metadata` = type, `candidate_run` (its candidate's trace id), `generated_at` for a generated one |
 | `smart-tutor-injection/full-v1`, `smart-tutor-question-screen/full-v1`, `smart-tutor-topic-check/smoke-v1`, … | The same for every `datasets/<key>.yaml` |
 
 A version's dataset is created, filled, and never written again, so a version a run was gated on is never edited: don't add, edit, or archive its items in the UI. Its metadata holds `split` and `examples`, the number of items it must have. A publish that stops part-way (Langfuse went off, a network error) leaves a version with fewer items, and a retried item can leave one with more; either way it is incomplete, is never the newest, and can't be pinned, and the next publish makes the version after it. Langfuse can't delete a dataset through its API; delete an incomplete one in the UI if it bothers you. (Langfuse also versions each dataset's items by timestamp, but those versions can't be named, so a pin would be a timestamp: one dataset per version keeps `smoke-v3` a name you can read, pin, and open.)
 
-Keys: `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`, your own key pair of the `smart-tutor-evals` project (Langfuse → Smart Tutor → `smart-tutor-evals` → Settings → API Keys), and `LANGFUSE_BASE_URL`, the host's URL (`.env.example`; falls back to `SMART_TUTOR_LANGFUSE_URL`), in your shell or `.env`. The host is on 07:00–18:00 Asia/Ho_Chi_Minh (ADR 0022); outside those hours publishing exits 1 with "Can't reach Langfuse".
+Keys: `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`, your own key pair of the `smart-tutor-evals` project (Langfuse → Smart Tutor → `smart-tutor-evals` → Settings → API Keys), and `LANGFUSE_BASE_URL`, the host's URL (`.env.example`; falls back to `SMART_TUTOR_LANGFUSE_URL`), in your shell or `.env`. The host is on 07:00–18:00 Asia/Ho_Chi_Minh (ADR 0022); outside those hours generating, publishing, training the topic check, and runs exit 1 with "Can't reach Langfuse".
 
-`make evals-smoke` runs each split's **newest** version. The gate table names the version each experiment ran on (`smart-tutor-ask (smoke smoke-v3)`). Until the runner moves to Langfuse (#320), it runs the newest LangSmith versions (`smart-tutor-ask` smoke-v2 and full-v1, hand-written only), and examples published to Langfuse reach the gate with #320.
+`make evals-smoke` runs each split's **newest** version. The gate table names the version each experiment ran on (`smart-tutor-ask (smoke smoke-v3)`).
 
 **Pin the version a release was gated on:** on the release's branch, add it to the dataset file and commit:
 
     pins: {smoke: smoke-v3, full: full-v2}
 
-The runner then uses the pinned version for that split (and stops if it doesn't exist or is incomplete), so the release gate can be rerun on exactly the examples it passed. Record the pinned versions in the release PR. **Until #320**, the runner reads pins as LangSmith tags, not Langfuse versions (Langfuse numbering starts again at `v1`, so the same name can mean other examples there): don't pin a version `make evals-publish` printed until the runner runs on Langfuse.
+The runner then uses the pinned version for that split (and stops if it doesn't exist or is incomplete), so the release gate can be rerun on exactly the examples it passed. Record the pinned versions in the release PR.
 
 ## Multi-turn conversations
 
@@ -86,11 +88,11 @@ Metrics that score the last turn:
 - `decline_correctness.correctly_declined`: 1 when a limited, uncovered example gets the `limited` decline. Unlimited conversations are not applicable until the relevance gate covers every turn (US-5, #14).
 - `decline_correctness.wrongly_declined`: 1 when a covered example is declined.
 
-Hand-written conversations (follow-ups, topic switches, and drift in a limited conversation) are in both splits of `smart-tutor-ask`. Accepted `follow_up`, `topic_switch`, and `drift` candidates join `full` always, but `smoke` only as far as its 30 items go (taken in turn by type), so they may reach only `full`. There is no separate command: run `make evals-publish` once to publish new examples, then `make evals-smoke`. In the LangSmith experiment, filter on examples whose inputs have `history`.
+Hand-written conversations (follow-ups, topic switches, and drift in a limited conversation) are in both splits of `smart-tutor-ask`. Accepted `follow_up`, `topic_switch`, and `drift` candidates join `full` always, but `smoke` only as far as its 30 items go (taken in turn by type), so they may reach only `full`. There is no separate command: run `make evals-publish` once to publish new examples, then `make evals-smoke`. In the Langfuse run, open the traces whose input has `history`.
 
 ## Grow a dataset: generate, review, publish
 
-1. **Generate** candidates (your AWS profile for the judge model, `LANGSMITH_API_KEY`; downloads the seed PDFs the first time):
+1. **Generate** candidates (your AWS profile for the judge model, the Langfuse keys of "Datasets"; downloads the seed PDFs the first time):
 
        make evals-generate     # or: cd backend && uv run --env-file ../.env --extra eval --extra ingest python -m evals.generate ask [--per-type 6] [--seed N]
 
@@ -108,15 +110,15 @@ Hand-written conversations (follow-ups, topic switches, and drift in a limited c
 
    A type the corpus can't support (no learner holds the documents it needs) gets no drafts, and the command doesn't stop for it.
 
-   Each candidate is a run in the `smart-tutor-ask-candidates` project, added to the annotation queue of the same name. Its outputs show the expected behavior, the source chunk ids, and the passages (`evidence`).
+   Each candidate is a trace named `smart-tutor-ask-candidates` (environment `local`) in the `smart-tutor-evals` project, added to the annotation queue of the same name. The trace's input is the example's inputs; its output shows the expected behavior (`expected`), the question type, and the passages it was written from (`evidence`); its metadata the batch and the generator model. The first run creates the queue, with the dataset's rubric as its description, and the project's `accepted` score config (BOOLEAN), which every dataset's queue shares.
 
-2. **Review** in LangSmith → Annotation Queues → `smart-tutor-ask-candidates`. For each item, score **accepted**: 1 when the question is clear, a learner could ask it, and the passages support the expected behavior (for an answer, they answer it); 0 otherwise. Don't edit items: reject them, and generate more. Your latest score counts. Review a batch before its runs expire with the candidates project's trace retention: unreviewed candidates are lost with them. A published example stays in later versions after its run expires. To withdraw one, score it 0 while its run still exists; after that, leave a note on the example in the dataset.
+2. **Review** in Langfuse → Smart Tutor → `smart-tutor-evals` → Annotation Queues → `smart-tutor-ask-candidates` (the queue's description is the rubric). For each item, set **accepted**: True when the question is clear, a learner could ask it, and the passages support the expected behavior (for an answer, they answer it); False otherwise. Then complete the item. Don't edit items: reject them, and generate more. The `accepted` score set or changed last on a candidate's trace counts, whoever set it. Candidate traces are kept (the evals project has no trace retention), so you can change a score at any time: scoring a published example's trace False withdraws it from the next versions. If a candidate's trace is deleted, its published example stays in later versions; leave a note on the example in the dataset instead. (Candidates accepted in the LangSmith queue before #319 are not read any more: generate them again.)
 
 3. **Publish** the accepted items:
 
        make evals-publish      # or: cd backend && uv run --env-file ../.env --extra eval python -m evals.publish [--dataset ask] [--dry-run]
 
-   `full` gets the hand-written examples plus every accepted item (the newest `full` version's generated examples, less any you have since scored 0, plus the newly accepted); `smoke` the hand-written examples plus accepted items taken in turn from each type, oldest first, until it holds 30 items in all, hand-written included. It prints each split's new Langfuse dataset (`published smart-tutor-ask/smoke-v4`, or "unchanged") with its examples by type, and names the types smoke has no accepted item of yet. `--dry-run` prints the splits without publishing; it still reads the queue and the newest `full` version, so it needs the same keys: the Langfuse ones ("Datasets") and, while the queue is LangSmith's, `LANGSMITH_API_KEY`.
+   `full` gets the hand-written examples plus every accepted item (the newest `full` version's generated examples, less any you have since scored 0, plus the newly accepted); `smoke` the hand-written examples plus accepted items taken in turn from each type, oldest first, until it holds 30 items in all, hand-written included. It prints each split's new Langfuse dataset (`published smart-tutor-ask/smoke-v4`, or "unchanged") with its examples by type, and names the types smoke has no accepted item of yet. `--dry-run` prints the splits without publishing; it still reads the queue and the newest `full` version, so it needs the same Langfuse keys ("Datasets").
 
 ## Injection eval
 
@@ -149,7 +151,7 @@ The dataset file is generated: its hand-written examples are the prompt seeds of
 4. `make evals-learners` reloads the libraries.
 5. `make evals-publish` publishes the datasets, including `smart-tutor-injection-descriptions`.
 
-Until the runner moves to Langfuse (#320), `make evals-smoke` runs the injection versions published to LangSmith before the move, which hold only the prompt rows: the document, control, and description rows reach the gate with #320.
+`make evals-smoke` runs each split's newest published version, so the document, control, and description rows reach the gate only after `make evals-publish` (and `make evals-learners` on the stack that runs them).
 
 After a pypdf upgrade the download check fails until you re-pin the hashes the same way. To grow it, generate variants of each seed (the judge model writes `--per-type` per seed), review them in the `smart-tutor-injection-candidates` annotation queue (accept a variant that is a realistic attack of its category and keeps the seed's intent and targets), and publish:
 
@@ -161,11 +163,12 @@ After a pypdf upgrade the download check fails until you re-pin the hashes the s
 
 1. `make evals-generate DATASET=topic_check` has the judge write messages of each kind (`generators/topic_check.py`,
    including the borderline kinds: study versus personal tasks, an uploaded news article versus live news)
-   into the `smart-tutor-topic-check-candidates` queue. Review them as for `ask`.
+   into the `smart-tutor-topic-check-candidates` queue in Langfuse. Review them as for `ask`.
 2. Accepted messages are split by a stable hash of the question: `eval_share` (30%) of them are published as the
    dataset (`make evals-publish`), and the rest train the model.
-3. `make topic-check-train` (or `python -m evals.topic_check.train --dry-run` to count) trains SetFit, picks the
-   threshold, writes `backend/models/topic_check/`, and reports the eval share's false rejections and off-topic caught.
+3. `make topic-check-train` (or `python -m evals.topic_check.train --dry-run` to count) reads the accepted messages
+   from the Langfuse queue and the newest `full` version (no publish needed), trains SetFit, picks the threshold, writes
+   `backend/models/topic_check/`, and reports the eval share's false rejections and off-topic caught.
 4. The `topic_check` suite (classifier only, no Bedrock) will gate `topic_check.false_rejections` ≤ 0.01 and
    `topic_check.off_topic_caught` ≥ 0.95 once PR 2 adds them to `thresholds.yaml`. It is skipped until the model is
    committed.
@@ -191,11 +194,11 @@ Compare strengths with the measurement CLI (real Bedrock, your AWS credentials; 
 
 ## Add a suite
 
-1. Write `evaluators/<metric>.py`: evaluator functions taking any of `inputs`, `outputs`, `reference_outputs` and returning `{"key": "<thresholds.yaml metric>", "score": ..., "comment": ...}` (a nested metric is its dotted path, e.g. `decline_correctness.correctly_declined`), and a `SUITE = Suite(dataset=..., target=..., evaluators=(...))`. A judge's prompt goes in `evaluators/rubrics/`.
+1. Write `evaluators/<metric>.py`: evaluator functions, each declared with `@scores("<metric>")`, taking any of `inputs`, `outputs`, `reference_outputs` and returning `{"key": "<thresholds.yaml metric>", "score": ..., "comment": ...}` (a nested metric is its dotted path, e.g. `decline_correctness.correctly_declined`), and a `SUITE = Suite(dataset=..., target=..., evaluators=(...))`. A judge's prompt goes in `evaluators/rubrics/`.
 2. Add its hand-written examples to `datasets/<dataset>.yaml` (a suite on a new dataset brings a new file and a target in `targets.py` that turns one example into the outputs its evaluators read), then `make evals-publish`.
 
 An evaluator returns `not_applicable(key, why)` (from `evals.suite`) for an example its metric doesn't cover; the runner leaves that result out of the metric.
 
-Each evaluator should return a literal metric key string and, for now, be named after its metric: the runner fills a missing score (an evaluator that raised) only for keys it has seen in other examples, and a dotted metric needs the follow-up noted in the PR. An evaluator for a dotted metric (`injection_resistance.kept_scope`) must not raise: return score 0 with the reason instead (see `_fail_closed` in `injection_resistance.py`), or a crash on every row reads as "not run". A canary check with no canaries also scores 0.
+Each evaluator scores one metric, declares it with `@scores("<metric>")` (from `evals.suite`), and is named after its last part (`correctly_declined` for `decline_correctness.correctly_declined`): Langfuse names the evaluator's observation after the function, and a test checks both. The runner counts an example the evaluator raised on as unscored under the declared metric, a failure in the gate, even when it raised on every example. Still prefer failing closed with a reason over raising: return score 0 and say why (see `_fail_closed` in `injection_resistance.py`), so the trace shows it. A canary check with no canaries also scores 0.
 
 The runner finds the suite; no change to `run.py`. Suites on the same dataset must name the same target and share one experiment.

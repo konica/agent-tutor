@@ -10,9 +10,9 @@ Sources of truth — read the relevant one before changing behavior or structure
 
 | Need | Read |
 |---|---|
-| Product behavior, user stories, data model, flows, evals, roadmap | `sdd/prd.md` (v2.69) |
+| Product behavior, user stories, data model, flows, evals, roadmap | `sdd/prd.md` (v2.70) |
 | Folder structure, module boundaries, import rules | `sdd/specs/2026-10-02-project-structure-design.md` |
-| Why an architecture choice was made | `sdd/adr/` (0001–0023) |
+| Why an architecture choice was made | `sdd/adr/` (0001–0024) |
 | Why the PRD changed in v2.1 | `sdd/reviews/2026-10-03-prd-v2.0-review.md` |
 
 **Release scope:** build **Release 1** (core tutor: modules `knowledge`, `subjects`, `tutoring`, `learning`, `accounts`, `insights`). Later releases already have empty modules and prepared data (R2 research map → `graph`; R3 `catalog`, `quizzes`, `recommendations`, `reports`; R4 sharing and imports; R5 deep graph); build them only when asked.
@@ -46,7 +46,7 @@ Code must keep these true; each has tests or evals guarding it.
 - `docker compose up -d` starts pgvector (host port 10400), Keycloak (:10401), LocalStack (:10402), Mailpit (:10403, web UI for emails Keycloak sends), and Phoenix (:10404, http://localhost:10404, traces from local runs; no sign-in); `--profile app` adds api (:10450), agent (:10451), mcp (:10452), and web (:10453). Host ports count up from 10400 for dependency services and from 10450 for app services; a new service takes the next free port in its group. Copy `.env.example` to `.env`.
 - To iterate faster, run the app services on the host on the same ports: `make api`, `make agent`, `make mcp`, `make worker`, and `make web` (README "Run the app"). Start host backend processes with `uv run --env-file ../.env`; otherwise boto3 skips LocalStack and calls real AWS. To debug, use `make <service>-debug` (debugpy listens at app port + 10, 10460–10463) or the checked-in `.vscode/launch.json` (README "Debug the backend").
 - The worker, agent, and MCP server call Bedrock with your AWS profile (in Compose, `~/.aws` is mounted read-only); the worker's S3/SQS calls use LocalStack's dummy keys (`SMART_TUTOR_LOCALSTACK`).
-- Bedrock has no emulator and LangSmith is real (evals only): local runs call real us-east-1 models with your AWS credentials, and their traces go to the local Phoenix (`smart-tutor-local`, `smart-tutor-local-ingestion`). `make bedrock-check` (pytest marker `bedrock`, under a cent) verifies the configured models and adapters.
+- Bedrock has no emulator and LangSmith is real (evals only): local runs call real us-east-1 models with your AWS credentials, and their traces go to Langfuse project `smart-tutor-local` when `.env` has your key pair, and to the local Phoenix (`smart-tutor-local`, `smart-tutor-local-ingestion`) until #322. `make bedrock-check` (pytest marker `bedrock`, under a cent) verifies the configured models and adapters.
 - Keycloak users: `learner@example.com`/`learner`, `learner2@example.com`/`learner2`, `admin@example.com`/`admin` (console admin/admin). The realm imports only when it doesn't exist yet: run `docker compose down -v` after editing `local/keycloak/realm-smart-tutor.json`, and keep the built-in roles `offline_access` and `uma_authorization` defined in it.
 - `make migrate` applies Alembic migrations to the Compose database (the app profile runs it before the API). After changing an API route, run `make api-client` to regenerate `web/src/api/`; CI fails when it is stale.
 - Windows Git Bash: set `PYTHONUTF8=1` for `lint-imports` and `MSYS_NO_PATHCONV=1` for commands taking `/smart-tutor/...` paths (SSM names). `make` may be missing; every `Makefile` target is a one-line command you can run directly.

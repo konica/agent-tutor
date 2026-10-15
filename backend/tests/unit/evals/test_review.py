@@ -1,16 +1,25 @@
-"""The human review gate (PRD §10.3 item 6): candidates go to an annotation queue as runs, and only the ones a
-reviewer accepted come back as examples."""
+"""The human review gate (PRD §10.3 item 6): candidates go to a Langfuse annotation queue as traces, and only the
+ones a reviewer accepted come back as examples."""
 
 from dataclasses import replace
-
-import pytest
-from langsmith.utils import LangSmithNotFoundError
+from datetime import UTC, datetime
 
 from evals.dataset import Dataset, Example
-from evals.review import ACCEPTED, Candidate, Reviewed, candidates_name, ensure_queue, reviewed, submit
-from fakes.langsmith import FakeLangSmith
+from evals.review import (
+    ACCEPTED,
+    ENVIRONMENT,
+    RUBRIC,
+    Candidate,
+    Reviewed,
+    candidates_name,
+    ensure_queue,
+    reviewed,
+    submit,
+)
+from fakes.langfuse import FakeLangfuse
 
 ASK = Dataset("ask", "smart-tutor-ask", "", (Example({"question": "hand"}, {"covered": True}),))
+INJECTION = Dataset("injection", "smart-tutor-injection", "", (Example({"question": "seed"}, {}),))
 
 
 def candidate(question: str, kind: str = "factual", covered: bool = True) -> Candidate:
@@ -22,126 +31,127 @@ def candidate(question: str, kind: str = "factual", covered: bool = True) -> Can
     )
 
 
-def test_the_queue_is_created_once_with_a_required_accepted_rubric_item() -> None:
-    client = FakeLangSmith()
+def test_the_queue_is_created_once_with_the_rubric_and_a_boolean_accepted_score() -> None:
+    client = FakeLangfuse()
     first, again = ensure_queue(client, ASK), ensure_queue(client, ASK)
     assert first == again and len(client.queues) == 1
     queue = client.queues[first]
     assert queue.name == candidates_name(ASK) == "smart-tutor-ask-candidates"
-    assert [(i["feedback_key"], i["is_required"]) for i in queue.rubric_items] == [(ACCEPTED, True)]
-    assert client.feedback_configs[ACCEPTED]["type"] == "continuous"
-    assert "reject" in (queue.rubric_instructions or "").lower()
+    assert queue.description.endswith(RUBRIC) and "smart-tutor-ask" in queue.description
+    [config_id] = queue.score_config_ids
+    assert client.score_configs[config_id][0] == ACCEPTED
 
 
-def test_submitted_candidates_are_runs_in_the_queue_with_their_evidence() -> None:
-    client = FakeLangSmith()
+def test_every_dataset_queue_shares_the_one_accepted_score_config() -> None:
+    client = FakeLangfuse()
+    ask, injection = ensure_queue(client, ASK), ensure_queue(client, INJECTION, "Accept realistic attacks.")
+    assert len(client.score_configs) == 1
+    assert client.queues[ask].score_config_ids == client.queues[injection].score_config_ids
+    assert client.queues[injection].description.endswith("Accept realistic attacks.")
+
+
+def test_submitted_candidates_are_traces_in_the_queue_with_their_evidence() -> None:
+    client = FakeLangfuse()
     ids = submit(client, ASK, [candidate("What is ReAct?"), candidate("Is X?", "unanswerable", False)], {"batch": "b1"})
-    assert client.flushed >= 1
-    queue = next(iter(client.queues.values()))
-    assert queue.run_ids == ids
-    run = client.runs[ids[1]]
-    assert run.project_name == "smart-tutor-ask-candidates" and run.name == "ask-candidate"
-    assert run.inputs["question"] == "Is X?"
-    assert run.outputs == {
+    [queue] = client.queues.values()
+    assert queue.trace_ids == ids
+    trace = client.traces_by_id[ids[1]]
+    assert trace.name == "smart-tutor-ask-candidates" and trace.environment == ENVIRONMENT == "local"
+    assert len(trace.id) == 32 and int(trace.id, 16) >= 0  # Langfuse trace ids are 32 lowercase hex characters
+    assert trace.input["question"] == "Is X?"
+    assert trace.output == {
         "expected": {"covered": False, "sources": [], "chunks": ["react-2022:4"]},
         "type": "unanswerable",
         "evidence": [{"chunk": "react-2022:4", "text": "ReAct interleaves reasoning and acting."}],
     }
-    assert run.extra == {"metadata": {"dataset": "smart-tutor-ask", "type": "unanswerable", "batch": "b1"}}
+    assert trace.metadata == {
+        "dataset": "smart-tutor-ask",
+        "type": "unanswerable",
+        "generated_at": trace.timestamp.isoformat(timespec="microseconds"),
+        "batch": "b1",
+    }
 
 
-def test_runs_are_queued_by_their_full_key_in_the_candidates_project() -> None:
-    client = FakeLangSmith()
-    ids = submit(client, ASK, [candidate("a"), candidate("b")], {})
-    project = client.read_project(project_name="smart-tutor-ask-candidates")
-    [keys] = client.queue_adds
-    assert keys == [
-        {"run_id": run_id, "session_id": project.id, "start_time": client.runs[run_id].start_time} for run_id in ids
-    ]
-    assert project.description and "smart-tutor-ask" in project.description
+def test_candidates_of_one_batch_are_generated_in_order_a_millisecond_apart() -> None:
+    client = FakeLangfuse()
+    ids = submit(client, ASK, [candidate("a"), candidate("b"), candidate("c")], {})
+    times = [client.traces_by_id[i].timestamp for i in ids]
+    assert all((later - earlier).total_seconds() == 0.001 for earlier, later in zip(times, times[1:], strict=False))
 
 
-def test_an_existing_candidates_project_is_reused() -> None:
-    client = FakeLangSmith()
+def test_an_existing_queue_is_reused() -> None:
+    client = FakeLangfuse()
     first = submit(client, ASK, [candidate("a")], {})
     second = submit(client, ASK, [candidate("b")], {})
-    assert len(client.projects) == 1
-    assert next(iter(client.queues.values())).run_ids == [*first, *second]
+    [queue] = client.queues.values()
+    assert queue.trace_ids == [*first, *second]
 
 
-def test_runs_not_yet_ingested_are_queued_after_retries() -> None:
-    client, sleeps = FakeLangSmith(), []
-    client.ingestion_lag = 2
-    ids = submit(client, ASK, [candidate("a")], {}, sleep=sleeps.append)
-    assert next(iter(client.queues.values())).run_ids == ids
-    assert sleeps == [2, 4]
-
-
-def test_many_candidates_are_queued_in_batches_of_at_most_100() -> None:
-    client = FakeLangSmith()
-    ids = submit(client, ASK, [candidate(f"q{i}") for i in range(130)], {})
-    assert [len(keys) for keys in client.queue_adds] == [100, 30]
-    assert next(iter(client.queues.values())).run_ids == ids
-
-
-def test_runs_still_missing_after_about_two_minutes_raise() -> None:
-    client, sleeps = FakeLangSmith(), []
-    client.ingestion_lag = 1000
-    with pytest.raises(LangSmithNotFoundError):
-        submit(client, ASK, [candidate("a")], {}, sleep=sleeps.append)
-    assert sleeps[:3] == [2, 4, 8] and max(sleeps) <= 15 and 100 <= sum(sleeps) <= 150
-
-
-def test_only_items_whose_latest_feedback_accepts_them_are_accepted() -> None:
-    client = FakeLangSmith()
+def test_only_items_whose_latest_score_accepts_them_are_accepted() -> None:
+    client = FakeLangfuse()
     kept, rejected, unscored, changed = submit(
         client, ASK, [candidate("kept"), candidate("rejected"), candidate("unscored"), candidate("changed")], {}
     )
-    client.create_feedback(kept, ACCEPTED, score=1)
-    client.create_feedback(rejected, ACCEPTED, score=0)
-    client.create_feedback(changed, ACCEPTED, score=1)
-    client.create_feedback(changed, ACCEPTED, score=0)  # the reviewer changed their mind
-    client.create_feedback(unscored, "note", score=1)  # another key doesn't count
+    client.score(kept, ACCEPTED, 1)
+    client.score(rejected, ACCEPTED, 0)
+    client.score(changed, ACCEPTED, 1)
+    client.score(changed, ACCEPTED, 0)  # the reviewer changed their mind
+    client.score(unscored, "note", 1)  # another score doesn't count
     review = reviewed(client, ASK)
     [example] = review.accepted
+    trace = client.traces_by_id[kept]
     assert example == Example(
         {"question": "kept", "learner": "learner@example.com", "documents": None},
         {"covered": True, "sources": ["react-2022"], "chunks": ["react-2022:4"]},
-        {
-            "type": "factual",
-            "candidate_run": str(kept),
-            "generated_at": client.runs[kept].start_time.isoformat(timespec="microseconds"),
-        },
+        {"type": "factual", "candidate_run": kept, "generated_at": trace.timestamp.isoformat(timespec="microseconds")},
     )
-    # a run that still exists and isn't accepted withdraws its example from later versions
-    assert review.withdrawn == {str(rejected), str(unscored), str(changed)}
+    # a trace that still exists and isn't accepted withdraws its example from later versions
+    assert review.withdrawn == {rejected, unscored, changed}
 
 
-def test_a_naive_run_start_time_is_read_as_utc() -> None:
-    client = FakeLangSmith()
-    [run_id] = submit(client, ASK, [candidate("kept")], {})
-    client.create_feedback(run_id, ACCEPTED, score=1)
-    aware = client.runs[run_id].start_time
-    client.runs[run_id] = replace(client.runs[run_id], start_time=aware.replace(tzinfo=None))
-    [example] = reviewed(client, ASK).accepted
-    assert example.metadata["generated_at"] == aware.isoformat(timespec="microseconds")
+def test_a_score_edited_later_beats_a_score_set_after_it_was_first_set() -> None:
+    client = FakeLangfuse()
+    [trace_id] = submit(client, ASK, [candidate("q")], {})
+    client.score(trace_id, ACCEPTED, 0)  # reviewer A rejects
+    client.score(trace_id, ACCEPTED, 0)  # reviewer B rejects later
+    client.edit_score(0, 1)  # then A changes their score to accept
+    assert [e.inputs["question"] for e in reviewed(client, ASK).accepted] == ["q"]
 
 
-def test_accepted_examples_come_oldest_first_across_many_feedback_batches() -> None:
-    client = FakeLangSmith()
+def test_another_datasets_candidates_are_ignored() -> None:
+    client = FakeLangfuse()
+    [ours] = submit(client, ASK, [candidate("ours")], {})
+    [theirs] = submit(client, INJECTION, [candidate("theirs")], {})
+    client.score(ours, ACCEPTED, 1)
+    client.score(theirs, ACCEPTED, 1)
+    assert [e.inputs["question"] for e in reviewed(client, ASK).accepted] == ["ours"]
+
+
+def test_accepted_examples_come_oldest_first_whatever_order_they_were_scored_in() -> None:
+    client = FakeLangfuse()
     ids = submit(client, ASK, [candidate(f"q{i}") for i in range(130)], {})
-    for run_id in reversed(ids):
-        client.create_feedback(run_id, ACCEPTED, score=1)
+    for trace_id in reversed(ids):
+        client.score(trace_id, ACCEPTED, 1)
     assert [e.inputs["question"] for e in reviewed(client, ASK).accepted] == [f"q{i}" for i in range(130)]
 
 
-def test_an_expired_run_is_neither_accepted_nor_withdrawn() -> None:
-    client = FakeLangSmith()
-    [run_id] = submit(client, ASK, [candidate("old")], {})
-    client.create_feedback(run_id, ACCEPTED, score=1)
-    del client.runs[run_id]  # the project's trace retention deleted it
+def test_a_trace_without_generated_at_is_ordered_by_its_timestamp() -> None:
+    client = FakeLangfuse()
+    [trace_id] = submit(client, ASK, [candidate("kept")], {})
+    trace = client.traces_by_id[trace_id]
+    client.traces_by_id[trace_id] = replace(trace, metadata={}, timestamp=datetime(2026, 10, 1, tzinfo=UTC))
+    client.score(trace_id, ACCEPTED, 1)
+    [example] = reviewed(client, ASK).accepted
+    assert example.metadata["generated_at"] == "2026-10-01T00:00:00.000000+00:00"
+
+
+def test_a_deleted_trace_is_neither_accepted_nor_withdrawn() -> None:
+    client = FakeLangfuse()
+    [trace_id] = submit(client, ASK, [candidate("old")], {})
+    client.score(trace_id, ACCEPTED, 1)
+    client.delete_trace(trace_id)
     assert reviewed(client, ASK) == Reviewed([], set())
 
 
-def test_no_candidates_project_means_nothing_accepted() -> None:
-    assert reviewed(FakeLangSmith(), ASK) == Reviewed([], set())
+def test_nothing_generated_means_nothing_accepted() -> None:
+    assert reviewed(FakeLangfuse(), ASK) == Reviewed([], set())

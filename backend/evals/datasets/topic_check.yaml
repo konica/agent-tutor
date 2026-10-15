@@ -1,5 +1,5 @@
 # The topic check (spec 2026-10-13 §3, §6): learner messages labeled on-topic (study, understand, research) or
-# off-topic. LangSmith dataset `name`. These hand-written examples are in every version of both splits and never train
+# off-topic. Langfuse folder `name`. These hand-written examples are in every version of both splits and never train
 # the model; generated examples join after a human accepts them (make evals-generate DATASET=topic_check), split by a
 # stable hash of the question: `eval_share` of them are published here, the rest train the model
 # (make topic-check-train).

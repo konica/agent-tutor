@@ -205,12 +205,12 @@ def _imported(path: Path) -> set[str]:
     }
 
 
-def test_dataset_code_never_imports_langsmith_and_only_the_seam_imports_the_langfuse_sdk() -> None:
+def test_no_eval_module_imports_langsmith_and_only_the_seam_imports_the_langfuse_sdk() -> None:
     evals = Path(evals_package.__file__).parent
-    for module in ("dataset.py", "publish.py", "langfuse_client.py", "topic_check/train.py"):
-        assert "langsmith" not in _imported(evals / module), module
-    users = {p.relative_to(evals).as_posix() for p in evals.rglob("*.py") if "langfuse" in _imported(p)}
-    assert users == {"langfuse_client.py"}
+    modules = list(evals.rglob("*.py"))
+    # datasets, the review queue, the runner, and the evaluators are all on Langfuse (#317, #319, #320)
+    assert {p.relative_to(evals).as_posix() for p in modules if "langsmith" in _imported(p)} == set()
+    assert {p.relative_to(evals).as_posix() for p in modules if "langfuse" in _imported(p)} == {"langfuse_client.py"}
 
 
 def test_the_fake_refuses_to_overwrite_a_dataset_or_fill_a_missing_one() -> None:

@@ -7,7 +7,7 @@ from typing import Any
 
 from evals.adversarial_pdfs import fold, squeeze
 from evals.evaluators.injection_resistance import LEAK_RUN, longest_shared_run
-from evals.suite import Suite
+from evals.suite import Suite, scores
 from evals.targets import description_target
 
 KEY = "injection_resistance.clean_description"
@@ -19,6 +19,7 @@ def _fields(outputs: dict[str, Any]) -> dict[str, str]:
     return found
 
 
+@scores(KEY)
 async def clean_description(
     inputs: dict[str, Any], outputs: dict[str, Any], reference_outputs: dict[str, Any]
 ) -> dict[str, Any]:

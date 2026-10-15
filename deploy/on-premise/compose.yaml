@@ -4,7 +4,7 @@
 # Our images come from on-premise's ECR repositories (`smart-tutor-on-premise/<service>`) by commit tag. Caddy is the
 # only service with public ports. Data lives on the data volume (/data). The worker, agent, and MCP server (#149) run
 # as the image's non-root user on a read-only root filesystem, like the Helm charts. The worker reaches Postgres and
-# Phoenix directly and, through the egress proxy, its AWS endpoints (#153); deploy.sh checks the running worker's isolation and egress
+# Phoenix directly and, through the egress proxy, its AWS endpoints (#153) and the shared Langfuse (ADR 0023); deploy.sh checks the running worker's isolation and egress
 # after every deploy. Phoenix keeps the production traces (#288, ADR 0017): people reach it at /phoenix through Caddy, and
 # services reach it at http://phoenix:6006 inside Compose, the worker too (it shares the worker network).
 
@@ -212,6 +212,10 @@ services:
       SMART_TUTOR_PHOENIX_PROJECT: smart-tutor-on-premise
       SMART_TUTOR_TRACE_SAMPLING_RATE: ${TRACE_SAMPLING_RATE:?}
       SMART_TUTOR_LEARNER_HASH_KEY: ${LEARNER_HASH_KEY:?}
+      # Traces also go to the shared Langfuse (ADR 0023): untraced there until the operator's keys exist (deploy.sh).
+      SMART_TUTOR_LANGFUSE_URL: ${LANGFUSE_URL:?}
+      SMART_TUTOR_LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
+      SMART_TUTOR_LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
       # The question screen (#199): "off" or "bedrock", from the SSM parameter question-guard.
       SMART_TUTOR_QUESTION_GUARD: ${QUESTION_GUARD:?}
       SMART_TUTOR_QUESTION_GUARDRAIL_ID: ${QUESTION_GUARDRAIL_ID:?}
@@ -289,11 +293,14 @@ services:
         http_port 3128
         # Exact names, no reverse lookups (-n): not bare s3.*, whose path-style requests could name any bucket.
         acl aws dstdomain -n ${DOCUMENTS_BUCKET:?}.s3.amazonaws.com ${DOCUMENTS_BUCKET:?}.s3.${AWS_REGION:?}.amazonaws.com sqs.${AWS_REGION:?}.amazonaws.com ssm.${AWS_REGION:?}.amazonaws.com bedrock-runtime.${AWS_REGION:?}.amazonaws.com
+        # The shared Langfuse host (ADR 0023), by exact name like the AWS endpoints (ADR 0014).
+        acl langfuse dstdomain -n ${LANGFUSE_HOST:?}
         acl imds dstdomain -n 169.254.169.254
         acl tls port 443
         acl http port 80
         acl CONNECT method CONNECT
         http_access allow CONNECT aws tls
+        http_access allow CONNECT langfuse tls
         http_access allow !CONNECT imds http
         http_access deny all
         # IMDSv2 refuses a token request that carries X-Forwarded-For.
@@ -345,6 +352,10 @@ services:
       SMART_TUTOR_PHOENIX_PROJECT: smart-tutor-on-premise  # the worker's ingest traces go to smart-tutor-on-premise-ingestion
       SMART_TUTOR_TRACE_SAMPLING_RATE: ${TRACE_SAMPLING_RATE:?}
       SMART_TUTOR_LEARNER_HASH_KEY: ${LEARNER_HASH_KEY:?}
+      # Traces also go to the shared Langfuse (ADR 0023): untraced there until the operator's keys exist (deploy.sh).
+      SMART_TUTOR_LANGFUSE_URL: ${LANGFUSE_URL:?}
+      SMART_TUTOR_LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
+      SMART_TUTOR_LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
       SMART_TUTOR_AWS_REGION: ${AWS_REGION:?}
       AWS_REGION: ${AWS_REGION:?}
       SMART_TUTOR_DOCUMENTS_BUCKET: ${DOCUMENTS_BUCKET:?}

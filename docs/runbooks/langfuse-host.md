@@ -194,3 +194,9 @@ Snapshots of the data volume are taken daily at 02:00 Asia/Ho_Chi_Minh (19:00 UT
 `npx aws-cdk@latest destroy Langfuse-Host` (from `platform/langfuse`). The data volume leaves a final snapshot, and the bucket is kept (delete it by hand when sure). Its name is fixed (`langfuse-<account>-<region>`), so a later deploy fails with "already exists" until you empty and delete the bucket.
 
 `destroy` also schedules the `langfuse/*` secrets for deletion. The final snapshot can only be used with the same secrets (`encryption-seed` and the database passwords), so treat a destroy as deleting the data unless you recover the secrets first: within their recovery window (30 days, the Secrets Manager default; the stack sets none), run `aws secretsmanager restore-secret --secret-id langfuse/<name>` for each one. While a secret is scheduled for deletion, or after you restore it, a new stack can't create a secret with the same name.
+
+## 8. Smart Tutor's organization and projects (ADR 0023)
+
+As the admin, create the organization **Smart Tutor**, and in it the projects `smart-tutor-on-premise`, `smart-tutor-local`, and `smart-tutor-evals`. Invite Smart Tutor's people to that organization only, not to **Platform**. Each project has its own keys under *Settings → API Keys*; make a pair per project and never share one across projects. On-premise keys go into Secrets Manager (`on-premise-deploy.md` section 10); developers make their own pair in `smart-tutor-local`.
+
+Where traces show: in the project, *Tracing → Traces*. Filter by name (`ask` or `ingest`), environment (`on-premise`, `local`), user (the learner hash), or session (the thread).

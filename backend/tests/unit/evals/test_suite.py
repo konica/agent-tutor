@@ -3,13 +3,22 @@
 import pytest
 
 from evals.evaluators import answer_relevance, search_step_ran
-from evals.suite import DatasetSuites, Suite, by_dataset, discover
+from evals.suite import DatasetSuites, Suite, by_dataset, discover, metric_of
 from evals.targets import ask_target
 
 
 def test_every_evaluator_module_with_a_suite_is_discovered() -> None:
     suites = discover()
     assert search_step_ran.SUITE in suites and answer_relevance.SUITE in suites
+
+
+def test_every_evaluator_declares_the_metric_it_scores() -> None:
+    # without it, an evaluator that raised on every example would read as "not run" and pass the gate
+    for suite in discover():
+        for evaluator in suite.evaluators:
+            metric = metric_of(evaluator)
+            assert metric is not None, evaluator
+            assert metric.split(".")[-1] == evaluator.__name__, (metric, evaluator.__name__)
 
 
 def test_suites_on_one_dataset_share_one_experiment() -> None:

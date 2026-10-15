@@ -169,12 +169,13 @@ backend/evals/              # datasets live in LangSmith (versioned there); the 
 
 ```
 infra/
-├── app.py  cdk.json  pyproject.toml
+├── app.py  evals_ci_app.py  cdk.json  pyproject.toml
 ├── smart_tutor_infra/stacks/   # network, data (RDS + database secrets), storage (S3 + SQS/DLQ + lifecycle), cluster (EKS + Pod Identity),
 │                               # registry (ECR), edge (internal ALB + CloudFront), config (SSM, Keycloak secrets), budgets,
 │                               # github_deploy (GitHub OIDC provider + CI deploy role; admin deploys it once),
 │                               # host (on-premise VPC, VM, Elastic IP, data volume, deploy document; #148;
-│                               # snapshot policy, off-hours schedule; #151, ADR 0022)
+│                               # snapshot policy, off-hours schedule; #151, ADR 0022),
+│                               # evals_ci (GitHub Actions role for the smoke evals; outside both modes, own entry evals_ci_app.py; ADR 0024)
 ├── smart_tutor_infra/names.py  # per-mode names; context smart-tutor:mode picks on-premise (default: storage, config,
 │                               # budgets, github_deploy, registry, host) or native-cloud (all but host)
 └── tests/                      # CDK assertion tests

@@ -1,18 +1,15 @@
 """Publishing (PRD §10.3 item 6): hand-written plus accepted examples become the next smoke and full versions in
-Langfuse. Accepted candidates are read from the review queue, still LangSmith's until #319."""
+Langfuse. Accepted candidates are read from the dataset's annotation queue in the same Langfuse project."""
 
-import uuid
 from collections import Counter
 
 import pytest
-from langsmith.utils import LangSmithError
 
 from evals.dataset import Dataset, Example, examples_at, in_eval_share
-from evals.langfuse_client import KEYS, URLS, LangfuseError
+from evals.langfuse_client import KEYS, URLS, LangfuseError, Trace
 from evals.publish import TYPES, main, oldest_first, split_examples
 from evals.review import ACCEPTED, Candidate, submit
 from fakes.langfuse import FakeLangfuse
-from fakes.langsmith import FakeLangSmith
 
 HAND = (Example({"question": "hand"}, {"covered": True}),)
 ASK = Dataset("ask", "smart-tutor-ask", "", HAND)
@@ -43,43 +40,37 @@ def test_an_accepted_item_equal_to_a_hand_written_one_is_not_added_twice() -> No
 
 
 class Stores:
-    """Langfuse (the datasets) and the review queue (LangSmith until #319)."""
+    """Langfuse: the review queue and the datasets."""
 
     def __init__(self) -> None:
         self.langfuse = FakeLangfuse()
-        self.review = FakeLangSmith()
 
-    def submit(self, *questions: str) -> list[uuid.UUID]:
+    def submit(self, *questions: str) -> list[str]:
         candidates = [
             Candidate({"question": q}, {"covered": True}, "factual", ({"chunk": "react-2022:1", "text": "t"},))
             for q in questions
         ]
-        return submit(self.review, ASK, candidates, {})
+        return submit(self.langfuse, ASK, candidates, {})
 
-    def accept(self, *questions: str) -> list[uuid.UUID]:
+    def accept(self, *questions: str) -> list[str]:
         ids = self.submit(*questions)
-        for run_id in ids:
-            self.review.create_feedback(run_id, ACCEPTED, score=1)
+        for trace_id in ids:
+            self.langfuse.score(trace_id, ACCEPTED, 1)
         return ids
 
-    def expire(self, run_id: uuid.UUID) -> None:
-        """The candidates project's trace retention deletes a run and its feedback."""
-        del self.review.runs[run_id]
-        self.review.feedback = [f for f in self.review.feedback if f.run_id != run_id]
-
     def publish(self, *argv: str, dataset: Dataset = ASK) -> int:
-        return main(list(argv), client=self.langfuse, review=self.review, load=lambda key: dataset, keys=[dataset.key])
+        return main(list(argv), client=self.langfuse, load=lambda key: dataset, keys=[dataset.key])
 
     def questions(self, version: str) -> list[str]:
         return [e.inputs["question"] for e in examples_at(self.langfuse, ASK, version)]
 
 
-def test_an_accepted_example_stays_after_its_candidate_run_expires(capsys: pytest.CaptureFixture[str]) -> None:
+def test_an_accepted_example_stays_after_its_candidate_trace_is_deleted(capsys: pytest.CaptureFixture[str]) -> None:
     stores = Stores()
     [old] = stores.accept("old")
     assert stores.publish() == 0
     capsys.readouterr()
-    stores.expire(old)
+    stores.langfuse.delete_trace(old)
     stores.publish()
     assert capsys.readouterr().out.count("unchanged") == 2  # no smaller version
     stores.accept("new")
@@ -87,14 +78,14 @@ def test_an_accepted_example_stays_after_its_candidate_run_expires(capsys: pytes
     assert sorted(stores.questions("full-v2")) == ["hand", "new", "old"]
     assert sorted(stores.questions("smoke-v2")) == ["hand", "new", "old"]
     [carried] = [e for e in examples_at(stores.langfuse, ASK, "full-v2") if e.inputs["question"] == "old"]
-    assert carried.metadata["candidate_run"] == str(old)
+    assert carried.metadata["candidate_run"] == old
 
 
 def test_a_carried_example_a_reviewer_rejects_later_is_dropped() -> None:
     stores = Stores()
     changed, _ = stores.accept("changed", "kept")
     stores.publish()
-    stores.review.create_feedback(changed, ACCEPTED, score=0)
+    stores.langfuse.score(changed, ACCEPTED, 0)
     stores.publish()
     assert sorted(stores.questions("full-v2")) == ["hand", "kept"]
     assert sorted(stores.questions("smoke-v2")) == ["hand", "kept"]
@@ -103,9 +94,9 @@ def test_a_carried_example_a_reviewer_rejects_later_is_dropped() -> None:
 def test_a_later_publish_adds_new_acceptances_and_keeps_smoke_oldest_first() -> None:
     stores = Stores()
     older, newer = stores.submit("older", "newer")
-    stores.review.create_feedback(newer, ACCEPTED, score=1)
+    stores.langfuse.score(newer, ACCEPTED, 1)
     stores.publish()
-    stores.review.create_feedback(older, ACCEPTED, score=1)  # accepted after a newer candidate was published
+    stores.langfuse.score(older, ACCEPTED, 1)  # accepted after a newer candidate was published
     stores.publish()
     assert stores.questions("full-v2") == ["hand", "older", "newer"]
     assert stores.questions("smoke-v2") == ["hand", "older", "newer"]
@@ -155,14 +146,15 @@ def test_types_missing_from_smoke_are_named(capsys: pytest.CaptureFixture[str]) 
 
 
 def test_a_review_queue_error_exits_1_with_a_hint(capsys: pytest.CaptureFixture[str]) -> None:
-    class NoKey(FakeLangSmith):
-        def list_runs(self, **kwargs: object) -> object:
-            raise LangSmithError("Authentication failed")
+    class NoKey(FakeLangfuse):
+        def traces(self, name: str) -> list[Trace]:
+            raise LangfuseError("401: Invalid credentials")
 
     stores = Stores()
-    stores.review = NoKey()
+    stores.langfuse = NoKey()
     assert stores.publish() == 1
-    assert "LANGSMITH_API_KEY" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "Can't reach Langfuse: 401: Invalid credentials" in err and all(key in err for key in KEYS)
 
 
 def test_a_langfuse_error_exits_1_naming_the_keys_and_the_hours(capsys: pytest.CaptureFixture[str]) -> None:
@@ -184,7 +176,7 @@ def test_without_langfuse_keys_publish_exits_1_and_says_which(
     for name in (*KEYS, *URLS):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
-    assert main([], review=FakeLangSmith(), load=lambda key: ASK, keys=["ask"]) == 1
+    assert main([], load=lambda key: ASK, keys=["ask"]) == 1
     assert "LANGFUSE_SECRET_KEY not set" in capsys.readouterr().err
 
 
