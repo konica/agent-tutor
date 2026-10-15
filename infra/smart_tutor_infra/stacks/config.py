@@ -136,17 +136,8 @@ class ConfigStack(cdk.Stack):
                 ),
             )
 
-        # Traces name a learner only by an HMAC of their user id (PRD §10.4); the agent and worker read the Langfuse key
-        # below (ADR 0023). Langfuse's project keys are <prefix>/langfuse/public-key and
-        # <prefix>/langfuse/secret-key, which the operator creates in Langfuse (runbook).
-        secretsmanager.Secret(
-            self,
-            "LearnerHashKeySecret",
-            secret_name=f"{names.secret_prefix}/phoenix/learner-hash-key",
-            description="HMAC key for the learner hash in Phoenix traces",
-            generate_secret_string=secretsmanager.SecretStringGenerator(exclude_punctuation=True, password_length=64),
-        )
-        # The key the app reads as SMART_TUTOR_LEARNER_HASH_KEY. Langfuse's project keys are <prefix>/langfuse/public-key
+        # Traces name a learner only by an HMAC of their user id (PRD §10.4); the key the app reads as
+        # SMART_TUTOR_LEARNER_HASH_KEY. Langfuse's project keys are <prefix>/langfuse/public-key
         # and <prefix>/langfuse/secret-key, which the operator creates in Langfuse (runbooks).
         secretsmanager.Secret(
             self,

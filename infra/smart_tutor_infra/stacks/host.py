@@ -272,13 +272,12 @@ class HostStack(cdk.Stack):
         public_url = f"https://{domain}"
 
         # Database and test-learner secrets (Keycloak's are in ConfigStack). deploy.sh resets the database passwords
-        # (Phoenix's role included) to these values on every deploy, so a restored volume or a rotated secret gets back
+        # to these values on every deploy, so a restored volume or a rotated secret gets back
         # in sync.
         for construct_name, name in (
             ("PostgresSecret", "db/postgres"),
             ("AppDatabaseSecret", "db/app"),
             ("KeycloakDatabaseSecret", "db/keycloak"),
-            ("PhoenixDatabaseSecret", "db/phoenix"),
         ):
             secretsmanager.Secret(
                 self,
@@ -302,22 +301,6 @@ class HostStack(cdk.Stack):
                 password_length=24,
             ),
         )
-        # Phoenix (#288, ADR 0017): the key that signs its sessions (at least 32 characters with a digit and a
-        # lowercase letter, or Phoenix won't start) and the first admin's password, which Phoenix makes the admin change
-        # at first sign-in. Its API key is <prefix>/phoenix/api-key, which the operator creates in Phoenix (runbook).
-        for construct_name, name, length in (
-            ("PhoenixSecret", "phoenix/secret", 64),
-            ("PhoenixAdminPasswordSecret", "phoenix/admin-password", 32),
-        ):
-            secretsmanager.Secret(
-                self,
-                construct_name,
-                secret_name=f"{names.secret_prefix}/{name}",
-                description=f"On-premise Phoenix: {name}",
-                generate_secret_string=secretsmanager.SecretStringGenerator(
-                    exclude_punctuation=True, password_length=length, require_each_included_type=True
-                ),
-            )
 
         # Settings deploy.sh reads (the per-file limits and time zone are ConfigStack's, under the same path).
         for name, value in (

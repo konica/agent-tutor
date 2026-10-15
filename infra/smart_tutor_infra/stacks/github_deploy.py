@@ -95,13 +95,7 @@ class GitHubDeployStack(cdk.Stack):
                         actions=["eks:DescribeCluster"],
                         resources=[f"arn:aws:eks:{region}:{account}:cluster/smart-tutor-*"],
                     ),
-                    # The deploy passes the trace sampling rate to Helm (#229).
-                    iam.PolicyStatement(
-                        sid="ReadTraceSamplingRate",
-                        actions=["ssm:GetParameter"],
-                        resources=[f"arn:aws:ssm:{region}:{account}:parameter{names.ssm_path}/trace-sampling-rate"],
-                    ),
-                    # ... and the question screen's settings to the agent (#199).
+                    # The deploy passes the question screen's settings to the agent (#199).
                     iam.PolicyStatement(
                         sid="ReadQuestionGuardSettings",
                         actions=["ssm:GetParameter"],

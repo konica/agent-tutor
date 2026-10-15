@@ -92,8 +92,6 @@ jobs:
           [[ -n "$documents_bucket" && "$documents_bucket" != None ]] || { echo "::error::SmartTutor-prod-Storage has no DocumentsBucketName output"; exit 1; }
           ingest_queue_url=$(output Storage IngestQueueUrl)
           [[ -n "$ingest_queue_url" && "$ingest_queue_url" != None ]] || { echo "::error::SmartTutor-prod-Storage has no IngestQueueUrl output"; exit 1; }
-          trace_sampling_rate=$(aws ssm get-parameter --name /smart-tutor/trace-sampling-rate --query Parameter.Value --output text)
-          [[ -n "$trace_sampling_rate" && "$trace_sampling_rate" != None ]] || { echo "::error::/smart-tutor/trace-sampling-rate is not set (deploy the Config stack)"; exit 1; }
           question_guard=$(aws ssm get-parameter --name /smart-tutor/question-guard --query Parameter.Value --output text)
           [[ -n "$question_guard" && "$question_guard" != None ]] || { echo "::error::/smart-tutor/question-guard is not set (deploy the Config stack)"; exit 1; }
           question_guardrail_id=$(aws ssm get-parameter --name /smart-tutor/question-guardrail-id --query Parameter.Value --output text)
@@ -106,7 +104,6 @@ jobs:
             echo "VPC_ID=$vpc_id"
             echo "DOCUMENTS_BUCKET=$documents_bucket"
             echo "INGEST_QUEUE_URL=$ingest_queue_url"
-            echo "TRACE_SAMPLING_RATE=$trace_sampling_rate"
             echo "QUESTION_GUARD=$question_guard"
             echo "QUESTION_GUARDRAIL_ID=$question_guardrail_id"
             echo "QUESTION_GUARDRAIL_VERSION=$question_guardrail_version"
@@ -136,7 +133,6 @@ jobs:
             --set global.publicUrl="$CLOUDFRONT_URL" \
             --set global.documentsBucket="$DOCUMENTS_BUCKET" \
             --set global.ingestQueueUrl="$INGEST_QUEUE_URL" \
-            --set-string global.langsmith.samplingRate="$TRACE_SAMPLING_RATE" \
             --set-string global.questionGuard.mode="$QUESTION_GUARD" \
             --set-string global.questionGuard.guardrailId="$QUESTION_GUARDRAIL_ID" \
             --set-string global.questionGuard.guardrailVersion="$QUESTION_GUARDRAIL_VERSION" \

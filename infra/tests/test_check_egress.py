@@ -141,31 +141,6 @@ def test_a_crash_is_not_exit_code_2(check: ModuleType, monkeypatch) -> None:
         check.main()  # an uncaught exception exits Python with status 1
 
 
-def test_leaks_reports_a_proxy_that_lets_langsmith_through(refused: ModuleType, monkeypatch) -> None:
-    monkeypatch.setattr(refused, "_tunnel_status", lambda host, port=443: 200 if "langchain" in host else 403)
-    assert refused.leaks() == ["the proxy answered 200 to CONNECT api.smith.langchain.com:443, not 403"]
-
-
-def test_unreachable_never_probes_phoenix(check: ModuleType, monkeypatch) -> None:
-    def refuse(*args: object, **kwargs: object) -> None:
-        raise AssertionError("no direct probe expected")
-
-    monkeypatch.setenv("AWS_REGION", "us-east-1")
-    monkeypatch.setenv("SMART_TUTOR_PHOENIX_URL", "http://phoenix:6006")  # an old env file must change nothing
-    monkeypatch.setenv("SMART_TUTOR_PHOENIX_API_KEY", "key")
-    monkeypatch.setattr(check.urllib.request, "build_opener", refuse)
-    monkeypatch.setattr(check.urllib.request, "urlopen", lambda url, timeout: None)
-    monkeypatch.setattr(check, "_connects", lambda host, port: True)
-    monkeypatch.setattr(check, "_aws_problems", lambda region: [])
-    assert check.unreachable() == []
-    assert not hasattr(check, "_tracing")
-
-
-def test_leaks_reports_a_direct_connection_to_phoenix(refused: ModuleType, monkeypatch) -> None:
-    monkeypatch.setattr(refused, "_connects", lambda host, port: (host, port) == ("phoenix", 6006))
-    assert refused.leaks() == ["direct phoenix:6006 connected"]
-
-
 @pytest.fixture
 def langfuse(check: ModuleType, monkeypatch) -> list[tuple[str, int]]:
     """unreachable() with everything else fine and Langfuse configured; the CONNECTs it sends are recorded."""

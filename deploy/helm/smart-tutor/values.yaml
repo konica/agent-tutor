@@ -11,13 +11,6 @@ global:
   # and worker won't render for AWS without them.
   documentsBucket: ""
   ingestQueueUrl: ""
-  # LangSmith tracing (PRD §10.4, #229) for the agent and worker: on when a project is set and secrets come from
-  # Secrets Manager. The worker traces into <project>-ingestion. samplingRate is the share of runs traced (0-1); the
-  # deploy passes the SSM parameter trace-sampling-rate.
-  langsmith:
-    project: ""
-    samplingRate: "1"
-
   # Question screen (#199) for the agent: mode is "off" or "bedrock"; "bedrock" needs the guardrail id and version. The
   # deploy passes the SSM parameters question-guard, question-guardrail-id, and question-guardrail-version.
   questionGuard:

@@ -72,8 +72,6 @@ def leaks() -> list[str]:
         for host in (ARBITRARY_HOST, ARBITRARY_IP, sqs_host)  # even an allowed host only through the proxy
         if _connects(host, 443)
     ]
-    if _connects("phoenix", 6006):  # off the worker's network since #316; the app no longer traces into it
-        problems.append("direct phoenix:6006 connected")
     # A name that exists: any answer means the worker has a DNS resolver outside the VM.
     if _resolves(ARBITRARY_HOST):
         problems.append(f"DNS resolved {ARBITRARY_HOST}")
@@ -83,7 +81,6 @@ def leaks() -> list[str]:
         problems.append(f"the proxy answered {status} to GET {url}, not 403")
     tunnels = [(host, 443) for host in (ARBITRARY_HOST, ARBITRARY_IP, f"other-{os.getpid()}.s3.amazonaws.com")]
     tunnels.append((sqs_host, 80))  # an allowed host, but only on 443
-    tunnels.append(("api.smith.langchain.com", 443))  # LangSmith left the allowlist (ADR 0017)
     for host, port in tunnels:
         status = _tunnel_status(host, port)
         if status != 403:

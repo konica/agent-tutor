@@ -155,14 +155,14 @@ backend/tests/
 ├── fakes/                  # FakeChatModel (LangChain fake + bind_tools), fake_embeddings, in-memory repos
 └── conftest.py
 
-backend/evals/              # datasets live in LangSmith (versioned there); the repo holds what builds and runs them
+backend/evals/              # datasets live in Langfuse (versioned there); the repo holds what builds and runs them
 ├── seed_corpus/            # manifest.yaml: openly licensed eval documents with labels (PDFs downloaded to data/seed_corpus/)
 ├── generators/             # synthetic Q&A, negatives, synthetic learners
 ├── adversarial/            # taxonomy.yaml + seed prompts, incl. document-embedded attacks (PRD §10.3)
 ├── evaluators/             # one file per PRD §10.1 evaluator; rubrics/ for Qwen judge prompts
 ├── targets.py              # how an evaluation run invokes the agent
 ├── thresholds.yaml         # PRD §10.1 targets, read by the release gate
-└── run.py                  # run --split smoke|full → LangSmith experiment
+└── run.py                  # run --split smoke|full → Langfuse experiment
 ```
 
 ## 8. Infrastructure and deployment

@@ -822,7 +822,7 @@ def test_rating_a_run_that_is_not_in_the_thread_is_not_found() -> None:
 
 
 def test_a_failing_feedback_send_still_keeps_the_rating(caplog: pytest.LogCaptureFixture) -> None:
-    svc, _, thread_id, run = _rated_setup(FakeAnswerFeedback(error=RuntimeError("LangSmith down")))
+    svc, _, thread_id, run = _rated_setup(FakeAnswerFeedback(error=RuntimeError("Langfuse down")))
 
     with caplog.at_level(logging.ERROR):
         svc.rate_turn(thread_id, LEARNER, run, Rating.UP)

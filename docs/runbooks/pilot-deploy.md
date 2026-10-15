@@ -100,14 +100,12 @@ foreach ($t in "agent", "mcp", "worker") {
 $QuestionGuard = aws ssm get-parameter --name /smart-tutor/question-guard --query Parameter.Value --output text
 $GuardrailId = aws ssm get-parameter --name /smart-tutor/question-guardrail-id --query Parameter.Value --output text
 $GuardrailVersion = aws ssm get-parameter --name /smart-tutor/question-guardrail-version --query Parameter.Value --output text
-helm upgrade --install smart-tutor deploy/helm/smart-tutor -n smart-tutor --create-namespace -f deploy/helm/smart-tutor/values-prod.yaml --set global.imageRegistry=$Registry --set global.imageTag=$Tag --set global.publicUrl=$Url --set global.documentsBucket=$Bucket --set global.ingestQueueUrl=$Queue --set-string global.langsmith.samplingRate=1 --set-string global.questionGuard.mode=$QuestionGuard --set-string global.questionGuard.guardrailId=$GuardrailId --set-string global.questionGuard.guardrailVersion=$GuardrailVersion --wait=legacy --timeout 15m
+helm upgrade --install smart-tutor deploy/helm/smart-tutor -n smart-tutor --create-namespace -f deploy/helm/smart-tutor/values-prod.yaml --set global.imageRegistry=$Registry --set global.imageTag=$Tag --set global.publicUrl=$Url --set global.documentsBucket=$Bucket --set global.ingestQueueUrl=$Queue --set-string global.questionGuard.mode=$QuestionGuard --set-string global.questionGuard.guardrailId=$GuardrailId --set-string global.questionGuard.guardrailVersion=$GuardrailVersion --wait=legacy --timeout 15m
 ```
 
 The three `$QuestionGuard`, `$GuardrailId`, and `$GuardrailVersion` values are the question screen's SSM parameters (`bedrock` since 2026-10-14; `off` turns the screen off); a release without them turns the screen off. `global.publicUrl` is the CloudFront address from step 2. Without it Keycloak refuses to start. `global.documentsBucket` and `global.ingestQueueUrl` are the Storage outputs from step 2; the production chart (it applies when `global.secretStore` is set) refuses to render without them. The first install runs the `db-bootstrap` hook, which creates the database roles and databases. Keycloak's first start takes about 2 min (schema and realm import), so the wait is slow the first time; `--timeout 15m` (Helm's default is 5 min) covers the hook plus that first start. Use `--wait=legacy`: with Helm 4's default (`--wait`, the watcher strategy) Helm sits out the whole timeout on every hook that isn't a Job (the SecretStore, the ExternalSecrets, the ConfigMap), about an hour for a first install. Before the API rolls out, the `migrate` hook brings the app database to the latest Alembic revision; if it fails, the release fails and the running API stays. A failed hook Job stays for debugging: `kubectl -n smart-tutor logs job/migrate`.
 
-Before the first install, or the first deploy after #229 on an existing release (the agent and worker pods stay in `CreateContainerConfigError` until `helm --wait` times out), create the LangSmith API key's secret (`aws secretsmanager create-secret --name smart-tutor/langsmith/api-key --secret-string <service key>`); without it the agent and worker pods can't start. Traces go to the LangSmith project `smart-tutor-native-cloud` (ingestion: `smart-tutor-native-cloud-ingestion`). Set both projects' retention in LangSmith (Projects, the project, Retention) to **Extended (180 days)**: LangSmith SaaS keeps no trace longer than 180 days, which meets D25 (details: `on-premise-deploy.md` section 10).
-
-Since #289 the agent and worker no longer read `LANGSMITH_*`, so native-cloud runs untraced until it gets Langfuse settings when it is picked up again (ADR 0023 §7); the secret and project above are unused until then.
+Native-cloud runs untraced until it gets Langfuse settings when it is picked up again (ADR 0023 §7); its charts carry no tracing settings or secrets.
 
 ## 7. Check
 
@@ -252,7 +250,7 @@ foreach ($Deploy in "keycloak", "api", "agent", "mcp-server", "worker") {
 }
 ```
 
-The agent receives the app database secret but doesn't use it yet, so restarting it is harmless and keeps its copy current. To rotate the LangSmith API key (`smart-tutor/langsmith/api-key`) or the learner-hash key, do the same with the ExternalSecrets `agent-langsmith` and `worker-langsmith` and the deployments `agent` and `worker`. Merging redeploys (it runs the hooks and the CDK deploy), but after a rotation the force-sync and `rollout restart` commands are still manual.
+The agent receives the app database secret but doesn't use it yet, so restarting it is harmless and keeps its copy current. Merging redeploys (it runs the hooks and the CDK deploy), but after a rotation the force-sync and `rollout restart` commands are still manual.
 
 ## 10. Tear down
 

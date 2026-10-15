@@ -8,7 +8,7 @@ The one Python package, `smart_tutor`, shared by every backend deployable.
 | `src/smart_tutor/<module>/` | Feature modules (`knowledge`, `tutoring`, `learning`, `accounts`, `insights`; R2: `catalog`, `quizzes`, `recommendations`, `reports`), each with `domain/ application/ ports/ adapters/` |
 | `src/smart_tutor/apps/` | Entrypoints: `api`, `agent`, `mcp_server`, `worker`, `jobs` |
 | `tests/` | `unit/` (fakes, no I/O), `integration/` (Compose stack), `isolation/` (US-12), `fakes/` |
-| `evals/` | LangSmith dataset generators, evaluators, thresholds, runner |
+| `evals/` | Langfuse dataset generators, evaluators, thresholds, runner |
 
 ## Commands
 

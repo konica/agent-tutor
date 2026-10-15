@@ -5,8 +5,7 @@
 # only service with public ports. Data lives on the data volume (/data). The worker, agent, and MCP server (#149) run
 # as the image's non-root user on a read-only root filesystem, like the Helm charts. The worker reaches Postgres directly and,
 # through the egress proxy, its AWS endpoints (#153) and the shared Langfuse (ADR 0023); deploy.sh checks the running
-# worker's isolation and egress after every deploy. Phoenix is unused since #316 (traces go to Langfuse); #322 removes
-# it. People still reach it at /phoenix through Caddy.
+# worker's isolation and egress after every deploy.
 
 name: smart-tutor
 
@@ -31,7 +30,6 @@ services:
       # Read only by deploy.sh's role bootstrap (psql \getenv), so the passwords never appear on a command line.
       APP_DB_PASSWORD: ${APP_DB_PASSWORD:?}
       KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
-      PHOENIX_DB_PASSWORD: ${PHOENIX_DB_PASSWORD:?}
     networks: [default, worker]
     volumes:
       - /data/postgres:/var/lib/postgresql/data
@@ -40,54 +38,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
-
-  # Unused since #316 (traces go to Langfuse); #322 removes it. Arize Phoenix: people sign in at https://<domain>/phoenix
-  # (Caddy strips the prefix; PHOENIX_HOST_ROOT_PATH puts it back into the pages' links). It keeps its old traces in the
-  # `phoenix` database, which the backup leaves out. Off the worker's network, so the worker can't reach it.
-  phoenix:
-    image: arizephoenix/phoenix:version-20.16.0-nonroot
-    restart: unless-stopped
-    logging: *logging
-    environment:
-      PHOENIX_HOST_ROOT_PATH: /phoenix
-      PHOENIX_ROOT_URL: https://${DOMAIN:?}/phoenix
-      PHOENIX_POSTGRES_HOST: postgres
-      PHOENIX_POSTGRES_PORT: "5432"
-      PHOENIX_POSTGRES_USER: phoenix
-      PHOENIX_POSTGRES_PASSWORD: ${PHOENIX_DB_PASSWORD:?}
-      PHOENIX_POSTGRES_DB: phoenix
-      PHOENIX_WORKING_DIR: /tmp/phoenix  # exports only; the traces are in Postgres
-      PHOENIX_ENABLE_AUTH: "true"
-      PHOENIX_ENABLE_STRONG_PASSWORD_POLICY: "true"
-      PHOENIX_USE_SECURE_COOKIES: "true"  # TLS ends at Caddy
-      PHOENIX_SECRET: ${PHOENIX_SECRET:?}
-      # Read only when the admin account is created (the first start); Phoenix makes the admin change it.
-      PHOENIX_DEFAULT_ADMIN_INITIAL_PASSWORD: ${PHOENIX_ADMIN_PASSWORD:?}
-      # D25. Read only when the default retention policy is created (the first start); later, change it in the UI.
-      PHOENIX_DEFAULT_RETENTION_POLICY_DAYS: "180"
-      # The traces hold learners' questions and answers: no analytics pixels in the UI, no assistant that sends them
-      # to an LLM provider, and no MCP server (/mcp) or code sandbox providers, which would give tools and third
-      # parties another way to read or send them.
-      PHOENIX_TELEMETRY_ENABLED: "false"
-      PHOENIX_DISABLE_AGENT_ASSISTANT: "true"
-      PHOENIX_ENABLE_MCP_SERVER: "false"
-      PHOENIX_ALLOWED_SANDBOX_PROVIDERS: NONE
-    networks: [default]
-    user: "65532:65532"  # the image's nonroot user
-    read_only: true
-    tmpfs: [/tmp:size=64m]
-    cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
-    mem_limit: 1g
-    healthcheck:
-      # The image has Python but no shell or curl.
-      test: ["CMD", "/usr/bin/python3.13", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:6006/healthz', timeout=5)"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 60s  # the first start migrates the phoenix database
-    depends_on:
-      postgres: {condition: service_healthy}
 
   keycloak:
     image: ${REGISTRY:?}/${REPOSITORY_PREFIX:?}/keycloak:${IMAGE_TAG:?}
@@ -398,7 +348,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # One origin: `/` → web, `/api/*` → API, `/auth/*` → Keycloak, `/phoenix/*` → Phoenix; a Let's Encrypt certificate for DOMAIN (ADR 0012).
+  # One origin: `/` → web, `/api/*` → API, `/auth/*` → Keycloak; a Let's Encrypt certificate for DOMAIN (ADR 0012).
   caddy:
     image: caddy:2.11-alpine
     restart: unless-stopped
@@ -422,4 +372,3 @@ services:
       web: {condition: service_started}
       api: {condition: service_started}
       keycloak: {condition: service_started}
-      phoenix: {condition: service_started}
