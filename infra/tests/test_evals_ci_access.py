@@ -111,18 +111,22 @@ def test_it_names_no_resource_of_either_mode(template: Template) -> None:
             assert name not in text, (mode, name)
 
 
-def test_the_runbook_names_the_workflow_the_variable_and_the_secrets() -> None:
+def test_the_runbook_deploys_the_stack_and_names_the_secrets() -> None:
     text = (RUNBOOKS / "evals-ci.md").read_text(encoding="utf-8")
     for name in (
         "evals-smoke.yml",
+        "SmartTutor-EvalsCI",
+        "make evals-ci-deploy",
+        "make evals-ci-destroy",
+        "RoleArn",
+        "smart-tutor-evals-ci",
         "EVALS_AWS_ROLE_ARN",
         "LANGFUSE_PUBLIC_KEY",
         "LANGFUSE_SECRET_KEY",
         "LANGFUSE_BASE_URL",
         "smart-tutor-evals",
         "langfuse-host.md",
-        "evals-ci-bedrock-policy.json",
-        "evals-ci-trust-policy.json",
-        "smart-tutor-evals-ci",
     ):
         assert name in text, name
+    assert "aws iam create-role" not in text and "put-role-policy" not in text  # the stack makes the role
+    assert not list(RUNBOOKS.glob("evals-ci-*.json"))  # one copy of the policy: the stack
