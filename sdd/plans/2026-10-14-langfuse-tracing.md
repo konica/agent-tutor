@@ -477,5 +477,5 @@ Pydantic-settings rejects unknown `SMART_TUTOR_*` keys in a `.env` file read fro
 - README: the Phoenix row and lines and the `make up` comment; tell developers to drop `SMART_TUTOR_PHOENIX_*` from `.env`. AGENTS.md local-dev lines.
 - On-premise runbook §10 ("Tracing (Langfuse)"): drop the Phoenix copy, ratings-to-Phoenix, and Phoenix-key steps; mark §11 Phoenix "unused since #316, removed by #322"; egress-check and worker-egress paragraphs (the worker no longer reaches Phoenix); teardown row for `phoenix/api-key` (no longer read). Monitoring runbook: Bedrock usage in Langfuse traces.
 - Deferred minor: in `langfuse-host.md`, move the Smart Tutor organization section in with the other admin sections (before patching/restore/teardown), renumbering.
-- PRD v2.69: reword the "Changes from v2.68" row (Langfuse only; Phoenix receives nothing until #322 removes it; ratings reach Langfuse with #318) and §9.1, §9.10, §9.12, §10.4, Appendix A (no Phoenix key).
+- PRD v2.70 (v2.69 was merged with PR #333, so the change got its own v2.70 row rather than rewording the "Changes from v2.68" row) (Langfuse only; Phoenix receives nothing until #322 removes it; ratings reach Langfuse with #318) and §9.1, §9.10, §9.12, §10.4, Appendix A (no Phoenix key).
 - Checks: `cd infra && uv run pytest -q`. Commit: `Document Langfuse-only tracing (#316)`.

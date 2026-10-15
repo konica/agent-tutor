@@ -467,7 +467,7 @@ Invoke-WebRequest -Method Post "$Url/phoenix/v1/traces" -SkipHttpErrorCheck   # 
 Then, if you made a system key, send a test span with it. From a Session Manager shell (section 7):
 
 ```bash
-PHOENIX_API_KEY=$(aws secretsmanager get-secret-value --region us-east-1 --secret-id smart-tutor-on-premise/phoenix/api-key --query SecretString --output text) docker run --rm -i --network smart-tutor_worker --entrypoint /usr/bin/python3.13 -e PHOENIX_API_KEY arizephoenix/phoenix:version-20.16.0-nonroot - http://phoenix:6006 smart-tutor-on-premise < /opt/smart-tutor/on-premise/send-test-span.py
+PHOENIX_API_KEY=$(aws secretsmanager get-secret-value --region us-east-1 --secret-id smart-tutor-on-premise/phoenix/api-key --query SecretString --output text) docker run --rm -i --network smart-tutor_default --entrypoint /usr/bin/python3.13 -e PHOENIX_API_KEY arizephoenix/phoenix:version-20.16.0-nonroot - http://phoenix:6006 smart-tutor-on-premise < /opt/smart-tutor/on-premise/send-test-span.py
 ```
 
 It prints `test-span (...) is in the Phoenix project smart-tutor-on-premise`. Delete that trace in the UI afterwards if you like.

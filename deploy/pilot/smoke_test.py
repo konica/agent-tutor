@@ -803,7 +803,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument(
         "--trace-project",
-        help="also require the ask's trace in this Phoenix project (needs PHOENIX_API_KEY)",
+        help="also require the ask's trace in this Phoenix project (needs PHOENIX_API_KEY) (checks Phoenix, which receives nothing since #316; moves to Langfuse with #318)",
     )
     args = parser.parse_args(argv)
 

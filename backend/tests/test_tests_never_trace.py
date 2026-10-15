@@ -15,7 +15,7 @@ from langsmith import run_trees
 from langsmith import utils as ls_utils
 
 from fakes import RecordingClient, fake_chat_model
-from smart_tutor.shared.adapters.tracing import start_tracing
+from smart_tutor.shared.adapters.tracing import start_tracing, tracing_enabled
 from smart_tutor.shared.config import Settings
 
 
@@ -59,11 +59,17 @@ def test_a_model_call_on_another_thread_sends_no_trace(tracing_env: RecordingCli
     assert tracing_env.payloads == []
 
 
-def test_positive_control_without_the_guard_the_environment_turns_tracing_on(tracing_env: RecordingClient) -> None:
-    with without_the_guard():
-        call_a_model()
-    assert any(p["op"] == "create" for p in tracing_env.payloads)
-    tracing_env.payloads.clear()  # sent on purpose; the root conftest fails a test that leaves a trace behind
+def test_positive_control_without_the_guard_a_dotenv_langfuse_key_pair_turns_tracing_on(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / ".env").write_text(
+        "SMART_TUTOR_LANGFUSE_URL=https://langfuse.example\n"
+        "SMART_TUTOR_LANGFUSE_PUBLIC_KEY=pk-lf-x\nSMART_TUTOR_LANGFUSE_SECRET_KEY=sk-lf-x\n"
+    )
+    monkeypatch.chdir(tmp_path)
+    for name in ("URL", "PUBLIC_KEY", "SECRET_KEY"):
+        monkeypatch.delenv(f"SMART_TUTOR_LANGFUSE_{name}", raising=False)
+    assert tracing_enabled(Settings())
 
 
 def test_start_tracing_keeps_langsmith_off_whatever_the_environment_says(

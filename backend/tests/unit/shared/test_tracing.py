@@ -162,10 +162,10 @@ def test_a_metadata_value_of_none_gives_langfuse_no_key() -> None:
     assert "langfuse.observation.input" not in attributes
 
 
-def test_a_thread_is_present_when_its_id_is_not_none_as_in_the_ask_metadata() -> None:
+def test_a_thread_is_the_session_only_when_its_id_is_not_empty() -> None:
     assert learner_attributes("h", None) == {"user.id": "h"}
     assert learner_attributes("h", "t-1") == {"user.id": "h", "session.id": "t-1"}
-    assert learner_attributes("h", "") == {"user.id": "h", "session.id": ""}
+    assert learner_attributes("h", "") == {"user.id": "h"}
 
 
 def test_each_ingest_is_its_own_trace() -> None:

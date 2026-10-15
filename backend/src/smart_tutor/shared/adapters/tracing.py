@@ -260,7 +260,7 @@ def _text(value: object) -> str:
 def learner_attributes(user_hash: str, session_id: str | None) -> dict[str, str]:
     """A root span's learner and thread, set at its start: a root starts from an empty context, so it doesn't inherit
     them from `run_context`. A thread is present when its id is not None, as in the ask's metadata."""
-    return {USER_ID: user_hash} | ({SESSION_ID: session_id} if session_id is not None else {})
+    return {USER_ID: user_hash} | ({SESSION_ID: session_id} if session_id else {})
 
 
 @contextmanager
