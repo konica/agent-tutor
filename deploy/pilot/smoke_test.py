@@ -4,7 +4,7 @@
 Usage:
   python3 deploy/pilot/smoke_test.py <url> [--deadline-seconds 600] [--interval-seconds 15]
   SMOKE_TEST_USERNAME=... SMOKE_TEST_PASSWORD=... python3 deploy/pilot/smoke_test.py <url> --end-to-end
-  PHOENIX_API_KEY=... SMOKE_TEST_USERNAME=... SMOKE_TEST_PASSWORD=... python3 deploy/pilot/smoke_test.py <url> --end-to-end --trace-project smart-tutor-on-premise
+  LANGFUSE_BASE_URL=... LANGFUSE_PUBLIC_KEY=... LANGFUSE_SECRET_KEY=... SMOKE_TEST_USERNAME=... SMOKE_TEST_PASSWORD=... python3 deploy/pilot/smoke_test.py <url> --end-to-end --trace-project smart-tutor-on-premise
 
 <url> is the public address, e.g. https://<id>.cloudfront.net or the on-premise https://<host>.
 
@@ -18,12 +18,12 @@ the thread is kept, as every thread is. The same deadline covers the whole run. 
 document's subject may add one subject, "Smoke testing", to the shared catalog. Credentials come from the
 environment and are never printed.
 
---trace-project then reads the ask's run id from the conversation's turns and waits for its trace in that Phoenix
-project (#289): a root span named `ask` whose trace id is the run id and whose span id is its low 64 bits, with the
-run metadata of PRD §10.4, and holding neither the access token, the username, nor the learner's user id.
-It then rates that turn thumbs-up (the answer was just checked) and waits for the `learner_rating` annotation on the
-ask span (#290): HUMAN, label `up`, score 1. That proves the API has the Phoenix settings.
-PHOENIX_URL defaults to `<url>/phoenix`. The key is never printed.
+--trace-project then checks that the Langfuse key pair belongs to that project, reads the ask's run id from the
+conversation's turns, and waits for the trace's `ask` root observation (#316): its id is the run id's low 64 bits,
+it holds the run metadata of PRD §10.4, its session is the thread, and the trace holds neither the access token,
+the username, nor the learner's user id. It then rates that turn thumbs-up (the answer was just checked) and waits for
+a `learner_rating` BOOLEAN `true` score on the trace, with the project's score config and the trace's environment
+(#318). That proves the API has the Langfuse settings. The keys are never printed.
 
 Exit 0 when everything passes, 1 otherwise. Standard library only.
 """
@@ -400,6 +400,7 @@ class _Run:
     document_id: str | None = None
     thread_id: str | None = None
     ask_run_id: str | None = None  # the ask's run id, read from the thread's turns (check_trace)
+    ask_environment: str | None = None  # the ask root's Langfuse environment, which the rating must share
 
 
 def upload(s: _Session, run: _Run) -> str:
@@ -559,12 +560,23 @@ def ask(s: _Session, run: _Run) -> None:
         )
 
 
-def _phoenix(s: _Session, path: str, api_key: str, phoenix_url: str) -> Response:
-    """A Phoenix REST call: the API key only, never the learner's bearer token."""
+@dataclass(frozen=True)
+class _Langfuse:
+    """Where and how to read Langfuse: the expected project and the key pair (never printed)."""
+
+    project: str
+    base_url: str
+    public_key: str
+    secret_key: str
+
+
+def _langfuse(s: _Session, path: str, langfuse: _Langfuse) -> Response:
+    """A Langfuse REST call: the project's key pair only, never the learner's bearer token."""
+    pair = f"{langfuse.public_key}:{langfuse.secret_key}".encode()
     return s.request(
         "GET",
-        phoenix_url.rstrip("/") + path,
-        headers={"authorization": f"Bearer {api_key}"},
+        langfuse.base_url.rstrip("/") + path,
+        headers={"authorization": "Basic " + base64.b64encode(pair).decode()},
     )
 
 
@@ -581,15 +593,23 @@ def _token_subject(token: str | None) -> str | None:
     return sub if isinstance(sub, str) and sub else None
 
 
-def check_trace(
-    s: _Session,
-    run: _Run,
-    project: str,
-    phoenix_url: str,
-    api_key: str,
-    username: str,
-) -> str:
-    """Wait for the ask's trace in the Phoenix project; require its root span, metadata, and no leaked secrets."""
+def check_trace(s: _Session, run: _Run, langfuse: _Langfuse, username: str) -> str:
+    """Wait for the ask's trace in the Langfuse project; require its root, metadata, and no leaked secrets."""
+    project = langfuse.project
+    r = _langfuse(s, "/api/public/projects", langfuse)
+    if r.status in (401, 403):
+        raise SmokeTestError("trace: Langfuse refused the key pair")
+    if r.status != 200:
+        raise SmokeTestError(f"trace: GET Langfuse's project gave {r.status}, expected 200")
+    found = _json(r, "trace")
+    projects = found.get("data") if isinstance(found, dict) else None
+    first = projects[0] if isinstance(projects, list) and projects else None
+    name = first.get("name") if isinstance(first, dict) else None
+    if name != project:
+        raise SmokeTestError(
+            f"trace: the Langfuse key belongs to project {name!r}, not {project!r}"
+        )
+
     r = s.api("GET", f"/api/threads/{run.thread_id}/turns")
     if r.status != 200:
         raise SmokeTestError(
@@ -602,38 +622,42 @@ def check_trace(
         raise SmokeTestError("trace: the turn has no run id")
     run.ask_run_id = run_id
 
-    trace_id = uuid.UUID(run_id).hex
-    path = (
-        f"/v1/projects/{urllib.parse.quote(project, safe='')}/spans"
-        f"?trace_id={trace_id}&limit=100"
+    # The v1 trace endpoint answers 404 on a v4 host; the v2 observations endpoint carries the same data.
+    path = "/api/public/v2/observations?" + urllib.parse.urlencode(
+        {
+            "traceId": uuid.UUID(run_id).hex,
+            "fields": "core,basic,io,metadata",
+            "expandMetadata": ",".join(TRACE_METADATA),
+            "limit": 1000,
+        }
     )
-    spans: list[object] = []
+    observations: list[object] = []
     root: dict[str, object] = {}
-    seen = False  # spans of the trace exist in Phoenix, the ask span or not
-    last_other: int | None = None  # the last answer that was not 200, 404, 401, 403
+    seen = False  # observations of the trace exist in Langfuse, the ask root or not
+    last_other: int | None = None  # the last answer that was not 200, 401, 403
     try:
         while True:
-            r = _phoenix(s, path, api_key, phoenix_url)
+            r = _langfuse(s, path, langfuse)
             if r.status in (401, 403):
-                raise SmokeTestError("trace: Phoenix refused the API key")
+                raise SmokeTestError("trace: Langfuse refused the key pair")
             if r.status == 200:
                 found = _json(r, "trace")
                 data = found.get("data") if isinstance(found, dict) else None
-                spans = data if isinstance(data, list) else []
-                seen = seen or bool(spans)
+                observations = data if isinstance(data, list) else []
+                seen = seen or bool(observations)
                 root = next(
                     (
                         x
-                        for x in spans
+                        for x in observations
                         if isinstance(x, dict)
                         and x.get("name") == "ask"
-                        and x.get("parent_id") is None
+                        and x.get("parentObservationId") is None
                     ),
                     {},
                 )
                 if root:
                     break
-            elif r.status != 404:  # 404: the project appears with its first span
+            else:
                 last_other = r.status
             s.wait("the ask's trace")
     except SmokeTestError as e:
@@ -642,29 +666,30 @@ def check_trace(
         tail = f"; last answer {last_other}" if last_other else ""
         if seen:
             raise SmokeTestError(
-                f"trace: run {run_id} reached Phoenix but its ask span never arrived{tail}"
+                f"trace: run {run_id} reached Langfuse but its ask observation never arrived{tail}"
             ) from None
         raise SmokeTestError(
-            f"trace: run {run_id} never reached Phoenix (is tracing on, with the key "
-            f"<prefix>/phoenix/api-key, and the sampling rate trace-sampling-rate 1?){tail}"
+            f"trace: run {run_id} never reached Langfuse (is tracing on, with the keys "
+            f"<prefix>/langfuse/public-key and secret-key, and the sampling rate trace-sampling-rate 1?){tail}"
         ) from None
 
-    context = root.get("context")
-    span_id = context.get("span_id") if isinstance(context, dict) else None
+    root_id = root.get("id")
     low_bits = f"{uuid.UUID(run_id).int & 0xFFFF_FFFF_FFFF_FFFF:016x}"
-    if span_id != low_bits:
+    if root_id != low_bits:
         raise SmokeTestError(
-            f"trace: the root span's id {span_id!r} is not the run id's low 64 bits ({low_bits})"
+            f"trace: the root observation's id {root_id!r} is not the run id's low 64 bits ({low_bits})"
         )
-    attributes = root.get("attributes")
-    attributes = attributes if isinstance(attributes, dict) else {}
-    missing = [k for k in TRACE_METADATA if f"metadata.{k}" not in attributes]
+    metadata = root.get("metadata")
+    metadata = metadata if isinstance(metadata, dict) else {}
+    missing = [k for k in TRACE_METADATA if k not in metadata]
     if missing:
-        raise SmokeTestError(f"trace: the ask span lacks metadata {', '.join(missing)}")
-    if attributes["metadata.thread_id"] != run.thread_id:
-        raise SmokeTestError("trace: the ask span belongs to another thread")
+        raise SmokeTestError(f"trace: the ask trace lacks metadata {', '.join(missing)}")
+    if metadata["thread_id"] != run.thread_id:
+        raise SmokeTestError("trace: the ask trace belongs to another thread")
+    if root.get("sessionId") != run.thread_id:
+        raise SmokeTestError("trace: the ask trace's session is not its thread")
 
-    blob = json.dumps(spans)
+    blob = json.dumps(observations)
     if s.token and s.token in blob:
         raise SmokeTestError("trace: the trace holds the learner's access token")
     if username and username in blob:
@@ -672,13 +697,13 @@ def check_trace(
     user_id = _token_subject(s.token)
     if user_id and user_id in blob:
         raise SmokeTestError("trace: the trace holds the learner's user id")
+    environment = root.get("environment")
+    run.ask_environment = environment if isinstance(environment, str) else None
     return f"ask trace {run_id} is in {project}"
 
 
-def check_rating(
-    s: _Session, run: _Run, project: str, phoenix_url: str, api_key: str
-) -> str:
-    """Rate the ask thumbs-up and wait for its learner_rating annotation on the ask span in Phoenix (#290)."""
+def check_rating(s: _Session, run: _Run, langfuse: _Langfuse) -> str:
+    """Rate the ask thumbs-up and wait for its learner_rating score on the trace in Langfuse (#318)."""
     ask_run_id = run.ask_run_id
     if ask_run_id is None:
         raise SmokeTestError("rating: the ask's run id is unknown (the trace check comes first)")
@@ -691,48 +716,44 @@ def check_rating(
         raise SmokeTestError(
             f"rating: PUT the turn's rating gave {r.status}, expected 200"
         )
-    span_id = f"{uuid.UUID(ask_run_id).int & 0xFFFF_FFFF_FFFF_FFFF:016x}"
-    path = (
-        f"/v1/projects/{urllib.parse.quote(project, safe='')}/span_annotations"
-        f"?span_ids={span_id}&include_annotation_names=learner_rating"
+    path = "/api/public/v3/scores?" + urllib.parse.urlencode(
+        {
+            "traceId": uuid.UUID(ask_run_id).hex,
+            "name": "learner_rating",
+            "fields": "details",
+            "limit": 100,
+        }
     )
     try:
         while True:
-            r = _phoenix(s, path, api_key, phoenix_url)
+            r = _langfuse(s, path, langfuse)
             if r.status in (401, 403):
-                raise SmokeTestError("rating: Phoenix refused the API key")
+                raise SmokeTestError("rating: Langfuse refused the key pair")
             found = _json(r, "rating") if r.status == 200 else {}
             data = found.get("data") if isinstance(found, dict) else None
-            mine = [
-                a
-                for a in data or []
-                if isinstance(a, dict) and a.get("identifier") == ask_run_id
-            ]
-            if mine:
+            scores = [x for x in data or [] if isinstance(x, dict)]
+            if scores:
                 break
-            s.wait("the rating's annotation")
+            s.wait("the rating's score")
     except SmokeTestError as e:
         if "the deadline passed" not in str(e):
             raise
         raise SmokeTestError(
-            f"rating: run {ask_run_id}'s rating never reached Phoenix "
-            "(does the API have the Phoenix settings?)"
+            f"rating: run {ask_run_id}'s rating never reached Langfuse "
+            "(does the API have the Langfuse settings, and does the project have the learner_rating score config?)"
         ) from None
-    result = mine[0].get("result")
-    result = result if isinstance(result, dict) else {}
-    # Phoenix returns the score as a float, so compare numerically.
-    score = result.get("score")
+    score = max(scores, key=lambda x: str(x.get("timestamp") or ""))
     if (
-        mine[0].get("annotator_kind") != "HUMAN"
-        or result.get("label") != "up"
-        or isinstance(score, bool)
-        or not isinstance(score, (int, float))
-        or score != 1
+        score.get("dataType") != "BOOLEAN"
+        or score.get("value") is not True
+        or score.get("environment") != run.ask_environment
+        or not score.get("configId")
     ):
         raise SmokeTestError(
-            f"rating: the annotation is not a HUMAN 'up' with score 1: {mine[0]!r}"
+            f"rating: the score is not a BOOLEAN true in environment {run.ask_environment!r} "
+            f"with the learner_rating config: {score!r}"
         )
-    return f"rating of {ask_run_id} is in {project}"
+    return f"rating of {ask_run_id} is in {langfuse.project}"
 
 
 def clean_up(s: _Session, run: _Run) -> str | None:
@@ -758,7 +779,7 @@ def run_end_to_end(
     interval: float,
     username: str,
     password: str,
-    trace: tuple[str, str, str] | None = None,
+    trace: _Langfuse | None = None,
 ) -> int:
     s = _Session(base, deadline, interval)
     run = _Run(secrets.token_hex(4))
@@ -773,8 +794,8 @@ def run_end_to_end(
         ask(s, run)
         print("cited answer received")
         if trace:
-            print(check_trace(s, run, *trace, username))
-            print(check_rating(s, run, *trace))
+            print(check_trace(s, run, trace, username))
+            print(check_rating(s, run, trace))
     except SmokeTestError as e:
         failure = str(e)
     except (http.client.HTTPException, OSError, KeyError, TypeError, ValueError) as e:
@@ -803,21 +824,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument(
         "--trace-project",
-        help="also require the ask's trace in this Phoenix project (needs PHOENIX_API_KEY)",
+        help="also require the ask's trace and rating in this Langfuse project (needs LANGFUSE_BASE_URL, LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY)",
     )
     args = parser.parse_args(argv)
 
-    trace: tuple[str, str, str] | None = None
+    trace: _Langfuse | None = None
     if args.trace_project:
         if not args.end_to_end:
             print("--trace-project needs --end-to-end")
             return 1
-        phoenix_key = os.environ.get("PHOENIX_API_KEY", "")
-        if not phoenix_key:
-            print("--trace-project needs PHOENIX_API_KEY in the environment")
+        names = ("LANGFUSE_BASE_URL", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY")
+        values = [os.environ.get(n, "") for n in names]
+        absent = [n for n, v in zip(names, values) if not v]
+        if absent:
+            print(
+                "--trace-project needs LANGFUSE_BASE_URL, LANGFUSE_PUBLIC_KEY and "
+                f"LANGFUSE_SECRET_KEY in the environment (missing {', '.join(absent)})"
+            )
             return 1
-        phoenix_url = os.environ.get("PHOENIX_URL") or args.url.rstrip("/") + "/phoenix"
-        trace = (args.trace_project, phoenix_url, phoenix_key)
+        trace = _Langfuse(args.trace_project, *values)
 
     username = os.environ.get("SMOKE_TEST_USERNAME", "")
     password = os.environ.get("SMOKE_TEST_PASSWORD", "")

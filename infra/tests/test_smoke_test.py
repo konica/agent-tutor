@@ -222,31 +222,36 @@ UPLOAD = "33333333-3333-3333-3333-333333333333"
 SUBJECT = "44444444-4444-4444-4444-444444444444"
 THREAD = "55555555-5555-5555-5555-555555555555"
 REALM = "/auth/realms/smart-tutor"
-PHOENIX_KEY = "phoenix-test-not-a-key"
+LANGFUSE_PUBLIC = "pk-lf-test-not-a-key"
+LANGFUSE_SECRET = "sk-lf-test-not-a-key"
+LANGFUSE_AUTH = "Basic " + base64.b64encode(
+    f"{LANGFUSE_PUBLIC}:{LANGFUSE_SECRET}".encode()
+).decode()
 QUESTION_TEXT = "What is the Smart Tutor smoke test passphrase?"
 
 
-def _ask_span(run_id: str, thread_id: str) -> dict[str, Any]:
+def _ask_observation(run_id: str, thread_id: str) -> dict[str, Any]:
     return {
+        "id": f"{uuid.UUID(run_id).int & 0xFFFFFFFFFFFFFFFF:016x}",
+        "traceId": uuid.UUID(run_id).hex,
+        "parentObservationId": None,
         "name": "ask",
-        "context": {
-            "trace_id": uuid.UUID(run_id).hex,
-            "span_id": f"{uuid.UUID(run_id).int & 0xFFFFFFFFFFFFFFFF:016x}",
+        "type": "CHAIN",
+        "environment": "on-premise",
+        "userId": "ab" * 32,
+        "sessionId": thread_id,
+        "input": '{"question": "What is the passphrase?"}',
+        "output": "The passphrase is in your document [1].",
+        "metadata": {
+            "deployment": "on-premise",
+            "chat_model": "m",
+            "embedding_model": "e",
+            "thread_id": thread_id,
+            "learner_hash": "ab" * 32,
+            "limited": "false",
+            "decline": "none",
+            "chunks": "2",
         },
-        "span_kind": "CHAIN",
-        "parent_id": None,
-        "status_code": "OK",
-        "attributes": {
-            "metadata.deployment": "on-premise",
-            "metadata.chat_model": "m",
-            "metadata.embedding_model": "e",
-            "metadata.thread_id": thread_id,
-            "metadata.learner_hash": "ab" * 32,
-            "metadata.limited": False,
-            "metadata.decline": "none",
-            "metadata.chunks": 2,
-        },
-        "events": [],
     }
 
 
@@ -274,18 +279,23 @@ class FakePilot:
         self.stream: list[bytes] | None = None
         self.delete_status = 204
         self.trace_run_id = "99999999-8888-4777-8666-555555555555"
-        self.trace_spans: list[dict] | None = None  # default: just the ask span
-        self.trace_after_polls = 1  # the ask span appears on the 2nd poll
-        self.trace_poll_status = 404  # what the polls before that answer
+        self.langfuse_project = "smart-tutor-on-premise"
+        self.langfuse_accepted_auth = LANGFUSE_AUTH
+        self.trace_observations: list[dict] | None = None  # default: just the ask root
+        self.trace_after_polls = 1  # the ask root appears on the 2nd poll
+        self.trace_poll_status = 200  # what the polls before that answer (200 = no observations yet)
         self.rating_put_status = 200
-        self.rating_label = "up"  # what Phoenix holds for the rating
-        self.rating_after_polls = 1  # the annotation appears on the 2nd poll
-        self.rating_phoenix_status = 200  # 401 = Phoenix refuses the key
+        self.rating_value: object = True  # what Langfuse holds for the rating
+        self.rating_environment = "on-premise"
+        self.rating_config_id: str | None = "cfg"
+        self.rating_older_false = False  # also an older, false score of the same trace
+        self.rating_after_polls = 1  # the score appears on the 2nd poll
+        self.rating_langfuse_status = 200  # 401 = Langfuse refuses the key
         self.rating_puts: list[object] = []  # bodies; handle() already requires the learner's bearer
         self.rating_polls = 0
         # What happened
         self.trace_polls = 0
-        self.phoenix_auth: list[str | None] = []
+        self.langfuse_auth: list[str | None] = []
         self.state = "processing"
         self.document_polls = 0
         self.auth_request: dict[str, str] = {}
@@ -308,50 +318,54 @@ class FakePilot:
             "failure_reason": self.failure_reason if self.state == "failed" else None,
         }
 
-    def _phoenix(
+    def _langfuse(
         self, method: str, path: str, query: dict[str, str], headers: dict[str, str]
     ) -> Route:
-        self.phoenix_auth.append(headers.get("authorization"))
-        if headers.get("authorization") != f"Bearer {PHOENIX_KEY}":
-            return self._json(401, {"detail": "bad key"})
-        spans_path = "/phoenix/v1/projects/smart-tutor-on-premise/spans"
-        if method == "GET" and path == spans_path:
-            assert query["trace_id"] == uuid.UUID(self.trace_run_id).hex
+        self.langfuse_auth.append(headers.get("authorization"))
+        if headers.get("authorization") != self.langfuse_accepted_auth:
+            return self._json(401, {"message": "bad key"})
+        if method == "GET" and path == "/langfuse/api/public/projects":
+            return self._json(
+                200, {"data": [{"id": "p1", "name": self.langfuse_project}]}
+            )
+        if method == "GET" and path == "/langfuse/api/public/v2/observations":
+            assert query["traceId"] == uuid.UUID(self.trace_run_id).hex
+            assert {"io", "metadata"} <= set(query["fields"].split(","))
+            assert query["expandMetadata"] == ",".join(smoke.TRACE_METADATA)
             self.trace_polls += 1
             if self.trace_polls <= self.trace_after_polls:
-                return self._json(self.trace_poll_status, {"detail": "not yet"})
-            spans = (
-                self.trace_spans
-                if self.trace_spans is not None
-                else [_ask_span(self.trace_run_id, THREAD)]
+                return self._json(self.trace_poll_status, {"data": [], "meta": {}})
+            observations = (
+                self.trace_observations
+                if self.trace_observations is not None
+                else [_ask_observation(self.trace_run_id, THREAD)]
             )
-            return self._json(200, {"data": spans, "next_cursor": None})
-        annotations_path = (
-            "/phoenix/v1/projects/smart-tutor-on-premise/span_annotations"
-        )
-        if method == "GET" and path == annotations_path:
-            run_id = self.trace_run_id
-            assert query["span_ids"] == f"{uuid.UUID(run_id).int & 0xFFFF_FFFF_FFFF_FFFF:016x}"
-            assert query["include_annotation_names"] == "learner_rating"
+            return self._json(200, {"data": observations, "meta": {}})
+        if method == "GET" and path == "/langfuse/api/public/v3/scores":
+            assert query["traceId"] == uuid.UUID(self.trace_run_id).hex
+            assert query["name"] == "learner_rating"
             self.rating_polls += 1
-            if self.rating_phoenix_status != 200:
-                return self._json(self.rating_phoenix_status, {"detail": "no"})
+            if self.rating_langfuse_status != 200:
+                return self._json(self.rating_langfuse_status, {"message": "no"})
             if self.rating_polls <= self.rating_after_polls or not self.rating_puts:
-                return self._json(200, {"data": [], "next_cursor": None})
-            annotation = {
-                "id": "QW5ub3RhdGlvbjox",
-                "span_id": query["span_ids"],
+                return self._json(200, {"data": [], "meta": {"limit": 100}})
+            score: dict[str, object] = {
+                "id": "s1",
                 "name": "learner_rating",
-                "annotator_kind": "HUMAN",
-                "identifier": run_id,
-                "result": {
-                    "label": self.rating_label,
-                    "score": 1.0 if self.rating_label == "up" else 0.0,
-                    "explanation": None,
-                },
+                "value": self.rating_value,
+                "dataType": "BOOLEAN",
+                "environment": self.rating_environment,
+                "timestamp": "2026-10-15T10:00:00.000Z",
             }
-            return self._json(200, {"data": [annotation], "next_cursor": None})
-        return self._json(404, {"detail": "project not found"})
+            if self.rating_config_id:
+                score["configId"] = self.rating_config_id
+            scores = [score]
+            if self.rating_older_false:
+                older = {**score, "id": "s0", "value": False}
+                older["timestamp"] = "2026-10-15T09:00:00.000Z"
+                scores.insert(0, older)
+            return self._json(200, {"data": scores, "meta": {"limit": 100}})
+        return self._json(404, {"message": "not found"})
 
     def _login_form(self, message: str = "") -> Route:
         action = (
@@ -424,8 +438,8 @@ class FakePilot:
                 name = part.get_param("name", header="content-disposition")
                 self.s3_parts.append((str(name), part.get_payload(decode=True)))
             return 204, {}, b""
-        if path.startswith("/phoenix/"):
-            return self._phoenix(method, path, query, headers)
+        if path.startswith("/langfuse/"):
+            return self._langfuse(method, path, query, headers)
         if path.startswith("/api/"):
             if headers.get("authorization") != f"Bearer {TOKEN}":
                 self.api_without_token.append(path)
@@ -676,12 +690,13 @@ def test_smoke_pdf_has_enough_text_per_page_to_not_read_as_scanned() -> None:
     assert pdf.startswith(b"%PDF-1.4") and pdf.rstrip().endswith(b"%%EOF")
 
 
-# --- The ask's trace in Phoenix (#289) ----------------------------------------------------------------------------
+# --- The ask's trace in Langfuse (#316) ---------------------------------------------------------------------------
 
 
 def run_with_trace(pilot: FakePilot, monkeypatch) -> int:
-    monkeypatch.setenv("PHOENIX_API_KEY", PHOENIX_KEY)
-    monkeypatch.setenv("PHOENIX_URL", f"{pilot.base}/phoenix")
+    monkeypatch.setenv("LANGFUSE_BASE_URL", f"{pilot.base}/langfuse")
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", LANGFUSE_PUBLIC)
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", LANGFUSE_SECRET)
     return smoke.main(
         [
             pilot.base,
@@ -701,16 +716,16 @@ def test_trace_check_finds_the_ask_trace_with_its_metadata(
 ) -> None:
     assert run_with_trace(pilot, monkeypatch) == 0
     out = output_without_secrets(capsys)
-    assert PHOENIX_KEY not in out
+    assert LANGFUSE_PUBLIC not in out and LANGFUSE_SECRET not in out
     assert f"ask trace {pilot.trace_run_id} is in smart-tutor-on-premise" in out
     assert pilot.trace_polls >= 2  # it waited for the trace to arrive
-    assert set(pilot.phoenix_auth) == {f"Bearer {PHOENIX_KEY}"}
+    assert set(pilot.langfuse_auth) == {LANGFUSE_AUTH}  # never the learner's bearer
 
 
 def test_trace_with_the_token_fails(pilot, monkeypatch, capsys) -> None:
-    leaked = _ask_span(pilot.trace_run_id, THREAD)
-    leaked["attributes"]["input.value"] = TOKEN
-    pilot.trace_spans = [leaked]
+    leaked = _ask_observation(pilot.trace_run_id, THREAD)
+    leaked["input"] = TOKEN
+    pilot.trace_observations = [leaked]
     assert run_with_trace(pilot, monkeypatch) == 1
     out = capsys.readouterr().out
     assert "the trace holds the learner's access token" in out
@@ -718,17 +733,17 @@ def test_trace_with_the_token_fails(pilot, monkeypatch, capsys) -> None:
 
 
 def test_trace_with_the_username_fails(pilot, monkeypatch, capsys) -> None:
-    leaked = _ask_span(pilot.trace_run_id, THREAD)
-    leaked["attributes"]["metadata.user"] = USERNAME
-    pilot.trace_spans = [leaked]
+    leaked = _ask_observation(pilot.trace_run_id, THREAD)
+    leaked["metadata"]["user"] = USERNAME
+    pilot.trace_observations = [leaked]
     assert run_with_trace(pilot, monkeypatch) == 1
     assert "the trace names the learner" in output_without_secrets(capsys)
 
 
 def test_trace_with_the_user_id_fails(pilot, monkeypatch, capsys) -> None:
-    leaked = _ask_span(pilot.trace_run_id, THREAD)
-    leaked["attributes"]["metadata.owner"] = USER_ID
-    pilot.trace_spans = [leaked]
+    leaked = _ask_observation(pilot.trace_run_id, THREAD)
+    leaked["metadata"]["owner"] = USER_ID
+    pilot.trace_observations = [leaked]
     assert run_with_trace(pilot, monkeypatch) == 1
     assert "the trace holds the learner's user id" in output_without_secrets(capsys)
 
@@ -736,19 +751,35 @@ def test_trace_with_the_user_id_fails(pilot, monkeypatch, capsys) -> None:
 def test_trace_missing_metadata_fails_naming_the_keys(
     pilot, monkeypatch, capsys
 ) -> None:
-    span = _ask_span(pilot.trace_run_id, THREAD)
-    del span["attributes"]["metadata.learner_hash"]
-    pilot.trace_spans = [span]
+    root = _ask_observation(pilot.trace_run_id, THREAD)
+    del root["metadata"]["learner_hash"]
+    pilot.trace_observations = [root]
     assert run_with_trace(pilot, monkeypatch) == 1
     assert "learner_hash" in output_without_secrets(capsys)
 
 
-def test_trace_root_span_id_not_the_run_ids_low_bits_fails(
+def test_trace_of_another_thread_fails(pilot, monkeypatch, capsys) -> None:
+    pilot.trace_observations = [_ask_observation(pilot.trace_run_id, "other-thread")]
+    assert run_with_trace(pilot, monkeypatch) == 1
+    assert "the ask trace belongs to another thread" in output_without_secrets(capsys)
+
+
+def test_trace_whose_session_is_not_the_thread_fails(
     pilot, monkeypatch, capsys
 ) -> None:
-    span = _ask_span(pilot.trace_run_id, THREAD)
-    span["context"]["span_id"] = "0" * 16
-    pilot.trace_spans = [span]
+    root = _ask_observation(pilot.trace_run_id, THREAD)
+    root["sessionId"] = "other-session"
+    pilot.trace_observations = [root]
+    assert run_with_trace(pilot, monkeypatch) == 1
+    assert "the ask trace's session is not its thread" in output_without_secrets(capsys)
+
+
+def test_trace_root_observation_id_not_the_run_ids_low_bits_fails(
+    pilot, monkeypatch, capsys
+) -> None:
+    root = _ask_observation(pilot.trace_run_id, THREAD)
+    root["id"] = "0" * 16
+    pilot.trace_observations = [root]
     assert run_with_trace(pilot, monkeypatch) == 1
     assert "low 64 bits" in output_without_secrets(capsys)
 
@@ -759,22 +790,23 @@ def test_trace_that_never_arrives_fails_naming_the_run_and_sampling(
     pilot.trace_after_polls = 10**6
     assert run_with_trace(pilot, monkeypatch) == 1
     out = output_without_secrets(capsys)
-    assert pilot.trace_run_id in out and "trace-sampling-rate" in out
+    assert f"run {pilot.trace_run_id} never reached Langfuse" in out
+    assert "trace-sampling-rate" in out
     assert pilot.deleted == [DOC]  # cleanup still ran
 
 
-def test_trace_with_only_children_fails_saying_the_ask_span_never_arrived(
+def test_trace_with_only_children_fails_saying_the_ask_observation_never_arrived(
     pilot, monkeypatch, capsys
 ) -> None:
-    child = _ask_span(pilot.trace_run_id, THREAD)
+    child = _ask_observation(pilot.trace_run_id, THREAD)
     child["name"] = "retrieve"
-    child["parent_id"] = "1" * 16
-    pilot.trace_spans = [child]
+    child["parentObservationId"] = "1" * 16
+    pilot.trace_observations = [child]
     pilot.trace_after_polls = 0
     assert run_with_trace(pilot, monkeypatch) == 1
     out = output_without_secrets(capsys)
-    assert "reached Phoenix but its ask span never arrived" in out
-    assert "never reached Phoenix" not in out
+    assert "reached Langfuse but its ask observation never arrived" in out
+    assert "never reached Langfuse" not in out
 
 
 def test_trace_polls_answering_errors_name_the_last_status(
@@ -784,47 +816,86 @@ def test_trace_polls_answering_errors_name_the_last_status(
     pilot.trace_poll_status = 503
     assert run_with_trace(pilot, monkeypatch) == 1
     out = output_without_secrets(capsys)
-    assert "never reached Phoenix" in out and "last answer 503" in out
+    assert "never reached Langfuse" in out and "last answer 503" in out
 
 
-def test_trace_project_needs_the_api_key_and_end_to_end(
+def test_trace_langfuse_refusing_the_key_fails(pilot, monkeypatch, capsys) -> None:
+    pilot.langfuse_accepted_auth = "Basic other"
+    assert run_with_trace(pilot, monkeypatch) == 1
+    assert "trace: Langfuse refused the key pair" in output_without_secrets(capsys)
+
+
+def test_trace_key_of_another_project_fails_naming_both(
     pilot, monkeypatch, capsys
 ) -> None:
-    monkeypatch.delenv("PHOENIX_API_KEY", raising=False)
+    pilot.langfuse_project = "smart-tutor-local"
+    assert run_with_trace(pilot, monkeypatch) == 1
+    out = output_without_secrets(capsys)
+    assert "'smart-tutor-local'" in out and "'smart-tutor-on-premise'" in out
+    assert pilot.trace_polls == 0  # it stopped before reading the trace
+
+
+@pytest.mark.parametrize(
+    "missing", ["LANGFUSE_BASE_URL", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY"]
+)
+def test_trace_project_needs_the_langfuse_settings_and_end_to_end(
+    pilot, monkeypatch, capsys, missing
+) -> None:
+    monkeypatch.setenv("LANGFUSE_BASE_URL", f"{pilot.base}/langfuse")
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", LANGFUSE_PUBLIC)
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", LANGFUSE_SECRET)
+    monkeypatch.delenv(missing)
     assert smoke.main([pilot.base, "--end-to-end", "--trace-project", "p"]) == 1
-    assert "PHOENIX_API_KEY" in capsys.readouterr().out
-    monkeypatch.setenv("PHOENIX_API_KEY", PHOENIX_KEY)
+    assert missing in capsys.readouterr().out
+    monkeypatch.setenv(missing, "x")
     assert smoke.main([pilot.base, "--trace-project", "p"]) == 1
     assert "--trace-project needs --end-to-end" in capsys.readouterr().out
 
 
-# --- The ask's rating in Phoenix (#290) ---------------------------------------------------------------------------
+# --- The ask's rating in Langfuse (#318) --------------------------------------------------------------------------
 
 
-def test_rating_check_finds_the_annotation_after_rating_the_turn_up(
+def test_rating_check_finds_the_score_after_rating_the_turn_up(
     pilot, monkeypatch, capsys
 ) -> None:
     assert run_with_trace(pilot, monkeypatch) == 0
     out = output_without_secrets(capsys)
     assert f"rating of {pilot.trace_run_id} is in smart-tutor-on-premise" in out
     assert pilot.rating_puts == [{"rating": "up"}]
-    assert pilot.rating_polls >= 2  # it waited for the annotation to arrive
+    assert pilot.rating_polls >= 2  # it waited for the score to arrive
     assert pilot.api_without_token == []  # the PUT carried the learner's bearer
-    assert set(pilot.phoenix_auth) == {f"Bearer {PHOENIX_KEY}"}
+    assert set(pilot.langfuse_auth) == {LANGFUSE_AUTH}
+
+
+def test_rating_takes_the_newest_score(pilot, monkeypatch, capsys) -> None:
+    pilot.rating_older_false = True
+    assert run_with_trace(pilot, monkeypatch) == 0
 
 
 def test_rating_that_never_arrives_fails_saying_so(pilot, monkeypatch, capsys) -> None:
     pilot.rating_after_polls = 10**6
     assert run_with_trace(pilot, monkeypatch) == 1
     out = output_without_secrets(capsys)
-    assert f"run {pilot.trace_run_id}'s rating never reached Phoenix" in out
+    assert f"run {pilot.trace_run_id}'s rating never reached Langfuse" in out
     assert pilot.deleted == [DOC]  # cleanup still ran
 
 
-def test_rating_with_the_wrong_label_fails(pilot, monkeypatch, capsys) -> None:
-    pilot.rating_label = "down"
+def test_rating_with_the_wrong_value_fails(pilot, monkeypatch, capsys) -> None:
+    pilot.rating_value = False
     assert run_with_trace(pilot, monkeypatch) == 1
-    assert "not a HUMAN 'up' with score 1" in output_without_secrets(capsys)
+    assert "not a BOOLEAN true" in output_without_secrets(capsys)
+
+
+def test_rating_without_a_score_config_fails(pilot, monkeypatch, capsys) -> None:
+    pilot.rating_config_id = None
+    assert run_with_trace(pilot, monkeypatch) == 1
+    assert "with the learner_rating config" in output_without_secrets(capsys)
+
+
+def test_rating_in_another_environment_fails(pilot, monkeypatch, capsys) -> None:
+    pilot.rating_environment = "default"
+    assert run_with_trace(pilot, monkeypatch) == 1
+    assert "environment 'on-premise'" in output_without_secrets(capsys)
 
 
 def test_rating_put_refused_fails_with_its_status(pilot, monkeypatch, capsys) -> None:
@@ -835,7 +906,7 @@ def test_rating_put_refused_fails_with_its_status(pilot, monkeypatch, capsys) ->
     )
 
 
-def test_rating_phoenix_refusing_the_key_fails(pilot, monkeypatch, capsys) -> None:
-    pilot.rating_phoenix_status = 401
+def test_rating_langfuse_refusing_the_key_fails(pilot, monkeypatch, capsys) -> None:
+    pilot.rating_langfuse_status = 401
     assert run_with_trace(pilot, monkeypatch) == 1
-    assert "rating: Phoenix refused the API key" in output_without_secrets(capsys)
+    assert "rating: Langfuse refused the key pair" in output_without_secrets(capsys)
