@@ -1,4 +1,4 @@
-"""Learner ratings sent on to where answers are traced (PRD §10.2): Phoenix span annotations (ADR 0017)."""
+"""Learner ratings sent on to where answers are traced (PRD §10.2): none yet; #318 sends them to Langfuse as scores."""
 
 from abc import ABC, abstractmethod
 

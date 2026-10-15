@@ -18,7 +18,6 @@ from fakes.models import (
 )
 from fakes.parameters import APP_TZ, TEST_LIMITS, TEST_UPLOAD_LIMITS, FakeParameterStore
 from fakes.pdfs import make_pdf
-from fakes.phoenix import FakePhoenix, InlineExecutor
 from fakes.processing import FakePdfExtractor, PageChunker, fake_tools
 from fakes.queue import FakeQueue
 from fakes.subjects import InMemorySubjects
@@ -53,8 +52,6 @@ __all__ = [
     "PassingGuard",
     "QuestionTrippingGuard",
     "TrippingGuard",
-    "FakePhoenix",
-    "InlineExecutor",
     "FailingExporter",
     "FakeRunTracing",
     "RecordingClient",

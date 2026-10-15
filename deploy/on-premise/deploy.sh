@@ -3,7 +3,7 @@
 # <prefix>-deploy (HostStack), after unpacking the deploy bundle to /opt/smart-tutor:
 #   SMART_TUTOR_PREFIX=smart-tutor-on-premise AWS_REGION=us-east-1 deploy.sh <full commit SHA>
 #
-# 1. Renders settings (SSM) and secrets (Secrets Manager), including the Phoenix and Langfuse tracing settings, into a root-only env file. A DuckDNS domain is pointed at this
+# 1. Renders settings (SSM) and secrets (Secrets Manager), including the Langfuse tracing settings, into a root-only env file. A DuckDNS domain is pointed at this
 #    instance's Elastic IP (#154).
 # 2. Pulls the images, starts Postgres, and creates or updates the app, Keycloak, and Phoenix roles and databases.
 # 3. Migrates, then starts every service and waits until all are healthy. Compose recreates only the services whose
@@ -63,19 +63,10 @@ trace_sampling_rate=$(param trace-sampling-rate)
 question_guard=$(param question-guard)
 question_guardrail_id=$(param question-guardrail-id)
 question_guardrail_version=$(param question-guardrail-version)
-# Traces go to the on-premise Phoenix, projects smart-tutor-on-premise and -ingestion (ADR 0017); the API sends
-# learner ratings there too (#290). The operator creates the system key's secret in Phoenix
-# (docs/runbooks/on-premise-deploy.md); until then the agent and worker run untraced and the API sends no ratings,
-# rather than failing the deploy.
-phoenix_api_key=
-if ! phoenix_api_key=$(secret phoenix/api-key 2>/dev/null) || [[ -z $phoenix_api_key ]]; then
-  phoenix_api_key=
-  echo "Warning: no Phoenix API key (is the secret $prefix/phoenix/api-key set?); deploying without tracing" >&2
-fi
-# Traces also go to the shared Langfuse (ADR 0023): its address is an SSM parameter, and the worker's egress proxy
+# Traces go to the shared Langfuse (ADR 0023): its address is an SSM parameter, and the worker's egress proxy
 # allows exactly its host name (ADR 0014). The operator creates the project's keys in Langfuse
 # (docs/runbooks/on-premise-deploy.md); until both secrets exist the agent and worker send nothing there.
-host_of() { local rest=${1#*://}; rest=${rest%%/*}; printf '%s' "${rest%%:*}"; }
+host_of() { local rest=${1#*://}; rest=${rest%%/*}; rest=${rest##*@}; printf '%s' "${rest%%:*}"; }
 langfuse_url=$(param langfuse-url)
 langfuse_host=$(host_of "$langfuse_url")
 langfuse_public_key=
@@ -109,7 +100,6 @@ KEYCLOAK_ADMIN_USERNAME=$keycloak_admin_username
 KEYCLOAK_ADMIN_PASSWORD=$keycloak_admin_password
 API_CLIENT_SECRET=$api_client_secret
 MCP_CLIENT_SECRET=$mcp_client_secret
-PHOENIX_API_KEY=$phoenix_api_key
 TRACE_SAMPLING_RATE=$trace_sampling_rate
 QUESTION_GUARD=$question_guard
 QUESTION_GUARDRAIL_ID=$question_guardrail_id

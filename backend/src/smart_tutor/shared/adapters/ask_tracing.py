@@ -1,7 +1,7 @@
 """The ask's root span (PRD §10.4, ADR 0023): its trace id is the turn's run id and its span id the run id's low 64
 bits, so the API can address it from the stored run id. LangGraph and model spans nest beneath it, and every span names
 the learner hash as its user and the thread, if any, as its session. The root carries the run's metadata, input, and
-output for Langfuse and, until #322, for Phoenix."""
+output for Langfuse."""
 
 import json
 import logging
@@ -27,6 +27,14 @@ NO_DECLINE = "none"
 logger = logging.getLogger(__name__)
 
 
+def _safely(step: Callable[[], object]) -> None:
+    """Runs a step that ends the ask's span; a failure is logged, since tracing never fails the ask (#229)."""
+    try:
+        step()
+    except Exception:
+        logger.warning("could not end the ask trace", exc_info=True)
+
+
 class _OtelAskTrace(AskTrace):
     def __init__(self, span: Span, metadata: dict[str, Any]) -> None:
         self._span = span
@@ -45,7 +53,7 @@ class _OtelAskTrace(AskTrace):
     def close(self) -> None:
         """Ends a span left open (the stream was closed before the ask ended)."""
         if self._span.is_recording():
-            self._safely(self._span.end)
+            _safely(self._span.end)
 
     def _end(self, metadata: dict[str, Any], status: Status, output: dict[str, Any] | None = None) -> None:
         def end() -> None:
@@ -58,14 +66,7 @@ class _OtelAskTrace(AskTrace):
             self._span.end()
 
         if self._span.is_recording():
-            self._safely(end)
-
-    @staticmethod
-    def _safely(step: Callable[[], object]) -> None:
-        try:
-            step()
-        except Exception:  # tracing never fails the ask (#229)
-            logger.warning("could not end the ask trace", exc_info=True)
+            _safely(end)
 
 
 class OtelAskTracing(AskTracing):
@@ -78,9 +79,10 @@ class OtelAskTracing(AskTracing):
         if run.thread_id is not None:
             metadata["thread_id"] = run.thread_id
         learner = metadata["learner_hash"] = self._traces.hasher(run.user_id)
+        span: Span | None = None
         try:
             attributes = span_attributes({"question": run.question, "document_ids": run.document_ids}, metadata)
-            # Langfuse and Phoenix both group a conversation's asks as a session.
+            # Langfuse groups a conversation's asks as a session.
             attributes |= learner_attributes(learner, run.thread_id)
             with root_ids(run.run_id):
                 # An empty context: a true root, whatever span is current.
@@ -92,6 +94,8 @@ class OtelAskTracing(AskTracing):
             token = context.attach(trace.set_span_in_context(span, base))
         except Exception:
             logger.warning("tracing could not start; running untraced", exc_info=True)
+            if span is not None:
+                _safely(span.end)  # started but never made current: end it, so no span is left open
             yield NoAskTrace()
             return
         ask = _OtelAskTrace(span, metadata)
