@@ -63,6 +63,14 @@ def test_each_item_is_scored_in_langfuse_with_its_comment_and_not_applicable_res
     assert client.runs[0].scores == [[], [ItemScore("decline_correctness.correctly_declined", 1.0, "declined")]]
 
 
+def test_a_zero_score_is_printed_with_its_question_and_comment(capsys: pytest.CaptureFixture[str]) -> None:
+    group = DatasetSuites("ask", make_target, (scored("search_step_ran", 0.0), scored("answer_relevance", 0.9)))
+    run_split(published(), [group], "smoke", run_name="r", load=lambda key: ASK)
+    err = capsys.readouterr().err
+    assert "search_step_ran scored 0 on 'a': fixed" in err and "search_step_ran scored 0 on 'b': fixed" in err
+    assert "answer_relevance" not in err
+
+
 def test_a_callable_object_target_runs() -> None:
     class ObjectTarget:
         async def __call__(self, inputs: dict[str, Any]) -> dict[str, Any]:
