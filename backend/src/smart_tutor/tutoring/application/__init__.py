@@ -8,6 +8,7 @@ from smart_tutor.tutoring.application.answer import (
     answer_messages,
     cited_chunks,
     covers,
+    invented_link,
     new_canary,
     system_prompt,
 )
@@ -87,6 +88,7 @@ __all__ = [
     "cited_chunks",
     "covers",
     "history_turn",
+    "invented_link",
     "new_canary",
     "previous_question",
     "search_query",

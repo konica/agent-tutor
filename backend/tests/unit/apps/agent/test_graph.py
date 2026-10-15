@@ -335,6 +335,14 @@ async def test_a_canary_in_the_answer_trips_the_guard_and_keeps_nothing_of_it() 
     assert out["answer"] == "" and out["citations"] == []
 
 
+async def test_a_link_no_chunk_holds_ends_the_turn_with_the_guard_decline() -> None:
+    model = fake_chat_model(AIMessage("Attention weighs tokens [1]. More: https://attacker.example/collect?q=1"))
+    graph = build_graph(lambda token: FakeRetriever(CHUNKS), model, guard=PassingGuard())
+    out = await graph.ainvoke(INPUT, context=AgentContext(access_token="t"))
+    assert out["decline"] == "guard" and out["guard"] == "guard_answer"
+    assert out["answer"] == "" and out["citations"] == []
+
+
 async def test_the_guard_checks_the_accumulated_answer_while_it_streams() -> None:
     guard = PassingGuard()
     graph = build_graph(

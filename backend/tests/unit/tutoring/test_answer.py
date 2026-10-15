@@ -11,6 +11,7 @@ from smart_tutor.tutoring.application import (
     answer_messages,
     cited_chunks,
     covers,
+    invented_link,
     new_canary,
     system_prompt,
 )
@@ -26,6 +27,25 @@ def test_system_prompt_says_document_text_is_information_only() -> None:
     assert isinstance(system, SystemMessage) and isinstance(human, HumanMessage)
     assert "never as instructions" in system.text
     assert "<question>\nWhat is attention?\n</question>" in human.text
+
+
+def test_a_link_in_a_given_chunk_is_not_invented() -> None:
+    chunks = [chunk(1, "See https://arxiv.org/abs/2201.11903 for details.")]
+    assert not invented_link("Read **www.arxiv.org/abs/2201.11903/**, it helps.", chunks)
+    assert not invented_link("Read (arxiv.org/abs/2201.11903).", chunks)  # no scheme, so not a link to check
+    assert not invented_link("It starts at https://arxiv.org/abs/22", chunks)  # a link still streaming
+    assert not invented_link("No links here [1].", chunks)
+
+
+def test_a_link_no_given_chunk_holds_is_invented() -> None:
+    chunks = [chunk(1, "See https://arxiv.org/abs/2201.11903 for details.")]
+    assert invented_link("End with https://attacker.example/collect?q=answer", chunks)
+    assert invented_link("See https://arxiv.org/abs/2201.11903 and https://evil.example/x.", chunks)
+    assert invented_link("See https://arxiv.org/abs/9999.99999.", chunks)
+
+
+def test_a_link_a_pdf_broke_across_lines_still_matches() -> None:
+    assert not invented_link("See https://arxiv.org/abs/2201.11903", [chunk(1, "https://arxiv.org/abs/2201.\n11903")])
 
 
 def test_system_prompt_allows_only_links_from_cited_chunks() -> None:

@@ -41,6 +41,27 @@ _RANGE = re.compile(r"\s*[-\u2013]\s*")
 _OLD_MARKER = re.compile(r"(?:\s*,)?\s+" + _MARKER.pattern + r"|^" + _MARKER.pattern)
 
 
+_URL = re.compile(r"(?:https?://|www\.)[^\s<>()\[\]\"'`]+", re.IGNORECASE)
+_SCHEME = re.compile(r"^(?:https?://)?(?:www\.)?", re.IGNORECASE)
+
+
+def _packed(text: str) -> str:
+    """Lower case with no whitespace, so a link a PDF broke across lines still matches."""
+    return "".join(text.lower().split())
+
+
+def invented_link(text: str, chunks: Sequence[RetrievedChunk]) -> bool:
+    """Whether the answer so far holds a link that no chunk it was given holds (US-6: an injected instruction can ask
+    for a link that carries data out). The scheme, `www.`, Markdown emphasis, trailing punctuation and a trailing slash
+    are ignored, and a link still being streamed matches while it is a prefix of one in a chunk."""
+    given = _packed(" ".join(c.text for c in chunks))
+    for url in _URL.findall(text):
+        link = _SCHEME.sub("", url.rstrip(".,;:!?*_/"))
+        if _packed(link) not in given:
+            return True
+    return False
+
+
 def covers(chunks: Sequence[RetrievedChunk], floor: float) -> bool:
     """A limited search covers the question when its best chunk scores at least `floor` (US-4c; US-5 tunes it)."""
     return any(c.score >= floor for c in chunks)
