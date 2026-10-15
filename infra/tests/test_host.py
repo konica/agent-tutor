@@ -630,6 +630,7 @@ def test_egress_proxy_allows_only_the_workers_aws_endpoints_and_imds(compose: di
     rules = [line for line in lines if line.startswith("http_access ")]
     assert rules == [
         "http_access allow CONNECT aws tls",
+        "http_access allow CONNECT langfuse tls",  # the shared Langfuse host (ADR 0023)
         "http_access allow !CONNECT imds http",
         "http_access deny all",
     ]
@@ -1104,7 +1105,8 @@ def test_egress_proxy_no_longer_allows_langsmith(compose: dict[str, Any]) -> Non
 
 def test_deploy_script_renders_the_tracing_settings_and_leaves_the_key_empty_without_its_secret() -> None:
     script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
-    assert "learner_hash_key=$(secret phoenix/learner-hash-key)" in script
+    assert "learner_hash_key=$(secret langfuse/learner-hash-key)" in script
+    assert "secret phoenix/learner-hash-key" not in script
     assert "trace_sampling_rate=$(param trace-sampling-rate)" in script
     tracing = script[script.index("phoenix_api_key=") : script.index("umask 077")]
     assert "secret phoenix/api-key 2>/dev/null" in tracing
@@ -1214,3 +1216,68 @@ def test_nightly_backup_leaves_the_phoenix_database_out() -> None:
     script = (ON_PREMISE_DIR / "backup.sh").read_text(encoding="utf-8")
     assert re.findall(r"for db in ([^;]+);", script) == ["smart_tutor keycloak", "smart_tutor keycloak"]
     assert "phoenix" not in _commands(script)
+
+
+@pytest.mark.parametrize("service", ["agent", "worker"])
+def test_agent_and_worker_export_traces_to_langfuse(compose: dict[str, Any], service: str) -> None:
+    env = compose["services"][service]["environment"]
+    assert env["SMART_TUTOR_LANGFUSE_URL"] == "${LANGFUSE_URL:?}"
+    assert env["SMART_TUTOR_LANGFUSE_PUBLIC_KEY"] == "${LANGFUSE_PUBLIC_KEY}"  # empty: untraced in Langfuse
+    assert env["SMART_TUTOR_LANGFUSE_SECRET_KEY"] == "${LANGFUSE_SECRET_KEY}"
+    assert env["SMART_TUTOR_PHOENIX_URL"] == "http://phoenix:6006"  # Phoenix keeps its copy until #322
+
+
+@pytest.mark.parametrize("service", ["mcp", "api"])
+def test_only_the_agent_and_worker_get_langfuse_settings(compose: dict[str, Any], service: str) -> None:
+    env = compose["services"][service]["environment"]
+    assert not [k for k in env if k.startswith("SMART_TUTOR_LANGFUSE_")]  # the API gets them in #318
+
+
+def test_the_worker_reaches_langfuse_through_the_egress_proxy(compose: dict[str, Any]) -> None:
+    env = compose["services"]["worker"]["environment"]
+    assert env["NO_PROXY"].split(",") == ["phoenix"]
+    lines = _squid_conf(compose)
+    acls = {line.split()[1]: line.split()[2:] for line in lines if line.startswith("acl ")}
+    assert acls["langfuse"] == ["dstdomain", "-n", "${LANGFUSE_HOST:?}"]
+    rules = [line for line in lines if line.startswith("http_access ")]
+    assert rules == [
+        "http_access allow CONNECT aws tls",
+        "http_access allow CONNECT langfuse tls",
+        "http_access allow !CONNECT imds http",
+        "http_access deny all",
+    ]
+    assert len(acls["aws"]) == 7  # unchanged
+
+
+def test_deploy_script_renders_the_langfuse_settings_and_leaves_the_keys_empty_without_their_secrets() -> None:
+    script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
+    assert "langfuse_url=$(param langfuse-url)" in script
+    langfuse = script[script.index("langfuse_public_key=") : script.index("umask 077")]
+    assert "secret langfuse/public-key 2>/dev/null" in langfuse
+    assert "secret langfuse/secret-key 2>/dev/null" in langfuse
+    assert "$prefix/langfuse/public-key" in langfuse and ">&2" in langfuse  # the warning names the secret
+    for line in (
+        "LANGFUSE_URL=$langfuse_url",
+        "LANGFUSE_HOST=$langfuse_host",
+        "LANGFUSE_PUBLIC_KEY=$langfuse_public_key",
+        "LANGFUSE_SECRET_KEY=$langfuse_secret_key",
+    ):
+        assert line in script
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")
+@pytest.mark.parametrize(
+    ("url", "host"),
+    [
+        ("https://sec-dog.duckdns.org", "sec-dog.duckdns.org"),
+        ("https://sec-dog.duckdns.org/", "sec-dog.duckdns.org"),
+        ("https://h.example:8443/x", "h.example"),
+    ],
+)
+def test_deploy_script_derives_the_langfuse_host_name_from_the_url(url: str, host: str) -> None:
+    script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
+    [definition] = [line for line in script.splitlines() if line.startswith("host_of()")]
+    # On stdin: on Windows, `bash` may be WSL's, which cannot be handed arguments reliably.
+    program = f"{definition}\nhost_of {shlex.quote(url)}"
+    result = subprocess.run(["bash"], input=program.encode(), capture_output=True, check=True)
+    assert result.stdout.decode() == host

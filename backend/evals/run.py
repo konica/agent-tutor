@@ -25,7 +25,7 @@ from typing import Any
 
 from evals.dataset import Dataset, DatasetError, load_dataset, version_name, version_to_run
 from evals.gate import check, load_thresholds, passed, ran, render, render_markdown
-from evals.langfuse_client import ItemEvaluator, LangfuseClient, LangfuseError, Score, SdkLangfuse, Task
+from evals.langfuse_client import ItemEvaluator, ItemScore, LangfuseClient, LangfuseError, SdkLangfuse, Task
 from evals.learners import LoadError
 from evals.suite import NOT_APPLICABLE, DatasetSuites, Evaluator, Suite, by_dataset, discover, metric_of
 from evals.targets import Target
@@ -66,7 +66,7 @@ def _recorded(evaluator: Evaluator, results: list[_Result | None]) -> ItemEvalua
 
     async def evaluate(
         inputs: dict[str, Any], outputs: dict[str, Any], reference_outputs: dict[str, Any]
-    ) -> list[Score]:
+    ) -> list[ItemScore]:
         given = {"inputs": inputs, "outputs": outputs, "reference_outputs": reference_outputs}
         try:
             found = evaluator(**{k: v for k, v in given.items() if k in wanted})
@@ -79,7 +79,7 @@ def _recorded(evaluator: Evaluator, results: list[_Result | None]) -> ItemEvalua
             results.append(None if metric is None else _Result(metric, None, applicable=True))
             raise
         results.append(result)
-        return [] if result.score is None else [Score(result.key, result.score, found.get("comment"))]
+        return [] if result.score is None else [ItemScore(result.key, result.score, found.get("comment"))]
 
     evaluate.__name__ = evaluate.__qualname__ = getattr(evaluator, "__name__", type(evaluator).__name__)
     return evaluate

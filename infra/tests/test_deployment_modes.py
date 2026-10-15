@@ -106,7 +106,13 @@ def test_on_premise_has_its_own_parameters_and_secrets() -> None:
         "smart-tutor-on-premise/keycloak/api-client",
         "smart-tutor-on-premise/keycloak/mcp-client",
         "smart-tutor-on-premise/phoenix/learner-hash-key",
+        "smart-tutor-on-premise/langfuse/learner-hash-key",
     }
+    # The shared Langfuse host's address (ADR 0023), from cdk.json.
+    values = {
+        p["Properties"]["Name"]: p["Properties"]["Value"] for p in t.find_resources("AWS::SSM::Parameter").values()
+    }
+    assert values["/smart-tutor-on-premise/langfuse-url"] == "https://sec-dog.duckdns.org"
 
 
 def test_on_premise_has_its_own_budget() -> None:

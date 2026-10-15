@@ -205,14 +205,11 @@ def _imported(path: Path) -> set[str]:
     }
 
 
-def test_only_the_review_queue_imports_langsmith_and_only_the_seam_imports_the_langfuse_sdk() -> None:
+def test_no_eval_module_imports_langsmith_and_only_the_seam_imports_the_langfuse_sdk() -> None:
     evals = Path(evals_package.__file__).parent
     modules = list(evals.rglob("*.py"))
-    # the annotation queue is LangSmith's until #319; datasets, the runner, and the evaluators are on Langfuse
-    assert {p.relative_to(evals).as_posix() for p in modules if "langsmith" in _imported(p)} == {
-        "generate.py",
-        "review.py",
-    }
+    # datasets, the review queue, the runner, and the evaluators are all on Langfuse (#317, #319, #320)
+    assert {p.relative_to(evals).as_posix() for p in modules if "langsmith" in _imported(p)} == set()
     assert {p.relative_to(evals).as_posix() for p in modules if "langfuse" in _imported(p)} == {"langfuse_client.py"}
 
 

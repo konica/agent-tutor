@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 
 from evals.dataset import Dataset, Example, publish_split
-from evals.langfuse_client import LangfuseError, Score
+from evals.langfuse_client import ItemScore, LangfuseError
 from evals.learners import LoadError
 from evals.run import main, run_split
 from evals.suite import DatasetSuites, Suite, not_applicable, scores
@@ -60,7 +60,7 @@ def test_each_item_is_scored_in_langfuse_with_its_comment_and_not_applicable_res
     client = published()
     group = DatasetSuites("ask", make_target, (_declines,))
     run_split(client, [group], "smoke", run_name="r", load=lambda key: ASK)
-    assert client.runs[0].scores == [[], [Score("decline_correctness.correctly_declined", 1.0, "declined")]]
+    assert client.runs[0].scores == [[], [ItemScore("decline_correctness.correctly_declined", 1.0, "declined")]]
 
 
 def test_a_callable_object_target_runs() -> None:

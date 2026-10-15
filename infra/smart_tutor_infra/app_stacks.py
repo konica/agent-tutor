@@ -56,7 +56,14 @@ def _on_premise(app: cdk.App, env: cdk.Environment, names: ModeNames) -> list[cd
         or f"arn:aws:iam::{cdk.Aws.ACCOUNT_ID}:oidc-provider/{GITHUB_OIDC_HOST}",
     )
     domain = app.node.try_get_context("smart-tutor:on-premise-domain") or None
-    config = ConfigStack(app, f"{prefix}-Config", env=env, names=names)
+    config = ConfigStack(
+        app,
+        f"{prefix}-Config",
+        env=env,
+        names=names,
+        # The shared Langfuse host's DuckDNS name (ADR 0023): a setting, never a reference to the Langfuse-Host stack.
+        langfuse_url=app.node.try_get_context("smart-tutor:langfuse-url") or None,
+    )
     host = HostStack(
         app,
         f"{prefix}-Host",

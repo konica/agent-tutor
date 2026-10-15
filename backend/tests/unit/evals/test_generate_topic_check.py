@@ -6,9 +6,9 @@ import pytest
 from langchain_core.messages import AIMessage
 
 from evals.generate import main
-from evals.generators.topic_check import KINDS, Kind, message_writer, write_candidates
+from evals.generators.topic_check import KINDS, RUBRIC, Kind, message_writer, write_candidates
 from fakes import fake_chat_model
-from fakes.langsmith import FakeLangSmith
+from fakes.langfuse import FakeLangfuse
 
 
 async def write(kind: str, spec: Kind, count: int) -> list[str]:
@@ -70,8 +70,9 @@ async def test_the_writer_reads_one_message_per_line_without_numbering() -> None
 
 
 def test_generate_queues_topic_check_candidates(capsys: pytest.CaptureFixture[str]) -> None:
-    client = FakeLangSmith()
+    client = FakeLangfuse()
     assert main(["topic_check", "--per-type", "1"], client=client, write_topic=write, model_id="m") == 0
     [queue] = client.queues.values()
-    assert len(queue.run_ids) == len(KINDS)
+    assert queue.name == "smart-tutor-topic-check-candidates" and queue.description.endswith(RUBRIC)
+    assert len(queue.trace_ids) == len(KINDS)
     assert f"{len(KINDS)} candidates" in capsys.readouterr().out

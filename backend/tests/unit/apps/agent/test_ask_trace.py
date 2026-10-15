@@ -22,8 +22,8 @@ from fakes import (
 )
 from smart_tutor.apps.agent.graph import build_graph
 from smart_tutor.apps.agent.server import AskRequest, answer_events
-from smart_tutor.shared.adapters.ask_tracing import PhoenixAskTracing
-from smart_tutor.shared.adapters.tracing import LearnerHasher, otlp_exporter, phoenix_traces, root_span_id
+from smart_tutor.shared.adapters.ask_tracing import OtelAskTracing
+from smart_tutor.shared.adapters.tracing import LearnerHasher, otel_traces, phoenix_exporter, root_span_id
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.ports.ask_tracing import AskRun
@@ -57,7 +57,7 @@ async def traced(
     run = AskRun(RUN_ID, body.thread_id and str(body.thread_id), USER, body.question, body.document_ids)
     got: list[str] = []
     with recorded_traces(sampling_rate=sampling_rate) as (traces, spans):
-        events = answer_events(graph, body, "tok", run, PhoenixAskTracing(traces))
+        events = answer_events(graph, body, "tok", run, OtelAskTracing(traces))
         async for event in events:
             got.append(event)
             if close_after is not None and len(got) >= close_after:
@@ -83,6 +83,36 @@ async def test_an_answer_traces_as_one_root_ask_span_whose_trace_id_is_the_run_i
     assert meta["limited"] is False and meta["decline"] == "none" and meta["chunks"] == 2
     assert json.loads(span.attributes["output.value"])["answer"] == "It weighs tokens [1]."
     assert span.status.status_code is StatusCode.OK
+
+
+async def test_every_ask_span_carries_the_learner_hash_and_the_thread() -> None:
+    spans, _ = await traced(AskRequest(question="What is attention?", thread_id=uuid.UUID(THREAD_ID)))
+    # every span: the ask root, LangGraph nodes, and the model call
+    assert {"ask", "LangGraph", "search", "answer"} <= {s.name for s in spans}
+    assert any(s.attributes.get("openinference.span.kind") == "LLM" for s in spans)
+    assert all(s.attributes["user.id"] == LearnerHasher("k")(USER) for s in spans)
+    assert all(s.attributes["session.id"] == THREAD_ID for s in spans)
+
+
+async def test_an_ask_without_a_thread_sets_no_session() -> None:
+    spans, _ = await traced(AskRequest(question="What is attention?"))
+    assert len(spans) > 1
+    assert all(s.attributes["user.id"] == LearnerHasher("k")(USER) for s in spans)
+    assert all("session.id" not in s.attributes for s in spans)
+
+
+async def test_the_ask_root_has_langfuse_metadata_input_and_output() -> None:
+    spans, _ = await traced(AskRequest(question="What is attention?", thread_id=uuid.UUID(THREAD_ID)))
+    root, _ = ask_span(spans)
+    assert root.attributes["langfuse.trace.metadata.limited"] == "false"
+    assert root.attributes["langfuse.trace.metadata.decline"] == "none"
+    assert root.attributes["langfuse.trace.metadata.chunks"] == "2"
+    assert root.attributes["langfuse.trace.metadata.thread_id"] == THREAD_ID
+    assert root.attributes["langfuse.trace.metadata.chat_model"] == TRACE_META["chat_model"]
+    assert root.attributes["langfuse.trace.metadata.learner_hash"] == LearnerHasher("k")(USER)
+    assert json.loads(root.attributes["langfuse.observation.input"])["question"] == "What is attention?"
+    assert json.loads(root.attributes["langfuse.observation.output"])["answer"] == "It weighs tokens [1]."
+    assert root.context.trace_id == RUN_ID.int  # still the run id
 
 
 async def test_langgraph_search_and_model_spans_nest_under_the_ask() -> None:
@@ -157,7 +187,7 @@ async def test_a_failing_exporter_never_fails_the_ask() -> None:
     )
     run = AskRun(RUN_ID, None, USER, "What is attention?", None)
     with recorded_traces(exporter=FailingExporter()) as (traces, _):
-        tracing = PhoenixAskTracing(traces)
+        tracing = OtelAskTracing(traces)
         got = [e async for e in answer_events(graph, AskRequest(question="What is attention?"), "tok", run, tracing)]
     assert any(e.startswith("event: delta") for e in got) and got[-1].startswith("event: done")
 
@@ -167,10 +197,10 @@ async def test_a_collector_that_is_down_never_fails_the_ask() -> None:
         lambda token: FakeRetriever(CHUNKS), fake_chat_model(AIMessage("It weighs tokens [1].")), guard=PassingGuard()
     )
     run = AskRun(RUN_ID, None, USER, "What is attention?", None)
-    exporter = otlp_exporter(Settings(phoenix_url="http://127.0.0.1:9"), timeout=1)  # nothing listens
-    traces = phoenix_traces("p", 1.0, BatchSpanProcessor(exporter), LearnerHasher("k"), {})
+    exporter = phoenix_exporter(Settings(phoenix_url="http://127.0.0.1:9"), timeout=1)  # nothing listens
+    traces = otel_traces("p", "local", 1.0, [BatchSpanProcessor(exporter)], LearnerHasher("k"), {})
     try:
-        tracing = PhoenixAskTracing(traces)
+        tracing = OtelAskTracing(traces)
         got = [e async for e in answer_events(graph, AskRequest(question="What is attention?"), "tok", run, tracing)]
     finally:
         traces.shutdown()

@@ -76,7 +76,7 @@ class Settings(BaseSettings):
     # This service's confidential client for token introspection: smart-tutor-api (API, agent) or rag-mcp (MCP).
     keycloak_client_id: str = "smart-tutor-api"
     keycloak_client_secret: SecretStr = SecretStr("")
-    # HMAC key for the learner hash in traces (PRD §10.4). A secret: <mode prefix>/phoenix/learner-hash-key in Secrets
+    # HMAC key for the learner hash in traces (PRD §10.4). A secret: <mode prefix>/langfuse/learner-hash-key in Secrets
     # Manager when deployed; required only while tracing is on.
     learner_hash_key: SecretStr = SecretStr("")
     # Runtime traces (PRD §10.4, ADR 0017): the environment's own Phoenix. Spans go to <phoenix_url>/v1/traces; empty
@@ -87,6 +87,12 @@ class Settings(BaseSettings):
     phoenix_api_key: SecretStr = SecretStr("")
     # The agent's project; the worker traces into <phoenix_project>-ingestion.
     phoenix_project: str = "smart-tutor-local"
+    # Runtime traces in Langfuse (PRD §10.4, ADR 0023): spans go to <langfuse_url>/api/public/otel/v1/traces with the
+    # environment's project keys; the keys pick the project. Empty URL or keys: no Langfuse traces. Locally each
+    # developer's own pair in smart-tutor-local; on-premise <prefix>/langfuse/public-key and secret-key.
+    langfuse_url: str = ""
+    langfuse_public_key: SecretStr = SecretStr("")
+    langfuse_secret_key: SecretStr = SecretStr("")
     # Share of traces kept, 0–1 (the SSM parameter trace-sampling-rate when deployed). Outside 0–1 stops startup.
     trace_sampling_rate: float = Field(default=1.0, ge=0, le=1)
     cors_origins: list[str] = ["http://localhost:10453"]
