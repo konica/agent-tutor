@@ -18,7 +18,7 @@ The role is the stack `SmartTutor-EvalsCI` (`infra/smart_tutor_infra/stacks/eval
 
 ## Deploy the role
 
-Run once, with your admin profile and real AWS (see `on-premise-deploy.md` §1 for the shell setup: no LocalStack endpoints). The account must be CDK-bootstrapped in us-east-1 (the `CDKToolkit` stack; any deployed mode has done it, and `pilot-aws-prerequisites.md` §2 shows how). It assumes the account's GitHub OIDC provider exists; native-cloud's `GitHubDeploy` stack creates it (ADR 0016). If `aws iam list-open-id-connect-providers` shows no `token.actions.githubusercontent.com`, create it first:
+Run once, with your admin profile and real AWS (see `on-premise-deploy.md` §1 for the shell setup: no LocalStack endpoints). On Windows PowerShell, use "From PowerShell" below instead. The account must be CDK-bootstrapped in us-east-1 (the `CDKToolkit` stack; any deployed mode has done it, and `pilot-aws-prerequisites.md` §2 shows how). It assumes the account's GitHub OIDC provider exists; native-cloud's `GitHubDeploy` stack creates it (ADR 0016). If `aws iam list-open-id-connect-providers` shows no `token.actions.githubusercontent.com`, create it first:
 
 ```bash
 aws iam create-open-id-connect-provider --url https://token.actions.githubusercontent.com --client-id-list sts.amazonaws.com
@@ -46,6 +46,52 @@ gh secret delete EVALS_AWS_ROLE_ARN --repo konica/agent-tutor
 ```
 
 The smoke job then skips with a warning until the stack and the secret exist again. The OIDC provider stays: it isn't this stack's.
+
+## From PowerShell
+
+The same steps for Windows PowerShell, where `make` and the bash lines above don't run. Run each block from the repository root.
+
+Set up the shell for real AWS, once per session. It is `on-premise-deploy.md` §1's setup, and it also clears `SMART_TUTOR_LOCALSTACK` and a `VIRTUAL_ENV` left from `backend/`:
+
+```powershell
+Get-ChildItem Env: | Where-Object Name -like "AWS_ENDPOINT_URL*" | ForEach-Object { Remove-Item "Env:$($_.Name)" }
+Remove-Item Env:AWS_ACCESS_KEY_ID, Env:AWS_SECRET_ACCESS_KEY, Env:AWS_SESSION_TOKEN, Env:SMART_TUTOR_LOCALSTACK, Env:VIRTUAL_ENV -ErrorAction SilentlyContinue
+$env:AWS_IGNORE_CONFIGURED_ENDPOINT_URLS = "true"
+$env:AWS_PROFILE = "default"          # your admin profile
+$env:AWS_REGION = "us-east-1"
+$env:JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION = "1"
+aws sts get-caller-identity
+```
+
+Create the GitHub OIDC provider if the account has none:
+
+```powershell
+$oidc = aws iam list-open-id-connect-providers --query "OpenIDConnectProviderList[].Arn" --output text
+if ($oidc -notmatch "token.actions.githubusercontent.com") {
+    aws iam create-open-id-connect-provider --url https://token.actions.githubusercontent.com --client-id-list sts.amazonaws.com
+}
+```
+
+Deploy the stack and set the secret (again after a model change, "When a model changes"):
+
+```powershell
+Push-Location infra
+uv sync
+npx --yes aws-cdk@2.1145.0 --app "uv run python evals_ci_app.py" deploy SmartTutor-EvalsCI --require-approval broadening
+Pop-Location
+$roleArn = aws cloudformation describe-stacks --region us-east-1 --stack-name SmartTutor-EvalsCI `
+    --query "Stacks[0].Outputs[?OutputKey=='RoleArn'].OutputValue" --output text
+gh secret set EVALS_AWS_ROLE_ARN --repo konica/agent-tutor --body $roleArn
+```
+
+Remove it:
+
+```powershell
+Push-Location infra
+npx --yes aws-cdk@2.1145.0 --app "uv run python evals_ci_app.py" destroy SmartTutor-EvalsCI
+Pop-Location
+gh secret delete EVALS_AWS_ROLE_ARN --repo konica/agent-tutor
+```
 
 ## Langfuse
 
