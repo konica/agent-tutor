@@ -557,7 +557,7 @@ source_modules = [
 ]
 forbidden_modules = ["onnxruntime", "tokenizers"]
 
-# ADR 0017: runtime traces go to Phoenix; only backend/evals (outside smart_tutor) uses LangSmith.
+# ADR 0017, ADR 0023: runtime traces go to Langfuse; only backend/evals (outside smart_tutor) uses LangSmith.
 [[tool.importlinter.contracts]]
 name = "Runtime code never imports LangSmith"
 type = "forbidden"

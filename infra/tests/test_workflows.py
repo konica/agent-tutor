@@ -921,16 +921,22 @@ def local_compose() -> dict[str, Any]:
 
 
 @pytest.mark.parametrize("service", ["agent", "worker"])
-def test_app_services_trace_into_the_compose_phoenix_and_not_langsmith(service: str) -> None:
+def test_app_services_do_not_trace_into_phoenix_or_langsmith(service: str) -> None:
     env = local_compose()["services"][service]["environment"]
-    assert env["SMART_TUTOR_PHOENIX_URL"] == "http://phoenix:6006"
+    assert not [k for k in env if k.startswith("SMART_TUTOR_PHOENIX_")]  # Langfuse only since #316
     assert env["LANGSMITH_TRACING"] == "false"  # an old .env must not trace into LangSmith
 
 
-def test_ci_app_services_run_untraced() -> None:  # CI starts no Phoenix; .env.example points at localhost:10404
+def test_the_local_api_does_not_wait_for_phoenix() -> None:
+    compose = local_compose()
+    assert "phoenix" not in compose["services"]["api"]["depends_on"]
+    assert "phoenix" in compose["services"]  # kept until #322 removes it
+
+
+def test_ci_app_services_have_no_phoenix_setting() -> None:
     override = yaml.safe_load((WORKFLOWS.parents[1] / "compose.ci.yaml").read_text(encoding="utf-8"))
     for service in ("api", "agent", "mcp", "worker"):
-        assert "SMART_TUTOR_PHOENIX_URL=" in override["services"][service]["environment"], service
+        assert not [e for e in override["services"][service]["environment"] if "PHOENIX" in e], service
 
 
 def test_ci_app_services_do_not_trace_into_langfuse() -> None:  # the eval runner's experiments are CI's record (#320)
