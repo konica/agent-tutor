@@ -123,7 +123,7 @@ def test_an_ingest_is_a_root_span_with_its_metadata_and_the_model_call_beneath_i
         "langfuse.trace.metadata.content_id": "c-1",
         "langfuse.trace.metadata.learner_hash": LearnerHasher("k")(UserId("user-123")),
     }
-    assert "metadata" not in root.attributes  # OpenInference's JSON copy was Phoenix's; Langfuse reads the keys above
+    assert "metadata" not in root.attributes  # OpenInference's JSON copy is not used; Langfuse reads the keys above
     children = [s for s in finished if s is not root]
     assert children and all(s.context.trace_id == root.context.trace_id for s in children)
     assert "user-123" not in json.dumps([s.to_json() for s in finished])

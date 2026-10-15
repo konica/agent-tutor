@@ -65,7 +65,6 @@ def test_secrets_are_generated_not_written() -> None:
         "smart-tutor/keycloak/admin",
         "smart-tutor/keycloak/api-client",
         "smart-tutor/keycloak/mcp-client",
-        "smart-tutor/phoenix/learner-hash-key",
         "smart-tutor/langfuse/learner-hash-key",
     }
     assert all("SecretString" not in p and "GenerateSecretString" in p for p in by_name.values())
@@ -78,17 +77,6 @@ def test_trace_sampling_rate_is_an_ssm_parameter_tracing_every_run() -> None:
     template = Template.from_stack(ConfigStack(cdk.App(), "Config", names=mode_names(NATIVE_CLOUD)))
 
     template.has_resource_properties("AWS::SSM::Parameter", {"Name": "/smart-tutor/trace-sampling-rate", "Value": "1"})
-
-
-def test_learner_hash_key_is_a_long_generated_string_per_mode() -> None:
-    template = Template.from_stack(ConfigStack(cdk.App(), "Config", names=mode_names(ON_PREMISE)))
-
-    secrets = template.find_resources("AWS::SecretsManager::Secret")
-    [key] = [s["Properties"] for s in secrets.values() if s["Properties"]["Name"].endswith("/phoenix/learner-hash-key")]
-    assert key["Name"] == "smart-tutor-on-premise/phoenix/learner-hash-key"
-    generated = key["GenerateSecretString"]
-    assert generated["PasswordLength"] == 64 and generated["ExcludePunctuation"] is True
-    assert "SecretStringTemplate" not in generated  # a plain string, read as the whole secret value
 
 
 @pytest.mark.parametrize(("mode", "prefix"), [(NATIVE_CLOUD, "smart-tutor"), (ON_PREMISE, "smart-tutor-on-premise")])

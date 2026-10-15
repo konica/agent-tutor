@@ -7,8 +7,6 @@ image:
 awsRegion: us-east-1
 secrets:
   database: smart-tutor/db/app
-  langsmithApiKey: smart-tutor/langsmith/api-key
-  learnerHashKey: smart-tutor/phoenix/learner-hash-key
 resources:
   requests: {cpu: 250m, memory: 512Mi}
   limits: {memory: 1536Mi}  # pypdf on a 500-page PDF

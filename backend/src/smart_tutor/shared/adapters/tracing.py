@@ -47,7 +47,8 @@ LANGFUSE_METADATA_PREFIX = "langfuse.trace.metadata."
 LANGFUSE_INPUT = "langfuse.observation.input"
 LANGFUSE_OUTPUT = "langfuse.observation.output"
 _LOW_64_BITS = 0xFFFF_FFFF_FFFF_FFFF
-# langchain-core traces every run to LangSmith while any is on (ADR 0017: LangSmith is for evals only).
+# langchain-core ships a cloud tracing client and sends every run to it while any of these is on; ADR 0023 traces to
+# Langfuse only.
 LANGSMITH_SWITCHES = ("LANGSMITH_TRACING_V2", "LANGSMITH_TRACING", "LANGCHAIN_TRACING_V2")
 _root_run: ContextVar[uuid.UUID | None] = ContextVar("root_run", default=None)
 
@@ -210,15 +211,15 @@ def otel_traces(
 
 
 def stop_langsmith_tracing() -> None:
-    """Runtime traces go to Langfuse only: LangSmith's tracing stays off in this process even when the environment (a
-    developer's shell or `.env`) turns it on. Call before the first model call: LangSmith caches what it reads."""
+    """Runtime traces go to Langfuse only: langchain-core's own cloud tracing stays off in this process even when the
+    environment (a developer's shell) turns it on. Call before the first model call: it caches what it reads."""
     for name in LANGSMITH_SWITCHES:
         os.environ[name] = "false"
 
 
 def start_tracing(settings: Settings) -> OtelTraces | None:
-    """Startup for a process that traces: turns LangSmith tracing off, then refuses tracing without a learner-hash key
-    (see `learner_hasher`); None leaves the process untraced."""
+    """Startup for a process that traces: turns langchain-core's cloud tracing off, then refuses tracing without a
+    learner-hash key (see `learner_hasher`); None leaves the process untraced."""
     stop_langsmith_tracing()
     hasher = learner_hasher(settings)
     if not tracing_enabled(settings):

@@ -11,8 +11,6 @@ mcpUrl: http://mcp-server/mcp
 secrets:
   database: smart-tutor/db/app
   keycloakClient: smart-tutor/keycloak/api-client
-  langsmithApiKey: smart-tutor/langsmith/api-key
-  learnerHashKey: smart-tutor/phoenix/learner-hash-key
 resources:
   requests: {cpu: 100m, memory: 256Mi}
   limits: {memory: 512Mi}

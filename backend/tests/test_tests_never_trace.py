@@ -1,4 +1,4 @@
-"""ADR 0017: no test sends a trace, whatever environment is loaded (an IDE runner's `.env`, `uv run --env-file`, an
+"""ADR 0023: no test sends a trace, whatever environment is loaded (an IDE runner's `.env`, `uv run --env-file`, an
 exported shell). This file sits outside `tests/unit` on purpose: the guarantee comes from the root conftest, not from
 a folder's."""
 

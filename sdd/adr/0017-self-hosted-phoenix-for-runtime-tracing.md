@@ -1,6 +1,6 @@
 # 0017. Self-hosted Arize Phoenix for runtime tracing; evals stay on LangSmith
 
-- Status: accepted; its choice of tool is superseded by 0021 and how Smart Tutor uses Langfuse by 0023 (Phoenix runs until the Langfuse migration lands)
+- Status: superseded by 0021 (the choice of tool) and 0023 (how Smart Tutor uses Langfuse); Phoenix and LangSmith were removed in #322
 - Date: 2026-10-12
 - Supersedes: the LangSmith parts of PRD §10.2 and §10.4 (#229) for runtime traces and ratings, and 0014's amendment (the worker no longer reaches `api.smith.langchain.com`)
 
@@ -83,3 +83,7 @@ The on-premise host is one t3.large (2 vCPU, 8 GiB) that already runs Postgres, 
 - PRD §10.2, §10.3 item 7, §10.4, D25, Q34, and §9's job table change wording from LangSmith to Phoenix in the slices that ship the behaviour. Growing eval datasets from 👎-rated production turns (§10.3 item 7) now needs an export from Phoenix into LangSmith datasets. That export is not built yet.
 - The pilot smoke test's trace check queries Phoenix's API instead of LangSmith's.
 - Evals still need `LANGSMITH_API_KEY` locally and in CI. The quota now covers eval runs only.
+
+## Retirement (#322)
+
+Nothing uses Phoenix or LangSmith any more, and the repository no longer runs or configures either. Phoenix's traces were not migrated. A host deployed before #322 keeps what the deploy no longer manages, so on such a host, once, from a Session Manager shell (`docs/runbooks/on-premise-deploy.md` section 7): drop the `phoenix` database and role (`dc exec postgres psql -U postgres -c "DROP DATABASE IF EXISTS phoenix" -c "DROP ROLE IF EXISTS phoenix"`) and delete the hand-made secret `smart-tutor-on-premise/phoenix/api-key` if it exists. The next `Host` and `Config` stack deploys delete the generated secrets (`db/phoenix`, `phoenix/secret`, `phoenix/admin-password`, `phoenix/learner-hash-key`), and the next app deploy removes the container (`--remove-orphans`).

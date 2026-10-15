@@ -333,7 +333,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--turn-input-tokens",
         type=int,
         default=2652,
-        help="input tokens of an average ask turn (default 2652: mean of 16 local ask traces in Phoenix, 2026-10-13)",
+        help="input tokens of an average ask turn (default 2652: mean of 16 local ask traces, 2026-10-13)",
     )
     parser.add_argument(
         "--turn-output-tokens",

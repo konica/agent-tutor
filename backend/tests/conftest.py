@@ -1,9 +1,9 @@
 """Shared fixtures. Unit tests use fakes; integration tests (marker `integration`) need `make up`.
 
-No test sends a trace, whatever environment is loaded (ADR 0017): tracing is off for the whole session, and LangSmith's
-default client records instead of sending. A test that needs a trace turns it on with its own recording client. No test
-reaches Langfuse either: its URL and keys are blank for the session, so every `Settings()` is untraced, and a test that
-leaves LangChain instrumented fails."""
+No test sends a trace, whatever environment is loaded (ADR 0023): tracing is off for the whole session, and
+langchain-core's default client records instead of sending. A test that needs a trace turns it on with its own
+recording client. No test reaches Langfuse either: its URL and keys are blank for the session, so every `Settings()` is
+untraced, and a test that leaves LangChain instrumented fails."""
 
 import os
 from collections.abc import Iterator

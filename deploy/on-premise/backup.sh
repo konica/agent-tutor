@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Dumps the app and Keycloak databases to the on-premise bucket (#151). The `phoenix` database (traces, ADR 0017) is
-# left out: losing traces on a restore is acceptable. smart-tutor-backup.timer runs it as root every
+# Dumps the app and Keycloak databases to the on-premise bucket (#151). smart-tutor-backup.timer runs it as root every
 # night; deploy.sh installs the timer. Runbook: docs/runbooks/on-premise-backups.md.
 #
 #   s3://<documents bucket>/backups/postgres/<UTC timestamp>/{smart_tutor,keycloak}.dump   (pg_dump custom format)
