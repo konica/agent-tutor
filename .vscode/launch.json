@@ -53,6 +53,19 @@
       "windows": { "python": "${workspaceFolder}/backend/.venv/Scripts/python.exe" }
     },
     {
+      // `make evals-smoke` under the debugger. Run `make sync` with the eval extra too (uv sync --extra eval).
+      // Needs the app stack and the eval learners' libraries (backend/evals/README.md "Run a split").
+      "name": "Evals: smoke",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "evals.run",
+      "args": ["--split", "smoke"],
+      "cwd": "${workspaceFolder}/backend",
+      "envFile": "${workspaceFolder}/.env",
+      "python": "${workspaceFolder}/backend/.venv/bin/python",
+      "windows": { "python": "${workspaceFolder}/backend/.venv/Scripts/python.exe" }
+    },
+    {
       "name": "Attach: API",
       "type": "debugpy",
       "request": "attach",
