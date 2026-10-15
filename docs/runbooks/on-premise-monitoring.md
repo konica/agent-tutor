@@ -62,7 +62,7 @@ aws sns list-subscriptions-by-topic --topic-arn $Topic --query "Subscriptions[].
 
 **What happened.** Spend this month passed 80% of `smart-tutor:budget-monthly-usd`, or AWS forecasts it will pass 100%. The usual causes are Bedrock use, a VM larger than `t3.large`, or the native-cloud stacks running beside on-premise.
 
-**What to do.** In **Billing → Cost Explorer**, group this month's cost by service. Check Bedrock usage in Phoenix traces (LLM spans' token counts), and check that no native-cloud stack (`SmartTutor-prod-*`) is running when it shouldn't be. Tell the product owner if the budget is too low for the pilot. The amount is `smart-tutor:budget-monthly-usd` in `infra/cdk.json`.
+**What to do.** In **Billing → Cost Explorer**, group this month's cost by service. Check Bedrock usage in the Langfuse traces (LLM generations' token counts), and check that no native-cloud stack (`SmartTutor-prod-*`) is running when it shouldn't be. Tell the product owner if the budget is too low for the pilot. The amount is `smart-tutor:budget-monthly-usd` in `infra/cdk.json`.
 
 ## Hours (ADR 0022)
 
@@ -183,9 +183,9 @@ aws ssm get-command-invocation --command-id $Command --instance-id $InstanceId -
 
 The output lists each service's status. If one stays unhealthy, open a shell (`on-premise-deploy.md` §7) and read its logs with `dc logs --tail 200 <service>`. Common causes: `/data` not mounted (the data volume), the disk full (`df -h / /data`; `docker image prune -af` frees old images), or Keycloak slow to start after a reboot. If a deploy left the services broken, redeploy the last good tag.
 
-## Phoenix's memory and database size (#288)
+## Phoenix's memory and database size (#288, until #322)
 
-Phoenix itself is capped at 1 GB (`mem_limit`; it idles at about 450 MiB) and is restarted if it goes over. ADR 0017's estimate of 1 to 2 GB includes the database's growth in Postgres, which has no limit. Container limits now total about 5.75 GiB of the t3.large's ~7.6 GiB, with Postgres and Caddy unlimited and no swap, so watch available memory. Check monthly, and after a traffic jump. From a Session Manager shell (`on-premise-deploy.md` §7):
+Phoenix is unused since #316 (#322 removes it), but it still runs and holds memory. It is capped at 1 GB (`mem_limit`; it idles at about 450 MiB) and is restarted if it goes over. ADR 0017's estimate of 1 to 2 GB includes the database's growth in Postgres, which has no limit. Container limits now total about 5.75 GiB of the t3.large's ~7.6 GiB, with Postgres and Caddy unlimited and no swap, so watch available memory. Check monthly, and after a traffic jump. From a Session Manager shell (`on-premise-deploy.md` §7):
 
 ```bash
 free -m
@@ -194,4 +194,4 @@ df -h /data
 dc exec postgres psql -U postgres -c "SELECT pg_size_pretty(pg_database_size('phoenix'));"
 ```
 
-When it grows, lower `trace-sampling-rate` (`on-premise-deploy.md` §10) or shorten retention in Phoenix's *Settings, Data Retention*, never above 180 days. If the host's available memory stays under about 1 GB, move to a larger instance (`smart-tutor:on-premise-instance-type`).
+When it grows, lower `trace-sampling-rate` (`on-premise-deploy.md` §10) or shorten retention in Phoenix's *Settings, Data Retention*, never above 180 days (Phoenix no longer receives traces). If the host's available memory stays under about 1 GB, move to a larger instance (`smart-tutor:on-premise-instance-type`).
