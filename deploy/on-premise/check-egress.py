@@ -4,7 +4,8 @@ every patch window:
     docker compose exec -T worker python - <check-egress.py
 
 The worker must not reach the internet, directly, by DNS, or through the proxy (CONNECT to another host or port, or
-plain HTTP), while S3, SQS, SSM, Bedrock, Phoenix (while tracing), Langfuse (while exporting, through the proxy), and Postgres work. The AWS calls are read-only and use the instance profile, whose credentials come through the proxy too.
+plain HTTP), while S3, SQS, SSM, Bedrock, Langfuse (while exporting, through the proxy), and Postgres work. The AWS calls are read-only and use
+the instance profile, whose credentials come through the proxy too.
 Exit 0: as expected. Exit 2: blocked, but a needed destination is unreachable. Exit 1, or a crash: treat as a leak.
 """
 
@@ -71,6 +72,8 @@ def leaks() -> list[str]:
         for host in (ARBITRARY_HOST, ARBITRARY_IP, sqs_host)  # even an allowed host only through the proxy
         if _connects(host, 443)
     ]
+    if _connects("phoenix", 6006):  # off the worker's network since #316; the app no longer traces into it
+        problems.append("direct phoenix:6006 connected")
     # A name that exists: any answer means the worker has a DNS resolver outside the VM.
     if _resolves(ARBITRARY_HOST):
         problems.append(f"DNS resolved {ARBITRARY_HOST}")
@@ -111,11 +114,6 @@ def _aws_problems(region: str) -> list[str]:
     return problems
 
 
-def _tracing() -> bool:
-    """The worker traces when it has a Phoenix URL and its key (deploy.sh leaves the key empty without the secret)."""
-    return bool(os.environ.get("SMART_TUTOR_PHOENIX_URL")) and bool(os.environ.get("SMART_TUTOR_PHOENIX_API_KEY"))
-
-
 def _langfuse() -> bool:
     """The worker exports to Langfuse when it has the URL and both keys (deploy.sh leaves the keys empty without them)."""
     return all(
@@ -135,16 +133,6 @@ def unreachable() -> list[str]:
         pass
     except OSError as error:
         problems.append(f"Bedrock: {error}")
-    # Phoenix (the ingest traces), on the worker's internal network: any HTTP answer proves the route.
-    if _tracing():
-        url = os.environ["SMART_TUTOR_PHOENIX_URL"].rstrip("/") + "/healthz"
-        direct = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-        try:
-            direct.open(url, timeout=TIMEOUT)
-        except urllib.error.HTTPError:
-            pass
-        except OSError as error:
-            problems.append(f"Phoenix: {error}")
     # Langfuse, through the proxy (its host is on the allowlist): the tunnel opening proves the route. It is off
     # 18:00-07:00 (ADR 0022), when Squid answers 502/503; tracing is non-critical (ADR 0023), so that only gets a notice.
     if _langfuse():
@@ -178,9 +166,8 @@ def main() -> int:
         return 1
     if missing:
         return 2
-    phoenix = "Phoenix (tracing on), " if _tracing() else ""
     langfuse = "Langfuse (through the proxy), " if _langfuse() else ""
-    print(f"The worker reaches S3, SQS, SSM, Bedrock, {phoenix}{langfuse}and Postgres, and nothing else")
+    print(f"The worker reaches S3, SQS, SSM, Bedrock, {langfuse}and Postgres, and nothing else")
     return 0
 
 
