@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Observe traces and monitor metrics</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      color-scheme: dark;
+      --color-paper:  #0e1418;
+      --color-ink:    #e8eef2;
+      --color-muted:  #b3bfc9;
+      --color-accent: #4cc2b8;
+      --color-rule:   rgba(232,238,242,0.12);
+      --font-sans:    system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      --font-serif:   Charter, 'Bitstream Charter', 'Iowan Old Style', 'Palatino Linotype', Cambria, Georgia, serif;
+      --font-mono:    ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+
+    .frame { max-width: 1200px; width: 100%; min-width: 0; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+
+    .notes {
+      margin-top: 1.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--color-rule);
+      max-width: 72ch;
+      font-size: 0.9rem;
+      line-height: 1.55;
+      color: var(--color-muted);
+    }
+    .notes h2 { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em;
+                 text-transform: uppercase; margin-bottom: 0.5rem; }
+    .notes ol, .notes ul { padding-left: 1.25rem; }
+    .notes li + li { margin-top: 0.25rem; }
+    .notes code { font-family: var(--font-mono); font-size: 0.82rem; color: var(--color-ink); }
+
+    svg { width: 100%; min-width: 984px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Architecture · Smart Tutor observability</p>
+    <h1>Observe traces and monitor metrics</h1>
+
+    <div class="diagram-container">
+<svg viewBox="0 64 984 448" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="langfuse-monitoring-dark-title langfuse-monitoring-dark-desc">
+<title id="langfuse-monitoring-dark-title">Observe Smart Tutor traces and metrics in Langfuse</title>
+<desc id="langfuse-monitoring-dark-desc">The agent and the ingestion worker send ask and ingest traces through an OpenTelemetry exporter over OTLP/HTTP to the production Langfuse project, where people read them in the trace explorer; learner ratings as scores and dashboards with alerts are planned.</desc>
+<defs>
+<marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#b3bfc9"/></marker>
+<marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4cc2b8"/></marker>
+<marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#8bbdf3"/></marker>
+</defs>
+<rect x="0" y="64" width="984" height="448" fill="#0e1418"/>
+<!-- zones -->
+<rect x="24" y="104" width="448" height="320" rx="8" fill="rgba(232,238,242,0.02)" stroke="rgba(232,238,242,0.14)" stroke-width="0.8"/>
+<rect x="36" y="108" width="156" height="12" rx="2" fill="#0e1418"/>
+<text x="40" y="117" fill="#a0adb8" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">SMART TUTOR · ON-PREMISE VM</text>
+<rect x="496" y="104" width="464" height="320" rx="8" fill="rgba(232,238,242,0.02)" stroke="rgba(232,238,242,0.14)" stroke-width="0.8"/>
+<rect x="508" y="108" width="172" height="12" rx="2" fill="#0e1418"/>
+<text x="512" y="117" fill="#a0adb8" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">LANGFUSE · SEC-DOG.DUCKDNS.ORG</text>
+<!-- arrows -->
+<path d="M 216,168 H 240 Q 248,168 248,176 V 212 Q 248,220 256,220 H 280" fill="none" stroke="#b3bfc9" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 216,296 H 240 Q 248,296 248,288 V 252 Q 248,244 256,244 H 280" fill="none" stroke="#b3bfc9" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 456,232 H 520" fill="none" stroke="#4cc2b8" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+<path d="M 456,376 H 600 Q 608,376 608,368 V 264" fill="none" stroke="#8bbdf3" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#arrow-link)"/>
+<path d="M 696,220 H 720 Q 728,220 728,212 V 176 Q 728,168 736,168 H 760" fill="none" stroke="#b3bfc9" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 696,244 H 720 Q 728,244 728,252 V 288 Q 728,296 736,296 H 760" fill="none" stroke="#b3bfc9" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+<!-- arrow labels -->
+<rect x="460" y="212" width="56" height="12" rx="2" fill="#0e1418"/>
+<text x="488" y="221" fill="#4cc2b8" font-size="8" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.06em">OTLP/HTTP</text>
+<rect x="510" y="356" width="36" height="12" rx="2" fill="#0e1418"/>
+<text x="528" y="365" fill="#8bbdf3" font-size="8" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.06em">SCORE</text>
+<!-- nodes -->
+<rect x="40" y="136" width="176" height="64" rx="6" fill="#0e1418"/>
+<rect x="40" y="136" width="176" height="64" rx="6" fill="#151d23" stroke="#e8eef2" stroke-width="1"/>
+<rect x="48" y="142" width="24" height="12" rx="2" fill="none" stroke="#a0adb8" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="60" y="151" fill="#a0adb8" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">ASK</text>
+<text x="128" y="168" fill="#e8eef2" font-size="12" font-weight="600" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">Agent</text>
+<text x="128" y="182" fill="#b3bfc9" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">one trace per question</text>
+<text x="128" y="194" fill="#b3bfc9" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">trace name: ask</text>
+<rect x="40" y="264" width="176" height="64" rx="6" fill="#0e1418"/>
+<rect x="40" y="264" width="176" height="64" rx="6" fill="#151d23" stroke="#e8eef2" stroke-width="1"/>
+<rect x="48" y="270" width="40" height="12" rx="2" fill="none" stroke="#a0adb8" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="68" y="279" fill="#a0adb8" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">INGEST</text>
+<text x="128" y="296" fill="#e8eef2" font-size="12" font-weight="600" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">Ingestion worker</text>
+<text x="128" y="310" fill="#b3bfc9" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">one trace per content</text>
+<text x="128" y="322" fill="#b3bfc9" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">trace name: ingest</text>
+<rect x="280" y="200" width="176" height="64" rx="6" fill="#0e1418"/>
+<rect x="280" y="200" width="176" height="64" rx="6" fill="#151d23" stroke="#e8eef2" stroke-width="1"/>
+<rect x="288" y="206" width="44" height="12" rx="2" fill="none" stroke="#a0adb8" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="310" y="215" fill="#a0adb8" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">TRACING</text>
+<text x="368" y="232" fill="#e8eef2" font-size="12" font-weight="600" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">OTel exporter</text>
+<text x="368" y="246" fill="#b3bfc9" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">OpenInference LangChain</text>
+<text x="368" y="258" fill="#b3bfc9" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">sampled · never raises</text>
+<rect x="280" y="344" width="176" height="64" rx="6" fill="#0e1418"/>
+<rect x="280" y="344" width="176" height="64" rx="6" fill="rgba(232,238,242,0.02)" stroke="rgba(232,238,242,0.45)" stroke-width="1" stroke-dasharray="4,3"/>
+<rect x="288" y="350" width="28" height="12" rx="2" fill="none" stroke="#a0adb8" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="302" y="359" fill="#a0adb8" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">#318</text>
+<text x="368" y="376" fill="#e8eef2" font-size="12" font-weight="600" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">Learner ratings</text>
+<text x="368" y="390" fill="#b3bfc9" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">learner_rating score</text>
+<text x="368" y="402" fill="#b3bfc9" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">thumbs up / down</text>
+<rect x="520" y="200" width="176" height="64" rx="6" fill="#0e1418"/>
+<rect x="520" y="200" width="176" height="64" rx="6" fill="rgba(76,194,184,0.10)" stroke="#4cc2b8" stroke-width="1"/>
+<rect x="528" y="206" width="44" height="12" rx="2" fill="none" stroke="#4cc2b8" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="550" y="215" fill="#4cc2b8" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">PROJECT</text>
+<text x="608" y="232" fill="#e8eef2" font-size="12" font-weight="600" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">Production project</text>
+<text x="608" y="246" fill="#b3bfc9" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">smart-tutor-on-premise</text>
+<text x="608" y="258" fill="#b3bfc9" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">+ -local, -evals</text>
+<rect x="760" y="136" width="176" height="64" rx="6" fill="#0e1418"/>
+<rect x="760" y="136" width="176" height="64" rx="6" fill="#151d23" stroke="#e8eef2" stroke-width="1"/>
+<rect x="768" y="142" width="28" height="12" rx="2" fill="none" stroke="#a0adb8" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="782" y="151" fill="#a0adb8" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">VIEW</text>
+<text x="848" y="168" fill="#e8eef2" font-size="12" font-weight="600" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">Trace explorer</text>
+<text x="848" y="182" fill="#b3bfc9" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">Tracing → Traces</text>
+<text x="848" y="194" fill="#b3bfc9" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">name · env · session</text>
+<rect x="760" y="264" width="176" height="64" rx="6" fill="#0e1418"/>
+<rect x="760" y="264" width="176" height="64" rx="6" fill="rgba(232,238,242,0.02)" stroke="rgba(232,238,242,0.45)" stroke-width="1" stroke-dasharray="4,3"/>
+<rect x="768" y="270" width="20" height="12" rx="2" fill="none" stroke="#a0adb8" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="778" y="279" fill="#a0adb8" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">M4</text>
+<text x="848" y="296" fill="#e8eef2" font-size="12" font-weight="600" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">Dashboards + alerts</text>
+<text x="848" y="310" fill="#b3bfc9" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">latency · cost · tokens</text>
+<text x="848" y="322" fill="#b3bfc9" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">errors · score drops</text>
+<!-- callouts and legend -->
+<line x1="24" y1="456" x2="960" y2="456" stroke="rgba(232,238,242,0.1)" stroke-width="0.8"/>
+<text x="24" y="476" fill="#b3bfc9" font-size="8" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">LEGEND</text>
+<rect x="96" y="467" width="24" height="12" rx="2" fill="#151d23" stroke="#e8eef2" stroke-width="1"/>
+<text x="128" y="476" fill="#b3bfc9" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">service / view</text>
+<rect x="236" y="467" width="24" height="12" rx="2" fill="rgba(76,194,184,0.10)" stroke="#4cc2b8" stroke-width="1"/>
+<text x="268" y="476" fill="#b3bfc9" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">where traces land</text>
+<rect x="392" y="467" width="24" height="12" rx="2" fill="rgba(232,238,242,0.02)" stroke="rgba(232,238,242,0.45)" stroke-width="1" stroke-dasharray="4,3"/>
+<text x="424" y="476" fill="#b3bfc9" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">planned</text>
+<line x1="492" y1="473" x2="516" y2="473" stroke="#4cc2b8" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+<text x="524" y="476" fill="#b3bfc9" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">trace export</text>
+<line x1="620" y1="473" x2="644" y2="473" stroke="#8bbdf3" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+<text x="652" y="476" fill="#b3bfc9" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">API call</text>
+</svg>
+    </div>
+
+    <div class="notes">
+      <h2>How to</h2>
+      <ul>
+        <li>Open <code>https://sec-dog.duckdns.org</code> (07:00–18:00 Asia/Ho_Chi_Minh) → project <code>smart-tutor-on-premise</code> → <b>Tracing → Traces</b>. Filter by name (<code>ask</code>, <code>ingest</code>), environment, session (= thread) or user (= learner hash).</li>
+        <li>The <code>ask</code> root carries <code>deployment</code>, <code>chat_model</code>, <code>embedding_model</code>, <code>limited</code>, <code>decline</code>, <code>chunks</code>, <code>thread_id</code> and <code>learner_hash</code>; the <code>ingest</code> root carries <code>deployment</code>, <code>chat_model</code>, <code>embedding_model</code>, <code>learner_hash</code> and <code>content_id</code>. Latency, tokens and model calls come from the LangChain spans.</li>
+        <li>Developers use <code>smart-tutor-local</code>. <code>smart-tutor-evals</code> holds datasets, review queues and candidate traces (environment <code>local</code>); the CI stack is not traced until #320.</li>
+        <li>Privacy: traces carry a learner hash, never a user id, email or token. Production traces must be gone within 180 days; the deletion job is #321.</li>
+      </ul>
+      <h2 style="margin-top:1rem">Planned</h2>
+      <p>Learner ratings as <code>learner_rating</code> scores (#318); dashboards, alerts and online judges on live traces (M4); retiring Phoenix (#322), which still gets a copy of every trace until then.</p>
+    </div>
+  </div>
+</body>
+</html>
