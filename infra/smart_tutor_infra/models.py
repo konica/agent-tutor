@@ -6,7 +6,7 @@ every region it routes to (`aws bedrock get-inference-profile --inference-profil
 The question screen's guardrail (Standard tier) is cross-region too: it names a guardrail profile, and the agent applies
 it through the profile in each region the profile routes to (#199).
 
-The CI evals role (`docs/runbooks/evals-ci.md`, #226) is granted the same models plus the eval judge, `JUDGE_MODEL`.
+The CI evals role (stack SmartTutor-EvalsCI, stacks/evals_ci.py, #226, #337) is granted the same models plus the eval judge, JUDGE_MODEL.
 """
 
 AGENT_PROFILE = "us.amazon.nova-2-lite-v1:0"

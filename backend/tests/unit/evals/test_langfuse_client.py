@@ -1,13 +1,14 @@
-"""The Langfuse seam's SDK adapter, on a stub of the SDK client: pages, archived items, review queues, and errors
-in our types."""
+"""The Langfuse seam's SDK adapter, on a stub of the SDK client: pages, archived items, review queues, experiments,
+and errors in our types."""
 
+import asyncio
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
-from evals.langfuse_client import KEYS, URLS, Item, LangfuseError, Score, SdkLangfuse, StoredDataset, Trace
+from evals.langfuse_client import KEYS, URLS, Item, ItemScore, LangfuseError, Score, SdkLangfuse, StoredDataset, Trace
 
 pytest.importorskip("langfuse")  # the eval extra
 import httpx  # noqa: E402
@@ -28,6 +29,8 @@ class StubSdk:
     def __init__(self, pages: list[list[str]] | None = None, error: Exception | None = None) -> None:
         self.pages, self.error = pages or [[]], error
         self.created: list[dict[str, Any]] = []
+        self.experiments: list[dict[str, Any]] = []
+        self.run_url: str | None = "https://langfuse.example/project/p/datasets/d/runs/r"
         self.api = SimpleNamespace(datasets=SimpleNamespace(list=self._list))
 
     def _list(self, *, page: int, limit: int) -> SimpleNamespace:
@@ -49,6 +52,23 @@ class StubSdk:
 
     def create_dataset_item(self, **kwargs: Any) -> None:
         self.created.append({"item": kwargs})
+
+    def run_experiment(self, **kwargs: Any) -> SimpleNamespace:
+        """As the SDK calls a task and evaluators: keyword arguments, with each item's metadata."""
+
+        async def one(item: Any) -> dict[str, Any]:
+            output = await kwargs["task"](item=item)
+            evaluations = []
+            for evaluator in kwargs["evaluators"]:
+                given = {"input": item.input, "output": output, "expected_output": item.expected_output}
+                evaluations += await evaluator(**given, metadata=item.metadata)
+            return {"output": output, "evaluations": evaluations}
+
+        async def every() -> list[dict[str, Any]]:
+            return [await one(item) for item in kwargs["data"]]
+
+        self.experiments.append({**kwargs, "results": asyncio.run(every())})
+        return SimpleNamespace(dataset_run_url=self.run_url)
 
 
 def test_dataset_names_reads_every_page() -> None:
@@ -90,6 +110,48 @@ def test_items_are_created_with_their_reference_outputs_and_metadata() -> None:
     ]
 
 
+async def _answer(inputs: dict[str, Any]) -> dict[str, Any]:
+    return {"answer": f"about {inputs['question']}"}
+
+
+async def _relevance(inputs: dict[str, Any], outputs: dict[str, Any], expected: dict[str, Any]) -> list[ItemScore]:
+    return [ItemScore("answer_relevance", 0.5 if expected["covered"] else 0.0, outputs["answer"])]
+
+
+def _run(client: SdkLangfuse) -> str:
+    return client.run_experiment(
+        "a/smoke-v1",
+        run_name="local 2026-10-14 09:00:00Z",
+        description="smoke evals on smoke-v1",
+        metadata={"split": "smoke"},
+        task=_answer,
+        evaluators=[_relevance],
+        max_concurrency=4,
+    )
+
+
+def test_an_experiment_runs_the_active_items_as_a_dataset_run_with_numeric_scores() -> None:
+    stub = StubSdk()
+    assert _run(SdkLangfuse(stub)) == "https://langfuse.example/project/p/datasets/d/runs/r"
+    [experiment] = stub.experiments
+    assert experiment["name"] == "a/smoke-v1" and experiment["run_name"] == "local 2026-10-14 09:00:00Z"
+    assert experiment["description"] == "smoke evals on smoke-v1" and experiment["metadata"] == {"split": "smoke"}
+    assert experiment["max_concurrency"] == 4
+    assert [i.input for i in experiment["data"]] == [{"question": "q"}]  # the archived item stays out
+    [result] = experiment["results"]
+    assert result["output"] == {"answer": "about q"}
+    [evaluation] = result["evaluations"]
+    assert (evaluation.name, evaluation.value, evaluation.comment) == ("answer_relevance", 0.5, "about q")
+    assert evaluation.data_type == "NUMERIC"
+    assert experiment["evaluators"][0].__name__ == "_relevance"  # the evaluator's observation in Langfuse
+
+
+def test_an_experiment_without_a_run_link_is_named_by_its_run() -> None:
+    stub = StubSdk()
+    stub.run_url = None
+    assert _run(SdkLangfuse(stub)) == "local 2026-10-14 09:00:00Z"
+
+
 @pytest.mark.parametrize(
     ("error", "says"),
     [
@@ -122,6 +184,16 @@ def test_the_runtime_url_setting_is_the_fallback_and_tracing_stays_off(monkeypat
     monkeypatch.setattr("langfuse.Langfuse", lambda **kwargs: made.update(kwargs) or StubSdk())
     SdkLangfuse()
     assert made == {"base_url": "https://langfuse.example", "tracing_enabled": False}
+
+
+def test_an_experiment_client_traces(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-test")
+    monkeypatch.setenv("LANGFUSE_BASE_URL", "https://langfuse.example")
+    made: dict[str, Any] = {}
+    monkeypatch.setattr("langfuse.Langfuse", lambda **kwargs: made.update(kwargs) or StubSdk())
+    SdkLangfuse(tracing=True)
+    assert made == {"base_url": "https://langfuse.example", "tracing_enabled": True}
 
 
 class StubApi:
