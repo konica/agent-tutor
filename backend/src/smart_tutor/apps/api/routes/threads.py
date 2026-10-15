@@ -728,7 +728,7 @@ def rate_turn(
     conversations: Conversations,
 ) -> TurnRatingResponse:
     """Rate an answer or decline of the learner's conversation helpful ("up") or not ("down"); a new rating replaces
-    the last (PRD §10.2). Saved with the turn, then sent to Phoenix as a `learner_rating` span annotation on the ask's
+    the last (PRD §10.2). Saved with the turn, then sent to Langfuse as a `learner_rating` score on the ask's
     trace."""
     try:
         conversations.rate_turn(ThreadId(str(thread_id)), principal.user_id, RunId(str(run_id)), Rating(body.rating))
