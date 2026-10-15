@@ -72,31 +72,13 @@ def test_start_tracing_keeps_langsmith_off_whatever_the_environment_says(
     monkeypatch.setenv("LANGCHAIN_TRACING_V2", "true")
     with without_the_guard():
         ls_utils.get_env_var.cache_clear()
-        assert start_tracing(Settings(phoenix_url=""), "p") is None
+        assert start_tracing(Settings(langfuse_url="")) is None
         ls_utils.get_env_var.cache_clear()  # a fresh process reads the environment after startup
         call_a_model()
     assert os.environ["LANGSMITH_TRACING"] == "false"
     assert os.environ["LANGCHAIN_TRACING_V2"] == "false"
     assert os.environ["LANGSMITH_TRACING_V2"] == "false"
     assert tracing_env.payloads == []
-
-
-def test_a_phoenix_url_in_the_environment_does_not_reach_settings(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    (tmp_path / ".env").write_text("SMART_TUTOR_PHOENIX_URL=http://localhost:10404\n")
-    monkeypatch.chdir(tmp_path)  # Settings reads ./.env
-    assert Settings().phoenix_url == ""
-    assert start_tracing(Settings(learner_hash_key="k"), "smart-tutor-local") is None
-
-
-def test_positive_control_without_the_guard_a_dotenv_url_turns_tracing_on(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    (tmp_path / ".env").write_text("SMART_TUTOR_PHOENIX_URL=http://localhost:10404\n")
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("SMART_TUTOR_PHOENIX_URL")
-    assert Settings().phoenix_url == "http://localhost:10404"
 
 
 def test_a_langfuse_url_in_the_environment_does_not_reach_settings(
@@ -106,9 +88,9 @@ def test_a_langfuse_url_in_the_environment_does_not_reach_settings(
         "SMART_TUTOR_LANGFUSE_URL=https://langfuse.example\n"
         "SMART_TUTOR_LANGFUSE_PUBLIC_KEY=pk-lf-x\nSMART_TUTOR_LANGFUSE_SECRET_KEY=sk-lf-x\n"
     )
-    monkeypatch.chdir(tmp_path)
+    monkeypatch.chdir(tmp_path)  # Settings reads ./.env
     assert Settings().langfuse_url == ""
-    assert start_tracing(Settings(learner_hash_key="k"), "smart-tutor-local") is None
+    assert start_tracing(Settings(learner_hash_key="k")) is None
 
 
 def test_positive_control_without_the_guard_a_dotenv_langfuse_url_turns_tracing_on(

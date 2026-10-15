@@ -25,7 +25,7 @@ def include_protected(app: FastAPI, router: APIRouter) -> None:
 
 
 def _close_services(app: FastAPI) -> None:
-    """Stop the services' background work, so ratings queued for Phoenix don't hold the shutdown up."""
+    """Stop the services' background work (such as ratings queued to send), so it doesn't hold the shutdown up."""
     built: ApiServices | None = getattr(app.state, "services", None)
     if built is not None:
         built.close()
