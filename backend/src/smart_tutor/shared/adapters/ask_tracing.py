@@ -27,6 +27,14 @@ NO_DECLINE = "none"
 logger = logging.getLogger(__name__)
 
 
+def _safely(step: Callable[[], object]) -> None:
+    """Runs a step that ends the ask's span; a failure is logged, since tracing never fails the ask (#229)."""
+    try:
+        step()
+    except Exception:
+        logger.warning("could not end the ask trace", exc_info=True)
+
+
 class _OtelAskTrace(AskTrace):
     def __init__(self, span: Span, metadata: dict[str, Any]) -> None:
         self._span = span
@@ -45,7 +53,7 @@ class _OtelAskTrace(AskTrace):
     def close(self) -> None:
         """Ends a span left open (the stream was closed before the ask ended)."""
         if self._span.is_recording():
-            self._safely(self._span.end)
+            _safely(self._span.end)
 
     def _end(self, metadata: dict[str, Any], status: Status, output: dict[str, Any] | None = None) -> None:
         def end() -> None:
@@ -58,14 +66,7 @@ class _OtelAskTrace(AskTrace):
             self._span.end()
 
         if self._span.is_recording():
-            self._safely(end)
-
-    @staticmethod
-    def _safely(step: Callable[[], object]) -> None:
-        try:
-            step()
-        except Exception:  # tracing never fails the ask (#229)
-            logger.warning("could not end the ask trace", exc_info=True)
+            _safely(end)
 
 
 class OtelAskTracing(AskTracing):
@@ -94,7 +95,7 @@ class OtelAskTracing(AskTracing):
         except Exception:
             logger.warning("tracing could not start; running untraced", exc_info=True)
             if span is not None:
-                _OtelAskTrace._safely(span.end)  # started but never made current: end it, so no span is left open
+                _safely(span.end)  # started but never made current: end it, so no span is left open
             yield NoAskTrace()
             return
         ask = _OtelAskTrace(span, metadata)
