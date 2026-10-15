@@ -543,8 +543,8 @@ def test_native_cloud_release_waits_with_the_legacy_strategy() -> None:
 
 def test_native_cloud_stack_outputs_fail_loudly_when_missing() -> None:
     run = str(step(native_cloud_job(), "Read the stack outputs")["run"])
-    assert run.count("!= None") == 9  # six outputs, the sampling rate, and the three question-screen parameters
-    assert run.count("::error::") == 9
+    assert run.count("!= None") == 8  # five outputs and the three question-screen parameters
+    assert run.count("::error::") == 8
 
 
 def test_native_cloud_release_is_followed_by_an_in_cluster_service_check() -> None:
@@ -710,13 +710,6 @@ def test_on_premise_runbook_tears_down_the_whole_mode_without_naming_native_clou
     ):
         assert kept in section, kept
     assert "native-cloud keeps running" in text.split("## 8. Tear down")[1].split("###")[0]
-
-
-def test_native_cloud_release_passes_the_trace_sampling_rate_from_ssm() -> None:
-    text = steps_text(native_cloud_job())
-    assert "/smart-tutor/trace-sampling-rate" in text
-    release = step(native_cloud_job(), "Release the app (Helm)")["run"]
-    assert '--set-string global.langsmith.samplingRate="$TRACE_SAMPLING_RATE"' in release
 
 
 def test_native_cloud_release_passes_the_question_screen_settings_from_ssm() -> None:
@@ -902,7 +895,6 @@ def test_smoke_evals_load_the_learners_then_gate_into_the_summary() -> None:
     }
     # the .env file's empty developer keys must not stand in for the secrets
     assert "-e '^LANGFUSE_'" in step(job, "Prepare .env")["run"]
-    assert "LANGSMITH" not in yaml.safe_dump(job)
     for s in job["steps"]:
         assert "${{" not in str(s.get("run", "")), s.get("name")
 
@@ -912,31 +904,11 @@ def test_ci_compose_override_passes_the_oidc_session_not_a_profile() -> None:
     for service in ("api", "agent", "mcp", "worker"):
         env = override["services"][service]["environment"]
         assert {"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"} <= set(env), service
-        assert not [k for k in env if k.startswith("LANGSMITH_")], service
     assert "-e '^AWS_PROFILE='" in step(evals_job(), "Prepare .env")["run"]  # removed, so botocore uses the session
 
 
 def local_compose() -> dict[str, Any]:
     return yaml.safe_load((WORKFLOWS.parents[1] / "compose.yaml").read_text(encoding="utf-8"))
-
-
-@pytest.mark.parametrize("service", ["agent", "worker"])
-def test_app_services_do_not_trace_into_phoenix_or_langsmith(service: str) -> None:
-    env = local_compose()["services"][service]["environment"]
-    assert not [k for k in env if k.startswith("SMART_TUTOR_PHOENIX_")]  # Langfuse only since #316
-    assert env["LANGSMITH_TRACING"] == "false"  # an old .env must not trace into LangSmith
-
-
-def test_the_local_api_does_not_wait_for_phoenix() -> None:
-    compose = local_compose()
-    assert "phoenix" not in compose["services"]["api"]["depends_on"]
-    assert "phoenix" in compose["services"]  # kept until #322 removes it
-
-
-def test_ci_app_services_have_no_phoenix_setting() -> None:
-    override = yaml.safe_load((WORKFLOWS.parents[1] / "compose.ci.yaml").read_text(encoding="utf-8"))
-    for service in ("api", "agent", "mcp", "worker"):
-        assert not [e for e in override["services"][service]["environment"] if "PHOENIX" in e], service
 
 
 def test_ci_app_services_do_not_trace_into_langfuse() -> None:  # the eval runner's experiments are CI's record (#320)

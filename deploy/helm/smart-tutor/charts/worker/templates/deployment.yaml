@@ -34,19 +34,6 @@ spec:
               value: prod
             - name: SMART_TUTOR_DEPLOYMENT
               value: native-cloud
-            {{- if and .Values.global.secretStore .Values.global.langsmith.project }}
-            # Traces (PRD §10.4, #229)
-            - name: LANGSMITH_TRACING
-              value: "true"
-            - name: LANGSMITH_PROJECT
-              value: {{ .Values.global.langsmith.project | quote }}
-            - name: LANGSMITH_TRACING_SAMPLING_RATE
-              value: {{ .Values.global.langsmith.samplingRate | quote }}
-            - name: LANGSMITH_API_KEY
-              valueFrom: {secretKeyRef: {name: worker-langsmith, key: api-key}}
-            - name: SMART_TUTOR_LEARNER_HASH_KEY
-              valueFrom: {secretKeyRef: {name: worker-langsmith, key: learner-hash-key}}
-            {{- end }}
             - name: SMART_TUTOR_AWS_REGION
               value: {{ .Values.awsRegion | quote }}
             - name: SMART_TUTOR_DOCUMENTS_BUCKET

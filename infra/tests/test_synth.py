@@ -76,7 +76,6 @@ def test_deploy_role_gets_only_the_deployment_permissions() -> None:
         "EcrLogin",
         "EcrPushAppImages",
         "EksKubeconfig",
-        "ReadTraceSamplingRate",
         "ReadQuestionGuardSettings",
         "ReadStackOutputs",
     ]
@@ -88,20 +87,16 @@ def test_deploy_role_gets_only_the_deployment_permissions() -> None:
     assert ":repository/smart-tutor/*" in json.dumps(push["Resource"])
 
 
-def test_deploy_role_reads_only_the_trace_sampling_rate_and_question_guard_parameters() -> None:
+def test_deploy_role_reads_only_the_question_guard_parameters() -> None:
     t = template(make_app(), "GitHubDeploy")
 
     statements = next(iter(t.find_resources("AWS::IAM::Policy").values()))["Properties"]["PolicyDocument"]["Statement"]
-    (read,) = (s for s in statements if s["Sid"] == "ReadTraceSamplingRate")
-    assert read["Action"] == "ssm:GetParameter"
-    assert "parameter/smart-tutor/trace-sampling-rate" in json.dumps(read["Resource"])
     (guard,) = (s for s in statements if s["Sid"] == "ReadQuestionGuardSettings")
     assert guard["Action"] == "ssm:GetParameter"
     assert [r["Fn::Join"][1][-1] for r in guard["Resource"]] == [
         f":parameter/smart-tutor/{name}" for name in ("question-guard", "question-guardrail-id", "question-guardrail-version")
     ]
     assert [s["Sid"] for s in statements if "ssm:GetParameter" in str(s["Action"])] == [
-        "ReadTraceSamplingRate",
         "ReadQuestionGuardSettings",
     ]
 

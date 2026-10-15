@@ -5,7 +5,7 @@
 #
 # 1. Renders settings (SSM) and secrets (Secrets Manager), including the Langfuse tracing settings, into a root-only env file. A DuckDNS domain is pointed at this
 #    instance's Elastic IP (#154).
-# 2. Pulls the images, starts Postgres, and creates or updates the app, Keycloak, and Phoenix roles and databases.
+# 2. Pulls the images, starts Postgres, and creates or updates the app and Keycloak roles and databases.
 # 3. Migrates, then starts every service and waits until all are healthy. Compose recreates only the services whose
 #    image or settings changed, so the same tag again changes nothing. Fails unless the running worker is isolated
 #    (non-root, read-only root, no capabilities) and egress-limited (check-worker.sh, which ensure-healthy.sh runs
@@ -55,9 +55,6 @@ api_client_secret=$(secret keycloak/api-client)
 mcp_client_secret=$(secret keycloak/mcp-client)
 test_learner=$(secret keycloak/test-learner)
 learner_hash_key=$(secret langfuse/learner-hash-key)
-phoenix_db_password=$(secret db/phoenix)
-phoenix_secret=$(secret phoenix/secret)
-phoenix_admin_password=$(secret phoenix/admin-password)
 trace_sampling_rate=$(param trace-sampling-rate)
 # The question screen (#199): the agent applies the guardrail only when question-guard is "bedrock".
 question_guard=$(param question-guard)
@@ -110,9 +107,6 @@ LANGFUSE_URL=$langfuse_url
 LANGFUSE_HOST=$langfuse_host
 LANGFUSE_PUBLIC_KEY=$langfuse_public_key
 LANGFUSE_SECRET_KEY=$langfuse_secret_key
-PHOENIX_DB_PASSWORD=$phoenix_db_password
-PHOENIX_SECRET=$phoenix_secret
-PHOENIX_ADMIN_PASSWORD=$phoenix_admin_password
 EOF
 mv "$rendered" "$env_file"
 
@@ -142,16 +136,12 @@ aws ecr get-login-password --region "$region" | docker login --username AWS --pa
 
 echo "Starting Postgres and bootstrapping the databases"
 "${compose[@]}" up -d --wait postgres
-# The same idempotent script as native-cloud's Helm hook (app and Keycloak), then Phoenix's role from an on-premise-only
-# file; each resets its role's password to its secret.
+# The same idempotent script as native-cloud's Helm hook; it resets each role's password to its secret.
 {
   printf '\\getenv app_password APP_DB_PASSWORD\n\\getenv keycloak_password KEYCLOAK_DB_PASSWORD\n'
-  printf '\\getenv phoenix_password PHOENIX_DB_PASSWORD\n'
   cat "$here/../helm/smart-tutor/files/db-bootstrap.sql"
-  cat "$here/phoenix-db-bootstrap.sql"
 } | "${compose[@]}" exec -T postgres psql -q -U postgres -d postgres \
-  -v app_user=smart_tutor -v app_db=smart_tutor -v keycloak_user=keycloak -v keycloak_db=keycloak \
-  -v phoenix_user=phoenix -v phoenix_db=phoenix >/dev/null
+  -v app_user=smart_tutor -v app_db=smart_tutor -v keycloak_user=keycloak -v keycloak_db=keycloak >/dev/null
 
 echo "Migrating"
 "${compose[@]}" run --rm migrate

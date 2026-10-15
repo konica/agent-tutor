@@ -4,8 +4,6 @@
 # The pilot (#54) runs only the US-1 services; each is enabled by its slice.
 global:
   secretStore: aws-secrets-manager
-  langsmith:
-    project: smart-tutor-native-cloud  # needs the secret smart-tutor/langsmith/api-key (pilot-deploy.md)
 dbBootstrap:
   enabled: true
 web:

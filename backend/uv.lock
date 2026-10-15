@@ -3144,7 +3144,6 @@ dependencies = [
 [package.optional-dependencies]
 eval = [
     { name = "langfuse" },
-    { name = "langsmith" },
     { name = "openevals" },
     { name = "pyyaml" },
 ]
@@ -3200,7 +3199,6 @@ requires-dist = [
     { name = "langfuse", marker = "extra == 'eval'", specifier = ">=4.16" },
     { name = "langgraph", specifier = ">=0.6" },
     { name = "langgraph-checkpoint-postgres", specifier = ">=2.0" },
-    { name = "langsmith", marker = "extra == 'eval'", specifier = ">=0.4" },
     { name = "mcp", specifier = ">=2.2" },
     { name = "numpy", marker = "extra == 'topic'", specifier = ">=2.0" },
     { name = "onnx", marker = "extra == 'train'", specifier = ">=1.17" },
