@@ -1,7 +1,8 @@
 """Answer step (PRD §9.2): stream the model's answer over quoted chunks.
 
 The answer streams as the node's own ``custom`` events, each piece checked by the output guard with all the text so
-far; a trip ends the turn with the ``guard`` decline and nothing of the answer (US-6, D29).
+far; a trip ends the turn with the ``guard`` decline and nothing of the answer (US-6, D29). So does a link that no chunk
+given holds (US-6, #196).
 
 Nothing readable ends in the upload request (US-3), and a search limited to given documents that doesn't cover the
 question in a decline (US-4c); the model is called for neither.
@@ -16,7 +17,7 @@ from langchain_core.messages import BaseMessageChunk
 from langgraph.config import get_stream_writer
 
 from smart_tutor.apps.agent.state import AskState
-from smart_tutor.tutoring.application import Guard, answer_messages, cited_chunks, covers
+from smart_tutor.tutoring.application import Guard, answer_messages, cited_chunks, covers, invented_link, uncited_link
 
 
 class AnswerNode(Protocol):
@@ -45,7 +46,11 @@ def answer_node(model: BaseChatModel, answer_floor: float, max_tokens: int, guar
                 text += piece.text
                 if (trip := await guard.check_answer(text)) is not None:  # before the piece leaves (D29)
                     return {"answer": "", "citations": [], "decline": "guard", "guard": trip.reason}
+                if invented_link(text, chunks):  # a link no chunk holds can carry data out (US-6)
+                    return {"answer": "", "citations": [], "decline": "guard", "guard": "guard_answer"}
                 write({"delta": piece.text})
+        if uncited_link(text, chunks):  # the pieces are out: the server replaces them with the decline (D29)
+            return {"answer": "", "citations": [], "decline": "guard", "guard": "guard_answer"}
         return {"answer": text, "citations": [c.citation(n) for n, c in cited_chunks(text, chunks)]}
 
     return answer

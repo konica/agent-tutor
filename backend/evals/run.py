@@ -79,6 +79,8 @@ def _recorded(evaluator: Evaluator, results: list[_Result | None]) -> ItemEvalua
             results.append(None if metric is None else _Result(metric, None, applicable=True))
             raise
         results.append(result)
+        if result.score == 0:  # Langfuse's score API is off on v4 hosts: the log is where a failed row's reason shows
+            print(f"{result.key} scored 0 on {inputs.get('question')!r}: {found.get('comment')}", file=sys.stderr)
         return [] if result.score is None else [ItemScore(result.key, result.score, found.get("comment"))]
 
     evaluate.__name__ = evaluate.__qualname__ = getattr(evaluator, "__name__", type(evaluator).__name__)

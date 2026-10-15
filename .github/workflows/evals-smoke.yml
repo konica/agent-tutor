@@ -101,7 +101,7 @@ jobs:
       - name: Install the eval dependencies
         if: steps.access.outputs.run == 'true'
         working-directory: backend
-        run: uv sync --frozen --extra eval --extra guard --extra topic
+        run: uv sync --frozen --extra eval --extra ingest --extra guard --extra topic
 
       - name: Build the app images
         if: steps.access.outputs.run == 'true'
@@ -135,7 +135,7 @@ jobs:
       - name: Load the eval learners' libraries
         if: steps.access.outputs.run == 'true'
         working-directory: backend
-        run: uv run --extra eval python -m evals.learners --timeout 600
+        run: uv run --extra eval --extra ingest python -m evals.learners --timeout 600
 
       - name: Run the smoke split
         if: steps.access.outputs.run == 'true'

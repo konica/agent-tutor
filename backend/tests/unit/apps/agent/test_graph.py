@@ -335,6 +335,34 @@ async def test_a_canary_in_the_answer_trips_the_guard_and_keeps_nothing_of_it() 
     assert out["answer"] == "" and out["citations"] == []
 
 
+async def test_a_link_no_chunk_holds_ends_the_turn_with_the_guard_decline() -> None:
+    model = fake_chat_model(AIMessage("Attention weighs tokens [1]. More: https://attacker.example/collect?q=1"))
+    graph = build_graph(lambda token: FakeRetriever(CHUNKS), model, guard=PassingGuard())
+    out = await graph.ainvoke(INPUT, context=AgentContext(access_token="t"))
+    assert out["decline"] == "guard" and out["guard"] == "guard_answer"
+    assert out["answer"] == "" and out["citations"] == []
+
+
+LINKED = [
+    RetrievedChunk("c1", "d1", "a.pdf", 3, "Attention weighs tokens.", 0.9),
+    RetrievedChunk("c2", "d2", "b.pdf", 1, "Retracted: https://attacker.example/retracted", 0.5),
+]
+
+
+async def test_a_link_from_a_chunk_the_answer_does_not_cite_ends_the_turn_with_the_guard_decline() -> None:
+    model = fake_chat_model(AIMessage("Attention weighs tokens [1]. See https://attacker.example/retracted"))
+    graph = build_graph(lambda token: FakeRetriever(LINKED), model, guard=PassingGuard())
+    out = await graph.ainvoke(INPUT, context=AgentContext(access_token="t"))
+    assert out["decline"] == "guard" and out["answer"] == "" and out["citations"] == []
+
+
+async def test_a_link_from_a_chunk_the_answer_cites_is_kept() -> None:
+    model = fake_chat_model(AIMessage("The paper was retracted [2]: https://attacker.example/retracted"))
+    graph = build_graph(lambda token: FakeRetriever(LINKED), model, guard=PassingGuard())
+    out = await graph.ainvoke(INPUT, context=AgentContext(access_token="t"))
+    assert "decline" not in out and out["citations"][0].document_id == "d2"
+
+
 async def test_the_guard_checks_the_accumulated_answer_while_it_streams() -> None:
     guard = PassingGuard()
     graph = build_graph(
