@@ -1,9 +1,12 @@
-"""Runtime traces into the environment's own Phoenix (PRD §10.4, ADR 0017), through OpenTelemetry: a batched OTLP/HTTP
-exporter, a parent-based trace-id ratio sampler, and OpenInference's LangChain instrumentation for the LangGraph and
-model spans under our own root spans. Who a run is for appears only as a keyed hash of the learner's user id. Tokens,
+"""Runtime traces into Langfuse (PRD §10.4, ADR 0023) and, until #322 retires it, a copy in the environment's own
+Phoenix (ADR 0017), through OpenTelemetry: one batched OTLP/HTTP exporter per backend, a parent-based trace-id ratio
+sampler, and OpenInference's LangChain instrumentation for the LangGraph and model spans under our own root spans. Who
+a run is for appears only as a keyed hash of the learner's user id, which every span of the run names as its `user.id`
+(with the thread as its `session.id`), so Langfuse can filter any observation by learner and conversation. Tokens,
 user ids, and emails never reach a span (ADR 0007). Exporting runs on the SDK's own thread: a failed export is logged
-by the SDK and dropped, and never fails the work it traces (#229)."""
+by the SDK and dropped, and never fails the work it traces (#229); a host that is off (nights) only logs and drops."""
 
+import base64
 import hashlib
 import hmac
 import json
@@ -15,9 +18,11 @@ from contextlib import AbstractContextManager, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 
+from openinference.instrumentation import using_attributes
 from openinference.instrumentation.langchain import LangChainInstrumentor
 from openinference.semconv.resource import ResourceAttributes
 from openinference.semconv.trace import OpenInferenceMimeTypeValues, OpenInferenceSpanKindValues, SpanAttributes
+from opentelemetry import trace
 from opentelemetry.context import Context
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
@@ -35,6 +40,13 @@ from smart_tutor.shared.ports.run_tracing import RunTracing
 
 KEY_SETTING = "SMART_TUTOR_LEARNER_HASH_KEY"
 EXPORT_TIMEOUT_SECONDS = 10.0
+LANGFUSE_TRACES_PATH = "/api/public/otel/v1/traces"
+LANGFUSE_ENVIRONMENT = "langfuse.environment"
+USER_ID = SpanAttributes.USER_ID
+SESSION_ID = SpanAttributes.SESSION_ID
+LANGFUSE_METADATA_PREFIX = "langfuse.trace.metadata."
+LANGFUSE_INPUT = "langfuse.observation.input"
+LANGFUSE_OUTPUT = "langfuse.observation.output"
 _LOW_64_BITS = 0xFFFF_FFFF_FFFF_FFFF
 # langchain-core traces every run to LangSmith while any is on (ADR 0017: LangSmith is for evals only).
 LANGSMITH_SWITCHES = ("LANGSMITH_TRACING_V2", "LANGSMITH_TRACING", "LANGCHAIN_TRACING_V2")
@@ -120,11 +132,25 @@ class LearnerHasher:
         return hmac.new(self._key, user_id.encode(), hashlib.sha256).hexdigest()
 
 
-def tracing_enabled(settings: Settings) -> bool:
-    """Traced with a Phoenix URL; a deployed process also needs its key (the local Phoenix has no sign-in)."""
+def phoenix_enabled(settings: Settings) -> bool:
+    """Traced into Phoenix with its URL; a deployed process also needs its key (the local Phoenix has no sign-in)."""
     if not settings.phoenix_url:
         return False
     return settings.deployment == "local" or bool(settings.phoenix_api_key.get_secret_value())
+
+
+def langfuse_enabled(settings: Settings) -> bool:
+    """Traced into Langfuse with its URL and the project's key pair (ADR 0023)."""
+    return bool(
+        settings.langfuse_url
+        and settings.langfuse_public_key.get_secret_value()
+        and settings.langfuse_secret_key.get_secret_value()
+    )
+
+
+def tracing_enabled(settings: Settings) -> bool:
+    """Traced into either; Phoenix keeps a copy of every trace until #322 retires it."""
+    return phoenix_enabled(settings) or langfuse_enabled(settings)
 
 
 def learner_hasher(settings: Settings) -> LearnerHasher | None:
@@ -152,7 +178,7 @@ def ingestion_project(settings: Settings) -> str:
     return f"{settings.phoenix_project}-ingestion"
 
 
-def otlp_exporter(settings: Settings, timeout: float = EXPORT_TIMEOUT_SECONDS) -> OTLPSpanExporter:
+def phoenix_exporter(settings: Settings, timeout: float = EXPORT_TIMEOUT_SECONDS) -> OTLPSpanExporter:
     key = settings.phoenix_api_key.get_secret_value()
     return OTLPSpanExporter(
         endpoint=settings.phoenix_url.rstrip("/") + "/v1/traces",  # the bare base URL answers 405
@@ -161,8 +187,21 @@ def otlp_exporter(settings: Settings, timeout: float = EXPORT_TIMEOUT_SECONDS) -
     )
 
 
+def langfuse_exporter(settings: Settings, timeout: float = EXPORT_TIMEOUT_SECONDS) -> OTLPSpanExporter:
+    pair = f"{settings.langfuse_public_key.get_secret_value()}:{settings.langfuse_secret_key.get_secret_value()}"
+    return OTLPSpanExporter(
+        endpoint=settings.langfuse_url.rstrip("/") + LANGFUSE_TRACES_PATH,
+        headers={
+            "authorization": f"Basic {base64.b64encode(pair.encode()).decode()}",
+            # Without the version header Langfuse may take up to 10 minutes to show a trace (ADR 0023).
+            "x-langfuse-ingestion-version": "4",
+        },
+        timeout=timeout,
+    )
+
+
 @dataclass(frozen=True)
-class PhoenixTraces:
+class OtelTraces:
     """Where this process's spans go, and what every root span says about the run."""
 
     provider: TracerProvider
@@ -178,57 +217,95 @@ class PhoenixTraces:
         self.provider.shutdown()
 
 
-def phoenix_traces(
-    project: str, sampling_rate: float, processor: SpanProcessor, hasher: LearnerHasher, metadata: Mapping[str, str]
-) -> PhoenixTraces:
+def otel_traces(
+    project: str,
+    environment: str,
+    sampling_rate: float,
+    processors: Sequence[SpanProcessor],
+    hasher: LearnerHasher,
+    metadata: Mapping[str, str],
+) -> OtelTraces:
     provider = TracerProvider(
-        resource=Resource({ResourceAttributes.PROJECT_NAME: project}),
+        # The project names Phoenix's project; Langfuse's comes from the key, and it reads the environment from here.
+        resource=Resource({ResourceAttributes.PROJECT_NAME: project, LANGFUSE_ENVIRONMENT: environment}),
         sampler=ParentBased(RunIdRatio(sampling_rate)),
         id_generator=RunIds(),
     )
-    provider.add_span_processor(processor)
+    for processor in processors:
+        provider.add_span_processor(processor)
     LangChainInstrumentor().instrument(tracer_provider=provider)
-    return PhoenixTraces(provider, hasher, dict(metadata))
+    return OtelTraces(provider, hasher, dict(metadata))
 
 
 def stop_langsmith_tracing() -> None:
-    """Runtime traces go to Phoenix only: LangSmith's tracing stays off in this process even when the environment (a
-    developer's shell or `.env`) turns it on. Call before the first model call: LangSmith caches what it reads."""
+    """Runtime traces go to Langfuse and Phoenix only: LangSmith's tracing stays off in this process even when the
+    environment (a developer's shell or `.env`) turns it on. Call before the first model call: LangSmith caches what it
+    reads."""
     for name in LANGSMITH_SWITCHES:
         os.environ[name] = "false"
 
 
-def start_tracing(settings: Settings, project: str) -> PhoenixTraces | None:
+def start_tracing(settings: Settings, project: str) -> OtelTraces | None:
     """Startup for a process that traces: turns LangSmith tracing off, then refuses tracing without a learner-hash key
     (see `learner_hasher`); None leaves the process untraced."""
     stop_langsmith_tracing()
     hasher = learner_hasher(settings)
-    if not tracing_enabled(settings):
-        if settings.phoenix_url:
-            logger.warning("SMART_TUTOR_PHOENIX_API_KEY is not set; running untraced")
-        else:
-            logger.info("SMART_TUTOR_PHOENIX_URL is not set; running untraced")
+    processors: list[SpanProcessor] = []
+    where: list[str] = []
+    if phoenix_enabled(settings):
+        processors.append(BatchSpanProcessor(phoenix_exporter(settings)))
+        where.append(f"Phoenix project {project} at {settings.phoenix_url}")
+    elif settings.phoenix_url:
+        logger.warning("SMART_TUTOR_PHOENIX_API_KEY is not set; not tracing into Phoenix")
+    else:
+        logger.info("SMART_TUTOR_PHOENIX_URL is not set; not tracing into Phoenix")
+    if langfuse_enabled(settings):
+        processors.append(BatchSpanProcessor(langfuse_exporter(settings)))
+        where.append(f"Langfuse at {settings.langfuse_url}")
+    else:
+        logger.info("SMART_TUTOR_LANGFUSE_URL or its keys are not set; not tracing into Langfuse")
+    if not processors:
         return None
     assert hasher is not None  # learner_hasher refuses tracing without a key
-    exporter = otlp_exporter(settings)
-    traces = phoenix_traces(
-        project, settings.trace_sampling_rate, BatchSpanProcessor(exporter), hasher, run_metadata(settings)
+    traces = otel_traces(
+        project, settings.deployment, settings.trace_sampling_rate, processors, hasher, run_metadata(settings)
     )
-    logger.info("tracing into Phoenix project %s at %s", project, settings.phoenix_url)
+    logger.info("tracing into %s", ", ".join(where))
     return traces
 
 
 def span_attributes(inputs: Mapping[str, object] | None, metadata: Mapping[str, object]) -> dict[str, str]:
-    """A root span's OpenInference attributes: a CHAIN, its inputs, and its metadata (Phoenix shows each key as
-    `metadata.<key>`)."""
+    """A root span's attributes: for Langfuse, each metadata key as `langfuse.trace.metadata.<key>` (text; a None
+    value is left out) and the inputs as `langfuse.observation.input`; for Phoenix, OpenInference's CHAIN kind, the
+    metadata as one JSON `metadata` attribute (shown as `metadata.<key>`), and the inputs as `input.value`."""
     attributes = {
         SpanAttributes.OPENINFERENCE_SPAN_KIND: OpenInferenceSpanKindValues.CHAIN.value,
         SpanAttributes.METADATA: json.dumps(metadata),
     }
+    attributes |= {LANGFUSE_METADATA_PREFIX + key: _text(value) for key, value in metadata.items() if value is not None}
     if inputs is not None:
-        attributes[SpanAttributes.INPUT_VALUE] = json.dumps(inputs)
+        attributes[SpanAttributes.INPUT_VALUE] = attributes[LANGFUSE_INPUT] = json.dumps(inputs)
         attributes[SpanAttributes.INPUT_MIME_TYPE] = OpenInferenceMimeTypeValues.JSON.value
     return attributes
+
+
+def _text(value: object) -> str:
+    """A metadata value as Langfuse filters it: booleans as `true`/`false`, everything else as `str` gives it."""
+    return json.dumps(value) if isinstance(value, bool) else str(value)
+
+
+def learner_attributes(user_hash: str, session_id: str | None) -> dict[str, str]:
+    """A root span's learner and thread, set at its start: a root starts from an empty context, so it doesn't inherit
+    them from `run_context`."""
+    return {USER_ID: user_hash} | ({SESSION_ID: session_id} if session_id else {})
+
+
+@contextmanager
+def run_context(user_hash: str, session_id: str | None) -> Iterator[None]:
+    """The run's learner hash and thread on every span started inside, LangChain's included: OpenInference copies
+    them from the context. Langfuse v4 filters per observation, so the root alone isn't enough (ADR 0023)."""
+    with using_attributes(user_id=user_hash, session_id=session_id or ""):  # an empty session id sets none
+        yield
 
 
 @contextmanager
@@ -256,18 +333,26 @@ def _end(cm: AbstractContextManager[object], exc_type: type[BaseException] | Non
         logger.warning("tracing could not end", exc_info=True)
 
 
-class PhoenixRunTracing(RunTracing):
-    """Each run is a root span (its own trace) in this process's project; the model calls inside nest beneath it."""
+class OtelRunTracing(RunTracing):
+    """Each run is a root span (its own trace) in this process's project; the model calls inside nest beneath it, and
+    every span names the learner hash as its user. A run here has no thread, so no session."""
 
-    def __init__(self, traces: PhoenixTraces) -> None:
+    def __init__(self, traces: OtelTraces) -> None:
         self._traces = traces
 
     @contextmanager
     def run(self, name: str, user_id: UserId, metadata: Mapping[str, str]) -> Iterator[None]:
-        attributes = span_attributes(
-            None, {**self._traces.metadata, **metadata, "learner_hash": self._traces.hasher(user_id)}
-        )
-        # An empty context: a root span, whatever span is current.
-        span = self._traces.tracer().start_as_current_span(name, context=Context(), attributes=attributes)
-        with never_raising(span, None):
+        learner = self._traces.hasher(user_id)
+        with never_raising(self._root(name, learner, metadata), None):
             yield
+
+    @contextmanager
+    def _root(self, name: str, learner: str, metadata: Mapping[str, str]) -> Iterator[None]:
+        attributes = span_attributes(None, {**self._traces.metadata, **metadata, "learner_hash": learner})
+        attributes |= learner_attributes(learner, None)
+        with run_context(learner, None):
+            # An empty context: a root span, whatever span is current. `use_span` makes it current on top of the run
+            # context; start_as_current_span would attach a context built from the empty one and lose the learner.
+            span = self._traces.tracer().start_span(name, context=Context(), attributes=attributes)
+            with trace.use_span(span, end_on_exit=True):
+                yield

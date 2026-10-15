@@ -15,7 +15,7 @@ from concurrent.futures import Executor, Future, ThreadPoolExecutor
 
 import httpx
 
-from smart_tutor.shared.adapters.tracing import root_span_id, tracing_enabled
+from smart_tutor.shared.adapters.tracing import phoenix_enabled, root_span_id
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import RunId
 from smart_tutor.tutoring.domain.turn import Rating
@@ -128,7 +128,7 @@ def _log_failure(done: "Future[None]", action: str, run_id: RunId) -> None:
 
 def answer_feedback(settings: Settings) -> AnswerFeedback:
     """Phoenix annotations into the agent's project while tracing is on (same URL and key as its traces); else none."""
-    if not tracing_enabled(settings):
+    if not phoenix_enabled(settings):
         return NoAnswerFeedback()
     key = settings.phoenix_api_key.get_secret_value()
     client = httpx.Client(

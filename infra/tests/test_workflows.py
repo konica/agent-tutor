@@ -875,6 +875,12 @@ def test_ci_app_services_run_untraced() -> None:  # CI starts no Phoenix; .env.e
         assert "SMART_TUTOR_PHOENIX_URL=" in override["services"][service]["environment"], service
 
 
+def test_ci_app_services_do_not_trace_into_langfuse() -> None:  # #320 gives CI its own Langfuse project
+    override = yaml.safe_load((WORKFLOWS.parents[1] / "compose.ci.yaml").read_text(encoding="utf-8"))
+    for service in ("api", "agent", "mcp", "worker"):
+        assert "SMART_TUTOR_LANGFUSE_URL=" in override["services"][service]["environment"], service
+
+
 def test_smoke_evals_logs_cover_cancelled_runs_and_every_service() -> None:
     logs = step(evals_job(), "Service logs")
     # a 60-minute timeout cancels the job, which is when the logs matter most

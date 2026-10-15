@@ -32,7 +32,7 @@ from smart_tutor.shared.adapters.aws.sqs_queue import SqsMessageQueue
 from smart_tutor.shared.adapters.aws.ssm_parameters import SsmParameterStore
 from smart_tutor.shared.adapters.model_factory import ChatRole, ModelFactory
 from smart_tutor.shared.adapters.postgres.engine import create_db_engine
-from smart_tutor.shared.adapters.tracing import PhoenixRunTracing, ingestion_project, start_tracing
+from smart_tutor.shared.adapters.tracing import OtelRunTracing, ingestion_project, start_tracing
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.ports.message_queue import MessageQueue
 from smart_tutor.shared.ports.run_tracing import NoRunTracing
@@ -73,7 +73,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     settings = Settings()
     traces = start_tracing(settings, ingestion_project(settings))  # refuses tracing without a learner-hash key
-    tracing = PhoenixRunTracing(traces) if traces else NoRunTracing()
+    tracing = OtelRunTracing(traces) if traces else NoRunTracing()
     engine = create_db_engine(settings.database_url)
 
     def library() -> SqlLibraryUnitOfWork:

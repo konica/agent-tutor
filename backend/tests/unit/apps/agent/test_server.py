@@ -22,7 +22,7 @@ from fakes import (
 )
 from smart_tutor.apps.agent.graph import build_graph
 from smart_tutor.apps.agent.server import create_app
-from smart_tutor.shared.adapters.ask_tracing import PhoenixAskTracing
+from smart_tutor.shared.adapters.ask_tracing import OtelAskTracing
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.domain.ids import UserId
@@ -261,7 +261,7 @@ def test_with_a_phoenix_url_the_agent_starts_traced_and_stops_instrumenting_on_e
     )  # nothing listens on :9, and no ask is made
     app = create_app(settings, graph=graph)
     with TestClient(app):
-        assert isinstance(app.state.tracing, PhoenixAskTracing)
+        assert isinstance(app.state.tracing, OtelAskTracing)
         assert LangChainInstrumentor().is_instrumented_by_opentelemetry
     assert not LangChainInstrumentor().is_instrumented_by_opentelemetry
 

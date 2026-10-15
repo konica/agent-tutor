@@ -3,7 +3,7 @@
 # <prefix>-deploy (HostStack), after unpacking the deploy bundle to /opt/smart-tutor:
 #   SMART_TUTOR_PREFIX=smart-tutor-on-premise AWS_REGION=us-east-1 deploy.sh <full commit SHA>
 #
-# 1. Renders settings (SSM) and secrets (Secrets Manager), including the Phoenix tracing settings, into a root-only env file. A DuckDNS domain is pointed at this
+# 1. Renders settings (SSM) and secrets (Secrets Manager), including the Phoenix and Langfuse tracing settings, into a root-only env file. A DuckDNS domain is pointed at this
 #    instance's Elastic IP (#154).
 # 2. Pulls the images, starts Postgres, and creates or updates the app, Keycloak, and Phoenix roles and databases.
 # 3. Migrates, then starts every service and waits until all are healthy. Compose recreates only the services whose
@@ -54,7 +54,7 @@ keycloak_admin_password=$(field password <<<"$keycloak_admin")
 api_client_secret=$(secret keycloak/api-client)
 mcp_client_secret=$(secret keycloak/mcp-client)
 test_learner=$(secret keycloak/test-learner)
-learner_hash_key=$(secret phoenix/learner-hash-key)
+learner_hash_key=$(secret langfuse/learner-hash-key)
 phoenix_db_password=$(secret db/phoenix)
 phoenix_secret=$(secret phoenix/secret)
 phoenix_admin_password=$(secret phoenix/admin-password)
@@ -71,6 +71,20 @@ phoenix_api_key=
 if ! phoenix_api_key=$(secret phoenix/api-key 2>/dev/null) || [[ -z $phoenix_api_key ]]; then
   phoenix_api_key=
   echo "Warning: no Phoenix API key (is the secret $prefix/phoenix/api-key set?); deploying without tracing" >&2
+fi
+# Traces also go to the shared Langfuse (ADR 0023): its address is an SSM parameter, and the worker's egress proxy
+# allows exactly its host name (ADR 0014). The operator creates the project's keys in Langfuse
+# (docs/runbooks/on-premise-deploy.md); until both secrets exist the agent and worker send nothing there.
+host_of() { local rest=${1#*://}; rest=${rest%%/*}; printf '%s' "${rest%%:*}"; }
+langfuse_url=$(param langfuse-url)
+langfuse_host=$(host_of "$langfuse_url")
+langfuse_public_key=
+langfuse_secret_key=
+if ! langfuse_public_key=$(secret langfuse/public-key 2>/dev/null) || ! langfuse_secret_key=$(secret langfuse/secret-key 2>/dev/null) ||
+  [[ -z $langfuse_public_key || -z $langfuse_secret_key ]]; then
+  langfuse_public_key=
+  langfuse_secret_key=
+  echo "Warning: no Langfuse keys (are the secrets $prefix/langfuse/public-key and secret-key set?); deploying without Langfuse traces" >&2
 fi
 caddyfile_sha256=$(sha256sum "$here/Caddyfile" | cut -d' ' -f1)
 
@@ -101,6 +115,10 @@ QUESTION_GUARD=$question_guard
 QUESTION_GUARDRAIL_ID=$question_guardrail_id
 QUESTION_GUARDRAIL_VERSION=$question_guardrail_version
 LEARNER_HASH_KEY=$learner_hash_key
+LANGFUSE_URL=$langfuse_url
+LANGFUSE_HOST=$langfuse_host
+LANGFUSE_PUBLIC_KEY=$langfuse_public_key
+LANGFUSE_SECRET_KEY=$langfuse_secret_key
 PHOENIX_DB_PASSWORD=$phoenix_db_password
 PHOENIX_SECRET=$phoenix_secret
 PHOENIX_ADMIN_PASSWORD=$phoenix_admin_password
