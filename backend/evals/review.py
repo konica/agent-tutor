@@ -1,6 +1,7 @@
 """The human review gate before an item enters a dataset (PRD §10.3 item 6), in Langfuse (ADR 0023 §5).
 
-Generated candidates become traces named `<dataset>-candidates` in the `smart-tutor-evals` project and are added to the
+Generated candidates become traces named `<dataset>-candidates` in the `smart-tutor-evals` project (each a root span
+sent over OpenTelemetry, since Langfuse v4 has no trace-create endpoint; evals.langfuse_client) and are added to the
 annotation queue of the same name. The queue's description is the dataset's rubric, and its score config `accepted`
 (BOOLEAN) asks the reviewer to accept (True) or reject (False). Only candidates whose latest `accepted` score is True
 come back as examples, for evals.publish to add to the next versions; the other candidate traces come back as

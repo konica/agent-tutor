@@ -7,22 +7,28 @@ instead of importing the SDK. `SdkLangfuse` implements it with the Langfuse Pyth
 
 Keys: `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` of the `smart-tutor-evals` project, and the host's URL in
 `LANGFUSE_BASE_URL` (else `SMART_TUTOR_LANGFUSE_URL`, the runtime's setting for the same host).
+
+The host runs Langfuse v4 in `events_only` mode, which removes the legacy trace, score, and ingestion endpoints
+(ADR 0023 §5). A review candidate is therefore an OpenTelemetry root span (its trace's only observation), read back
+with the Observations API v2, and the reviewer's `accepted` scores are read with the Scores API v3.
 """
 
+import json
 import os
-import uuid
 from collections.abc import Awaitable, Callable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
 KEYS = ("LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY")
 URLS = ("LANGFUSE_BASE_URL", "SMART_TUTOR_LANGFUSE_URL")
 # Printed when Langfuse can't be reached: its keys, and the host's hours (ADR 0022).
 HINT = f"check {', '.join(KEYS)} and {URLS[0]}; the host is off 18:00-07:00 Asia/Ho_Chi_Minh"
-PAGE = 100  # datasets, queues, traces, scores, or score configs per list call
-TRACE_BATCH = 50  # traces per ingestion call, well under its 3.5 MB limit
+PAGE = 100  # datasets, queues, observations, scores, or score configs per list call (the scores API allows 100)
+TRACE_BATCH = 50  # candidate spans per OTLP export call
+SERVICE = "smart-tutor-evals"
+_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 
 class LangfuseError(Exception):
@@ -155,6 +161,69 @@ def _utc(at: datetime) -> datetime:
     return at.replace(tzinfo=UTC) if at.tzinfo is None else at.astimezone(UTC)
 
 
+def observation_id(trace_id: str) -> str:
+    """The id of a candidate's root span: the first 16 hex characters of its trace id, so the queue item and the
+    score's subject need no lookup."""
+    return trace_id[:16]
+
+
+def _json_object(value: Any) -> dict[str, Any]:
+    """An observation's input, output, or metadata as a dict: the Observations API v2 returns input and output as raw
+    JSON strings."""
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return {}
+    return dict(value) if isinstance(value, dict) else {}
+
+
+def _attribute(key: str, value: str) -> Any:
+    from langfuse.api import OtelAttribute, OtelAttributeValue
+
+    return OtelAttribute(key=key, value=OtelAttributeValue(string_value=value))
+
+
+def _candidate_span(trace: Trace) -> Any:
+    """The OTLP root span of one candidate: its input, output, and metadata as Langfuse's span attributes. It starts
+    and ends at the trace's timestamp (whole milliseconds, which Langfuse keeps)."""
+    from langfuse.api import OtelSpan
+
+    nanos = str((_utc(trace.timestamp) - _EPOCH) // timedelta(milliseconds=1) * 1_000_000)
+    attributes = [
+        ("langfuse.trace.name", trace.name),
+        ("langfuse.observation.type", "span"),
+        ("langfuse.environment", trace.environment),
+        ("langfuse.observation.input", json.dumps(trace.input)),
+        ("langfuse.observation.output", json.dumps(trace.output)),
+        *(
+            (f"langfuse.observation.metadata.{key}", value if isinstance(value, str) else json.dumps(value))
+            for key, value in trace.metadata.items()
+        ),
+    ]
+    return OtelSpan(
+        trace_id=trace.id,
+        span_id=observation_id(trace.id),
+        name=trace.name,
+        kind=1,
+        start_time_unix_nano=nanos,
+        end_time_unix_nano=nanos,
+        attributes=[_attribute(key, value) for key, value in attributes],
+    )
+
+
+def _scored_trace(score: Any) -> str | None:
+    """The trace a score is on: its own, or the trace of the observation it is on; none for a session or experiment."""
+    subject = score.subject
+    if subject is None:
+        return None
+    if subject.kind == "trace":
+        return str(subject.id)
+    if subject.kind == "observation":
+        return subject.trace_id
+    return None
+
+
 class SdkLangfuse:
     """LangfuseClient on the Langfuse Python SDK. Its tracing is off unless `tracing`: only an experiment traces (each
     item's run); every other call is the REST API only (review candidates go through the ingestion API)."""
@@ -182,6 +251,18 @@ class SdkLangfuse:
                 if page >= found.meta.total_pages:
                     return rows
                 page += 1
+
+    def _cursored(self, list_page: Any, **filters: Any) -> list[Any]:
+        """Every row of a cursor-paginated list call (the v4 observations and scores APIs)."""
+        rows: list[Any] = []
+        cursor: str | None = None
+        with _translated():
+            while True:
+                found = list_page(limit=PAGE, cursor=cursor, **filters)
+                rows += found.data
+                cursor = found.meta.cursor
+                if not cursor:
+                    return rows
 
     def dataset_names(self) -> list[str]:
         return [d.name for d in self._all(self._client.api.datasets.list)]
@@ -239,62 +320,53 @@ class SdkLangfuse:
         return str(queue.id)
 
     def create_traces(self, traces: Sequence[Trace]) -> None:
-        from langfuse.api import TraceBody
-        from langfuse.api.ingestion.types.ingestion_event import IngestionEvent_TraceCreate
+        from langfuse.api import OtelResource, OtelResourceSpan, OtelScope, OtelScopeSpan
 
         for first in range(0, len(traces), TRACE_BATCH):
-            events = [
-                IngestionEvent_TraceCreate(
-                    id=str(uuid.uuid4()),
-                    timestamp=datetime.now(UTC).isoformat(),
-                    body=TraceBody(
-                        id=t.id,
-                        name=t.name,
-                        input=t.input,
-                        output=t.output,
-                        metadata=t.metadata,
-                        timestamp=t.timestamp,
-                        environment=t.environment,
-                    ),
-                )
-                for t in traces[first : first + TRACE_BATCH]
-            ]
+            spans = [_candidate_span(t) for t in traces[first : first + TRACE_BATCH]]
+            resource_span = OtelResourceSpan(
+                resource=OtelResource(attributes=[_attribute("service.name", SERVICE)]),
+                scope_spans=[OtelScopeSpan(scope=OtelScope(name=SERVICE), spans=spans)],
+            )
             with _translated():
-                response = self._client.api.ingestion.batch(batch=events)
-            if response.errors:
-                error = response.errors[0]
-                raise LangfuseError(
-                    f"{len(response.errors)} of {len(events)} traces refused, first {error.status}: "
-                    f"{error.message or error.error}"
-                )
+                self._client.api.opentelemetry.export_traces(resource_spans=[resource_span])
 
     def queue_trace(self, queue_id: str, trace_id: str) -> None:
         from langfuse.api import AnnotationQueueObjectType
 
         with _translated():
             self._client.api.annotation_queues.create_queue_item(
-                queue_id, object_id=trace_id, object_type=AnnotationQueueObjectType.TRACE
+                queue_id, object_id=observation_id(trace_id), object_type=AnnotationQueueObjectType.OBSERVATION
             )
 
     def traces(self, name: str) -> list[Trace]:
+        found = self._cursored(
+            self._client.api.observations.get_many,
+            name=name,
+            is_root_observation=True,
+            fields="core,basic,io,metadata",
+        )
         return [
             Trace(
-                t.id,
-                t.name or name,
-                dict(t.input or {}),
-                dict(t.output or {}),
-                dict(t.metadata or {}),
-                _utc(t.timestamp),
-                t.environment,
+                o.trace_id,
+                o.name or name,
+                _json_object(o.input),
+                _json_object(o.output),
+                _json_object(o.metadata),
+                _utc(o.start_time),
+                o.environment or "",
             )
-            for t in self._all(self._client.api.trace.list, name=name, fields="core,io")
+            for o in found
+            if o.trace_id is not None
         ]
 
     def boolean_scores(self, name: str) -> list[Score]:
-        from langfuse.api import ScoreDataType
-
-        found = self._all(self._client.api.scores.get_many, name=name, data_type=ScoreDataType.BOOLEAN)
-        return [Score(s.trace_id, s.name, float(s.value), _utc(s.updated_at)) for s in found if s.trace_id is not None]
+        found = self._cursored(self._client.api.scores_v3.get_many_v3, name=name, data_type="BOOLEAN", fields="subject")
+        return [
+            Score(trace_id, s.name, float(s.value), _utc(s.updated_at))
+            for s in found
+            if (trace_id := _scored_trace(s)) is not None
+        ]
 
     def run_experiment(
         self,

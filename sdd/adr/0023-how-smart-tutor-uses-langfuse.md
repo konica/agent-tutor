@@ -119,6 +119,13 @@ Smart Tutor's members out of other apps'.
 - **One evals project, not separate local and CI projects.** Langfuse datasets, queues, and experiments belong to one
   project, and a developer's eval run and CI's smoke run must read the same dataset versions. The environment tells
   their runs apart.
+- **The evals use only endpoints Langfuse v4 keeps in `events_only` mode** (the host's default write mode, #342).
+  That mode answers 404 on `GET /api/public/traces` and `GET /api/public/scores`, and 400 on
+  `POST /api/public/ingestion` for everything but scores. So a review candidate is an OpenTelemetry root span sent to
+  the OTLP endpoint (its trace's only observation, named `<dataset>-candidates`); the annotation queue holds that
+  observation; candidates are read back with the Observations API v2 and the reviewer's `accepted` scores with the
+  Scores API v3. Experiments run through the SDK's experiment runner. We do not set the host's
+  `LANGFUSE_MIGRATION_V4_WRITE_MODE` to `legacy` or `dual`: it is shared by every app, and those modes are for migrating.
 - **The Langfuse URL** is a setting (`SMART_TUTOR_LANGFUSE_URL`). On-premise it comes from the CDK context
   `smart-tutor:langfuse-url` through an SSM parameter. CI keeps it as a repository variable. It is the host's DuckDNS
   name, never a reference to the `Langfuse-Host` stack.
@@ -184,7 +191,9 @@ native-cloud is picked up again.
   cut-off). D25 now depends
   on a job of ours running at least every day or two.
 - #318 sends BOOLEAN scores with new ids and deletes the others. Analysis of ratings takes the newest per trace.
-- #317, #319, and #320 use the `smart-tutor-evals` project; CI's smoke runs fail fast at night.
+- #317, #319, and #320 use the `smart-tutor-evals` project; CI's smoke runs fail fast at night. #342 moved their
+  trace and score reads and candidate writes to v4's endpoints; a Langfuse upgrade must keep the evals on endpoints the
+  new version serves (its upgrade guide lists the removed ones).
 - The Langfuse admin creates the **Smart Tutor** organization, its three projects, and the `learner_rating` score
   config by hand; the runbook lists the steps.
 - Learners' questions and answers live on the shared Langfuse host for up to 180 days. Anyone in the Smart Tutor
