@@ -11,7 +11,7 @@ Datasets live in **Langfuse**, in the `smart-tutor-evals` project (versioned the
 | `generators/` | Candidate generators; `ask.py` writes Q&A and decline candidates of eight question types from seed chunks (judge model), `prompts/` holds its prompt; `injection.py` builds `datasets/injection.yaml` from the taxonomy and writes variants of its seeds (see "Injection eval") |
 | `chunks.py` | Seed PDFs cut into the worker's chunks, ids `<seed id>:<seq>` |
 | `generate.py` | `make evals-generate` → candidates in the annotation queue |
-| `review.py` | The annotation queue in Langfuse: candidates as traces, the `accepted` score config, accepted items read back |
+| `review.py` | The annotation queue in Langfuse: candidates as OpenTelemetry root spans (v4 has no trace-create endpoint), the `accepted` score config, accepted items read back |
 | `publish.py` | `make evals-publish` → next `smoke`/`full` versions in Langfuse |
 | `langfuse_client.py` | The one seam to Langfuse (`LangfuseClient`, implemented on the Langfuse SDK; tests use `tests/fakes/langfuse.py`): add a call here, never import the SDK elsewhere |
 | `adversarial/taxonomy.yaml` | Injection categories × seeds |

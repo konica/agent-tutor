@@ -119,7 +119,9 @@ GitHub issues no OIDC token and no secrets to workflows on fork PRs, so the job 
 
 Don't make `evals-smoke` a required status check: it is path-filtered, so PRs outside its paths would wait forever on "Expected".
 
-After deploying the role and setting the secrets and the variable, start a first `workflow_dispatch` run from a branch between 07:00 and 18:00 to confirm Langfuse, LocalStack, the arXiv downloads, and Bedrock access.
+After deploying the role and setting the secrets and the variable, publish the datasets (`make evals-publish`, with a developer's `smart-tutor-evals` keys in `.env`): until a smoke version of a dataset exists in Langfuse, the job has nothing to score and fails with "has no smoke version yet". Then start a first `workflow_dispatch` run from a branch between 07:00 and 18:00 to confirm Langfuse, LocalStack, the arXiv downloads, and Bedrock access. While the secret `EVALS_AWS_ROLE_ARN` is missing the job skips, so a green check before this step proves nothing.
+
+The Langfuse host runs v4 in its default `events_only` mode, which removes the legacy trace, score, and ingestion endpoints. The evals call only endpoints that mode keeps (ADR 0023 §5); if a publish or run fails with "This endpoint is not available on deployments running in Langfuse v4 events_only mode", the call is one of the removed ones and belongs in `backend/evals/langfuse_client.py` on a v4 endpoint.
 
 ## When a model changes
 
