@@ -146,39 +146,24 @@ def test_leaks_reports_a_proxy_that_lets_langsmith_through(refused: ModuleType, 
     assert refused.leaks() == ["the proxy answered 200 to CONNECT api.smith.langchain.com:443, not 403"]
 
 
-def test_unreachable_reports_phoenix(check: ModuleType, monkeypatch) -> None:
-    class Direct:
-        def open(self, url: str, timeout: float) -> None:
-            assert url == "http://phoenix:6006/healthz"
-            raise OSError("Connection refused")
-
-    monkeypatch.setenv("AWS_REGION", "us-east-1")
-    monkeypatch.setattr(check.urllib.request, "build_opener", lambda *handlers: Direct())
-    monkeypatch.setattr(check.urllib.request, "urlopen", lambda url, timeout: None)
-    monkeypatch.setattr(check, "_connects", lambda host, port: True)
-    monkeypatch.setattr(check, "_aws_problems", lambda region: [])
-    monkeypatch.setenv("SMART_TUTOR_PHOENIX_URL", "http://phoenix:6006")
-    monkeypatch.setenv("SMART_TUTOR_PHOENIX_API_KEY", "key")
-    assert check.unreachable() == ["Phoenix: Connection refused"]
-
-
-@pytest.mark.parametrize("key", [None, ""])
-def test_unreachable_ignores_phoenix_while_untraced(check: ModuleType, monkeypatch, key) -> None:
-    # Tracing is non-critical: a Phoenix outage, or a key not yet created, must not fail a deploy.
+def test_unreachable_never_probes_phoenix(check: ModuleType, monkeypatch) -> None:
     def refuse(*args: object, **kwargs: object) -> None:
-        raise OSError("unreachable")
+        raise AssertionError("no direct probe expected")
 
     monkeypatch.setenv("AWS_REGION", "us-east-1")
-    monkeypatch.setenv("SMART_TUTOR_PHOENIX_URL", "http://phoenix:6006")
-    if key is None:
-        monkeypatch.delenv("SMART_TUTOR_PHOENIX_API_KEY", raising=False)
-    else:
-        monkeypatch.setenv("SMART_TUTOR_PHOENIX_API_KEY", key)
+    monkeypatch.setenv("SMART_TUTOR_PHOENIX_URL", "http://phoenix:6006")  # an old env file must change nothing
+    monkeypatch.setenv("SMART_TUTOR_PHOENIX_API_KEY", "key")
     monkeypatch.setattr(check.urllib.request, "build_opener", refuse)
     monkeypatch.setattr(check.urllib.request, "urlopen", lambda url, timeout: None)
     monkeypatch.setattr(check, "_connects", lambda host, port: True)
     monkeypatch.setattr(check, "_aws_problems", lambda region: [])
     assert check.unreachable() == []
+    assert not hasattr(check, "_tracing")
+
+
+def test_leaks_reports_a_direct_connection_to_phoenix(refused: ModuleType, monkeypatch) -> None:
+    monkeypatch.setattr(refused, "_connects", lambda host, port: (host, port) == ("phoenix", 6006))
+    assert refused.leaks() == ["direct phoenix:6006 connected"]
 
 
 @pytest.fixture

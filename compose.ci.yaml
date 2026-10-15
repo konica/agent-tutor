@@ -3,14 +3,13 @@
 # GitHub signs in to AWS with OIDC, which puts a short-lived session in the runner's environment instead of a profile
 # in ~/.aws. Pass it through to the services that call Bedrock; a name without a value takes the runner's variable.
 # The api and worker still sign LocalStack calls with its dummy keys (SMART_TUTOR_LOCALSTACK).
-# CI starts no Phoenix, and its services don't trace into Langfuse: the ask graph runs in the eval runner, whose
-# experiment traces in smart-tutor-evals hold each answer (#320). Empty SMART_TUTOR_PHOENIX_URL and
-# SMART_TUTOR_LANGFUSE_URL keep the services untraced (.env.example points at localhost and at the shared host).
+# CI's services don't trace into Langfuse: the ask graph runs in the eval runner, whose experiment traces in
+# smart-tutor-evals hold each answer (#320). An empty SMART_TUTOR_LANGFUSE_URL keeps the services untraced
+# (.env.example points at the shared host).
 x-ci-env: &ci-env
   - AWS_ACCESS_KEY_ID
   - AWS_SECRET_ACCESS_KEY
   - AWS_SESSION_TOKEN
-  - SMART_TUTOR_PHOENIX_URL=
   - SMART_TUTOR_LANGFUSE_URL=
 
 services:

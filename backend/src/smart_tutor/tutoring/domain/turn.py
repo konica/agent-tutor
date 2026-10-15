@@ -57,7 +57,7 @@ class Turn:
     citations: tuple[TurnCitation, ...]
     decline: Decline | None
     created_at: datetime
-    run_id: RunId | None = None  # the ask's trace id in Phoenix (PRD §10.4); None for turns kept before it was recorded
+    run_id: RunId | None = None  # the ask's Langfuse trace id (PRD §10.4); None for turns kept before it was recorded
     rating: Rating | None = None  # the learner's 👍/👎 (PRD §10.2); None until rated
 
     def as_history(self, max_answer_chars: int) -> HistoryTurn:
@@ -75,7 +75,7 @@ class AnsweredTurn:
     citations: tuple[TurnCitation, ...] = ()
     decline: Decline | None = None
     document_ids: tuple[DocumentId, ...] = ()
-    run_id: RunId | None = None  # the ask's trace id in Phoenix (PRD §10.4); None for turns kept before it was recorded
+    run_id: RunId | None = None  # the ask's Langfuse trace id (PRD §10.4); None for turns kept before it was recorded
 
 
 @dataclass(frozen=True)
@@ -98,5 +98,5 @@ class TurnView:
     citations: tuple[CitationView, ...]
     decline: Decline | None
     created_at: datetime
-    run_id: RunId | None = None  # the ask's trace id in Phoenix (PRD §10.4); None for turns kept before it was recorded
+    run_id: RunId | None = None  # the ask's Langfuse trace id (PRD §10.4); None for turns kept before it was recorded
     rating: Rating | None = None  # the learner's 👍/👎 (PRD §10.2); None until rated

@@ -3,10 +3,10 @@
 #   docker compose -f /opt/smart-tutor/on-premise/compose.yaml --env-file /etc/smart-tutor/smart-tutor.env ps
 # Our images come from on-premise's ECR repositories (`smart-tutor-on-premise/<service>`) by commit tag. Caddy is the
 # only service with public ports. Data lives on the data volume (/data). The worker, agent, and MCP server (#149) run
-# as the image's non-root user on a read-only root filesystem, like the Helm charts. The worker reaches Postgres and
-# Phoenix directly and, through the egress proxy, its AWS endpoints (#153) and the shared Langfuse (ADR 0023); deploy.sh checks the running worker's isolation and egress
-# after every deploy. Phoenix keeps the production traces (#288, ADR 0017): people reach it at /phoenix through Caddy, and
-# services reach it at http://phoenix:6006 inside Compose, the worker too (it shares the worker network).
+# as the image's non-root user on a read-only root filesystem, like the Helm charts. The worker reaches Postgres directly and,
+# through the egress proxy, its AWS endpoints (#153) and the shared Langfuse (ADR 0023); deploy.sh checks the running
+# worker's isolation and egress after every deploy. Phoenix is unused since #316 (traces go to Langfuse); #322 removes
+# it. People still reach it at /phoenix through Caddy.
 
 name: smart-tutor
 
@@ -15,7 +15,7 @@ x-logging: &logging
   options: {max-size: 10m, max-file: "5"}
 
 networks:
-  # The worker parses untrusted PDFs (PRD §9.10). On this network it reaches Postgres, Phoenix, and the egress proxy only:
+  # The worker parses untrusted PDFs (PRD §9.10). On this network it reaches Postgres and the egress proxy only:
   # an internal network has no route out of the VM and no external DNS.
   worker:
     internal: true
@@ -41,10 +41,9 @@ services:
       timeout: 5s
       retries: 12
 
-  # Runtime traces (#288, ADR 0017): Arize Phoenix. People sign in at https://<domain>/phoenix (Caddy strips the prefix;
-  # PHOENIX_HOST_ROOT_PATH puts it back into the pages' links). The agent and worker send OTLP/HTTP to
-  # http://phoenix:6006/v1/traces with the system key <prefix>/phoenix/api-key (runbook); on the worker's network so the
-  # worker reaches it without the egress proxy. Its traces live in the `phoenix` database, which the backup leaves out.
+  # Unused since #316 (traces go to Langfuse); #322 removes it. Arize Phoenix: people sign in at https://<domain>/phoenix
+  # (Caddy strips the prefix; PHOENIX_HOST_ROOT_PATH puts it back into the pages' links). It keeps its old traces in the
+  # `phoenix` database, which the backup leaves out. Off the worker's network, so the worker can't reach it.
   phoenix:
     image: arizephoenix/phoenix:version-20.16.0-nonroot
     restart: unless-stopped
@@ -73,7 +72,7 @@ services:
       PHOENIX_DISABLE_AGENT_ASSISTANT: "true"
       PHOENIX_ENABLE_MCP_SERVER: "false"
       PHOENIX_ALLOWED_SANDBOX_PROVIDERS: NONE
-    networks: [default, worker]
+    networks: [default]
     user: "65532:65532"  # the image's nonroot user
     read_only: true
     tmpfs: [/tmp:size=64m]
@@ -160,10 +159,11 @@ services:
     environment:
       SMART_TUTOR_ENVIRONMENT: prod
       SMART_TUTOR_DEPLOYMENT: on-premise
-      # Ratings go to Phoenix as annotations on the agent's ask traces (#290); none until the key's secret exists.
-      SMART_TUTOR_PHOENIX_URL: http://phoenix:6006
-      SMART_TUTOR_PHOENIX_API_KEY: ${PHOENIX_API_KEY}
-      SMART_TUTOR_PHOENIX_PROJECT: smart-tutor-on-premise
+      # Ratings go to Langfuse as learner_rating scores on the agent's ask traces (#318, ADR 0023); none until the
+      # project's keys exist.
+      SMART_TUTOR_LANGFUSE_URL: ${LANGFUSE_URL:?}
+      SMART_TUTOR_LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
+      SMART_TUTOR_LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
       SMART_TUTOR_ROOT_PATH: /api
       SMART_TUTOR_AWS_REGION: ${AWS_REGION:?}
       AWS_REGION: ${AWS_REGION:?}
@@ -206,13 +206,9 @@ services:
     environment:
       SMART_TUTOR_ENVIRONMENT: prod
       SMART_TUTOR_DEPLOYMENT: on-premise
-      # Traces (PRD §10.4, ADR 0017): untraced until the Phoenix key's secret exists (deploy.sh).
-      SMART_TUTOR_PHOENIX_URL: http://phoenix:6006
-      SMART_TUTOR_PHOENIX_API_KEY: ${PHOENIX_API_KEY}
-      SMART_TUTOR_PHOENIX_PROJECT: smart-tutor-on-premise
       SMART_TUTOR_TRACE_SAMPLING_RATE: ${TRACE_SAMPLING_RATE:?}
       SMART_TUTOR_LEARNER_HASH_KEY: ${LEARNER_HASH_KEY:?}
-      # Traces also go to the shared Langfuse (ADR 0023): untraced there until the operator's keys exist (deploy.sh).
+      # Traces go to the shared Langfuse (ADR 0023): untraced there until the operator's keys exist (deploy.sh).
       SMART_TUTOR_LANGFUSE_URL: ${LANGFUSE_URL:?}
       SMART_TUTOR_LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
       SMART_TUTOR_LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
@@ -346,13 +342,9 @@ services:
     environment:
       SMART_TUTOR_ENVIRONMENT: prod
       SMART_TUTOR_DEPLOYMENT: on-premise
-      # Traces (PRD §10.4, ADR 0017): untraced until the Phoenix key's secret exists (deploy.sh).
-      SMART_TUTOR_PHOENIX_URL: http://phoenix:6006
-      SMART_TUTOR_PHOENIX_API_KEY: ${PHOENIX_API_KEY}
-      SMART_TUTOR_PHOENIX_PROJECT: smart-tutor-on-premise  # the worker's ingest traces go to smart-tutor-on-premise-ingestion
       SMART_TUTOR_TRACE_SAMPLING_RATE: ${TRACE_SAMPLING_RATE:?}
       SMART_TUTOR_LEARNER_HASH_KEY: ${LEARNER_HASH_KEY:?}
-      # Traces also go to the shared Langfuse (ADR 0023): untraced there until the operator's keys exist (deploy.sh).
+      # Traces go to the shared Langfuse (ADR 0023): untraced there until the operator's keys exist (deploy.sh).
       SMART_TUTOR_LANGFUSE_URL: ${LANGFUSE_URL:?}
       SMART_TUTOR_LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
       SMART_TUTOR_LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
@@ -367,8 +359,6 @@ services:
       # Its only way out (egress-proxy); botocore also fetches the instance profile's credentials through it.
       HTTP_PROXY: http://egress-proxy:3128
       HTTPS_PROXY: http://egress-proxy:3128
-      NO_PROXY: phoenix  # on the worker's internal network; requests reads either spelling
-      no_proxy: phoenix
       AWS_METADATA_SERVICE_TIMEOUT: "2"  # one more hop to IMDS than the default 1 s assumes
       AWS_METADATA_SERVICE_NUM_ATTEMPTS: "3"
       HOME: /tmp  # botocore looks for ~/.aws; the root filesystem is read-only

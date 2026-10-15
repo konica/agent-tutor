@@ -66,7 +66,7 @@ class ConfigStack(cdk.Stack):
         super().__init__(scope, construct_id, **kwargs)
 
         # Per-file limits, processing attempts, and upload rate limits and daily caps (PRD §11, §9.5), read at startup by the API and the worker, and the
-        # app time zone (D27), read by the API, and the share of runs traced in Phoenix (PRD §10.4: every run), read at deploy time; change them here,
+        # app time zone (D27), read by the API, and the share of runs traced in Langfuse (PRD §10.4: every run), read at deploy time; change them here,
         # not in code.
         for name, value in (
             ("max-upload-mb", "50"),
@@ -137,8 +137,8 @@ class ConfigStack(cdk.Stack):
             )
 
         # Traces name a learner only by an HMAC of their user id (PRD §10.4); the agent and worker read the Langfuse key
-        # below (ADR 0023). This Phoenix key stays until #322 removes Phoenix; the Phoenix API key is
-        # <prefix>/phoenix/api-key, which the operator creates in Phoenix (runbooks).
+        # below (ADR 0023). Langfuse's project keys are <prefix>/langfuse/public-key and
+        # <prefix>/langfuse/secret-key, which the operator creates in Langfuse (runbook).
         secretsmanager.Secret(
             self,
             "LearnerHashKeySecret",

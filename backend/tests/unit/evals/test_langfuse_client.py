@@ -16,7 +16,6 @@ from langfuse.api import (  # noqa: E402
     AnnotationQueueObjectType,
     NotFoundError,
     ScoreConfigDataType,
-    ScoreDataType,
     UnauthorizedError,
 )
 
@@ -199,18 +198,18 @@ def test_an_experiment_client_traces(monkeypatch: pytest.MonkeyPatch) -> None:
 class StubApi:
     """The SDK's REST resources the review queue uses, recording each call."""
 
-    def __init__(self, ingestion_errors: list[SimpleNamespace] | None = None) -> None:
+    def __init__(self, export_error: Exception | None = None) -> None:
         self.calls: list[tuple[str, dict[str, Any]]] = []
-        self.ingestion_errors = ingestion_errors or []
+        self.export_error = export_error
         self.score_configs = SimpleNamespace(get=self._configs, create=self._record("create_config", id="c-new"))
         self.annotation_queues = SimpleNamespace(
             list_queues=self._queues,
             create_queue=self._record("create_queue", id="q-new"),
             create_queue_item=self._queue_item,
         )
-        self.ingestion = SimpleNamespace(batch=self._batch)
-        self.trace = SimpleNamespace(list=self._traces)
-        self.scores = SimpleNamespace(get_many=self._scores)
+        self.opentelemetry = SimpleNamespace(export_traces=self._export)
+        self.observations = SimpleNamespace(get_many=self._observations)
+        self.scores_v3 = SimpleNamespace(get_many_v3=self._scores)
 
     def _record(self, name: str, **returned: Any) -> Any:
         def call(**kwargs: Any) -> SimpleNamespace:
@@ -235,30 +234,51 @@ class StubApi:
     def _queue_item(self, queue_id: str, **kwargs: Any) -> None:
         self.calls.append(("queue_item", {"queue_id": queue_id, **kwargs}))
 
-    def _batch(self, *, batch: list[Any]) -> SimpleNamespace:
-        self.calls.append(("batch", {"batch": batch}))
-        return SimpleNamespace(successes=[], errors=self.ingestion_errors)
+    def _export(self, *, resource_spans: list[Any]) -> SimpleNamespace:
+        if self.export_error is not None:
+            raise self.export_error
+        self.calls.append(("export", {"resource_spans": resource_spans}))
+        return SimpleNamespace()
 
-    def _traces(self, *, page: int, limit: int, **filters: Any) -> SimpleNamespace:
-        self.calls.append(("traces", filters))
-        trace = SimpleNamespace(
-            id="ab" * 16,
-            name="a-candidates",
-            input={"question": "q"},
-            output={"type": "factual"},
-            metadata=None,
-            timestamp=datetime(2026, 10, 14, 1, 2, 3),  # naive, read as UTC
-            environment="local",
+    @staticmethod
+    def _cursored(pages: list[list[SimpleNamespace]], cursor: str | None) -> SimpleNamespace:
+        """The page after `cursor` (the first when none); every page but the last names the next cursor."""
+        index = 0 if cursor is None else int(cursor)
+        return SimpleNamespace(
+            data=pages[index], meta=SimpleNamespace(cursor=str(index + 1) if index + 1 < len(pages) else None)
         )
-        return self._paged([[trace]], page)
 
-    def _scores(self, *, page: int, limit: int, **filters: Any) -> SimpleNamespace:
-        self.calls.append(("scores", filters))
+    def _observations(self, *, limit: int, cursor: str | None, **filters: Any) -> SimpleNamespace:
+        self.calls.append(("observations", {"cursor": cursor, **filters}))
+
+        def root(trace_id: str, start: datetime, input: str, metadata: dict[str, str] | None) -> SimpleNamespace:
+            return SimpleNamespace(
+                id=trace_id[:16],
+                trace_id=trace_id,
+                name="a-candidates",
+                input=input,  # v4 returns input and output as raw JSON strings
+                output='{"type": "factual"}',
+                metadata=metadata,
+                start_time=start,
+                environment="local",
+            )
+
+        first = root("ab" * 16, datetime(2026, 10, 14, 1, 2, 3), '{"question": "q"}', {"batch": "b"})  # naive: UTC
+        second = root("cd" * 16, datetime(2026, 10, 14, 1, 2, 4, tzinfo=UTC), "not json", None)
+        return self._cursored([[first], [second]], cursor)
+
+    def _scores(self, *, limit: int, cursor: str | None, **filters: Any) -> SimpleNamespace:
+        self.calls.append(("scores", {"cursor": cursor, **filters}))
         at = datetime(2026, 10, 14, tzinfo=UTC)
         edited = datetime(2026, 10, 15, tzinfo=UTC)  # a reviewer changed it a day later
-        on_trace = SimpleNamespace(trace_id="ab" * 16, name="accepted", value=1.0, timestamp=at, updated_at=edited)
-        on_session = SimpleNamespace(trace_id=None, name="accepted", value=0.0, timestamp=at, updated_at=at)
-        return self._paged([[on_trace, on_session]], page)
+
+        def score(subject: SimpleNamespace | None, value: bool, updated_at: datetime) -> SimpleNamespace:
+            return SimpleNamespace(subject=subject, name="accepted", value=value, timestamp=at, updated_at=updated_at)
+
+        on_trace = score(SimpleNamespace(kind="trace", id="ab" * 16), True, edited)
+        on_observation = score(SimpleNamespace(kind="observation", id="cd" * 8, trace_id="cd" * 16), False, at)
+        on_session = score(SimpleNamespace(kind="session", id="s-1"), False, at)
+        return self._cursored([[on_trace, on_observation], [on_session, score(None, True, at)]], cursor)
 
 
 def _sdk(api: StubApi) -> SdkLangfuse:
@@ -293,48 +313,73 @@ def _trace(i: int) -> Trace:
     return Trace(f"{i:032x}", "a-candidates", {"question": f"q{i}"}, {"type": "factual"}, {"batch": "b"}, at, "local")
 
 
-def test_traces_are_sent_as_trace_create_events_in_batches_of_50() -> None:
+def _attributes(span: Any) -> dict[str, str]:
+    return {a.key: a.value.string_value for a in span.attributes}
+
+
+def test_candidates_are_exported_as_otlp_root_spans_in_batches_of_50() -> None:
     api = StubApi()
     _sdk(api).create_traces([_trace(i) for i in range(60)])
-    batches = [kwargs["batch"] for name, kwargs in api.calls if name == "batch"]
-    assert [len(b) for b in batches] == [50, 10]
-    event = batches[1][0].model_dump(by_alias=True, exclude_none=True)
-    assert event["type"] == "trace-create"
-    assert event["body"] == {
-        "id": f"{50:032x}",
-        "name": "a-candidates",
-        "input": {"question": "q50"},
-        "output": {"type": "factual"},
-        "metadata": {"batch": "b"},
-        "timestamp": datetime(2026, 10, 14, tzinfo=UTC),
-        "environment": "local",
+    exports = [kwargs["resource_spans"] for name, kwargs in api.calls if name == "export"]
+    assert [len(e[0].scope_spans[0].spans) for e in exports] == [50, 10]
+    assert _attributes(exports[0][0].resource) == {"service.name": "smart-tutor-evals"}
+    span = exports[1][0].scope_spans[0].spans[0]
+    assert (span.trace_id, span.span_id, span.name) == (f"{50:032x}", f"{50:032x}"[:16], "a-candidates")
+    assert span.start_time_unix_nano == span.end_time_unix_nano == "1791936000000000000"  # 2026-10-14T00:00:00Z
+    assert _attributes(span) == {
+        "langfuse.trace.name": "a-candidates",
+        "langfuse.observation.type": "span",
+        "langfuse.environment": "local",
+        "langfuse.observation.input": '{"question": "q50"}',
+        "langfuse.observation.output": '{"type": "factual"}',
+        "langfuse.observation.metadata.batch": "b",
     }
 
 
-def test_a_trace_ingestion_refused_is_a_langfuse_error() -> None:
-    api = StubApi([SimpleNamespace(id="e1", status=400, message="Invalid request data", error=None)])
-    with pytest.raises(LangfuseError, match="1 of 1 traces refused, first 400: Invalid request data"):
+def test_a_span_starts_at_its_millisecond_so_a_batch_keeps_its_order() -> None:
+    api = StubApi()
+    at = datetime(2026, 10, 14, 0, 0, 0, 2000, tzinfo=UTC)  # the third candidate of a batch: +2 ms
+    _sdk(api).create_traces([Trace("ab" * 16, "a-candidates", {}, {}, {}, at, "local")])
+    [(_, kwargs)] = api.calls
+    assert kwargs["resource_spans"][0].scope_spans[0].spans[0].start_time_unix_nano == "1791936000002000000"
+
+
+def test_a_failed_export_is_a_langfuse_error() -> None:
+    api = StubApi(export_error=UnauthorizedError(body="Invalid credentials"))
+    with pytest.raises(LangfuseError, match="401: Invalid credentials"):
         _sdk(api).create_traces([_trace(1)])
 
 
-def test_a_trace_is_queued_as_a_trace_item() -> None:
+def test_a_candidate_is_queued_as_its_root_observation() -> None:
     api = StubApi()
     _sdk(api).queue_trace("q-1", "ab" * 16)
     assert api.calls == [
-        ("queue_item", {"queue_id": "q-1", "object_id": "ab" * 16, "object_type": AnnotationQueueObjectType.TRACE})
+        (
+            "queue_item",
+            {"queue_id": "q-1", "object_id": "ab" * 8, "object_type": AnnotationQueueObjectType.OBSERVATION},
+        )
     ]
 
 
-def test_traces_of_a_name_come_back_with_their_input_output_and_a_utc_timestamp() -> None:
+def test_traces_of_a_name_are_every_root_observation_on_every_page_with_parsed_input_and_output() -> None:
     api = StubApi()
-    [trace] = _sdk(api).traces("a-candidates")
-    when = datetime(2026, 10, 14, 1, 2, 3, tzinfo=UTC)
-    assert trace == Trace("ab" * 16, "a-candidates", {"question": "q"}, {"type": "factual"}, {}, when, "local")
-    assert api.calls == [("traces", {"name": "a-candidates", "fields": "core,io"})]
+    first, second = _sdk(api).traces("a-candidates")
+    when = datetime(2026, 10, 14, 1, 2, 3, tzinfo=UTC)  # a naive time is read as UTC
+    assert first == Trace(
+        "ab" * 16, "a-candidates", {"question": "q"}, {"type": "factual"}, {"batch": "b"}, when, "local"
+    )
+    assert (second.id, second.input, second.metadata) == ("cd" * 16, {}, {})  # input that isn't JSON is empty
+    filters = {"name": "a-candidates", "is_root_observation": True, "fields": "core,basic,io,metadata"}
+    assert api.calls == [("observations", {"cursor": None, **filters}), ("observations", {"cursor": "1", **filters})]
 
 
 def test_boolean_scores_are_read_by_name_with_when_they_were_last_set_and_only_trace_scores_count() -> None:
     api = StubApi()
     edited = datetime(2026, 10, 15, tzinfo=UTC)
-    assert _sdk(api).boolean_scores("accepted") == [Score("ab" * 16, "accepted", 1.0, edited)]
-    assert api.calls == [("scores", {"name": "accepted", "data_type": ScoreDataType.BOOLEAN})]
+    # a score on a trace or on a trace's observation counts, on a session or on nothing it doesn't; both pages are read
+    assert _sdk(api).boolean_scores("accepted") == [
+        Score("ab" * 16, "accepted", 1.0, edited),
+        Score("cd" * 16, "accepted", 0.0, datetime(2026, 10, 14, tzinfo=UTC)),
+    ]
+    filters = {"name": "accepted", "data_type": "BOOLEAN", "fields": "subject"}
+    assert api.calls == [("scores", {"cursor": None, **filters}), ("scores", {"cursor": "1", **filters})]

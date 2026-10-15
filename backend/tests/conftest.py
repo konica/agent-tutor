@@ -2,8 +2,8 @@
 
 No test sends a trace, whatever environment is loaded (ADR 0017): tracing is off for the whole session, and LangSmith's
 default client records instead of sending. A test that needs a trace turns it on with its own recording client. No test
-reaches a Phoenix or Langfuse either: their URLs and Langfuse's keys are blank for the session, so every
-`Settings()` is untraced, and a test that leaves LangChain instrumented fails."""
+reaches Langfuse either: its URL and keys are blank for the session, so every `Settings()` is untraced, and a test that
+leaves LangChain instrumented fails."""
 
 import os
 from collections.abc import Iterator
@@ -21,12 +21,7 @@ from smart_tutor.shared.adapters.tracing import LANGSMITH_SWITCHES
 def _tracing_hosts_off() -> Iterator[None]:
     # The environment beats `.env` files in pydantic-settings, so a blank value wins over a developer's URL.
     patch = pytest.MonkeyPatch()
-    for name in (
-        "SMART_TUTOR_PHOENIX_URL",
-        "SMART_TUTOR_LANGFUSE_URL",
-        "SMART_TUTOR_LANGFUSE_PUBLIC_KEY",
-        "SMART_TUTOR_LANGFUSE_SECRET_KEY",
-    ):
+    for name in ("SMART_TUTOR_LANGFUSE_URL", "SMART_TUTOR_LANGFUSE_PUBLIC_KEY", "SMART_TUTOR_LANGFUSE_SECRET_KEY"):
         patch.setenv(name, "")
     yield
     patch.undo()
