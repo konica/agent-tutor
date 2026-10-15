@@ -1,6 +1,6 @@
 # One entry point for local work. On Windows, run from Git Bash/WSL with `make` installed,
 # or run the commands below directly.
-.PHONY: help up down up-app api agent mcp worker api-debug agent-debug mcp-debug worker-debug sync migrate lint test test-integration bedrock-check sweep retention evals-smoke evals-learners evals-generate evals-publish topic-check-train web api-client infra-synth helm-lint
+.PHONY: help up down up-app api agent mcp worker api-debug agent-debug mcp-debug worker-debug sync migrate lint test test-integration bedrock-check sweep retention evals-smoke evals-learners evals-generate evals-publish topic-check-train web api-client infra-synth evals-ci-deploy evals-ci-destroy helm-lint
 .PHONY: design-states design-accept design-shots design-diff
 
 BACKEND := cd backend &&
@@ -86,6 +86,14 @@ web:
 MODE ?= on-premise
 infra-synth:
 	cd infra && uv run cdk synth -c smart-tutor:mode=$(MODE)
+
+# The CI evals role (#337): its own CDK app, outside both modes. Run with an admin profile and real AWS (no LocalStack
+# endpoints in the shell), once, and again after a model change in infra/smart_tutor_infra/models.py.
+EVALS_CI_CDK := cd infra && npx --yes aws-cdk@2.1145.0 --app "uv run python evals_ci_app.py"
+evals-ci-deploy: ## deploy SmartTutor-EvalsCI, the GitHub Actions role for the smoke evals (docs/runbooks/evals-ci.md)
+	$(EVALS_CI_CDK) deploy SmartTutor-EvalsCI --require-approval broadening
+evals-ci-destroy: ## remove SmartTutor-EvalsCI and its role
+	$(EVALS_CI_CDK) destroy SmartTutor-EvalsCI
 
 helm-lint:
 	helm lint deploy/helm/smart-tutor
