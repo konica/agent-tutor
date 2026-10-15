@@ -100,7 +100,7 @@ async def test_guardrails_runs_in_process_with_telemetry_and_tracing_off(monkeyp
     AsyncGuard()  # another Guard re-reads ~/.guardrailsrc and resets the metrics flag: still nothing may be sent
     assert await g.check_answer("fine") is None
     assert await g.check_answer(f"leak {CANARY}") is not None
-    assert settings.disable_tracing is True  # else spans with the text reach our tracer provider (Phoenix)
+    assert settings.disable_tracing is True  # else spans with the text reach our tracer provider (Langfuse)
     assert HubTelemetry()._tracer is None  # anonymous usage metrics go nowhere
     assert not settings.use_server  # no Guardrails server
     assert attempts == []
@@ -108,7 +108,7 @@ async def test_guardrails_runs_in_process_with_telemetry_and_tracing_off(monkeyp
 
 async def guardrails_spans(monkeypatch: pytest.MonkeyPatch, tracing_off: bool) -> list[str]:
     """Names of the spans Guardrails sends to the process's global tracer provider, which an app or library installs
-    (Phoenix, in the agent) and from which Guardrails gets its tracer."""
+    (Langfuse tracing, in the agent) and from which Guardrails gets its tracer."""
     memory = InMemorySpanExporter()
     provider = TracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(memory))

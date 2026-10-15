@@ -1,5 +1,5 @@
-"""ADR 0007: the token rides in runtime context only, so neither Langfuse nor Phoenix receives it, in spans or in
-rating scores; nor does a user id or an email (the learner is a keyed hash, ADR 0023).
+"""ADR 0007: the token rides in runtime context only, so Langfuse never receives it, in spans or in rating scores; nor
+does a user id or an email (the learner is a keyed hash, ADR 0023).
 
 The real OpenInference instrumentation exports to an in-memory exporter instead of the network. A positive control
 puts the token in the question, so the check is proven able to fire.

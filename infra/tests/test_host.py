@@ -594,17 +594,17 @@ def _squid_conf(compose: dict[str, Any]) -> list[str]:
     return [line.strip() for line in conf.splitlines() if line.strip() and not line.strip().startswith("#")]
 
 
-def test_worker_reaches_only_postgres_phoenix_and_the_egress_proxy(compose: dict[str, Any]) -> None:
+def test_worker_reaches_only_postgres_and_the_egress_proxy(compose: dict[str, Any]) -> None:
     assert compose["networks"]["worker"] == {"internal": True}  # no route out of the VM, no external DNS
     assert compose["services"]["worker"]["networks"] == ["worker"]
     on_worker_network = {n for n, s in compose["services"].items() if "worker" in s.get("networks", [])}
-    assert on_worker_network == {"worker", "postgres", "egress-proxy", "phoenix"}
+    assert on_worker_network == {"worker", "postgres", "egress-proxy"}
     # Every other service keeps the default network only.
     assert compose["services"]["postgres"]["networks"] == ["default", "worker"]
     assert compose["services"]["egress-proxy"]["networks"] == ["default", "worker"]
-    assert compose["services"]["phoenix"]["networks"] == ["default", "worker"]
+    assert compose["services"]["phoenix"]["networks"] == ["default"]  # unused by the app since #316
     for name, service in compose["services"].items():
-        if name not in on_worker_network:
+        if name not in on_worker_network | {"phoenix"}:  # phoenix names the default network explicitly
             assert "networks" not in service, name
     env = compose["services"]["worker"]["environment"]
     assert env["HTTPS_PROXY"] == env["HTTP_PROXY"] == "http://egress-proxy:3128"
@@ -1064,20 +1064,24 @@ def test_deploy_installs_and_enables_every_timer() -> None:
     assert script.index("up -d --wait --wait-timeout") < script.rindex("systemctl daemon-reload")
 
 
-@pytest.mark.parametrize("service", ["agent", "worker"])
-def test_agent_and_worker_trace_into_the_on_premise_phoenix(compose: dict[str, Any], service: str) -> None:
+@pytest.mark.parametrize("service", ["api", "agent", "worker", "mcp"])
+def test_no_app_service_is_wired_to_phoenix(compose: dict[str, Any], service: str) -> None:
     env = compose["services"][service]["environment"]
-    assert env["SMART_TUTOR_PHOENIX_URL"] == "http://phoenix:6006"
-    assert env["SMART_TUTOR_PHOENIX_API_KEY"] == "${PHOENIX_API_KEY}"  # empty: untraced
-    assert env["SMART_TUTOR_PHOENIX_PROJECT"] == "smart-tutor-on-premise"  # the worker adds -ingestion
+    assert not [k for k in env if k.startswith("SMART_TUTOR_PHOENIX_")]
+    assert "PHOENIX_API_KEY" not in str(compose["services"][service])
+
+
+@pytest.mark.parametrize("service", ["agent", "worker"])
+def test_agent_and_worker_keep_the_sampling_rate_and_learner_hash_key(compose: dict[str, Any], service: str) -> None:
+    env = compose["services"][service]["environment"]
     assert env["SMART_TUTOR_TRACE_SAMPLING_RATE"] == "${TRACE_SAMPLING_RATE:?}"
     assert env["SMART_TUTOR_LEARNER_HASH_KEY"] == "${LEARNER_HASH_KEY:?}"
     assert not [k for k in env if k.startswith("LANGSMITH_")]
 
 
-def test_the_worker_reaches_phoenix_without_the_egress_proxy(compose: dict[str, Any]) -> None:
+def test_the_worker_needs_no_proxy_exceptions(compose: dict[str, Any]) -> None:
     env = compose["services"]["worker"]["environment"]
-    assert "phoenix" in env["NO_PROXY"].split(",") and env["no_proxy"] == env["NO_PROXY"]
+    assert "NO_PROXY" not in env and "no_proxy" not in env
 
 
 def test_the_mcp_server_does_not_trace(compose: dict[str, Any]) -> None:
@@ -1092,7 +1096,7 @@ def test_the_api_sends_ratings_to_the_on_premise_langfuse_project(compose: dict[
     agent_env = compose["services"]["agent"]["environment"]
     for name in ("SMART_TUTOR_LANGFUSE_URL", "SMART_TUTOR_LANGFUSE_PUBLIC_KEY", "SMART_TUTOR_LANGFUSE_SECRET_KEY"):
         assert env[name] == agent_env[name]  # the agent's project: ratings land on its traces
-    assert not [k for k in env if k.startswith("SMART_TUTOR_PHOENIX_")]  # ratings left Phoenix (#318)
+    assert not [k for k in env if k.startswith("SMART_TUTOR_PHOENIX_")]  # Langfuse only since #316
     assert not [k for k in env if k.startswith("LANGSMITH_")]
 
 
@@ -1108,11 +1112,8 @@ def test_deploy_script_renders_the_tracing_settings_and_leaves_the_key_empty_wit
     assert "learner_hash_key=$(secret langfuse/learner-hash-key)" in script
     assert "secret phoenix/learner-hash-key" not in script
     assert "trace_sampling_rate=$(param trace-sampling-rate)" in script
-    tracing = script[script.index("phoenix_api_key=") : script.index("umask 077")]
-    assert "secret phoenix/api-key 2>/dev/null" in tracing
-    assert "$prefix/phoenix/api-key" in tracing and ">&2" in tracing  # the warning names the secret
+    assert "phoenix/api-key" not in script and "PHOENIX_API_KEY" not in script and "phoenix_api_key" not in script
     for line in (
-        "PHOENIX_API_KEY=$phoenix_api_key",
         "TRACE_SAMPLING_RATE=$trace_sampling_rate",
         "LEARNER_HASH_KEY=$learner_hash_key",
     ):
@@ -1224,7 +1225,7 @@ def test_agent_and_worker_export_traces_to_langfuse(compose: dict[str, Any], ser
     assert env["SMART_TUTOR_LANGFUSE_URL"] == "${LANGFUSE_URL:?}"
     assert env["SMART_TUTOR_LANGFUSE_PUBLIC_KEY"] == "${LANGFUSE_PUBLIC_KEY}"  # empty: untraced in Langfuse
     assert env["SMART_TUTOR_LANGFUSE_SECRET_KEY"] == "${LANGFUSE_SECRET_KEY}"
-    assert env["SMART_TUTOR_PHOENIX_URL"] == "http://phoenix:6006"  # Phoenix keeps its copy until #322
+    assert not [k for k in env if k.startswith("SMART_TUTOR_PHOENIX_")]  # Langfuse only since #316
 
 
 @pytest.mark.parametrize("service", ["mcp"])
@@ -1235,7 +1236,7 @@ def test_the_mcp_server_gets_no_langfuse_settings(compose: dict[str, Any], servi
 
 def test_the_worker_reaches_langfuse_through_the_egress_proxy(compose: dict[str, Any]) -> None:
     env = compose["services"]["worker"]["environment"]
-    assert env["NO_PROXY"].split(",") == ["phoenix"]
+    assert "NO_PROXY" not in env and "no_proxy" not in env  # everything leaves through the proxy
     lines = _squid_conf(compose)
     acls = {line.split()[1]: line.split()[2:] for line in lines if line.startswith("acl ")}
     assert acls["langfuse"] == ["dstdomain", "-n", "${LANGFUSE_HOST:?}"]
@@ -1272,6 +1273,8 @@ def test_deploy_script_renders_the_langfuse_settings_and_leaves_the_keys_empty_w
         ("https://sec-dog.duckdns.org", "sec-dog.duckdns.org"),
         ("https://sec-dog.duckdns.org/", "sec-dog.duckdns.org"),
         ("https://h.example:8443/x", "h.example"),
+        ("https://u:p@h.example/x", "h.example"),
+        ("https://u:p@h.example:8443", "h.example"),
     ],
 )
 def test_deploy_script_derives_the_langfuse_host_name_from_the_url(url: str, host: str) -> None:

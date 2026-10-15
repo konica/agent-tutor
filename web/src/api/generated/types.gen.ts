@@ -573,7 +573,7 @@ export type TurnResponse = {
     /**
      * Run Id
      *
-     * The ask's trace id in Langfuse, for attaching a rating (#227); null for turns kept before it was recorded.
+     * The ask's trace id (its run id), for attaching a rating (#227); null for turns kept before it was recorded.
      */
     run_id: string | null;
 };

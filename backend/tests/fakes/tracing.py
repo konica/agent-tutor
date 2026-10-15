@@ -40,12 +40,7 @@ def recorded_traces(
     moment it ends, instead of being sent. LangChain is instrumented only inside the block."""
     memory = InMemorySpanExporter()
     traces = otel_traces(
-        "smart-tutor-test",
-        "local",
-        sampling_rate,
-        [SimpleSpanProcessor(exporter or memory)],
-        hasher or LearnerHasher("k"),
-        metadata,
+        "local", sampling_rate, [SimpleSpanProcessor(exporter or memory)], hasher or LearnerHasher("k"), metadata
     )
     try:
         yield traces, memory

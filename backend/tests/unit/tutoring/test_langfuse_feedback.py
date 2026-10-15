@@ -367,8 +367,3 @@ def test_answer_feedback_sends_with_the_projects_key_pair_and_the_deployment() -
 )
 def test_answer_feedback_is_off_without_langfuse(settings: Settings) -> None:
     assert isinstance(answer_feedback(settings), NoAnswerFeedback)
-
-
-def test_phoenix_alone_sends_no_ratings() -> None:
-    settings = Settings(phoenix_url="http://phoenix:6006", phoenix_api_key=SecretStr("k"), deployment="on-premise")
-    assert isinstance(answer_feedback(settings), NoAnswerFeedback)

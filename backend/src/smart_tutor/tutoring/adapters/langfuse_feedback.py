@@ -20,7 +20,7 @@ from typing import Any
 
 import httpx
 
-from smart_tutor.shared.adapters.tracing import langfuse_enabled
+from smart_tutor.shared.adapters.tracing import tracing_enabled
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import RunId
 from smart_tutor.tutoring.domain.turn import Rating
@@ -174,9 +174,9 @@ def _log_failure(done: "Future[None]", action: str, run_id: RunId) -> None:
 
 
 def answer_feedback(settings: Settings) -> AnswerFeedback:
-    """Scores into the environment's Langfuse project while Langfuse tracing is on (same URL and key pair as its
-    traces); else none."""
-    if not langfuse_enabled(settings):
+    """Scores into the environment's Langfuse project while tracing is on (same URL and key pair as its traces); else
+    none."""
+    if not tracing_enabled(settings):
         return NoAnswerFeedback()
     client = httpx.Client(
         base_url=settings.langfuse_url.rstrip("/"),

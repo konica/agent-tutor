@@ -660,7 +660,8 @@ class TurnResponse(BaseModel):
     created_at: datetime
     run_id: str | None = Field(
         description=(
-            "The ask's trace id in Langfuse, for attaching a rating (#227); null for turns kept before it was recorded."
+            "The ask's trace id (its run id), for attaching a rating (#227); "
+            "null for turns kept before it was recorded."
         )
     )
     rating: Literal["up", "down"] | None = Field(description="The learner's rating (PRD §10.2); null until rated.")

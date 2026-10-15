@@ -128,7 +128,13 @@ Next morning, run the same commands with `--state ENABLED`.
 
 **Did a schedule run?** `StateTransitionReason` shows the last stop or start only: `aws ec2 describe-instances --instance-ids $InstanceId --query "Reservations[0].Instances[0].[State.Name, StateTransitionReason]"`. For the history, ask CloudTrail: `aws cloudtrail lookup-events --lookup-attributes AttributeKey=ResourceName,AttributeValue=$InstanceId --query "Events[?EventName=='StopInstances' || EventName=='StartInstances'].[EventTime,EventName,Username]" --output table`. In CloudWatch, the free `AWS/Scheduler` metrics `InvocationAttemptCount` and `TargetErrorCount` (dimension `ScheduleGroup`) show attempts and failures.
 
-## 5. Patching and health
+## 5. Smart Tutor's organization and projects (ADR 0023)
+
+As the admin, create the organization **Smart Tutor**, and in it the projects `smart-tutor-on-premise`, `smart-tutor-local`, and `smart-tutor-evals`. Invite Smart Tutor's people to that organization only, not to **Platform**. Each project has its own keys under *Settings → API Keys*; make a pair per project and never share one across projects. On-premise keys go into Secrets Manager (`on-premise-deploy.md` section 10); developers make their own pair in `smart-tutor-local`. In `smart-tutor-on-premise` and `smart-tutor-local`, create the score config learners' ratings are checked against: *Settings → Scores / Evaluation → Score Configs → Add*, name `learner_rating`, data type **Boolean**, description "Learner's 👍 (true) / 👎 (false) on an answer (PRD §10.2)". Ratings show on each `ask` trace's Scores, and under *Scores* filtered by name `learner_rating`; if a trace briefly has two, the newest counts.
+
+Where traces show: in the project, *Tracing → Traces*. Filter by name (`ask` or `ingest`), environment (`on-premise`, `local`), user (the learner hash), or session (the thread).
+
+## 6. Patching and health
 
 | What | Value |
 |---|---|
@@ -185,18 +191,12 @@ No alarm watches Langfuse (ADR 0022): open `$Url` when in doubt. A failed patchi
 
    When it has finished (and the VM has rebooted, if it needed to), bring the services back (the command above) as the health check.
 
-## 6. Restore from a snapshot
+## 7. Restore from a snapshot
 
 Snapshots of the data volume are taken daily at 02:00 Asia/Ho_Chi_Minh (19:00 UTC) and kept 7 days (**EC2 → Snapshots**; the volume carries the tag `langfuse:snapshots` = `langfuse`, which the snapshot policy targets). To restore: set `langfuse:data-snapshot-id` in `cdk.json` to the snapshot id and `cdk deploy`. That creates a volume from the snapshot and replaces the instance, whose first boot attaches it; then re-read `$InstanceId`, wait until SSM lists it `Online` (section 1, step 3), and run the deploy document (the replaced instance is new, and Langfuse is down until it runs). Leave `langfuse:data-snapshot-id` set afterwards: clearing it swaps in a blank volume (its final snapshot keeps the data) and Langfuse starts empty. Keep the secrets: `encryption-seed` in particular must be the one the data was written with. A restore in a live stack keeps them.
 
-## 7. Tear down
+## 8. Tear down
 
 `npx aws-cdk@latest destroy Langfuse-Host` (from `platform/langfuse`). The data volume leaves a final snapshot, and the bucket is kept (delete it by hand when sure). Its name is fixed (`langfuse-<account>-<region>`), so a later deploy fails with "already exists" until you empty and delete the bucket.
 
 `destroy` also schedules the `langfuse/*` secrets for deletion. The final snapshot can only be used with the same secrets (`encryption-seed` and the database passwords), so treat a destroy as deleting the data unless you recover the secrets first: within their recovery window (30 days, the Secrets Manager default; the stack sets none), run `aws secretsmanager restore-secret --secret-id langfuse/<name>` for each one. While a secret is scheduled for deletion, or after you restore it, a new stack can't create a secret with the same name.
-
-## 8. Smart Tutor's organization and projects (ADR 0023)
-
-As the admin, create the organization **Smart Tutor**, and in it the projects `smart-tutor-on-premise`, `smart-tutor-local`, and `smart-tutor-evals`. Invite Smart Tutor's people to that organization only, not to **Platform**. Each project has its own keys under *Settings → API Keys*; make a pair per project and never share one across projects. On-premise keys go into Secrets Manager (`on-premise-deploy.md` section 10); developers make their own pair in `smart-tutor-local`. In `smart-tutor-on-premise` and `smart-tutor-local`, create the score config learners' ratings are checked against: *Settings → Scores / Evaluation → Score Configs → Add*, name `learner_rating`, data type **Boolean**, description "Learner's 👍 (true) / 👎 (false) on an answer (PRD §10.2)". Ratings show on each `ask` trace's Scores, and under *Scores* filtered by name `learner_rating`; if a trace briefly has two, the newest counts.
-
-Where traces show: in the project, *Tracing → Traces*. Filter by name (`ask` or `ingest`), environment (`on-premise`, `local`), user (the learner hash), or session (the thread).

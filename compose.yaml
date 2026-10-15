@@ -71,10 +71,8 @@ services:
     image: axllent/mailpit:v1.27
     ports: ["10403:8025"]
 
-  # Runtime traces (ADR 0017): Arize Phoenix at http://localhost:10404, the same image as on-premise, but separate from
-  # production's. No sign-in (it holds only your own test data). Traces are in SQLite on the phoenixdata volume
-  # (`docker compose down -v` clears them) and kept 14 days. Services in Compose send to
-  # http://phoenix:6006/v1/traces, processes on your machine to http://localhost:10404/v1/traces.
+  # Unused since #316 (traces go to Langfuse); #322 removes it. Arize Phoenix at http://localhost:10404: no sign-in,
+  # traces in SQLite on the phoenixdata volume (`docker compose down -v` clears them), kept 14 days.
   phoenix:
     image: arizephoenix/phoenix:version-20.16.0-nonroot
     environment:
@@ -126,7 +124,6 @@ services:
       migrate: {condition: service_completed_successfully}
       keycloak: {condition: service_started}
       agent: {condition: service_started}
-      phoenix: {condition: service_started}
       localstack: {condition: service_healthy}
 
   agent:
@@ -140,7 +137,6 @@ services:
       SMART_TUTOR_KEYCLOAK_CLIENT_ID: smart-tutor-api
       SMART_TUTOR_KEYCLOAK_CLIENT_SECRET: local-api-secret
       SMART_TUTOR_MCP_URL: http://mcp:8000/mcp
-      SMART_TUTOR_PHOENIX_URL: http://phoenix:6006  # .env has the host's localhost:10404
       LANGSMITH_TRACING: "false"  # LangSmith is for evals only; an older .env may still turn it on
       # Bedrock (chat model) with your AWS profile: same setup as the worker below.
       HOME: /home/app
@@ -182,7 +178,6 @@ services:
       AWS_ENDPOINT_URL_SSM: http://localstack:4566
       SMART_TUTOR_S3_PATH_STYLE: "true"
       SMART_TUTOR_LOCALSTACK: "true"
-      SMART_TUTOR_PHOENIX_URL: http://phoenix:6006  # .env has the host's localhost:10404
       LANGSMITH_TRACING: "false"  # LangSmith is for evals only; an older .env may still turn it on
       # Bedrock uses AWS_PROFILE and SMART_TUTOR_AWS_REGION (Settings.aws_region) from .env. botocore reads
       # config, credentials and the SSO / `aws login` caches under $HOME/.aws; the image user (uid 10001) has no
