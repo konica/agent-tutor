@@ -2,6 +2,7 @@
 exactly the models the evals call, trusted only for this repository's pull requests and branch runs."""
 
 import json
+import re
 from pathlib import Path
 
 import aws_cdk as cdk
@@ -138,3 +139,15 @@ def test_the_runbook_deploys_the_stack_and_names_the_secrets() -> None:
         assert name in text, name
     assert "aws iam create-role" not in text and "put-role-policy" not in text  # the stack makes the role
     assert not list(RUNBOOKS.glob("evals-ci-*.json"))  # one copy of the policy: the stack
+
+
+def test_the_runbooks_powershell_runs_the_makefiles_cdk_commands() -> None:
+    # Windows admins have no make: the PowerShell section must not drift from the targets' CDK version or app
+    makefile = (Path(__file__).parents[2] / "Makefile").read_text(encoding="utf-8")
+    (cdk,) = re.findall(r"^EVALS_CI_CDK := cd infra && (.+)$", makefile, re.MULTILINE)
+    (deploy,) = re.findall(r"^\t\$\(EVALS_CI_CDK\) (deploy .+)$", makefile, re.MULTILINE)
+    (destroy,) = re.findall(r"^\t\$\(EVALS_CI_CDK\) (destroy .+)$", makefile, re.MULTILINE)
+    text = (RUNBOOKS / "evals-ci.md").read_text(encoding="utf-8")
+    powershell = "\n".join(re.findall(r"```powershell\n(.*?)```", text, re.DOTALL))
+    for command in (f"{cdk} {deploy}", f"{cdk} {destroy}", "gh secret set EVALS_AWS_ROLE_ARN", "gh secret delete"):
+        assert command in powershell, command
