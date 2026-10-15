@@ -47,6 +47,7 @@ def test_a_rating_is_a_boolean_learner_rating_score_on_the_runs_trace() -> None:
     feedback(langfuse)[0].send(RUN, Rating.UP)
     [body] = posts(langfuse)
     assert uuid.UUID(str(body.pop("id")))  # a new id per rating
+    assert type(body["value"]) is int  # a JSON number, not true/false
     assert body == {
         "traceId": TRACE,
         "name": "learner_rating",
@@ -113,6 +114,35 @@ def test_an_earlier_score_that_never_shows_is_a_warning_and_the_new_one_stays(
     assert not [r for r in langfuse.requests if r.method == "DELETE"]
 
 
+def test_a_failed_post_keeps_the_memory_of_the_earlier_queued_score() -> None:
+    langfuse = FakeLangfuseScores(lag=3)
+    langfuse.config()
+    sender, slept = feedback(langfuse, waits=(1.0, 2.0, 4.0))
+    sender.send(RUN, Rating.UP)  # still queued
+    langfuse.down = True
+    sender.send(RUN, Rating.UP)  # its POST fails (logged)
+    langfuse.down = False
+    sender.send(RUN, Rating.DOWN)
+    assert slept == [1.0]  # still waits for the first 👍, then deletes it
+    assert [s["value"] for s in langfuse.scores.values()] == [False]
+
+
+def test_an_archived_config_is_looked_up_again_after_an_earlier_score_never_shows() -> None:
+    langfuse = FakeLangfuseScores(lag=100)
+    langfuse.config()
+    sender, _ = feedback(langfuse, waits=(1.0,))
+
+    def lookups() -> int:
+        return len([r for r in langfuse.requests if r.url.path == "/api/public/score-configs"])
+
+    sender.send(RUN, Rating.UP)
+    langfuse.configs[0]["isArchived"] = True  # an admin archives it; Langfuse now drops scores that name it
+    sender.send(RUN, Rating.DOWN)  # still posts the cached id; the earlier score never shows
+    assert lookups() == 1
+    sender.send(RUN, Rating.UP)
+    assert lookups() == 2 and "configId" not in posts(langfuse)[-1]
+
+
 def test_scores_left_by_an_earlier_process_are_deleted_without_waiting_across_pages() -> None:
     langfuse = FakeLangfuseScores(page_size=2)
     langfuse.config()
@@ -143,6 +173,15 @@ def test_clearing_right_after_rating_waits_for_the_rating_to_show() -> None:
     sender.send(RUN, Rating.UP)
     sender.clear(RUN)
     assert langfuse.scores == {} and slept == []  # hidden for one list call, shown on the clear's first
+
+
+def test_clearing_a_still_queued_rating_waits_for_it_to_show() -> None:
+    langfuse = FakeLangfuseScores(lag=3)
+    langfuse.config()
+    sender, slept = feedback(langfuse, waits=(1.0, 2.0, 4.0))
+    sender.send(RUN, Rating.UP)  # its list call leaves the score 2 calls from showing
+    sender.clear(RUN)  # first list: 1 left, so sleep; second list shows it, then delete
+    assert slept == [1.0] and langfuse.scores == {}
 
 
 def test_clearing_a_run_never_rated_deletes_nothing(caplog: pytest.LogCaptureFixture) -> None:

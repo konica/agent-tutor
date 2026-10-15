@@ -77,7 +77,13 @@ class FakeLangfuseScores:
         return httpx.Response(404, json={"message": "not found"})
 
     def _post(self, body: dict[str, Any]) -> httpx.Response:
-        if body.get("dataType") != "BOOLEAN" or body.get("value") not in (0, 1) or not body.get("traceId"):
+        value = body.get("value")
+        if (
+            body.get("dataType") != "BOOLEAN"
+            or type(value) is not int
+            or value not in (0, 1)
+            or not body.get("traceId")
+        ):
             return httpx.Response(400, json={"message": "invalid score"})
         score_id = body.get("id") or str(uuid.uuid4())
         score = _listed(score_id, body["traceId"], body["name"], body["value"] == 1, body.get("environment", "default"))

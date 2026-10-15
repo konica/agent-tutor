@@ -82,7 +82,7 @@ class LangfuseAnswerFeedback(AnswerFeedback):
         self._executor.submit(call, run_id, *args).add_done_callback(lambda done: _log_failure(done, action, run_id))
 
     def _score(self, run_id: RunId, rating: Rating) -> None:
-        earlier = self._posted.pop(run_id, None)
+        earlier = self._posted.get(run_id)
         score_id = str(uuid.uuid4())
         body: dict[str, Any] = {
             "id": score_id,
@@ -95,6 +95,7 @@ class LangfuseAnswerFeedback(AnswerFeedback):
         if config_id := self._config():
             body["configId"] = config_id
         self.client.post(SCORES_PATH, json=body).raise_for_status()
+        self._posted.pop(run_id, None)  # only after the POST: a failed one keeps the memory of the earlier score
         self._posted[run_id] = score_id
         while len(self._posted) > REMEMBERED_RUNS:
             self._posted.popitem(last=False)
@@ -113,9 +114,9 @@ class LangfuseAnswerFeedback(AnswerFeedback):
             if earlier is None or earlier in shown:
                 break
             if wait is None:
-                logger.warning(
-                    "the earlier rating of run %s never showed in Langfuse; it may stay beside the new one", run_id
-                )
+                logger.warning("an earlier rating of run %s never showed in Langfuse; it may stay", run_id)
+                # Langfuse drops scores whose config was archived or deleted; look the config up again next time.
+                self._config_id = None
                 break
             self._sleep(wait)
         for score_id in shown - {keep}:
