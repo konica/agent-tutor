@@ -3,7 +3,8 @@ rules, and the checker that proves every quote is in its paper.
 
 Usage: uv run --extra eval --extra ingest python -m evals.evidence
 Loads ask.yaml, downloads the seed PDFs its gold rows name, and checks each quote against its page and the worker's
-chunks. Prints the category x difficulty mix and each question's word overlap with its quotes. Exits 1 on any failure.
+chunks, and that no distractor shares a chunk with the row's evidence. Prints the category x difficulty mix and each
+question's word overlap with its quotes. Exits 1 on any failure.
 The pure functions need no PDF (the ingest extra is imported only by `main`).
 """
 
@@ -153,23 +154,40 @@ def word_overlap(question: str, quotes: Sequence[str]) -> float:
     return len(wanted & _words(" ".join(quotes))) / len(wanted)
 
 
+def distractor_overlaps(
+    evidence_chunks: Sequence[Sequence[str]], distractor_chunks: Sequence[Sequence[str]]
+) -> list[str]:
+    """Distractors that sit in a worker chunk holding one of the row's evidence quotes, given each quote's chunk ids.
+    A cited chunk counts as noise only when it holds a distractor quote and no gold quote (design §7.4), so such a
+    distractor could never score, and the passage it shares a chunk with supports the answer."""
+    problems: list[str] = []
+    for i, held in enumerate(distractor_chunks):
+        for j, gold in enumerate(evidence_chunks):
+            if set(held) & set(gold):
+                problems.append(
+                    f"distractors[{i}] (chunks {' '.join(held)}) shares a chunk"
+                    f" with evidence[{j}] (chunks {' '.join(gold)})"
+                )
+    return problems
+
+
 def _quote_lines(
     number: int, kind: str, items: Sequence[dict[str, Any]], pages: dict[str, list[str]], chunks: dict[str, Any]
-) -> list[tuple[str, bool]]:
-    """One (line, ok) per quote: on its page, and whole inside at least one worker chunk."""
-    lines: list[tuple[str, bool]] = []
+) -> list[tuple[str, bool, list[str]]]:
+    """One (line, ok, chunk ids) per quote: on its page, and whole inside at least one worker chunk."""
+    lines: list[tuple[str, bool, list[str]]] = []
     for item in items:
         source, page, quote = item["source"], item["page"], str(item["quote"])
         head = f"{number} {kind} {source} p{page}"
         texts = pages.get(source, [])
         if not 1 <= page <= len(texts) or not contains(texts[page - 1], quote):
-            lines.append((f"{head} FAIL quote not on page {page}: {quote[:60]!r}", False))
+            lines.append((f"{head} FAIL quote not on page {page}: {quote[:60]!r}", False, []))
             continue
         holding = [c.id for c in chunks.get(source, []) if contains(c.text, quote)]
         if not holding:
-            lines.append((f"{head} FAIL quote on page {page} but in no single chunk: {quote[:60]!r}", False))
+            lines.append((f"{head} FAIL quote on page {page} but in no single chunk: {quote[:60]!r}", False, []))
         else:
-            lines.append((f"{head} OK {' '.join(holding)}", True))
+            lines.append((f"{head} OK {' '.join(holding)}", True, holding))
     return lines
 
 
@@ -198,11 +216,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         chunks[source] = chunks_of_pdf(source, data)
 
     for number, example in gold_rows:
+        held: dict[str, list[list[str]]] = {}
         for kind in ("evidence", "distractors"):
-            for line, ok in _quote_lines(number, kind, example.outputs.get(kind) or [], pages, chunks):
+            held[kind] = []
+            for line, ok, ids in _quote_lines(number, kind, example.outputs.get(kind) or [], pages, chunks):
                 print(line)
                 failed |= not ok
-        for problem in row_problems(example):
+                held[kind].append(ids)
+        for problem in row_problems(example) + distractor_overlaps(held["evidence"], held["distractors"]):
             print(f"{number} FAIL {problem}")
             failed = True
 

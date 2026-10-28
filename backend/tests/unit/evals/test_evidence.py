@@ -111,6 +111,17 @@ def test_a_distractor_must_not_contain_a_gold_quote() -> None:
     assert any("distractor" in p and "contains" in p for p in evidence.row_problems(row))
 
 
+def test_a_distractor_sharing_a_chunk_with_the_rows_evidence_fails() -> None:
+    evidence_chunks = [["jev:39"], ["jev:40", "jev:41"]]
+    problems = evidence.distractor_overlaps(evidence_chunks, [["jev:43"], ["jev:41"], ["jev:40", "jev:41"]])
+    assert problems == [
+        "distractors[1] (chunks jev:41) shares a chunk with evidence[1] (chunks jev:40 jev:41)",
+        "distractors[2] (chunks jev:40 jev:41) shares a chunk with evidence[1] (chunks jev:40 jev:41)",
+    ]
+    assert evidence.distractor_overlaps(evidence_chunks, [["jev:43"]]) == []
+    assert evidence.distractor_overlaps([], [["jev:43"]]) == []  # an uncovered row has no evidence
+
+
 def test_a_distractor_quote_over_200_characters_fails() -> None:
     row = gold(distractors=[{"source": "wikiskill-2026", "page": 6, "quote": "y" * 201}])
     assert any("distractor" in p and "200" in p for p in evidence.row_problems(row))

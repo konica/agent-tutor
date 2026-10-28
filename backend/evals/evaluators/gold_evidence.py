@@ -2,6 +2,9 @@
 `retrieved_recall`: the share of gold quotes found in the chunks the search returned. `cited_recall`: the same over
 the chunks the answer cited. `gold_rank`: 1 / rank of the first retrieved chunk holding a gold quote, else 0.
 `distractor_cited`: 1 when a cited chunk holds a distractor quote and no gold quote.
+This reads §7.4 per chunk, not per answer: a cited chunk counts as noise only when it holds a distractor quote and none
+of the row's gold quotes. A worker chunk (1,000 characters) can hold a distractor next to a passage that supports the
+answer, so distractors are labeled only where they share no chunk with gold (`evals.evidence` fails a row otherwise).
 Quotes match by `evidence.contains`. Recall and rank score covered rows with evidence;
 `distractor_cited` scores rows with distractors; on an uncovered row there is no gold quote, so any cited chunk
 holding a distractor quote scores 1, and a run that failed before it answered cited nothing and scores 0."""
