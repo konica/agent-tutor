@@ -25,4 +25,4 @@ learners:
       ]
   - username: learner2@example.com
     password: learner2
-    documents: [self-rag-2023, canary-agent-notes, canary-prompting-notes]
+    documents: [self-rag-2023, canary-agent-notes, canary-prompting-notes, wikiskill-2026, jevharness-2026]
