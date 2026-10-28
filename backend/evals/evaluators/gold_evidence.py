@@ -3,7 +3,8 @@
 the chunks the answer cited. `gold_rank`: 1 / rank of the first retrieved chunk holding a gold quote, else 0.
 `distractor_cited`: 1 when a cited chunk holds a distractor quote and no gold quote.
 Quotes match by `evidence.contains`. Recall and rank score covered rows with evidence;
-`distractor_cited` scores rows with distractors."""
+`distractor_cited` scores rows with distractors; on an uncovered row there is no gold quote, so any cited chunk
+holding a distractor quote scores 1, and a run that failed before it answered cited nothing and scores 0."""
 
 from typing import Any
 
@@ -11,10 +12,10 @@ from evals.evidence import contains
 from evals.suite import Suite, not_applicable, scores
 from evals.targets import ask_target
 
-RETRIEVED_RECALL = "gold_evidence.retrieved_recall"
-CITED_RECALL = "gold_evidence.cited_recall"
-GOLD_RANK = "gold_evidence.gold_rank"
-DISTRACTOR_CITED = "gold_evidence.distractor_cited"
+RETRIEVED_RECALL = "evidence.retrieved_recall"
+CITED_RECALL = "evidence.cited_recall"
+GOLD_RANK = "evidence.gold_rank"
+DISTRACTOR_CITED = "evidence.distractor_cited"
 NO_EVIDENCE = "the row has no gold evidence"
 NO_DISTRACTORS = "the row has no distractors"
 NOT_SEARCHED = "the run failed before it searched"

@@ -87,9 +87,18 @@ def test_rows_without_labels_are_not_applicable() -> None:
 
 def test_suite_lists_the_four_evaluators() -> None:
     assert g.SUITE.dataset == "ask"
-    assert {metric_of(e) for e in g.SUITE.evaluators} == {
-        g.RETRIEVED_RECALL,
-        g.CITED_RECALL,
-        g.GOLD_RANK,
-        g.DISTRACTOR_CITED,
+    keys = {
+        "evidence.retrieved_recall",
+        "evidence.cited_recall",
+        "evidence.gold_rank",
+        "evidence.distractor_cited",
     }
+    assert {metric_of(e) for e in g.SUITE.evaluators} == keys
+    assert {g.RETRIEVED_RECALL, g.CITED_RECALL, g.GOLD_RANK, g.DISTRACTOR_CITED} == keys
+
+
+def test_a_run_with_chunks_but_no_citations_scores_0() -> None:
+    out = {"chunks": [_chunk("cA", QA), _chunk("cD", QD)]}
+    assert g.cited_recall(out, _ref())["score"] == 0
+    ref = _ref(distractors=[{"source": "s", "page": 3, "quote": QD}])
+    assert g.distractor_cited(out, ref)["score"] == 0
