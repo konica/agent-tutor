@@ -18,7 +18,7 @@ Datasets live in **Langfuse**, in the `smart-tutor-evals` project (versioned the
 | `adversarial_pdfs.py` | Plants the taxonomy's `document_embedded` seeds into pages 1, 2, and 17 of the QLoRA paper (`qlora-2023`) and builds the seven `adv-qlora-*` derivatives; `python -m evals.adversarial_pdfs` prints their SHA-256 values (see "Injection eval") |
 | `datasets/injection_descriptions.yaml` | The description dataset: one row per derivative, read through the API with no Bedrock call (see "Injection eval") |
 | `adversarial/benign_questions.yaml` | Benign study questions, including hard security and ML-safety ones, for the question screen |
-| `measure_question_screen.py` | Measures a Bedrock guardrail per strength: false positives, catch rate, latency, cost (see "Question screen") |
+| `measure_question_screen.py` | Measures a Bedrock guardrail per strength or the local DetectJailbreak screen: false positives, catch rate, latency, cost (see "Question screen") |
 | `pdf.py` | Renders generated seed documents (the canary documents) to the same PDF bytes every run |
 | `evaluators/` | One module per PRD §10.1 evaluator; `rubrics/` holds the Qwen judge prompts |
 | `targets.py` | How an evaluation run invokes the agent |
@@ -191,6 +191,21 @@ Compare strengths with the measurement CLI (real Bedrock, your AWS credentials; 
     cd backend && uv run --env-file ../.env --extra eval python -m evals.measure_question_screen --strength LOW --strength MEDIUM --strength HIGH
 
 `--guardrail ID:VERSION` measures an existing guardrail instead. It prints one table row per guardrail (false positives, catch rate, client and guardrail p50/p95 latency, mean text units, cost per question, and the cost as a share of an average turn), then the benign questions that were tripped and the catch rate per category. `--turn-input-tokens` and `--turn-output-tokens` set the average turn (defaults from 16 local ask traces). It exits 1 when any call failed.
+
+The screen has two adapters (`question_guard`): the Bedrock guardrail above (`bedrock`) and Guardrails AI's DetectJailbreak, run locally on CPU (`guardrails_ai`, #200; it needs the `agent-jailbreak` image, whose `jailbreak` extra installs CPU torch, transformers, and the validator; the root `pyproject.toml` overrides `rich>=14.2` to lift the cap that the validator's `cached-path` puts on it). `--local THRESHOLD` (repeatable) measures it in the CLI's own process: rows are `guardrails_ai@<threshold>`, cost $0, and "Guardrail p50/p95" is the validator's run time. Questions run one at a time, and the report ends with the process's peak RSS (Linux), models included.
+
+    cd backend && uv sync --extra eval --extra jailbreak
+    HF_HOME=../.cache/hf uv run python -m smart_tutor.tutoring.adapters.detect_jailbreak fetch ../.cache/hf   # once, about 1.5 GB
+    HF_HOME=../.cache/hf uv run --extra eval --extra jailbreak python -m evals.measure_question_screen --local 0.81 --concurrency 1
+
+The latency that matters is the production host's, one t3.large (2 vCPU, 8 GB). Measure it in a 2-CPU container: `--cpuset-cpus 0,1` makes torch see two CPUs (`--cpus 2` alone leaves it all the cores' threads), `--memory 8g` is the host's memory, and `--network none` proves nothing is downloaded. The venv lives in a named volume, built once on Linux (the mounted `backend/` is read-only, so the project is not installed and runs from `PYTHONPATH`):
+
+    docker volume create st-jb-venv
+    docker run --rm -v st-jb-venv:/venv -v "$PWD":/src:ro -w /src -e UV_PROJECT_ENVIRONMENT=/venv python:3.12-slim \
+      sh -c "pip install -q uv && uv sync --frozen --no-install-project --extra eval --extra jailbreak --extra guard --extra topic"
+    docker run --rm --cpuset-cpus 0,1 --memory 8g --network none -v st-jb-venv:/venv -v "$PWD":/src:ro \
+      -v "$PWD/../.cache/hf":/hf:ro -e HF_HOME=/hf -e PYTHONPATH=/src:/src/src -w /src python:3.12-slim \
+      /venv/bin/python -m evals.measure_question_screen --local 0.81 --concurrency 1
 
 ## Add a suite
 

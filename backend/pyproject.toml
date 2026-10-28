@@ -35,6 +35,9 @@ ingest = ["langchain-text-splitters>=1.1", "pypdf>=6.0"]
 guard = ["guardrails-ai==0.11.0"]
 # Installed only in the agent image: the topic check's SetFit model on onnxruntime (spec 2026-10-13, ADR 0020).
 topic = ["numpy>=2.0", "onnxruntime>=1.20", "tokenizers>=0.20"]
+# Optional agent image only (`agent-jailbreak`): Guardrails AI's DetectJailbreak question screen (#200) on CPU torch.
+# About 1.5 GB of models plus torch: never in the default agent image (ADR 0019).
+jailbreak = ["guardrails-ai==0.11.0", "guardrails-ai-detect-jailbreak==0.1.6", "torch==2.14.1", "transformers==5.19.0"]
 # Evaluation runs (backend/evals) and CI eval gates.
 eval = ["langfuse>=4.16", "openevals>=0.1", "pyyaml>=6.0"]
 # Training the topic-check model only (evals.topic_check.train): never in an image or a CI install.
@@ -88,11 +91,12 @@ known-first-party = ["smart_tutor", "fakes"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-addopts = "-m 'not integration and not bedrock' --import-mode=importlib"
+addopts = "-m 'not integration and not bedrock and not jailbreak' --import-mode=importlib"
 pythonpath = ["tests", "."]  # so tests can `import fakes` and `import evals`
 markers = [
     "integration: needs the Docker Compose stack (make up)",
     "bedrock: real Bedrock calls in us-east-1 with your AWS credentials (make bedrock-check)",
+    "jailbreak: real DetectJailbreak models from HF_HOME (needs the jailbreak extra; see tests/jailbreak)",
 ]
 
 [tool.mypy]
@@ -104,6 +108,10 @@ exclude = ["shared/adapters/postgres/migrations/versions/"]
 [[tool.mypy.overrides]]
 module = ["guardrails", "guardrails.*"]
 ignore_missing_imports = true  # guardrails-ai ships no py.typed marker
+
+[[tool.mypy.overrides]]
+module = ["guardrails_ai", "guardrails_ai.*"]
+ignore_missing_imports = true  # the jailbreak extra is not in the dev install
 
 [[tool.mypy.overrides]]
 module = ["onnxruntime", "onnxruntime.*"]
@@ -515,7 +523,10 @@ forbidden_modules = ["langchain_text_splitters", "pypdf"]
 name = "Guardrails AI only in tutoring.adapters (keeps the guard extra in the agent image)"
 type = "forbidden"
 # Only the agent image installs the guard extra, so only its composition root may build the adapter.
-ignore_imports = ["smart_tutor.apps.agent.guards -> smart_tutor.tutoring.adapters.guardrails_guard"]
+ignore_imports = [
+    "smart_tutor.apps.agent.guards -> smart_tutor.tutoring.adapters.guardrails_guard",
+    "smart_tutor.apps.agent.guards -> smart_tutor.tutoring.adapters.detect_jailbreak",
+]
 source_modules = [
     "smart_tutor.shared",
     "smart_tutor.apps",
@@ -530,7 +541,7 @@ source_modules = [
     "smart_tutor.reports",
     "smart_tutor.graph",
 ]
-forbidden_modules = ["guardrails"]
+forbidden_modules = ["guardrails", "guardrails_ai", "torch", "transformers", "huggingface_hub"]
 
 [[tool.importlinter.contracts]]
 name = "ONNX topic classifier only in tutoring.adapters (keeps the topic extra in the agent image)"
@@ -579,3 +590,7 @@ layers = [
     "subjects",
     "accounts | insights",
 ]
+
+[tool.uv]
+# cached-path (via guardrails-ai-detect-jailbreak) caps rich<14; the dev tools (import-linter) need >=14.2
+override-dependencies = ["rich>=14.2,<15"]

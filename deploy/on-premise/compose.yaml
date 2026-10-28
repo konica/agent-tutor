@@ -162,7 +162,8 @@ services:
       SMART_TUTOR_LANGFUSE_URL: ${LANGFUSE_URL:?}
       SMART_TUTOR_LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
       SMART_TUTOR_LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
-      # The question screen (#199): "off" or "bedrock", from the SSM parameter question-guard.
+      # The question screen (#199, #200): "off", "bedrock", or "guardrails_ai" (agent-jailbreak image only), from the SSM
+      # parameter question-guard.
       SMART_TUTOR_QUESTION_GUARD: ${QUESTION_GUARD:?}
       SMART_TUTOR_QUESTION_GUARDRAIL_ID: ${QUESTION_GUARDRAIL_ID:?}
       SMART_TUTOR_QUESTION_GUARDRAIL_VERSION: ${QUESTION_GUARDRAIL_VERSION:?}

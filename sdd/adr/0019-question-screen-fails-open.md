@@ -1,8 +1,10 @@
-# 0019. The Bedrock question screen is optional, fails open, and stays off until its latency is solved
+# 0019. The question screen is optional and fails open; Bedrock at LOW, not a local DetectJailbreak
 
 - Status: accepted
 - Date: 2026-10-13
 - Builds on: 0018 (layer 3, "an optional Bedrock Guardrails screen of the question only")
+- Updated: 2026-10-14 (#200: the local DetectJailbreak screen, measured against this one)
+- Note: issue #200 called this "ADR 0015"; 0015 is the conversation-history ADR, so #200's result is recorded here.
 
 ## Context
 
@@ -13,10 +15,10 @@ ADR 0018 left the question check on the `Guard` port returning no trip, and name
 
 ## Decision
 
-1. **The screen is optional and off until measured.** `question_guard` is `off` or `bedrock` (SSM `question-guard`, default `off`). With `bedrock`, the agent needs `question_guardrail_id` and `question_guardrail_version` and refuses to start without them. A `screen` node runs before `search`. A trip follows PRD D29 with reason `guard_question`: the stream ends with the `replace` event, the turn is kept as a decline with code `guard`, and search and the model are not called.
+1. **The screen is optional and off until measured.** `question_guard` is `off`, `bedrock`, or `guardrails_ai` (the local screen, below; SSM `question-guard`, default `off`). With `bedrock`, the agent needs `question_guardrail_id` and `question_guardrail_version` and refuses to start without them. A `screen` node runs before `search`. A trip follows PRD D29 with reason `guard_question`: the stream ends with the `replace` event, the turn is kept as a decline with code `guard`, and search and the model are not called.
 2. **It fails open.** If ApplyGuardrail raises or takes longer than `question_guard_timeout_seconds` (1.0), the turn goes on unscreened and a content-free counter adds one.
 3. **CDK owns the guardrail.** `<data_prefix>-question-screen`: the prompt-attack filter at strength LOW, input only, action BLOCK, Standard tier on the cross-region profile `us.guardrail.v1:0`. A retained guardrail version is re-published whenever a hash of the whole definition changes, so a changed definition never leaves agents on a stale snapshot. The agent's role may call `bedrock:ApplyGuardrail` on that guardrail and that profile only.
-4. **Strength LOW, and the screen stays off in both modes.** See the measurements. A deployment turns it on by changing `question-guard` in `infra/smart_tutor_infra/stacks/config.py` after re-measuring (`docs/runbooks/on-premise-deploy.md`).
+4. **Strength LOW, and the screen stays off in both modes.** See the measurements. If a mode turns a screen on, it is `bedrock` at LOW, not the local one ("Local alternative (#200)"). A deployment turns it on by changing `question-guard` in `infra/smart_tutor_infra/stacks/config.py` after re-measuring (`docs/runbooks/on-premise-deploy.md`).
 
 ### Update (2026-10-14): on in both modes
 
@@ -36,6 +38,27 @@ The product owner turned the screen on in both modes: `question-guard` is `bedro
 - At LOW the screen caught 5 of 7 seeds in the five true prompt-attack categories (instruction override, system-prompt extraction, role-play jailbreak, obfuscation, multi-turn escalation) plus the denial-of-wallet seed. It caught none of citation spoofing, other users' data, output links, scope smuggling, and subject manipulation: those ask for things the code checks already refuse, and are not prompt attacks in Bedrock's sense. The catch-rate gate is `question_screen.catch_rate` at least 0.30.
 - The cost is 1 text unit at $0.15 per 1,000 = $0.00015 per question, against an average turn of $0.00169 (2,652 input and 297 output tokens of Nova 2 Lite, the mean of 16 local `ask` traces, at $0.33 and $2.75 per million tokens).
 - **Latency misses the target.** Bedrock's own processing p95 is about 410 to 450 ms at every strength, before network time, so the added wait before the first token exceeds 300 ms wherever the caller is. False positives and cost pass; latency does not, so the screen stays off.
+
+## Local alternative (#200)
+
+`question_guard=guardrails_ai` screens the question with Guardrails AI's `DetectJailbreak` (0.1.6) on CPU, in process, at `question_jailbreak_threshold` (default 0.81, the validator's own). `DetectJailbreakScreen` has the same timeout, fail-open behavior, counter, and trip (`guard_question`) as the Bedrock screen. It runs one validation at a time; a run that times out keeps the lock until it ends, so later questions fail open, each counted. The models load offline at startup with one warm-up run (the first run takes about 18 s). Torch and about 1.5 GB of models do not fit the default image or the 512 MiB agent, so the adapter's dependencies are the optional `jailbreak` extra and its models are baked into a separate `agent-jailbreak` image that CI neither builds nor deploys. Setting `guardrails_ai` in the plain `agent` image stops the agent at startup with a message naming that image.
+
+Measured 2026-10-14 on the same dataset, in a 2-CPU, 8 GB container with no network (`sdd/reviews/2026-10-14-question-screen-comparison.md`). Bedrock's added latency is shown as its server-side processing time and, in brackets, its client time from GMT+7 (the closer match to the local end-to-end run time). The local range covers five measurements across three runs, since the threshold changes the cut, not the work. Latency and memory come from the dev container, not the t3.large.
+
+| Screen | False positives | Catch rate (18 seeds) | Added latency p50/p95 | Cost per question (share of a turn) | Agent image | Agent memory |
+|---|---|---|---|---|---|---|
+| Bedrock LOW | 0/364 (0.0%) | 6/18 | 335/424 ms (663/773 ms) | $0.000150 (8.9%) | `agent` 1.12 GB | No change expected (193 MiB RSS measured with the screen off) |
+| Bedrock MEDIUM | 4/364 (1.1%) | 10/18 | 323/412 ms (650/755 ms) | $0.000150 (8.9%) | `agent` 1.12 GB | No change expected |
+| Bedrock HIGH | 6/364 (1.6%) | 11/18 | 334/450 ms (657/786 ms) | $0.000150 (8.9%) | `agent` 1.12 GB | No change expected |
+| DetectJailbreak 0.78 | 20/364 (5.5%) | 6/18 | 187–258 / 424–789 ms | ~$0.000005 compute (~0.3%) | `agent-jailbreak` 5.36 GB | Peak RSS 1,842 MiB; about 2 GiB limit |
+| DetectJailbreak 0.81 | 4/364 (1.1%) | 1/18 | 187–258 / 424–789 ms | ~$0.000005 compute (~0.3%) | `agent-jailbreak` 5.36 GB | Peak RSS 1,842 MiB; about 2 GiB limit |
+| DetectJailbreak 0.85 | 1/364 (0.3%) | 0/18 | 187–258 / 424–789 ms | ~$0.000005 compute (~0.3%) | `agent-jailbreak` 5.36 GB | Peak RSS 1,842 MiB; about 2 GiB limit |
+
+- The scores barely separate benign questions (median 0.739, max 0.857) from attacks (median 0.757, max 0.828). Every trip came from the validator's match against known DAN-style jailbreaks; our seeds are short, targeted injections. At 0.81 it tripped on questions such as "Compare the instruction hierarchy approach with simple delimiters around untrusted text."
+- At the only thresholds with at most 1% false positives (0.85 and above) it catches nothing. Its p95 misses 300 ms in every run, pasted excerpts of 540 to 740 characters take 0.8 to 2.3 s, and a 4,000-character question 2.9 s.
+- It needs about 2 GiB of agent memory (the plain agent peaks at 193 MiB). On-premise that would have left about 0.7 GB of the t3.large's 8 GB for the OS and Docker (about 1.7 GB since Phoenix left the compose, #322), by arithmetic from the compose limits and the RSS measured in the dev container (not measured on the host).
+
+**Default per mode: `bedrock` at LOW in both modes, unchanged (see "Update (2026-10-14)").** DetectJailbreak is not eligible in either mode and does not replace the Bedrock screen: at every threshold it either trips more than 1% of study questions or catches at most 1 of 18 seeds, its p95 latency misses 300 ms, and it needs about 2 GiB of agent memory, four times the 512 MiB limit. Bedrock LOW wins on false positives, on catch rate at 1% false positives or fewer, on image size, and on memory. Latency is comparable (the local p50 is lower; both miss the 300 ms p95), and the local screen wins on the per-call fee and keeps the question in process. The product accepts Bedrock's latency miss for its 0% false positives; the local screen would add the same miss without that accuracy. Document-embedded attacks (#196) never reach a question screen, so they add no rows.
 
 ## Why it fails open when the output guard fails closed
 
@@ -59,4 +82,4 @@ ADR 0018's output guard closes the turn when it raises, because an answer that w
 - Run the screen concurrently with search and discard the search on a trip. This hides most of the latency but calls search for a question that was tripped, which #199 rules out.
 - The Classic tier: lower latency, but no prompt-leakage detection and only English, French, and Spanish (the benign set has Vietnamese questions).
 - Bedrock's newer per-check API (`InvokeGuardrailChecks`, prompt-attack check at $0.08 per 1,000 text units), once it is measured.
-- A local classifier, such as Guardrails AI's `DetectJailbreak` (#200): no network time, but a model in the agent image.
+- An int8 ONNX export of DetectJailbreak's three models, as ADR 0020 did for the topic check: less memory and no torch. #200 measured the validator as published ("Local alternative (#200)").

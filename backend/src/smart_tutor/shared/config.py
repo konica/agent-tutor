@@ -127,11 +127,13 @@ class Settings(BaseSettings):
     # last `history_turns` turns (0 sends none), each earlier answer cut to `history_answer_chars` characters.
     history_turns: int = Field(default=5, ge=0, le=MAX_HISTORY_TURNS)
     history_answer_chars: int = Field(default=2000, gt=0, le=MAX_HISTORY_ANSWER_CHARS)
-    # Question screen (US-6, #199, PRD D30): "bedrock" sends the learner's question to a Bedrock guardrail before
-    # search; a screen that fails or is slower than the timeout lets the question through and is counted.
-    question_guard: Literal["off", "bedrock"] = "off"
+    # Question screen (US-6, PRD D30): "bedrock" sends the learner's question to a Bedrock guardrail (#199);
+    # "guardrails_ai" runs Guardrails AI's DetectJailbreak on CPU in the agent (#200; agent-jailbreak image only).
+    # A screen that fails or is slower than the timeout lets the question through and is counted.
+    question_guard: Literal["off", "bedrock", "guardrails_ai"] = "off"
     question_guardrail_id: str = ""
     question_guardrail_version: str = ""
+    question_jailbreak_threshold: float = Field(default=0.81, gt=0, lt=1)  # DetectJailbreak's own default
     question_guard_timeout_seconds: float = Field(default=1.0, gt=0)
     models: ModelsConfig = ModelsConfig()
     chunking: ChunkingConfig = ChunkingConfig()

@@ -57,8 +57,9 @@ A new cross-module dependency means moving a module in the order on purpose and 
 - `tests/integration/<module>/` — adapters against the Compose stack, marked `@pytest.mark.integration`.
 - `tests/isolation/` — cross-user access, per-learner contents, and delete guarantees (PRD US-10c, US-11, US-12).
 - `tests/bedrock/` — real Bedrock calls through `ModelFactory` (`test_question_screen.py` calls ApplyGuardrail directly and skips without a guardrail id and version), marked `@pytest.mark.bedrock` (`make bedrock-check`). Run it after changing a model ID, an adapter, or boto3.
+- `tests/jailbreak/` — the real DetectJailbreak validator, marked `@pytest.mark.jailbreak` and excluded by default; needs `uv sync --extra jailbreak` and the models in `HF_HOME`, fetched with `python -m smart_tutor.tutoring.adapters.detect_jailbreak fetch <dir>`.
 - No test traces, whatever environment is loaded (ADR 0023): `tests/conftest.py` blanks `SMART_TUTOR_LANGFUSE_URL` and Langfuse's keys for the session and fails a test that leaves LangChain instrumented; it also turns langchain-core's cloud tracing off and makes its default client a `RecordingClient`. A test that checks spans traces inside `fakes.recorded_traces()` (in-memory exporter).
 
 ## Images
 
-`Dockerfile` targets `api`, `agent`, `mcp`, `worker` (CronJobs reuse `api`), running as uid 10001. Only `worker` installs the `ingest` extra and only `agent` the `guard` and `topic` extras and the topic-check model folder (`models/topic_check/`).
+`Dockerfile` targets `api`, `agent`, `agent-jailbreak`, `mcp`, `worker` (CronJobs reuse `api`), running as uid 10001. Only `worker` installs the `ingest` extra and only `agent` the `guard` and `topic` extras and the topic-check model folder (`models/topic_check/`). `agent-jailbreak` is the agent plus the `jailbreak` extra and the DetectJailbreak models (#200); CI builds only `agent`.

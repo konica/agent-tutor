@@ -11,7 +11,7 @@ global:
   # and worker won't render for AWS without them.
   documentsBucket: ""
   ingestQueueUrl: ""
-  # Question screen (#199) for the agent: mode is "off" or "bedrock"; "bedrock" needs the guardrail id and version. The
+  # Question screen (#199) for the agent: mode is "off", "bedrock", or "guardrails_ai" (agent-jailbreak image only); "bedrock" needs the guardrail id and version. The
   # deploy passes the SSM parameters question-guard, question-guardrail-id, and question-guardrail-version.
   questionGuard:
     mode: "off"

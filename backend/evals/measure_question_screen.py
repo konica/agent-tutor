@@ -2,12 +2,17 @@
 questions, catch rate on the injection taxonomy's attacks, latency, and cost against an average turn.
 
 Usage: uv run --env-file ../.env --extra eval python -m evals.measure_question_screen \\
-           [--guardrail ID:VERSION ...] [--strength LOW|MEDIUM|HIGH ...] [--concurrency 4]
+           [--guardrail ID:VERSION ...] [--strength LOW|MEDIUM|HIGH ...] [--local THRESHOLD ...] [--concurrency 4]
 
 `--guardrail` measures existing guardrails. `--strength` creates a temporary guardrail per strength with the
 production definition, waits until it is READY, versions it, measures it, and deletes it (also on Ctrl-C). This calls
 real Bedrock (ApplyGuardrail at $0.15 per 1,000 text units) with your AWS credentials. Prints one Markdown table row
 per guardrail, then the benign questions it tripped on. Exits 1 when any call failed.
+
+`--local THRESHOLD` (repeatable, 0 < t < 1) measures the local DetectJailbreak screen (#200) in this process: it needs
+`--extra jailbreak` and the models in `HF_HOME` (smart_tutor.tutoring.adapters.detect_jailbreak fetch). Its rows are
+labelled `guardrails_ai@<threshold>`, cost nothing, and "guardrail ms" is the validator's run time; the calls run one at
+a time. On Linux the report ends with the process's peak memory, models included.
 """
 
 import argparse
@@ -28,6 +33,8 @@ from smart_tutor.shared.adapters.aws.clients import bedrock_runtime_client
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.ports.counter import NoCounter
 from smart_tutor.tutoring.adapters.bedrock_question_screen import SCREEN_BOTO_CONFIG, BedrockQuestionScreen, Screening
+from smart_tutor.tutoring.adapters.detect_jailbreak import load_detect_jailbreak
+from smart_tutor.tutoring.adapters.detect_jailbreak_screen import DetectJailbreakScreen
 from smart_tutor.tutoring.application import GUARD_MESSAGE
 from smart_tutor.tutoring.ports.guard import Guard
 
@@ -293,6 +300,28 @@ def _screen(settings: Settings, guardrail_id: str, version: str) -> BedrockQuest
     )
 
 
+async def measure_local(
+    validator: Any, thresholds: Sequence[float], examples: Sequence[Example], turn_input: int, turn_output: int
+) -> list[Summary]:
+    """One validator (the models load once) through the screen at each threshold. The timeout is long: this measures
+    the run time and does not fail open."""
+    screen = DetectJailbreakScreen(_PassThrough(), validator, timeout=60, failures=NoCounter())
+    summaries = []
+    for threshold in thresholds:
+        validator.threshold = threshold
+        found = await measure_guardrail(screen, examples, concurrency=1)  # runs are serialized: more only adds waits
+        summaries.append(summarize(f"guardrails_ai@{threshold}", found, turn_input, turn_output))
+    return summaries
+
+
+def _peak_rss_mib() -> float | None:
+    try:
+        import resource
+    except ImportError:  # Windows
+        return None
+    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024  # KiB on Linux
+
+
 async def run(args: argparse.Namespace) -> int:
     settings, examples = Settings(), _examples()
 
@@ -312,7 +341,19 @@ async def run(args: argparse.Namespace) -> int:
         for strength in args.strength:
             done = await measure_strengths(control, [strength], settings.aws_region, partial(measure, strength))
             summaries.extend(summary for _, summary in done)
+    if args.local:
+        if args.concurrency > 1:
+            print(
+                "note: --local runs one question at a time; --concurrency applies to the other sources", file=sys.stderr
+            )
+        validator = load_detect_jailbreak(args.local[0])
+        summaries.extend(
+            await measure_local(validator, args.local, examples, args.turn_input_tokens, args.turn_output_tokens)
+        )
     print(format_report(summaries))
+    if args.local and (peak := _peak_rss_mib()) is not None:
+        print()
+        print(f"peak RSS: {peak:.0f} MiB")
     return 1 if any(s.failures for s in summaries) else 0
 
 
@@ -323,11 +364,25 @@ def _positive(text: str) -> int:
     return value
 
 
+def _threshold(text: str) -> float:
+    value = float(text)
+    if not 0 < value < 1:
+        raise argparse.ArgumentTypeError("must be between 0 and 1, exclusive")
+    return value
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--guardrail", action="append", metavar="ID:VERSION", help="an existing guardrail to measure")
     parser.add_argument(
         "--strength", action="append", choices=STRENGTHS, help="create a temporary guardrail at this strength"
+    )
+    parser.add_argument(
+        "--local",
+        action="append",
+        type=_threshold,
+        metavar="THRESHOLD",
+        help="measure the local DetectJailbreak screen at this threshold (needs the jailbreak extra and its models)",
     )
     parser.add_argument(
         "--turn-input-tokens",
@@ -343,8 +398,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--concurrency", type=_positive, default=4, help="screen calls in flight at once (default 4)")
     args = parser.parse_args(argv)
-    if not (args.guardrail or args.strength):
-        parser.error("name a guardrail (--guardrail ID:VERSION) or a strength (--strength LOW|MEDIUM|HIGH)")
+    if not (args.guardrail or args.strength or args.local):
+        parser.error(
+            "name a guardrail (--guardrail ID:VERSION), a strength (--strength LOW|MEDIUM|HIGH), "
+            "or a local threshold (--local 0.81)"
+        )
     return asyncio.run(run(args))
 
 
