@@ -38,6 +38,8 @@ class Example:
     inputs: dict[str, Any]
     outputs: dict[str, Any]
     metadata: dict[str, Any] = field(default_factory=dict)
+    # the splits a hand-written row is in; never published (a version is already one split)
+    splits: tuple[str, ...] = SPLITS
 
 
 @dataclass(frozen=True)
@@ -55,7 +57,10 @@ class Dataset:
 def load_dataset(key: str, folder: Path = DATASETS) -> Dataset:
     path = folder / f"{key}.yaml"
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-    examples = tuple(Example(dict(e["inputs"]), dict(e.get("outputs") or {})) for e in raw.get("examples") or [])
+    splits = tuple(str(split) for split in raw.get("splits") or SPLITS)
+    if unknown := set(splits) - set(SPLITS):
+        raise DatasetError(f"{path.name}: splits names unknown splits {sorted(unknown)} (splits: {', '.join(SPLITS)})")
+    examples = tuple(_example(row, splits, path.name) for row in raw.get("examples") or [])
     if not examples:
         raise DatasetError(f"{path.name}: no examples")
     pins = {str(split): str(tag) for split, tag in (raw.get("pins") or {}).items()}
@@ -64,9 +69,6 @@ def load_dataset(key: str, folder: Path = DATASETS) -> Dataset:
     for split, tag in pins.items():
         if _number(tag, split) is None:
             raise DatasetError(f"{path.name}: pin {split}: {tag} is not a {split}-v<N> version")
-    splits = tuple(str(split) for split in raw.get("splits") or SPLITS)
-    if unknown := set(splits) - set(SPLITS):
-        raise DatasetError(f"{path.name}: splits names unknown splits {sorted(unknown)} (splits: {', '.join(SPLITS)})")
     if outside := set(pins) - set(splits):
         raise DatasetError(f"{path.name}: pins name splits the dataset opts out of: {sorted(outside)}")
     share = raw.get("eval_share")
@@ -81,6 +83,18 @@ def load_dataset(key: str, folder: Path = DATASETS) -> Dataset:
         splits,
         None if share is None else float(share),
     )
+
+
+def _example(row: dict[str, Any], splits: tuple[str, ...], filename: str) -> Example:
+    """One hand-written row: its `metadata` and the `splits` it is in (default: all the dataset's)."""
+    own = tuple(str(split) for split in row.get("splits") or splits)
+    question = row["inputs"].get("question", row["inputs"])
+    if outside := [split for split in own if split not in splits]:
+        raise DatasetError(
+            f"{filename}: row {question!r} is in split {outside[0]}, which the dataset doesn't publish "
+            f"(splits: {', '.join(splits)})"
+        )
+    return Example(dict(row["inputs"]), dict(row.get("outputs") or {}), dict(row.get("metadata") or {}), own)
 
 
 def _number(tag: str, split: str) -> int | None:
@@ -151,7 +165,9 @@ def newest_examples(client: LangfuseClient, dataset: Dataset, split: str) -> lis
 
 
 def _canonical(examples: Iterable[Example]) -> list[str]:
-    return sorted(json.dumps({"inputs": e.inputs, "outputs": e.outputs}, sort_keys=True) for e in examples)
+    return sorted(
+        json.dumps({"inputs": e.inputs, "outputs": e.outputs, "metadata": e.metadata}, sort_keys=True) for e in examples
+    )
 
 
 def publish_split(client: LangfuseClient, dataset: Dataset, split: str, examples: Sequence[Example]) -> str | None:

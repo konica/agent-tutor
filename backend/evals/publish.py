@@ -56,13 +56,14 @@ def split_examples(
     for example in new:
         by_type[str(example.metadata.get("type"))].append(example)
     order = [t for t in TYPES if t in by_type] + sorted(set(by_type) - set(TYPES))
-    smoke, turn = list(dataset.examples), 0
+    smoke, turn = [e for e in dataset.examples if "smoke" in e.splits], 0
     while len(smoke) < smoke_size and any(turn < len(by_type[t]) for t in order):
         for kind in order:
             if turn < len(by_type[kind]) and len(smoke) < smoke_size:
                 smoke.append(by_type[kind][turn])
         turn += 1
-    found = {"smoke": smoke, "full": [*dataset.examples, *new]}
+    full = [e for e in dataset.examples if "full" in e.splits]
+    found = {"smoke": smoke, "full": [*full, *new]}
     return {split: found[split] for split in SPLITS if split in dataset.splits}
 
 
@@ -88,7 +89,8 @@ def generated_examples(client: LangfuseClient, dataset: Dataset) -> list[Example
 
 
 def _summary(examples: Sequence[Example]) -> str:
-    counts = Counter(str(e.metadata.get("type", "hand-written")) for e in examples)
+    # hand-written rows, gold labels included, carry no candidate_run
+    counts = Counter(str(e.metadata.get("type")) if "candidate_run" in e.metadata else "hand-written" for e in examples)
     return ", ".join(f"{n} {kind}" for kind, n in sorted(counts.items()))
 
 
@@ -119,7 +121,7 @@ def main(
                 tag = publish_split(client, dataset, split, examples)
                 state = f"published {version_name(dataset, tag)}" if tag else "unchanged"
                 print(f"{dataset.name} {split}: {state}, {len(examples)} examples ({_summary(examples)})")
-            generated = {str(e.metadata.get("type")) for e in splits.get("smoke", ()) if e.metadata}
+            generated = {str(e.metadata.get("type")) for e in splits.get("smoke", ()) if "candidate_run" in e.metadata}
             # only the ask question types are expected in every smoke split (injection examples are typed by category)
             if generated & set(TYPES) and (missing := [t for t in TYPES if t not in generated]):
                 print(f"{dataset.name} smoke: {', '.join(f'no accepted {t}' for t in missing)} (make evals-generate)")

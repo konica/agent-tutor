@@ -284,3 +284,26 @@ def test_a_dataset_naming_an_unknown_split_or_pinning_one_it_opts_out_of_is_refu
     )
     with pytest.raises(DatasetError, match="opts out"):
         load_dataset("d", tmp_path)
+
+
+def test_load_keeps_row_metadata_and_splits(tmp_path: Path) -> None:
+    (tmp_path / "m.yaml").write_text(
+        "name: m\nexamples:\n"
+        "  - {inputs: {q: a}, metadata: {category: single_hop}, splits: [full]}\n"
+        "  - {inputs: {q: b}}\n",
+        encoding="utf-8",
+    )
+    first, second = load_dataset("m", tmp_path).examples
+    assert first.metadata == {"category": "single_hop"} and first.splits == ("full",)
+    assert second.metadata == {} and second.splits == ("smoke", "full")
+
+
+def test_row_splits_must_be_in_dataset_splits(tmp_path: Path) -> None:
+    (tmp_path / "n.yaml").write_text(
+        "name: n\nsplits: [full]\nexamples: [{inputs: {q: a}, splits: [smoke]}]\n", encoding="utf-8"
+    )
+    with pytest.raises(DatasetError, match="smoke"):
+        load_dataset("n", tmp_path)
+    (tmp_path / "o.yaml").write_text("name: o\nexamples: [{inputs: {q: a}, splits: [nightly]}]\n", encoding="utf-8")
+    with pytest.raises(DatasetError, match="nightly"):
+        load_dataset("o", tmp_path)
