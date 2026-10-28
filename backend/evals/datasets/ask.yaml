@@ -353,8 +353,7 @@ examples:
         - {source: wikiskill-2026, page: 20, quote: "ALFWorld Multi-Step 39 18 134 Admissible Actions"}
       distractors:
         - {source: jevharness-2026, page: 29, quote: "It solved 95.0% against 90.7% for Flash alone, at 89.0% lower cost with the GPU charged"}
-        - {source: jevharness-2026, page: 7, quote: "ALFWorld: action cascade, JEV 140 91.4 91.4 +0.0 14.0 24.1 22.3"}
-    metadata: {category: conflicting, type: multi_document, difficulty: hard}  # hard: noticing a conflict across two papers (implicit); 140-game seen-room distractors
+    metadata: {category: conflicting, type: multi_document, difficulty: hard}  # hard: noticing a conflict across two papers (implicit); 140-game seen-room distractor
     splits: [full]
   - inputs: {question: "Do my two papers agree on Gemini 3.5 Flash's score on the 134-game ALFWorld split when it runs without skills or a decision model?", learner: learner2@example.com, documents: null}
     outputs:
@@ -395,11 +394,10 @@ examples:
       nuggets:
         - {fact: "JEV was billed through OpenRouter at $0.042 per million input tokens.", evidence: [0]}
         - {fact: "Output tokens cost nothing.", evidence: [0]}
-        - {fact: "That is the list price on the study's run dates for the pinned JEV 1.13, so it is dated and may have changed.", evidence: [1, 2, 3]}
+        - {fact: "The price is dated: it is the list price on the study's run dates, as of the paper.", evidence: [1, 2]}
       evidence:
         - {source: jevharness-2026, page: 33, quote: "JEV is billed through OpenRouter at $0.042/M input tokens and nothing for output"}
         - {source: jevharness-2026, page: 33, quote: "with list prices on the run dates applied to measured tokens"}
-        - {source: jevharness-2026, page: 33, quote: "a closed typed decision API released on 15 September 2026, is pinned as typesafe/jev-1.13"}
         - {source: jevharness-2026, page: 9, quote: "Prices and latencies are those we recorded, and they change with providers, hardware and how the decision model is served"}
       distractors:
         - {source: jevharness-2026, page: 2, quote: "In one recorded episode, a call to JEV took 28% of an LLM call’s time and 2.6% of its price."}
@@ -414,17 +412,13 @@ examples:
       sources: [jevharness-2026]
       answer: "With the final AgentDecision-4B on its own GPU, the DecisionGym agent was 86.3% cheaper and 2.5 times faster, without losing 3 or more points of success."
       nuggets:
-        - {fact: "The DecisionGym agent was 86.3% cheaper.", evidence: [0, 1, 2]}
-        - {fact: "It was about 2.5 times faster (60.3% less time).", evidence: [0, 1, 2]}
+        - {fact: "The DecisionGym agent was 86.3% cheaper.", evidence: [0]}
+        - {fact: "It was about 2.5 times faster.", evidence: [0]}
       evidence:
         - {source: jevharness-2026, page: 7, quote: "With AGENT DECISION -4B on its own GPU, the DECISION GYM agent was 86.3% cheaper and 2.5 times faster, without losing 3 or more points of success"}
-        - {source: jevharness-2026, page: 7, quote: "With AGENT DECISION -4B the agent ran 86.3% cheaper and 2.5× faster."}
-        - {source: jevharness-2026, page: 7, quote: "4B + public data, own GPU† +0.5 86.3 60.3"}
       distractors:
         - {source: jevharness-2026, page: 8, quote: "With AGENT DECISION -4B in place of JEV, it passed at 81.1% lower cost on 500 new tasks."}
-        - {source: jevharness-2026, page: 1, quote: "4B models trained this way made agents 81.1–89.0% cheaper and up to 2.5 times faster"}
-        - {source: jevharness-2026, page: 7, quote: "4B, batched, own GPU† +0.5 76.3 29.4"}
-    metadata: {category: near_miss, type: factual, difficulty: hard}  # hard: labeled distractors (V1's 81.1% Stage-2 test, V1 batched on own GPU 76.3%, the 81.1–89.0% range)
+    metadata: {category: near_miss, type: factual, difficulty: hard}  # hard: labeled distractor (V1's 81.1% Stage-2 test)
     splits: [full]
   - inputs: {question: "In Stage 1, when JEV chose all the tools itself with no cut-off, how many points of task success did the agent lose?", learner: learner2@example.com, documents: null}
     outputs:
@@ -432,16 +426,13 @@ examples:
       sources: [jevharness-2026]
       answer: "In Stage 1, letting JEV make every tool choice without a fitted confidence threshold lowered task success by 19.0 points."
       nuggets:
-        - {fact: "Letting JEV make every tool choice lost 19.0 points of task success.", evidence: [0, 1, 2]}
+        - {fact: "Letting JEV make every tool choice lost 19.0 points of task success.", evidence: [0]}
       evidence:
         - {source: jevharness-2026, page: 6, quote: "Letting JEV make every tool choice lost 19.0 points"}
-        - {source: jevharness-2026, page: 1, quote: "without a fitted confidence threshold, delegating tool choices lowered success by 19.0 points"}
-        - {source: jevharness-2026, page: 7, quote: "Tool choice −19.0 67 +0.0 14 −7.8 54 +0.0 0 +0.0 −14"}
       distractors:
         - {source: jevharness-2026, page: 6, quote: "It cut cost by 14.2% without losing a single task. A fixed threshold lost 21.5 points."}
-        - {source: jevharness-2026, page: 7, quote: "Tool args. −20.0 88 +0.0 14 +0.0 9 +0.0 −7 +0.0 −1"}
         - {source: jevharness-2026, page: 6, quote: "JEV 89.9 91.8 82.0"}
-    metadata: {category: near_miss, type: factual, difficulty: hard}  # hard: labeled distractors (fixed threshold's 21.5, arguments' 20.0, shifted-task 82.0)
+    metadata: {category: near_miss, type: factual, difficulty: hard}  # hard: labeled distractors (fixed threshold's 21.5, shifted-task 82.0)
     splits: [full]
   - inputs: {question: "On average across the benchmarks, how much did WikiSkill improve Qwen-3.6-27B over using no skills at all?", learner: learner2@example.com, documents: null}
     outputs:
@@ -449,14 +440,12 @@ examples:
       sources: [wikiskill-2026]
       answer: "WikiSkill raised Qwen-3.6-27B's average by 23.9 points over the no-skill baseline, the largest gain in the Qwen family (12.3 for 4B, 17.5 for 9B)."
       nuggets:
-        - {fact: "WikiSkill improved Qwen-3.6-27B's average performance by 23.9 points over no skills.", evidence: [0, 1]}
+        - {fact: "WikiSkill improved Qwen-3.6-27B's average performance by 23.9 points over no skills.", evidence: [0]}
       evidence:
         - {source: wikiskill-2026, page: 8, quote: "from +12.3 points for Qwen-3.5-4B to +17.5 points for Qwen-3.5-9B and +23.9 points for Qwen-3.6-27B"}
-        - {source: wikiskill-2026, page: 3, quote: "WikiSkill improves average performance by 12.3%, 17.5%, and 23.9% for 4B, 9B, and 27B models, respectively"}
       distractors:
         - {source: wikiskill-2026, page: 7, quote: "Compared with the strongest competing skill-evolution method for each model, WikiSkill improves average performance by 3.3, 5.1, 10.0, 5.8, and 12.0 points"}
-        - {source: wikiskill-2026, page: 8, quote: "This trend is particularly pronounced on SpreadSheet, where WikiSkill improves the three models by +6.5, +9.3, and +40.9 points, respectively"}
-    metadata: {category: near_miss, type: factual, difficulty: hard}  # hard: labeled distractors (+10.0 over the strongest competitor, +40.9 on SpreadSheet)
+    metadata: {category: near_miss, type: factual, difficulty: hard}  # hard: labeled distractor (+10.0 over the strongest competitor)
     splits: [full]
   - inputs: {question: "Which benchmarks did the original ReAct paper evaluate its method on?", learner: learner2@example.com, documents: null}
     outputs:
