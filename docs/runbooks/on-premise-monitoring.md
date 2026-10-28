@@ -62,7 +62,7 @@ aws sns list-subscriptions-by-topic --topic-arn $Topic --query "Subscriptions[].
 
 **What happened.** Spend this month passed 80% of `smart-tutor:budget-monthly-usd`, or AWS forecasts it will pass 100%. The usual causes are Bedrock use, a VM larger than `t3.large`, or the native-cloud stacks running beside on-premise.
 
-**What to do.** In **Billing → Cost Explorer**, group this month's cost by service. Check Bedrock usage in Phoenix traces (LLM spans' token counts), and check that no native-cloud stack (`SmartTutor-prod-*`) is running when it shouldn't be. Tell the product owner if the budget is too low for the pilot. The amount is `smart-tutor:budget-monthly-usd` in `infra/cdk.json`.
+**What to do.** In **Billing → Cost Explorer**, group this month's cost by service. Check Bedrock usage in the Langfuse traces (LLM generations' token counts), and check that no native-cloud stack (`SmartTutor-prod-*`) is running when it shouldn't be. Tell the product owner if the budget is too low for the pilot. The amount is `smart-tutor:budget-monthly-usd` in `infra/cdk.json`.
 
 ## Hours (ADR 0022)
 
@@ -168,7 +168,7 @@ No data points means no failures (or the screen is off). The first question afte
 
 1. Compare it with the turns asked. A few a day is noise. A steady share means learners are asking unscreened questions.
 2. Read the agent's log for the cause (`dc logs --tail 200 agent` in a shell, `on-premise-deploy.md` section 7): each failure logs `question screen unavailable, letting the question through` and the exception's type only. `TimeoutError` means Bedrock Guardrails was slower than 1 second (a latency regression, or a cold cross-region route). `ClientError` types such as access denied, validation, or throttling point at the agent's IAM (`bedrock:ApplyGuardrail` on the guardrail and the `us.guardrail.v1:0` profile), a guardrail version that no longer exists, or the guardrail's quota. With the local screen (`guardrails_ai`), turn latency that rises by about 1 second and stays there while the count rises can mean a stuck model thread: one hung run holds the screen, so every later question waits out the 1 second and goes on unscreened; restart the agent.
-3. If the cause is not fixed quickly and the unscreened share matters, turn the screen off (`on-premise-deploy.md` section 12). A missing `cloudwatch:PutMetricData` grant on the agent shows as `could not count QuestionScreenFailures` warnings in the agent's log (the turn is not affected); no data points alone means no failures.
+3. If the cause is not fixed quickly and the unscreened share matters, turn the screen off (`on-premise-deploy.md` section 11). A missing `cloudwatch:PutMetricData` grant on the agent shows as `could not count QuestionScreenFailures` warnings in the agent's log (the turn is not affected); no data points alone means no failures.
 
 ## Bring the services back
 
@@ -183,15 +183,3 @@ aws ssm get-command-invocation --command-id $Command --instance-id $InstanceId -
 
 The output lists each service's status. If one stays unhealthy, open a shell (`on-premise-deploy.md` §7) and read its logs with `dc logs --tail 200 <service>`. Common causes: `/data` not mounted (the data volume), the disk full (`df -h / /data`; `docker image prune -af` frees old images), or Keycloak slow to start after a reboot. If a deploy left the services broken, redeploy the last good tag.
 
-## Phoenix's memory and database size (#288)
-
-Phoenix itself is capped at 1 GB (`mem_limit`; it idles at about 450 MiB) and is restarted if it goes over. ADR 0017's estimate of 1 to 2 GB includes the database's growth in Postgres, which has no limit. Container limits now total about 5.75 GiB of the t3.large's ~7.6 GiB, with Postgres and Caddy unlimited and no swap, so watch available memory. Check monthly, and after a traffic jump. From a Session Manager shell (`on-premise-deploy.md` §7):
-
-```bash
-free -m
-docker stats --no-stream
-df -h /data
-dc exec postgres psql -U postgres -c "SELECT pg_size_pretty(pg_database_size('phoenix'));"
-```
-
-When it grows, lower `trace-sampling-rate` (`on-premise-deploy.md` §10) or shorten retention in Phoenix's *Settings, Data Retention*, never above 180 days. If the host's available memory stays under about 1 GB, move to a larger instance (`smart-tutor:on-premise-instance-type`).

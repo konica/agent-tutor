@@ -1,4 +1,5 @@
-"""ADR 0007: the token rides in runtime context only, so Phoenix never receives it, in spans or in rating annotations.
+"""ADR 0007: the token rides in runtime context only, so Langfuse never receives it, in spans or in rating scores; nor
+does a user id or an email (the learner is a keyed hash, ADR 0023).
 
 The real OpenInference instrumentation exports to an in-memory exporter instead of the network. A positive control
 puts the token in the question, so the check is proven able to fire.
@@ -15,7 +16,7 @@ from langchain_core.messages import AIMessage
 from opentelemetry.sdk.trace import ReadableSpan
 
 from fakes import (
-    FakePhoenix,
+    FakeLangfuseScores,
     FakeRetriever,
     FakeTokenVerifier,
     InlineExecutor,
@@ -32,13 +33,12 @@ from smart_tutor.apps.agent.graph import build_graph
 from smart_tutor.apps.agent.server import AskRequest, answer_events
 from smart_tutor.apps.agent.state import AgentContext
 from smart_tutor.apps.api.main import create_app
-from smart_tutor.shared.adapters.ask_tracing import PhoenixAskTracing
-from smart_tutor.shared.adapters.tracing import root_span_id
+from smart_tutor.shared.adapters.ask_tracing import OtelAskTracing
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.domain.principal import Principal
 from smart_tutor.shared.ports.ask_tracing import AskRun
-from smart_tutor.tutoring.adapters.phoenix_feedback import PhoenixAnswerFeedback
+from smart_tutor.tutoring.adapters.langfuse_feedback import LangfuseAnswerFeedback
 from smart_tutor.tutoring.application import HistoryTurn
 from smart_tutor.tutoring.domain.retrieved_chunk import RetrievedChunk
 
@@ -91,16 +91,18 @@ def test_the_context_repr_hides_the_token() -> None:
 
 USER_ID = "user-id-under-test-42"
 EMAIL = "ada.lovelace@example.com"
+THREAD_ID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
 
 
 async def ask_spans(question: str) -> str:
+    """A traced ask in a thread as USER_ID with TOKEN; every span dumped, Langfuse's attributes included."""
     graph = build_graph(
         lambda token: FakeRetriever(CHUNKS), fake_chat_model(AIMessage("It weighs tokens [1].")), guard=PassingGuard()
     )
-    body = AskRequest(question=question)
-    run = AskRun(uuid.uuid4(), None, UserId(USER_ID), body.question, None)
+    body = AskRequest(question=question, thread_id=uuid.UUID(THREAD_ID))
+    run = AskRun(uuid.uuid4(), THREAD_ID, UserId(USER_ID), body.question, None)
     with recorded_traces() as (traces, spans):
-        async for _ in answer_events(graph, body, TOKEN, run, PhoenixAskTracing(traces)):
+        async for _ in answer_events(graph, body, TOKEN, run, OtelAskTracing(traces)):
             pass
     assert spans.get_finished_spans()
     return dumped(spans.get_finished_spans())
@@ -109,6 +111,9 @@ async def ask_spans(question: str) -> str:
 async def test_the_ask_trace_holds_no_token_user_id_or_email() -> None:
     traces = await ask_spans("What is attention?")
     assert "What is attention?" in traces
+    # The dump holds Langfuse's attributes too: the learner and thread on every span, and the root's metadata.
+    for name in ("user.id", "session.id", "langfuse.trace.metadata.learner_hash", "langfuse.observation.input"):
+        assert name in traces
     for secret in (TOKEN, USER_ID, EMAIL):
         assert secret not in traces
 
@@ -118,7 +123,7 @@ async def test_positive_control_a_user_id_in_the_question_is_caught() -> None:
 
 
 def rated_requests(question: str) -> str:
-    """Ask through the API as Ada with TOKEN, rate the turn 👎, and return every request the API made to Phoenix."""
+    """Ask through the API as Ada with TOKEN, rate the turn 👎, and return every request the API made to Langfuse."""
     verifier = FakeTokenVerifier()
     verifier.add(TOKEN, Principal(UserId(USER_ID), EMAIL, frozenset({"learner"})))
     library, threads = InMemoryLibrary(), InMemoryThreads()
@@ -129,28 +134,26 @@ def rated_requests(question: str) -> str:
         seen.append(request)
         return httpx.Response(200, content=AGENT_SSE, headers={"content-type": "text/event-stream"})
 
-    phoenix = FakePhoenix()
-    sender = PhoenixAnswerFeedback(
-        phoenix.client(), "smart-tutor-test", executor=InlineExecutor(), sleep=lambda s: None
-    )
+    langfuse = FakeLangfuseScores()
+    langfuse.config()
+    sender = LangfuseAnswerFeedback(langfuse.client(), "local", executor=InlineExecutor(), sleep=lambda s: None)
     services = api_services(library, threads=threads, agent=fake_agent(agent), feedback=sender)
     client = TestClient(create_app(Settings(), verifier=verifier, services=services))
     auth = {"Authorization": f"Bearer {TOKEN}"}
     client.post("/threads", json={"question": question}, headers=auth)
     run_id = json.loads(seen[0].content)["run_id"]
-    phoenix.spans.add(f"{root_span_id(uuid.UUID(run_id)):016x}")
     [thread] = threads.threads.values()
     rated = client.put(f"/threads/{thread.thread_id}/turns/{run_id}/rating", json={"rating": "down"}, headers=auth)
-    assert rated.status_code == 200 and phoenix.annotations, "nothing was annotated, so the check would pass vacuously"
+    assert rated.status_code == 200 and langfuse.scores, "nothing was scored, so the check would pass vacuously"
     return json.dumps(
-        [{"url": str(r.url), "headers": dict(r.headers), "body": r.content.decode()} for r in phoenix.requests]
+        [{"url": str(r.url), "headers": dict(r.headers), "body": r.content.decode()} for r in langfuse.requests]
     )
 
 
-def test_the_rating_annotation_holds_no_token_user_id_or_email() -> None:
+def test_the_rating_score_holds_no_token_user_id_or_email() -> None:
     sent = rated_requests("What is attention?")
-    # Positive control: the dump holds the request bodies (the annotation) and headers (the Phoenix key), so a secret
+    # Positive control: the dump holds the request bodies (the score) and headers (the Basic auth), so a secret
     # in either would be caught.
-    assert "learner_rating" in sent and "Bearer test-key" in sent
+    assert "learner_rating" in sent and "Basic " in sent
     for secret in (TOKEN, USER_ID, EMAIL):
         assert secret not in sent

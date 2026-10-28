@@ -1,5 +1,5 @@
-"""Fakes for tracing: LangSmith (evals, and the test guard) with a client that records payloads, and Phoenix with a
-RunTracing that records runs."""
+"""Fakes for tracing: LangSmith (evals, and the test guard) with a client that records payloads, and OpenTelemetry
+tracing with a RunTracing that records runs."""
 
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager, contextmanager, nullcontext
@@ -10,7 +10,7 @@ from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExporter, SpanExportResult
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from smart_tutor.shared.adapters.tracing import LearnerHasher, PhoenixTraces, phoenix_traces
+from smart_tutor.shared.adapters.tracing import LearnerHasher, OtelTraces, otel_traces
 from smart_tutor.shared.domain.ids import UserId
 from smart_tutor.shared.ports.run_tracing import RunTracing
 
@@ -20,10 +20,10 @@ META = {"deployment": "local", "chat_model": "chat-x", "embedding_model": "embed
 
 
 class FailingExporter(SpanExporter):
-    """An exporter whose every export raises, as a Phoenix that is down would."""
+    """An exporter whose every export raises, as a tracing host that is down would."""
 
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
-        raise ConnectionError("Phoenix is down")
+        raise ConnectionError("tracing host is down")
 
     def shutdown(self) -> None:
         pass
@@ -35,16 +35,12 @@ def recorded_traces(
     exporter: SpanExporter | None = None,
     metadata: Mapping[str, str] = META,
     hasher: LearnerHasher | None = None,
-) -> Iterator[tuple[PhoenixTraces, InMemorySpanExporter]]:
-    """Phoenix tracing as the agent and worker set it up, but each span is kept in memory (or given to `exporter`) the
+) -> Iterator[tuple[OtelTraces, InMemorySpanExporter]]:
+    """Tracing as the agent and worker set it up, but each span is kept in memory (or given to `exporter`) the
     moment it ends, instead of being sent. LangChain is instrumented only inside the block."""
     memory = InMemorySpanExporter()
-    traces = phoenix_traces(
-        "smart-tutor-test",
-        sampling_rate,
-        SimpleSpanProcessor(exporter or memory),
-        hasher or LearnerHasher("k"),
-        metadata,
+    traces = otel_traces(
+        "local", sampling_rate, [SimpleSpanProcessor(exporter or memory)], hasher or LearnerHasher("k"), metadata
     )
     try:
         yield traces, memory

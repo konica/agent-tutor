@@ -10,6 +10,9 @@ An example's `history` holds its earlier turns, oldest first: a question alone i
 kept (a generated or hand-written conversation); a question with its answer is kept as written (an injection attack
 that spans turns). Each ask gets the turns before it capped like the API caps them (`history_turns`,
 `history_answer_chars`); only the last ask is scored.
+
+The description target reads the worker's stored description of a document (title, summary, subject suggestions) through
+the API as its owner (#196).
 """
 
 import time
@@ -117,9 +120,13 @@ class EvalLearners:
             self._libraries[username] = [str(d["document_id"]) for d in listed]
         return list(self._libraries[username])
 
+    def get(self, username: str, path: str) -> Any:
+        """A GET through the learner's own session."""
+        return self._tutor(username).call("GET", path)
+
     def check_libraries(self, holdings: Mapping[str, Sequence[str]]) -> None:
         """Raise LoadError unless each learner holds all of their seed documents. Done before the run: inside the
-        target, LangSmith would only log the error and the run would go on to a misleading gate table."""
+        target, the error would only fail that example and the run would go on to a misleading gate table."""
         for username, seed_ids in holdings.items():
             for seed_id in seed_ids:
                 self.document_id(username, seed_id)
@@ -262,6 +269,43 @@ def ask_target() -> AskTarget:
         topic_threshold=topic_threshold(settings.topic_check, classifier),
         topic_timeout_ms=settings.topic_check.timeout_ms,
     )
+
+
+class Readers(Protocol):
+    def document_id(self, username: str, seed_id: str) -> str: ...
+    def get(self, username: str, path: str) -> Any: ...
+
+
+class DescriptionTarget:
+    """The description the worker stored for a seed document (#196), read as the learner who owns it."""
+
+    def __init__(self, learners: Readers) -> None:
+        self._learners = learners
+
+    async def __call__(self, inputs: dict[str, Any]) -> dict[str, Any]:
+        username = inputs["learner"]
+        document_id = self._learners.document_id(username, inputs["document"])
+        details = self._learners.get(username, f"/documents/{document_id}")
+        found = self._learners.get(username, f"/documents/{document_id}/subject-suggestions")
+        return {
+            "document_id": document_id,
+            "title": details.get("title"),
+            "extracted_title": details.get("extracted_title"),
+            "summary": details.get("summary"),
+            "suggestions": [s["name"] for s in found["suggestions"]],
+        }
+
+
+def description_target() -> DescriptionTarget:
+    """The stored descriptions of the eval learners' documents, read through the local stack's API."""
+    seeds = load_manifest()
+    learners = load_learners(LEARNERS, seeds)
+    tutors = {
+        learner.username: Tutor(httpx.Client(timeout=60), learner.username, learner.password) for learner in learners
+    }
+    readers = EvalLearners(tutors, seeds)
+    readers.check_libraries({learner.username: learner.documents for learner in learners})
+    return DescriptionTarget(readers)
 
 
 class Screen(Protocol):

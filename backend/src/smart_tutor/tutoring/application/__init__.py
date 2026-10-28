@@ -8,8 +8,10 @@ from smart_tutor.tutoring.application.answer import (
     answer_messages,
     cited_chunks,
     covers,
+    invented_link,
     new_canary,
     system_prompt,
+    uncited_link,
 )
 from smart_tutor.tutoring.application.conversation_service import ConversationService
 from smart_tutor.tutoring.application.follow_up import search_query
@@ -87,9 +89,11 @@ __all__ = [
     "cited_chunks",
     "covers",
     "history_turn",
+    "invented_link",
     "new_canary",
     "previous_question",
     "search_query",
     "system_prompt",
+    "uncited_link",
     "topic_texts",
 ]

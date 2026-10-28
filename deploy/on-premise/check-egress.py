@@ -4,7 +4,8 @@ every patch window:
     docker compose exec -T worker python - <check-egress.py
 
 The worker must not reach the internet, directly, by DNS, or through the proxy (CONNECT to another host or port, or
-plain HTTP), while S3, SQS, SSM, Bedrock, Phoenix (while tracing), and Postgres work. The AWS calls are read-only and use the instance profile, whose credentials come through the proxy too.
+plain HTTP), while S3, SQS, SSM, Bedrock, Langfuse (while exporting, through the proxy), and Postgres work. The AWS calls are read-only and use
+the instance profile, whose credentials come through the proxy too.
 Exit 0: as expected. Exit 2: blocked, but a needed destination is unreachable. Exit 1, or a crash: treat as a leak.
 """
 
@@ -19,6 +20,7 @@ import urllib.request
 ARBITRARY_HOST = "example.com"
 ARBITRARY_IP = "1.1.1.1"
 TIMEOUT = 10
+LANGFUSE_TIMEOUT = 20
 
 
 def _connects(host: str, port: int) -> bool:
@@ -37,14 +39,14 @@ def _resolves(name: str) -> bool:
     return True
 
 
-def _proxy() -> http.client.HTTPConnection:
+def _proxy(timeout: float = TIMEOUT) -> http.client.HTTPConnection:
     proxy = urllib.parse.urlsplit(os.environ["HTTPS_PROXY"])
-    return http.client.HTTPConnection(proxy.hostname, proxy.port or 3128, timeout=TIMEOUT)
+    return http.client.HTTPConnection(proxy.hostname, proxy.port or 3128, timeout=timeout)
 
 
-def _tunnel_status(host: str, port: int = 443) -> int:
+def _tunnel_status(host: str, port: int = 443, timeout: float = TIMEOUT) -> int:
     """The proxy's answer to CONNECT host:port (200 when it opens the tunnel, 403 when it refuses)."""
-    conn = _proxy()
+    conn = _proxy(timeout)
     try:
         conn.request("CONNECT", f"{host}:{port}", headers={"Host": f"{host}:{port}"})
         return conn.getresponse().status
@@ -79,7 +81,6 @@ def leaks() -> list[str]:
         problems.append(f"the proxy answered {status} to GET {url}, not 403")
     tunnels = [(host, 443) for host in (ARBITRARY_HOST, ARBITRARY_IP, f"other-{os.getpid()}.s3.amazonaws.com")]
     tunnels.append((sqs_host, 80))  # an allowed host, but only on 443
-    tunnels.append(("api.smith.langchain.com", 443))  # LangSmith left the allowlist (ADR 0017)
     for host, port in tunnels:
         status = _tunnel_status(host, port)
         if status != 403:
@@ -110,9 +111,12 @@ def _aws_problems(region: str) -> list[str]:
     return problems
 
 
-def _tracing() -> bool:
-    """The worker traces when it has a Phoenix URL and its key (deploy.sh leaves the key empty without the secret)."""
-    return bool(os.environ.get("SMART_TUTOR_PHOENIX_URL")) and bool(os.environ.get("SMART_TUTOR_PHOENIX_API_KEY"))
+def _langfuse() -> bool:
+    """The worker exports to Langfuse when it has the URL and both keys (deploy.sh leaves the keys empty without them)."""
+    return all(
+        os.environ.get(name)
+        for name in ("SMART_TUTOR_LANGFUSE_URL", "SMART_TUTOR_LANGFUSE_PUBLIC_KEY", "SMART_TUTOR_LANGFUSE_SECRET_KEY")
+    )
 
 
 def unreachable() -> list[str]:
@@ -126,16 +130,24 @@ def unreachable() -> list[str]:
         pass
     except OSError as error:
         problems.append(f"Bedrock: {error}")
-    # Phoenix (the ingest traces), on the worker's internal network: any HTTP answer proves the route.
-    if _tracing():
-        url = os.environ["SMART_TUTOR_PHOENIX_URL"].rstrip("/") + "/healthz"
-        direct = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    # Langfuse, through the proxy (its host is on the allowlist): the tunnel opening proves the route. It is off
+    # 18:00-07:00 (ADR 0022), when Squid answers 502/503; tracing is non-critical (ADR 0023), so that only gets a notice.
+    if _langfuse():
+        parts = urllib.parse.urlsplit(os.environ["SMART_TUTOR_LANGFUSE_URL"])
+        host, port = parts.hostname or "", parts.port or 443  # the exporter connects to the URL's own port
+        target = host if port == 443 else f"{host}:{port}"
+        # Longer than Squid's connect_timeout (10 s), so Squid's own 503 normally wins the race when Langfuse is off.
         try:
-            direct.open(url, timeout=TIMEOUT)
-        except urllib.error.HTTPError:
-            pass
-        except OSError as error:
-            problems.append(f"Phoenix: {error}")
+            status: int | str = _tunnel_status(host, port, LANGFUSE_TIMEOUT)
+        except (OSError, http.client.HTTPException) as error:
+            status = type(error).__name__
+        if status == 403:
+            problems.append(f"Langfuse: the egress proxy refuses {target}")
+        elif status != 200:
+            print(
+                f"Notice: Langfuse at {target} didn't answer through the proxy ({status}); it is off 18:00-07:00",
+                file=sys.stdout,
+            )
     if not _connects("postgres", 5432):
         problems.append("Postgres: postgres:5432 refused or timed out")
     return problems
@@ -151,8 +163,8 @@ def main() -> int:
         return 1
     if missing:
         return 2
-    phoenix = "Phoenix (tracing on), " if _tracing() else ""
-    print(f"The worker reaches S3, SQS, SSM, Bedrock, {phoenix}and Postgres, and nothing else")
+    langfuse = "Langfuse (through the proxy), " if _langfuse() else ""
+    print(f"The worker reaches S3, SQS, SSM, Bedrock, {langfuse}and Postgres, and nothing else")
     return 0
 
 

@@ -1,11 +1,12 @@
-"""Eval datasets: hand-written examples in datasets/, split versions made only by publishing (PRD §10.3 item 6)."""
+"""Eval datasets: hand-written examples in datasets/, split versions made only by publishing, each a Langfuse dataset
+(PRD §10.3 item 6)."""
 
-from datetime import timedelta
+import ast
 from pathlib import Path
 
 import pytest
-from langsmith.utils import LangSmithError, LangSmithNotFoundError
 
+import evals as evals_package
 from evals.corpus import load_manifest
 from evals.dataset import (
     Dataset,
@@ -20,8 +21,9 @@ from evals.dataset import (
     publish_split,
     version_to_run,
 )
+from evals.langfuse_client import Item, LangfuseError
 from evals.learners import LEARNERS, load_learners
-from fakes.langsmith import FakeLangSmith
+from fakes.langfuse import FakeLangfuse
 
 Q1 = Example({"question": "What is ReAct?", "learner": "learner@example.com", "documents": None}, {"covered": True})
 Q2 = Example({"question": "What is CoT?", "learner": "learner@example.com", "documents": None}, {"covered": True})
@@ -88,49 +90,48 @@ def test_pins_are_read_from_the_file(tmp_path: Path) -> None:
     assert load_dataset("z", tmp_path).pins == {"full": "full-v3"}
 
 
-def test_the_first_publish_creates_the_dataset_and_tags_version_1() -> None:
-    client = FakeLangSmith()
+def test_the_first_publish_makes_version_1_as_a_langfuse_dataset_of_its_own() -> None:
+    client = FakeLangfuse()
     assert publish_split(client, ASK, "smoke", [Q1, Q2]) == "smoke-v1"
-    assert newest_version(client, "smart-tutor-ask", "smoke") == "smoke-v1"
-    examples = examples_at(client, ASK, "smoke", "smoke-v1")
-    assert _pairs(examples) == _pairs([Q1, Q2]) and all(e.split == "smoke" for e in examples)
+    assert list(client.datasets) == ["smart-tutor-ask/smoke-v1"]
+    assert client.datasets["smart-tutor-ask/smoke-v1"].metadata == {"split": "smoke", "examples": 2}
+    assert newest_version(client, ASK, "smoke") == "smoke-v1"
+    assert _pairs(examples_at(client, ASK, "smoke-v1")) == _pairs([Q1, Q2])
 
 
 def test_publishing_the_same_examples_again_makes_no_version() -> None:
-    client = FakeLangSmith()
+    client = FakeLangfuse()
     publish_split(client, ASK, "smoke", [Q1, Q2])
     assert publish_split(client, ASK, "smoke", [Q2, Q1]) is None
-    assert client.created == 1
+    assert list(client.datasets) == ["smart-tutor-ask/smoke-v1"]
 
 
-def test_a_changed_split_gets_the_next_version_and_the_old_tag_keeps_its_examples() -> None:
-    client = FakeLangSmith()
+def test_a_changed_split_gets_the_next_version_and_the_old_one_keeps_its_examples() -> None:
+    client = FakeLangfuse()
     publish_split(client, ASK, "smoke", [Q1, Q2])
     assert publish_split(client, ASK, "smoke", [Q1, Q2, Q3]) == "smoke-v2"
-    assert _pairs(examples_at(client, ASK, "smoke", "smoke-v1")) == _pairs([Q1, Q2])
-    assert _pairs(examples_at(client, ASK, "smoke", "smoke-v2")) == _pairs([Q1, Q2, Q3])
+    assert _pairs(examples_at(client, ASK, "smoke-v1")) == _pairs([Q1, Q2])
+    assert _pairs(examples_at(client, ASK, "smoke-v2")) == _pairs([Q1, Q2, Q3])
 
 
 def test_splits_are_versioned_apart() -> None:
-    client = FakeLangSmith()
+    client = FakeLangfuse()
     publish_split(client, ASK, "smoke", [Q1])
     assert publish_split(client, ASK, "full", [Q1, Q2]) == "full-v1"
     assert publish_split(client, ASK, "smoke", [Q1, Q3]) == "smoke-v2"
-    assert _pairs(examples_at(client, ASK, "full", "full-v1")) == _pairs([Q1, Q2])
+    assert _pairs(examples_at(client, ASK, "full-v1")) == _pairs([Q1, Q2])
 
 
-def test_example_metadata_is_published() -> None:
-    client = FakeLangSmith()
+def test_example_metadata_is_published_and_read_back() -> None:
+    client = FakeLangfuse()
     typed = Example(Q3.inputs, Q3.outputs, {"type": "unanswerable"})
     publish_split(client, ASK, "full", [typed])
-    assert [e.metadata for e in examples_at(client, ASK, "full", "full-v1")] == [
-        {"type": "unanswerable", "dataset_split": ["full"]}
-    ]
+    assert [e.metadata for e in examples_at(client, ASK, "full-v1")] == [{"type": "unanswerable"}]
 
 
 def test_the_newest_examples_of_a_split_come_back_with_their_own_metadata() -> None:
-    client = FakeLangSmith()
-    assert newest_examples(client, ASK, "full") == []  # no dataset yet
+    client = FakeLangfuse()
+    assert newest_examples(client, ASK, "full") == []  # nothing published yet
     typed = Example(Q3.inputs, Q3.outputs, {"type": "unanswerable", "candidate_run": "r1"})
     publish_split(client, ASK, "smoke", [Q1])
     assert newest_examples(client, ASK, "full") == []  # no full version yet
@@ -140,47 +141,86 @@ def test_the_newest_examples_of_a_split_come_back_with_their_own_metadata() -> N
 
 
 def test_the_runner_uses_the_newest_version_unless_one_is_pinned() -> None:
-    client = FakeLangSmith()
+    client = FakeLangfuse()
     publish_split(client, ASK, "smoke", [Q1])
     publish_split(client, ASK, "smoke", [Q1, Q2])
     assert version_to_run(client, ASK, "smoke") == "smoke-v2"
     pinned = Dataset("ask", "smart-tutor-ask", "", ASK.examples, {"smoke": "smoke-v1"})
     assert version_to_run(client, pinned, "smoke") == "smoke-v1"
+    assert _pairs(examples_at(client, pinned, "smoke-v1")) == _pairs([Q1])
 
 
 def test_a_split_or_dataset_never_published_has_no_version_to_run() -> None:
-    client = FakeLangSmith()
+    client = FakeLangfuse()
     assert version_to_run(client, ASK, "smoke") is None
     publish_split(client, ASK, "smoke", [Q1])
     assert version_to_run(client, ASK, "full") is None
 
 
 def test_a_pin_to_a_missing_version_stops_the_run() -> None:
-    client = FakeLangSmith()
+    client = FakeLangfuse()
     publish_split(client, ASK, "smoke", [Q1])
     pinned = Dataset("ask", "smart-tutor-ask", "", ASK.examples, {"smoke": "smoke-v7"})
     with pytest.raises(DatasetError, match="smoke-v7"):
         version_to_run(client, pinned, "smoke")
+    with pytest.raises(DatasetError, match="smoke-v7"):
+        examples_at(client, pinned, "smoke-v7")
 
 
-def test_the_fake_refuses_what_langsmith_refuses() -> None:
-    # publish_split's tagging relies on these: a tag needs an exact version time, and an unknown tag is not found
-    client = FakeLangSmith()
+def _stopped_part_way(client: FakeLangfuse, tag: str, *examples: Example) -> None:
+    """A publish that created the version's dataset and then failed after some of its items."""
+    name = f"smart-tutor-ask/{tag}"
+    client.create_dataset(name, description="", metadata={"split": tag.split("-")[0], "examples": len(examples) + 1})
+    for e in examples:
+        client.create_item(name, Item(e.inputs, e.outputs, e.metadata))
+
+
+def test_an_incomplete_version_is_never_the_newest_and_its_number_is_not_reused() -> None:
+    client = FakeLangfuse()
     publish_split(client, ASK, "smoke", [Q1])
-    as_of = client.datasets["smart-tutor-ask"].tags["smoke-v1"]
-    with pytest.raises(LangSmithError, match="not an exact version"):
-        client.update_dataset_tag(dataset_name="smart-tutor-ask", as_of=as_of + timedelta(microseconds=1), tag="x")
-    with pytest.raises(LangSmithNotFoundError):
-        list(client.list_examples(dataset_name="smart-tutor-ask", splits=["smoke"], as_of="smoke-v2"))
+    _stopped_part_way(client, "smoke-v2", Q1)
+    assert newest_version(client, ASK, "smoke") == "smoke-v1"
+    assert _pairs(newest_examples(client, ASK, "smoke")) == _pairs([Q1])
+    assert publish_split(client, ASK, "smoke", [Q1]) is None  # equal to the newest complete version
+    assert publish_split(client, ASK, "smoke", [Q1, Q2]) == "smoke-v3"
+    pinned = Dataset("ask", "smart-tutor-ask", "", ASK.examples, {"smoke": "smoke-v2"})
+    with pytest.raises(DatasetError, match="smoke-v2 is incomplete"):
+        version_to_run(client, pinned, "smoke")
 
 
-def test_tags_of_other_shapes_are_not_versions() -> None:
-    client = FakeLangSmith()
+def test_datasets_of_other_shapes_or_folders_are_not_versions() -> None:
+    client = FakeLangfuse()
     publish_split(client, ASK, "smoke", [Q1])
-    as_of = client.datasets["smart-tutor-ask"].tags["smoke-v1"]
-    client.update_dataset_tag(dataset_name="smart-tutor-ask", as_of=as_of, tag="smoke-v10-draft")
-    client.update_dataset_tag(dataset_name="smart-tutor-ask", as_of=as_of, tag="smokey-v99")
-    assert newest_version(client, "smart-tutor-ask", "smoke") == "smoke-v1"
+    for name in ("smart-tutor-ask/smoke-v10-draft", "smart-tutor-ask/smokey-v99", "smart-tutor-asked/smoke-v9"):
+        client.create_dataset(name, description="", metadata={"examples": 0})
+    assert newest_version(client, ASK, "smoke") == "smoke-v1"
+    assert publish_split(client, ASK, "smoke", [Q2]) == "smoke-v2"
+
+
+def _imported(path: Path) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    found = {a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
+    return {name.split(".")[0] for name in found} | {
+        n.module.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module
+    }
+
+
+def test_no_eval_module_imports_langsmith_and_only_the_seam_imports_the_langfuse_sdk() -> None:
+    evals = Path(evals_package.__file__).parent
+    modules = list(evals.rglob("*.py"))
+    # datasets, the review queue, the runner, and the evaluators are all on Langfuse (#317, #319, #320)
+    assert {p.relative_to(evals).as_posix() for p in modules if "langsmith" in _imported(p)} == set()
+    assert {p.relative_to(evals).as_posix() for p in modules if "langfuse" in _imported(p)} == {"langfuse_client.py"}
+
+
+def test_the_fake_refuses_to_overwrite_a_dataset_or_fill_a_missing_one() -> None:
+    # publishing relies on never writing into a version that exists
+    client = FakeLangfuse()
+    publish_split(client, ASK, "smoke", [Q1])
+    with pytest.raises(LangfuseError, match="exists"):
+        client.create_dataset("smart-tutor-ask/smoke-v1", description="", metadata={})
+    with pytest.raises(LangfuseError, match="no dataset"):
+        client.create_item("smart-tutor-ask/smoke-v9", Item({}, {}))
 
 
 KINDS = {

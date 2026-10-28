@@ -543,8 +543,8 @@ def test_native_cloud_release_waits_with_the_legacy_strategy() -> None:
 
 def test_native_cloud_stack_outputs_fail_loudly_when_missing() -> None:
     run = str(step(native_cloud_job(), "Read the stack outputs")["run"])
-    assert run.count("!= None") == 9  # six outputs, the sampling rate, and the three question-screen parameters
-    assert run.count("::error::") == 9
+    assert run.count("!= None") == 8  # five outputs and the three question-screen parameters
+    assert run.count("::error::") == 8
 
 
 def test_native_cloud_release_is_followed_by_an_in_cluster_service_check() -> None:
@@ -712,13 +712,6 @@ def test_on_premise_runbook_tears_down_the_whole_mode_without_naming_native_clou
     assert "native-cloud keeps running" in text.split("## 8. Tear down")[1].split("###")[0]
 
 
-def test_native_cloud_release_passes_the_trace_sampling_rate_from_ssm() -> None:
-    text = steps_text(native_cloud_job())
-    assert "/smart-tutor/trace-sampling-rate" in text
-    release = step(native_cloud_job(), "Release the app (Helm)")["run"]
-    assert '--set-string global.langsmith.samplingRate="$TRACE_SAMPLING_RATE"' in release
-
-
 def test_native_cloud_release_passes_the_question_screen_settings_from_ssm() -> None:
     text = steps_text(native_cloud_job())
     for name in ("question-guard", "question-guardrail-id", "question-guardrail-version"):
@@ -827,14 +820,64 @@ def test_smoke_evals_skip_script_decides_correctly(tmp_path: Path) -> None:
         )
         return out.read_text() + summary.read_text(), result.stdout
 
-    files, stdout = run(HEAD_REPO="someone/agent-tutor", REPO="konica/agent-tutor", HAS_ROLE="false", HAS_KEY="false")
+    repo = {"REPO": "konica/agent-tutor"}
+    files, stdout = run(HEAD_REPO="someone/agent-tutor", **repo, HAS_ROLE="false", HAS_KEYS="false", HAS_URL="false")
     assert "run=false" in files and "fork" in files and "::notice" in stdout
-    files, stdout = run(HEAD_REPO="konica/agent-tutor", REPO="konica/agent-tutor", HAS_ROLE="false", HAS_KEY="true")
+    files, stdout = run(HEAD_REPO="konica/agent-tutor", **repo, HAS_ROLE="false", HAS_KEYS="true", HAS_URL="true")
     assert "run=false" in files and "EVALS_AWS_ROLE_ARN" in files and "::warning" in stdout
-    files, stdout = run(HEAD_REPO="konica/agent-tutor", REPO="konica/agent-tutor", HAS_ROLE="true", HAS_KEY="false")
-    assert "run=false" in files and "LANGSMITH_API_KEY" in files
-    files, _ = run(HEAD_REPO="", REPO="konica/agent-tutor", HAS_ROLE="true", HAS_KEY="true")  # workflow_dispatch
+    files, stdout = run(HEAD_REPO="konica/agent-tutor", **repo, HAS_ROLE="true", HAS_KEYS="false", HAS_URL="true")
+    assert "run=false" in files and "LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY" in files
+    files, stdout = run(HEAD_REPO="konica/agent-tutor", **repo, HAS_ROLE="true", HAS_KEYS="true", HAS_URL="false")
+    assert "run=false" in files and "LANGFUSE_BASE_URL" in files
+    files, _ = run(HEAD_REPO="", **repo, HAS_ROLE="true", HAS_KEYS="true", HAS_URL="true")  # workflow_dispatch
     assert "run=true" in files
+
+
+def test_smoke_evals_check_langfuse_first_with_the_secrets_and_the_variable() -> None:
+    job = evals_job()
+    access = step(job, "Check access to the eval secrets")["env"]
+    assert access["HAS_KEYS"] == "${{ secrets.LANGFUSE_PUBLIC_KEY != '' && secrets.LANGFUSE_SECRET_KEY != '' }}"
+    assert access["HAS_URL"] == "${{ vars.LANGFUSE_BASE_URL != '' }}"
+    health = step(job, "Check that Langfuse is up")
+    assert health["env"] == {"LANGFUSE_BASE_URL": "${{ vars.LANGFUSE_BASE_URL }}"}
+    # right after the access check: before any build, sign-in, or Bedrock call (ADR 0023 §4)
+    assert job["steps"].index(health) == job["steps"].index(step(job, "Check access to the eval secrets")) + 1
+    assert job["steps"].index(health) < index_of(job, "setup-uv")
+
+
+def test_smoke_evals_fail_with_the_night_message_when_langfuse_is_off(tmp_path: Path) -> None:
+    bash = shutil.which("bash")
+    if bash is None:
+        pytest.skip("bash is not installed")
+    script = step(evals_job(), "Check that Langfuse is up")["run"]
+    stubs = tmp_path / "bin"
+    stubs.mkdir()
+    (stubs / "sleep").write_text("#!/bin/sh\nexit 0\n", newline="\n")
+
+    def run(curl_exit: int) -> tuple[int, str, str, str]:
+        calls, summary = tmp_path / "calls", tmp_path / "summary"
+        calls.write_text(""), summary.write_text("")
+        (stubs / "curl").write_text(f'#!/bin/sh\necho "$@" >> "{calls.as_posix()}"\nexit {curl_exit}\n', newline="\n")
+        for stub in stubs.iterdir():
+            stub.chmod(0o755)
+        result = subprocess.run(
+            [bash, "-c", script],
+            env={
+                "PATH": f"{stubs}{os.pathsep}{os.environ['PATH']}",
+                "GITHUB_STEP_SUMMARY": str(summary),
+                "LANGFUSE_BASE_URL": "https://langfuse.example/",
+            },
+            capture_output=True, encoding="utf-8", check=False,
+        )
+        return result.returncode, result.stdout, summary.read_text(encoding="utf-8"), calls.read_text()
+
+    code, stdout, summary, calls = run(curl_exit=7)
+    night = "Langfuse is off 18:00–07:00 Asia/Ho_Chi_Minh: re-run this job after 07:00, or start the host"
+    assert code == 1 and "::error" in stdout and night in stdout and night in summary
+    assert "docs/runbooks/langfuse-host.md" in summary
+    assert calls.count("https://langfuse.example/api/public/health") == 3  # retried, then failed within a minute
+    code, _, summary, calls = run(curl_exit=0)
+    assert code == 0 and summary == "" and calls.count("/api/public/health") == 1
 
 
 def test_smoke_evals_load_the_learners_then_gate_into_the_summary() -> None:
@@ -844,8 +887,14 @@ def test_smoke_evals_load_the_learners_then_gate_into_the_summary() -> None:
     gate = step(job, "Run the smoke split")
     assert index_of(job, "evals.learners") < job["steps"].index(gate)
     assert "--split smoke" in gate["run"] and '--summary "$GITHUB_STEP_SUMMARY"' in gate["run"]
-    assert gate["env"]["LANGSMITH_API_KEY"] == "${{ secrets.LANGSMITH_API_KEY }}"
-    assert "smart-tutor-ci" in step(job, "Prepare .env")["run"]
+    assert "--environment ci" in gate["run"]
+    assert gate["env"] == {
+        "LANGFUSE_PUBLIC_KEY": "${{ secrets.LANGFUSE_PUBLIC_KEY }}",
+        "LANGFUSE_SECRET_KEY": "${{ secrets.LANGFUSE_SECRET_KEY }}",
+        "LANGFUSE_BASE_URL": "${{ vars.LANGFUSE_BASE_URL }}",
+    }
+    # the .env file's empty developer keys must not stand in for the secrets
+    assert "-e '^LANGFUSE_'" in step(job, "Prepare .env")["run"]
     for s in job["steps"]:
         assert "${{" not in str(s.get("run", "")), s.get("name")
 
@@ -854,25 +903,18 @@ def test_ci_compose_override_passes_the_oidc_session_not_a_profile() -> None:
     override = yaml.safe_load((WORKFLOWS.parents[1] / "compose.ci.yaml").read_text(encoding="utf-8"))
     for service in ("api", "agent", "mcp", "worker"):
         env = override["services"][service]["environment"]
-        assert {"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "LANGSMITH_API_KEY"} <= set(env), service
-    assert "grep -v '^AWS_PROFILE='" in step(evals_job(), "Prepare .env")["run"]  # removed, so botocore uses the session
+        assert {"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"} <= set(env), service
+    assert "-e '^AWS_PROFILE='" in step(evals_job(), "Prepare .env")["run"]  # removed, so botocore uses the session
 
 
 def local_compose() -> dict[str, Any]:
     return yaml.safe_load((WORKFLOWS.parents[1] / "compose.yaml").read_text(encoding="utf-8"))
 
 
-@pytest.mark.parametrize("service", ["agent", "worker"])
-def test_app_services_trace_into_the_compose_phoenix_and_not_langsmith(service: str) -> None:
-    env = local_compose()["services"][service]["environment"]
-    assert env["SMART_TUTOR_PHOENIX_URL"] == "http://phoenix:6006"
-    assert env["LANGSMITH_TRACING"] == "false"  # an old .env must not trace into LangSmith
-
-
-def test_ci_app_services_run_untraced() -> None:  # CI starts no Phoenix; .env.example points at localhost:10404
+def test_ci_app_services_do_not_trace_into_langfuse() -> None:  # the eval runner's experiments are CI's record (#320)
     override = yaml.safe_load((WORKFLOWS.parents[1] / "compose.ci.yaml").read_text(encoding="utf-8"))
     for service in ("api", "agent", "mcp", "worker"):
-        assert "SMART_TUTOR_PHOENIX_URL=" in override["services"][service]["environment"], service
+        assert "SMART_TUTOR_LANGFUSE_URL=" in override["services"][service]["environment"], service
 
 
 def test_smoke_evals_logs_cover_cancelled_runs_and_every_service() -> None:

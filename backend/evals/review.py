@@ -1,33 +1,29 @@
-"""The human review gate before an item enters a dataset (PRD §10.3 item 6).
+"""The human review gate before an item enters a dataset (PRD §10.3 item 6), in Langfuse (ADR 0023 §5).
 
-Generated candidates become runs in the dataset's candidates project (`<dataset>-candidates`) and are added to the
-annotation queue of the same name. The queue's rubric asks the reviewer for `accepted`: 1 to accept, 0 to reject. Only
-candidates whose latest `accepted` feedback is 1 come back as examples, for evals.publish to add to the next versions;
-the other runs that still exist come back as withdrawn, so publishing drops an example a reviewer no longer accepts.
+Generated candidates become traces named `<dataset>-candidates` in the `smart-tutor-evals` project (each a root span
+sent over OpenTelemetry, since Langfuse v4 has no trace-create endpoint; evals.langfuse_client) and are added to the
+annotation queue of the same name. The queue's description is the dataset's rubric, and its score config `accepted`
+(BOOLEAN) asks the reviewer to accept (True) or reject (False). Only candidates whose latest `accepted` score is True
+come back as examples, for evals.publish to add to the next versions; the other candidate traces come back as
+withdrawn, so publishing drops an example a reviewer no longer accepts.
 """
 
-import time
 import uuid
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-import langsmith
-from langsmith.schemas import RunKey
-from langsmith.utils import LangSmithNotFoundError
-
 from evals.dataset import Dataset, Example
+from evals.langfuse_client import LangfuseClient, Score, Trace
 
 ACCEPTED = "accepted"
-FEEDBACK_BATCH = 100  # run ids per list_feedback call
-QUEUE_BATCH = 100  # runs per add to an annotation queue: LangSmith's limit
-QUEUE_WAITS = (2, 4, 8, 15, 15, 15, 15, 15, 15, 15)  # seconds between tries of a queue add, about two minutes in all
+ENVIRONMENT = "local"  # make evals-generate runs on a developer's machine (ADR 0023 §5)
 RUBRIC = """\
-Each item is a question proposed for the eval dataset, with the passages it was written from (outputs.evidence) and
-the expected behavior (outputs.expected: covered = the learner's library answers it; not covered = the tutor must
-decline). Accept (1) only when the question is clear, a learner could ask it, the evidence supports the expected
-behavior, and for a covered question the passages answer it. Reject (0) anything you would need to edit; the next
+Each item is a question proposed for the eval dataset, with the passages it was written from (output.evidence) and
+the expected behavior (output.expected: covered = the learner's library answers it; not covered = the tutor must
+decline). Accept (True) only when the question is clear, a learner could ask it, the evidence supports the expected
+behavior, and for a covered question the passages answer it. Reject (False) anything you would need to edit; the next
 generation run proposes more.
 """
 
@@ -44,123 +40,82 @@ def candidates_name(dataset: Dataset) -> str:
     return f"{dataset.name}-candidates"
 
 
-def ensure_queue(client: langsmith.Client, dataset: Dataset, rubric: str = RUBRIC) -> uuid.UUID:
-    """The dataset's annotation queue, created with its `accepted` rubric item on first use; `rubric` tells the
+def ensure_queue(client: LangfuseClient, dataset: Dataset, rubric: str = RUBRIC) -> str:
+    """The dataset's annotation queue, created with the `accepted` score config on first use; `rubric` tells the
     reviewer what to accept (the ask rubric by default)."""
     name = candidates_name(dataset)
-    for queue in client.list_annotation_queues(name=name):
-        return queue.id
-    if not list(client.list_feedback_configs(feedback_key=[ACCEPTED])):
-        client.create_feedback_config(ACCEPTED, feedback_config={"type": "continuous", "min": 0, "max": 1})
-    queue = client.create_annotation_queue(
-        name=name,
-        description=f"Generated candidates for the {dataset.name} dataset (backend/evals, make evals-generate)",
-        rubric_instructions=rubric,
-        rubric_items=[
-            {
-                "feedback_key": ACCEPTED,
-                "description": "1 = accept into the dataset, 0 = reject",
-                "score_descriptions": {"0": "Reject", "1": "Accept"},
-                "is_required": True,
-            }
-        ],
+    if (queue_id := client.queue_id(name)) is not None:
+        return queue_id
+    config_id = client.score_config_id(ACCEPTED) or client.create_boolean_score_config(
+        ACCEPTED, description="True = accept the candidate into its dataset, False = reject it"
     )
-    return queue.id
+    description = f"Generated candidates for the {dataset.name} dataset (make evals-generate).\n\n{rubric}"
+    return client.create_queue(name, description=description, score_config_id=config_id)
 
 
-def _project_id(client: langsmith.Client, dataset: Dataset) -> uuid.UUID:
-    """The candidates project's id, created on first use: each queue entry names its run's project."""
-    name = candidates_name(dataset)
-    if client.has_project(name):
-        return client.read_project(project_name=name).id
-    description = f"Generated candidates for the {dataset.name} dataset, reviewed in the annotation queue of this name"
-    return client.create_project(name, description=description).id
-
-
-def _queue(
-    client: langsmith.Client, queue_id: uuid.UUID, runs: Sequence[RunKey], sleep: Callable[[float], None]
-) -> None:
-    """Add `runs` to the queue, retrying while LangSmith hasn't ingested them yet (it answers "not found")."""
-    for wait in (*QUEUE_WAITS, None):
-        try:
-            client.add_runs_to_annotation_queue(queue_id, runs=runs)
-            return
-        except LangSmithNotFoundError:
-            if wait is None:
-                raise
-            sleep(wait)
+def _iso(at: datetime) -> str:
+    return at.astimezone(UTC).isoformat(timespec="microseconds")
 
 
 def submit(
-    client: langsmith.Client,
+    client: LangfuseClient,
     dataset: Dataset,
     candidates: Sequence[Candidate],
     metadata: Mapping[str, str],
     *,
     rubric: str = RUBRIC,
-    sleep: Callable[[float], None] = time.sleep,
-) -> list[uuid.UUID]:
-    """Record each candidate as a run in the candidates project and add them all to the queue."""
+) -> list[str]:
+    """Record each candidate as a trace and add them all to the dataset's queue; returns the trace ids."""
     queue_id = ensure_queue(client, dataset, rubric)
-    project_id = _project_id(client, dataset)
-    ids: list[uuid.UUID] = []
-    keys: list[RunKey] = []
     start = datetime.now(UTC)
+    traces: list[Trace] = []
     for i, candidate in enumerate(candidates):
-        # strictly increasing start times keep "oldest first" (publish's smoke order) well defined within a batch
-        run_id, now = uuid.uuid4(), start + timedelta(microseconds=i)
-        client.create_run(
-            f"{dataset.key}-candidate",
-            candidate.inputs,
-            "chain",
-            project_name=candidates_name(dataset),
-            id=run_id,
-            outputs={"expected": candidate.expected, "type": candidate.type, "evidence": list(candidate.evidence)},
-            start_time=now,
-            end_time=now,
-            extra={"metadata": {"dataset": dataset.name, "type": candidate.type, **metadata}},
+        # strictly increasing times (Langfuse keeps milliseconds) keep "oldest first", publish's smoke order, well
+        # defined within a batch
+        at = start + timedelta(milliseconds=i)
+        traces.append(
+            Trace(
+                uuid.uuid4().hex,
+                candidates_name(dataset),
+                dict(candidate.inputs),
+                {"expected": candidate.expected, "type": candidate.type, "evidence": list(candidate.evidence)},
+                {"dataset": dataset.name, "type": candidate.type, "generated_at": _iso(at), **metadata},
+                at,
+                ENVIRONMENT,
+            )
         )
-        ids.append(run_id)
-        keys.append({"run_id": run_id, "session_id": project_id, "start_time": now})
-    client.flush()  # runs are sent in the background: they must exist before the queue can hold them
-    for first in range(0, len(keys), QUEUE_BATCH):
-        _queue(client, queue_id, keys[first : first + QUEUE_BATCH], sleep)
-    return ids
+    client.create_traces(traces)
+    for trace in traces:
+        client.queue_trace(queue_id, trace.id)
+    return [trace.id for trace in traces]
 
 
 @dataclass(frozen=True)
 class Reviewed:
-    accepted: list[Example]  # candidates whose latest `accepted` feedback is 1, oldest first
-    withdrawn: set[str]  # ids of the other candidate runs that still exist: none of them may stay published
+    accepted: list[Example]  # candidates whose latest `accepted` score is True, oldest first
+    withdrawn: set[str]  # trace ids of the other candidates that still exist: none of them may stay published
 
 
-def _generated_at(start: datetime) -> str:
-    """A run's start time as UTC ISO 8601 (LangSmith may return it without a zone), sortable as text."""
-    utc = start.replace(tzinfo=UTC) if start.tzinfo is None else start.astimezone(UTC)
-    return utc.isoformat(timespec="microseconds")
+def _generated_at(trace: Trace) -> str:
+    """When a candidate was generated, as UTC ISO 8601 with microseconds, sortable as text."""
+    return str(trace.metadata.get("generated_at") or _iso(trace.timestamp))
 
 
-def reviewed(client: langsmith.Client, dataset: Dataset) -> Reviewed:
-    """The review state of the candidate runs that still exist (runs expire with the project's trace retention)."""
-    try:
-        runs = list(client.list_runs(project_name=candidates_name(dataset), is_root=True))
-    except LangSmithNotFoundError:
-        return Reviewed([], set())  # nothing generated yet
-    runs.sort(key=lambda r: _generated_at(r.start_time))
-    latest: dict[uuid.UUID, Any] = {}
-    for start in range(0, len(runs), FEEDBACK_BATCH):
-        batch = [r.id for r in runs[start : start + FEEDBACK_BATCH]]
-        for feedback in client.list_feedback(run_ids=batch, feedback_key=[ACCEPTED]):
-            seen = latest.get(feedback.run_id)
-            if seen is None or feedback.modified_at > seen.modified_at:
-                latest[feedback.run_id] = feedback
-    accepted = [run for run in runs if run.id in latest and latest[run.id].score == 1]
+def reviewed(client: LangfuseClient, dataset: Dataset) -> Reviewed:
+    """The review state of the dataset's candidate traces that still exist (one deleted by hand is neither)."""
+    traces = sorted(client.traces(candidates_name(dataset)), key=lambda t: (_generated_at(t), t.id))
+    latest: dict[str, Score] = {}
+    for score in client.boolean_scores(ACCEPTED):
+        seen = latest.get(score.trace_id)
+        if seen is None or score.updated_at >= seen.updated_at:
+            latest[score.trace_id] = score
+    accepted = [t for t in traces if t.id in latest and latest[t.id].value == 1]
     examples = [
         Example(
-            dict(run.inputs),
-            dict(run.outputs["expected"]),
-            {"type": run.outputs["type"], "candidate_run": str(run.id), "generated_at": _generated_at(run.start_time)},
+            dict(trace.input),
+            dict(trace.output["expected"]),
+            {"type": trace.output["type"], "candidate_run": trace.id, "generated_at": _generated_at(trace)},
         )
-        for run in accepted
+        for trace in accepted
     ]
-    return Reviewed(examples, {str(run.id) for run in runs} - {str(run.id) for run in accepted})
+    return Reviewed(examples, {t.id for t in traces} - {t.id for t in accepted})

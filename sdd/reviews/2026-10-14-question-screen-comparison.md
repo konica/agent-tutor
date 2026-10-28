@@ -15,7 +15,7 @@ No. DetectJailbreak is not eligible in either mode:
 - Its p95 run time on 2 CPUs is 424–789 ms, over the 300 ms target.
 - It needs about 2 GiB of agent memory, against the agent's 512 MiB today.
 
-`question_guard` stays `off` in both modes. If a mode turns a screen on later, it is `bedrock` at LOW. Bedrock LOW wins on false positives, on catch rate at 1% false positives or fewer, on image size, and on memory. Latency is comparable: the local p50 is lower, and both miss the 300 ms p95 target. The local screen wins on the per-call fee and keeps the question in process. Bedrock LOW still misses the latency target (ADR 0019), so it stays off too.
+`question_guard` stays `bedrock` at LOW in both modes, where the product owner put it on 2026-10-14 (ADR 0019, "Update"), and the local screen does not replace it. Bedrock LOW wins on false positives, on catch rate at 1% false positives or fewer, on image size, and on memory. Latency is comparable: the local p50 is lower, and both miss the 300 ms p95 target. The local screen wins on the per-call fee and keeps the question in process. The product accepts Bedrock's latency miss for its 0% false positives; the local screen would bring the same miss without that accuracy.
 
 ## What was built
 
@@ -98,7 +98,7 @@ At 0.78 the 20 false positives also hit ML safety, computer security (botnets), 
 
 - An agent-like probe imports the agent server, builds the guard as the lifespan does, and screens 20 questions. The plain `agent` image with `question_guard=off` peaks at 193 MiB RSS in the process and 238 MiB in the container. `agent-jailbreak` with `guardrails_ai` peaks at 1,842 MiB RSS in the process, about +1.6 GiB (193 → 1,842 MiB). The measurement CLI's process peaks at 1,956–2,038 MiB.
 - The weights are memory-mapped safetensors (file-backed). Under the agent's 512 MiB compose limit the probe still ran (166 ms mean on the dev machine's NVMe), with the container pinned at exactly 512 MiB, by evicting and re-reading model pages. That leaves no room for the agent's own work, and on the t3.large's EBS volume every re-read costs disk I/O. A safe limit is about 2 GiB.
-- On-premise compose limits sum to about 5.8 GB of the t3.large's 8 GB (phoenix 1g, keycloak 1536m, api, agent, and mcp 512m each, worker 1536m, web 128m, egress-proxy 128m). Raising the agent to 2 GiB leaves about 0.7 GB for the OS and Docker. That is arithmetic from the limits and the RSS measured in the dev container, not a measurement on the host.
+- On-premise compose limits sum to about 5.8 GB of the t3.large's 8 GB (phoenix 1g, keycloak 1536m, api, agent, and mcp 512m each, worker 1536m, web 128m, egress-proxy 128m). Raising the agent to 2 GiB leaves about 0.7 GB for the OS and Docker. That is arithmetic from the limits and the RSS measured in the dev container, not a measurement on the host. Since then Phoenix has left the on-premise compose (#322): the limits sum to about 4.75 GB, so a 2 GiB agent would leave about 1.7 GB.
 - `docker image ls`: `agent` 1.12 GB, `agent-jailbreak` 5.36 GB. Unpacked layers (`docker history`): `agent` about 0.86 GB (venv 729 MB), `agent-jailbreak` about 3.45 GB (venv 1.79 GB, of which 1.06 GB is torch and transformers; models 1.53 GB).
 
 ### Cost per turn
@@ -112,14 +112,14 @@ A screen is eligible when false positives are at most 1% and the p95 added laten
 
 | Mode | `question_guard` | Why |
 |---|---|---|
-| On-premise | `off` | DetectJailbreak fails all three limits: at 0.81 it trips 1.1% and catches 1 of 18; at 0.85 and above it catches nothing; its p95 is over 300 ms; and 2 GiB for the agent leaves about 0.7 GB on the host (by arithmetic from the compose limits and the RSS measured in a 2-CPU, 8 GB dev container, not on the t3.large). Bedrock LOW passes false positives and cost but misses latency (ADR 0019). |
-| Native-cloud | `off` | Memory is easier on EKS, but accuracy and latency fail the same way. Bedrock LOW misses latency here too. |
+| On-premise | `bedrock` (unchanged) | DetectJailbreak fails all three limits: at 0.81 it trips 1.1% and catches 1 of 18; at 0.85 and above it catches nothing; its p95 is over 300 ms; and 2 GiB for the agent left about 0.7 GB on the host (about 1.7 GB since Phoenix left compose; by arithmetic from the compose limits and the RSS measured in a 2-CPU, 8 GB dev container, not on the t3.large). Bedrock LOW passes false positives and cost and misses latency, which the product accepts (ADR 0019, "Update"). |
+| Native-cloud | `bedrock` (unchanged) | Memory is easier on EKS, but accuracy and latency fail the same way. Bedrock LOW's latency miss is accepted here too. |
 
-If a mode turns a screen on later (after the latency target is relaxed or met), it is `bedrock` at LOW: 0% false positives and 6 of 18 caught, against DetectJailbreak's best eligible-FP result of 0 of 18. Bedrock LOW also needs no larger image or more memory. Latency is comparable: the local p50 (187–258 ms) is below Bedrock's processing p50 (335 ms) and client p50 (663 ms), and both miss the 300 ms p95 target. DetectJailbreak wins on the per-call fee and keeps the question in process.
+Bedrock at LOW stays the screen: 0% false positives and 6 of 18 caught, against DetectJailbreak's best eligible-FP result of 0 of 18. Bedrock LOW also needs no larger image or more memory. Latency is comparable: the local p50 (187–258 ms) is below Bedrock's processing p50 (335 ms) and client p50 (663 ms), and both miss the 300 ms p95 target. DetectJailbreak wins on the per-call fee and keeps the question in process.
 
 ## The adapter ships as an optional extra
 
-`DetectJailbreakScreen` stays in the code, behind `question_guard=guardrails_ai`. Its dependencies live in the optional `jailbreak` extra and its models in the separate `agent-jailbreak` image, which CI neither builds nor deploys. Torch and about 1.5 GB of models do not fit the default image or the 512 MiB agent. Turning it on needs that image and about 2 GiB of agent memory (on-premise: the agent's compose `mem_limit`; see `docs/runbooks/on-premise-deploy.md` section 12).
+`DetectJailbreakScreen` stays in the code, behind `question_guard=guardrails_ai`. Its dependencies live in the optional `jailbreak` extra and its models in the separate `agent-jailbreak` image, which CI neither builds nor deploys. Torch and about 1.5 GB of models do not fit the default image or the 512 MiB agent. Turning it on needs that image and about 2 GiB of agent memory (on-premise: the agent's compose `mem_limit`; see `docs/runbooks/on-premise-deploy.md` section 11).
 
 ## Document-embedded attacks (#196)
 

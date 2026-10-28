@@ -1,5 +1,5 @@
 # The migrate hook (#58), and later the CronJobs (PRD §9.1): learning-record sweeper (every minute),
-# retention of the decline log (daily; traces expire through LangSmith retention, D25), (R3) learner reports (hourly). All reuse the api image.
+# retention of the decline log (daily; traces expire in Langfuse, D25), (R3) learner reports (hourly). All reuse the api image.
 image:
   repository: smart-tutor/api
   tag: ""  # defaults to global.imageTag

@@ -31,7 +31,7 @@ from smart_tutor.shared.adapters.postgres.engine import create_db_engine
 from smart_tutor.shared.config import Settings
 from smart_tutor.subjects.adapters.sql_subjects import SqlSubjectRepository
 from smart_tutor.subjects.application import SubjectCatalogService, SubjectNames, SubjectSearch, SubjectSuggester
-from smart_tutor.tutoring.adapters.phoenix_feedback import answer_feedback
+from smart_tutor.tutoring.adapters.langfuse_feedback import answer_feedback
 from smart_tutor.tutoring.adapters.sql_threads import SqlThreadRepository
 from smart_tutor.tutoring.application import ConversationService
 

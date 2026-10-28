@@ -16,7 +16,7 @@ When a guard trips (on the question before search, or while the answer streams) 
 {"code": "guard", "text"} then ``done``: the learner sees ``text`` in place of the partial answer, and no ``sources``
 or ``citations`` follow (US-6, D29).
 
-The request may carry ``thread_id`` and ``run_id`` (set by the API); each ask is one ``ask`` trace in Phoenix whose
+The request may carry ``thread_id`` and ``run_id`` (set by the API); each ask is one ``ask`` trace in Langfuse whose
 trace id is ``run_id`` (PRD §10.4). It may also carry ``history``, the conversation's last turns (``question``,
 ``answer``), oldest first: the answer model reads them before the chunks, and the search adds the previous question
 (PRD §9.2, ADR 0015).
@@ -38,7 +38,7 @@ from smart_tutor.apps.agent.graph import AskGraph, build_graph
 from smart_tutor.apps.agent.guards import build_guard
 from smart_tutor.apps.agent.state import DECLINE_MESSAGES, AgentContext, AskState
 from smart_tutor.apps.agent.topic import topic_classifier, topic_threshold
-from smart_tutor.shared.adapters.ask_tracing import PhoenixAskTracing
+from smart_tutor.shared.adapters.ask_tracing import OtelAskTracing
 from smart_tutor.shared.adapters.auth.bearer import BearerToken, CurrentPrincipal
 from smart_tutor.shared.adapters.auth.keycloak_introspection import keycloak_verifier
 from smart_tutor.shared.adapters.model_factory import ChatRole, ModelFactory
@@ -155,9 +155,9 @@ def create_app(
             return
         if not settings.keycloak_client_secret.get_secret_value():
             raise RuntimeError("SMART_TUTOR_KEYCLOAK_CLIENT_SECRET is not set")  # before tracing instruments LangChain
-        traces = start_tracing(settings, settings.phoenix_project)  # tracing on without a learner-hash key: refuse
+        traces = start_tracing(settings)  # tracing on without a learner-hash key: refuse
         if tracing is None:
-            app.state.tracing = PhoenixAskTracing(traces) if traces else NoAskTracing()
+            app.state.tracing = OtelAskTracing(traces) if traces else NoAskTracing()
         if graph is None:
             model = ModelFactory(settings).chat(ChatRole.AGENT)
             canary = new_canary()

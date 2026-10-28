@@ -9,7 +9,7 @@ from langchain_core.messages import AIMessage, BaseMessage
 
 from evals.corpus import SeedDocument
 from evals.learners import LoadError
-from evals.targets import AskTarget, EvalLearners, RecordingRetriever
+from evals.targets import AskTarget, DescriptionTarget, EvalLearners, RecordingRetriever
 from fakes import FakeRetriever, FakeTopicClassifier, fake_chat_model
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.tutoring.application import (
@@ -213,6 +213,9 @@ class StubTutor:
     def __init__(self, held: dict[str, str], documents: list[str] | None = None) -> None:
         self.held, self.checks, self.token, self.sign_ins = held, 0, "tok", 0
         self.documents, self.listings = documents or [], 0
+        self.details: dict[str, Any] = {}
+        self.suggestions: dict[str, Any] = {}
+        self.reads: list[str] = []
 
     def access_token(self) -> str:
         return self.token
@@ -225,6 +228,11 @@ class StubTutor:
         if (method, path) == ("GET", "/documents?state=ready"):
             self.listings += 1
             return [{"document_id": d, "title": "x"} for d in self.documents]
+        if method == "GET" and path.startswith("/documents/"):
+            self.reads.append(path)
+            if path.endswith("/subject-suggestions"):
+                return self.suggestions
+            return self.details
         assert (method, path) == ("POST", "/documents/duplicate-check")
         self.checks += 1
         return {"document_id": self.held.get(body["sha256"])}
@@ -269,6 +277,22 @@ def test_the_library_is_the_learners_ready_documents_including_ones_they_uploade
     assert learners.library("l@x") == ["d-seed", "d-own-upload"]
     assert learners.library("l@x") == ["d-seed", "d-own-upload"]
     assert tutor.listings == 1  # read once per learner
+
+
+async def test_the_description_target_reads_the_stored_description_as_the_learner() -> None:
+    tutor = StubTutor({"abc": "doc-7"})
+    tutor.details = {"title": "T", "extracted_title": "T", "summary": "S"}
+    tutor.suggestions = {"suggestions": [{"subject_id": None, "name": "Fine-tuning", "origin": "new"}]}
+    learners = EvalLearners({"learner@example.com": tutor}, SEEDS)
+    out = await DescriptionTarget(learners)({"learner": "learner@example.com", "document": "react-2022"})
+    assert out == {
+        "document_id": "doc-7",
+        "title": "T",
+        "extracted_title": "T",
+        "summary": "S",
+        "suggestions": ["Fine-tuning"],
+    }
+    assert tutor.reads == ["/documents/doc-7", "/documents/doc-7/subject-suggestions"]
 
 
 def test_signing_in_again_gives_a_fresh_token() -> None:

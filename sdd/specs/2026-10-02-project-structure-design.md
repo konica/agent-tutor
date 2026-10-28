@@ -155,26 +155,27 @@ backend/tests/
 ├── fakes/                  # FakeChatModel (LangChain fake + bind_tools), fake_embeddings, in-memory repos
 └── conftest.py
 
-backend/evals/              # datasets live in LangSmith (versioned there); the repo holds what builds and runs them
+backend/evals/              # datasets live in Langfuse (versioned there); the repo holds what builds and runs them
 ├── seed_corpus/            # manifest.yaml: openly licensed eval documents with labels (PDFs downloaded to data/seed_corpus/)
 ├── generators/             # synthetic Q&A, negatives, synthetic learners
 ├── adversarial/            # taxonomy.yaml + seed prompts, incl. document-embedded attacks (PRD §10.3)
 ├── evaluators/             # one file per PRD §10.1 evaluator; rubrics/ for Qwen judge prompts
 ├── targets.py              # how an evaluation run invokes the agent
 ├── thresholds.yaml         # PRD §10.1 targets, read by the release gate
-└── run.py                  # run --split smoke|full → LangSmith experiment
+└── run.py                  # run --split smoke|full → Langfuse experiment
 ```
 
 ## 8. Infrastructure and deployment
 
 ```
 infra/
-├── app.py  cdk.json  pyproject.toml
+├── app.py  evals_ci_app.py  cdk.json  pyproject.toml
 ├── smart_tutor_infra/stacks/   # network, data (RDS + database secrets), storage (S3 + SQS/DLQ + lifecycle), cluster (EKS + Pod Identity),
 │                               # registry (ECR), edge (internal ALB + CloudFront), config (SSM, Keycloak secrets), budgets,
 │                               # github_deploy (GitHub OIDC provider + CI deploy role; admin deploys it once),
 │                               # host (on-premise VPC, VM, Elastic IP, data volume, deploy document; #148;
-│                               # snapshot policy, off-hours schedule; #151, ADR 0022)
+│                               # snapshot policy, off-hours schedule; #151, ADR 0022),
+│                               # evals_ci (GitHub Actions role for the smoke evals; outside both modes, own entry evals_ci_app.py; ADR 0024)
 ├── smart_tutor_infra/names.py  # per-mode names; context smart-tutor:mode picks on-premise (default: storage, config,
 │                               # budgets, github_deploy, registry, host) or native-cloud (all but host)
 └── tests/                      # CDK assertion tests

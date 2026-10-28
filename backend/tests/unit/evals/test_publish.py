@@ -1,15 +1,15 @@
-"""Publishing (PRD §10.3 item 6): hand-written plus accepted examples become the next smoke and full versions."""
+"""Publishing (PRD §10.3 item 6): hand-written plus accepted examples become the next smoke and full versions in
+Langfuse. Accepted candidates are read from the dataset's annotation queue in the same Langfuse project."""
 
-import uuid
 from collections import Counter
 
 import pytest
-from langsmith.utils import LangSmithError
 
 from evals.dataset import Dataset, Example, examples_at, in_eval_share
+from evals.langfuse_client import KEYS, URLS, LangfuseError, Trace
 from evals.publish import TYPES, main, oldest_first, split_examples
 from evals.review import ACCEPTED, Candidate, submit
-from fakes.langsmith import FakeLangSmith
+from fakes.langfuse import FakeLangfuse
 
 HAND = (Example({"question": "hand"}, {"covered": True}),)
 ASK = Dataset("ask", "smart-tutor-ask", "", HAND)
@@ -39,70 +39,67 @@ def test_an_accepted_item_equal_to_a_hand_written_one_is_not_added_twice() -> No
     assert split_examples(ASK, [duplicate])["full"] == list(HAND)
 
 
-def _submit(client: FakeLangSmith, *questions: str) -> list[uuid.UUID]:
-    candidates = [
-        Candidate({"question": q}, {"covered": True}, "factual", ({"chunk": "react-2022:1", "text": "t"},))
-        for q in questions
-    ]
-    return submit(client, ASK, candidates, {})
+class Stores:
+    """Langfuse: the review queue and the datasets."""
+
+    def __init__(self) -> None:
+        self.langfuse = FakeLangfuse()
+
+    def submit(self, *questions: str) -> list[str]:
+        candidates = [
+            Candidate({"question": q}, {"covered": True}, "factual", ({"chunk": "react-2022:1", "text": "t"},))
+            for q in questions
+        ]
+        return submit(self.langfuse, ASK, candidates, {})
+
+    def accept(self, *questions: str) -> list[str]:
+        ids = self.submit(*questions)
+        for trace_id in ids:
+            self.langfuse.score(trace_id, ACCEPTED, 1)
+        return ids
+
+    def publish(self, *argv: str, dataset: Dataset = ASK) -> int:
+        return main(list(argv), client=self.langfuse, load=lambda key: dataset, keys=[dataset.key])
+
+    def questions(self, version: str) -> list[str]:
+        return [e.inputs["question"] for e in examples_at(self.langfuse, ASK, version)]
 
 
-def _accept(client: FakeLangSmith, *questions: str) -> list[uuid.UUID]:
-    ids = _submit(client, *questions)
-    for run_id in ids:
-        client.create_feedback(run_id, ACCEPTED, score=1)
-    return ids
-
-
-def _expire(client: FakeLangSmith, run_id: uuid.UUID) -> None:
-    """The candidates project's trace retention deletes a run and its feedback."""
-    del client.runs[run_id]
-    client.feedback = [f for f in client.feedback if f.run_id != run_id]
-
-
-def _publish(client: FakeLangSmith) -> None:
-    assert main([], client=client, load=lambda key: ASK, keys=["ask"]) == 0
-
-
-def _questions(client: FakeLangSmith, split: str, version: str) -> list[str]:
-    return [e.inputs["question"] for e in examples_at(client, ASK, split, version)]
-
-
-def test_an_accepted_example_stays_after_its_candidate_run_expires(capsys: pytest.CaptureFixture[str]) -> None:
-    client = FakeLangSmith()
-    [old] = _accept(client, "old")
-    _publish(client)
+def test_an_accepted_example_stays_after_its_candidate_trace_is_deleted(capsys: pytest.CaptureFixture[str]) -> None:
+    stores = Stores()
+    [old] = stores.accept("old")
+    assert stores.publish() == 0
     capsys.readouterr()
-    _expire(client, old)
-    _publish(client)
+    stores.langfuse.delete_trace(old)
+    stores.publish()
     assert capsys.readouterr().out.count("unchanged") == 2  # no smaller version
-    _accept(client, "new")
-    _publish(client)
-    assert sorted(_questions(client, "full", "full-v2")) == ["hand", "new", "old"]
-    assert sorted(_questions(client, "smoke", "smoke-v2")) == ["hand", "new", "old"]
-    [carried] = [e for e in examples_at(client, ASK, "full", "full-v2") if e.inputs["question"] == "old"]
-    assert carried.metadata is not None and carried.metadata["candidate_run"] == str(old)
+    stores.accept("new")
+    stores.publish()
+    assert sorted(stores.questions("full-v2")) == ["hand", "new", "old"]
+    assert sorted(stores.questions("smoke-v2")) == ["hand", "new", "old"]
+    [carried] = [e for e in examples_at(stores.langfuse, ASK, "full-v2") if e.inputs["question"] == "old"]
+    assert carried.metadata["candidate_run"] == old
 
 
 def test_a_carried_example_a_reviewer_rejects_later_is_dropped() -> None:
-    client = FakeLangSmith()
-    changed, _ = _accept(client, "changed", "kept")
-    _publish(client)
-    client.create_feedback(changed, ACCEPTED, score=0)
-    _publish(client)
-    assert sorted(_questions(client, "full", "full-v2")) == ["hand", "kept"]
-    assert sorted(_questions(client, "smoke", "smoke-v2")) == ["hand", "kept"]
+    stores = Stores()
+    changed, _ = stores.accept("changed", "kept")
+    stores.publish()
+    stores.langfuse.score(changed, ACCEPTED, 0)
+    stores.publish()
+    assert sorted(stores.questions("full-v2")) == ["hand", "kept"]
+    assert sorted(stores.questions("smoke-v2")) == ["hand", "kept"]
 
 
 def test_a_later_publish_adds_new_acceptances_and_keeps_smoke_oldest_first() -> None:
-    client = FakeLangSmith()
-    older, newer = _submit(client, "older", "newer")
-    client.create_feedback(newer, ACCEPTED, score=1)
-    _publish(client)
-    client.create_feedback(older, ACCEPTED, score=1)  # accepted after a newer candidate was published
-    _publish(client)
-    assert _questions(client, "full", "full-v2") == ["hand", "older", "newer"]
-    assert _questions(client, "smoke", "smoke-v2") == ["hand", "older", "newer"]
+    stores = Stores()
+    older, newer = stores.submit("older", "newer")
+    stores.langfuse.score(newer, ACCEPTED, 1)
+    stores.publish()
+    stores.langfuse.score(older, ACCEPTED, 1)  # accepted after a newer candidate was published
+    stores.publish()
+    assert stores.questions("full-v2") == ["hand", "older", "newer"]
+    assert stores.questions("smoke-v2") == ["hand", "older", "newer"]
 
 
 def test_generated_examples_are_ordered_by_when_they_were_generated() -> None:
@@ -115,56 +112,81 @@ def test_generated_examples_are_ordered_by_when_they_were_generated() -> None:
     assert [e.inputs["question"] for e in oldest_first(examples)] == ["a", "c", "d", "b"]
 
 
-def test_publish_makes_the_next_versions_and_prints_them(capsys: pytest.CaptureFixture[str]) -> None:
-    client = FakeLangSmith()
-    _accept(client, "What is ReAct?")
-    assert main([], client=client, load=lambda key: ASK, keys=["ask"]) == 0
+def test_publish_makes_the_next_versions_in_langfuse_and_prints_them(capsys: pytest.CaptureFixture[str]) -> None:
+    stores = Stores()
+    stores.accept("What is ReAct?")
+    assert stores.publish() == 0
     out = capsys.readouterr().out
-    assert "smoke-v1" in out and "full-v1" in out
-    questions = sorted(e.inputs["question"] for e in examples_at(client, ASK, "full", "full-v1"))
-    assert questions == ["What is ReAct?", "hand"]
+    assert "published smart-tutor-ask/smoke-v1" in out and "published smart-tutor-ask/full-v1" in out
+    assert sorted(stores.questions("full-v1")) == ["What is ReAct?", "hand"]
 
 
 def test_a_second_publish_with_nothing_new_is_unchanged(capsys: pytest.CaptureFixture[str]) -> None:
-    client = FakeLangSmith()
-    _accept(client, "What is ReAct?")
-    main([], client=client, load=lambda key: ASK, keys=["ask"])
-    assert main([], client=client, load=lambda key: ASK, keys=["ask"]) == 0
+    stores = Stores()
+    stores.accept("What is ReAct?")
+    stores.publish()
+    assert stores.publish() == 0
     assert "unchanged" in capsys.readouterr().out
-    assert client.datasets["smart-tutor-ask"].tags.keys() == {"smoke-v1", "full-v1"}
+    assert set(stores.langfuse.datasets) == {"smart-tutor-ask/smoke-v1", "smart-tutor-ask/full-v1"}
 
 
 def test_a_dry_run_prints_the_splits_and_publishes_nothing(capsys: pytest.CaptureFixture[str]) -> None:
-    client = FakeLangSmith()
-    _accept(client, "What is ReAct?")
-    assert main(["--dry-run"], client=client, load=lambda key: ASK, keys=["ask"]) == 0
-    assert "smart-tutor-ask" not in client.datasets
+    stores = Stores()
+    stores.accept("What is ReAct?")
+    assert stores.publish("--dry-run") == 0
+    assert stores.langfuse.datasets == {}
     assert "factual" in capsys.readouterr().out
 
 
 def test_types_missing_from_smoke_are_named(capsys: pytest.CaptureFixture[str]) -> None:
-    client = FakeLangSmith()
-    _accept(client, "What is ReAct?")
-    main([], client=client, load=lambda key: ASK, keys=["ask"])
+    stores = Stores()
+    stores.accept("What is ReAct?")
+    stores.publish()
     assert "no accepted drift" in capsys.readouterr().out
 
 
-def test_a_langsmith_error_exits_1_with_a_hint(capsys: pytest.CaptureFixture[str]) -> None:
-    class NoKey(FakeLangSmith):
-        def list_runs(self, **kwargs: object) -> object:
-            raise LangSmithError("Authentication failed")
+def test_a_review_queue_error_exits_1_with_a_hint(capsys: pytest.CaptureFixture[str]) -> None:
+    class NoKey(FakeLangfuse):
+        def traces(self, name: str) -> list[Trace]:
+            raise LangfuseError("401: Invalid credentials")
 
-    assert main([], client=NoKey(), load=lambda key: ASK, keys=["ask"]) == 1
-    assert "LANGSMITH_API_KEY" in capsys.readouterr().err
+    stores = Stores()
+    stores.langfuse = NoKey()
+    assert stores.publish() == 1
+    err = capsys.readouterr().err
+    assert "Can't reach Langfuse: 401: Invalid credentials" in err and all(key in err for key in KEYS)
+
+
+def test_a_langfuse_error_exits_1_naming_the_keys_and_the_hours(capsys: pytest.CaptureFixture[str]) -> None:
+    class Off(FakeLangfuse):
+        def dataset_names(self) -> list[str]:
+            raise LangfuseError("[Errno 111] Connection refused")
+
+    stores = Stores()
+    stores.langfuse = Off()
+    assert stores.publish() == 1
+    err = capsys.readouterr().err
+    assert "Can't reach Langfuse: [Errno 111] Connection refused" in err
+    assert all(key in err for key in KEYS) and "18:00-07:00" in err
+
+
+def test_without_langfuse_keys_publish_exits_1_and_says_which(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    for name in (*KEYS, *URLS):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
+    assert main([], load=lambda key: ASK, keys=["ask"]) == 1
+    assert "LANGFUSE_SECRET_KEY not set" in capsys.readouterr().err
 
 
 def test_a_dataset_with_an_eval_share_publishes_only_its_held_out_questions() -> None:
-    client = FakeLangSmith()
+    stores = Stores()
     shared = Dataset("ask", "smart-tutor-ask", "", HAND, eval_share=0.3)
     questions = [f"question {i}" for i in range(40)]
-    _accept(client, *questions)
-    assert main([], client=client, load=lambda key: shared, keys=["ask"]) == 0
-    full = {e.inputs["question"] for e in examples_at(client, shared, "full", "full-v1")}
+    stores.accept(*questions)
+    assert stores.publish(dataset=shared) == 0
+    full = {e.inputs["question"] for e in examples_at(stores.langfuse, shared, "full-v1")}
     assert full == {"hand"} | {q for q in questions if in_eval_share(q, 0.3)}
     assert 1 < len(full) < 41
 
@@ -176,8 +198,8 @@ def test_a_dataset_that_opts_out_of_smoke_is_split_and_published_to_full_only(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     assert set(split_examples(FULL_ONLY, [])) == {"full"}
-    client = FakeLangSmith()
-    assert main([], client=client, load=lambda key: FULL_ONLY, keys=["full-only"]) == 0
+    stores = Stores()
+    assert stores.publish(dataset=FULL_ONLY) == 0
     out = capsys.readouterr().out
     assert "full-v1" in out and "smoke" not in out
-    assert client.datasets["smart-tutor-full-only"].tags.keys() == {"full-v1"}
+    assert set(stores.langfuse.datasets) == {"smart-tutor-full-only/full-v1"}

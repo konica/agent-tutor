@@ -141,41 +141,80 @@ def test_a_crash_is_not_exit_code_2(check: ModuleType, monkeypatch) -> None:
         check.main()  # an uncaught exception exits Python with status 1
 
 
-def test_leaks_reports_a_proxy_that_lets_langsmith_through(refused: ModuleType, monkeypatch) -> None:
-    monkeypatch.setattr(refused, "_tunnel_status", lambda host, port=443: 200 if "langchain" in host else 403)
-    assert refused.leaks() == ["the proxy answered 200 to CONNECT api.smith.langchain.com:443, not 403"]
-
-
-def test_unreachable_reports_phoenix(check: ModuleType, monkeypatch) -> None:
-    class Direct:
-        def open(self, url: str, timeout: float) -> None:
-            assert url == "http://phoenix:6006/healthz"
-            raise OSError("Connection refused")
-
+@pytest.fixture
+def langfuse(check: ModuleType, monkeypatch) -> list[tuple[str, int]]:
+    """unreachable() with everything else fine and Langfuse configured; the CONNECTs it sends are recorded."""
+    sent: list[tuple[str, int]] = []
     monkeypatch.setenv("AWS_REGION", "us-east-1")
-    monkeypatch.setattr(check.urllib.request, "build_opener", lambda *handlers: Direct())
+    monkeypatch.setenv("SMART_TUTOR_LANGFUSE_URL", "https://lf.example")
+    monkeypatch.setenv("SMART_TUTOR_LANGFUSE_PUBLIC_KEY", "pk")
+    monkeypatch.setenv("SMART_TUTOR_LANGFUSE_SECRET_KEY", "sk")
     monkeypatch.setattr(check.urllib.request, "urlopen", lambda url, timeout: None)
     monkeypatch.setattr(check, "_connects", lambda host, port: True)
     monkeypatch.setattr(check, "_aws_problems", lambda region: [])
-    monkeypatch.setenv("SMART_TUTOR_PHOENIX_URL", "http://phoenix:6006")
-    monkeypatch.setenv("SMART_TUTOR_PHOENIX_API_KEY", "key")
-    assert check.unreachable() == ["Phoenix: Connection refused"]
+    monkeypatch.setattr(check, "_tunnel_status", lambda host, port=443, timeout=10: sent.append((host, port)) or 200)
+    return sent
 
 
-@pytest.mark.parametrize("key", [None, ""])
-def test_unreachable_ignores_phoenix_while_untraced(check: ModuleType, monkeypatch, key) -> None:
-    # Tracing is non-critical: a Phoenix outage, or a key not yet created, must not fail a deploy.
-    def refuse(*args: object, **kwargs: object) -> None:
-        raise OSError("unreachable")
+def _answer(check: ModuleType, monkeypatch, status: int) -> None:
+    monkeypatch.setattr(check, "_tunnel_status", lambda host, port=443, timeout=10: status)
 
-    monkeypatch.setenv("AWS_REGION", "us-east-1")
-    monkeypatch.setenv("SMART_TUTOR_PHOENIX_URL", "http://phoenix:6006")
-    if key is None:
-        monkeypatch.delenv("SMART_TUTOR_PHOENIX_API_KEY", raising=False)
-    else:
-        monkeypatch.setenv("SMART_TUTOR_PHOENIX_API_KEY", key)
-    monkeypatch.setattr(check.urllib.request, "build_opener", refuse)
-    monkeypatch.setattr(check.urllib.request, "urlopen", lambda url, timeout: None)
-    monkeypatch.setattr(check, "_connects", lambda host, port: True)
-    monkeypatch.setattr(check, "_aws_problems", lambda region: [])
+
+def test_unreachable_reports_a_proxy_that_refuses_langfuse(check, langfuse, monkeypatch) -> None:
+    _answer(check, monkeypatch, 403)
+    assert check.unreachable() == ["Langfuse: the egress proxy refuses lf.example"]
+
+
+def test_unreachable_probes_the_langfuse_urls_own_port(check, langfuse, monkeypatch) -> None:
+    # Squid allows CONNECT only to 443, so a Langfuse URL on another port is refused although the exporter would use it.
+    monkeypatch.setenv("SMART_TUTOR_LANGFUSE_URL", "https://lf.example:8443")
+    monkeypatch.setattr(
+        check, "_tunnel_status", lambda host, port=443, timeout=10: langfuse.append((host, port)) or 403
+    )
+    assert check.unreachable() == ["Langfuse: the egress proxy refuses lf.example:8443"]
+    assert langfuse == [("lf.example", 8443)]
+
+
+def test_unreachable_accepts_a_tunnel_to_langfuse(check, langfuse) -> None:
     assert check.unreachable() == []
+    assert langfuse == [("lf.example", 443)]
+
+
+@pytest.mark.parametrize("status", [502, 503])
+def test_unreachable_only_notes_a_langfuse_that_does_not_answer(check, langfuse, monkeypatch, capsys, status) -> None:
+    # Langfuse is off 18:00-07:00 (ADR 0022): Squid allows the host but cannot connect. Tracing is non-critical.
+    _answer(check, monkeypatch, status)
+    assert check.unreachable() == []
+    out = capsys.readouterr().out
+    assert "Langfuse at lf.example" in out and str(status) in out
+
+
+@pytest.mark.parametrize(
+    "missing", ["SMART_TUTOR_LANGFUSE_URL", "SMART_TUTOR_LANGFUSE_PUBLIC_KEY", "SMART_TUTOR_LANGFUSE_SECRET_KEY"]
+)
+def test_unreachable_ignores_langfuse_without_its_settings(check, langfuse, monkeypatch, missing) -> None:
+    monkeypatch.setenv(missing, "")
+    assert check.unreachable() == []
+    assert langfuse == []
+
+
+def test_the_success_message_names_langfuse_when_it_is_on(check, monkeypatch, capsys) -> None:
+    monkeypatch.setattr(check, "leaks", lambda: [])
+    monkeypatch.setattr(check, "unreachable", lambda: [])
+    monkeypatch.setenv("SMART_TUTOR_LANGFUSE_URL", "https://lf.example")
+    monkeypatch.setenv("SMART_TUTOR_LANGFUSE_PUBLIC_KEY", "pk")
+    monkeypatch.setenv("SMART_TUTOR_LANGFUSE_SECRET_KEY", "sk")
+    assert check.main() == 0
+    assert "Langfuse (through the proxy)" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("error", [TimeoutError("timed out"), ConnectionResetError("reset")])
+def test_unreachable_only_notes_a_langfuse_tunnel_that_raises(check, langfuse, monkeypatch, capsys, error) -> None:
+    # Off at night, Squid's connect timeout can race the client's socket timeout: the probe raises, the check goes on.
+    def raises(host: str, port: int = 443, timeout: float = 10) -> int:
+        raise error
+
+    monkeypatch.setattr(check, "_tunnel_status", raises)
+    assert check.unreachable() == []
+    out = capsys.readouterr().out
+    assert "Langfuse at lf.example" in out and type(error).__name__ in out

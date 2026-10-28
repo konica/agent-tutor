@@ -1,6 +1,8 @@
 """Builds every stack of one deployment mode for one environment (prod in Releases 1-2; a staging stage can reuse this
 later). The mode comes from the context `smart-tutor:mode` (`on-premise` by default, or `native-cloud`; #147)."""
 
+import os
+
 import aws_cdk as cdk
 
 from smart_tutor_infra.names import DEFAULT_MODE, NATIVE_CLOUD, ModeNames, mode_names
@@ -9,6 +11,8 @@ from smart_tutor_infra.stacks.cluster import ClusterStack
 from smart_tutor_infra.stacks.config import ConfigStack
 from smart_tutor_infra.stacks.data import DataStack
 from smart_tutor_infra.stacks.edge import EdgeStack
+from smart_tutor_infra.stacks.evals_ci import STACK_NAME as EVALS_CI_STACK_NAME
+from smart_tutor_infra.stacks.evals_ci import EvalsCiStack
 from smart_tutor_infra.stacks.github_deploy import GITHUB_OIDC_HOST, GitHubDeployStack
 from smart_tutor_infra.stacks.host import HostStack
 from smart_tutor_infra.stacks.network import NetworkStack
@@ -56,7 +60,14 @@ def _on_premise(app: cdk.App, env: cdk.Environment, names: ModeNames) -> list[cd
         or f"arn:aws:iam::{cdk.Aws.ACCOUNT_ID}:oidc-provider/{GITHUB_OIDC_HOST}",
     )
     domain = app.node.try_get_context("smart-tutor:on-premise-domain") or None
-    config = ConfigStack(app, f"{prefix}-Config", env=env, names=names)
+    config = ConfigStack(
+        app,
+        f"{prefix}-Config",
+        env=env,
+        names=names,
+        # The shared Langfuse host's DuckDNS name (ADR 0023): a setting, never a reference to the Langfuse-Host stack.
+        langfuse_url=app.node.try_get_context("smart-tutor:langfuse-url") or None,
+    )
     host = HostStack(
         app,
         f"{prefix}-Host",
@@ -151,3 +162,18 @@ def _native_cloud(app: cdk.App, env: cdk.Environment, names: ModeNames) -> list[
     stacks.append(deploy)
     stacks.append(edge)
     return stacks
+
+
+def build_evals_ci(app: cdk.App) -> EvalsCiStack:
+    """The CI evals role's stack (#337). Not part of any mode: only `evals_ci_app.py` builds it, never `build_app`."""
+    env = cdk.Environment(
+        account=os.environ.get("CDK_DEFAULT_ACCOUNT"),
+        region=app.node.try_get_context("smart-tutor:region") or "us-east-1",
+    )
+    return EvalsCiStack(
+        app,
+        EVALS_CI_STACK_NAME,
+        env=env,
+        subject_prefix=app.node.get_context("smart-tutor:github-oidc-subject-prefix"),
+        provider_arn=app.node.try_get_context("smart-tutor:github-oidc-provider-arn"),
+    )

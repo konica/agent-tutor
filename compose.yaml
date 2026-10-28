@@ -1,8 +1,7 @@
 # Local development (PRD §9.12).
-#   docker compose up -d                 # dependencies only: pgvector, Keycloak, LocalStack, Mailpit, Phoenix
+#   docker compose up -d                 # dependencies only: pgvector, Keycloak, LocalStack, Mailpit
 #   docker compose --profile app up -d   # + app services from the same images as production
-# Bedrock has no emulator: agent and mcp call the real us-east-1 models with your AWS profile. LangSmith is real too
-# (evals only).
+# Bedrock has no emulator: agent and mcp call the real us-east-1 models with your AWS profile.
 
 name: smart-tutor
 
@@ -71,19 +70,6 @@ services:
     image: axllent/mailpit:v1.27
     ports: ["10403:8025"]
 
-  # Runtime traces (ADR 0017): Arize Phoenix at http://localhost:10404, the same image as on-premise, but separate from
-  # production's. No sign-in (it holds only your own test data). Traces are in SQLite on the phoenixdata volume
-  # (`docker compose down -v` clears them) and kept 14 days. Services in Compose send to
-  # http://phoenix:6006/v1/traces, processes on your machine to http://localhost:10404/v1/traces.
-  phoenix:
-    image: arizephoenix/phoenix:version-20.16.0-nonroot
-    environment:
-      PHOENIX_WORKING_DIR: /home/nonroot  # the volume; the image's user owns it
-      PHOENIX_DEFAULT_RETENTION_POLICY_DAYS: "14"
-      PHOENIX_TELEMETRY_ENABLED: "false"
-    ports: ["10404:6006"]
-    volumes: [phoenixdata:/home/nonroot]
-
   # --- app profile: same images as production -------------------------------------------
   migrate:
     profiles: [app]
@@ -113,7 +99,6 @@ services:
       AWS_ENDPOINT_URL_SQS: http://localstack:4566
       SMART_TUTOR_S3_PATH_STYLE: "true"
       SMART_TUTOR_AGENT_URL: http://agent:8080
-      SMART_TUTOR_PHOENIX_URL: http://phoenix:6006  # ratings as annotations on the agent's traces (#290); .env has localhost:10404
       SMART_TUTOR_LOCALSTACK: "true"
       # The api signs S3/SSM with dummy keys (SMART_TUTOR_LOCALSTACK), so your real keys never reach LocalStack.
       # It also calls Bedrock to embed subject names, with AWS_PROFILE and SMART_TUTOR_AWS_REGION from .env.
@@ -127,7 +112,6 @@ services:
       migrate: {condition: service_completed_successfully}
       keycloak: {condition: service_started}
       agent: {condition: service_started}
-      phoenix: {condition: service_started}
       localstack: {condition: service_healthy}
 
   agent:
@@ -141,8 +125,6 @@ services:
       SMART_TUTOR_KEYCLOAK_CLIENT_ID: smart-tutor-api
       SMART_TUTOR_KEYCLOAK_CLIENT_SECRET: local-api-secret
       SMART_TUTOR_MCP_URL: http://mcp:8000/mcp
-      SMART_TUTOR_PHOENIX_URL: http://phoenix:6006  # .env has the host's localhost:10404
-      LANGSMITH_TRACING: "false"  # LangSmith is for evals only; an older .env may still turn it on
       # Bedrock (chat model) with your AWS profile: same setup as the worker below.
       HOME: /home/app
     volumes: ["~/.aws:/home/app/.aws:ro"]
@@ -183,8 +165,6 @@ services:
       AWS_ENDPOINT_URL_SSM: http://localstack:4566
       SMART_TUTOR_S3_PATH_STYLE: "true"
       SMART_TUTOR_LOCALSTACK: "true"
-      SMART_TUTOR_PHOENIX_URL: http://phoenix:6006  # .env has the host's localhost:10404
-      LANGSMITH_TRACING: "false"  # LangSmith is for evals only; an older .env may still turn it on
       # Bedrock uses AWS_PROFILE and SMART_TUTOR_AWS_REGION (Settings.aws_region) from .env. botocore reads
       # config, credentials and the SSO / `aws login` caches under $HOME/.aws; the image user (uid 10001) has no
       # home, so give it one and mount your ~/.aws there. The mount is read-only, so SSO token refresh can't write
@@ -202,4 +182,3 @@ services:
 
 volumes:
   pgdata:
-  phoenixdata:

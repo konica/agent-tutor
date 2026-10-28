@@ -72,7 +72,7 @@ def test_the_dataset_has_benign_rows_and_an_attack_row_for_every_prompt_category
     assert all(set(e.inputs) == {"question"} for e in rows)
 
 
-def test_the_dataset_is_named_for_langsmith() -> None:
+def test_the_dataset_is_named_for_langfuse() -> None:
     assert load_dataset("question_screen").name == "smart-tutor-question-screen"
 
 

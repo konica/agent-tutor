@@ -39,7 +39,7 @@ topic = ["numpy>=2.0", "onnxruntime>=1.20", "tokenizers>=0.20"]
 # About 1.5 GB of models plus torch: never in the default agent image (ADR 0019).
 jailbreak = ["guardrails-ai==0.11.0", "guardrails-ai-detect-jailbreak==0.1.6", "torch==2.14.1", "transformers==5.19.0"]
 # Evaluation runs (backend/evals) and CI eval gates.
-eval = ["langsmith>=0.4", "openevals>=0.1", "pyyaml>=6.0"]
+eval = ["langfuse>=4.16", "openevals>=0.1", "pyyaml>=6.0"]
 # Training the topic-check model only (evals.topic_check.train): never in an image or a CI install.
 train = ["onnx>=1.17", "onnxruntime>=1.20", "onnxscript>=0.2", "setfit>=1.1", "torch>=2.5"]
 
@@ -93,10 +93,6 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-m 'not integration and not bedrock and not jailbreak' --import-mode=importlib"
 pythonpath = ["tests", "."]  # so tests can `import fakes` and `import evals`
-filterwarnings = [
-    # langsmith 0.14's own code; remove when upgraded
-    "ignore:ast.Str is deprecated:DeprecationWarning:langsmith.evaluation._key_extraction",
-]
 markers = [
     "integration: needs the Docker Compose stack (make up)",
     "bedrock: real Bedrock calls in us-east-1 with your AWS credentials (make bedrock-check)",
@@ -568,7 +564,7 @@ source_modules = [
 ]
 forbidden_modules = ["onnxruntime", "tokenizers"]
 
-# ADR 0017: runtime traces go to Phoenix; only backend/evals (outside smart_tutor) uses LangSmith.
+# ADR 0023: runtime traces go to Langfuse only; langchain-core ships a cloud tracing client that runtime code never touches.
 [[tool.importlinter.contracts]]
 name = "Runtime code never imports LangSmith"
 type = "forbidden"

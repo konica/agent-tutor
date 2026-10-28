@@ -22,7 +22,7 @@ from fakes import (
 )
 from smart_tutor.apps.agent.graph import build_graph
 from smart_tutor.apps.agent.server import create_app
-from smart_tutor.shared.adapters.ask_tracing import PhoenixAskTracing
+from smart_tutor.shared.adapters.ask_tracing import OtelAskTracing
 from smart_tutor.shared.config import Settings
 from smart_tutor.shared.domain.errors import UnauthenticatedError
 from smart_tutor.shared.domain.ids import UserId
@@ -36,6 +36,8 @@ BODY = {"question": "What is attention?"}
 AUTH = {"Authorization": "Bearer t-ada"}
 CHUNK = RetrievedChunk("c1", "d1", "a.pdf", 3, "Attention weighs tokens.", 0.9)
 NO_DOCUMENTS = "None of your documents can be used right now: they are all archived or deleted."
+# Tracing on; nothing listens on :9, and no test here sends a span.
+LANGFUSE = {"langfuse_url": "http://127.0.0.1:9", "langfuse_public_key": "pk-lf-t", "langfuse_secret_key": "sk-lf-t"}
 
 
 def client(
@@ -238,12 +240,12 @@ def test_more_than_200_document_ids_are_refused() -> None:
 
 
 def test_startup_refuses_tracing_without_a_learner_hash_key() -> None:
-    settings = Settings(keycloak_client_secret="s", learner_hash_key="", phoenix_url="http://127.0.0.1:9")
+    settings = Settings(keycloak_client_secret="s", learner_hash_key="", **LANGFUSE)
     with pytest.raises(RuntimeError, match="SMART_TUTOR_LEARNER_HASH_KEY"), TestClient(create_app(settings)):
         pass
 
 
-def test_without_a_phoenix_url_the_agent_starts_untraced(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_without_langfuse_the_agent_starts_untraced(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("smart_tutor.apps.agent.server.keycloak_verifier", lambda settings, http: FakeTokenVerifier())
     graph = build_graph(lambda token: FakeRetriever([CHUNK]), fake_chat_model(AIMessage("x")), guard=PassingGuard())
     app = create_app(Settings(keycloak_client_secret="s"), graph=graph)
@@ -251,23 +253,21 @@ def test_without_a_phoenix_url_the_agent_starts_untraced(monkeypatch: pytest.Mon
         assert isinstance(app.state.tracing, NoAskTracing)
 
 
-def test_with_a_phoenix_url_the_agent_starts_traced_and_stops_instrumenting_on_exit(
+def test_with_langfuse_the_agent_starts_traced_and_stops_instrumenting_on_exit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr("smart_tutor.apps.agent.server.keycloak_verifier", lambda settings, http: FakeTokenVerifier())
     graph = build_graph(lambda token: FakeRetriever([CHUNK]), fake_chat_model(AIMessage("x")), guard=PassingGuard())
-    settings = Settings(
-        keycloak_client_secret="s", learner_hash_key="k", phoenix_url="http://127.0.0.1:9"
-    )  # nothing listens on :9, and no ask is made
+    settings = Settings(keycloak_client_secret="s", learner_hash_key="k", **LANGFUSE)  # no ask is made
     app = create_app(settings, graph=graph)
     with TestClient(app):
-        assert isinstance(app.state.tracing, PhoenixAskTracing)
+        assert isinstance(app.state.tracing, OtelAskTracing)
         assert LangChainInstrumentor().is_instrumented_by_opentelemetry
     assert not LangChainInstrumentor().is_instrumented_by_opentelemetry
 
 
 def test_a_refused_startup_for_a_missing_client_secret_leaves_langchain_uninstrumented() -> None:
-    settings = Settings(keycloak_client_secret="", learner_hash_key="k", phoenix_url="http://127.0.0.1:9")
+    settings = Settings(keycloak_client_secret="", learner_hash_key="k", **LANGFUSE)
     with pytest.raises(RuntimeError, match="KEYCLOAK_CLIENT_SECRET"), TestClient(create_app(settings)):
         pass
     assert not LangChainInstrumentor().is_instrumented_by_opentelemetry

@@ -65,7 +65,7 @@ def test_secrets_are_generated_not_written() -> None:
         "smart-tutor/keycloak/admin",
         "smart-tutor/keycloak/api-client",
         "smart-tutor/keycloak/mcp-client",
-        "smart-tutor/phoenix/learner-hash-key",
+        "smart-tutor/langfuse/learner-hash-key",
     }
     assert all("SecretString" not in p and "GenerateSecretString" in p for p in by_name.values())
     admin = by_name["smart-tutor/keycloak/admin"]["GenerateSecretString"]
@@ -79,15 +79,31 @@ def test_trace_sampling_rate_is_an_ssm_parameter_tracing_every_run() -> None:
     template.has_resource_properties("AWS::SSM::Parameter", {"Name": "/smart-tutor/trace-sampling-rate", "Value": "1"})
 
 
-def test_learner_hash_key_is_a_long_generated_string_per_mode() -> None:
-    template = Template.from_stack(ConfigStack(cdk.App(), "Config", names=mode_names(ON_PREMISE)))
+@pytest.mark.parametrize(("mode", "prefix"), [(NATIVE_CLOUD, "smart-tutor"), (ON_PREMISE, "smart-tutor-on-premise")])
+def test_langfuse_learner_hash_key_is_a_long_generated_string_per_mode(mode: str, prefix: str) -> None:
+    template = Template.from_stack(ConfigStack(cdk.App(), "Config", names=mode_names(mode)))
 
     secrets = template.find_resources("AWS::SecretsManager::Secret")
-    [key] = [s["Properties"] for s in secrets.values() if s["Properties"]["Name"].endswith("/phoenix/learner-hash-key")]
-    assert key["Name"] == "smart-tutor-on-premise/phoenix/learner-hash-key"
+    [key] = [
+        s["Properties"] for s in secrets.values() if s["Properties"]["Name"].endswith("/langfuse/learner-hash-key")
+    ]
+    assert key["Name"] == f"{prefix}/langfuse/learner-hash-key"
     generated = key["GenerateSecretString"]
     assert generated["PasswordLength"] == 64 and generated["ExcludePunctuation"] is True
-    assert "SecretStringTemplate" not in generated  # a plain string, read as the whole secret value
+    assert "SecretStringTemplate" not in generated
+
+
+def test_langfuse_url_is_an_ssm_parameter_only_when_given() -> None:
+    given = Template.from_stack(
+        ConfigStack(cdk.App(), "Config", names=mode_names(ON_PREMISE), langfuse_url="https://langfuse.example")
+    )
+    given.has_resource_properties(
+        "AWS::SSM::Parameter", {"Name": "/smart-tutor-on-premise/langfuse-url", "Value": "https://langfuse.example"}
+    )
+
+    absent = Template.from_stack(ConfigStack(cdk.App(), "Config", names=mode_names(NATIVE_CLOUD)))
+    params = {p["Properties"]["Name"] for p in absent.find_resources("AWS::SSM::Parameter").values()}
+    assert "/smart-tutor/langfuse-url" not in params
 
 
 # --- the question screen's guardrail (#199) ------------------------------------------------------------------------
@@ -138,10 +154,10 @@ def test_question_screen_version_description_changes_with_any_filter_setting() -
 
 
 @pytest.mark.parametrize(("mode", "path"), [(NATIVE_CLOUD, "/smart-tutor"), (ON_PREMISE, "/smart-tutor-on-premise")])
-def test_question_screen_is_off_and_its_guardrail_is_in_ssm(mode: str, path: str) -> None:
+def test_question_screen_is_on_and_its_guardrail_is_in_ssm(mode: str, path: str) -> None:
     template = Template.from_stack(ConfigStack(cdk.App(), "Config", names=mode_names(mode)))
 
-    template.has_resource_properties("AWS::SSM::Parameter", {"Name": f"{path}/question-guard", "Value": "off"})
+    template.has_resource_properties("AWS::SSM::Parameter", {"Name": f"{path}/question-guard", "Value": "bedrock"})
     params = template.find_resources("AWS::SSM::Parameter").values()
     value = {p["Properties"]["Name"]: json.dumps(p["Properties"]["Value"]) for p in params}
     assert "QuestionScreen" in value[f"{path}/question-guardrail-id"]

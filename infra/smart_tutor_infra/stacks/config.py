@@ -60,11 +60,13 @@ def definition_digest(stack: cdk.Stack, definition: dict[str, Any]) -> str:
 
 
 class ConfigStack(cdk.Stack):
-    def __init__(self, scope: Construct, construct_id: str, *, names: ModeNames, **kwargs: Any) -> None:
+    def __init__(
+        self, scope: Construct, construct_id: str, *, names: ModeNames, langfuse_url: str | None = None, **kwargs: Any
+    ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         # Per-file limits, processing attempts, and upload rate limits and daily caps (PRD §11, §9.5), read at startup by the API and the worker, and the
-        # app time zone (D27), read by the API, and the share of runs traced in Phoenix (PRD §10.4: every run), read at deploy time; change them here,
+        # app time zone (D27), read by the API, and the share of runs traced in Langfuse (PRD §10.4: every run), read at deploy time; change them here,
         # not in code.
         for name, value in (
             ("max-upload-mb", "50"),
@@ -74,11 +76,17 @@ class ConfigStack(cdk.Stack):
             ("max-uploads-per-day", "100"),
             ("app-time-zone", APP_TIME_ZONE),
             ("trace-sampling-rate", "1"),
-            # The question screen is off everywhere: the measurement showed Bedrock's own processing p95 (about
-            # 420-450 ms) misses the 300 ms latency target, so no deployment turns it on yet (#199).
-            ("question-guard", "off"),
+            # The question screen is on everywhere (#199, PRD D30): the product accepts that Bedrock's own processing
+            # p95 (about 420-450 ms, measured 2026-10-13) misses the 300 ms latency target; false positives were 0/364.
+            ("question-guard", "bedrock"),
         ):
             ssm.StringParameter(self, f"Param-{name}", parameter_name=f"{names.ssm_path}/{name}", string_value=value)
+
+        # The shared Langfuse host (ADR 0023) that on-premise's agent and worker export traces to; native-cloud has none.
+        if langfuse_url:
+            ssm.StringParameter(
+                self, "Param-langfuse-url", parameter_name=f"{names.ssm_path}/langfuse-url", string_value=langfuse_url
+            )
 
         definition = question_screen_definition(self)
         guardrail = bedrock.CfnGuardrail(
@@ -128,12 +136,13 @@ class ConfigStack(cdk.Stack):
                 ),
             )
 
-        # Traces name a learner only by an HMAC of their user id (PRD §10.4); the agent and worker read this key. The
-        # Phoenix API key is <prefix>/phoenix/api-key, which the operator creates in Phoenix (runbooks).
+        # Traces name a learner only by an HMAC of their user id (PRD §10.4); the key the app reads as
+        # SMART_TUTOR_LEARNER_HASH_KEY. Langfuse's project keys are <prefix>/langfuse/public-key
+        # and <prefix>/langfuse/secret-key, which the operator creates in Langfuse (runbooks).
         secretsmanager.Secret(
             self,
-            "LearnerHashKeySecret",
-            secret_name=f"{names.secret_prefix}/phoenix/learner-hash-key",
-            description="HMAC key for the learner hash in Phoenix traces",
+            "LangfuseLearnerHashKeySecret",
+            secret_name=f"{names.secret_prefix}/langfuse/learner-hash-key",
+            description="HMAC key for the learner hash in Langfuse traces",
             generate_secret_string=secretsmanager.SecretStringGenerator(exclude_punctuation=True, password_length=64),
         )

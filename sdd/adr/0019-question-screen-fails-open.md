@@ -1,4 +1,4 @@
-# 0019. The question screen is optional, fails open, and stays off until its latency is solved; Bedrock at LOW over a local DetectJailbreak
+# 0019. The question screen is optional and fails open; Bedrock at LOW, not a local DetectJailbreak
 
 - Status: accepted
 - Date: 2026-10-13
@@ -19,6 +19,10 @@ ADR 0018 left the question check on the `Guard` port returning no trip, and name
 2. **It fails open.** If ApplyGuardrail raises or takes longer than `question_guard_timeout_seconds` (1.0), the turn goes on unscreened and a content-free counter adds one.
 3. **CDK owns the guardrail.** `<data_prefix>-question-screen`: the prompt-attack filter at strength LOW, input only, action BLOCK, Standard tier on the cross-region profile `us.guardrail.v1:0`. A retained guardrail version is re-published whenever a hash of the whole definition changes, so a changed definition never leaves agents on a stale snapshot. The agent's role may call `bedrock:ApplyGuardrail` on that guardrail and that profile only.
 4. **Strength LOW, and the screen stays off in both modes.** See the measurements. If a mode turns a screen on, it is `bedrock` at LOW, not the local one ("Local alternative (#200)"). A deployment turns it on by changing `question-guard` in `infra/smart_tutor_infra/stacks/config.py` after re-measuring (`docs/runbooks/on-premise-deploy.md`).
+
+### Update (2026-10-14): on in both modes
+
+The product owner turned the screen on in both modes: `question-guard` is `bedrock` in `infra/smart_tutor_infra/stacks/config.py`. The measurements below still hold, so each on-topic question waits about 0.4 to 0.45 s longer (p95) before the first token, against the 300 ms target. The product accepts that for 0% false positives and the obvious prompt attacks it stops before search. Decision 4's "stays off" and the latency paragraph below record the state on 2026-10-13. The options to revisit at the end can still replace the screen with a faster one.
 
 ### Measurements (2026-10-13)
 
@@ -52,9 +56,9 @@ Measured 2026-10-14 on the same dataset, in a 2-CPU, 8 GB container with no netw
 
 - The scores barely separate benign questions (median 0.739, max 0.857) from attacks (median 0.757, max 0.828). Every trip came from the validator's match against known DAN-style jailbreaks; our seeds are short, targeted injections. At 0.81 it tripped on questions such as "Compare the instruction hierarchy approach with simple delimiters around untrusted text."
 - At the only thresholds with at most 1% false positives (0.85 and above) it catches nothing. Its p95 misses 300 ms in every run, pasted excerpts of 540 to 740 characters take 0.8 to 2.3 s, and a 4,000-character question 2.9 s.
-- It needs about 2 GiB of agent memory (the plain agent peaks at 193 MiB). On-premise that would leave about 0.7 GB of the t3.large's 8 GB for the OS and Docker, by arithmetic from the compose limits and the RSS measured in the dev container (not measured on the host).
+- It needs about 2 GiB of agent memory (the plain agent peaks at 193 MiB). On-premise that would have left about 0.7 GB of the t3.large's 8 GB for the OS and Docker (about 1.7 GB since Phoenix left the compose, #322), by arithmetic from the compose limits and the RSS measured in the dev container (not measured on the host).
 
-**Default per mode: `off` for on-premise and for native-cloud.** DetectJailbreak is not eligible in either mode: at every threshold it either trips more than 1% of study questions or catches at most 1 of 18 seeds, its p95 latency misses 300 ms, and it needs four times the agent's memory. Bedrock LOW stays the screen of choice if a mode turns one on later; it wins on false positives, on catch rate at 1% false positives or fewer, on image size, and on memory. Latency is comparable (the local p50 is lower; both miss the 300 ms p95), and the local screen wins on the per-call fee and keeps the question in process. Bedrock LOW still misses the latency target, so it stays off as well. Document-embedded attacks (#196) never reach a question screen, so they add no rows.
+**Default per mode: `bedrock` at LOW in both modes, unchanged (see "Update (2026-10-14)").** DetectJailbreak is not eligible in either mode and does not replace the Bedrock screen: at every threshold it either trips more than 1% of study questions or catches at most 1 of 18 seeds, its p95 latency misses 300 ms, and it needs about 2 GiB of agent memory, four times the 512 MiB limit. Bedrock LOW wins on false positives, on catch rate at 1% false positives or fewer, on image size, and on memory. Latency is comparable (the local p50 is lower; both miss the 300 ms p95), and the local screen wins on the per-call fee and keeps the question in process. The product accepts Bedrock's latency miss for its 0% false positives; the local screen would add the same miss without that accuracy. Document-embedded attacks (#196) never reach a question screen, so they add no rows.
 
 ## Why it fails open when the output guard fails closed
 

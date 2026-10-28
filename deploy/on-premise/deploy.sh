@@ -3,9 +3,9 @@
 # <prefix>-deploy (HostStack), after unpacking the deploy bundle to /opt/smart-tutor:
 #   SMART_TUTOR_PREFIX=smart-tutor-on-premise AWS_REGION=us-east-1 deploy.sh <full commit SHA>
 #
-# 1. Renders settings (SSM) and secrets (Secrets Manager), including the Phoenix tracing settings, into a root-only env file. A DuckDNS domain is pointed at this
+# 1. Renders settings (SSM) and secrets (Secrets Manager), including the Langfuse tracing settings, into a root-only env file. A DuckDNS domain is pointed at this
 #    instance's Elastic IP (#154).
-# 2. Pulls the images, starts Postgres, and creates or updates the app, Keycloak, and Phoenix roles and databases.
+# 2. Pulls the images, starts Postgres, and creates or updates the app and Keycloak roles and databases.
 # 3. Migrates, then starts every service and waits until all are healthy. Compose recreates only the services whose
 #    image or settings changed, so the same tag again changes nothing. Fails unless the running worker is isolated
 #    (non-root, read-only root, no capabilities) and egress-limited (check-worker.sh, which ensure-healthy.sh runs
@@ -54,23 +54,26 @@ keycloak_admin_password=$(field password <<<"$keycloak_admin")
 api_client_secret=$(secret keycloak/api-client)
 mcp_client_secret=$(secret keycloak/mcp-client)
 test_learner=$(secret keycloak/test-learner)
-learner_hash_key=$(secret phoenix/learner-hash-key)
-phoenix_db_password=$(secret db/phoenix)
-phoenix_secret=$(secret phoenix/secret)
-phoenix_admin_password=$(secret phoenix/admin-password)
+learner_hash_key=$(secret langfuse/learner-hash-key)
 trace_sampling_rate=$(param trace-sampling-rate)
 # The question screen (#199): the agent applies the guardrail only when question-guard is "bedrock".
 question_guard=$(param question-guard)
 question_guardrail_id=$(param question-guardrail-id)
 question_guardrail_version=$(param question-guardrail-version)
-# Traces go to the on-premise Phoenix, projects smart-tutor-on-premise and -ingestion (ADR 0017); the API sends
-# learner ratings there too (#290). The operator creates the system key's secret in Phoenix
-# (docs/runbooks/on-premise-deploy.md); until then the agent and worker run untraced and the API sends no ratings,
-# rather than failing the deploy.
-phoenix_api_key=
-if ! phoenix_api_key=$(secret phoenix/api-key 2>/dev/null) || [[ -z $phoenix_api_key ]]; then
-  phoenix_api_key=
-  echo "Warning: no Phoenix API key (is the secret $prefix/phoenix/api-key set?); deploying without tracing" >&2
+# Traces go to the shared Langfuse (ADR 0023): its address is an SSM parameter, and the worker's egress proxy
+# allows exactly its host name (ADR 0014). The operator creates the project's keys in Langfuse
+# (docs/runbooks/on-premise-deploy.md); until both secrets exist the agent and worker send nothing there and the API
+# sends no learner ratings (#318).
+host_of() { local rest=${1#*://}; rest=${rest%%/*}; rest=${rest##*@}; printf '%s' "${rest%%:*}"; }
+langfuse_url=$(param langfuse-url)
+langfuse_host=$(host_of "$langfuse_url")
+langfuse_public_key=
+langfuse_secret_key=
+if ! langfuse_public_key=$(secret langfuse/public-key 2>/dev/null) || ! langfuse_secret_key=$(secret langfuse/secret-key 2>/dev/null) ||
+  [[ -z $langfuse_public_key || -z $langfuse_secret_key ]]; then
+  langfuse_public_key=
+  langfuse_secret_key=
+  echo "Warning: no Langfuse keys (are the secrets $prefix/langfuse/public-key and secret-key set?); deploying without Langfuse traces or ratings" >&2
 fi
 caddyfile_sha256=$(sha256sum "$here/Caddyfile" | cut -d' ' -f1)
 
@@ -95,15 +98,15 @@ KEYCLOAK_ADMIN_USERNAME=$keycloak_admin_username
 KEYCLOAK_ADMIN_PASSWORD=$keycloak_admin_password
 API_CLIENT_SECRET=$api_client_secret
 MCP_CLIENT_SECRET=$mcp_client_secret
-PHOENIX_API_KEY=$phoenix_api_key
 TRACE_SAMPLING_RATE=$trace_sampling_rate
 QUESTION_GUARD=$question_guard
 QUESTION_GUARDRAIL_ID=$question_guardrail_id
 QUESTION_GUARDRAIL_VERSION=$question_guardrail_version
 LEARNER_HASH_KEY=$learner_hash_key
-PHOENIX_DB_PASSWORD=$phoenix_db_password
-PHOENIX_SECRET=$phoenix_secret
-PHOENIX_ADMIN_PASSWORD=$phoenix_admin_password
+LANGFUSE_URL=$langfuse_url
+LANGFUSE_HOST=$langfuse_host
+LANGFUSE_PUBLIC_KEY=$langfuse_public_key
+LANGFUSE_SECRET_KEY=$langfuse_secret_key
 EOF
 mv "$rendered" "$env_file"
 
@@ -133,16 +136,12 @@ aws ecr get-login-password --region "$region" | docker login --username AWS --pa
 
 echo "Starting Postgres and bootstrapping the databases"
 "${compose[@]}" up -d --wait postgres
-# The same idempotent script as native-cloud's Helm hook (app and Keycloak), then Phoenix's role from an on-premise-only
-# file; each resets its role's password to its secret.
+# The same idempotent script as native-cloud's Helm hook; it resets each role's password to its secret.
 {
   printf '\\getenv app_password APP_DB_PASSWORD\n\\getenv keycloak_password KEYCLOAK_DB_PASSWORD\n'
-  printf '\\getenv phoenix_password PHOENIX_DB_PASSWORD\n'
   cat "$here/../helm/smart-tutor/files/db-bootstrap.sql"
-  cat "$here/phoenix-db-bootstrap.sql"
 } | "${compose[@]}" exec -T postgres psql -q -U postgres -d postgres \
-  -v app_user=smart_tutor -v app_db=smart_tutor -v keycloak_user=keycloak -v keycloak_db=keycloak \
-  -v phoenix_user=phoenix -v phoenix_db=phoenix >/dev/null
+  -v app_user=smart_tutor -v app_db=smart_tutor -v keycloak_user=keycloak -v keycloak_db=keycloak >/dev/null
 
 echo "Migrating"
 "${compose[@]}" run --rm migrate

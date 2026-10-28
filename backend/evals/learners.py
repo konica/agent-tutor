@@ -1,6 +1,6 @@
 """Load the eval learners' libraries from the seed corpus through the real upload path (PRD §10.3, issue #222).
 
-Usage: uv run --extra eval python -m evals.learners [--timeout 900]
+Usage: uv run --extra eval --extra ingest python -m evals.learners [--timeout 900]
 
 Needs the Compose stack with the app profile (or the host processes, README "Run the app") and your AWS profile: the
 worker describes and embeds each PDF with Bedrock. Downloads the seed PDFs (evals.corpus), then for each learner in

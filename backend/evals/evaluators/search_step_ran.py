@@ -6,7 +6,7 @@ Scored 1 or 0 from the ask target's trajectory, with the reason."""
 from collections.abc import Sequence
 from typing import Any
 
-from evals.suite import Suite, not_applicable
+from evals.suite import Suite, not_applicable, scores
 from evals.targets import ask_target
 
 KEY = "search_step_ran"
@@ -20,6 +20,7 @@ def _same(a: Sequence[str] | None, b: Sequence[str] | None) -> bool:
     return a is None and b is None or a is not None and b is not None and set(a) == set(b)
 
 
+@scores(KEY)
 def search_step_ran(outputs: dict[str, Any]) -> dict[str, Any]:
     if "trajectory" not in outputs:
         return _score(0, "the run failed before it searched")

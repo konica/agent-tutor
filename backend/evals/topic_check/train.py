@@ -25,11 +25,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import langsmith
 import numpy as np
-from langsmith.utils import LangSmithError
 
 from evals.dataset import load_dataset
+from evals.langfuse_client import HINT, LangfuseClient, LangfuseError, SdkLangfuse
 from evals.publish import generated_examples
 from evals.topic_check.data import (
     Labeled,
@@ -124,7 +123,7 @@ def _export(model: Any, out: Path, manifest: dict[str, Any]) -> None:
     (out / "manifest.json").write_text(json.dumps(full, indent=2) + "\n", encoding="utf-8")
 
 
-def main(argv: Sequence[str] | None = None, *, client: Any = None) -> int:
+def main(argv: Sequence[str] | None = None, *, client: LangfuseClient | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--dry-run", action="store_true", help="print the shares' sizes; train nothing")
     parser.add_argument("--base", default="BAAI/bge-small-en-v1.5", help="the sentence-transformer body")
@@ -135,10 +134,11 @@ def main(argv: Sequence[str] | None = None, *, client: Any = None) -> int:
     dataset = load_dataset("topic_check")
     assert dataset.eval_share is not None, "topic_check.yaml must set eval_share"
     try:
-        accepted = [labeled(e) for e in generated_examples(client or langsmith.Client(), dataset)]
-    except LangSmithError as e:
-        print(f"Can't reach LangSmith: {e} (check LANGSMITH_API_KEY)", file=sys.stderr)
+        examples = generated_examples(client or SdkLangfuse(), dataset)
+    except LangfuseError as e:
+        print(f"Can't reach Langfuse: {e} ({HINT})", file=sys.stderr)
         return 1
+    accepted = [labeled(e) for e in examples]
     hand = [str(e.inputs["question"]) for e in dataset.examples]
     train, evaluation = split_train_eval(accepted, hand, dataset.eval_share)
     evaluation += [labeled(e) for e in dataset.examples]

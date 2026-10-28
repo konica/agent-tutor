@@ -8,7 +8,7 @@ from functools import cache
 from pathlib import Path
 from typing import Any
 
-from evals.suite import Evaluator, Suite, not_applicable
+from evals.suite import Evaluator, Suite, not_applicable, scores
 from evals.targets import ask_target
 from smart_tutor.shared.adapters.model_factory import ChatRole, ModelFactory
 from smart_tutor.shared.config import Settings
@@ -50,6 +50,7 @@ def _judge() -> Judge:
 
 
 def judged_by(judge: Callable[[], Judge]) -> Evaluator:
+    @scores(KEY)
     async def retrieval_relevance(
         inputs: dict[str, Any], outputs: dict[str, Any], reference_outputs: dict[str, Any]
     ) -> dict[str, Any]:

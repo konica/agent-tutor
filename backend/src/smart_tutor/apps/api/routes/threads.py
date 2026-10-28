@@ -9,7 +9,7 @@ to upload a document (a "no_documents" decline), kept as a turn like any decline
 id that names its trace and is kept with the turn. The learner lists their active conversations, newest activity
 first (US-13); the learner archives and restores a conversation, and an archived one is read-only (US-13). The
 learner rates a kept answer or decline 👍/👎 (PRD §10.2); the rating is saved with the turn,
-then sent to Phoenix as a `learner_rating` span annotation on the ask's trace. A guard trip's `replace` event keeps
+then sent to Langfuse as a `learner_rating` score on the ask's trace. A guard trip's `replace` event keeps
 the turn as the guard message, with no documents used."""
 
 import json
@@ -660,7 +660,8 @@ class TurnResponse(BaseModel):
     created_at: datetime
     run_id: str | None = Field(
         description=(
-            "The ask's trace id in Phoenix, for attaching a rating (#227); null for turns kept before it was recorded."
+            "The ask's trace id (its run id), for attaching a rating (#227); "
+            "null for turns kept before it was recorded."
         )
     )
     rating: Literal["up", "down"] | None = Field(description="The learner's rating (PRD §10.2); null until rated.")
@@ -728,7 +729,7 @@ def rate_turn(
     conversations: Conversations,
 ) -> TurnRatingResponse:
     """Rate an answer or decline of the learner's conversation helpful ("up") or not ("down"); a new rating replaces
-    the last (PRD §10.2). Saved with the turn, then sent to Phoenix as a `learner_rating` span annotation on the ask's
+    the last (PRD §10.2). Saved with the turn, then sent to Langfuse as a `learner_rating` score on the ask's
     trace."""
     try:
         conversations.rate_turn(ThreadId(str(thread_id)), principal.user_id, RunId(str(run_id)), Rating(body.rating))
