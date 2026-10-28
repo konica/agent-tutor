@@ -46,7 +46,7 @@ def scored(key: str, score: float):
 def test_suites_on_one_dataset_run_as_one_experiment_on_the_versioned_split() -> None:
     client = published()
     group = DatasetSuites("ask", make_target, (scored("search_step_ran", 1.0), scored("answer_relevance", 0.9)))
-    scores, links = run_split(
+    scores, links, _ = run_split(
         client, [group], "smoke", run_name="local run", load=lambda key: ASK, metadata={"agent_model": "m"}
     )
     assert scores == {"search_step_ran": [1.0, 1.0], "answer_relevance": [0.9, 0.9]}
@@ -77,7 +77,7 @@ def test_a_callable_object_target_runs() -> None:
             return {"answer": inputs["question"]}
 
     group = DatasetSuites("ask", ObjectTarget, (scored("search_step_ran", 1.0),))
-    scores, _ = run_split(published(), [group], "smoke", run_name="r", load=lambda key: ASK)
+    scores, _, _ = run_split(published(), [group], "smoke", run_name="r", load=lambda key: ASK)
     assert scores == {"search_step_ran": [1.0, 1.0]}
 
 
@@ -94,7 +94,7 @@ def test_an_example_whose_target_raised_is_scored_as_a_failed_run() -> None:
         return {"key": "search_step_ran", "score": int("answer" in outputs), "comment": ""}
 
     client = published()
-    scores, _ = run_split(
+    scores, _, _ = run_split(
         client, [DatasetSuites("ask", make_failing, (answered,))], "smoke", run_name="r", load=lambda key: ASK
     )
     assert scores == {"search_step_ran": [1, 0]}
@@ -109,7 +109,7 @@ def _flaky_relevance(inputs: dict[str, Any]) -> dict[str, Any]:
 
 def test_an_example_whose_evaluator_raised_counts_as_unscored() -> None:
     group = DatasetSuites("ask", make_target, (_flaky_relevance,))
-    scores, _ = run_split(published(), [group], "smoke", run_name="r", load=lambda key: ASK)
+    scores, _, _ = run_split(published(), [group], "smoke", run_name="r", load=lambda key: ASK)
     assert scores == {"answer_relevance": [0.9, None]}
 
 
@@ -120,7 +120,7 @@ async def _judge_down(inputs: dict[str, Any]) -> dict[str, Any]:
 
 def test_a_declared_metric_whose_evaluator_raised_on_every_example_is_unscored_not_absent() -> None:
     group = DatasetSuites("ask", make_target, (_judge_down,))
-    scores_, _ = run_split(published(), [group], "smoke", run_name="r", load=lambda key: ASK)
+    scores_, _, _ = run_split(published(), [group], "smoke", run_name="r", load=lambda key: ASK)
     assert scores_ == {"answer_relevance": [None, None]}
 
 
@@ -143,7 +143,7 @@ def _declines(inputs: dict[str, Any]) -> dict[str, Any]:
 
 def test_a_not_applicable_result_is_left_out_of_its_metric() -> None:
     group = DatasetSuites("ask", make_target, (_declines,))
-    scores, _ = run_split(published(), [group], "smoke", run_name="r", load=lambda key: ASK)
+    scores, _, _ = run_split(published(), [group], "smoke", run_name="r", load=lambda key: ASK)
     assert scores == {"decline_correctness.correctly_declined": [1]}
 
 
@@ -155,20 +155,20 @@ def _declines_or_raises(inputs: dict[str, Any]) -> dict[str, Any]:
 
 def test_a_raise_beside_a_not_applicable_result_leaves_one_unscored_example() -> None:
     group = DatasetSuites("ask", make_target, (_declines_or_raises,))
-    scores, _ = run_split(published(), [group], "smoke", run_name="r", load=lambda key: ASK)
+    scores, _, _ = run_split(published(), [group], "smoke", run_name="r", load=lambda key: ASK)
     assert scores == {"decline_correctness.correctly_declined": [None]}
 
 
 def test_a_metric_that_applied_to_no_example_is_not_run() -> None:
     group = DatasetSuites("ask", make_target, (lambda inputs: not_applicable("answer_relevance", "n/a"),))
-    scores, _ = run_split(published(), [group], "smoke", run_name="r", load=lambda key: ASK)
+    scores, _, _ = run_split(published(), [group], "smoke", run_name="r", load=lambda key: ASK)
     assert scores == {}
 
 
 def test_a_dataset_without_the_split_runs_nothing() -> None:
     client = published()
     group = DatasetSuites("ask", make_target, (scored("search_step_ran", 1.0),))
-    scores, links = run_split(client, [group], "full", run_name="r", load=lambda key: ASK)
+    scores, links, _ = run_split(client, [group], "full", run_name="r", load=lambda key: ASK)
     assert scores == {} and links == {} and client.runs == []
 
 
@@ -176,7 +176,7 @@ def test_the_newest_version_runs_and_its_tag_is_recorded() -> None:
     client = published()
     publish_split(client, ASK, "smoke", (*ASK.examples, Example({"question": "c"}, {"covered": True})))
     group = DatasetSuites("ask", make_target, (scored("search_step_ran", 1.0),))
-    scores, links = run_split(client, [group], "smoke", run_name="r", load=lambda key: ASK)
+    scores, links, _ = run_split(client, [group], "smoke", run_name="r", load=lambda key: ASK)
     assert scores == {"search_step_ran": [1.0, 1.0, 1.0]}
     assert client.runs[0].dataset == "smart-tutor-ask/smoke-v2"
     assert client.runs[0].metadata["dataset_version"] == "smoke-v2"
@@ -188,7 +188,7 @@ def test_a_pinned_version_runs_instead_of_the_newest() -> None:
     publish_split(client, ASK, "smoke", (*ASK.examples, Example({"question": "c"}, {"covered": True})))
     pinned = Dataset("ask", "smart-tutor-ask", "", ASK.examples, {"smoke": "smoke-v1"})
     group = DatasetSuites("ask", make_target, (scored("search_step_ran", 1.0),))
-    scores, _ = run_split(client, [group], "smoke", run_name="r", load=lambda key: pinned)
+    scores, _, _ = run_split(client, [group], "smoke", run_name="r", load=lambda key: pinned)
     assert scores == {"search_step_ran": [1.0, 1.0]}
     assert client.runs[0].dataset == "smart-tutor-ask/smoke-v1"
 
@@ -351,7 +351,7 @@ def test_a_suite_that_is_not_ready_is_skipped_and_its_metrics_stay_not_run(
 ) -> None:
     client = published()
     group = DatasetSuites("ask", make_target, (scored("search_step_ran", 1.0),), skip=lambda: "no model yet")
-    scores, links = run_split(client, [group], "smoke", run_name="r", load=lambda key: ASK)
+    scores, links, _ = run_split(client, [group], "smoke", run_name="r", load=lambda key: ASK)
     assert scores == {} and links == {} and client.runs == []
     assert "no model yet" in capsys.readouterr().err
 
@@ -361,7 +361,59 @@ def test_a_dataset_that_opts_out_of_a_split_is_skipped_without_asking_to_publish
 ) -> None:
     full_only = Dataset("ask", "smart-tutor-ask", "", ASK.examples, splits=("full",))
     group = DatasetSuites("ask", make_target, (scored("search_step_ran", 1.0),))
-    scores, links = run_split(published(), [group], "smoke", run_name="r", load=lambda key: full_only)
+    scores, links, _ = run_split(published(), [group], "smoke", run_name="r", load=lambda key: full_only)
     assert scores == {} and links == {}
     err = capsys.readouterr().err
     assert "opts out" in err and "publish" not in err
+
+
+GOLD = Dataset(
+    "ask",
+    "smart-tutor-ask",
+    "",
+    (
+        Example({"question": "a"}, {}, {"difficulty": "hard", "category": "x"}),
+        Example({"question": "b"}, {}, {"difficulty": "easy", "category": "x"}),
+    ),
+)
+
+
+def _gold_published() -> FakeLangfuse:
+    client = FakeLangfuse()
+    publish_split(client, GOLD, "smoke", GOLD.examples)
+    return client
+
+
+def test_run_split_pairs_each_score_with_its_examples_row_metadata() -> None:
+    group = DatasetSuites("ask", make_target, (scored("evidence.cited_recall", 0.5),))
+    scores, _, labelled = run_split(_gold_published(), [group], "smoke", run_name="r", load=lambda key: GOLD)
+    assert scores == {"evidence.cited_recall": [0.5, 0.5]}
+    assert labelled == {
+        "evidence.cited_recall": [
+            (0.5, {"difficulty": "hard", "category": "x"}),
+            (0.5, {"difficulty": "easy", "category": "x"}),
+        ]
+    }
+
+
+def test_an_evaluator_that_raised_keeps_its_examples_metadata() -> None:
+    group = DatasetSuites("ask", make_target, (_judge_down,))
+    _, _, labelled = run_split(_gold_published(), [group], "smoke", run_name="r", load=lambda key: GOLD)
+    assert [score for score, _ in labelled["answer_relevance"]] == [None, None]
+    assert labelled["answer_relevance"][0][1]["difficulty"] == "hard"
+
+
+def test_the_breakdown_prints_after_the_gate_and_lands_in_the_summary(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    summary = tmp_path / "summary.md"
+    suites = [Suite("ask", make_target, (scored("evidence.cited_recall", 0.5),))]
+    main(["--split", "smoke", "--summary", str(summary)], client=_gold_published(), suites=suites, load=lambda k: GOLD)
+    out = capsys.readouterr().out
+    assert out.index("Gate:") < out.index("Gold evidence by difficulty and category")
+    assert "| evidence.cited_recall | difficulty | hard | 0.500 | 1 |" in summary.read_text(encoding="utf-8")
+
+
+def test_no_breakdown_without_gold_metrics(capsys: pytest.CaptureFixture[str]) -> None:
+    main(["--split", "smoke"], client=published(), suites=_suites(0.9), load=lambda key: ASK)
+    assert "Gold evidence by difficulty" not in capsys.readouterr().out

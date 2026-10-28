@@ -113,7 +113,9 @@ async def _answer(inputs: dict[str, Any]) -> dict[str, Any]:
     return {"answer": f"about {inputs['question']}"}
 
 
-async def _relevance(inputs: dict[str, Any], outputs: dict[str, Any], expected: dict[str, Any]) -> list[ItemScore]:
+async def _relevance(
+    inputs: dict[str, Any], outputs: dict[str, Any], expected: dict[str, Any], metadata: dict[str, Any]
+) -> list[ItemScore]:
     return [ItemScore("answer_relevance", 0.5 if expected["covered"] else 0.0, outputs["answer"])]
 
 
@@ -383,3 +385,24 @@ def test_boolean_scores_are_read_by_name_with_when_they_were_last_set_and_only_t
     ]
     filters = {"name": "accepted", "data_type": "BOOLEAN", "fields": "subject"}
     assert api.calls == [("scores", {"cursor": None, **filters}), ("scores", {"cursor": "1", **filters})]
+
+
+def test_an_evaluator_receives_empty_metadata_for_an_item_without() -> None:
+    seen: list[dict[str, Any]] = []
+
+    async def spy(
+        inputs: dict[str, Any], outputs: dict[str, Any], expected: dict[str, Any], metadata: dict[str, Any]
+    ) -> list[ItemScore]:
+        seen.append(metadata)
+        return []
+
+    SdkLangfuse(StubSdk()).run_experiment(
+        "a/smoke-v1",
+        run_name="r",
+        description="d",
+        metadata={},
+        task=_answer,
+        evaluators=[spy],
+        max_concurrency=1,
+    )
+    assert seen == [{}]

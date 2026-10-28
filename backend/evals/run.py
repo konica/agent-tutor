@@ -18,11 +18,12 @@ import inspect
 import sys
 from collections import defaultdict
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from evals import breakdown
 from evals.dataset import Dataset, DatasetError, load_dataset, version_name, version_to_run
 from evals.gate import check, load_thresholds, passed, ran, render, render_markdown
 from evals.langfuse_client import ItemEvaluator, ItemScore, LangfuseClient, LangfuseError, SdkLangfuse, Task
@@ -40,6 +41,14 @@ class _Result:
     key: str
     score: float | None  # None when not applicable, or when the evaluator gave no score
     applicable: bool
+    metadata: dict[str, Any] = field(default_factory=dict)  # the example's row metadata (difficulty, category, ...)
+
+
+@dataclass(frozen=True)
+class _Raised:
+    """An evaluator that raised on an example and declares no metric."""
+
+    metadata: dict[str, Any]
 
 
 def _failure_scored(target: Target) -> Task:
@@ -56,7 +65,7 @@ def _failure_scored(target: Target) -> Task:
     return run
 
 
-def _recorded(evaluator: Evaluator, results: list[_Result | None]) -> ItemEvaluator:
+def _recorded(evaluator: Evaluator, results: list[_Result | _Raised]) -> ItemEvaluator:
     """The evaluator as Langfuse runs it: called with the arguments its parameters name, its score posted on the
     example's trace, and every result appended to `results`, because Langfuse keeps neither a not-applicable result
     nor the key of an evaluator that raised. A raise is recorded as unscored under the evaluator's declared metric
@@ -65,7 +74,7 @@ def _recorded(evaluator: Evaluator, results: list[_Result | None]) -> ItemEvalua
     metric = metric_of(evaluator)
 
     async def evaluate(
-        inputs: dict[str, Any], outputs: dict[str, Any], reference_outputs: dict[str, Any]
+        inputs: dict[str, Any], outputs: dict[str, Any], reference_outputs: dict[str, Any], metadata: dict[str, Any]
     ) -> list[ItemScore]:
         given = {"inputs": inputs, "outputs": outputs, "reference_outputs": reference_outputs}
         try:
@@ -74,9 +83,9 @@ def _recorded(evaluator: Evaluator, results: list[_Result | None]) -> ItemEvalua
                 found = await found
             applicable = found.get("value") != NOT_APPLICABLE
             score = found.get("score") if applicable else None
-            result = _Result(found["key"], None if score is None else float(score), applicable)
+            result = _Result(found["key"], None if score is None else float(score), applicable, metadata)
         except Exception:
-            results.append(None if metric is None else _Result(metric, None, applicable=True))
+            results.append(_Raised(metadata) if metric is None else _Result(metric, None, True, metadata))
             raise
         results.append(result)
         if result.score == 0:  # Langfuse's score API is off on v4 hosts: the log is where a failed row's reason shows
@@ -87,17 +96,17 @@ def _recorded(evaluator: Evaluator, results: list[_Result | None]) -> ItemEvalua
     return evaluate
 
 
-def _scores(results: Sequence[_Result | None]) -> dict[str, list[float | None]]:
-    """One evaluator's scores by metric. An example it raised on counts as unscored (None) under its declared metric,
-    else under each metric it scored elsewhere, not as absent, or the gate would average only the survivors. A
-    not-applicable result is left out of its metric."""
-    scores: defaultdict[str, list[float | None]] = defaultdict(list)
-    for key in {r.key for r in results if r is not None}:
+def _scores(results: Sequence[_Result | _Raised]) -> dict[str, list[tuple[float | None, dict[str, Any]]]]:
+    """One evaluator's scores by metric, each with its example's row metadata. An example it raised on counts as
+    unscored (None) under its declared metric, else under each metric it scored elsewhere, not as absent, or the gate
+    would average only the survivors. A not-applicable result is left out of its metric."""
+    scores: defaultdict[str, list[tuple[float | None, dict[str, Any]]]] = defaultdict(list)
+    for key in {r.key for r in results if isinstance(r, _Result)}:
         for result in results:
-            if result is None:
-                scores[key].append(None)
+            if isinstance(result, _Raised):
+                scores[key].append((None, result.metadata))
             elif result.key == key and result.applicable:
-                scores[key].append(result.score)
+                scores[key].append((result.score, result.metadata))
     return dict(scores)
 
 
@@ -109,9 +118,11 @@ def run_split(
     run_name: str,
     load: Callable[[str], Dataset] = load_dataset,
     metadata: Mapping[str, str] | None = None,
-) -> tuple[dict[str, list[float | None]], dict[str, str]]:
-    """Each metric's scores, one per example, and each experiment's link."""
+) -> tuple[dict[str, list[float | None]], dict[str, str], breakdown.Labelled]:
+    """Each metric's scores, one per example, each experiment's link, and each metric's scores with their examples'
+    row metadata (for the breakdown)."""
     scores: defaultdict[str, list[float | None]] = defaultdict(list)
+    labelled: defaultdict[str, list[tuple[float | None, dict[str, Any]]]] = defaultdict(list)
     links: dict[str, str] = {}
     for group in groups:
         dataset = load(group.dataset)
@@ -125,7 +136,7 @@ def run_split(
         if version is None:  # its metrics stay "not run"
             print(f"{dataset.name} has no {split} version yet: publish one (make evals-publish)", file=sys.stderr)
             continue
-        results: list[list[_Result | None]] = [[] for _ in group.evaluators]
+        results: list[list[_Result | _Raised]] = [[] for _ in group.evaluators]
         links[f"{dataset.name} ({split} {version})"] = client.run_experiment(
             version_name(dataset, version),
             run_name=run_name,
@@ -137,8 +148,9 @@ def run_split(
         )
         for evaluator_results in results:
             for key, found in _scores(evaluator_results).items():
-                scores[key] += found
-    return dict(scores), links
+                scores[key] += [score for score, _ in found]
+                labelled[key] += found
+    return dict(scores), links, dict(labelled)
 
 
 def _append(path: Path | None, text: str) -> None:
@@ -187,7 +199,7 @@ def main(
     run_name = f"{args.environment} {datetime.now(UTC):%Y-%m-%d %H:%M:%S}Z"
     groups = by_dataset(discover() if suites is None else suites)
     try:
-        scores, links = run_split(
+        scores, links, labelled = run_split(
             client or SdkLangfuse(tracing=True), groups, args.split, run_name=run_name, load=load, metadata=metadata
         )
     except (DatasetError, LoadError) as e:
@@ -198,6 +210,10 @@ def main(
     rows = check(thresholds, scores)
     print(render(rows, links))
     _append(args.summary, render_markdown(rows, links, f"{args.split.capitalize()} evals"))
+    if split_rows := breakdown.rows(labelled):  # never gates
+        print()
+        print(breakdown.render(split_rows))
+        _append(args.summary, breakdown.render_markdown(split_rows))
     if not ran(rows):
         why = f"no suite's dataset has a {args.split} split, or every evaluator failed"
         return _stop(args.summary, f"Nothing ran: no metric was scored ({why}).")

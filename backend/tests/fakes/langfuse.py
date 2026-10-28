@@ -156,7 +156,7 @@ class FakeLangfuse:
             scores: list[ItemScore] = []
             for evaluator in evaluators:
                 try:
-                    scores += await evaluator(dict(item.input), output, dict(item.expected_output))
+                    scores += await evaluator(dict(item.input), output, dict(item.expected_output), dict(item.metadata))
                 except Exception:
                     continue  # the SDK logs it; the item keeps its other scores
             return output, scores
