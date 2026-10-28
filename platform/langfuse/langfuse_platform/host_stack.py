@@ -11,7 +11,7 @@ sends it traces, scores, and datasets (spec sdd/specs/2026-10-14-off-hours-and-l
 - Deploy: `cdk deploy` uploads `deploy/` as an asset; the SSM document `langfuse-deploy` unpacks it to /opt/langfuse and
   runs deploy.sh, which renders settings and secrets into a root-only env file. No secret is in the template, the
   outputs, or the user data.
-- Off-hours (ADR 0022): stopped at 18:00 and 00:00, started at 07:00, Asia/Ho_Chi_Minh. No CloudWatch alarms; a failed
+- Off-hours (ADR 0022): stopped at 18:00 and 00:00, started by hand (no schedule), Asia/Ho_Chi_Minh. No CloudWatch alarms; a failed
   weekly patching window emails `langfuse-alerts`.
 """
 
@@ -50,7 +50,7 @@ HOST_TAG = "langfuse:host"
 SNAPSHOT_TAG = "langfuse:snapshots"
 SNAPSHOT_TIME_UTC = "19:00"  # 02:00 in TIME_ZONE
 SNAPSHOT_RETENTION_DAYS = 7
-PATCH_SCHEDULE = "cron(20 7 ? * SUN *)"  # twenty minutes after the 07:00 start
+PATCH_SCHEDULE = "cron(20 7 ? * SUN *)"  # the host is started by hand, not at 07:00: it is patched only if running
 ENSURE_HEALTHY = "/opt/langfuse/ensure-healthy.sh"
 ENSURE_HEALTHY_COMMAND = (
     f"[ -f {ENSURE_HEALTHY} ] || {{ echo 'ensure-healthy.sh is missing: run the deploy document"

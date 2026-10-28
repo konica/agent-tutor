@@ -21,8 +21,8 @@
 - Deploy: `cdk deploy` uploads `deploy/` as an asset; the SSM document `<prefix>-deploy` downloads it and runs
   `deploy/on-premise/deploy.sh <image tag>`, which renders settings and secrets into a root-only env file on the VM.
   No secret is in the template, the outputs, or the user data.
-- Off-hours (ADR 0022): EventBridge Scheduler stops the instance at 18:00 and 00:00 and starts it at 07:00 in the app
-  time zone (OffHours). A person may start it at any hour; Docker brings every service back.
+- Off-hours (ADR 0022): EventBridge Scheduler stops the instance at 18:00 and 00:00 in the app time zone (OffHours).
+  No schedule starts it: a person starts it at any hour, and Docker brings every service back.
 - No CloudWatch alarms (ADR 0022). The topic `<prefix>-alerts` emails the budget recipients when the weekly patching
   fails. EC2's default automatic recovery moves the instance off failed hardware. Runbook:
   docs/runbooks/on-premise-monitoring.md.
@@ -70,9 +70,9 @@ COMPOSE_SHA256 = "db1889184726840f75c4f9c001048430d4f25b3be3cb084d3ddd762bc0aed5
 BUNDLE_DIR = Path(__file__).parents[3] / "deploy"
 # Only the instance with this tag may attach the volume with this tag.
 HOST_TAG = "smart-tutor:host"
-# Weekly patching: Sunday 07:20 in the app time zone, twenty minutes after the off-hours start (07:00), so Docker has the
-# services up; it reboots only when a patch needs it. A reboot can cut short Sunday's catch-up dump (the 03:00 dump runs
-# at the 07:00 boot after a randomized delay); that day's 02:00 snapshot still covers it.
+# Weekly patching: Sunday 07:20 in the app time zone. The host is no longer started at 07:00, so the window reaches it
+# only if someone started it; it reboots only when a patch needs it. A reboot can cut short Sunday's catch-up dump (the
+# 03:00 dump runs at the boot after a randomized delay); that day's 02:00 snapshot still covers it.
 PATCH_SCHEDULE = "cron(20 7 ? * SUN *)"
 # Run after the patching. The script reaches the VM with the bundle, i.e. with a deploy, not with `cdk deploy`.
 ENSURE_HEALTHY = "/opt/smart-tutor/on-premise/ensure-healthy.sh"

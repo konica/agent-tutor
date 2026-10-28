@@ -1,13 +1,12 @@
 """Off-hours for one EC2 host (spec sdd/specs/2026-10-14-off-hours-and-langfuse-host-design.md §4, ADR 0022).
 
-EventBridge Scheduler stops the instance at 18:00 and again at 00:00 (a host someone started by hand in the evening)
-and starts it at 07:00, in the given time zone, by calling the EC2 API directly (universal targets): no Lambda, no
-alarm, no dead-letter queue. Stopping a stopped instance, or starting a running one, changes nothing, so a person may
-start the host at any hour; it then runs until the next stop.
+EventBridge Scheduler stops the instance at 18:00 and again at 00:00 (a host someone started by hand in the evening),
+in the given time zone, by calling the EC2 API directly (universal targets): no Lambda, no alarm, no dead-letter
+queue. No schedule starts the host: people start it by hand at any hour, and it then runs until the next stop.
 
 The app host's CDK project keeps its own copy of this construct; keep the two in step when the schedule's shape
 changes. This copy prefixes each schedule's name (`langfuse-stop`): CloudFormation identifies a schedule by its name
-alone, whatever its group, and the app host's stack already owns `stop`, `stop-late`, and `start`.
+alone, whatever its group, and the app host's stack already owns `stop` and `stop-late`.
 """
 
 import aws_cdk as cdk
@@ -20,7 +19,6 @@ from constructs import Construct
 SCHEDULES = (
     ("stop", "cron(0 18 * * ? *)", "stopInstances"),
     ("stop-late", "cron(0 0 * * ? *)", "stopInstances"),
-    ("start", "cron(0 7 * * ? *)", "startInstances"),
 )
 RETRY_ATTEMPTS = 2
 
@@ -38,21 +36,21 @@ class OffHours(Construct):
             assumed_by=iam.ServicePrincipal(
                 "scheduler.amazonaws.com", conditions={"StringEquals": {"aws:SourceAccount": stack.account}}
             ),
-            description=f"EventBridge Scheduler: start and stop the {name_prefix} host outside its hours",
+            description=f"EventBridge Scheduler: stop the {name_prefix} host outside its hours",
         )
         # The volumes use the AWS-managed aws/ebs key, whose key policy lets EC2 use it for any principal in the
         # account, so starting needs no KMS permission here (a customer-managed key would need kms:CreateGrant).
         role.add_to_policy(
             iam.PolicyStatement(
-                sid="StartAndStopTheHost",
-                actions=["ec2:StartInstances", "ec2:StopInstances"],
+                sid="StopTheHost",
+                actions=["ec2:StopInstances"],
                 resources=[stack.format_arn(service="ec2", resource="instance", resource_name=instance.instance_id)],
             )
         )
         for name, expression, action in SCHEDULES:
             scheduler.CfnSchedule(
                 self,
-                name.title().replace("-", ""),  # Stop, StopLate, Start
+                name.title().replace("-", ""),  # Stop, StopLate
                 name=f"{name_prefix}-{name}",  # unique in the account, not just in the group (see the docstring)
                 group_name=group.ref,  # Ref of a schedule group is its name
                 description=f"{action} the {name_prefix} host ({expression}, {time_zone})",

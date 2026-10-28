@@ -221,7 +221,7 @@ def _instance_id(t: Template) -> str:
 
 def test_off_hours_and_patching_without_alarms(t: Template) -> None:
     t.has_resource_properties("AWS::Scheduler::ScheduleGroup", {"Name": "langfuse-off-hours"})
-    t.resource_count_is("AWS::Scheduler::Schedule", 3)
+    t.resource_count_is("AWS::Scheduler::Schedule", 2)
     t.resource_count_is("AWS::CloudWatch::Alarm", 0)
     t.resource_count_is("AWS::Route53::HealthCheck", 0)
     t.has_resource_properties(
@@ -232,18 +232,17 @@ def test_off_hours_and_patching_without_alarms(t: Template) -> None:
     t.has_resource_properties("AWS::SNS::Subscription", {"Protocol": "email", "Endpoint": "ops@example.com"})
 
 
-def test_schedules_target_this_instance_and_the_role_only_starts_and_stops_it(t: Template) -> None:
+def test_schedules_target_this_instance_and_the_role_only_stops_it(t: Template) -> None:
     schedules = {s["Properties"]["Name"]: s["Properties"] for s in t.find_resources("AWS::Scheduler::Schedule").values()}
     assert {n: (s["ScheduleExpression"], s["ScheduleExpressionTimezone"]) for n, s in schedules.items()} == {
         "langfuse-stop": ("cron(0 18 * * ? *)", "Asia/Ho_Chi_Minh"),
         "langfuse-stop-late": ("cron(0 0 * * ? *)", "Asia/Ho_Chi_Minh"),
-        "langfuse-start": ("cron(0 7 * * ? *)", "Asia/Ho_Chi_Minh"),
     }
     instance_ref = json.dumps({"Ref": _instance_id(t)})
     for schedule in schedules.values():
         assert instance_ref in json.dumps(schedule["Target"]["Input"])
-    statement = _statements(t)["StartAndStopTheHost"]
-    assert sorted(statement["Action"]) == ["ec2:StartInstances", "ec2:StopInstances"]
+    statement = _statements(t)["StopTheHost"]
+    assert statement["Action"] == "ec2:StopInstances"
     assert instance_ref in json.dumps(statement["Resource"])
 
 

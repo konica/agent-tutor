@@ -1,9 +1,8 @@
 """Off-hours for one EC2 host (spec sdd/specs/2026-10-14-off-hours-and-langfuse-host-design.md §4, ADR 0022).
 
-EventBridge Scheduler stops the instance at 18:00 and again at 00:00 (a host someone started by hand in the evening)
-and starts it at 07:00, in the given time zone, by calling the EC2 API directly (universal targets): no Lambda, no
-alarm, no dead-letter queue. Stopping a stopped instance, or starting a running one, changes nothing, so a person may
-start the host at any hour; it then runs until the next stop.
+EventBridge Scheduler stops the instance at 18:00 and again at 00:00 (a host someone started by hand in the evening),
+in the given time zone, by calling the EC2 API directly (universal targets): no Lambda, no alarm, no dead-letter
+queue. No schedule starts the host: people start it by hand at any hour, and it then runs until the next stop.
 
 platform/langfuse (the shared Langfuse host, ADR 0021) will keep its own copy of this file, so that project can move to a repository of its own.
 """
@@ -18,7 +17,6 @@ from constructs import Construct
 SCHEDULES = (
     ("stop", "cron(0 18 * * ? *)", "stopInstances"),
     ("stop-late", "cron(0 0 * * ? *)", "stopInstances"),
-    ("start", "cron(0 7 * * ? *)", "startInstances"),
 )
 RETRY_ATTEMPTS = 2
 
@@ -36,21 +34,21 @@ class OffHours(Construct):
             assumed_by=iam.ServicePrincipal(
                 "scheduler.amazonaws.com", conditions={"StringEquals": {"aws:SourceAccount": stack.account}}
             ),
-            description=f"EventBridge Scheduler: start and stop the {name_prefix} host outside its hours",
+            description=f"EventBridge Scheduler: stop the {name_prefix} host outside its hours",
         )
         # The volumes use the AWS-managed aws/ebs key, whose key policy lets EC2 use it for any principal in the
         # account, so starting needs no KMS permission here (a customer-managed key would need kms:CreateGrant).
         role.add_to_policy(
             iam.PolicyStatement(
-                sid="StartAndStopTheHost",
-                actions=["ec2:StartInstances", "ec2:StopInstances"],
+                sid="StopTheHost",
+                actions=["ec2:StopInstances"],
                 resources=[stack.format_arn(service="ec2", resource="instance", resource_name=instance.instance_id)],
             )
         )
         for name, expression, action in SCHEDULES:
             scheduler.CfnSchedule(
                 self,
-                name.title().replace("-", ""),  # Stop, StopLate, Start
+                name.title().replace("-", ""),  # Stop, StopLate
                 name=name,
                 group_name=group.ref,  # Ref of a schedule group is its name
                 description=f"{action} the {name_prefix} host ({expression}, {time_zone})",
