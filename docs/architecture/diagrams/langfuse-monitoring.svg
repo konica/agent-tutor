@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 64 984 448" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="langfuse-monitoring-title langfuse-monitoring-desc" id="langfuse-monitoring-root">
+<title id="langfuse-monitoring-title">Observe Smart Tutor traces and metrics in Langfuse</title>
+<desc id="langfuse-monitoring-desc">The agent and the ingestion worker send ask and ingest traces through an OpenTelemetry exporter over OTLP/HTTP to the production Langfuse project, where people read them in the trace explorer; learner ratings as scores and dashboards with alerts are planned.</desc>
+<defs>
+      <style>#langfuse-monitoring-root { color-scheme: light;
+      --color-paper:  #f6f7f9;
+      --color-ink:    #14202b;
+      --color-muted:  #4a5866;
+      --color-accent: #0b6b66;
+      --color-rule:   rgba(20,32,43,0.12);
+      --font-sans:    system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      --font-serif:   Charter, 'Bitstream Charter', 'Iowan Old Style', 'Palatino Linotype', Cambria, Georgia, serif;
+      --font-mono:    ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace; }
+      #langfuse-monitoring-root { font-family: var(--font-sans); color: var(--color-ink); }
+      #langfuse-monitoring-root .diagram-container { width: 100%; overflow-x: auto; }
+      #langfuse-monitoring-root .notes { margin-top: 1.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--color-rule);
+      max-width: 72ch;
+      font-size: 0.9rem;
+      line-height: 1.55;
+      color: var(--color-muted); }
+      #langfuse-monitoring-root .notes h2 { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em;
+                 text-transform: uppercase; margin-bottom: 0.5rem; }
+      #langfuse-monitoring-root .notes ol, #langfuse-monitoring-root .notes ul { padding-left: 1.25rem; }
+      #langfuse-monitoring-root .notes li + li { margin-top: 0.25rem; }
+      #langfuse-monitoring-root .notes code { font-family: var(--font-mono); font-size: 0.82rem; color: var(--color-ink); }
+      #langfuse-monitoring-root .diagram-container { overflow-x: visible; }</style>
+<marker id="langfuse-monitoring-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4a5866"/></marker>
+<marker id="langfuse-monitoring-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#0b6b66"/></marker>
+<marker id="langfuse-monitoring-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#1d5fa8"/></marker>
+</defs>
+<rect x="0" y="64" width="984" height="448" fill="#f6f7f9"/>
+<!-- zones -->
+<rect x="24" y="104" width="448" height="320" rx="8" fill="#14202b" fill-opacity="0.02" stroke="#14202b" stroke-opacity="0.14" stroke-width="0.8"/>
+<rect x="36" y="108" width="156" height="12" rx="2" fill="#f6f7f9"/>
+<text x="40" y="117" fill="#5b6875" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">SMART TUTOR · ON-PREMISE VM</text>
+<rect x="496" y="104" width="464" height="320" rx="8" fill="#14202b" fill-opacity="0.02" stroke="#14202b" stroke-opacity="0.14" stroke-width="0.8"/>
+<rect x="508" y="108" width="172" height="12" rx="2" fill="#f6f7f9"/>
+<text x="512" y="117" fill="#5b6875" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">LANGFUSE · SEC-DOG.DUCKDNS.ORG</text>
+<!-- arrows -->
+<path d="M 216,168 H 240 Q 248,168 248,176 V 212 Q 248,220 256,220 H 280" fill="none" stroke="#4a5866" stroke-width="1.2" marker-end="url(#langfuse-monitoring-arrow)"/>
+<path d="M 216,296 H 240 Q 248,296 248,288 V 252 Q 248,244 256,244 H 280" fill="none" stroke="#4a5866" stroke-width="1.2" marker-end="url(#langfuse-monitoring-arrow)"/>
+<path d="M 456,232 H 520" fill="none" stroke="#0b6b66" stroke-width="1.4" marker-end="url(#langfuse-monitoring-arrow-accent)"/>
+<path d="M 456,376 H 600 Q 608,376 608,368 V 264" fill="none" stroke="#1d5fa8" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#langfuse-monitoring-arrow-link)"/>
+<path d="M 696,220 H 720 Q 728,220 728,212 V 176 Q 728,168 736,168 H 760" fill="none" stroke="#4a5866" stroke-width="1.2" marker-end="url(#langfuse-monitoring-arrow)"/>
+<path d="M 696,244 H 720 Q 728,244 728,252 V 288 Q 728,296 736,296 H 760" fill="none" stroke="#4a5866" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#langfuse-monitoring-arrow)"/>
+<!-- arrow labels -->
+<rect x="460" y="212" width="56" height="12" rx="2" fill="#f6f7f9"/>
+<text x="488" y="221" fill="#0b6b66" font-size="8" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.06em">OTLP/HTTP</text>
+<rect x="510" y="356" width="36" height="12" rx="2" fill="#f6f7f9"/>
+<text x="528" y="365" fill="#1d5fa8" font-size="8" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.06em">SCORE</text>
+<!-- nodes -->
+<rect x="40" y="136" width="176" height="64" rx="6" fill="#f6f7f9"/>
+<rect x="40" y="136" width="176" height="64" rx="6" fill="#ffffff" stroke="#14202b" stroke-width="1"/>
+<rect x="48" y="142" width="24" height="12" rx="2" fill="none" stroke="#5b6875" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="60" y="151" fill="#5b6875" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">ASK</text>
+<text x="128" y="168" fill="#14202b" font-size="12" font-weight="600" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">Agent</text>
+<text x="128" y="182" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">one trace per question</text>
+<text x="128" y="194" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">trace name: ask</text>
+<rect x="40" y="264" width="176" height="64" rx="6" fill="#f6f7f9"/>
+<rect x="40" y="264" width="176" height="64" rx="6" fill="#ffffff" stroke="#14202b" stroke-width="1"/>
+<rect x="48" y="270" width="40" height="12" rx="2" fill="none" stroke="#5b6875" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="68" y="279" fill="#5b6875" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">INGEST</text>
+<text x="128" y="296" fill="#14202b" font-size="12" font-weight="600" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">Ingestion worker</text>
+<text x="128" y="310" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">one trace per content</text>
+<text x="128" y="322" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">trace name: ingest</text>
+<rect x="280" y="200" width="176" height="64" rx="6" fill="#f6f7f9"/>
+<rect x="280" y="200" width="176" height="64" rx="6" fill="#ffffff" stroke="#14202b" stroke-width="1"/>
+<rect x="288" y="206" width="44" height="12" rx="2" fill="none" stroke="#5b6875" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="310" y="215" fill="#5b6875" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">TRACING</text>
+<text x="368" y="232" fill="#14202b" font-size="12" font-weight="600" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">OTel exporter</text>
+<text x="368" y="246" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">OpenInference LangChain</text>
+<text x="368" y="258" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">sampled · never raises</text>
+<rect x="280" y="344" width="176" height="64" rx="6" fill="#f6f7f9"/>
+<rect x="280" y="344" width="176" height="64" rx="6" fill="#14202b" fill-opacity="0.02" stroke="#14202b" stroke-opacity="0.45" stroke-width="1" stroke-dasharray="4,3"/>
+<rect x="288" y="350" width="28" height="12" rx="2" fill="none" stroke="#5b6875" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="302" y="359" fill="#5b6875" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">#318</text>
+<text x="368" y="376" fill="#14202b" font-size="12" font-weight="600" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">Learner ratings</text>
+<text x="368" y="390" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">learner_rating score</text>
+<text x="368" y="402" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">thumbs up / down</text>
+<rect x="520" y="200" width="176" height="64" rx="6" fill="#f6f7f9"/>
+<rect x="520" y="200" width="176" height="64" rx="6" fill="#0b6b66" fill-opacity="0.08" stroke="#0b6b66" stroke-width="1"/>
+<rect x="528" y="206" width="44" height="12" rx="2" fill="none" stroke="#0b6b66" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="550" y="215" fill="#0b6b66" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">PROJECT</text>
+<text x="608" y="232" fill="#14202b" font-size="12" font-weight="600" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">Production project</text>
+<text x="608" y="246" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">smart-tutor-on-premise</text>
+<text x="608" y="258" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">+ -local, -evals</text>
+<rect x="760" y="136" width="176" height="64" rx="6" fill="#f6f7f9"/>
+<rect x="760" y="136" width="176" height="64" rx="6" fill="#ffffff" stroke="#14202b" stroke-width="1"/>
+<rect x="768" y="142" width="28" height="12" rx="2" fill="none" stroke="#5b6875" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="782" y="151" fill="#5b6875" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">VIEW</text>
+<text x="848" y="168" fill="#14202b" font-size="12" font-weight="600" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">Trace explorer</text>
+<text x="848" y="182" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">Tracing → Traces</text>
+<text x="848" y="194" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">name · env · session</text>
+<rect x="760" y="264" width="176" height="64" rx="6" fill="#f6f7f9"/>
+<rect x="760" y="264" width="176" height="64" rx="6" fill="#14202b" fill-opacity="0.02" stroke="#14202b" stroke-opacity="0.45" stroke-width="1" stroke-dasharray="4,3"/>
+<rect x="768" y="270" width="20" height="12" rx="2" fill="none" stroke="#5b6875" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="778" y="279" fill="#5b6875" font-size="7" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">M4</text>
+<text x="848" y="296" fill="#14202b" font-size="12" font-weight="600" font-family="system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">Dashboards + alerts</text>
+<text x="848" y="310" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">latency · cost · tokens</text>
+<text x="848" y="322" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">errors · score drops</text>
+<!-- callouts and legend -->
+<line x1="24" y1="456" x2="960" y2="456" stroke="#14202b" stroke-opacity="0.1" stroke-width="0.8"/>
+<text x="24" y="476" fill="#4a5866" font-size="8" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">LEGEND</text>
+<rect x="96" y="467" width="24" height="12" rx="2" fill="#ffffff" stroke="#14202b" stroke-width="1"/>
+<text x="128" y="476" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">service / view</text>
+<rect x="236" y="467" width="24" height="12" rx="2" fill="#0b6b66" fill-opacity="0.08" stroke="#0b6b66" stroke-width="1"/>
+<text x="268" y="476" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">where traces land</text>
+<rect x="392" y="467" width="24" height="12" rx="2" fill="#14202b" fill-opacity="0.02" stroke="#14202b" stroke-opacity="0.45" stroke-width="1" stroke-dasharray="4,3"/>
+<text x="424" y="476" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">planned</text>
+<line x1="492" y1="473" x2="516" y2="473" stroke="#0b6b66" stroke-width="1.2" marker-end="url(#langfuse-monitoring-arrow-accent)"/>
+<text x="524" y="476" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">trace export</text>
+<line x1="620" y1="473" x2="644" y2="473" stroke="#1d5fa8" stroke-width="1.2" marker-end="url(#langfuse-monitoring-arrow-link)"/>
+<text x="652" y="476" fill="#4a5866" font-size="9" font-family="ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace">API call</text>
+</svg>
