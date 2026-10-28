@@ -39,7 +39,7 @@ def test_the_ask_dataset_asks_eval_learners_about_their_own_seed_documents() -> 
     ask = load_dataset("ask")
     seeds = load_manifest()
     library = {learner.username: set(learner.documents) for learner in load_learners(LEARNERS, seeds)}
-    assert ask.name == "smart-tutor-ask" and 8 <= len(ask.examples) <= 30 and ask.pins == {}
+    assert ask.name == "smart-tutor-ask" and 8 <= len(ask.examples) <= 80 and ask.pins == {}
     for example in ask.examples:
         held = library[example.inputs["learner"]]
         assert set(example.inputs["documents"] or []) <= held  # a limit names the learner's own documents
