@@ -23,6 +23,7 @@ from evals.dataset import (
 )
 from evals.langfuse_client import Item, LangfuseError
 from evals.learners import LEARNERS, load_learners
+from evals.publish import SMOKE_SIZE
 from fakes.langfuse import FakeLangfuse
 
 Q1 = Example({"question": "What is ReAct?", "learner": "learner@example.com", "documents": None}, {"covered": True})
@@ -39,7 +40,9 @@ def test_the_ask_dataset_asks_eval_learners_about_their_own_seed_documents() -> 
     ask = load_dataset("ask")
     seeds = load_manifest()
     library = {learner.username: set(learner.documents) for learner in load_learners(LEARNERS, seeds)}
-    assert ask.name == "smart-tutor-ask" and 8 <= len(ask.examples) <= 80 and ask.pins == {}
+    assert ask.name == "smart-tutor-ask" and 8 <= len(ask.examples) and ask.pins == {}
+    assert len([e for e in ask.examples if "smoke" in e.splits]) <= SMOKE_SIZE  # hand-written rows fit the smoke split
+    assert all(e.splits == ("full",) for e in ask.examples if "category" in e.metadata)  # gold rows stay out of smoke
     for example in ask.examples:
         held = library[example.inputs["learner"]]
         assert set(example.inputs["documents"] or []) <= held  # a limit names the learner's own documents
