@@ -78,6 +78,20 @@ Keys: `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`, your own key pair of the 
 
 The runner then uses the pinned version for that split (and stops if it doesn't exist or is incomplete), so the release gate can be rerun on exactly the examples it passed. Record the pinned versions in the release PR.
 
+### Gold rows
+
+The `smart-tutor-ask` dataset also holds 30 gold rows (`splits: [full]`, learner 2, over `wikiskill-2026` and `jevharness-2026`). Each has `answer` (the reference), `nuggets` (facts the answer must state), `evidence` (quotes with their pages), `distractors` (look-alike quotes the answer must not cite), and row `metadata` `{category, type, difficulty}`. A row's `splits` overrides the dataset's. Relabeling a row's metadata makes a new dataset version.
+
+Check the rows before every change to `ask.yaml` (needs the PDFs; CI doesn't run it):
+
+    uv run --extra eval --extra ingest python -m evals.evidence
+
+It checks that each quote is on its stated page and inside one worker chunk (it prints the chunk ids, `<seed id>:<seq>`), the schema, the mix (`single_hop` at most 40%, each difficulty at least 20%), and question word overlap. It exits 1 on a failure.
+
+Gold evaluators: `evidence.retrieved_recall`, `evidence.cited_recall`, `evidence.gold_rank` (mean = MRR), `evidence.distractor_cited` (lower is better), and the `answer_correctness` judge (supported nugget recall). They have no thresholds yet, so the gate reports "no threshold"; set targets after two baseline runs of the full split. After the gate table, `evals.run` prints the five metrics' means per difficulty and per category (also in the CI job summary). It never gates.
+
+JevAgentHarness is CC BY-NC-SA 4.0: keep quotes short and attributed.
+
 ## Multi-turn conversations
 
 An `ask` example may have `inputs.history`: the earlier turns of the conversation, oldest first. A turn that is a question alone is asked first, as the same learner and with the example's `documents` limit, and its answer kept; a turn written as `{question, answer}` (the injection dataset's multi-turn attacks) is kept as written. Each ask gets the turns before it the way the API sends them: the last `history_turns` turns, each answer cut to `history_answer_chars`. Only the last question is scored. The outputs of the run carry the `history` and the `chunks` the last search found.
