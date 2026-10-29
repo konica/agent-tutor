@@ -17,14 +17,13 @@ from typing import Any
 from evals.dataset import Example, load_dataset
 from evals.publish import TYPES
 
-CATEGORIES = ("single_hop", "multi_hop", "unanswerable", "out_of_scope", "conflicting", "time_sensitive", "near_miss")
+CATEGORIES = ("single_hop", "multi_hop", "unanswerable", "conflicting", "time_sensitive", "near_miss")
 DIFFICULTIES = ("easy", "medium", "hard")
 QUESTION_TYPES = (*TYPES, "false_premise")
 MAX_QUOTE = 200  # the worker's chunks are 1,000 characters with 200 of overlap: a quote this short fits in one
 MAX_SINGLE_HOP = 0.4  # "about a third" with some slack
 MIN_DIFFICULTY_SHARE = 0.2
 ALWAYS_HARD = ("multi_hop", "conflicting", "near_miss")
-NO_RETRIEVAL = ("unanswerable", "out_of_scope")  # covered: false by nature, so they carry no evidence
 NEW_FIELDS = ("answer", "nuggets", "evidence", "distractors")
 STOPWORDS = frozenset(
     re.findall(
@@ -82,8 +81,6 @@ def row_problems(example: Example) -> list[str]:
         problems.append(f"{category} rows are always hard, not {difficulty}")
     elif category == "time_sensitive" and difficulty == "easy":
         problems.append("time_sensitive rows are at least medium, not easy")
-    elif category == "out_of_scope" and difficulty != "easy":
-        problems.append(f"out_of_scope rows are easy, not {difficulty}")
 
     evidence_items: list[dict[str, Any]] = list(out.get("evidence") or [])
     distractors: list[dict[str, Any]] = list(out.get("distractors") or [])
@@ -102,6 +99,8 @@ def row_problems(example: Example) -> list[str]:
 
     if "nuggets" in out:
         problems.append("nuggets are deferred (#362); answer_correctness judges the reference answer")
+    if "off_topic" in out:
+        problems.append("off-topic questions belong to the topic check eval (#363)")
 
     if not out.get("covered"):
         if sources:
@@ -110,8 +109,8 @@ def row_problems(example: Example) -> list[str]:
         if present:
             problems.append(f"uncovered rows carry no {', '.join(present)}")
         return problems
-    if category in NO_RETRIEVAL:
-        problems.append(f"{category} rows are covered: false")
+    if category == "unanswerable":  # covered: false by nature, so it carries no evidence
+        problems.append("unanswerable rows are covered: false")
     else:
         for field in ("evidence", "answer"):
             if not out.get(field):

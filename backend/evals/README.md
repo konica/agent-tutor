@@ -80,7 +80,7 @@ The runner then uses the pinned version for that split (and stops if it doesn't 
 
 ### Gold rows
 
-The `smart-tutor-ask` dataset also holds 30 gold rows (`splits: [full]`, learner 2, over `wikiskill-2026` and `jevharness-2026`). Each has `answer` (the reference answer: what a complete answer needs and nothing more, every statement backed by the row's evidence quotes), `evidence` (quotes with their pages), `distractors` (look-alike quotes the answer must not cite), and row `metadata` `{category, type, difficulty}`. A row's `splits` overrides the dataset's. Relabeling a row's metadata makes a new dataset version.
+The `smart-tutor-ask` dataset also holds 29 gold rows (`splits: [full]`, learner 2, over `wikiskill-2026` and `jevharness-2026`) in six categories: `single_hop`, `multi_hop`, `unanswerable`, `conflicting`, `time_sensitive`, and `near_miss`. Off-topic questions belong to the topic check eval below, not to `ask` (#363); the checker fails a gold row with `off_topic`. Each has `answer` (the reference answer: what a complete answer needs and nothing more, every statement backed by the row's evidence quotes), `evidence` (quotes with their pages), `distractors` (look-alike quotes the answer must not cite), and row `metadata` `{category, type, difficulty}`. A row's `splits` overrides the dataset's. Relabeling a row's metadata makes a new dataset version.
 
 Check the rows before every change to `ask.yaml` (needs the PDFs; CI doesn't run it):
 
@@ -88,7 +88,7 @@ Check the rows before every change to `ask.yaml` (needs the PDFs; CI doesn't run
 
 It checks that each quote is on its stated page and inside one worker chunk (it prints the chunk ids, `<seed id>:<seq>`), the schema, the mix (`single_hop` at most 40%, each difficulty at least 20%), and question word overlap. It exits 1 on a failure.
 
-Gold evaluators: `evidence.retrieved_recall`, `evidence.cited_recall`, `evidence.gold_rank` (mean = MRR), `evidence.distractor_cited` (lower is better), and the `answer_correctness` judge (0–1: how fully the answer states the reference answer's facts without contradicting it; extra true facts aren't penalized; a decline on a covered row or a failed run scores 0). Nuggets are deferred (#362): the checker fails a row that carries them. They have no thresholds yet, so the gate reports "no threshold"; set targets after two baseline runs of the full split. After the gate table, `evals.run` prints the five metrics' means per difficulty and per category (also in the CI job summary). It never gates.
+Gold evaluators: `evidence.retrieved_recall`, `evidence.cited_recall`, `evidence.gold_rank` (mean = MRR), `evidence.distractor_cited` (lower is better), and the `answer_correctness` judge (0–1: how fully the answer states the reference answer's facts without contradicting it; extra information that doesn't contradict the reference isn't penalized; a decline on a covered row or a failed run scores 0). Nuggets are deferred (#362): the checker fails a row that carries them. They have no thresholds yet, so the gate reports "no threshold"; set targets after two baseline runs of the full split. After the gate table, `evals.run` prints the five metrics' means per difficulty and per category (also in the CI job summary). It never gates.
 
 JevAgentHarness is CC BY-NC-SA 4.0: keep quotes short and attributed.
 

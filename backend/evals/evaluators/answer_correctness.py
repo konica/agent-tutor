@@ -1,7 +1,7 @@
 """Answer correctness (PRD §10.1, LLM-as-judge): how fully the answer states the facts of the gold row's reference
 answer without contradicting it. Judge: the `judge` model role with rubrics/answer_correctness.md; a 0–1 score and a
-short reason. Extra true facts are not penalized, since a reference answer is never complete. The evidence quotes never
-reach the judge."""
+short reason. Extra information that doesn't contradict the reference is not penalized, since a reference answer is
+never complete. The evidence quotes never reach the judge."""
 
 from collections.abc import Awaitable, Callable
 from functools import cache

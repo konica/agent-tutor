@@ -129,10 +129,13 @@ def test_difficulty_follows_category() -> None:
     assert any("multi_hop" in p and "hard" in p for p in multi)
     timed = evidence.row_problems(gold(metadata={"category": "time_sensitive", "difficulty": "easy"}))
     assert any("time_sensitive" in p for p in timed)
-    scope = evidence.row_problems(
-        uncovered(off_topic=True, metadata={"category": "out_of_scope", "difficulty": "hard"})
-    )
-    assert any("out_of_scope" in p and "easy" in p for p in scope)
+
+
+def test_off_topic_rows_belong_to_the_topic_check() -> None:
+    assert any("topic check" in p for p in evidence.row_problems(uncovered(off_topic=True)))
+    assert any("topic check" in p for p in evidence.row_problems(gold(off_topic=False)))
+    scope = evidence.row_problems(uncovered(metadata={"category": "out_of_scope", "difficulty": "easy"}))
+    assert any("unknown category 'out_of_scope'" in p for p in scope)
 
 
 def test_a_covered_gold_row_needs_evidence_and_answer() -> None:
