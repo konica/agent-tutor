@@ -100,29 +100,22 @@ def row_problems(example: Example) -> list[str]:
     if category == "near_miss" and not distractors:
         problems.append("near_miss rows need distractors")
 
+    if "nuggets" in out:
+        problems.append("nuggets are deferred (#362); answer_correctness judges the reference answer")
+
     if not out.get("covered"):
         if sources:
             problems.append("uncovered rows have sources: []")
-        present = [f for f in ("answer", "nuggets", "evidence") if f in out]
+        present = [f for f in ("answer", "evidence") if f in out]
         if present:
             problems.append(f"uncovered rows carry no {', '.join(present)}")
         return problems
     if category in NO_RETRIEVAL:
         problems.append(f"{category} rows are covered: false")
     else:
-        for field in ("evidence", "answer", "nuggets"):
+        for field in ("evidence", "answer"):
             if not out.get(field):
                 problems.append(f"covered gold rows need {field}")
-    nuggets = list(out.get("nuggets") or [])
-    if len(nuggets) > 4:
-        problems.append(f"{len(nuggets)} nuggets, at most 4")
-    for i, nugget in enumerate(nuggets):
-        indexes = list(nugget.get("evidence") or [])
-        if not indexes:
-            problems.append(f"nugget {i}: names no evidence")
-        for index in indexes:
-            if not isinstance(index, int) or not 0 <= index < len(evidence_items):
-                problems.append(f"nugget {i}: evidence index {index} is out of range (0..{len(evidence_items) - 1})")
     return problems
 
 

@@ -15,10 +15,6 @@ def gold(**changes: Any) -> Example:
         "covered": True,
         "sources": ["wikiskill-2026"],
         "answer": "It discards the candidate skill change and keeps the wiki.",
-        "nuggets": [
-            {"fact": "A rejected skill change is discarded.", "evidence": [0]},
-            {"fact": "The wiki is never rolled back.", "evidence": [1]},
-        ],
         "evidence": [
             {"source": "wikiskill-2026", "page": 6, "quote": QUOTE_A},
             {"source": "wikiskill-2026", "page": 6, "quote": QUOTE_B},
@@ -81,19 +77,13 @@ def test_a_quote_over_200_characters_fails() -> None:
     assert evidence.row_problems(with_evidence(quote="x" * 200)) == []
 
 
-def test_nugget_evidence_index_must_exist() -> None:
-    row = gold()
-    row.outputs["nuggets"][1]["evidence"] = [2]
-    assert any("index" in p for p in evidence.row_problems(row))
+def test_a_gold_row_carrying_nuggets_fails() -> None:
+    nuggets = [{"fact": "A rejected skill change is discarded.", "evidence": [0]}]
+    assert any("nuggets are deferred" in p for p in evidence.row_problems(gold(nuggets=nuggets)))
+    assert any("nuggets are deferred" in p for p in evidence.row_problems(uncovered(nuggets=nuggets)))
 
 
-def test_a_nugget_needs_evidence_indexes() -> None:
-    row = gold()
-    row.outputs["nuggets"][0]["evidence"] = []
-    assert any("nugget" in p and "evidence" in p for p in evidence.row_problems(row))
-
-
-def test_an_uncovered_row_carries_no_answer_nuggets_or_evidence() -> None:
+def test_an_uncovered_row_carries_no_answer_or_evidence() -> None:
     problems = evidence.row_problems(uncovered(answer="a"))
     assert any("answer" in p and "uncovered" in p for p in problems)
     assert evidence.row_problems(uncovered()) == []
@@ -145,8 +135,8 @@ def test_difficulty_follows_category() -> None:
     assert any("out_of_scope" in p and "easy" in p for p in scope)
 
 
-def test_a_covered_gold_row_needs_evidence_answer_and_nuggets() -> None:
-    for field in ("evidence", "answer", "nuggets"):
+def test_a_covered_gold_row_needs_evidence_and_answer() -> None:
+    for field in ("evidence", "answer"):
         row = gold()
         del row.outputs[field]
         assert any(field in p for p in evidence.row_problems(row)), field
