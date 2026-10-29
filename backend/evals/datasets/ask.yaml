@@ -8,7 +8,8 @@
 #          questions of the conversation; the target asks them first, with the conversation's limit, and scores the last.
 # outputs: covered: whether the learner's library answers the question; sources: seed ids that answer it;
 #          chunks (generated examples only): the seed chunks (`<seed id>:<seq>`) the question was written from.
-#          gold rows (#359) add, all optional: answer (reference answer); nuggets: [{fact, evidence: indexes into evidence}];
+#          gold rows (#359) add, all optional: answer (the reference answer_correctness scores against: what a complete
+#          answer needs and nothing more, each statement backed by the row's evidence quotes; no nuggets, #362);
 #          evidence: [{source, page (1-based PDF page), quote (<= 200 chars, verbatim from the page text)}]; distractors
 #          (same shape: near-miss passages that must not be cited); off_topic: true for out-of-scope questions.
 #          `python -m evals.evidence` checks every quote against the pypdf page text and the worker's chunks.
@@ -81,11 +82,7 @@ examples:
     outputs:
       covered: true
       sources: [wikiskill-2026]
-      answer: "WikiSkill splits its workspace into a Raw Layer that stores immutable execution traces, a Wiki Layer that keeps structured knowledge, and a Skill Layer that holds the evolving procedural knowledge (the skills)."
-      nuggets:
-        - {fact: "The Raw Layer stores immutable execution traces.", evidence: [0]}
-        - {fact: "The Wiki Layer maintains structured knowledge.", evidence: [0]}
-        - {fact: "The Skill Layer contains evolving procedural knowledge.", evidence: [0]}
+      answer: "WikiSkill splits its workspace into a Raw Layer that stores immutable execution traces, a Wiki Layer that keeps structured knowledge, and a Skill Layer that contains evolving procedural knowledge."
       evidence:
         - {source: wikiskill-2026, page: 2, quote: "agent workspace into three layers: a Raw Layer that stores immutable execution traces, a Wiki Layer that maintains structured knowledge, and a Skill Layer that contains evolving procedural knowledge"}
     metadata: {category: single_hop, type: factual, difficulty: easy}  # easy: main-text prose, the passage's key terms
@@ -95,9 +92,6 @@ examples:
       covered: true
       sources: [wikiskill-2026]
       answer: "It discards the candidate skill change and reverts to the last accepted skill set, but it never rolls back the wiki: patterns and logs persist across iterations."
-      nuggets:
-        - {fact: "A rejected skill change is discarded and the skill set reverts to the last accepted configuration.", evidence: [0]}
-        - {fact: "The wiki is never rolled back; its patterns and logs persist across iterations.", evidence: [1]}
       evidence:
         - {source: wikiskill-2026, page: 6, quote: "If rejected, the system discards the candidate skill modifications and reverts the skill set to the most recent successful configuration"}
         - {source: wikiskill-2026, page: 6, quote: "is never rolled back regardless of the acceptance decision; accumulated patterns and logs persist across all iterations"}
@@ -107,10 +101,7 @@ examples:
     outputs:
       covered: true
       sources: [wikiskill-2026]
-      answer: "Up to 8 traces per iteration: at most 5 failing traces, used for root-cause analysis, and up to 3 passing traces, used to identify what works."
-      nuggets:
-        - {fact: "The system samples up to 8 traces per iteration for the Wiki Maintainer.", evidence: [0]}
-        - {fact: "At most 5 of them are failing traces and up to 3 are passing traces.", evidence: [0]}
+      answer: "Up to 8 traces per iteration: at most 5 failing traces and up to 3 passing traces."
       evidence:
         - {source: wikiskill-2026, page: 21, quote: "the system samples up to 8 traces per iteration, stratified into a maximum of 5 failing traces (to perform root-cause analysis of errors) and up to 3 passing traces"}
     metadata: {category: single_hop, type: factual, difficulty: hard}  # hard: appendix (App. C) + paraphrased question
@@ -120,9 +111,6 @@ examples:
       covered: true
       sources: [wikiskill-2026]
       answer: "It doesn't choose: the full content of all active skills is injected directly into the inference agent's system prompt, which deliberately takes skill triggering and retrieval failures out of the study."
-      nuggets:
-        - {fact: "There is no skill retrieval step: the full content of the active skills is injected into the Inference Agent's system prompt.", evidence: [0]}
-        - {fact: "Full injection is deliberate, to remove skill triggering or retrieval failures as confounding variables.", evidence: [1]}
       evidence:
         - {source: wikiskill-2026, page: 5, quote: "the full content of active skills S k−1 is injected directly into the Inference Agent’s system prompt"}
         - {source: wikiskill-2026, page: 5, quote: "eliminating skill triggering or retrieval failures as confounding variables in our study"}
@@ -133,9 +121,6 @@ examples:
       covered: true
       sources: [jevharness-2026]
       answer: "A decision model takes the task, the history and one multiple-choice question and returns a probability for each listed option instead of generating text."
-      nuggets:
-        - {fact: "It is given the task, the history and one multiple-choice question.", evidence: [0]}
-        - {fact: "It returns a probability for each listed option instead of generating text.", evidence: [0]}
       evidence:
         - {source: jevharness-2026, page: 2, quote: "Given the task, the history and one multiple-choice question, a decision model returns a probability for each listed option instead of generating text"}
     metadata: {category: single_hop, type: conceptual, difficulty: easy}  # easy: main-text prose, the passage's key terms
@@ -145,9 +130,6 @@ examples:
       covered: true
       sources: [jevharness-2026]
       answer: "The decision model answers first, and the harness uses its answer when its confidence clears the threshold; otherwise the LLM decides as usual."
-      nuggets:
-        - {fact: "The decision model answers first and its answer is used when its confidence clears a threshold.", evidence: [0]}
-        - {fact: "Below the threshold the LLM decides as usual.", evidence: [1]}
       evidence:
         - {source: jevharness-2026, page: 3, quote: "the decision model answers first, and the harness uses it when its confidence clears a threshold"}
         - {source: jevharness-2026, page: 3, quote: "Otherwise the LLM decides as usual"}
@@ -157,10 +139,7 @@ examples:
     outputs:
       covered: true
       sources: [jevharness-2026]
-      answer: "On those 500 tasks, AgentDecision-4B took a median of 31 ms per answer on one L4 GPU, while a Flash call took 809 ms."
-      nuggets:
-        - {fact: "AgentDecision-4B took a median 31 ms per answer on one L4 GPU.", evidence: [0]}
-        - {fact: "A Flash call took 809 ms.", evidence: [0]}
+      answer: "AgentDecision-4B took a median of 31 ms per answer on one L4 GPU, while a Flash call took 809 ms."
       evidence:
         - {source: jevharness-2026, page: 7, quote: "On one L4 GPU, it took a median 31 ms per answer, while a Flash call took 809 ms."}
     metadata: {category: single_hop, type: factual, difficulty: easy}  # easy: main-text prose, the passage's key terms (run and GPU named, so Table 18's A10G and Table 26's isolated-question latencies do not answer)
@@ -170,10 +149,6 @@ examples:
       covered: true
       sources: [jevharness-2026]
       answer: "Every task offers the same 68 tools plus finish, in shuffled order: seven core tools, one that asks the customer, 31 near-duplicates of the core tools and 29 unrelated ones."
-      nuggets:
-        - {fact: "Every task offers the same 68 tools plus finish, in shuffled order.", evidence: [0]}
-        - {fact: "Seven are core tools and one asks the customer.", evidence: [0]}
-        - {fact: "31 are near-duplicates of core tools and 29 are unrelated.", evidence: [0]}
       evidence:
         - {source: jevharness-2026, page: 4, quote: "Every task offers the same 68 tools plus finish in shuffled order: seven core tools, one that asks the customer, 31 near-duplicates of core tools and 29 unrelated ones."}
     metadata: {category: single_hop, type: factual, difficulty: easy}  # easy: main-text prose, the passage's key terms
@@ -183,11 +158,6 @@ examples:
       covered: true
       sources: [jevharness-2026]
       answer: "No. The authors say a decision-model guard should never be the only control on an irreversible action. Adapters control only cost and speed and should not be used as security boundaries (if one fails, the step simply runs without it), and adversarial observations and policy injection were not tested, so the results hold for benign states only."
-      nuggets:
-        - {fact: "A decision-model guard should never be the only control on an irreversible action.", evidence: [0]}
-        - {fact: "Adapters control only cost and speed and should not be used as security boundaries.", evidence: [2]}
-        - {fact: "If an adapter fails, the step runs without it.", evidence: [1]}
-        - {fact: "Adversarial observations and policy injection were not tested, so the results hold for benign states only.", evidence: [3, 4]}
       evidence:
         - {source: jevharness-2026, page: 9, quote: "so a decision-model guard should never be the only control on an irreversible action"}
         - {source: jevharness-2026, page: 9, quote: "If an adapter fails, the step runs without it"}
@@ -203,10 +173,6 @@ examples:
       covered: true
       sources: [wikiskill-2026]
       answer: "Giving the skill proposer the persistent wiki raised average performance from 48.7% to 63.7% (+15.0) in the ablation. Nothing trims it: the wiki keeps accumulating pattern pages, logs and proposal diffs, and WikiSkill has no automated pruning, which the authors say may become necessary over longer runs."
-      nuggets:
-        - {fact: "Giving the Skill Proposer access to the persistent wiki raised average performance from 48.7% to 63.7% (+15.0).", evidence: [0]}
-        - {fact: "The wiki keeps accumulating pattern pages, evolution logs and proposal diffs across iterations.", evidence: [1]}
-        - {fact: "WikiSkill has no automated mechanism to prune the wiki; pruning may become necessary over longer evolution runs.", evidence: [2]}
       evidence:
         - {source: wikiskill-2026, page: 11, quote: "providing the Skill Proposer with access to the persistent wiki increases average benchmark performance from 48.7% to 63.7% (+15.0%)"}
         - {source: wikiskill-2026, page: 14, quote: "the Wiki Layer continuously accumulates pattern pages, evolution logs, and proposal diffs across iterations"}
@@ -217,11 +183,7 @@ examples:
     outputs:
       covered: true
       sources: [wikiskill-2026]
-      answer: "WikiSkill's count stays constant: with the full training set as one batch, each iteration needs 1 + T_ReAct calls (T_ReAct was roughly 10 to 20) whatever the training-set size. EvoSkill uses one proposer and one generator call per minibatch, so its calls grow linearly with the training set."
-      nuggets:
-        - {fact: "WikiSkill needs 1 + T_ReAct optimizer calls per iteration, regardless of the number of training instances.", evidence: [0]}
-        - {fact: "T_ReAct was roughly 10 to 20 in the experiments.", evidence: [1]}
-        - {fact: "EvoSkill makes two LLM calls per minibatch, so its call count scales linearly with training-set size.", evidence: [2, 3]}
+      answer: "WikiSkill's count stays constant: each iteration needs 1 + T_ReAct optimizer calls (T_ReAct was roughly 10 to 20), whatever the number of training instances. EvoSkill uses one proposer and one generator call per minibatch, so its calls grow linearly with the training set."
       evidence:
         - {source: wikiskill-2026, page: 22, quote: "each iteration requires 1 + T ReAct optimizer LLM calls, regardless of the number of training instances"}
         - {source: wikiskill-2026, page: 22, quote: "roughly 10 ≤ T ReAct ≤ 20 across our experiment runs"}
@@ -233,12 +195,7 @@ examples:
     outputs:
       covered: true
       sources: [jevharness-2026]
-      answer: "It is Qwen3-4B with LoRA, trained on states the harness visits with JEV's answers as labels: first supervised fine-tuning, then RL (GRPO) in the agent loop, and later further training on public tool-use data. In those first two steps SFT made the difference, raising step-level accuracy on shifted states from 52.9% to 98.4% in 2.2 GPU-hours, while GRPO added no measurable gain."
-      nuggets:
-        - {fact: "AgentDecision-4B is Qwen3-4B post-trained with LoRA on states the harness visits, with JEV's answers as labels.", evidence: [0, 1, 2]}
-        - {fact: "Training ran SFT first, then RL (GRPO) in the agent loop, and later further training on public tool-use data.", evidence: [2, 3]}
-        - {fact: "Most of the gain comes from SFT, which raised step-level accuracy on shifted states from 52.9% to 98.4%.", evidence: [4, 5]}
-        - {fact: "GRPO added no measurable gain over SFT.", evidence: [6]}
+      answer: "It is Qwen3-4B with LoRA, trained on states the harness visits with JEV's answers as labels: first supervised fine-tuning, then RL (GRPO) in the agent loop, and later further training on public tool-use data. Most of the gain came from SFT, which raised step-level accuracy on shifted states from 52.9% to 98.4%, while GRPO added no measurable gain over SFT."
       evidence:
         - {source: jevharness-2026, page: 5, quote: "We therefore post-train a small open model, Qwen3-4B with LoRA"}
         - {source: jevharness-2026, page: 1, quote: "an open 4B model, on such states with JEV’s answers as labels"}
@@ -253,11 +210,7 @@ examples:
     outputs:
       covered: true
       sources: [jevharness-2026]
-      answer: "Customer-service and household agents got 81.1–89.0% cheaper, but coding agents only saved 7.0–10.5%. Coding agents' actions are free text, so the decision model can only choose which LLM writes each step rather than make the step itself."
-      nuggets:
-        - {fact: "Customer-service and household agents were 81.1–89.0% cheaper.", evidence: [0]}
-        - {fact: "For coding agents, cost fell by only 7.0–10.5%.", evidence: [1]}
-        - {fact: "Coding agents' actions are free text, so the decision model can only choose which LLM writes a step.", evidence: [2]}
+      answer: "Customer-service and household agents got 81.1–89.0% cheaper, but coding agents only saved 7.0–10.5%. Coding agents' actions are free text, so the decision model can only choose which LLM writes each step."
       evidence:
         - {source: jevharness-2026, page: 3, quote: "service and household agents were 81.1–89.0% cheaper and up to 2.5 times faster"}
         - {source: jevharness-2026, page: 7, quote: "Coding agents gained less. When JEV sent each step to a strong or fast LLM, cost fell by 7.0–10.5% and success varied by harness"}
@@ -268,11 +221,7 @@ examples:
     outputs:
       covered: true
       sources: [wikiskill-2026, jevharness-2026]
-      answer: "Both use ALFWorld, the text-based household-task environment. WikiSkill evolves and tests skills on it (for example lifting Qwen-3.6-27B from 52.8% to 77.6%), while JevAgentHarness uses it to test a decision model that chooses every action of the agent, including a 4B model trained on ALFWorld's training games."
-      nuggets:
-        - {fact: "Both papers evaluate on ALFWorld, a text-based environment of multi-step household tasks.", evidence: [0, 2]}
-        - {fact: "WikiSkill uses ALFWorld as a benchmark for evolving and testing skills.", evidence: [0, 1]}
-        - {fact: "JevAgentHarness uses ALFWorld to test a decision model choosing the agent's actions, including a 4B model trained on its training games.", evidence: [2, 3]}
+      answer: "Both use ALFWorld, a text-based environment of multi-step household tasks. WikiSkill evolves and tests skills on it, while JevAgentHarness uses it to test a decision model that chooses every action of the agent, including a 4B model trained on ALFWorld's training games."
       evidence:
         - {source: wikiskill-2026, page: 20, quote: "ALFWorld (Shridhar et al., 2021) is an interactive text-based embodied environment where an agent solves multi-step household tasks"}
         - {source: wikiskill-2026, page: 8, quote: "while improving Qwen-3.6-27B from 52.8% to 77.6% on ALFWorld"}
@@ -284,9 +233,7 @@ examples:
     outputs:
       covered: true
       sources: [jevharness-2026]
-      answer: "With JEV and Gemini 3.5 Flash, the cascade's fitted thresholds were 1.00 for tool choices and 0.99 for arguments, so only near-certain answers were used."
-      nuggets:
-        - {fact: "With JEV and Flash, the fitted thresholds were 1.00 for tools and 0.99 for arguments.", evidence: [0]}
+      answer: "With JEV and Flash, the cascade's fitted thresholds were 1.00 for tool choices and 0.99 for arguments."
       evidence:
         - {source: jevharness-2026, page: 4, quote: "With JEV and Flash, the fitted thresholds were 1.00 for tools and 0.99 for arguments, so only near-certain answers are used."}
       distractors:
@@ -342,10 +289,6 @@ examples:
       covered: true
       sources: [wikiskill-2026, jevharness-2026]
       answer: "The papers give different numbers. WikiSkill reports 85.9% for Gemini 3.5 Flash with no skills on its 134-game ALFWorld test split, while JevAgentHarness reports 88.8% for Flash alone on ALFWorld's 134 unseen-room (valid_unseen) games."
-      nuggets:
-        - {fact: "WikiSkill reports 85.9% for Gemini 3.5 Flash with no skills on its 134-game ALFWorld test split.", evidence: [0, 3]}
-        - {fact: "JevAgentHarness reports 88.8% for Flash alone on ALFWorld's 134 unseen-room (valid_unseen) games.", evidence: [1, 2]}
-        - {fact: "The two papers report different numbers for Flash alone on the 134-game split.", evidence: [0, 1, 2, 3]}
       evidence:
         - {source: wikiskill-2026, page: 7, quote: "Note that for Gemini-3.5-Flash on ALFWorld, all evolution methods yield the same performance (85.9%) as the no-skill baseline"}
         - {source: jevharness-2026, page: 30, quote: "the unchanged cascade took 99.4% of the actions and solved 89.6% of the games against 88.8% for Flash alone"}
@@ -360,10 +303,6 @@ examples:
       covered: true
       sources: [wikiskill-2026, jevharness-2026]
       answer: "No. WikiSkill's table gives Gemini 3.5 Flash with no skill 85.9% on ALFWorld (its test split has 134 games), while JevAgentHarness gives 88.8% for Flash alone on the 134 unseen-room games."
-      nuggets:
-        - {fact: "WikiSkill gives Gemini 3.5 Flash with no skill 85.9% on its 134-game ALFWorld test split.", evidence: [0, 3]}
-        - {fact: "JevAgentHarness gives 88.8% for Flash alone on ALFWorld's 134 unseen-room games.", evidence: [1, 2]}
-        - {fact: "The two papers report different numbers, so they do not agree.", evidence: [0, 1]}
       evidence:
         - {source: wikiskill-2026, page: 8, quote: "Gemini-3.5-Flash No skill 33.0 29.4 50.5 48.6 85.9 49.5"}
         - {source: jevharness-2026, page: 7, quote: "ALFWorld, unseen rooms: same model and threshold 134 88.8 89.6 +0.7 92.0 35.1 18.2"}
@@ -378,9 +317,6 @@ examples:
       covered: true
       sources: [jevharness-2026]
       answer: "As of the JevAgentHarness paper (arXiv v1, 15 October 2026), the recent frontier models it names are GPT-6 Astra and Claude Opus 5.5; newer models may have come out since."
-      nuggets:
-        - {fact: "The paper names GPT-6 Astra and Claude Opus 5.5 as recent frontier models.", evidence: [0]}
-        - {fact: "That is as of the paper, dated 15 October 2026, so it may be out of date.", evidence: [1]}
       evidence:
         - {source: jevharness-2026, page: 1, quote: "Recent frontier models such as GPT-6 Astra (OpenAI, 2026c) and Claude Opus 5.5 (Anthropic, 2026)"}
         - {source: jevharness-2026, page: 1, quote: "arXiv:2610.21412v1 [cs.AI] 15 Oct 2026"}
@@ -390,11 +326,7 @@ examples:
     outputs:
       covered: true
       sources: [jevharness-2026]
-      answer: "As of the JevAgentHarness paper, JEV was billed through OpenRouter at $0.042 per million input tokens and nothing for output. That is the list price on the study's run dates for the pinned JEV 1.13 (released 15 September 2026), and the authors note that prices change with providers, so it may differ today."
-      nuggets:
-        - {fact: "JEV was billed through OpenRouter at $0.042 per million input tokens.", evidence: [0]}
-        - {fact: "Output tokens cost nothing.", evidence: [0]}
-        - {fact: "The price is dated: it is the list price on the study's run dates, as of the paper.", evidence: [1, 2]}
+      answer: "As of the JevAgentHarness paper, JEV was billed through OpenRouter at $0.042 per million input tokens and nothing for output. That is the list price on the study's run dates, and the authors note that prices change with providers, so it may differ today."
       evidence:
         - {source: jevharness-2026, page: 33, quote: "JEV is billed through OpenRouter at $0.042/M input tokens and nothing for output"}
         - {source: jevharness-2026, page: 33, quote: "with list prices on the run dates applied to measured tokens"}
@@ -410,10 +342,7 @@ examples:
     outputs:
       covered: true
       sources: [jevharness-2026]
-      answer: "With the final AgentDecision-4B on its own GPU, the DecisionGym agent was 86.3% cheaper and 2.5 times faster, without losing 3 or more points of success."
-      nuggets:
-        - {fact: "The DecisionGym agent was 86.3% cheaper.", evidence: [0]}
-        - {fact: "It was about 2.5 times faster.", evidence: [0]}
+      answer: "The DecisionGym agent was 86.3% cheaper and 2.5 times faster."
       evidence:
         - {source: jevharness-2026, page: 7, quote: "With AGENT DECISION -4B on its own GPU, the DECISION GYM agent was 86.3% cheaper and 2.5 times faster, without losing 3 or more points of success"}
       distractors:
@@ -424,9 +353,7 @@ examples:
     outputs:
       covered: true
       sources: [jevharness-2026]
-      answer: "In Stage 1, letting JEV make every tool choice without a fitted confidence threshold lowered task success by 19.0 points."
-      nuggets:
-        - {fact: "Letting JEV make every tool choice lost 19.0 points of task success.", evidence: [0]}
+      answer: "Letting JEV make every tool choice lost 19.0 points of task success."
       evidence:
         - {source: jevharness-2026, page: 6, quote: "Letting JEV make every tool choice lost 19.0 points"}
       distractors:
@@ -438,9 +365,7 @@ examples:
     outputs:
       covered: true
       sources: [wikiskill-2026]
-      answer: "WikiSkill raised Qwen-3.6-27B's average by 23.9 points over the no-skill baseline, the largest gain in the Qwen family (12.3 for 4B, 17.5 for 9B)."
-      nuggets:
-        - {fact: "WikiSkill improved Qwen-3.6-27B's average performance by 23.9 points over no skills.", evidence: [0]}
+      answer: "WikiSkill raised Qwen-3.6-27B's average performance by 23.9 points."
       evidence:
         - {source: wikiskill-2026, page: 8, quote: "from +12.3 points for Qwen-3.5-4B to +17.5 points for Qwen-3.5-9B and +23.9 points for Qwen-3.6-27B"}
       distractors:

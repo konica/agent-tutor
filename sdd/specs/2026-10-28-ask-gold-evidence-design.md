@@ -4,6 +4,7 @@
 - Status: draft for product owner review (research ticket #358; the approach in §3 was agreed in chat on 2026-10-28; the seven question categories in §5.2 come from the evaluation expert's review the same day)
 - Tickets: #358 (this research and design), #359 (implementation, blocked by #358); parent #220
 - PRD: §10.1 Evaluators, §10.2 Aligning LLM judges, §10.3 items 1 and 6
+- 2026-10-29, product owner: nuggets deferred; answer_correctness judges the reference answer (#362). Gold rows carry no `nuggets`, and the checker fails a row that does; the nugget sections below are kept as the deferred design.
 
 ## 1. Why
 
