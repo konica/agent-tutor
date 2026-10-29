@@ -865,7 +865,7 @@ def test_alert_topic_emails_the_budget_recipients(t: Template) -> None:
     assert all(s["TopicArn"] == {"Ref": topic_id} for s in subscriptions)
 
 
-def test_the_host_stops_at_18_and_00_and_starts_at_07_in_the_app_time_zone(t: Template) -> None:
+def test_the_host_stops_at_18_and_00_and_no_schedule_starts_it_in_the_app_time_zone(t: Template) -> None:
     (instance_id,) = t.find_resources("AWS::EC2::Instance")
     t.has_resource_properties("AWS::Scheduler::ScheduleGroup", {"Name": "smart-tutor-on-premise-prod-off-hours"})
     schedules = {
@@ -874,7 +874,6 @@ def test_the_host_stops_at_18_and_00_and_starts_at_07_in_the_app_time_zone(t: Te
     assert {name: s["ScheduleExpression"] for name, s in schedules.items()} == {
         "stop": "cron(0 18 * * ? *)",
         "stop-late": "cron(0 0 * * ? *)",
-        "start": "cron(0 7 * * ? *)",
     }
     for schedule in schedules.values():
         assert schedule["ScheduleExpressionTimezone"] == "Asia/Ho_Chi_Minh"
@@ -1038,7 +1037,7 @@ def test_postgres_shuts_down_cleanly_when_the_instance_stops(compose: dict[str, 
 
 
 def test_every_long_running_service_comes_back_after_a_boot(compose: dict[str, Any]) -> None:
-    # A scheduled 07:00 start or a person's start at any hour brings everything back without a deploy.
+    # A person's start at any hour brings everything back without a deploy.
     jobs = {name for name, s in compose["services"].items() if "jobs" in s.get("profiles", [])} | {"migrate"}
     for name, service in compose["services"].items():
         if name not in jobs:

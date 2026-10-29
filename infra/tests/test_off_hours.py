@@ -1,4 +1,4 @@
-"""Off-hours: the host stops at 18:00 and 00:00 and starts at 07:00 (spec 2026-10-14 §4, ADR 0022)."""
+"""Off-hours: the host stops at 18:00 and 00:00, and no schedule starts it (spec 2026-10-14 §4, ADR 0022)."""
 
 import json
 from typing import Any
@@ -53,11 +53,10 @@ def _scheduler_role(t: Template) -> tuple[str, dict[str, Any]]:
     return role_id, role
 
 
-def test_the_host_stops_at_18_and_00_and_starts_at_07(t: Template) -> None:
+def test_the_host_stops_at_18_and_00_and_no_schedule_starts_it(t: Template) -> None:
     assert {name: (s["ScheduleExpression"], s["Target"]["Arn"]) for name, s in _schedules(t).items()} == {
         "stop": ("cron(0 18 * * ? *)", "arn:aws:scheduler:::aws-sdk:ec2:stopInstances"),
         "stop-late": ("cron(0 0 * * ? *)", "arn:aws:scheduler:::aws-sdk:ec2:stopInstances"),
-        "start": ("cron(0 7 * * ? *)", "arn:aws:scheduler:::aws-sdk:ec2:startInstances"),
     }
 
 
@@ -94,7 +93,7 @@ def test_the_role_only_starts_and_stops_this_instance(t: Template) -> None:
         if p["Properties"]["Roles"] == [{"Ref": role_id}]
     )
     (granted,) = policy["PolicyDocument"]["Statement"]
-    assert sorted(granted["Action"]) == ["ec2:StartInstances", "ec2:StopInstances"]
+    assert granted["Action"] == "ec2:StopInstances"
     resource = json.dumps(granted["Resource"])
     assert ":instance/" in resource and json.dumps({"Ref": _instance_id(t)}) in resource
     for schedule in _schedules(t).values():
