@@ -23,6 +23,7 @@ from evals.dataset import (
 )
 from evals.langfuse_client import Item, LangfuseError
 from evals.learners import LEARNERS, load_learners
+from evals.publish import SMOKE_SIZE
 from fakes.langfuse import FakeLangfuse
 
 Q1 = Example({"question": "What is ReAct?", "learner": "learner@example.com", "documents": None}, {"covered": True})
@@ -39,7 +40,9 @@ def test_the_ask_dataset_asks_eval_learners_about_their_own_seed_documents() -> 
     ask = load_dataset("ask")
     seeds = load_manifest()
     library = {learner.username: set(learner.documents) for learner in load_learners(LEARNERS, seeds)}
-    assert ask.name == "smart-tutor-ask" and 8 <= len(ask.examples) <= 30 and ask.pins == {}
+    assert ask.name == "smart-tutor-ask" and len(ask.examples) >= 8 and ask.pins == {}
+    assert len([e for e in ask.examples if "smoke" in e.splits]) <= SMOKE_SIZE  # hand-written rows fit the smoke split
+    assert all(e.splits == ("full",) for e in ask.examples if "category" in e.metadata)  # gold rows stay out of smoke
     for example in ask.examples:
         held = library[example.inputs["learner"]]
         assert set(example.inputs["documents"] or []) <= held  # a limit names the learner's own documents
@@ -284,3 +287,26 @@ def test_a_dataset_naming_an_unknown_split_or_pinning_one_it_opts_out_of_is_refu
     )
     with pytest.raises(DatasetError, match="opts out"):
         load_dataset("d", tmp_path)
+
+
+def test_load_keeps_row_metadata_and_splits(tmp_path: Path) -> None:
+    (tmp_path / "m.yaml").write_text(
+        "name: m\nexamples:\n"
+        "  - {inputs: {q: a}, metadata: {category: single_hop}, splits: [full]}\n"
+        "  - {inputs: {q: b}}\n",
+        encoding="utf-8",
+    )
+    first, second = load_dataset("m", tmp_path).examples
+    assert first.metadata == {"category": "single_hop"} and first.splits == ("full",)
+    assert second.metadata == {} and second.splits == ("smoke", "full")
+
+
+def test_row_splits_must_be_in_dataset_splits(tmp_path: Path) -> None:
+    (tmp_path / "n.yaml").write_text(
+        "name: n\nsplits: [full]\nexamples: [{inputs: {q: a}, splits: [smoke]}]\n", encoding="utf-8"
+    )
+    with pytest.raises(DatasetError, match="smoke"):
+        load_dataset("n", tmp_path)
+    (tmp_path / "o.yaml").write_text("name: o\nexamples: [{inputs: {q: a}, splits: [nightly]}]\n", encoding="utf-8")
+    with pytest.raises(DatasetError, match="nightly"):
+        load_dataset("o", tmp_path)

@@ -114,6 +114,32 @@ documents:
     cites: []
     adversarial: false
     injection_eval: true
+  - id: wikiskill-2026
+    source: {type: arxiv, ref: "2608.27454v1"}
+    license: "CC-BY-4.0"
+    sha256: "65afc6e12f6f707483fe1b79a97ab67c03abf4b4992f82fde03eb7b8d9ad4a69"
+    subjects: ["LLM agents"]
+    metadata:
+      title: "WikiSkill: Compiling Agent Experience into Persistent Knowledge for Skill Evolution"
+      authors: ["Liyan Tang", "Cyrus Rashtchian", "Chun-Sung Ferng", "Andrew Tomkins", "Da-Cheng Juan", "Tu Vu"]
+      year: 2026
+    work_key: "title:wikiskill compiling agent experience into persistent knowledge for skill evolution:2026"
+    cites: ["react-2022"]
+    adversarial: false
+  # CC-BY-NC-SA-4.0 (non-commercial, share-alike): the eval dataset quotes only short attributed excerpts (gold ask
+  # rows, #359).
+  - id: jevharness-2026
+    source: {type: arxiv, ref: "2610.21412v1"}
+    license: "CC-BY-NC-SA-4.0"
+    sha256: "16af19adf3eed2a5fcce32cd4402cd71215f11f58d696d683809700d449feb06"
+    subjects: ["LLM agents"]
+    metadata:
+      title: "JevAgentHarness: Benchmarking, Deploying and Training Decision Models That Share Control with LLMs"
+      authors: ["Kunlun Zhu", "Tao Feng", "Xu Han", "Heng Wang", "Ling Yang", "Xiangru Tang", "Jiaxuan You", "Heng Ji"]
+      year: 2026
+    work_key: "title:jevagentharness benchmarking deploying and training decision models that share control with llms:2026"
+    cites: ["react-2022", "reflexion-2023"]
+    adversarial: false
   - id: adv-qlora-visible-text
     source: {type: adversarial, base: qlora-2023, plant: visible_text}
     license: "CC-BY-4.0"

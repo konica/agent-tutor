@@ -82,8 +82,8 @@ class ItemScore:
 
 
 Task = Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]  # an item's input -> its output
-# an item's input, output, and expected output -> its scores; one that raises leaves the item without them
-ItemEvaluator = Callable[[dict[str, Any], dict[str, Any], dict[str, Any]], Awaitable[list[ItemScore]]]
+# an item's input, output, expected output, and row metadata -> its scores; one that raises leaves the item without them
+ItemEvaluator = Callable[[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]], Awaitable[list[ItemScore]]]
 
 
 class LangfuseClient(Protocol):
@@ -389,9 +389,9 @@ class SdkLangfuse:
 
         def evaluation(evaluator: ItemEvaluator) -> Callable[..., Awaitable[list[Evaluation]]]:
             async def evaluate(
-                *, input: Any, output: Any, expected_output: Any = None, **kwargs: Any
+                *, input: Any, output: Any, expected_output: Any = None, metadata: Any = None, **kwargs: Any
             ) -> list[Evaluation]:
-                scores = await evaluator(dict(input or {}), output, dict(expected_output or {}))
+                scores = await evaluator(dict(input or {}), output, dict(expected_output or {}), dict(metadata or {}))
                 return [Evaluation(name=s.name, value=s.value, comment=s.comment, data_type="NUMERIC") for s in scores]
 
             # Langfuse names the evaluator's observation after the function

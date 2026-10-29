@@ -5,9 +5,9 @@ from collections import Counter
 
 import pytest
 
-from evals.dataset import Dataset, Example, examples_at, in_eval_share
+from evals.dataset import Dataset, Example, examples_at, in_eval_share, publish_split
 from evals.langfuse_client import KEYS, URLS, LangfuseError, Trace
-from evals.publish import TYPES, main, oldest_first, split_examples
+from evals.publish import TYPES, _summary, main, oldest_first, split_examples
 from evals.review import ACCEPTED, Candidate, submit
 from fakes.langfuse import FakeLangfuse
 
@@ -203,3 +203,26 @@ def test_a_dataset_that_opts_out_of_smoke_is_split_and_published_to_full_only(
     out = capsys.readouterr().out
     assert "full-v1" in out and "smoke" not in out
     assert set(stores.langfuse.datasets) == {"smart-tutor-full-only/full-v1"}
+
+
+def test_publish_split_new_version_when_only_metadata_changes() -> None:
+    client = FakeLangfuse()
+    labelled = Example(HAND[0].inputs, HAND[0].outputs, {"category": "single_hop"})
+    relabelled = Example(HAND[0].inputs, HAND[0].outputs, {"category": "multi_hop"})
+    assert publish_split(client, ASK, "full", [labelled]) == "full-v1"
+    assert publish_split(client, ASK, "full", [labelled]) is None
+    assert publish_split(client, ASK, "full", [relabelled]) == "full-v2"
+
+
+def test_split_examples_honours_row_splits() -> None:
+    full_only = Example({"question": "gold"}, {"covered": True}, {"category": "single_hop"}, ("full",))
+    dataset = Dataset("ask", "smart-tutor-ask", "", (*HAND, full_only))
+    items = [generated(f"factual-{i}", "factual") for i in range(3)]
+    splits = split_examples(dataset, items, smoke_size=2)
+    assert full_only in splits["full"] and full_only not in splits["smoke"]
+    assert splits["smoke"] == [HAND[0], items[0]]  # the full-only row doesn't count toward the smoke size
+
+
+def test_summary_counts_gold_rows_as_hand_written() -> None:
+    gold = Example({"question": "g"}, {}, {"category": "single_hop", "type": "factual"})
+    assert _summary([gold, generated("q", "factual")]) == "1 factual, 1 hand-written"
